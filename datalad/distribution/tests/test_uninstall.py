@@ -31,7 +31,6 @@ from datalad.tests.utils import (
     ok_,
     eq_,
     with_testrepos,
-    SkipTest,
     assert_raises,
     assert_status,
     assert_in,

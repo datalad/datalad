@@ -22,17 +22,23 @@ import iso8601
 
 from hashlib import md5
 from collections import OrderedDict
-from os.path import abspath, isabs
-from os.path import join as opj
-from os.path import dirname
+from os.path import (
+    dirname,
+    join as opj,
+)
 from ntpath import splitdrive as win_splitdrive
 
-from urllib.parse import urlsplit
 from urllib.request import Request
-from urllib.parse import unquote as urlunquote
-from urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
-from urllib.parse import parse_qsl
-from urllib.parse import urlencode
+from urllib.parse import (
+    parse_qsl,
+    ParseResult,
+    unquote as urlunquote,
+    urlencode,
+    urljoin,
+    urlparse,
+    urlsplit,
+    urlunparse,
+)
 from urllib.error import URLError
 
 from datalad.dochelpers import exc_str
@@ -492,7 +498,7 @@ class RI(object):
         # by default RIs point to remote locations
         raise ValueError("%s points to remote location" % self)
 
-    # Apparently doesn't quite play nicely with multiple inheritence for MixIn'
+    # Apparently doesn't quite play nicely with multiple inheritance for MixIn'
     # of regexp based URLs
     #@abstractmethod
     #@classmethod
@@ -799,7 +805,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
     # For now or forever we don't deal with any fragments or other special stuff
     _REGEX = re.compile(r'//(?P<remote>[^\s/]*)/(?P<path>.*)$')
 
-    # do they need to be normalized??? loosing track ...
+    # do they need to be normalized??? losing track ...
 
     def as_str(self):
         return "//{remote}/{path}".format(**self._fields)

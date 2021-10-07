@@ -48,6 +48,7 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
+from datalad.support.exceptions import CapturedException
 from datalad.utils import (
     get_encoding_info,
     get_envvars_info,
@@ -95,10 +96,14 @@ _test_states = {
     'env': {},
 }
 
+# handle to an HTTP server instance that is used as part of the tests
+test_http_server = None
 
 def setup_package():
     import os
     from datalad.utils import on_osx
+    from datalad.tests import _TEMP_PATHS_GENERATED
+
     if on_osx:
         # enforce honoring TMPDIR (see gh-5307)
         import tempfile
@@ -114,7 +119,7 @@ def setup_package():
         os.environ[v] = val
 
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
-    consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    consts.DATASETS_TOPURL = 'https://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
     from datalad.tests.utils import (
@@ -132,7 +137,6 @@ def setup_package():
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile
-        from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
             pass
@@ -145,12 +149,19 @@ def setup_package():
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[datalad "log"]
+	exc = 1
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
+
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    compute_cfg_defaults()
+    # datalad.locations.sockets has likely changed. Discard any cached values.
+    ssh_manager._socket_dir = None
 
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
@@ -201,6 +212,26 @@ def setup_package():
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
 
+    # in order to avoid having to fiddle with rather uncommon
+    # file:// URLs in the tests, have a standard HTTP server
+    # that serves an 'httpserve' directory in the test HOME
+    # the URL will be available from datalad.test_http_server.url
+    from datalad.tests.utils import HTTPPath
+    import tempfile
+
+    global test_http_server
+    # Start the server only if not running already
+    # Relevant: we have test_misc.py:test_test which runs datalad.test but
+    # not doing teardown, so the original server might never get stopped
+    if test_http_server is None:
+        serve_path = tempfile.mkdtemp(
+            dir=cfg.get("datalad.tests.temp.dir"),
+            prefix='httpserve',
+        )
+        test_http_server = HTTPPath(serve_path)
+        test_http_server.start()
+        _TEMP_PATHS_GENERATED.append(serve_path)
+
     if cfg.obtain('datalad.tests.setup.testrepos'):
         lgr.debug("Pre-populating testrepos")
         from datalad.tests.utils import with_testrepos
@@ -218,8 +249,8 @@ def teardown_package():
         print("Obscure filename: str=%s repr=%r"
                 % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
     except UnicodeEncodeError as exc:
-        from .dochelpers import exc_str
-        print("Obscure filename failed to print: %s" % exc_str(exc))
+        ce = CapturedException(exc)
+        print("Obscure filename failed to print: %s" % ce)
     def print_dict(d):
         return " ".join("%s=%r" % v for v in d.items())
     print("Encodings: %s" % print_dict(get_encoding_info()))
@@ -232,6 +263,13 @@ def teardown_package():
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
+
+    global test_http_server
+    if test_http_server:
+        test_http_server.stop()
+        test_http_server = None
+    else:
+        lgr.debug("For some reason global http_server was not set/running, thus not stopping")
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):
@@ -255,6 +293,10 @@ def teardown_package():
     # either way.
     cfg.reload(force=True)
 
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    compute_cfg_defaults()
+    ssh_manager._socket_dir = None
+
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
     from datalad.support.cookies import cookies_db
@@ -263,7 +305,9 @@ def teardown_package():
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
 
-from .version import __version__
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 
 if str(__version__) == '0' or __version__.startswith('0+'):
     lgr.warning(

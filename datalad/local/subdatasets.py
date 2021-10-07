@@ -16,6 +16,7 @@ import re
 import os
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import default_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
@@ -25,7 +26,10 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.param import Parameter
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
@@ -35,7 +39,6 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     getpwd,
@@ -74,7 +77,7 @@ def _parse_git_submodules(ds, paths, cache):
                 # it.
                 paths = None
             else:
-                # we had path contraints, but none matched this dataset
+                # we had path constraints, but none matched this dataset
                 return
     # can we use the reported as such, or do we need to recode wrt to the
     # query context dataset?
@@ -108,8 +111,7 @@ class Subdatasets(Interface):
         SHA1 of the subdataset commit recorded in the parent dataset
 
     "state"
-        Condition of the subdataset: 'clean', 'modified', 'absent', 'conflict'
-        as reported by `git submodule`
+        Condition of the subdataset: 'absent', 'present'
 
     "gitmodule_url"
         URL of the subdataset recorded in the parent
@@ -208,6 +210,8 @@ class Subdatasets(Interface):
             option can be given multiple times. CMD]""",
             constraints=EnsureStr() | EnsureNone()))
 
+    result_renderer = "tailored"
+
     @staticmethod
     @datasetmethod(name='subdatasets')
     @eval_results
@@ -283,6 +287,9 @@ class Subdatasets(Interface):
                     #logger=lgr
                 )
 
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        default_result_renderer(res)
 
 
 # internal helper that needs all switches, simply to avoid going through
@@ -312,6 +319,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         # not matching `contains`
         if not sm_path.exists() or not GitRepo.is_valid_repo(sm_path):
             sm['state'] = 'absent'
+        else:
+            assert 'state' not in sm
+            sm['state'] = 'present'
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \
@@ -365,12 +375,12 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     # variable name validity is checked before and Git
                     # replaces the file completely, resolving any permission
                     # issues, if the file could be read (already done above)
+                    ce = CapturedException(e)
                     yield get_status_dict(
                         'subdataset',
                         status='error',
-                        message=(
-                            "Failed to set property '%s': %s",
-                            prop, exc_str(e)),
+                        message=("Failed to set property '%s': %s", prop, ce),
+                        exception=ce,
                         type='dataset',
                         logger=lgr,
                         **sm)

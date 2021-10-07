@@ -50,6 +50,7 @@ from datalad.tests.utils import (
     assert_in,
     assert_in_results,
     assert_not_in,
+    assert_not_in_results,
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -57,7 +58,6 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
-    known_failure_appveyor,
     known_failure_githubci_win,
     known_failure_windows,
     neq_,
@@ -65,7 +65,6 @@ from datalad.tests.utils import (
     ok_,
     ok_exists,
     ok_file_has_content,
-    slow,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
@@ -183,13 +182,6 @@ def test_py2_unicode_command(path):
 @with_tempfile(mkdir=True)
 def test_sidecar(path):
     ds = Dataset(path).create()
-    if ds.repo.is_managed_branch():
-        if "8" < ds.repo.git_annex_version < "8.20200309":
-            # git-annex's 1978a2420 (2020-03-09) fixed a bug where
-            # annexed dotfiles could switch when annex.dotfiles=true
-            # was not set in .git/config or git-annex:config.log.
-            ds.repo.config.set("annex.dotfiles", "true",
-                               where="local", reload=True)
     # Simple sidecar message checks.
     ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
@@ -211,7 +203,7 @@ def test_sidecar(path):
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
 
-    # make sure sidecar file is committed when explicitly specifiying outputs
+    # make sure sidecar file is committed when explicitly specifying outputs
     ds.run("cd .> dummy4",
            outputs=["dummy4"],
            sidecar=True,
@@ -231,7 +223,6 @@ def test_run_save_deletion(path):
     assert_repo_status(ds.path)
 
 
-@known_failure_appveyor  # causes appveyor (only) to crash, reason unknown
 @with_tempfile(mkdir=True)
 def test_run_from_subds(path):
     subds = Dataset(path).create().create("sub")
@@ -275,6 +266,73 @@ def test_run_from_subds_gh3551(path):
         # This check fails on Windows:
         # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
         ok_(subds.repo.file_has_content("f"))
+
+
+@with_tempfile(mkdir=True)
+def test_run_assume_ready(path):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    adjusted = repo.is_managed_branch()
+
+    # --assume-ready=inputs
+
+    (repo.pathobj / "f1").write_text("f1")
+    ds.save()
+
+    def cat_cmd(fname):
+        return [sys.executable, "-c",
+                "import sys; print(open(sys.argv[-1]).read())",
+                fname]
+
+    assert_in_results(
+        ds.run(cat_cmd("f1"), inputs=["f1"]),
+        action="get", type="file")
+    # Same thing, but without the get() call.
+    assert_not_in_results(
+        ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs"),
+        action="get", type="file")
+
+    ds.drop("f1", check=False)
+    if not adjusted:
+        # If the input is not actually ready, the command will fail.
+        with assert_raises(CommandError):
+            ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs")
+
+    # --assume-ready=outputs
+
+    def unlink_and_write_cmd(fname):
+        # This command doesn't care whether the output file is unlocked because
+        # it removes it ahead of time anyway.
+        return [sys.executable, "-c",
+                "import sys; import os; import os.path as op; "
+                "f = sys.argv[-1]; op.lexists(f) and os.unlink(f); "
+                "open(f, mode='w').write(str(sys.argv))",
+                fname]
+
+    (repo.pathobj / "f2").write_text("f2")
+    ds.save()
+
+    res = ds.run(unlink_and_write_cmd("f2"), outputs=["f2"])
+    if not adjusted:
+        assert_in_results(res, action="unlock", type="file")
+    # Same thing, but without the unlock() call.
+    res = ds.run(unlink_and_write_cmd("f2"), outputs=["f2"],
+                 assume_ready="outputs")
+    assert_not_in_results(res, action="unlock", type="file")
+
+    # --assume-ready=both
+
+    res = ds.run(unlink_and_write_cmd("f2"),
+                 outputs=["f2"], inputs=["f2"])
+    assert_in_results(res, action="get", type="file")
+    if not adjusted:
+        assert_in_results(res, action="unlock", type="file")
+
+    res = ds.run(unlink_and_write_cmd("f2"),
+                 outputs=["f2"], inputs=["f2"],
+                 assume_ready="both")
+    assert_not_in_results(res, action="get", type="file")
+    assert_not_in_results(res, action="unlock", type="file")
 
 
 # unexpected content of state "modified", likely a more fundamental issue with the
@@ -405,28 +463,17 @@ def test_run_cmdline_disambiguation(path):
                 '"--message"' if on_windows else "--message",
                 path, expected_exit=None)
 
-        # And a twist on above: Our parser mishandles --version (gh-3067),
+        # Our parser used to mishandle --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
-        version_stream = "out"
-        with swallow_outputs() as cmo:
-            with assert_raises(SystemExit) as cm:
-                main(["datalad", "run", "echo", "--version"])
-            eq_(cm.exception.code, 0)
-            out = getattr(cmo, version_stream)
-        with swallow_outputs() as cmo:
-            with assert_raises(SystemExit):
-                main(["datalad", "--version"])
-            version_out = getattr(cmo, version_stream)
-        ok_(version_out)
-        eq_(version_out, out)
-        # We can work around that (i.e., make "--version" get passed as
-        # command) with "--".
-        with patch("datalad.core.local.run._execute_command") as exec_cmd:
-            with assert_raises(SystemExit):
-                main(["datalad", "run", "--", "echo", "--version"])
-            exec_cmd.assert_called_once_with(
-                '"echo" "--version"' if on_windows else "echo --version",
-                path, expected_exit=None)
+        # but that is no longer the case and echo --version should work with or
+        # without explicit "--" separator
+        for sep in [[], ['--']]:
+            with patch("datalad.core.local.run._execute_command") as exec_cmd:
+                with assert_raises(SystemExit):
+                    main(["datalad", "run"] + sep + ["echo", "--version"])
+                exec_cmd.assert_called_once_with(
+                    '"echo" "--version"' if on_windows else "echo --version",
+                    path, expected_exit=None)
 
 
 @with_tempfile(mkdir=True)
@@ -482,6 +529,36 @@ def test_run_path_semantics(path):
         run("cd .> five", dataset=ds0)
     ok_exists(op.join(ds0.path, "five"))
     assert_repo_status(ds0.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_remove_keeps_leading_directory(path):
+    ds = Dataset(op.join(path, "ds")).create()
+    repo = ds.repo
+
+    (ds.pathobj / "d").mkdir()
+    output = (ds.pathobj / "d" / "foo")
+    output.write_text("foo")
+    ds.save()
+
+    output_rel = str(output.relative_to(ds.pathobj))
+    repo.drop(output_rel, options=["--force"])
+
+    assert_in_results(
+        ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
+               result_renderer=None),
+        action="run.remove", status="ok")
+
+    assert_repo_status(ds.path)
+
+    # Remove still gets saved() if command doesn't generate the output (just as
+    # it would if git-rm were used instead of unlink).
+    repo.drop(output_rel, options=["--force"])
+    assert_in_results(
+        ds.run("cd .> something-else", outputs=[output_rel],
+               result_renderer=None),
+        action="run.remove", status="ok")
+    assert_repo_status(ds.path)
 
 
 @with_tempfile(mkdir=True)
@@ -541,3 +618,67 @@ def test_run_empty_repo(path):
     assert_status("ok", ds.run(cmd, inputs=["."]))
     assert_repo_status(ds.path)
     ok_exists(str(ds.pathobj / "foo"))
+
+
+@with_tree(tree={"foo": "f", "bar": "b"})
+def test_dry_run(path):
+    ds = Dataset(path).create(force=True)
+
+    # The dataset is reported as dirty, and the custom result render relays
+    # that to the default renderer.
+    with swallow_outputs() as cmo:
+        with assert_raises(IncompleteResultsError):
+            ds.run("blah ", dry_run="basic")
+        assert_in("run(impossible)", cmo.out)
+        assert_not_in("blah", cmo.out)
+
+    ds.save()
+
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="basic")
+        assert_in("Dry run", cmo.out)
+        assert_in("location", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("expanded inputs", cmo.out)
+        assert_not_in("expanded outputs", cmo.out)
+
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs} {outputs}", dry_run="basic",
+               inputs=["fo*"], outputs=["b*r"])
+        assert_in(
+            'blah "foo" "bar"' if on_windows else "blah foo bar",
+            cmo.out)
+        assert_in("expanded inputs", cmo.out)
+        assert_in("['foo']", cmo.out)
+        assert_in("expanded outputs", cmo.out)
+        assert_in("['bar']", cmo.out)
+
+    # Just the command.
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="command")
+        assert_not_in("Dry run", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("inputs", cmo.out)
+
+    # The output file wasn't unlocked.
+    assert_repo_status(ds.path)
+
+    # Subdaset handling
+
+    subds = ds.create("sub")
+    (subds.pathobj / "baz").write_text("z")
+    ds.save(recursive=True)
+
+    # If a subdataset is installed, it works as usual.
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
+        assert_in(
+            'blah "sub\\baz"' if on_windows else 'blah sub/baz',
+            cmo.out)
+
+    # However, a dry run will not do the install/reglob procedure.
+    ds.uninstall("sub", check=False)
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
+        assert_in("sub/b*", cmo.out)
+        assert_not_in("baz", cmo.out)

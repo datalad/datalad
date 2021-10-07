@@ -21,7 +21,7 @@ def _command_summary():
     from datalad.interface.base import get_interface_groups
     from datalad.interface.base import load_interface
 
-    groups = get_interface_groups(include_plugins=True)
+    groups = get_interface_groups()
     grp_short_descriptions = defaultdict(list)
     for group, _, specs in sorted(groups, key=lambda x: x[1]):
         for spec in specs:
@@ -38,28 +38,14 @@ def _command_summary():
 __doc__ += "\n\n{}".format(_command_summary())
 
 
-def _load_plugins():
-    from datalad.plugin import _get_plugins
-    from datalad.plugin import _load_plugin
-    import re
-
-    camel = re.compile(r'([a-z])([A-Z])')
-
-    for pname, props in _get_plugins():
-        pi = _load_plugin(props['file'], fail=False)
-        if pi is None:
-            continue
-        globals()[camel.sub('\\1_\\2', pi.__name__).lower()] = pi.__call__
-
-
 def _generate_extension_api():
     """Auto detect all available extensions and generate an API from them
     """
     from importlib import import_module
     from pkg_resources import iter_entry_points
     from .interface.base import get_api_name
+    from datalad.support.exceptions import CapturedException
 
-    from datalad.dochelpers import exc_str
     import logging
     lgr = logging.getLogger('datalad.api')
 
@@ -73,7 +59,8 @@ def _generate_extension_api():
                 'Loaded entrypoint %s from datalad.extensions',
                 entry_point.name)
         except Exception as e:
-            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, exc_str(e))
+            ce = CapturedException(e)
+            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, ce)
             continue
 
         for intfspec in interfaces:
@@ -90,9 +77,7 @@ def _generate_extension_api():
 
 
 _generate_extension_api()
-_load_plugins()
 
 # Be nice and clean up the namespace properly
-del _load_plugins
 del _generate_extension_api
 del _command_summary

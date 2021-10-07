@@ -18,13 +18,11 @@ from .exceptions import MissingExternalDependency
 from .path import (
     basename,
     join as opj,
-    exists,
 )
 
 from datalad.utils import (
     ensure_bytes,
     chpwd,
-    rmdir,
 )
 
 import logging

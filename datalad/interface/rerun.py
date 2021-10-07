@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 
+from copy import copy
 import logging
 from functools import partial
 from itertools import dropwhile
@@ -24,6 +25,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
+from datalad.core.local.run import assume_ready_opt
 from datalad.core.local.run import run_command
 from datalad.core.local.run import format_command
 from datalad.core.local.run import _format_cmd_shorty
@@ -33,12 +35,18 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.param import Parameter
 from datalad.support.json_py import load_stream
+from datalad.support.exceptions import CapturedException
 
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 lgr = logging.getLogger('datalad.interface.rerun')
+
+rerun_assume_ready_opt = copy(assume_ready_opt)
+rerun_assume_ready_opt._doc += """
+Note that this option also affects any additional outputs that are
+automatically inferred based on inspecting changed files in the run commit."""
 
 
 @build_doc
@@ -144,6 +152,7 @@ class Rerun(Interface):
             doc="""Don't actually re-execute anything, just display what would
             be done. [CMD: Note: If you give this option, you most likely want
             to set --output-format to 'json' or 'json_pp'. CMD]"""),
+        assume_ready=rerun_assume_ready_opt,
         explicit=Parameter(
             args=("--explicit",),
             action="store_true",
@@ -189,6 +198,7 @@ class Rerun(Interface):
             onto=None,
             script=None,
             report=False,
+            assume_ready=None,
             explicit=False):
 
         ds = require_dataset(
@@ -252,7 +262,8 @@ class Rerun(Interface):
         elif report:
             handler = _report
         else:
-            handler = partial(_rerun, explicit=explicit)
+            handler = partial(_rerun, assume_ready=assume_ready,
+                              explicit=explicit)
 
         for res in handler(ds, results):
             yield res
@@ -303,7 +314,9 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     try:
         results = _revrange_as_results(dset, revrange)
     except ValueError as exc:
-        yield get_status_dict("run", status="error", message=exc_str(exc))
+        ce = CapturedException(exc)
+        yield get_status_dict("run", status="error", message=str(ce),
+                              exception=ce)
         return
 
     ds_repo = dset.repo
@@ -372,7 +385,7 @@ def _mark_nonrun_result(result, which):
     return result
 
 
-def _rerun(dset, results, explicit=False):
+def _rerun(dset, results, assume_ready=None, explicit=False):
     ds_repo = dset.repo
     # Keep a map from an original hexsha to a new hexsha created by the rerun
     # (i.e. a reran, cherry-picked, or merged commit).
@@ -495,6 +508,7 @@ def _rerun(dset, results, explicit=False):
                                  inputs=run_info.get("inputs", []),
                                  extra_inputs=run_info.get("extra_inputs", []),
                                  outputs=outputs,
+                                 assume_ready=assume_ready,
                                  explicit=explicit,
                                  rerun_outputs=auto_outputs,
                                  message=message,

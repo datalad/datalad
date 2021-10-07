@@ -2,6 +2,7 @@ from annexremote import SpecialRemote
 from annexremote import RemoteError
 from annexremote import ProtocolError
 
+import os
 from pathlib import (
     Path,
     PurePosixPath
@@ -91,6 +92,9 @@ class IOBase(object):
     def mkdir(self, path):
         raise NotImplementedError
 
+    def symlink(self, target, link_name):
+        raise NotImplementedError
+
     def put(self, src, dst, progress_cb):
         raise NotImplementedError
 
@@ -168,6 +172,9 @@ class LocalIO(IOBase):
             exist_ok=True,
         )
 
+    def symlink(self, target, link_name):
+        os.symlink(target, link_name)
+
     def put(self, src, dst, progress_cb):
         shutil.copy(
             str(src),
@@ -181,6 +188,12 @@ class LocalIO(IOBase):
         )
 
     def get_from_archive(self, archive, src, dst, progress_cb):
+        # Upfront check to avoid cryptic error output
+        # https://github.com/datalad/datalad/issues/4336
+        if not self.exists(archive):
+            raise RIARemoteError("archive {arc} does not exist."
+                                 "".format(arc=archive))
+
         # this requires python 3.5
         with open(dst, 'wb') as target_file:
             subprocess.run([
@@ -198,7 +211,12 @@ class LocalIO(IOBase):
         src.rename(dst)
 
     def remove(self, path):
-        path.unlink()
+        try:
+            path.unlink()
+        except PermissionError as e:
+            raise RIARemoteError(str(e) + os.linesep +
+                                 "Note: Write permissions for a key's parent"
+                                 "directory are also required to drop content.")
 
     def remove_dir(self, path):
         path.rmdir()
@@ -270,7 +288,8 @@ class SSHRemoteIO(IOBase):
     It doesn't even think about a windows server.
     """
 
-    # output markers to detect possible command failure as well as end of output from a particular command:
+    # output markers to detect possible command failure as well as end of output
+    # from a particular command:
     REMOTE_CMD_FAIL = "ora-remote: end - fail"
     REMOTE_CMD_OK = "ora-remote: end - ok"
 
@@ -295,7 +314,10 @@ class SSHRemoteIO(IOBase):
         self.ssh.open()
         # open a remote shell
         cmd = ['ssh'] + self.ssh._ssh_args + [self.ssh.sshri.as_str()]
-        self.shell = subprocess.Popen(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        self.shell = subprocess.Popen(cmd,
+                                      stderr=subprocess.DEVNULL,
+                                      stdout=subprocess.PIPE,
+                                      stdin=subprocess.PIPE)
         # swallow login message(s):
         self.shell.stdin.write(b"echo RIA-REMOTE-LOGIN-END\n")
         self.shell.stdin.flush()
@@ -315,7 +337,8 @@ class SSHRemoteIO(IOBase):
         exitcode = self.shell.wait(timeout=0.5)
         # be more brutal if it doesn't work
         if exitcode is None:  # timed out
-            # TODO: Theoretically terminate() can raise if not successful. How to deal with that?
+            # TODO: Theoretically terminate() can raise if not successful.
+            #       How to deal with that?
             self.shell.terminate()
         self.sshmanager.close()
 
@@ -329,7 +352,8 @@ class SSHRemoteIO(IOBase):
     def _get_download_size_from_key(self, key):
         """Get the size of an annex object file from it's key
 
-        Note, that this is not necessarily the size of the annexed file, but possibly only a chunk of it.
+        Note, that this is not necessarily the size of the annexed file, but
+        possibly only a chunk of it.
 
         Parameter
         ---------
@@ -341,10 +365,13 @@ class SSHRemoteIO(IOBase):
         int
           size in bytes
         """
-        # TODO: datalad's AnnexRepo.get_size_from_key() is not correct/not fitting. Incorporate the wisdom there, too.
-        #       We prob. don't want to actually move this method there, since AnnexRepo would be quite an expensive
-        #       import. Startup time for special remote matters.
-        # TODO: this method can be more compact. we don't need particularly elaborated error distinction
+        # TODO: datalad's AnnexRepo.get_size_from_key() is not correct/not
+        #       fitting. Incorporate the wisdom there, too.
+        #       We prob. don't want to actually move this method there, since
+        #       AnnexRepo would be quite an expensive import. Startup time for
+        #       special remote matters.
+        # TODO: this method can be more compact. we don't need particularly
+        #       elaborated error distinction
 
         # see: https://git-annex.branchable.com/internals/key_format/
         key_parts = key.split('--')
@@ -352,7 +379,7 @@ class SSHRemoteIO(IOBase):
 
         s = S = C = None
 
-        for field in key_fields[1:]:  # note: first one has to be backend -> ignore
+        for field in key_fields[1:]:  # note: first has to be backend -> ignore
             if field.startswith('s'):
                 # size of the annexed file content:
                 s = int(field[1:]) if field[1:].isdigit() else None
@@ -377,11 +404,13 @@ class SSHRemoteIO(IOBase):
 
     def _run(self, cmd, no_output=True, check=False):
 
-        # TODO: we might want to redirect stderr to stdout here (or have additional end marker in stderr)
-        #       otherwise we can't empty stderr to be ready for next command. We also can't read stderr for better error
-        #       messages (RemoteError) without making sure there's something to read in any case (it's blocking!)
-        #       However, if we are sure stderr can only ever happen if we would raise RemoteError anyway, it might be
-        #       okay
+        # TODO: we might want to redirect stderr to stdout here (or have
+        #       additional end marker in stderr) otherwise we can't empty stderr
+        #       to be ready for next command. We also can't read stderr for
+        #       better error messages (RemoteError) without making sure there's
+        #       something to read in any case (it's blocking!).
+        #       However, if we are sure stderr can only ever happen if we would
+        #       raise RemoteError anyway, it might be okay.
         call = self._append_end_markers(cmd)
         self.shell.stdin.write(call.encode())
         self.shell.stdin.flush()
@@ -395,9 +424,10 @@ class SSHRemoteIO(IOBase):
                 break
             elif line == self.REMOTE_CMD_FAIL + '\n':
                 if check:
-                    raise RemoteCommandFailedError("{cmd} failed: {msg}".format(cmd=cmd,
-                                                                                msg="".join(lines[:-1]))
-                                                   )
+                    raise RemoteCommandFailedError(
+                        "{cmd} failed: {msg}".format(cmd=cmd,
+                                                     msg="".join(lines[:-1]))
+                    )
                 else:
                     break
         if no_output and len(lines) > 1:
@@ -406,6 +436,9 @@ class SSHRemoteIO(IOBase):
 
     def mkdir(self, path):
         self._run('mkdir -p {}'.format(sh_quote(str(path))))
+
+    def symlink(self, target, link_name):
+        self._run('ln -s {} {}'.format(sh_quote(str(target)), sh_quote(str(link_name))))
 
     def put(self, src, dst, progress_cb):
         self.ssh.put(str(src), str(dst))
@@ -416,15 +449,19 @@ class SSHRemoteIO(IOBase):
         # actual get (that is 'cat').
         # Therefore check beforehand.
         if not self.exists(src):
-            raise RIARemoteError("annex object {src} does not exist.".format(src=src))
+            raise RIARemoteError("annex object {src} does not exist."
+                                 "".format(src=src))
 
         # TODO: see get_from_archive()
 
-        # TODO: Currently we will hang forever if the file isn't readable and it's supposed size is bigger than whatever
-        #       cat spits out on stdout. This is because we don't notice that cat has exited non-zero.
-        #       We could have end marker on stderr instead, but then we need to empty stderr beforehand to not act upon
-        #       output from earlier calls. This is a problem with blocking reading, since we need to make sure there's
-        #       actually something to read in any case.
+        # TODO: Currently we will hang forever if the file isn't readable and
+        #       it's supposed size is bigger than whatever cat spits out on
+        #       stdout. This is because we don't notice that cat has exited
+        #       non-zero. We could have end marker on stderr instead, but then
+        #       we need to empty stderr beforehand to not act upon output from
+        #       earlier calls. This is a problem with blocking reading, since we
+        #       need to make sure there's actually something to read in any
+        #       case.
         cmd = 'cat {}'.format(sh_quote(str(src)))
         self.shell.stdin.write(cmd.encode())
         self.shell.stdin.write(b"\n")
@@ -444,10 +481,13 @@ class SSHRemoteIO(IOBase):
 
         with open(dst, 'wb') as target_file:
             bytes_received = 0
-            while bytes_received < size:  # TODO: some additional abortion criteria? check stderr in addition?
+            while bytes_received < size:
+                # TODO: some additional abortion criteria? check stderr in
+                #       addition?
                 c = self.shell.stdout.read1(self.buffer_size)
-                # no idea yet, whether or not there's sth to gain by a sophisticated determination of how many bytes to
-                # read at once (like size - bytes_received)
+                # no idea yet, whether or not there's sth to gain by a
+                # sophisticated determination of how many bytes to read at once
+                # (like size - bytes_received)
                 if c:
                     bytes_received += len(c)
                     target_file.write(c)
@@ -457,7 +497,13 @@ class SSHRemoteIO(IOBase):
         self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
 
     def remove(self, path):
-        self._run('rm {}'.format(sh_quote(str(path))))
+        try:
+            self._run('rm {}'.format(sh_quote(str(path))))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(
+                str(e) + os.linesep +
+                "Note: Write permissions for a key's parent"
+                "directory are also required to drop content.")
 
     def remove_dir(self, path):
         self._run('rmdir {}'.format(sh_quote(str(path))))
@@ -490,13 +536,15 @@ class SSHRemoteIO(IOBase):
 
     def get_from_archive(self, archive, src, dst, progress_cb):
 
-        # Note, that as we are in blocking mode, we can't easily fail on the actual get (that is 'cat').
-        # Therefore check beforehand.
+        # Note, that as we are in blocking mode, we can't easily fail on the
+        # actual get (that is 'cat'). Therefore check beforehand.
         if not self.exists(archive):
-            raise RIARemoteError("archive {arc} does not exist.".format(arc=archive))
+            raise RIARemoteError("archive {arc} does not exist."
+                                 "".format(arc=archive))
 
-        # TODO: We probably need to check exitcode on stderr (via marker). If archive or content is missing we will
-        #       otherwise hang forever waiting for stdout to fill `size`
+        # TODO: We probably need to check exitcode on stderr (via marker). If
+        #       archive or content is missing we will otherwise hang forever
+        #       waiting for stdout to fill `size`.
 
         cmd = '7z x -so {} {}\n'.format(
             sh_quote(str(archive)),
@@ -506,8 +554,9 @@ class SSHRemoteIO(IOBase):
 
         # TODO: - size needs double-check and some robustness
         #       - can we assume src to be a posixpath?
-        #       - RF: Apart from the executed command this should be pretty much identical to self.get(), so move that
-        #         code into a common function
+        #       - RF: Apart from the executed command this should be pretty much
+        #         identical to self.get(), so move that code into a common
+        #         function
 
         from os.path import basename
         size = self._get_download_size_from_key(basename(str(src)))
@@ -551,7 +600,6 @@ class SSHRemoteIO(IOBase):
         except RemoteCommandFailedError:
             raise RIARemoteError("Could not write to {}".format(str(file_path)))
 
-
     def get_7z(self):
         # TODO: To not rely on availability in PATH we might want to use `which`
         #       (`where` on windows) and get the actual path to 7z to re-use in
@@ -588,13 +636,12 @@ class HTTPRemoteIO(object):
     # NOTE: For now read-only. Not sure yet whether an IO class is the right
     # approach.
 
-    def __init__(self, ria_url, dsid, buffer_size=DEFAULT_BUFFER_SIZE):
-        assert ria_url.startswith("ria+http")
-        self.base_url = ria_url[4:]
-        if self.base_url[-1] == '/':
-            self.base_url = self.base_url[:-1]
+    def __init__(self, url, buffer_size=DEFAULT_BUFFER_SIZE):
+        if not url.startswith("http"):
+            raise RIARemoteError("Expected HTTP URL, but got {}".format(url))
 
-        self.base_url += "/" + dsid[:3] + '/' + dsid[3:]
+        self.store_url = url.rstrip('/')
+
         # make sure default is used when None was passed, too.
         self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
@@ -602,17 +649,32 @@ class HTTPRemoteIO(object):
         # Note, that we need the path with hash dirs, since we don't have access
         # to annexremote.dirhash from within IO classes
 
-        url = self.base_url + "/annex/objects/" + str(key_path)
-        response = requests.head(url)
-        return response.status_code == 200
+        return self.exists(key_path)
 
     def get(self, key_path, filename, progress_cb):
         # Note, that we need the path with hash dirs, since we don't have access
         # to annexremote.dirhash from within IO classes
 
-        url = self.base_url + "/annex/objects/" + str(key_path)
+        url = self.store_url + str(key_path)
         from datalad.support.network import download_url
         download_url(url, filename, overwrite=True)
+
+    def exists(self, path):
+        # use same signature as in SSH and Local IO, although validity is
+        # limited in case of HTTP.
+        url = self.store_url + path.as_posix()
+        try:
+            response = requests.head(url, allow_redirects=True)
+        except Exception as e:
+            raise RIARemoteError(str(e))
+
+        return response.status_code == 200
+
+    def read_file(self, file_path):
+
+        from datalad.support.network import download_url
+        content = download_url(self.store_url + file_path.as_posix())
+        return content
 
 
 def handle_errors(func):
@@ -627,7 +689,7 @@ def handle_errors(func):
     # TODO: configurable on remote end (flag within layout_version!)
 
     @wraps(func)
-    def  _wrap_handle_errors(self, *args, **kwargs):
+    def _wrap_handle_errors(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
@@ -640,8 +702,8 @@ def handle_errors(func):
                                   exc_str=exc_str)
                 # ensure base path is platform path
                 log_target = Path(self.store_base_path) / 'error_logs' / \
-                             "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                        uuid=self.uuid)
+                    "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                               uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
 
             try:
@@ -663,7 +725,7 @@ def handle_errors(func):
             else:
                 raise e
 
-    return  _wrap_handle_errors
+    return _wrap_handle_errors
 
 
 class NoLayoutVersion(Exception):
@@ -686,14 +748,18 @@ class RIARemote(SpecialRemote):
         if hasattr(self, 'configs'):
             # introduced in annexremote 1.4.2 to support LISTCONFIGS
             self.configs['url'] = "RIA store to use"
+            self.configs['push-url'] = "URL for pushing to the RIA store. " \
+                                       "Optional."
             self.configs['archive-id'] = "Dataset ID. Should be set " \
                                          "automatically by datalad"
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
+        self.storage_host_push = None
         # must be absolute, and POSIX (will be instance of PurePosixPath)
         # subclass must set this
         self.store_base_path = None
+        self.store_base_path_push = None
         # by default we can read and write
         self.read_only = False
         self.force_write = None
@@ -707,7 +773,9 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir = None
         self.remote_archive_dir = None
         self.remote_obj_dir = None
-        self._io = None  # lazy
+        # lazy IO:
+        self._io = None
+        self._push_io = None
 
         # cache obj_locations:
         self._last_archive_path = None
@@ -804,22 +872,15 @@ class RIARemote(SpecialRemote):
                 raise NoLayoutVersion
 
     def _load_cfg(self, gitdir, name):
-        # for now still accept the configs, if no ria-URL is known:
-        if not self.ria_store_url:
-            self.storage_host = _get_gitcfg(
-                gitdir, 'annex.ora-remote.{}.ssh-host'.format(name))
-
-            store_base_path = _get_gitcfg(
-                gitdir, 'annex.ora-remote.{}.base-path'.format(name))
-            self.store_base_path = store_base_path.strip() \
-                if store_base_path else None
-        # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
-        # version mismatch.
+        # Whether or not to force writing to the remote. Currently used to
+        # overrule write protection due to layout version mismatch.
         self.force_write = _get_gitcfg(
             gitdir, 'annex.ora-remote.{}.force-write'.format(name))
 
         # whether to ignore config flags set at the remote end
-        self.ignore_remote_config = _get_gitcfg(gitdir, 'annex.ora-remote.{}.ignore-remote-config'.format(name))
+        self.ignore_remote_config = \
+            _get_gitcfg(gitdir,
+                        'annex.ora-remote.{}.ignore-remote-config'.format(name))
 
         # buffer size for reading files over HTTP and SSH
         self.buffer_size = _get_gitcfg(gitdir,
@@ -837,31 +898,52 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError(
                 "Cannot determine special remote name, got: {}".format(
                     repr(name)))
-        # get store url:
+        # get store url(s):
         self.ria_store_url = self.annex.getconfig('url')
+        self.ria_store_pushurl = self.annex.getconfig('push-url')
+        # Support URL rewrite without talking to a DataLad ConfigManager,
+        # because of additional import cost otherwise. Remember that this is a
+        # special remote not a "real" datalad process.
+        url_cfgs = dict()
+        url_cfgs_raw = _get_gitcfg(gitdir, "^url.*", regex=True)
+        if url_cfgs_raw:
+            for line in url_cfgs_raw.splitlines():
+                k, v = line.split()
+                url_cfgs[k] = v
+
         if self.ria_store_url:
-            # support URL rewrite without talking to a DataLad ConfigManager
-            # Q is why? Why not use the config manager?
-            url_cfgs = dict()
-            url_cfgs_raw = _get_gitcfg(gitdir, "^url.*", regex=True)
-            if url_cfgs_raw:
-                for line in url_cfgs_raw.splitlines():
-                    k, v = line.split()
-                    url_cfgs[k] = v
             self.storage_host, self.store_base_path, self.ria_store_url = \
                 verify_ria_url(self.ria_store_url, url_cfgs)
 
-        # TODO duplicates call to `git-config` after RIA url rewrite
-        self._load_cfg(gitdir, name)
+        else:
+            # for now still accept the configs, if no ria-URL is known, but
+            # issue deprecation warning:
+            host = _get_gitcfg(gitdir,
+                               'annex.ora-remote.{}.ssh-host'.format(name)) or \
+                   self.annex.getconfig('ssh-host')
+            # Note: Special value '0' is replaced by None only after checking
+            # the repository's annex config. This is to uniformly handle '0' and
+            # None later on, but let a user's config '0' overrule what's
+            # stored by git-annex.
+            self.storage_host = None if host == '0' else host
 
-        # for now still accept the configs, if no ria-URL is known:
-        if not self.ria_store_url:
-            if not self.store_base_path:
-                self.store_base_path = self.annex.getconfig('base-path')
-            if not self.store_base_path:
-                raise RIARemoteError(
-                    "No remote base path configured. "
-                    "Specify `base-path` setting.")
+            path = _get_gitcfg(gitdir,
+                               'annex.ora-remote.{}.base-path'.format(name)) or \
+                   self.annex.getconfig('base-path')
+            self.store_base_path = path.strip() if path else path
+
+            if path or host:
+                self.message("WARNING: base-path + ssh-host configs are "
+                             "deprecated and won't be considered in the future."
+                             " Use 'git annex enableremote {} "
+                             "url=<RIA-URL-TO-STORE>' to store a ria+<scheme>:"
+                             "//... URL in the special remote's config."
+                             "".format(name))
+
+        if not self.store_base_path:
+            raise RIARemoteError(
+                "No base path configured for RIA store. Specify a proper "
+                "ria+<scheme>://... URL.")
 
         # the base path is ultimately derived from a URL, always treat as POSIX
         self.store_base_path = PurePosixPath(self.store_base_path)
@@ -870,15 +952,17 @@ class RIARemote(SpecialRemote):
                 'Non-absolute object tree base path configuration: %s'
                 '' % str(self.store_base_path))
 
-        # for now still accept the configs, if no ria-URL is known:
-        if not self.ria_store_url:
-            # Note: Special value '0' is replaced by None only after checking the repository's annex config.
-            # This is to uniformly handle '0' and None later on, but let a user's config '0' overrule what's
-            # stored by git-annex.
-            if not self.storage_host:
-                self.storage_host = self.annex.getconfig('ssh-host')
-            elif self.storage_host == '0':
-                self.storage_host = None
+        if self.ria_store_pushurl:
+            if self.ria_store_pushurl.startswith("ria+http"):
+                raise RIARemoteError("Invalid push-url: {}. Pushing over HTTP "
+                                     "not implemented."
+                                     "".format(self.ria_store_pushurl))
+            self.storage_host_push, self.store_base_path_push, \
+                self.ria_store_pushurl = verify_ria_url(self.ria_store_pushurl,
+                                                        url_cfgs)
+
+        # TODO duplicates call to `git-config` after RIA url rewrite
+        self._load_cfg(gitdir, name)
 
         # go look for an ID
         self.archive_id = self.annex.getconfig('archive-id')
@@ -886,8 +970,9 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError(
                 "No archive ID configured. This should not happen.")
 
-        # TODO: This should prob. not be done! Would only have an effect if force-write was committed
-        #       annex-special-remote-config and this is likely a bad idea.
+        # TODO: This should prob. not be done! Would only have an effect if
+        #       force-write was committed annex-special-remote-config and this
+        #       is likely a bad idea.
         if not self.force_write:
             self.force_write = self.annex.getconfig('force-write')
 
@@ -901,11 +986,14 @@ class RIARemote(SpecialRemote):
             return None
 
         remote_version = file_content[0]
-        remote_config_flags = file_content[1] if len(file_content) == 2 else None
+        remote_config_flags = file_content[1] \
+            if len(file_content) == 2 else None
         if not self.ignore_remote_config and remote_config_flags:
-            # Note: 'or', since config flags can come from toplevel (dataset-tree-root) as well as
-            #       from dataset-level. toplevel is supposed flag the entire tree.
-            self.remote_log_enabled = self.remote_log_enabled or 'l' in remote_config_flags
+            # Note: 'or', since config flags can come from toplevel
+            #       (dataset-tree-root) as well as from dataset-level.
+            #       toplevel is supposed flag the entire tree.
+            self.remote_log_enabled = self.remote_log_enabled or \
+                                      'l' in remote_config_flags
 
         return remote_version
 
@@ -973,16 +1061,13 @@ class RIARemote(SpecialRemote):
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
 
-        if not isinstance(self.io, HTTPRemoteIO):
-            self.get_store()
-
-        # else:
-        # TODO: consistency with SSH and FILE behavior? In those cases we make
-        #       sure the store exists from within initremote
+        self.get_store()
 
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
         self.annex.setconfig('url', self.ria_store_url)
+        if self.ria_store_pushurl:
+            self.annex.setconfig('push-url', self.ria_store_pushurl)
 
     def _local_io(self):
         """Are we doing local operations?"""
@@ -992,6 +1077,9 @@ class RIARemote(SpecialRemote):
         # coincidence. Instead, let's do remote whenever there
         # is a remote host configured
         #return self.store_base_path.is_dir()
+
+        # TODO: Isn't that wrong with HTTP anyway?
+        #       + just isinstance(LocalIO)?
         return not self.storage_host
 
     def debug(self, msg):
@@ -1021,7 +1109,7 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError("Remote is treated as read-only. "
                                  "Set 'ora-remote.<name>.force-write=true' to "
                                  "overrule this.")
-        if isinstance(self.io, HTTPRemoteIO):
+        if isinstance(self.push_io, HTTPRemoteIO):
             raise RIARemoteError("Write access via HTTP not implemented")
 
     @property
@@ -1030,9 +1118,18 @@ class RIARemote(SpecialRemote):
             if self._local_io():
                 self._io = LocalIO()
             elif self.ria_store_url.startswith("ria+http"):
-                self._io = HTTPRemoteIO(self.ria_store_url,
-                                        self.archive_id,
-                                        self.buffer_size)
+                # TODO: That construction of "http(s)://host/" should probably
+                #       be moved, so that we get that when we determine
+                #       self.storage_host. In other words: Get the parsed URL
+                #       instead and let HTTPRemoteIO + SSHRemoteIO deal with it
+                #       uniformly. Also: Don't forget about a possible port.
+
+                url_parts = self.ria_store_url[4:].split('/')
+                # we expect parts: ("http(s):", "", host:port, path)
+                self._io = HTTPRemoteIO(
+                    url_parts[0] + "//" + url_parts[2],
+                    self.buffer_size
+                )
             elif self.storage_host:
                 self._io = SSHRemoteIO(self.storage_host, self.buffer_size)
                 from atexit import register
@@ -1043,6 +1140,61 @@ class RIARemote(SpecialRemote):
                     "host configuration found.")
         return self._io
 
+    @property
+    def push_io(self):
+        # Instance of an IOBase subclass for execution based on configured
+        # 'push-url' if such exists. Otherwise identical to `self.io`.
+        # Note, that once we discover we need to use the push-url (that is on
+        # TRANSFER_STORE and REMOVE), we should switch all operations to that IO
+        # instance instead of using different connections for read and write
+        # operations. Ultimately this is due to the design of annex' special
+        # remote protocol - we don't know which annex command is running and
+        # therefore we don't know whether to use fetch or push URL during
+        # PREPARE.
+
+        if not self._push_io:
+            if self.ria_store_pushurl:
+                self.debug("switching ORA to push-url")
+                # Not-implemented-push-HTTP is ruled out already when reading
+                # push-url, so either local or SSH:
+                if not self.storage_host_push:
+                    # local operation
+                    self._push_io = LocalIO()
+                else:
+                    self._push_io = SSHRemoteIO(self.storage_host_push,
+                                                self.buffer_size)
+
+                # We have a new instance. Kill the existing one and replace.
+                from atexit import register, unregister
+                if hasattr(self.io, 'close'):
+                    unregister(self.io.close)
+                    self.io.close()
+
+                self._io = self._push_io
+                if hasattr(self.io, 'close'):
+                    register(self.io.close)
+
+                self.storage_host = self.storage_host_push
+                self.store_base_path = self.store_base_path_push
+
+                # delete/update cached locations:
+                self._last_archive_path = None
+                self._last_keypath = (None, None)
+
+                store_base_path = Path(self.store_base_path) \
+                    if self._local_io else self.store_base_path
+
+                self.remote_git_dir, \
+                self.remote_archive_dir, \
+                self.remote_obj_dir = \
+                    self.get_layout_locations(store_base_path, self.archive_id)
+
+            else:
+                # no push-url: use existing IO
+                self._push_io = self._io
+
+        return self._push_io
+
     @handle_errors
     def prepare(self):
 
@@ -1050,8 +1202,7 @@ class RIARemote(SpecialRemote):
         self.uuid = self.annex.getuuid()
         self._verify_config(gitdir)
 
-        if not isinstance(self.io, HTTPRemoteIO):
-            self.get_store()
+        self.get_store()
 
         # report active special remote configuration/status
         self.info = {
@@ -1059,52 +1210,58 @@ class RIARemote(SpecialRemote):
             'storage_host': 'local'
             if self._local_io() else self.storage_host,
         }
+
+        # TODO: following prob. needs hasattr instead:
         if not isinstance(self.io, HTTPRemoteIO):
-            self.info['7z'] = ("not " if not self.io.get_7z() else "") + "available"
+            self.info['7z'] = ("not " if not self.io.get_7z() else "") + \
+                              "available"
 
     @handle_errors
     def transfer_store(self, key, filename):
         self._ensure_writeable()
 
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
 
-        if self.io.exists(key_path):
+        if self.push_io.exists(key_path):
             # if the key is here, we trust that the content is in sync
             # with the key
             return
 
-        self.io.mkdir(key_path.parent)
+        self.push_io.mkdir(key_path.parent)
 
-        # we need to copy to a temp location to let
-        # checkpresent fail while the transfer is still in progress
-        # and furthermore not interfere with administrative tasks in annex/objects
-        # In addition include uuid, to not interfere with parallel uploads from different remotes
-        transfer_dir = self.remote_git_dir / "ora-remote-{}".format(self.uuid) / "transfer"
-        self.io.mkdir(transfer_dir)
+        # We need to copy to a temp location to let checkpresent fail while the
+        # transfer is still in progress and furthermore not interfere with
+        # administrative tasks in annex/objects.
+        # In addition include uuid, to not interfere with parallel uploads from
+        # different remotes.
+        transfer_dir = \
+            self.remote_git_dir / "ora-remote-{}".format(self.uuid) / "transfer"
+        self.push_io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 
-        if tmp_path.exists():
-            # Just in case - some parallel job could already be writing to it
-            # at least tell the conclusion, not just some obscure permission error
-            raise RIARemoteError('{}: upload already in progress'.format(filename))
+        if self.push_io.exists(tmp_path):
+            # Just in case - some parallel job could already be writing to it at
+            # least tell the conclusion, not just some obscure permission error
+            raise RIARemoteError('{}: upload already in progress'
+                                 ''.format(filename))
         try:
-            self.io.put(filename, tmp_path, self.annex.progress)
+            self.push_io.put(filename, tmp_path, self.annex.progress)
             # copy done, atomic rename to actual target
-            self.io.rename(tmp_path, key_path)
+            self.push_io.rename(tmp_path, key_path)
         except Exception as e:
-            # whatever went wrong, we don't want to leave the transfer location blocked
-            self.io.remove(tmp_path)
+            # whatever went wrong, we don't want to leave the transfer location
+            # blocked
+            self.push_io.remove(tmp_path)
             raise e
 
     @handle_errors
     def transfer_retrieve(self, key, filename):
-
-        if isinstance(self.io, HTTPRemoteIO):
-            self.io.get(PurePosixPath(self.annex.dirhash(key)) / key / key,
-                        filename,
-                        self.annex.progress)
-            return
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
@@ -1119,14 +1276,13 @@ class RIARemote(SpecialRemote):
                 self.io.get_from_archive(archive_path, key_path, filename,
                                          self.annex.progress)
             except Exception as e2:
-                raise RIARemoteError('Failed to key: {}'.format([str(e1), str(e2)]))
+                raise RIARemoteError('Failed to key: {}'
+                                     ''.format([str(e1), str(e2)]))
 
     @handle_errors
     def checkpresent(self, key):
-
-        if isinstance(self.io, HTTPRemoteIO):
-            return self.io.checkpresent(
-                PurePosixPath(self.annex.dirhash(key)) / key / key)
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
@@ -1142,18 +1298,21 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def remove(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
+
         self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
-        if self.io.exists(key_path):
-            self.io.remove(key_path)
+        if self.push_io.exists(key_path):
+            self.push_io.remove(key_path)
         key_dir = key_path
         # remove at most two levels of empty directories
         for level in range(2):
             key_dir = key_dir.parent
             try:
-                self.io.remove_dir(key_dir)
+                self.push_io.remove_dir(key_dir)
             except Exception:
                 break
 
@@ -1168,6 +1327,8 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def whereis(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         if isinstance(self.io, HTTPRemoteIO):
             # display the URL for a request
@@ -1212,6 +1373,37 @@ class RIARemote(SpecialRemote):
 
         return self.remote_obj_dir, self._last_archive_path, \
             self._last_keypath[1]
+
+    # TODO: implement method 'error'
+
+
+def _sanitize_key(key):
+    """Returns a sanitized key that is a suitable directory/file name
+
+    Documentation from the analog implementation in git-annex
+    Annex/Locations.hs
+
+    Converts a key into a filename fragment without any directory.
+
+    Escape "/" in the key name, to keep a flat tree of files and avoid
+    issues with keys containing "/../" or ending with "/" etc.
+
+    "/" is escaped to "%" because it's short and rarely used, and resembles
+        a slash
+    "%" is escaped to "&s", and "&" to "&a"; this ensures that the mapping
+        is one to one.
+    ":" is escaped to "&c", because it seemed like a good idea at the time.
+
+    Changing what this function escapes and how is not a good idea, as it
+    can cause existing objects to get lost.
+    """
+    esc = {
+        '/': '%',
+        '%': '&s',
+        '&': '&a',
+        ':': '&c',
+    }
+    return ''.join(esc.get(c, c) for c in key)
 
 
 def main():

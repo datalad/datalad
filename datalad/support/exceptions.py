@@ -9,100 +9,147 @@
 """ datalad exceptions
 """
 
+import logging
 import re
+import traceback
 from os import linesep
+from pathlib import Path
 from pprint import pformat
 
+from datalad.runner.exception import CommandError
 
-def _format_json_error_messages(recs):
-    # there could be many, condense
-    msgs = {}
-    for r in recs:
-        if r.get('success'):
-            continue
-        msg = '{}{}'.format(
-            ' {}\n'.format(r['note']) if r.get('note') else '',
-            '\n'.join(r.get('error-messages', [])),
-        )
-        if 'file' in r or 'key' in r:
-            occur = msgs.get(msg, 0)
-            occur += 1
-            msgs[msg] = occur
-
-    if not msgs:
-        return ''
-
-    return '\n>{}'.format(
-        '\n> '.join(
-            '{}{}'.format(
-                m,
-                ' [{} times]'.format(n) if n > 1 else '',
-            )
-            for m, n in msgs.items()
-        )
-    )
+lgr = logging.getLogger('datalad.support.exceptions')
 
 
-class CommandError(RuntimeError):
-    """Thrown if a command call fails.
+class CapturedException(object):
+    """This class represents information about an occurred exception (including
+    its traceback), while not holding any references to the actual exception
+    object or its traceback, frame references, etc.
 
-    Note: Subclasses should override `to_str` rather than `__str__` because
-    `to_str` is called directly in datalad.cmdline.main.
+    Just keep the textual information for logging or whatever other kind of
+    reporting.
     """
 
-    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
-                 **kwargs):
-        RuntimeError.__init__(self, msg)
-        self.cmd = cmd
-        self.msg = msg
-        self.code = code
-        self.stdout = stdout
-        self.stderr = stderr
-        self.cwd = cwd
-        self.kwargs = kwargs
+    def __init__(self, exc, limit=None, capture_locals=False,
+                 level=8, logger=None):
+        """Capture an exception and its traceback for logging.
 
-    def to_str(self, include_output=True):
-        from datalad.utils import (
-            ensure_unicode,
-            join_cmdline,
+        Clears the exception's traceback frame references afterwards.
+
+        Parameters
+        ----------
+        exc: Exception
+        limit: int
+          Note, that this is limiting the capturing of the exception's
+          traceback depth. Formatting for output comes with it's own limit.
+        capture_locals: bool
+          Whether or not to capture the local context of traceback frames.
+        """
+        # Note, that with lookup_lines=False the lookup is deferred,
+        # not disabled. Unclear to me ATM, whether that means to keep frame
+        # references around, but prob. not. TODO: Test that.
+        self.tb = traceback.TracebackException.from_exception(
+            exc,
+            limit=limit,
+            lookup_lines=True,
+            capture_locals=capture_locals
         )
-        to_str = "{}: ".format(self.__class__.__name__)
-        cmd = self.cmd
-        if cmd:
-            to_str += "'{}'".format(
-                # go for a compact, normal looking, properly quoted
-                # command rendering if the command is in list form
-                join_cmdline(cmd) if isinstance(cmd, list) else cmd
+        traceback.clear_frames(exc.__traceback__)
+
+        # log the captured exception
+        logger = logger or lgr
+        logger.log(level, "%r", self)
+
+    def format_oneline_tb(self, limit=None, include_str=True):
+        """Format an exception traceback as a one-line summary
+
+        Returns a string of the form [filename:contextname:linenumber, ...].
+        If include_str is True (default), this is prepended with the string
+        representation of the exception.
+        """
+
+        # Note: No import at module level, since ConfigManager imports
+        # dochelpers -> circular import when creating datalad.cfg instance at
+        # startup.
+        from datalad import cfg
+
+        if include_str:
+            # try exc message else exception type
+            leading = self.message or self.name
+            out = "{} ".format(leading)
+        else:
+            out = ""
+
+        entries = []
+        entries.extend(self.tb.stack)
+        if self.tb.__cause__:
+            entries.extend(self.tb.__cause__.stack)
+        elif self.tb.__context__ and not self.tb.__suppress_context__:
+            entries.extend(self.tb.__context__.stack)
+
+        if limit is None:
+            limit = int(cfg.obtain('datalad.exc.str.tblimit',
+                                   default=len(entries)))
+        if entries:
+            tb_str = "[%s]" % (','.join(
+                "{}:{}:{}".format(
+                    Path(frame_summary.filename).name,
+                    frame_summary.name,
+                    frame_summary.lineno)
+                for frame_summary in entries[-limit:])
             )
-        if self.code:
-            to_str += " failed with exitcode {}".format(self.code)
-        if self.cwd:
-            # only if not under standard PWD
-            to_str += " under {}".format(self.cwd)
-        if self.msg:
-            # typically a command error has no specific idea
-            to_str += " [{}]".format(ensure_unicode(self.msg))
+            out += "{}".format(tb_str)
 
-        if self.kwargs:
-            to_str += " [info keys: {}]".format(
-                ', '.join(self.kwargs.keys()))
+        return out
 
-            if 'stdout_json' in self.kwargs:
-                to_str += _format_json_error_messages(
-                    self.kwargs['stdout_json'])
+    def format_standard(self):
+        """Returns python's standard formatted traceback output
 
-        if not include_output:
-            return to_str
+        Returns
+        -------
+        str
+        """
+        # TODO: Intended for introducing a decent debug mode later when this
+        #       can be used fromm within log formatter / result renderer.
+        #       For now: a one-liner is free
+        return ''.join(self.tb.format())
 
-        if self.stdout:
-            to_str += " [out: '{}']".format(ensure_unicode(self.stdout).strip())
-        if self.stderr:
-            to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
+    def format_short(self):
+        """Returns a short representation of the original exception
 
-        return to_str
+        Form: ExceptionName(exception message)
+
+        Returns
+        -------
+        str
+        """
+        return self.name + '(' + self.message + ')'
+
+    @property
+    def message(self):
+        """Returns only the message of the original exception
+
+        Returns
+        -------
+        str
+        """
+        return str(self.tb)
+
+    @property
+    def name(self):
+        """Returns the class name of the original exception
+
+        Returns
+        -------
+        str
+        """
+        return self.tb.exc_type.__qualname__
 
     def __str__(self):
-        return self.to_str()
+        return self.format_short()
+
+    def __repr__(self):
+        return self.format_oneline_tb(limit=None, include_str=True)
 
 
 class MissingExternalDependency(RuntimeError):
@@ -115,10 +162,10 @@ class MissingExternalDependency(RuntimeError):
         self.msg = msg
 
     def __str__(self):
-        to_str = str(self.name)
+        to_str = 'No working {} installation'.format(self.name)
         if self.ver:
             to_str += " of version >= %s" % self.ver
-        to_str += " is missing."
+        to_str += "."
         if self.msg:
             to_str += " %s" % self.msg
         return to_str

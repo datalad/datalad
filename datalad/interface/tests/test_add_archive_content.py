@@ -40,10 +40,9 @@ from datalad.tests.utils import (
     known_failure_windows,
     ok_,
     ok_archives_caches,
+    ok_file_has_content,
     ok_file_under_git,
     serve_path_via_http,
-    slow,
-    swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -414,6 +413,30 @@ def test_add_archive_use_archive_dir(repo_path):
         ok_archives_caches(repo.path, 0)
 
 
+@with_tree(
+    tree={
+        'archives': {
+            '1.gz': '1',
+            '2.xz': '2',
+            '3.lzma': '3',
+            # TODO: add any other stream compression we might be supporting via 7zip or patool?
+        },
+    }
+)
+def test_add_archive_single_file(repo_path):
+    repo = AnnexRepo(repo_path, create=True)
+    with chpwd(repo_path):
+        archives = glob('archives/*')
+        repo.add(archives)
+        repo.commit('Added archives')
+
+        for archive in archives:
+            archive_name = os.path.splitext(archive)[0]
+            archive_content = os.path.basename(archive_name)
+            add_archive_content(archive)
+            ok_file_has_content(archive_name, archive_content)
+
+
 class TestAddArchiveOptions():
 
     # few tests bundled with a common setup/teardown to minimize boiler plate
@@ -466,9 +489,8 @@ class TestAddArchiveOptions():
 
         # previous state of things:
         prev_files = list(find_files('.*', self.annex.path))
-        with assert_raises(Exception), \
-                swallow_logs():
-            self.annex.whereis(key1, key=True, output='full')
+        assert_equal(self.annex.whereis(key1, key=True, output='full'), {})
+
         commits_prior = list(self.annex.get_branch_commits_('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
         commits_after = list(self.annex.get_branch_commits_('git-annex'))

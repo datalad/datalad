@@ -1,3 +1,374 @@
+# 0.15.2 (Wed Oct 06 2021)
+
+#### 🐛 Bug Fix
+
+- BF: Don't suppress datalad subdatasets output [#6035](https://github.com/datalad/datalad/pull/6035) ([@DisasterMo](https://github.com/DisasterMo) [@mih](https://github.com/mih))
+- Honor datalad.runtime.use-patool if set regardless of OS (was Windows only) [#6033](https://github.com/datalad/datalad/pull/6033) ([@mih](https://github.com/mih))
+- Discontinue usage of deprecated (public) helper [#6032](https://github.com/datalad/datalad/pull/6032) ([@mih](https://github.com/mih))
+- BF: ProgressHandler - close the other handler if was specified [#6020](https://github.com/datalad/datalad/pull/6020) ([@yarikoptic](https://github.com/yarikoptic))
+- UX: Report GitLab weburl of freshly created projects in the result [#6017](https://github.com/datalad/datalad/pull/6017) ([@adswa](https://github.com/adswa))
+- Ensure there's a blank line between the class `__doc__` and "Parameters" in `build_doc` docstrings [#6004](https://github.com/datalad/datalad/pull/6004) ([@jwodder](https://github.com/jwodder))
+- Large code-reorganization of everything runner-related [#6008](https://github.com/datalad/datalad/pull/6008) ([@mih](https://github.com/mih))
+- Discontinue exc_str() in all modern parts of the code base [#6007](https://github.com/datalad/datalad/pull/6007) ([@mih](https://github.com/mih))
+
+#### 🧪 Tests
+
+- TST: Add test to ensure functionality with subdatasets starting with a hyphen (-) [#6042](https://github.com/datalad/datalad/pull/6042) ([@DisasterMo](https://github.com/DisasterMo))
+- BF(TST): filter away warning from coverage from analysis of stderr of --help [#6028](https://github.com/datalad/datalad/pull/6028) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: disable outdated SSL root certificate breaking chain on older/buggy clients [#6027](https://github.com/datalad/datalad/pull/6027) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: start global test_http_server only if not running already [#6023](https://github.com/datalad/datalad/pull/6023) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Burgardt ([@DisasterMo](https://github.com/DisasterMo))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.15.1 (Fri Sep 24 2021)
+
+#### 🐛 Bug Fix
+
+- BF: downloader - fail to download even on non-crippled FS if symlink exists [#5991](https://github.com/datalad/datalad/pull/5991) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH: import datalad.api to bind extensions methods for discovery of dataset methods [#5999](https://github.com/datalad/datalad/pull/5999) ([@yarikoptic](https://github.com/yarikoptic))
+- Restructure cmdline API presentation [#5988](https://github.com/datalad/datalad/pull/5988) ([@mih](https://github.com/mih))
+- Close file descriptors after process exit [#5983](https://github.com/datalad/datalad/pull/5983) ([@mih](https://github.com/mih))
+
+#### ⚠️ Pushed to `maint`
+
+- Discontinue testing of hirni extension ([@mih](https://github.com/mih))
+
+#### 🏠 Internal
+
+- Add debugging information to release step [#5980](https://github.com/datalad/datalad/pull/5980) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- Coarse description of the credential subsystem's functionality [#5998](https://github.com/datalad/datalad/pull/5998) ([@mih](https://github.com/mih))
+
+#### 🧪 Tests
+
+- BF(TST): use sys.executable, mark test_ria_basics.test_url_keys as requiring network [#5986](https://github.com/datalad/datalad/pull/5986) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.15.0 (Tue Sep 14 2021) --  We miss you Kyle!
+
+#### Enhancements and new features
+
+- Command execution is now performed by a new `Runner` implementation that is
+  no longer based on the `asyncio` framework, which was found to exhibit
+  fragile performance in interaction with other `asyncio`-using code, such as
+  Jupyter notebooks. The new implementation is based on threads. It also supports
+  the specification of "protocols" that were introduced with the switch to the
+  `asyncio` implementation in 0.14.0. ([#5667][]) 
+
+- `clone` now supports arbitrary URL transformations based on regular
+  expressions. One or more transformation steps can be defined via
+  `datalad.clone.url-substitute.<label>` configuration settings. The feature can
+  be (and is now) used to support convenience mappings, such as
+  `https://osf.io/q8xnk/` (displayed in a browser window) to `osf://q8xnk`
+  (clonable via the `datalad-osf` extension. ([#5749][])
+
+- Homogenize SSH use and configurability between DataLad and git-annex, by
+  instructing git-annex to use DataLad's `sshrun` for SSH calls (instead of SSH
+  directly). ([#5389][])
+
+- The ORA special remote has received several new features:
+
+  - It now support a `push-url` setting as an alternative to `url` for write
+    access. An analog parameter was also added to `create-sibling-ria`.
+    ([#5420][], [#5428][])
+
+  - Access of RIA stores now performs homogeneous availability checks,
+    regardless of access protocol. Before, broken HTTP-based access due to
+    misspecified URLs could have gone unnoticed. ([#5459][], [#5672][])
+
+  - Error reporting was introduce to inform about undesirable conditions in
+    remote RIA stores. ([#5683][])
+
+- `create-sibling-ria` now supports `--alias` for the specification of a
+  convenience dataset alias name in a RIA store. ([#5592][])
+
+- Analog to `git commit`, `save` now features an `--amend` mode to support
+  incremental updates of a dataset state. ([#5430][])
+
+- `run` now supports a dry-run mode that can be used to inspect the result of
+  parameter expansion on the effective command to ease the composition of more
+  complicated command lines. ([#5539][])
+
+- `run` now supports a `--assume-ready` switch to avoid the (possibly
+  expensive) preparation of inputs and outputs with large datasets that have
+  already been readied through other means. ([#5431][])
+
+- `update` now features `--how` and `--how-subds` parameters to configure how
+  an update shall be performed. Supported modes are `fetch` (unchanged
+  default), and `merge` (previously also possible via `--merge`), but also new
+  strategies like `reset` or `checkout`. ([#5534][])
+
+- `update` has a new `--follow=parentds-lazy` mode that only performs a fetch
+  operation in subdatasets when the desired commit is not yet present. During
+  recursive updates involving many subdatasets this can substantially speed up
+  performance. ([#5474][])
+
+- DataLad's command line API can now report the version for individual commands
+  via `datalad <cmd> --version`. The output has been homogenized to
+  `<providing package> <version>`. ([#5543][])
+
+- `create-sibling` now logs information on an auto-generated sibling name, in
+  the case that no `--name/-s` was provided. ([#5550][])
+
+- `create-sibling-github` has been updated to emit result records like any
+  standard DataLad command. Previously it was implemented as a "plugin", which
+  did not support all standard API parameters. ([#5551][])
+
+- `copy-file` now also works with content-less files in datasets on crippled
+  filesystems (adjusted mode), when a recent enough git-annex (8.20210428 or
+  later) is available. ([#5630][])
+
+- `addurls` can now be instructed how to behave in the event of file name
+  collision via a new parameter `--on-collision`. ([#5675][])
+
+- `addurls` reporting now informs which particular subdatasets were created.
+  ([#5689][])
+
+- Credentials can now be provided or overwritten via all means supported by
+  `ConfigManager`. Importantly, `datalad.credential.<name>.<field>`
+  configuration settings and analog specification via environment variables are
+  now supported (rather than custom environment variables only). Previous
+  specification methods are still supported too. ([#5680][])
+
+- A new `datalad.credentials.force-ask` configuration flag can now be used to
+  force re-entry of already known credentials. This simplifies credential
+  updates without having to use an approach native to individual credential
+  stores. ([#5777][])
+
+- Suppression of rendering repeated similar results is now configurable via the
+  configuration switches `datalad.ui.suppress-similar-results` (bool), and
+  `datalad.ui.suppress-similar-results-threshold` (int). ([#5681][])
+
+- The performance of `status` and similar functionality when determining local
+  file availability has been improved. ([#5692][])
+
+- `push` now renders a result summary on completion. ([#5696][])
+
+- A dedicated info log message indicates when dataset repositories are
+  subjected to an annex version upgrade. ([#5698][])
+
+- Error reporting improvements:
+
+  - The `NoDatasetFound` exception now provides information for which purpose a
+    dataset is required. ([#5708][])
+
+  - Wording of the `MissingExternalDependeny` error was rephrased to account
+    for cases of non-functional installations. ([#5803][])
+
+  - `push` reports when a `--to` parameter specification was (likely)
+    forgotten. ([#5726][])
+
+  - Detailed information is now given when DataLad fails to obtain a lock for
+    credential entry in a timely fashion. Previously only a generic debug log
+    message was emitted. ([#5884][])
+
+  - Clarified error message when `create-sibling-gitlab` was called without
+    `--project`. ([#5907][])
+
+- `add-readme` now provides a README template with more information on the
+  nature and use of DataLad datasets. A README file is no longer annex'ed by
+  default, but can be using the new `--annex` switch. ([#5723][], [#5725][])
+
+- `clean` now supports a `--dry-run` mode to inform about cleanable content.
+  ([#5738][])
+
+- A new configuration setting `datalad.locations.locks` can be used to control
+  the placement of lock files. ([#5740][])
+
+- `wtf` now also reports branch names and states. ([#5804][])
+
+- `AnnexRepo.whereis()` now supports batch mode. ([#5533][])
+
+### Deprecations and removals
+
+- The minimum supported git-annex version is now 8.20200309. ([#5512][])
+
+- ORA special remote configuration items `ssh-host`, and `base-path` are
+  deprecated. They are completely replaced by `ria+<protocol>://` URL
+  specifications. ([#5425][])
+
+- The deprecated `no_annex` parameter of `create()` was removed from the Python
+  API. ([#5441][])
+
+- The unused `GitRepo.pull()` method has been removed. ([#5558][])
+
+- Residual support for "plugins" (a mechanism used before DataLad supported
+  extensions) was removed. This includes the configuration switches
+  `datalad.locations.{system,user}-plugins`. ([#5554][], [#5564][])
+
+- Several features and comments have been moved to the `datalad-deprecated`
+  package. This package must now be installed to be able to use keep using this
+  functionality.
+
+  - The `publish` command. Use `push` instead. ([#5837][])
+
+  - The `ls` command. ([#5569][])
+
+  - The web UI that is deployable via `datalad create-sibling --ui`. ([#5555][])
+
+  - The "automagic IO" feature. ([#5577][])
+
+- `AnnexRepo.copy_to()` has been deprecated. The `push` command should be used
+  instead. ([#5560][])
+
+- `AnnexRepo.sync()` has been deprecated. `AnnexRepo.call_annex(['sync', ...])`
+  should be used instead. ([#5461][])
+
+- All `GitRepo.*_submodule()` methods have been deprecated and will be removed
+  in a future release. ([#5559][])
+
+- `create-sibling-github`'s `--dryrun` switch was deprecated, use `--dry-run` instead.
+  ([#5551][])
+
+- The `datalad --pbs-runner` option has been deprecated, use `condor_run`
+  (or similar) instead. ([#5956][])
+
+#### 🐛 Fixes
+
+- Prevent invalid declaration of a publication dependencies for 'origin' on any
+  auto-detected ORA special remotes, when cloing from a RIA store. An ORA
+  remote is now checked whether it actually points to the RIA store the clone was
+  made from. ([#5415][])
+
+- The ORA special remote implementation has received several fixes:
+
+  - It can now handle HTTP redirects. ([#5792][])
+
+  - Prevents failure when URL-type annex keys contain the '/' character.
+    ([#5823][])
+
+  - Properly support the specification of usernames, passwords and ports in
+    `ria+<protocol>://` URLs. ([#5902][])
+
+- It is now possible to specifically select the default (or generic) result
+  renderer via `datalad -f default` and with that override a `tailored` result
+  renderer that may be preconfigured for a particular command. ([#5476][])
+
+- Starting with 0.14.0, original URLs given to `clone` were recorded in a
+  subdataset record. This was initially done in a second commit, leading to
+  inflation of commits and slowdown in superdatasets with many subdatasets. Such
+  subdataset record annotation is now collapsed into a single commits.
+  ([#5480][]) 
+
+- `run` now longer removes leading empty directories as part of the output
+  preparation. This was surprising behavior for commands that do not ensure on
+  their own that output directories exist. ([#5492][])
+
+- A potentially existing `message` property is no longer removed when using the
+  `json` or `json_pp` result renderer to avoid undesired withholding of
+  relevant information. ([#5536][])
+
+- `subdatasets` now reports `state=present`, rather than `state=clean`, for
+  installed subdatasets to complement `state=absent` reports for uninstalled
+  dataset. ([#5655][])
+
+- `create-sibling-ria` now executes commands with a consistent environment
+  setup that matches all other command execution in other DataLad commands.
+  ([#5682][])
+
+- `save` no longer saves unspecified subdatasets when called with an explicit
+  path (list). The fix required a behavior change of
+  `GitRepo.get_content_info()` in its interpretation of `None` vs. `[]` path
+  argument values that now aligns the behavior of `GitRepo.diff|status()` with
+  their respective documentation. ([#5693][])
+
+- `get` now prefers the location of a subdatasets that is recorded in a
+  superdataset's `.gitmodules` record. Previously, DataLad tried to obtain a
+  subdataset from an assumed checkout of the superdataset's origin. This new
+  default order is (re-)configurable via the
+  `datalad.get.subdataset-source-candidate-<priority-label>` configuration
+  mechanism. ([#5760][])
+
+- `create-sibling-gitlab` no longer skips the root dataset when `.` is given as
+  a path. ([#5789][])
+
+- `siblings` now rejects a value given to `--as-common-datasrc` that clashes
+  with the respective Git remote. ([#5805][])
+
+- The usage synopsis reported by `siblings` now lists all supported actions.
+  ([#5913][])
+
+- `siblings` now renders non-ok results to avoid silent failure. ([#5915][])
+
+- `.gitattribute` file manipulations no longer leave the file without a
+  trailing newline. ([#5847][])
+
+- Prevent crash when trying to delete a non-existing keyring credential field.
+  ([#5892][])
+
+- git-annex is no longer called with an unconditional `annex.retry=3`
+  configuration. Instead, this parameterization is now limited to `annex get`
+  and `annex copy` calls. ([#5904][])
+
+#### 🧪 Tests
+
+- `file://` URLs are no longer the predominant test case for `AnnexRepo`
+  functionality. A built-in HTTP server now used in most cases. ([#5332][])
+
+---
+
+# 0.14.8 (Sun Sep 12 2021)
+
+#### 🐛 Bug Fix
+
+- BF: add-archive-content on .xz and other non-.gz stream compressed files [#5930](https://github.com/datalad/datalad/pull/5930) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(UX): do not keep logging ERROR possibly present in progress records [#5936](https://github.com/datalad/datalad/pull/5936) ([@yarikoptic](https://github.com/yarikoptic))
+- Annotate datalad_core as not needing actual data -- just uses annex whereis [#5971](https://github.com/datalad/datalad/pull/5971) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: limit CMD_MAX_ARG if obnoxious value is encountered. [#5945](https://github.com/datalad/datalad/pull/5945) ([@yarikoptic](https://github.com/yarikoptic))
+- Download session/credentials locking -- inform user if locking is "failing" to be obtained, fail upon ~5min timeout [#5884](https://github.com/datalad/datalad/pull/5884) ([@yarikoptic](https://github.com/yarikoptic))
+- Render siblings()'s non-ok results with the default renderer [#5915](https://github.com/datalad/datalad/pull/5915) ([@mih](https://github.com/mih))
+- BF: do not crash, just skip whenever trying to delete non existing field in the underlying keyring [#5892](https://github.com/datalad/datalad/pull/5892) ([@yarikoptic](https://github.com/yarikoptic))
+- Fix argument-spec for `siblings` and improve usage synopsis [#5913](https://github.com/datalad/datalad/pull/5913) ([@mih](https://github.com/mih))
+- Clarify error message re unspecified gitlab project [#5907](https://github.com/datalad/datalad/pull/5907) ([@mih](https://github.com/mih))
+- Support username, password and port specification in RIA URLs [#5902](https://github.com/datalad/datalad/pull/5902) ([@mih](https://github.com/mih))
+- BF: take path from SSHRI, test URLs not only on Windows [#5881](https://github.com/datalad/datalad/pull/5881) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH(UX): warn user if keyring returned a "null" keyring [#5875](https://github.com/datalad/datalad/pull/5875) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH(UX): state original purpose in NoDatasetFound exception + detail it for get [#5708](https://github.com/datalad/datalad/pull/5708) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `maint`
+
+- Merge branch 'bf-http-headers-agent' into maint ([@yarikoptic](https://github.com/yarikoptic))
+- RF(BF?)+DOC: provide User-Agent to entire session headers + use those if provided ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Pass `--no-changelog` to `auto shipit` if changelog already has entry [#5952](https://github.com/datalad/datalad/pull/5952) ([@jwodder](https://github.com/jwodder))
+- Add isort config to match current convention + run isort via pre-commit (if configured) [#5923](https://github.com/datalad/datalad/pull/5923) ([@jwodder](https://github.com/jwodder))
+- .travis.yml: use python -m {nose,coverage} invocations, and always show combined report [#5888](https://github.com/datalad/datalad/pull/5888) ([@yarikoptic](https://github.com/yarikoptic))
+- Add project URLs into the package metadata for convenience links on Pypi [#5866](https://github.com/datalad/datalad/pull/5866) ([@adswa](https://github.com/adswa) [@yarikoptic](https://github.com/yarikoptic))
+
+#### 🧪 Tests
+
+- BF: do use OBSCURE_FILENAME instead of hardcoded unicode [#5944](https://github.com/datalad/datalad/pull/5944) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(TST): Skip testing for having PID listed if no psutil [#5920](https://github.com/datalad/datalad/pull/5920) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(TST): Boost version of git-annex to 8.20201129 to test an error message [#5894](https://github.com/datalad/datalad/pull/5894) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 4
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.14.7 (Tue Aug 03 2021)
 
 #### 🐛 Bug Fix
@@ -3198,6 +3569,12 @@ publishing
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 [NO_COLOR]: https://no-color.org/
 
+[#5420]: https://github.com/datalad/datalad/issues/5420
+[#5428]: https://github.com/datalad/datalad/issues/5428
+[#5459]: https://github.com/datalad/datalad/issues/5459
+[#5554]: https://github.com/datalad/datalad/issues/5554
+[#5564]: https://github.com/datalad/datalad/issues/5564
+[#5672]: https://github.com/datalad/datalad/issues/5672
 [#1350]: https://github.com/datalad/datalad/issues/1350
 [#1651]: https://github.com/datalad/datalad/issues/1651
 [#2534]: https://github.com/datalad/datalad/issues/2534
@@ -3775,32 +4152,95 @@ publishing
 [#5285]: https://github.com/datalad/datalad/issues/5285
 [#5290]: https://github.com/datalad/datalad/issues/5290
 [#5328]: https://github.com/datalad/datalad/issues/5328
+[#5332]: https://github.com/datalad/datalad/issues/5332
 [#5342]: https://github.com/datalad/datalad/issues/5342
 [#5344]: https://github.com/datalad/datalad/issues/5344
 [#5346]: https://github.com/datalad/datalad/issues/5346
 [#5350]: https://github.com/datalad/datalad/issues/5350
 [#5367]: https://github.com/datalad/datalad/issues/5367
+[#5389]: https://github.com/datalad/datalad/issues/5389
 [#5391]: https://github.com/datalad/datalad/issues/5391
+[#5415]: https://github.com/datalad/datalad/issues/5415
 [#5416]: https://github.com/datalad/datalad/issues/5416
 [#5421]: https://github.com/datalad/datalad/issues/5421
+[#5425]: https://github.com/datalad/datalad/issues/5425
+[#5430]: https://github.com/datalad/datalad/issues/5430
+[#5431]: https://github.com/datalad/datalad/issues/5431
 [#5436]: https://github.com/datalad/datalad/issues/5436
 [#5438]: https://github.com/datalad/datalad/issues/5438
+[#5441]: https://github.com/datalad/datalad/issues/5441
 [#5453]: https://github.com/datalad/datalad/issues/5453
 [#5458]: https://github.com/datalad/datalad/issues/5458
+[#5461]: https://github.com/datalad/datalad/issues/5461
 [#5466]: https://github.com/datalad/datalad/issues/5466
+[#5474]: https://github.com/datalad/datalad/issues/5474
+[#5476]: https://github.com/datalad/datalad/issues/5476
+[#5480]: https://github.com/datalad/datalad/issues/5480
 [#5488]: https://github.com/datalad/datalad/issues/5488
+[#5492]: https://github.com/datalad/datalad/issues/5492
 [#5505]: https://github.com/datalad/datalad/issues/5505
 [#5509]: https://github.com/datalad/datalad/issues/5509
+[#5512]: https://github.com/datalad/datalad/issues/5512
 [#5525]: https://github.com/datalad/datalad/issues/5525
 [#5531]: https://github.com/datalad/datalad/issues/5531
+[#5533]: https://github.com/datalad/datalad/issues/5533
+[#5534]: https://github.com/datalad/datalad/issues/5534
+[#5536]: https://github.com/datalad/datalad/issues/5536
+[#5539]: https://github.com/datalad/datalad/issues/5539
+[#5543]: https://github.com/datalad/datalad/issues/5543
 [#5544]: https://github.com/datalad/datalad/issues/5544
+[#5550]: https://github.com/datalad/datalad/issues/5550
+[#5551]: https://github.com/datalad/datalad/issues/5551
 [#5552]: https://github.com/datalad/datalad/issues/5552
+[#5555]: https://github.com/datalad/datalad/issues/5555
+[#5558]: https://github.com/datalad/datalad/issues/5558
+[#5559]: https://github.com/datalad/datalad/issues/5559
+[#5560]: https://github.com/datalad/datalad/issues/5560
+[#5569]: https://github.com/datalad/datalad/issues/5569
 [#5572]: https://github.com/datalad/datalad/issues/5572
+[#5577]: https://github.com/datalad/datalad/issues/5577
 [#5580]: https://github.com/datalad/datalad/issues/5580
+[#5592]: https://github.com/datalad/datalad/issues/5592
 [#5594]: https://github.com/datalad/datalad/issues/5594
 [#5603]: https://github.com/datalad/datalad/issues/5603
 [#5607]: https://github.com/datalad/datalad/issues/5607
 [#5609]: https://github.com/datalad/datalad/issues/5609
 [#5612]: https://github.com/datalad/datalad/issues/5612
+[#5630]: https://github.com/datalad/datalad/issues/5630
 [#5632]: https://github.com/datalad/datalad/issues/5632
 [#5639]: https://github.com/datalad/datalad/issues/5639
+[#5655]: https://github.com/datalad/datalad/issues/5655
+[#5667]: https://github.com/datalad/datalad/issues/5667
+[#5675]: https://github.com/datalad/datalad/issues/5675
+[#5680]: https://github.com/datalad/datalad/issues/5680
+[#5681]: https://github.com/datalad/datalad/issues/5681
+[#5682]: https://github.com/datalad/datalad/issues/5682
+[#5683]: https://github.com/datalad/datalad/issues/5683
+[#5689]: https://github.com/datalad/datalad/issues/5689
+[#5692]: https://github.com/datalad/datalad/issues/5692
+[#5693]: https://github.com/datalad/datalad/issues/5693
+[#5696]: https://github.com/datalad/datalad/issues/5696
+[#5698]: https://github.com/datalad/datalad/issues/5698
+[#5708]: https://github.com/datalad/datalad/issues/5708
+[#5726]: https://github.com/datalad/datalad/issues/5726
+[#5738]: https://github.com/datalad/datalad/issues/5738
+[#5740]: https://github.com/datalad/datalad/issues/5740
+[#5749]: https://github.com/datalad/datalad/issues/5749
+[#5760]: https://github.com/datalad/datalad/issues/5760
+[#5777]: https://github.com/datalad/datalad/issues/5777
+[#5789]: https://github.com/datalad/datalad/issues/5789
+[#5792]: https://github.com/datalad/datalad/issues/5792
+[#5803]: https://github.com/datalad/datalad/issues/5803
+[#5804]: https://github.com/datalad/datalad/issues/5804
+[#5805]: https://github.com/datalad/datalad/issues/5805
+[#5823]: https://github.com/datalad/datalad/issues/5823
+[#5837]: https://github.com/datalad/datalad/issues/5837
+[#5847]: https://github.com/datalad/datalad/issues/5847
+[#5884]: https://github.com/datalad/datalad/issues/5884
+[#5892]: https://github.com/datalad/datalad/issues/5892
+[#5902]: https://github.com/datalad/datalad/issues/5902
+[#5904]: https://github.com/datalad/datalad/issues/5904
+[#5907]: https://github.com/datalad/datalad/issues/5907
+[#5913]: https://github.com/datalad/datalad/issues/5913
+[#5915]: https://github.com/datalad/datalad/issues/5915
+[#5956]: https://github.com/datalad/datalad/issues/5956

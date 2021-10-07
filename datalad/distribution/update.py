@@ -32,7 +32,10 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import (
     recursion_flag,
@@ -56,6 +59,34 @@ class YieldDatasetAndRevision(YieldDatasets):
         return ds, res.get("gitshasum")
 
 
+def _process_how_args(merge, how, how_subds):
+    """Resolve how-related arguments into `how` and `how_subds` values.
+    """
+    # Translate old --merge value onto --how
+    if merge and (how or how_subds):
+        raise ValueError("`merge` is incompatible with `how` and `how_subds`")
+    elif merge == "ff-only":
+        how = merge
+    elif merge:
+        how = "merge"
+
+    if how == "fetch":
+        how = None
+
+    # Map "fetch" to None for easier conditions.
+    if how_subds == "fetch":
+        how_subds = None
+    elif how_subds is None:
+        # Subdatasets are updated according to --how unless --how-subds is
+        # given.
+        how_subds = how
+    return how, how_subds
+
+
+_how_constraints = EnsureChoice(
+    "fetch", "merge", "ff-only", "reset", "checkout", None)
+
+
 @build_doc
 class Update(Interface):
     """Update a dataset from a sibling.
@@ -71,15 +102,24 @@ class Update(Interface):
         dict(text="Update from a particular sibling and merge the changes "
                   "from a configured or matching branch from the sibling "
                   "(see [CMD: --follow CMD][PY: `follow` PY] for details)",
-             code_py="update(sibling='siblingname', merge=True)",
-             code_cmd="datalad update --merge -s <siblingname>"),
+             code_py="update(sibling='siblingname', how='merge')",
+             code_cmd="datalad update --how=merge -s <siblingname>"),
         dict(text="Update from the sibling 'origin', traversing into "
                   "subdatasets. For subdatasets, merge the revision "
                   "registered in the parent dataset into the current branch",
-             code_py="update(sibling='origin', merge=True, "
+             code_py="update(sibling='origin', how='merge', "
                      "follow='parentds', recursive=True)",
-             code_cmd="datalad update -s origin --merge "
+             code_cmd="datalad update -s origin --how=merge "
                       "--follow=parentds -r"),
+        dict(text="Fetch and merge the remote tracking branch "
+                  "into the current dataset. Then update each subdataset "
+                  "by resetting its current branch to the revision "
+                  "registered in the parent dataset, fetching only if "
+                  "the revision isn't already present",
+             code_py="update(how='merge', how_subds='reset', "
+                     "follow='parentds-lazy', recursive=True)",
+             code_cmd="datalad update --how=merge --how-subds=reset"
+                      "--follow=parentds-lazy -r"),
     ]
 
     _params_ = dict(
@@ -92,8 +132,12 @@ class Update(Interface):
             constraints=EnsureStr() | EnsureNone()),
         sibling=Parameter(
             args=("-s", "--sibling",),
-            doc="""name of the sibling to update from. If no sibling
-            is given, updates from all siblings are obtained.""",
+            doc="""name of the sibling to update from. When unspecified,
+            updates from all siblings are fetched. If there is more than one
+            sibling and changes will be brought into the working tree (as
+            requested via [CMD: --merge, --how, or --how-subds CMD][PY:
+            `merge`, `how`, or `how_subds` PY]), a sibling will be chosen based
+            on the configured remote for the current branch.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -108,26 +152,49 @@ class Update(Interface):
             const="any",
             nargs="?",
             constraints=EnsureBool() | EnsureChoice("any", "ff-only"),
-            doc="""merge obtained changes from the sibling. If a sibling is not
-            explicitly given and there is only a single known sibling, that
-            sibling is used. Otherwise, an unspecified sibling defaults to the
-            configured remote for the current branch. By default, changes are
-            fetched from the sibling but not merged into the current branch.
-            With [CMD: --merge or --merge=any CMD][PY: merge=True or
-            merge="any" PY], the changes will be merged into the current
-            branch. A value of 'ff-only' restricts the allowed merges to
-            fast-forwards."""),
+            # TODO: Decide whether this should be removed eventually.
+            doc="""merge obtained changes from the sibling. This is a subset of
+            the functionality that can be achieved via the newer [CMD: --how
+            CMD][PY: `how` PY]. [CMD: --merge or --merge=any CMD][PY:
+            merge=True or merge="any" PY] is equivalent to [CMD: --how=merge
+            CMD][PY: how="merge" PY]. [CMD: --merge=ff-only CMD][PY:
+            merge="ff-only" PY] is equivalent to [CMD: --how=ff-only CMD][PY:
+            how="ff-only" PY]."""),
+        how=Parameter(
+            args=("--how",),
+            nargs="?",
+            constraints=_how_constraints,
+            doc="""how to update the dataset. The default ("fetch") simply
+            fetches the changes from the sibling but doesn't incorporate them
+            into the working tree. A value of "merge" or "ff-only" merges in
+            changes, with the latter restricting the allowed merges to
+            fast-forwards. "reset" incorporates the changes with 'git reset
+            --hard <target>', staying on the current branch but discarding any
+            changes that aren't shared with the target. "checkout", on the
+            other hand, runs 'git checkout <target>', switching from the
+            current branch to a detached state. When [CMD: --recursive CMD][PY:
+            recursive=True PY] is specified, this action will also apply to
+            subdatasets unless overridden by [CMD: --how-subds CMD][PY:
+            `how_subds` PY]."""),
+        how_subds=Parameter(
+            args=("--how-subds",),
+            nargs="?",
+            constraints=_how_constraints,
+            doc="""Override the behavior of [CMD: --how CMD][PY: `how` PY] in
+            subdatasets."""),
         follow=Parameter(
             args=("--follow",),
-            constraints=EnsureChoice("sibling", "parentds"),
+            constraints=EnsureChoice("sibling", "parentds", "parentds-lazy"),
             doc="""source of updates for subdatasets. For 'sibling', the update
             will be done by merging in a branch from the (specified or
             inferred) sibling. The branch brought in will either be the current
             branch's configured branch, if it points to a branch that belongs
             to the sibling, or a sibling branch with a name that matches the
             current branch. For 'parentds', the revision registered in the
-            parent dataset of the subdataset is merged in. Note that the
-            current dataset is always updated according to 'sibling'. This
+            parent dataset of the subdataset is merged in. 'parentds-lazy' is
+            like 'parentds', but prevents fetching from a subdataset's sibling
+            if the registered revision is present in the subdataset. Note that
+            the current dataset is always updated according to 'sibling'. This
             option has no effect unless a merge is requested and [CMD:
             --recursive CMD][PY: recursive=True PY] is specified.""", ),
         recursive=recursion_flag,
@@ -150,6 +217,8 @@ class Update(Interface):
             path=None,
             sibling=None,
             merge=False,
+            how=None,
+            how_subds=None,
             follow="sibling",
             dataset=None,
             recursive=False,
@@ -162,10 +231,15 @@ class Update(Interface):
             lgr.warning('path constraints for subdataset updates ignored, '
                         'because `recursive` option was not given')
 
+        how, how_subds = _process_how_args(merge, how, how_subds)
+        # `merge` should be considered through `how` and `how_subds` only.
+        # Unbind `merge` to ensure that downstream code doesn't look at it.
+        del merge
+
         refds = require_dataset(dataset, check_installed=True, purpose='update')
 
         save_paths = []
-        merge_failures = set()
+        update_failures = set()
         saw_subds = False
         for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
@@ -181,6 +255,19 @@ class Update(Interface):
             is_annex = isinstance(repo, AnnexRepo)
             # prepare return value
             res = get_status_dict('update', ds=ds, logger=lgr, refds=refds.path)
+
+            follow_parent = revision and follow.startswith("parentds")
+            follow_parent_lazy = revision and follow == "parentds-lazy"
+            if follow_parent_lazy and \
+               repo.get_hexsha(repo.get_corresponding_branch()) == revision:
+                res["message"] = (
+                    "Dataset already at commit registered in parent: %s",
+                    repo.path)
+                res["status"] = "notneeded"
+                yield res
+                continue
+
+            how_curr = how_subds if revision else how
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
@@ -209,7 +296,7 @@ class Update(Interface):
                 res['status'] = 'impossible'
                 yield res
                 continue
-            if not sibling_ and len(remotes) > 1 and merge:
+            if not sibling_ and len(remotes) > 1 and how_curr:
                 lgr.debug("Found multiple siblings:\n%s", remotes)
                 res['status'] = 'impossible'
                 res['message'] = "Multiple siblings, please specify from which to update."
@@ -228,18 +315,21 @@ class Update(Interface):
                     # prune to not accumulate a mess over time
                     "--prune"]
             )
-            try:
-                repo.fetch(**fetch_kwargs)
-            except CommandError as exc:
-                yield dict(res, status="error",
-                           message=("Fetch failed: %s", exc_str(exc)))
-                continue
+            if not (follow_parent_lazy and repo.commit_exists(revision)):
+                try:
+                    repo.fetch(**fetch_kwargs)
+                except CommandError as exc:
+                    ce = CapturedException(exc)
+                    yield get_status_dict(status="error",
+                                          message=("Fetch failed: %s", ce),
+                                          exception=ce,
+                                          **res,)
+                    continue
 
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
             repo = ds.repo
 
-            follow_parent = revision and follow == "parentds"
             if follow_parent and not repo.commit_exists(revision):
                 if sibling_:
                     try:
@@ -248,12 +338,15 @@ class Update(Interface):
                         repo.fetch(remote=sibling_, refspec=revision,
                                    git_options=["--recurse-submodules=no"])
                     except CommandError as exc:
+                        ce = CapturedException(exc)
                         yield dict(
                             res,
                             status="impossible",
                             message=(
                                 "Attempt to fetch %s from %s failed: %s",
-                                revision, sibling_, exc_str(exc)))
+                                revision, sibling_, ce),
+                            exception=ce
+                        )
                         continue
                 else:
                     yield dict(res,
@@ -263,63 +356,76 @@ class Update(Interface):
                                         revision))
                     continue
 
-            saw_merge_failure = False
-            if merge:
+            saw_update_failure = False
+            if how_curr:
                 if follow_parent:
-                    merge_target = revision
+                    target = revision
                 else:
-                    merge_target = _choose_merge_target(
+                    target = _choose_update_target(
                         repo, curr_branch,
                         sibling_, tracking_remote)
 
-                merge_fn = _choose_merge_fn(
-                    repo,
-                    is_annex=is_annex,
-                    adjusted=is_annex and repo.is_managed_branch(curr_branch))
-
-                merge_opts = None
-                if merge_fn is _annex_sync:
+                adjusted = is_annex and repo.is_managed_branch(curr_branch)
+                if adjusted:
                     if follow_parent:
                         yield dict(
                             res, status="impossible",
                             message=("follow='parentds' is incompatible "
                                      "with adjusted branches"))
                         continue
-                elif merge_target is None:
-                    yield dict(res,
-                               status="impossible",
-                               message="Could not determine merge target")
-                    continue
-                elif merge == "ff-only":
-                    merge_opts = ["--ff-only"]
+                    if how_curr != "merge":
+                        yield dict(
+                            res, status="impossible",
+                            message=("Updating via '%s' is incompatible "
+                                     "with adjusted branches",
+                                     how_curr))
+                        continue
+
+                update_fn = _choose_update_fn(
+                    repo,
+                    how_curr,
+                    is_annex=is_annex,
+                    adjusted=adjusted)
+
+                fn_opts = ["--ff-only"] if how_curr == "ff-only" else None
+                if update_fn is not _annex_sync:
+                    if target is None:
+                        yield dict(res,
+                                   status="impossible",
+                                   message="Could not determine update target")
+                        continue
 
                 if is_annex and reobtain_data:
-                    merge_fn = _reobtain(ds, merge_fn)
+                    update_fn = _reobtain(ds, update_fn)
 
-                for mres in merge_fn(repo, sibling_, merge_target,
-                                     merge_opts=merge_opts):
-                    if mres["action"] == "merge" and mres["status"] != "ok":
-                        saw_merge_failure = True
-                    yield dict(res, **mres)
+                for ures in update_fn(repo, sibling_, target, opts=fn_opts):
+                    # NOTE: Ideally the "merge" action would also be prefixed
+                    # with "update.", but a plain "merge" is used for backward
+                    # compatibility.
+                    if ures["status"] != "ok" and (
+                            ures["action"] == "merge" or
+                            ures["action"].startswith("update.")):
+                        saw_update_failure = True
+                    yield dict(res, **ures)
 
-            if saw_merge_failure:
-                merge_failures.add(ds)
+            if saw_update_failure:
+                update_failures.add(ds)
                 res['status'] = 'error'
-                res['message'] = ("Merge of %s failed", merge_target)
+                res['message'] = ("Update of %s failed", target)
             else:
                 res['status'] = 'ok'
                 save_paths.append(ds.path)
             yield res
         # we need to save updated states only if merge was requested -- otherwise
         # it was a pure fetch
-        if merge and recursive:
+        if how_curr and recursive:
             if path and not saw_subds:
                 lgr.warning(
                     'path constraints did not match an installed subdataset: %s',
                     path)
-            if refds in merge_failures:
+            if refds in update_failures:
                 lgr.warning("Not saving because top-level dataset %s "
-                            "had a merge failure",
+                            "had an update failure in subdataset",
                             refds.path)
             else:
                 save_paths = [p for p in save_paths if p != refds.path]
@@ -335,8 +441,11 @@ class Update(Interface):
                     yield r
 
 
-def _choose_merge_target(repo, branch, remote, cfg_remote):
-    """Select a merge target for the update to `repo`.
+def _choose_update_target(repo, branch, remote, cfg_remote):
+    """Select a target to update `repo` from.
+
+    Note: This function is not concerned with _how_ the update is done (e.g.,
+    merge, reset, ...).
 
     Parameters
     ----------
@@ -350,71 +459,124 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
 
     Returns
     -------
-    str (the merge target) or None if a choice wasn't made.
+    str (the target) or None if a choice wasn't made.
     """
-    merge_target = None
+    target = None
     if cfg_remote and remote == cfg_remote:
-        # Use the configured cfg_remote branch as the merge target.
+        # Use the configured cfg_remote branch as the target.
         #
-        # In this scenario, it's tempting to use FETCH_HEAD as the merge
-        # target. That would be the equivalent of 'git pull REMOTE'. But doing
+        # In this scenario, it's tempting to use FETCH_HEAD as the target. For
+        # a merge, that would be the equivalent of 'git pull REMOTE'. But doing
         # so would be problematic when the GitRepo.fetch() call was passed
         # all_=True. Given we can't use FETCH_HEAD, it's tempting to use the
         # branch.*.merge value, but that assumes a value for remote.*.fetch.
-        merge_target = repo.call_git_oneline(
+        target = repo.call_git_oneline(
             ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
              "@{upstream}"],
             read_only=True)
     elif branch:
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
-            merge_target = remote_branch
-    return merge_target
+            target = remote_branch
+    return target
 
 
-#  Merge functions
+#  Update functions
 
 
-def _choose_merge_fn(repo, is_annex=False, adjusted=False):
-    if adjusted and is_annex:
-        # For adjusted repos, blindly sync.
-        merge_fn = _annex_sync
-    elif is_annex:
-        merge_fn = _annex_plain_merge
-    elif adjusted:
+def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
+    if adjusted and how != "merge":
         raise RuntimeError(
-            "bug: Upstream checks should make it impossible for "
-            "adjusted=True, is_annex=False")
+            "bug: Upstream checks should abort if adjusted is used "
+            "with action other than 'merge'")
+    elif how in ["merge", "ff-only"]:
+        if adjusted and is_annex:
+            # For adjusted repos, blindly sync.
+            fn = _annex_sync
+        elif is_annex:
+            fn = _annex_plain_merge
+        elif adjusted:
+            raise RuntimeError(
+                "bug: Upstream checks should make it impossible for "
+                "adjusted=True, is_annex=False")
+        else:
+            fn = _plain_merge
+    elif how == "reset":
+        fn = _reset_hard
+    elif how == "checkout":
+        fn = _checkout
     else:
-        merge_fn = _plain_merge
-    return merge_fn
+        raise ValueError(f"Unrecognized value for `how`: {how}")
+    return fn
 
 
-def _plain_merge(repo, _, target, merge_opts=None):
+def _try_command(record, fn, *args, **kwargs):
+    """Call `fn`, catching a `CommandError`.
+
+    Parameters
+    ----------
+    record : dict
+        A partial result record. It should at least have 'action' and 'message'
+        fields. A 'status' value of 'ok' or 'error' will be added based on
+        whether calling `fn` raises a `CommandError`.
+
+    Returns
+    -------
+    A new record with a 'status' field.
+    """
     try:
-        repo.merge(name=target, options=merge_opts,
-                   expect_fail=True, expect_stderr=True)
+        fn(*args, **kwargs)
     except CommandError as exc:
-        yield {"action": "merge", "status": "error",
-               "message": exc_str(exc)}
+        ce = CapturedException(exc)
+        return dict(record, status="error", message=str(ce))
     else:
-        yield {"action": "merge", "status": "ok",
-               "message": ("Merged %s", target)}
+        return dict(record, status="ok")
 
 
-def _annex_plain_merge(repo, _, target, merge_opts=None):
-    yield from _plain_merge(repo, _, target, merge_opts=merge_opts)
+def _plain_merge(repo, _, target, opts=None):
+    yield _try_command(
+        {"action": "merge", "message": ("Merged %s", target)},
+        repo.merge,
+        name=target, options=opts,
+        expect_fail=True, expect_stderr=True)
+
+
+def _annex_plain_merge(repo, _, target, opts=None):
+    yield from _plain_merge(repo, _, target, opts=opts)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
-    repo.call_annex(["merge"])
+    yield _try_command(
+        {"action": "update.annex_merge", "message": "Merged annex branch"},
+        repo.call_annex, ["merge"])
 
 
-def _annex_sync(repo, remote, _target, merge_opts=None):
-    repo.sync(remotes=remote, push=False, pull=True, commit=False)
-    return []
+def _annex_sync(repo, remote, _target, opts=None):
+    yield _try_command(
+        {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
+        repo.call_annex,
+        ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
 
 
-def _reobtain(ds, merge_fn):
+def _reset_hard(repo, _, target, opts=None):
+    if repo.dirty:
+        yield {"action": "update.reset",
+               "status": "error",
+               "message": "Refusing to reset dirty working tree"}
+    else:
+        yield _try_command(
+            {"action": "update.reset", "message": ("Reset to %s", target)},
+            repo.call_git,
+            ["reset", "--hard", target])
+
+
+def _checkout(repo, _, target, opts=None):
+    yield _try_command(
+        {"action": "update.checkout", "message": ("Checkout %s", target)},
+        repo.call_git,
+        ["checkout", target])
+
+
+def _reobtain(ds, update_fn):
     def wrapped(*args, **kwargs):
         repo = ds.repo
         repo_pathobj = repo.pathobj
@@ -429,7 +591,7 @@ def _reobtain(ds, merge_fn):
         present_files = [str(ds.pathobj / f.relative_to(repo_pathobj))
                          for f, st in ainfo.items() if st["has_content"]]
 
-        yield from merge_fn(*args, **kwargs)
+        yield from update_fn(*args, **kwargs)
 
         present_files = [p for p in present_files if lexists(p)]
         if present_files:

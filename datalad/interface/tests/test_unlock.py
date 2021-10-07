@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-import os
 from os.path import join as opj
 
 
@@ -38,8 +37,6 @@ from datalad.tests.utils import (
     assert_cwd_unchanged,
     with_testrepos,
     with_tree,
-    on_windows,
-    skip_if,
     skip_if_root,
     slow,
     assert_in_results,
@@ -129,11 +126,9 @@ def test_unlock(path):
         f.write("change content")
 
     ds.repo.add('test-annex.dat')
-    # in V6+ we need to explicitly re-lock it:
-    if ds.repo.supports_unlocked_pointers:
-        # TODO: RF: make 'lock' a command as well
-        # re-lock to further on have a consistent situation with V5:
-        ds.repo.call_annex(['lock'], files=['test-annex.dat'])
+    # TODO: RF: make 'lock' a command as well
+    # re-lock to further on have a consistent situation with V5:
+    ds.repo.call_annex(['lock'], files=['test-annex.dat'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
     # after commit, file is locked again:
@@ -153,11 +148,9 @@ def test_unlock(path):
         f.write("change content again")
 
     ds.repo.add('test-annex.dat')
-    # in V6+ we need to explicitly re-lock it:
-    if ds.repo.supports_unlocked_pointers:
-        # TODO: RF: make 'lock' a command as well
-        # re-lock to further on have a consistent situation with V5:
-        ds.repo.call_annex(['lock'], files=['test-annex.dat'])
+    # TODO: RF: make 'lock' a command as well
+    # re-lock to further on have a consistent situation with V5:
+    ds.repo.call_annex(['lock'], files=['test-annex.dat'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
     # TODO:
@@ -230,12 +223,10 @@ def test_unlock_cant_unlock(path):
         untracked=["untracked"])
     expected = {"regular_git": "notneeded",
                 "untracked": "impossible"}
-    if not ds.repo.supports_unlocked_pointers:
-        # Don't add "already_unlocked" in v6+ because unlocked files are still
-        # reported as having content and still passed to unlock. If we can
-        # reliably distinguish v6+ unlocked files in status's output, we should
-        # consider reporting a "notneeded" result.
-        expected["already_unlocked"] = "notneeded"
+    # Don't add "already_unlocked" in v6+ because unlocked files are still
+    # reported as having content and still passed to unlock. If we can
+    # reliably distinguish v6+ unlocked files in status's output, we should
+    # consider reporting a "notneeded" result.
     for f, status in expected.items():
         assert_in_results(
             ds.unlock(path=f, on_failure="ignore"),

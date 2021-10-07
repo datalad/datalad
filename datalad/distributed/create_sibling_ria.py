@@ -12,8 +12,8 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import subprocess
 
+from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit
@@ -146,9 +146,21 @@ class CreateSiblingRia(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         url=Parameter(
             args=("url",),
-            metavar="ria+<ssh|file>://<host>[/path]",
-            doc="""URL identifying the target RIA store and access protocol.
+            metavar="ria+<ssh|file|http(s)>://<host>[/path]",
+            doc="""URL identifying the target RIA store and access protocol. If
+            [CMD: --push-url CMD][PY: push_url PY] is given in addition, this is
+            used for read access only. Otherwise it will be used for write
+            access too and to create the repository sibling in the RIA store.
+            Note, that HTTP(S) currently is valid for consumption only thus
+            requiring to provide [CMD: --push-url CMD][PY: push_url PY].
             """,
+            constraints=EnsureStr() | EnsureNone()),
+        push_url=Parameter(
+            args=("--push-url",),
+            metavar="ria+<ssh|file>://<host>[/path]",
+            doc="""URL identifying the target RIA store and access protocol for
+            write access to the storage sibling. If given this will also be used
+            for creation of the repository sibling in the RIA store.""",
             constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
             args=('-s', '--name',),
@@ -166,6 +178,14 @@ class CreateSiblingRia(Interface):
             defaults to the sibling name plus '-storage' suffix. If only
             a storage sibling is created, this setting is ignored, and
             the primary sibling name is used.""",
+            constraints=EnsureStr() | EnsureNone()),
+        alias=Parameter(
+            args=('--alias',),
+            metavar='ALIAS',
+            doc="""Alias for the dataset in the RIA store.
+            Add the necessary symlink so that this dataset can be cloned from the RIA
+            store using the given ALIAS instead of its ID.
+            With `recursive=True`, only the top dataset will be aliased.""",
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
@@ -234,6 +254,7 @@ class CreateSiblingRia(Interface):
                  name,
                  dataset=None,
                  storage_name=None,
+                 alias=None,
                  post_update_hook=False,
                  shared=None,
                  group=None,
@@ -243,6 +264,7 @@ class CreateSiblingRia(Interface):
                  recursive=False,
                  recursion_limit=None,
                  disable_storage__=None,
+                 push_url=None
                  ):
         if disable_storage__ is not None:
             import warnings
@@ -269,8 +291,12 @@ class CreateSiblingRia(Interface):
         )
 
         # parse target URL
+        # Note: URL parsing is done twice ATM (for top-level ds). This can't be
+        # reduced to single instance, since rewriting url based on config could
+        # be different for subdatasets.
         try:
-            ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
+            ssh_host, base_path, rewritten_url = \
+                verify_ria_url(push_url if push_url else url, ds.config)
         except ValueError as e:
             yield get_status_dict(
                 status='error',
@@ -367,9 +393,6 @@ class CreateSiblingRia(Interface):
         #         command abstractions
         #       - more generally consider store creation a dedicated command or
         #         option
-        # Note: URL parsing is done twice ATM (for top-level ds). This can't be
-        # reduced to single instance, since rewriting url based on config could
-        # be different for subdatasets.
 
         create_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                      Path(base_path),
@@ -378,9 +401,11 @@ class CreateSiblingRia(Interface):
         yield from _create_sibling_ria(
             ds,
             url,
+            push_url,
             name,
             storage_sibling,
             storage_name,
+            alias,
             existing,
             shared,
             group,
@@ -400,9 +425,11 @@ class CreateSiblingRia(Interface):
                 yield from _create_sibling_ria(
                     subds,
                     url,
+                    push_url,
                     name,
                     storage_sibling,
                     storage_name,
+                    None,  # subdatasets can't have the same alias as the parent
                     existing,
                     shared,
                     group,
@@ -414,9 +441,11 @@ class CreateSiblingRia(Interface):
 def _create_sibling_ria(
         ds,
         url,
+        push_url,
         name,
         storage_sibling,
         storage_name,
+        alias,
         existing,
         shared,
         group,
@@ -438,7 +467,8 @@ def _create_sibling_ria(
 
     # parse target URL
     try:
-        ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
+        ssh_host, base_path, rewritten_url = \
+            verify_ria_url(push_url if push_url else url, ds.config)
     except ValueError as e:
         yield get_status_dict(
             status='error',
@@ -454,7 +484,12 @@ def _create_sibling_ria(
         url + '#{}'.format(ds.id),
         cfg=ds.config
     )['giturl']
-    # determine layout locations; go for a v1 layout
+    git_push_url = decode_source_spec(
+        push_url + '#{}'.format(ds.id),
+        cfg=ds.config
+    )['giturl'] if push_url else None
+
+    # determine layout locations; go for a v1 store-level layout
     repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
 
     ds_siblings = [r['name'] for r in ds.siblings(result_renderer=None)]
@@ -525,7 +560,7 @@ def _create_sibling_ria(
             " and '{}'".format(storage_name) if storage_name else '',
         ))
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
-                       base_path, ds.id, '2', '1')
+                       base_path, ds.id, '2', '1', alias)
     if storage_sibling:
         # we are using the main `name`, if the only thing we are creating
         # is the storage sibling
@@ -538,6 +573,8 @@ def _create_sibling_ria(
             'encryption=none',
             'autoenable=true',
             'url={}'.format(url)]
+        if push_url:
+            special_remote_options.append('push-url={}'.format(push_url))
         try:
             ds.repo.init_remote(
                 srname,
@@ -642,8 +679,10 @@ def _create_sibling_ria(
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
         if group:
-            # TODO; do we need a cwd here?
-            subprocess.run(chgrp_cmd, cwd=ds.path)
+            # No CWD needed here, since `chgrp` is expected to be found via PATH
+            # and the path it's operating on is absolute (repo_path). No
+            # repository operation involved.
+            Runner().run(chgrp_cmd)
         # finally update server
         if post_update_hook:
             # Conditional on post_update_hook, since one w/o the other doesn't
@@ -667,9 +706,8 @@ def _create_sibling_ria(
     ds.siblings(
         'configure',
         name=name,
-        url=git_url
-        if ssh_host
-        else str(repo_path),
+        url=str(repo_path) if url.startswith("ria+file") else git_url,
+        pushurl=git_push_url,
         recursive=False,
         # Note, that this should be None if storage_sibling was not set
         publish_depends=storage_name,

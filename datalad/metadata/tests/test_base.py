@@ -181,7 +181,7 @@ def test_aggregation(path):
     assert_result_count(cloneres, 1, type='file')
 
     # now loop over the previous results from the direct metadata query of
-    # origin and make sure we get the extact same stuff from the clone
+    # origin and make sure we get the extract same stuff from the clone
     _compare_metadata_helper(origres, clone)
 
     # now obtain a subdataset in the clone, should make no difference

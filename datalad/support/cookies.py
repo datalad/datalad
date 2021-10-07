@@ -10,7 +10,6 @@
 
 import atexit
 import shelve
-import pickle
 import appdirs
 import os.path
 

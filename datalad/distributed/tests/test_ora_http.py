@@ -48,6 +48,20 @@ def test_initremote(store_path, store_url, ds_path):
     url = "ria+" + store_url
     init_opts = common_init_opts + ['url={}'.format(url)]
 
+    # fail when there's no RIA store at the destination
+    assert_raises(CommandError, ds.repo.init_remote, 'ora-remote',
+                  options=init_opts)
+    # Doesn't actually create a remote if it fails
+    assert_not_in('ora-remote',
+                  [cfg['name']
+                   for uuid, cfg in ds.repo.get_special_remotes().items()]
+                  )
+
+    # now make it a store
+    io = LocalIO()
+    create_store(io, store_path, '1')
+    create_ds_in_store(io, store_path, ds.id, '2', '1')
+
     # fails on non-RIA URL
     assert_raises(CommandError, ds.repo.init_remote, 'ora-remote',
                   options=common_init_opts + ['url={}'

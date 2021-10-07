@@ -252,7 +252,7 @@ def test_publish_aggregated(path):
         name="local_target",
         sshurl="ssh://datalad-test",
         target_dir=spath)
-    base.publish('.', to='local_target', transfer_data='all')
+    base.push('.', to='local_target', data='anything')
     remote = Dataset(spath)
     objpath = opj('.datalad', 'metadata', 'objects')
     objs = list(sorted(base.repo.find(objpath)))
@@ -340,7 +340,7 @@ def test_update_strategy(path):
         eq_(len(_get_contained_objs(ds)), 0)
     # aggregate the entire tree, but by default only updates
     # the top-level dataset with all objects, none of the leaf
-    # or intermediate datasets get's touched
+    # or intermediate datasets gets touched
     base.aggregate_metadata(recursive=True)
     eq_(len(_get_contained_objs(base)), 6)
     eq_(len(_get_referenced_objs(base)), 6)

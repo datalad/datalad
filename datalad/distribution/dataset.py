@@ -31,11 +31,13 @@ from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
-from datalad.support.repo import path_based_str_repr
+from datalad.dataset.repo import (
+    path_based_str_repr,
+    PathBasedFlyweight,
+)
 from datalad.support.gitrepo import (
     GitRepo,
 )
-from datalad.support.repo import PathBasedFlyweight
 from datalad.support import path as op
 
 import datalad.utils as ut
@@ -49,7 +51,6 @@ from datalad.utils import (
     Path,
     PurePath,
     ensure_list,
-    quote_cmdlinearg,
 )
 
 
@@ -179,33 +180,14 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             return self.pathobj == other.pathobj
 
     def __getattr__(self, attr):
-        # Assure that we are not just missing some late binding
-        # @datasetmethod . We will use interface definitions.
-        # The gotcha could be the mismatch between explicit name
-        # provided to @datasetmethod and what is defined in interfaces
-        meth = None
+        # Assure that we are not just missing some late binding @datasetmethod .
         if not attr.startswith('_'):  # do not even consider those
-            from datalad.interface.base import (
-                get_interface_groups, get_api_name, load_interface
-            )
-            groups = get_interface_groups(True)
-            for group, _, interfaces in groups:
-                for intfspec in interfaces:
-                    # lgr.log(5, "Considering interface %s", intfspec)
-                    name = get_api_name(intfspec)
-                    if attr == name:
-                        meth_ = load_interface(intfspec)
-                        if meth_:
-                            lgr.debug("Found matching interface %s for %s",
-                                      intfspec, name)
-                            if meth:
-                                lgr.debug(
-                                    "New match %s possibly overloaded previous one %s",
-                                    meth_, meth
-                                )
-                            meth = meth_
-            if not meth:
-                lgr.debug("Found no match among known interfaces for %r", attr)
+            lgr.debug("Importing datalad.api to possibly discover possibly not yet bound method %r", attr)
+            # load entire datalad.api which will also bind datasetmethods
+            # from extensions.
+            import datalad.api
+            # which would bind all known interfaces as well.
+            # Although adds overhead, good for UX
         return super(Dataset, self).__getattribute__(attr)
 
     def close(self):
@@ -403,7 +385,6 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         -------
         Dataset or None
         """
-        from datalad.coreapi import subdatasets
         path = self.path
         sds_path = path if topmost else None
 
@@ -658,8 +639,8 @@ def resolve_path(path, ds=None, ds_resolved=None):
             # CONCEPT: do the minimal thing to catch most real-world inputs
             # ASSUMPTION: the only sane relative path input that needs
             # handling and can be handled are upward references like
-            # '../../some/that', wherease stuff like 'down/../someotherdown'
-            # are intellectual excercises
+            # '../../some/that', whereas stuff like 'down/../someotherdown'
+            # are intellectual exercises
             # ALGORITHM: match any number of leading '..' path components
             # and shorten the PWD by that number
             # NOT using ut.Path.cwd(), because it has symlinks resolved!!

@@ -7,7 +7,7 @@ run "cd demo"
 say "For this demo we are using two public brain imaging datasets that were published on OpenFMRI.org, and are available from DataLad's datasets.datalad.org"
 run "datalad install -d . -s ///openfmri/ds000001 inputs/ds000001"
 
-say "BTW: '///' is just short for http://datasets.datalad.org"
+say "BTW: '///' is just short for https://datasets.datalad.org"
 
 run "datalad install -d . -s ///openfmri/ds000002 inputs/ds000002"
 

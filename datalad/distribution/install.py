@@ -245,7 +245,7 @@ class Install(Interface):
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
-                    # down that deals with an install from an actuall `source`
+                    # down that deals with an install from an actual `source`
                     # any necessary fixes should go there too!
                     r['refds'] = refds_path
                     yield r
@@ -288,7 +288,7 @@ class Install(Interface):
             # or we fucked up one of our internal calls
             raise ValueError(
                 "install needs a single PATH when source is provided.  "
-                "Was given mutliple PATHs: %s" % str(path))
+                "Was given multiple PATHs: %s" % str(path))
 
         # parameter constraints:
         if not source:
@@ -390,7 +390,7 @@ class Install(Interface):
                     **common_kwargs):
                 r['refds'] = refds_path
                 yield r
-        # at this point no futher post-processing should be necessary,
+        # at this point no further post-processing should be necessary,
         # `clone` and `get` must have done that (incl. parent handling)
         # if not, bugs should be fixed in those commands
         return

@@ -45,6 +45,7 @@ from ..support.exceptions import (
 from ..support.locking import (
     InterProcessLock,
     try_lock,
+    try_lock_informatively,
 )
 
 from ..support.network import RI
@@ -114,10 +115,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
         self._lock = InterProcessLock(
-            op.join(
-                cfg.obtain('datalad.locations.cache'),
-                'locks',
-                'downloader-auth.lck'))
+            op.join(cfg.obtain('datalad.locations.locks'),
+                    'downloader-auth.lck')
+        )
 
     def access(self, method, url, allow_old_session=True, **kwargs):
         """Generic decorator to manage access to the URL via some method
@@ -156,12 +156,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
             supported_auth_types = []
             used_old_session = False
             try:
-                lgr.debug("Acquiring a currently %s lock to establish download session. "
-                          "If stalls - check which process holds %s",
-                          "existing" if self._lock.exists() else "absent",
-                          self._lock.path)
-                with self._lock:
-                    # Locking since it might desire to ask for credentials
+                # Try to lock since it might desire to ask for credentials, but still allow to time out at 5 minutes
+                # while providing informative message on what other process might be holding it.
+                with try_lock_informatively(self._lock, purpose="establish download session", proceed_unlocked=False):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -224,7 +221,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     # give up
                     raise
                 lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
-                # TODO: may be fail ealier than after 20 attempts in such a case?
+                # TODO: may be fail earlier than after 20 attempts in such a case?
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
@@ -439,9 +436,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         else:
             filepath = downloader_session.filename
 
-        existed = exists(filepath)
+        existed = op.lexists(filepath)
         if existed and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
+            raise DownloadError("Path %s already exists" % filepath)
 
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
@@ -451,7 +448,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # eventually we might want to continue the download
                 lgr.warning(
                     "Temporary file %s from the previous download was found. "
-                    "It will be overriden" % temp_filepath)
+                    "It will be overridden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
             with open(temp_filepath, 'wb') as fp:

@@ -18,13 +18,12 @@ from datalad.utils import (
     ensure_list,
 )
 from datalad.tests.utils import (
-    assert_equal,
     assert_false,
     assert_in,
+    assert_in_results,
     assert_not_in,
     assert_raises,
     assert_true,
-    eq_,
     skip_if_no_network,
     SkipTest,
     use_cassette as use_cassette_,
@@ -92,19 +91,30 @@ def test_dont_trip_over_missing_subds(path):
     assert_not_in('github', ds1.repo.get_remotes())
     # fail on existing
     ds1.repo.add_remote('github', 'http://nothere')
-    assert_raises(ValueError,
-        ds1.create_sibling_github, 'bogus', recursive=True,
-        github_login='disabledloginfortesting')
-    # talk to github when existing is OK
-    assert_raises(gh.BadCredentialsException,
-        ds1.create_sibling_github, 'bogus', recursive=True,
-        github_login='disabledloginfortesting', existing='reconfigure')
-    # return happy emptiness when all is skipped
-    assert_equal(
+    assert_in_results(
         ds1.create_sibling_github(
             'bogus', recursive=True,
-            github_login='disabledloginfortesting', existing='skip'),
-        [])
+            github_login='disabledloginfortesting',
+            on_failure='ignore'),
+        status='error',
+        message=('already has a configured sibling "%s"', 'github'),
+    )
+    assert_in_results(
+        ds1.create_sibling_github(
+            'bogus', recursive=True,
+            github_login='disabledloginfortesting',
+            existing='reconfigure'),
+        status='notneeded',
+        message=('already has a configured sibling "%s"', 'github'),
+    )
+    assert_in_results(
+        ds1.create_sibling_github(
+            'bogus', recursive=True,
+            github_login='disabledloginfortesting',
+            existing='skip',),
+        status='notneeded',
+        message=('already has a configured sibling "%s"', 'github'),
+    )
 
 
 # Ran on Yarik's laptop, so would use his available token
@@ -171,18 +181,27 @@ def check_integration1(login, keyring,
             url_fmt = 'https://{login}@github.com/{organization}/{repo_name}.git'
         else:
             url_fmt = 'https://github.com/{login}/{repo_name}.git'
-        eq_(res, [(ds, url_fmt.format(**locals()), False)])
+        assert_in_results(
+            res,
+            path=ds.path,
+            url=url_fmt.format(**locals()),
+            preexisted=False)
 
         # but if we rerun - should kaboom since already has this sibling:
-        with assert_raises(ValueError) as cme:
-            ds.create_sibling_github(repo_name, **kwargs)
-        assert_in("already has a configured sibling", str(cme.exception))
+        assert_in_results(
+            ds.create_sibling_github(repo_name, on_failure='ignore', **kwargs),
+            message=('already has a configured sibling "%s"', 'github'),
+            status='error',
+        )
 
         # but we can give it a new name, but it should kaboom since the remote one
         # exists already
-        with assert_raises(ValueError) as cme:
-            ds.create_sibling_github(repo_name, name="github2", **kwargs)
-        assert_in("already exists on", str(cme.exception))
+        assert_in_results(
+            ds.create_sibling_github(repo_name, name="github2",
+                                     on_failure='ignore', **kwargs),
+            message=('repository "%s" already exists on Github', 'test_integration1'),
+            status='error',
+        )
         # we should not leave the broken sibling behind
         assert_not_in('github2', ds.repo.get_remotes())
 

@@ -19,6 +19,7 @@ from os import (
 )
 
 from io import StringIO
+import sys
 from unittest.mock import patch
 
 from datalad.utils import (
@@ -66,9 +67,9 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_in,
     assert_not_in,
+    assert_not_in_results,
     swallow_logs,
     swallow_outputs,
-    known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
     slow,
@@ -455,7 +456,7 @@ def test_rerun_outofdate_tree(path):
     with open(input_file, "w") as f:
         f.write("abc\ndef")
     ds.save("foo", to_git=True)
-    # Create inital run.
+    # Create initial run.
     ds.run('grep def foo > out')
     eq_('def\n', open(output_file).read())
     # Change tree so that it is no longer compatible.
@@ -607,10 +608,12 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
-@known_failure_githubci_win
-@known_failure_appveyor
+@known_failure_windows
 # ^ Issue only happens on appveyor, Python itself implodes. Cannot be
 #   reproduced on a real win7 box
+# Comment above looks outdated. Last trial on Appveyor failed, but seems related
+# to unresolved globs:
+# https://ci.appveyor.com/project/mih/datalad/builds/37951288/job/yxx47i3vtola2wek
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
@@ -815,6 +818,33 @@ def test_rerun_explicit(path):
 
     with assert_raises(CommandError):
         ds.rerun(onto="", since="", explicit=True)
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_assume_ready(path):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    (repo.pathobj / "f1").write_text("f1\n")
+    ds.save()
+
+    def double_in_both_cmd(src, dest1, dest2):
+        return [
+            sys.executable, "-c",
+            "import sys; import os; import os.path as op; "
+            "content = open(sys.argv[-3]).read() * 2; "
+            "d1 = sys.argv[-2]; d2 = sys.argv[-1]; "
+            "op.lexists(d1) and os.unlink(d1); "
+            "op.lexists(d2) and os.unlink(d2); "
+            "open(d1, 'w').write(content); open(d2, 'w').write(content)",
+            src, dest1, dest2]
+
+    ds.run(double_in_both_cmd("f1", "out1", "out2"), outputs=["out1"])
+    # Drop the content so that we remove instead of unlock, making the test is
+    # more meaningful on an adjusted branch.
+    ds.drop(["out1", "out2"], check=False)
+    # --assume-ready affects both explicitly specified and automatic outputs.
+    res = ds.rerun(assume_ready="outputs")
+    assert_not_in_results(res, action="remove")
 
 
 # underlying code cannot deal with adjusted branches

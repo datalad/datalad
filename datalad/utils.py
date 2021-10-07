@@ -9,7 +9,6 @@
 
 import collections
 from collections.abc import Callable
-import hashlib
 import re
 import builtins
 import time
@@ -29,6 +28,8 @@ import string
 import warnings
 import wrapt
 
+import os.path as op
+
 from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import (
@@ -38,16 +39,29 @@ from functools import (
 from time import sleep
 import inspect
 from itertools import tee
+# this import is required because other modules import opj from here.
+from os.path import join as opj
+from os.path import (
+    abspath,
+    basename,
+    commonprefix,
+    curdir,
+    dirname,
+    exists,
+    expanduser,
+    expandvars,
+    isabs,
+    isdir,
+    islink,
+    lexists,
+    normpath,
+    pardir,
+    relpath,
+    sep,
+    split,
+    splitdrive
+)
 
-import os.path as op
-from os.path import sep as dirsep
-from os.path import commonprefix
-from os.path import curdir, basename, exists, islink, join as opj
-from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
-from os.path import isdir
-from os.path import relpath
-from os.path import dirname
-from os.path import split as psplit
 import posixpath
 
 from shlex import (
@@ -93,9 +107,6 @@ def get_linux_distribution():
     return result
 
 
-# TODO: deprecated, remove in 0.15
-# Wheezy EOLed 2 years ago, no new datalad builds from neurodebian
-on_debian_wheezy = False
 # Those weren't used for any critical decision making, thus we just set them to None
 # Use get_linux_distribution() directly where needed
 linux_distribution_name = linux_distribution_release = None
@@ -108,9 +119,13 @@ CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
     CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
     assert CMD_MAX_ARG > 0
-    if sys.version_info[:2] == (3, 4):
+    if CMD_MAX_ARG > CMD_MAX_ARG_HARDCODED * 1e6:
         # workaround for some kind of a bug which comes up with python 3.4
         # see https://github.com/datalad/datalad/issues/3150
+        # or on older CentOS with conda and python as new as 3.9
+        # see https://github.com/datalad/datalad/issues/5943
+        # TODO: let Yarik know that the world is a paradise now whenever 1e6
+        # is not large enough
         CMD_MAX_ARG = min(CMD_MAX_ARG, CMD_MAX_ARG_HARDCODED)
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
@@ -168,7 +183,7 @@ def get_func_kwargs_doc(func):
 
 
 def any_re_search(regexes, value):
-    """Return if any of regexes (list or str) searches succesfully for value"""
+    """Return if any of regexes (list or str) searches successfully for value"""
     for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
             return True
@@ -201,7 +216,7 @@ def get_home_envvars(new_home):
         # and also Python changed its behavior and started to respect USERPROFILE only
         # since python 3.8: https://bugs.python.org/issue36264
         out['USERPROFILE'] = new_home
-        out['HOMEDRIVE'], out['HOMEPATH'] = op.splitdrive(new_home)
+        out['HOMEDRIVE'], out['HOMEPATH'] = splitdrive(new_home)
     return {v: val for v, val in out.items() if v in os.environ}
 
 
@@ -300,11 +315,11 @@ def md5sum(filename):
 
 
 # unused in -core
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
+def sorted_files(path):
+    """Return a (sorted) list of files under path
     """
-    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
-                       for r, d, files in os.walk(dout)
+    return sorted(sum([[op.join(r, f)[len(path) + 1:] for f in files]
+                       for r, d, files in os.walk(path)
                        if not '.git' in r], []))
 
 _encoded_dirsep = r'\\'  if on_windows else r'/'
@@ -336,9 +351,9 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
         # TODO: might want to uniformize on windows to use '/'
-        paths = (opj(dirpath, name) for name in names)
+        paths = (op.join(dirpath, name) for name in names)
         for path in filter(re.compile(regex).search, paths):
-            path = path.rstrip(dirsep)
+            path = path.rstrip(sep)
             if exclude and re.search(exclude, path):
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):
@@ -368,7 +383,7 @@ def posix_relpath(path, start=None):
     return posixpath.join(
         # split and relpath native style
         # python2.7 ntpath implementation of relpath cannot handle start=None
-        *psplit(
+        *split(
             relpath(path, start=start if start is not None else '')))
 
 
@@ -413,7 +428,7 @@ def rotree(path, ro=True, chmod_files=True):
     for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
-                fullf = opj(root, f)
+                fullf = op.join(root, f)
                 # might be the "broken" symlink which would fail to stat etc
                 if exists(fullf):
                     chmod(fullf)
@@ -447,12 +462,12 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     assert_no_open_files(path)
 
     if children_only:
-        if not os.path.isdir(path):
+        if not isdir(path):
             raise ValueError("Can remove children only of directories")
         for p in os.listdir(path):
             rmtree(op.join(path, p))
         return
-    if not (os.path.islink(path) or not os.path.isdir(path)):
+    if not (islink(path) or not isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         if on_windows:
             # shutil fails to remove paths that exceed 260 characters on Windows machines
@@ -523,7 +538,7 @@ if _assert_no_open_files_cfg:
     def assert_no_open_files(path):
         files = get_open_files(path, log_open=40)
         if _assert_no_open_files_cfg == 'assert':
-            assert not files
+            assert not files, "Got following files still open: %s" % ','.join(files)
         elif files:
             if _assert_no_open_files_cfg == 'pdb':
                 import pdb
@@ -550,7 +565,7 @@ def rmtemp(f, *args, **kwargs):
             return
         lgr.log(5, "Removing temp file: %s", f)
         # Can also be a directory
-        if os.path.isdir(f):
+        if isdir(f):
             rmtree(f, *args, **kwargs)
         else:
             unlink(f)
@@ -633,7 +648,7 @@ else:
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():
-            # trust noone - adjust also of the target file
+            # trust no one - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
@@ -954,7 +969,7 @@ def generate_chunks(container, size):
 
 
 def generate_file_chunks(files, cmd=None):
-    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+    """Given a list of files, generate chunks of them to avoid exceeding cmdline length
 
     Parameters
     ----------
@@ -1122,7 +1137,7 @@ def collect_method_callstats(func):
     memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
     # gross timing
     times = []
-    toppath = op.dirname(__file__) + op.sep
+    toppath = dirname(__file__) + sep
 
     @wraps(func)
     def  _wrap_collect_method_callstats(*args, **kwargs):
@@ -1132,7 +1147,7 @@ def collect_method_callstats(func):
             caller = stack[-2]
             stack_sig = \
                 "{relpath}:{s.name}".format(
-                    s=caller, relpath=op.relpath(caller.filename, toppath))
+                    s=caller, relpath=relpath(caller.filename, toppath))
             sig = (id(self), stack_sig)
             # we will count based on id(self) + wherefrom
             memo[sig][caller.lineno] += 1
@@ -1494,7 +1509,7 @@ def ensure_dir(*args):
     Joins the list of arguments to an os-specific path to the desired
     directory and creates it, if it not exists yet.
     """
-    dirname = opj(*args)
+    dirname = op.join(*args)
     if not exists(dirname):
         os.makedirs(dirname)
     return dirname
@@ -1627,7 +1642,7 @@ class chpwd(object):
             return
 
         if not isabs(path):
-            path = normpath(opj(pwd, path))
+            path = normpath(op.join(pwd, path))
         if not os.path.exists(path) and mkdir:
             self._mkdir = True
             os.mkdir(path)
@@ -1659,7 +1674,7 @@ def dlabspath(path, norm=False):
     """
     if not isabs(path):
         # if not absolute -- relative to pwd
-        path = opj(getpwd(), path)
+        path = op.join(getpwd(), path)
     return normpath(path) if norm else path
 
 
@@ -1834,10 +1849,10 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 def _path_(*p):
     """Given a path in POSIX" notation, regenerate one in native to the env one"""
     if on_windows:
-        return opj(*map(lambda x: opj(*x.split('/')), p))
+        return op.join(*map(lambda x: op.join(*x.split('/')), p))
     else:
         # Assume that all others as POSIX compliant so nothing to be done
-        return opj(*p)
+        return op.join(*p)
 
 
 def get_timestamp_suffix(time_=None, prefix='-'):
@@ -1863,7 +1878,7 @@ def get_logfilename(dspath, cmd='datalad'):
     assert(exists(dspath))
     assert(isdir(dspath))
     ds_logdir = ensure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
-    return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
+    return op.join(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
 def get_trace(edges, start, end, trace=None):
@@ -1945,22 +1960,22 @@ def get_dataset_root(path):
     path = str(path)
     suffix = '.git'
     altered = None
-    if op.islink(path) or not op.isdir(path):
+    if islink(path) or not isdir(path):
         altered = path
-        path = op.dirname(path)
-    apath = op.abspath(path)
+        path = dirname(path)
+    apath = abspath(path)
     # while we can still go up
-    while op.split(apath)[1]:
-        if op.exists(op.join(path, suffix)):
+    while split(apath)[1]:
+        if exists(op.join(path, suffix)):
             return path
         # new test path in the format we got it
-        path = op.normpath(op.join(path, os.pardir))
+        path = normpath(op.join(path, os.pardir))
         # no luck, next round
-        apath = op.abspath(path)
+        apath = abspath(path)
     # if we applied dirname() at the top, we give it another go with
     # the actual path, if it was itself a symlink, it could be the
     # top-level dataset itself
-    if altered and op.exists(op.join(altered, suffix)):
+    if altered and exists(op.join(altered, suffix)):
         return altered
 
     return None
@@ -2087,20 +2102,6 @@ def slash_join(base, extension):
          extension.lstrip('/')))
 
 
-def safe_print(s):
-    """Print with protection against UTF-8 encoding errors"""
-    # A little bit of dance to be able to test this code
-    print_f = getattr(builtins, "print")
-    try:
-        print_f(s)
-    except UnicodeEncodeError:
-        # failed to encode so let's do encoding while ignoring errors
-        # to print at least something
-        # explicit `or ascii` since somehow on buildbot it seemed to return None
-        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
-            if hasattr(s, 'encode') else s
-        print_f(s.decode())
-
 #
 # IO Helpers
 #
@@ -2223,9 +2224,10 @@ def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug
                 pkg)
             mods_loaded.append(mod)
         except Exception as exc:
-            from datalad.dochelpers import exc_str
+            from datalad.support.exceptions import CapturedException
+            ce = CapturedException(exc)
             log((msg + ': {exception}').format(
-                module=modname, package=pkg, exception=exc_str(exc)))
+                module=modname, package=pkg, exception=ce.message))
     return mods_loaded
 
 
@@ -2372,8 +2374,8 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     if archives_leading_dir:
         compress_files([dirname], name, path=path, overwrite=overwrite)
     else:
-        compress_files(list(map(op.basename, glob.glob(opj(full_dirname, '*')))),
-                       opj(op.pardir, name),
+        compress_files(list(map(basename, glob.glob(op.join(full_dirname, '*')))),
+                       op.join(pardir, name),
                        path=op.join(path, dirname),
                        overwrite=overwrite)
     # remove original tree
@@ -2387,7 +2389,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     with that content and place it into the tree if name ends with .tar.gz
     """
     lgr.log(5, "Creating a tree under %s", path)
-    if not op.exists(path):
+    if not exists(path):
         os.makedirs(path)
 
     if isinstance(tree, dict):
@@ -2401,7 +2403,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             executable = False
             name = file_
         full_name = op.join(path, name)
-        if remove_existing and op.lexists(full_name):
+        if remove_existing and lexists(full_name):
             rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
@@ -2417,6 +2419,9 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             open_func = open
             if full_name.endswith('.gz'):
                 open_func = gzip.open
+            elif full_name.split('.')[-1] in ('xz', 'lzma'):
+                import lzma
+                open_func = lzma.open
             with open_func(full_name, "wb") as f:
                 f.write(ensure_bytes(load, 'utf-8'))
         if executable:
@@ -2598,7 +2603,7 @@ def check_symlink_capability(path, target):
     assume to be able to write to tmpfile and also not import a whole lot from
     datalad's test machinery. Finally, we want to know, whether we can create a
     symlink at a specific location, not just somewhere. Therefore use
-    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    arbitrary path to test-build a symlink and delete afterwards. Suitable
     location can therefore be determined by high lever code.
 
     Parameters

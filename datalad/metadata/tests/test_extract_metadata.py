@@ -64,7 +64,7 @@ def test_ds_extraction(path):
         type='dataset', status='ok', action='metadata', path=path, refds=ds.path)
     assert_in('xmp', res[0]['metadata'])
 
-    # now the more useful case: getting everthing for xmp from a dataset
+    # now the more useful case: getting everything for xmp from a dataset
     res = extract_metadata(
         types=['xmp'],
         dataset=ds)

@@ -49,21 +49,19 @@ ANNEX_TRANSFER_DIR = join('.git', 'annex', 'transfer')
 SEARCH_INDEX_DOTGITDIR = join('datalad', 'search_index')
 
 DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
-                  or "http://datasets.datalad.org/"
+                  or "https://datasets.datalad.org/"
 # safeguard
 if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
-WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')
 
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
 
-# We use custom ssh runner while interacting with git
-#GIT_SSH_COMMAND = "/tmp/sshrun"  # was a little shell script to help troubleshooting
-GIT_SSH_COMMAND = "datalad sshrun"
+# in order to avoid breakage, import runner-related const
+from datalad.runner.gitrunner import GIT_SSH_COMMAND
 
 # magic sha is from `git hash-object -t tree /dev/null`, i.e. from nothing
 PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'

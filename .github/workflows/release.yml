@@ -1,0 +1,64 @@
+name: Auto-release on PR merge
+
+on:
+  # ATM, this is the closest trigger to a PR merging
+  push:
+    branches:
+      - maint
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Download latest auto
+        run: |
+          auto_download_url="$(curl -fsSL https://api.github.com/repos/intuit/auto/releases/latest | jq -r '.assets[] | select(.name == "auto-linux.gz") | .browser_download_url')"
+          wget -O- "$auto_download_url" | gunzip > ~/auto
+          chmod a+x ~/auto
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '^3.8'
+
+      - name: Install Python dependencies
+        run: python -m pip install build twine
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Create release
+        run: |
+          set -x
+          new_version="$(~/auto shipit --dry-run --quiet)"
+          if [ -z "$new_version" ]
+          then echo "Nothing to release"
+               exit
+          fi
+          echo "[INFO] New version: $new_version"
+          changelog_version="$(perl -nle '/^# ([0-9]+\.\S*) \(.*\)/ and print $1 and exit' CHANGELOG.md)"
+          echo "[INFO] Changelog version: $changelog_version"
+          opts=
+          if dpkg --compare-versions "$new_version" lt "$changelog_version"
+          then echo "[ERROR] New version is less than latest version in changelog"
+               exit 1
+          elif dpkg --compare-versions "$new_version" eq "$changelog_version"
+          then echo '[INFO] Disabling changelog autogeneration'
+               opts=--no-changelog
+          elif ! dpkg --compare-versions "$new_version" gt "$changelog_version"
+          then echo "[ERROR] Could not compare new version '$new_version' to changelog version '$changelog_version'"
+               exit 1
+          fi
+          ~/auto shipit $opts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
+# vim:set sts=2:

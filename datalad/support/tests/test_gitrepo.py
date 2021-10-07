@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     assert_false,
     assert_in,
     assert_in_results,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_repo_status,
@@ -316,6 +317,24 @@ def test_GitRepo_commit(path):
     # commit with empty message:
     gr.commit()
     assert_repo_status(gr)
+    assert_equal(gr.format_commit("%B").strip(), "[DATALAD] Recorded changes")
+
+    # amend commit:
+    assert_equal(len(list(gr.get_branch_commits_())), 2)
+    last_sha = gr.get_hexsha()
+    with open(op.join(path, filename), 'w') as f:
+        f.write("changed again")
+    gr.add(filename)
+    gr.commit("amend message", options=to_options(amend=True))
+    assert_repo_status(gr)
+    assert_equal(gr.format_commit("%B").strip(), "amend message")
+    assert_not_equal(last_sha, gr.get_hexsha())
+    assert_equal(len(list(gr.get_branch_commits_())), 2)
+    # amend w/o message maintains previous one:
+    gr.commit(options=to_options(amend=True))
+    assert_repo_status(gr)
+    assert_equal(len(list(gr.get_branch_commits_())), 2)
+    assert_equal(gr.format_commit("%B").strip(), "amend message")
 
     # nothing to commit doesn't raise by default:
     gr.commit()
@@ -503,43 +522,6 @@ def test_GitRepo_get_remote_url(path):
 
 @with_tempfile
 @with_tempfile
-@with_tempfile
-def test_GitRepo_pull(test_path, orig_path, clone_path):
-
-    veryorigin = GitRepo(test_path)
-    with open(op.join(test_path, 'some.txt'), 'w') as f:
-        f.write("New text file.")
-    veryorigin.add('some.txt')
-    veryorigin.commit("new file added.")
-
-    origin = GitRepo.clone(test_path, orig_path)
-    clone = GitRepo.clone(orig_path, clone_path)
-    filename = get_most_obscure_supported_name()
-
-    with open(op.join(orig_path, filename), 'w') as f:
-        f.write("New file.")
-    origin.add(filename)
-    origin.commit("new file added.")
-    clone.pull()
-    ok_(op.exists(op.join(clone_path, filename)))
-
-    # While at it, let's test _get_remotes_having_commit a bit
-    from datalad.distribution.get import _get_remotes_having_commit
-    clone.add_remote("very_origin", test_path)
-    clone.fetch("very_origin")
-    eq_(
-        _get_remotes_having_commit(clone, clone.get_hexsha()),
-        [DEFAULT_REMOTE]
-    )
-    prev_commit = clone.get_hexsha('HEAD^')
-    eq_(
-        set(_get_remotes_having_commit(clone, prev_commit)),
-        {DEFAULT_REMOTE, 'very_origin'}
-    )
-
-
-@with_tempfile
-@with_tempfile
 def test_GitRepo_fetch(orig_path, clone_path):
 
     origin = GitRepo(orig_path)
@@ -620,42 +602,6 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     # we actually fetched it:
     assert_in('ssh-remote/' + DEFAULT_BRANCH,
               repo.get_remote_branches())
-
-
-@skip_nomultiplex_ssh
-@with_tempfile
-@with_tempfile
-def test_GitRepo_ssh_pull(remote_path, repo_path):
-    from datalad import ssh_manager
-
-    remote_repo = GitRepo(remote_path, create=True)
-    url = _path2localsshurl(remote_path)
-    socket_path = op.join(str(ssh_manager.socket_dir),
-                          get_connection_hash('datalad-test', bundled=True))
-    repo = GitRepo(repo_path, create=True)
-    repo.add_remote("ssh-remote", url)
-
-    # modify remote:
-    remote_repo.checkout("ssh-test", ['-b'])
-    with open(op.join(remote_repo.path, "ssh_testfile.dat"), "w") as f:
-        f.write("whatever")
-    remote_repo.add("ssh_testfile.dat")
-    remote_repo.commit("ssh_testfile.dat added.")
-
-    # file is not locally known yet:
-    assert_not_in("ssh_testfile.dat", repo.get_indexed_files())
-
-    # pull changes:
-    repo.pull(remote="ssh-remote", refspec=remote_repo.get_active_branch())
-    assert_repo_status(repo.path, annex=False)
-
-    # the connection is known to the SSH manager, since fetch() requested it:
-    assert_in(socket_path, list(map(str, ssh_manager._connections)))
-    # and socket was created:
-    ok_(op.exists(socket_path))
-
-    # we actually pulled the changes
-    assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
 @skip_nomultiplex_ssh
@@ -1416,7 +1362,7 @@ def test_gitattributes(path):
     # tag entirely
     gr.set_gitattributes([('*', {'tag': False})])
     eq_(gr.get_gitattributes('.')['.'], {'tag': False, 'sec.key': 'val'})
-    # attributes file is not added or commited, we can ignore such
+    # attributes file is not added or committed, we can ignore such
     # attributes
     eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
 
@@ -1449,6 +1395,18 @@ def test_gitattributes(path):
     # mode='w' should replace the entire file:
     gr.set_gitattributes([('**', {'some': 'nonsense'})], mode='w')
     eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense'})
+    # mode='a' appends additional key/value
+    gr.set_gitattributes([('*', {'king': 'kong'})], mode='a')
+    eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense', 'king': 'kong'})
+    # handle files without trailing newline
+    with open(op.join(gr.path, '.gitattributes'), 'r+') as f:
+        s = f.read()
+        f.seek(0)
+        f.write(s.rstrip())
+        f.truncate()
+    gr.set_gitattributes([('*', {'ding': 'dong'})], mode='a')
+    eq_(gr.get_gitattributes('.')['.'],
+        {'some': 'nonsense', 'king': 'kong', 'ding': 'dong'})
 
 
 @with_tempfile(mkdir=True)
@@ -1658,7 +1616,8 @@ def test_GitRepo_get_revisions(path):
     eq_(gr.get_revisions(DEFAULT_BRANCH + ".."), [])
 
 
-@with_tree({"foo": "foo"})
+@with_tree({"foo": "foo",
+            ".gitattributes": "* annex.largefiles=anything"})
 def test_gitrepo_add_to_git_with_annex_v7(path):
     from datalad.support.annexrepo import AnnexRepo
     ar = AnnexRepo(path, create=True, version=7)
@@ -1738,7 +1697,7 @@ def test_gitrepo_push_default_first_kludge(path):
                                            DEFAULT_BRANCH + ":a-oneshot",
                                            DEFAULT_BRANCH + ":c-oneshot"])
     cmds_oneshot = [ln for ln in cml.out.splitlines()
-                    if "cmd" in ln and "push" in ln and DEFAULT_BRANCH in ln]
+                    if "Run" in ln and "push" in ln and DEFAULT_BRANCH in ln]
     eq_(len(cmds_oneshot), 1)
     assert_in(":a-oneshot", cmds_oneshot[0])
     assert_in(":b-oneshot", cmds_oneshot[0])
@@ -1754,7 +1713,7 @@ def test_gitrepo_push_default_first_kludge(path):
                                            DEFAULT_BRANCH + ":a-twoshot",
                                            DEFAULT_BRANCH + ":c-twoshot"])
     cmds_twoshot = [ln for ln in cml.out.splitlines()
-                    if "cmd" in ln and "push" in ln and DEFAULT_BRANCH in ln]
+                    if "Run" in ln and "push" in ln and DEFAULT_BRANCH in ln]
     # ... there are instead two git-push calls.
     eq_(len(cmds_twoshot), 2)
     # The first is for the first item of the refspec.

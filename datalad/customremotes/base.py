@@ -12,14 +12,16 @@ from __future__ import absolute_import
 
 __docformat__ = 'restructuredtext'
 
-import inspect
 import errno
 import os
 import sys
 
 from collections import Counter
 
-from ..support.path import exists, join as opj, dirname, lexists
+from ..support.path import (
+    join as opj,
+    lexists,
+)
 
 from urllib.parse import urlparse
 
@@ -29,12 +31,10 @@ lgr.log(5, "Importing datalad.customremotes.main")
 
 from ..ui import ui
 from ..support.cache import DictCache
+from datalad.support.exceptions import CapturedException
 from ..cmdline.helpers import get_repo_instance
-from ..dochelpers import exc_str
 from datalad.utils import (
-    ensure_unicode,
     getargspec,
-    Path,
 )
 
 URI_PREFIX = "dl"
@@ -320,8 +320,9 @@ class AnnexCustomRemote(object):
             try:
                 method(*req_load)
             except Exception as e:
-                self.error("Problem processing %r with parameters %r: %r"
-                           % (req, req_load, exc_str(e)))
+                ce = CapturedException(e)
+                self.error("Problem processing %r with parameters %r: %s"
+                           % (req, req_load, ce))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s", format_exc())
 
@@ -381,7 +382,7 @@ class AnnexCustomRemote(object):
             self.debug("Not claiming url %s" % url)
             self.send("CLAIMURL-FAILURE")
 
-    # TODO: we should unify what to be overriden and some will provide CHECKURL
+    # TODO: we should unify what to be overridden and some will provide CHECKURL
 
     def req_TRANSFER(self, cmd, key, file):
         if cmd in ("RETRIEVE",):
@@ -389,8 +390,9 @@ class AnnexCustomRemote(object):
             try:
                 self._transfer(cmd, key, file)
             except Exception as exc:
+                ce = CapturedException(exc)
                 self.send(
-                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc_str(exc))
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, ce)
                 )
         else:
             self.send_unsupported(

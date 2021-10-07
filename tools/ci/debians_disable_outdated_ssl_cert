@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# "Recipe" from https://superuser.com/a/1679332 (thanks @jwodder)
+# to mitigate https://github.com/datalad/datalad/issues/6026
+
+if hash update-ca-certificates; then
+    sudo sed -i -e 's,^\(mozilla/DST_Root_CA_X3.crt\),!\1,g' /etc/ca-certificates.conf
+    sudo update-ca-certificates
+fi

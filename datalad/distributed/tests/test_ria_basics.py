@@ -8,12 +8,31 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
+
 from datalad.api import (
     Dataset,
     clone,
+    create_sibling_ria,
 )
-from datalad.utils import Path
+from datalad.cmd import NoCapture
+from datalad.customremotes.ria_utils import (
+    create_ds_in_store,
+    create_store,
+    get_layout_locations,
+)
+from datalad.distributed.ora_remote import (
+    LocalIO,
+    SSHRemoteIO,
+    _sanitize_key,
+)
+from datalad.distributed.tests.ria_utils import (
+    common_init_opts,
+    get_all_files,
+    populate_dataset,
+)
+from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
+    SkipTest,
     assert_equal,
     assert_in,
     assert_not_in,
@@ -22,38 +41,17 @@ from datalad.tests.utils import (
     assert_status,
     assert_true,
     has_symlink_capability,
-    SkipTest,
     known_failure_windows,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_ssh,
+    skip_wo_symlink_capability,
     slow,
     swallow_logs,
     turtle,
-    with_tempfile
+    with_tempfile,
 )
-from datalad.distributed.ora_remote import (
-    LocalIO,
-    SSHRemoteIO
-)
-from datalad.support.exceptions import (
-    CommandError,
-    IncompleteResultsError
-)
-from datalad.distributed.tests.ria_utils import (
-    get_all_files,
-    populate_dataset,
-    common_init_opts
-)
-from datalad.customremotes.ria_utils import (
-    create_store,
-    create_ds_in_store,
-    get_layout_locations
-)
-from datalad.cmd import (
-    NoCapture,
-)
-
+from datalad.utils import Path
 
 # Note, that exceptions to test for are generally CommandError since we are
 # talking to the special remote via annex.
@@ -172,6 +170,48 @@ def test_initremote_basic():
     yield known_failure_windows(skip_ssh(_test_initremote_basic)), \
           'datalad-test'
     yield _test_initremote_basic, None
+
+
+@skip_wo_symlink_capability
+@known_failure_windows  # see gh-4469
+@with_tempfile
+@with_tempfile
+def _test_initremote_alias(host, ds_path, store):
+
+    ds_path = Path(ds_path)
+    store = Path(store)
+    ds = Dataset(ds_path).create()
+    populate_dataset(ds)
+    ds.save()
+
+    if host:
+        url = "ria+ssh://{host}{path}".format(host=host,
+                                              path=store)
+    else:
+        url = "ria+{}".format(store.as_uri())
+    init_opts = common_init_opts + ['url={}'.format(url)]
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    create_store(io, store, '1')
+    # set up the dataset with alias
+    create_ds_in_store(io, store, ds.id, '2', '1', 'ali')
+    ds.repo.init_remote('ria-remote', options=init_opts)
+    assert_in('ria-remote',
+              [cfg['name']
+               for uuid, cfg in ds.repo.get_special_remotes().items()]
+              )
+    assert_repo_status(ds.path)
+    assert_true(io.exists(store / "alias" / "ali"))
+
+
+def test_initremote_alias():
+
+    # TODO: Skipped due to gh-4436
+    yield known_failure_windows(skip_ssh(_test_initremote_alias)), \
+          'datalad-test'
+    yield _test_initremote_alias, None
+
 
 
 @known_failure_windows  # see gh-4469
@@ -525,3 +565,109 @@ def test_binary_data():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_binary_data)), 'datalad-test'
     yield skip_if_no_network(_test_binary_data), None
+
+
+@known_failure_windows
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_push_url(storepath, dspath, blockfile):
+
+    dspath = Path(dspath)
+    store = Path(storepath)
+    blockfile = Path(blockfile)
+    blockfile.touch()
+
+    ds = Dataset(dspath).create()
+    populate_dataset(ds)
+    ds.save()
+    assert_repo_status(ds.path)
+
+    # set up store:
+    io = LocalIO()
+    store_url = "ria+{}".format(store.as_uri())
+    create_store(io, store, '1')
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # initremote fails with invalid url (not a ria+ URL):
+    invalid_url = (store.parent / "non-existent").as_uri()
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(invalid_url)]
+    assert_raises(CommandError, ds.repo.init_remote, 'store', options=init_opts)
+
+    # initremote succeeds with valid but inaccessible URL (pointing to a file
+    # instead of a store):
+    block_url = "ria+" + blockfile.as_uri()
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(block_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    # but a push will fail:
+    assert_raises(CommandError, ds.repo.call_annex,
+                  ['copy', 'one.txt', '--to', 'store'])
+
+    # reconfigure with correct push-url:
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(store_url)]
+    ds.repo.enable_remote('store', options=init_opts)
+
+    # push works now:
+    ds.repo.call_annex(['copy', 'one.txt', '--to', 'store'])
+
+    store_uuid = ds.siblings(name='store',
+                             return_type='item-or-list')['annex-uuid']
+    here_uuid = ds.siblings(name='here',
+                            return_type='item-or-list')['annex-uuid']
+
+    known_sources = ds.repo.whereis('one.txt')
+    assert_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
+
+
+@skip_if_no_network
+@known_failure_windows
+@with_tempfile
+@with_tempfile
+def test_url_keys(dspath, storepath):
+    ds = Dataset(dspath).create()
+    repo = ds.repo
+    filename = 'url_no_size.html'
+    # URL-type key without size
+    repo.call_annex([
+        'addurl', '--relaxed', '--raw', '--file', filename, 'http://example.com',
+    ])
+    ds.save()
+    # copy target
+    ds.create_sibling_ria(
+        name='ria',
+        url='ria+file://{}'.format(storepath),
+        storage_sibling='only',
+    )
+    ds.get(filename)
+    repo.call_annex(['copy', '--to', 'ria', filename])
+    ds.drop(filename)
+    # in the store and on the web
+    assert_equal(len(ds.repo.whereis(filename)), 2)
+    # try download, but needs special permissions to even be attempted
+    ds.config.set('annex.security.allow-unverified-downloads', 'ACKTHPPT', where='local')
+    repo.call_annex(['copy', '--from', 'ria', filename])
+    assert_equal(len(ds.repo.whereis(filename)), 3)
+    # smoke tests that execute the remaining pieces with the URL key
+    repo.call_annex(['fsck', '-f', 'ria'])
+    assert_equal(len(ds.repo.whereis(filename)), 3)
+    # mapped key in whereis output
+    assert_in('%%example', repo.call_annex(['whereis', filename]))
+
+    repo.call_annex(['move', '-f', 'ria', filename])
+    # check that it does not magically reappear, because it actually
+    # did not drop the file
+    repo.call_annex(['fsck', '-f', 'ria'])
+    assert_equal(len(ds.repo.whereis(filename)), 2)
+
+
+def test_sanitize_key():
+    for i, o in (
+                ('http://example.com/', 'http&c%%example.com%'),
+                ('/%&:', '%&s&a&c'),
+            ):
+        assert_equal(_sanitize_key(i), o)

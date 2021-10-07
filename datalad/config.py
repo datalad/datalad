@@ -23,7 +23,6 @@ from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
 )
-from datalad.dochelpers import exc_str
 
 import re
 import os
@@ -292,7 +291,7 @@ class ConfigManager(object):
         self._stores = dict(
             # populated with info from git
             git=store,
-            # only populated with info from commited dataset config
+            # only populated with info from committed dataset config
             dataset=store.copy(),
         )
         # merged representation (the only one that existed pre datalad 0.14)
@@ -484,7 +483,7 @@ class ConfigManager(object):
           `text`.
         """
         # do local import, as this module is import prominently and the
-        # could theoretically import all kind of weired things for type
+        # could theoretically import all kind of weird things for type
         # conversion
         from datalad.interface.common_cfg import definitions as cfg_defs
         # fetch what we know about this variable
@@ -518,7 +517,7 @@ class ConfigManager(object):
                 raise ValueError(
                     "value '{}' of existing configuration for '{}' cannot be "
                     "converted to the desired type '{}' ({})".format(
-                        _value, var, valtype, exc_str(e)))
+                        _value, var, valtype, e)) from e
 
         # now we need to try to obtain something from the user
         from datalad.ui import ui
@@ -572,7 +571,7 @@ class ConfigManager(object):
         except Exception as e:
             raise ValueError(
                 "cannot convert user input `{}` to desired type ({})".format(
-                    _value, exc_str(e)))
+                    _value, e)) from e
             # XXX we could consider "looping" until we have a value of proper
             # type in case of a user typo...
 
@@ -641,7 +640,7 @@ class ConfigManager(object):
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
 
-        If `source` is 'dataset', only the commited configuration is queried,
+        If `source` is 'dataset', only the committed configuration is queried,
         overrides are applied. In the case of 'local', the committed
         configuration is ignored, but overrides and configuration from
         environment variables are applied as usual.
@@ -800,8 +799,8 @@ class ConfigManager(object):
             lockfile = self._repo_dot_git / 'config.dataladlock'
         else:
             # follow pattern in downloaders for lockfile location
-            lockfile = Path(self.obtain('datalad.locations.cache')) \
-                / 'locks' / 'gitconfig.lck'
+            lockfile = Path(self.obtain('datalad.locations.locks')) \
+                       / 'gitconfig.lck'
 
         with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)

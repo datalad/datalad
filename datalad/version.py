@@ -8,10 +8,16 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 # Compatibility kludge for now to not break anything relying on datalad.version
-# TODO: announce in 0.15 to be deprecated for 0.16
 #
 
+import warnings
+
 from ._version import get_versions
+
+warnings.warn(
+    "datalad.version module will be removed in 0.16. "
+    "Please use datalad.__version__ (no other __*_version__ variables are to be provided).",
+    DeprecationWarning)
 
 __version__ = get_versions()['version']
 __hardcoded_version__ = __version__
