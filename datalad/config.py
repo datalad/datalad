@@ -284,17 +284,18 @@ class ConfigManager(object):
       this dataset's configuration file (which will be created on demand)
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
-    source : {'any', 'local', 'dataset', 'dataset-local'}, optional
+    source : {'any', 'local', 'branch', 'branch-local'}, optional
       Which sources of configuration setting to consider. If 'dataset',
       configuration items are only read from a dataset's persistent
       configuration file, if any is present (the one in ``.datalad/config``, not
       ``.git/config``); if 'local', any non-committed source is considered
       (local and global configuration in Git config's terminology);
-      if 'dataset-local', persistent dataset configuration and local, but
-      not global or system configuration are considered; if 'any'
+      if 'branch-local', persistent configuration in current dataset branch
+      and local, but not global or system configuration are considered; if 'any'
       all possible sources of configuration are considered.
+      Note: 'dataset' and 'dataset-local' are deprecated in favor of 'branch'
+      and 'branch-local'.
     """
-    # TODO: above dataset* -> branch*?
 
     _checked_git_identity = False
 
@@ -306,8 +307,15 @@ class ConfigManager(object):
     _run_lock = threading.Lock()
 
     def __init__(self, dataset=None, overrides=None, source='any'):
-        # TODO?
-        if source not in ('any', 'local', 'dataset', 'dataset-local'):
+        # TODO: remove along with the removal of deprecated 'where'
+        if source in ('dataset', 'dataset-local'):
+            source_new = source.replace('dataset', 'branch')
+            warnings.warn("'source=\"%s\"' is deprecated, use 'source=\"%s\"' instead"
+                          % (source, source_new),
+                          DeprecationWarning)
+            source = source_new
+
+        if source not in ('any', 'local', 'branch', 'branch-local'):
             raise ValueError(
                 'Unknown ConfigManager(source=) setting: {}'.format(source))
         store = dict(
@@ -350,9 +358,9 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            if source in ('dataset', 'dataset-local'):
+            if source in ('branch', 'branch-local'):
                 raise ValueError(
-                    'ConfigManager configured to read dataset only, '
+                    'ConfigManager configured to read from a branch of a dataset only, '
                     'but no dataset given')
             # The caller didn't specify a repository. Unset the git directory
             # when calling 'git config' to prevent a repository in the current
@@ -418,10 +426,10 @@ class ConfigManager(object):
                 force or self._need_reload(self._stores['dataset'])):
             to_run['dataset'] = run_args + ['--file', str(dataset_cfgfile)]
 
-        if self._src_mode != 'dataset' and (
+        if self._src_mode != 'branch' and (
                 force or self._need_reload(self._stores['git'])):
             to_run['git'] = run_args + ['--local'] \
-                if self._src_mode == 'dataset-local' \
+                if self._src_mode == 'branch-local' \
                 else run_args
 
         # reload everything that was found todo
@@ -439,7 +447,7 @@ class ConfigManager(object):
         merged.update(self.overrides)
         # override with environment variables, unless we only want to read the
         # dataset's commit config
-        if self._src_mode != 'dataset':
+        if self._src_mode != 'branch':
             _update_from_env(merged)
         self._merged_store = merged
 
