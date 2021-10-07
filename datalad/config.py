@@ -285,9 +285,10 @@ class ConfigManager(object):
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
     source : {'any', 'local', 'branch', 'branch-local'}, optional
-      Which sources of configuration setting to consider. If 'dataset',
+      Which sources of configuration setting to consider. If 'branch',
       configuration items are only read from a dataset's persistent
-      configuration file, if any is present (the one in ``.datalad/config``, not
+      configuration file in current branch, if any is present
+      (the one in ``.datalad/config``, not
       ``.git/config``); if 'local', any non-committed source is considered
       (local and global configuration in Git config's terminology);
       if 'branch-local', persistent configuration in current dataset branch
@@ -332,7 +333,7 @@ class ConfigManager(object):
             # populated with info from git
             git=store,
             # only populated with info from committed dataset config
-            dataset=store.copy(),
+            branch=store.copy(),
         )
         # merged representation (the only one that existed pre datalad 0.14)
         # will be built on initial reload
@@ -423,8 +424,8 @@ class ConfigManager(object):
         if (self._src_mode != 'local' and
                 dataset_cfgfile and
                 dataset_cfgfile.exists()) and (
-                force or self._need_reload(self._stores['dataset'])):
-            to_run['dataset'] = run_args + ['--file', str(dataset_cfgfile)]
+                force or self._need_reload(self._stores['branch'])):
+            to_run['branch'] = run_args + ['--file', str(dataset_cfgfile)]
 
         if self._src_mode != 'branch' and (
                 force or self._need_reload(self._stores['git'])):
@@ -440,7 +441,7 @@ class ConfigManager(object):
         # always update the merged representation, even if we did not reload
         # anything from a file. ENV or overrides could change independently
         # start with the commit dataset config
-        merged = self._stores['dataset']['cfg'].copy()
+        merged = self._stores['branch']['cfg'].copy()
         # local config always takes precedence
         merged.update(self._stores['git']['cfg'])
         # superimpose overrides
@@ -627,7 +628,7 @@ class ConfigManager(object):
     def __repr__(self):
         # give full list of all tracked config files, plus overrides
         return "ConfigManager({}{})".format(
-            [str(p) for p in self._stores['dataset']['files'].union(
+            [str(p) for p in self._stores['branch']['files'].union(
                 self._stores['git']['files'])],
             ', overrides={!r}'.format(self.overrides) if self.overrides else '',
         )
@@ -681,21 +682,27 @@ class ConfigManager(object):
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
 
-        If `source` is 'dataset', only the committed configuration is queried,
+        If `source` is 'branch', only the committed configuration is queried,
         overrides are applied. In the case of 'local', the committed
         configuration is ignored, but overrides and configuration from
         environment variables are applied as usual.
         """
-        if source not in ('dataset', 'local'):
-            raise ValueError("source must be 'dataset' or 'local'")
+        # TODO: remove along with the removal of deprecated 'where'
         if source == 'dataset':
+            warnings.warn("'source=\"%s\"' is deprecated, use 'source=\"%s\"' instead"
+                          % (source, 'branch'),
+                          DeprecationWarning)
+            source = 'branch'
+        if source not in ('branch', 'local'):
+            raise ValueError("source must be 'branch' or 'local'")
+        if source == 'branch':
             return self.overrides.get(
                 key,
-                self._stores['dataset']['cfg'].get(
+                self._stores['branch']['cfg'].get(
                     key,
                     default))
         else:
-            if key not in self._stores['dataset']['cfg']:
+            if key not in self._stores['branch']['cfg']:
                 # the key is not in the committed config, hence we can
                 # just report based on the merged representation
                 return self.get(key, default)

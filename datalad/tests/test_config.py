@@ -224,6 +224,12 @@ def test_something(path, new_home):
     cfg.set('mike.should.have', 'a beer', force=True)
     assert_equal(cfg['mike.should.have'], 'a beer')
 
+    # test deprecated 'where' interface and old 'dataset' (not 'branch') value
+    # TODO: remove along with the removal of deprecated 'where'
+    cfg.set('mike.should.have', 'wasknown', where='dataset')
+    assert_equal(cfg['mike.should.have'], 'wasknown')
+    assert_equal(cfg.get_from_source('dataset', 'mike.should.have'), 'wasknown')
+
     # fails unknown location
     assert_raises(ValueError, cfg.add, 'somesuch', 'shit', scope='umpalumpa')
 
@@ -551,12 +557,12 @@ def test_no_leaks(path1, path2):
         assert_not_in(ds1.pathobj / '.git' / 'config',
                       ds2.config._stores['git']['files'])
         assert_not_in(ds1.pathobj / '.datalad' / 'config',
-                      ds2.config._stores['dataset']['files'])
+                      ds2.config._stores['branch']['files'])
         # these are the right ones
         assert_in(ds2.pathobj / '.git' / 'config',
                   ds2.config._stores['git']['files'])
         assert_in(ds2.pathobj / '.datalad' / 'config',
-                  ds2.config._stores['dataset']['files'])
+                  ds2.config._stores['branch']['files'])
 
 
 @with_tempfile()
