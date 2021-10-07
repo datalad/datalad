@@ -139,13 +139,9 @@ reckless_opt = Parameter(
     EnsureChoice(None, True, False, 'auto', 'ephemeral') | \
     EnsureStrPrefix('shared-'),
     metavar='auto|ephemeral|shared-...',
-    doc="""Use this parameter with a command that clones a dataset
-    [PY: (`clone(<source>, reckless=True)`) PY]
-    [CMD: ('clone <source> --reckless') CMD]
-    or subdataset [PY: (`dl.get(<subds>, reckless=True)`) PY]
-    [CMD: ('datalad get <subds> --reckless') CMD]
-    to set up the dataset in a potentially unsafe way for performance, or
-    access reasons. Use with care, any dataset is marked as 'untrusted'.
+    doc="""Obtain a dataset or subdatset and set it up in a potentially 
+    unsafe way for performance, or access reasons. 
+    Use with care, any dataset is marked as 'untrusted'.
     The reckless mode is stored in a dataset's local configuration under
     'datalad.clone.reckless', and will be inherited to any of its subdatasets.
     Supported modes are:
