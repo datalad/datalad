@@ -14,10 +14,7 @@ from os.path import (
     join as opj,
     basename,
 )
-from unittest.mock import (
-    MagicMock,
-    patch,
-)
+from unittest.mock import patch
 
 from datalad.api import (
     create,
