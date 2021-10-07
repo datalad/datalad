@@ -170,5 +170,13 @@
     "DisasterMo": {
         "name": "Michael Burgardt",
         "email": "michael.burgardt@gmail.com"
+    },
+    "Remi-Gau": {
+        "name": "Remi Gau",
+        "email": "remi.gau@tuebingen.mpg.de",
+        "bio": "Neuroimaging (high-res & laminar fMRI) and multisensory.\r\n\r\nToo much matlab and presentation and not enough R and python",
+        "blog": "https://remi-gau.github.io/",
+        "orcid": "0000-0002-1535-9767",
+        "affiliation": "Université catholique de Louvain"
     }
 }
