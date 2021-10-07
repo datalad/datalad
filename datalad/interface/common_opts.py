@@ -157,7 +157,8 @@ reckless_opt = Parameter(
     update the clone before you're able to save new content on your end.
     Alternative to 'auto' when hardlinks are not an option, or number of consumed
     inodes needs to be minimized. Note that this is meant to be used
-    with either non-bare repositories or a RIA store as origin.
+    with either non-bare repositories or a RIA store as origin, since otherwise the organization of the annex object
+    trees of the clone and its symlinked origin may conflict (dirhashmixed vs dirhashlower).
     ['shared-<mode>']: set up repository and annex permission to enable multi-user
     access. This disables the standard write protection of annex'ed files.
     <mode> can be any value support by 'git init --shared=', such as 'group', or
