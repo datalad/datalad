@@ -121,9 +121,9 @@ def test_parse_gitconfig_dump():
 @with_tempfile(mkdir=True)
 def test_something(path, new_home):
     # will refuse to work on dataset without a dataset
-    assert_raises(ValueError, ConfigManager, source='dataset')
+    assert_raises(ValueError, ConfigManager, source='branch')
     # now read the example config
-    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='branch')
     assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
@@ -260,7 +260,7 @@ def test_something(path, new_home):
 
     cfg = ConfigManager(
         Dataset(opj(path, 'ds')),
-        source='dataset',
+        source='branch',
         overrides={'datalad.godgiven': True})
     assert_equal(cfg.get('datalad.godgiven'), True)
     # setter has no effect
@@ -280,7 +280,7 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='branch')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
@@ -395,7 +395,7 @@ def test_from_env():
         assert_in('datalad.crazy.cfg', cfg)
         assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
         # not in dataset-only mode
-        cfg = ConfigManager(Dataset('nowhere'), source='dataset')
+        cfg = ConfigManager(Dataset('nowhere'), source='branch')
         assert_not_in('datalad.crazy.cfg', cfg)
     # check env trumps override
     cfg = ConfigManager()
@@ -578,7 +578,7 @@ def test_dataset_local_mode(path):
     # from .git/config
     assert_in('annex.version', ds.config)
     # now check that dataset-local mode doesn't have the global piece
-    cfg = ConfigManager(ds, source='dataset-local')
+    cfg = ConfigManager(ds, source='branch-local')
     assert_not_in('user.name', cfg)
     assert_in('datalad.dataset.id', cfg)
     assert_in('annex.version', cfg)

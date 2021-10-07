@@ -362,7 +362,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
     if cand_cfg:
         # get a handle on the configuration that is specified in the
         # dataset itself (local and dataset)
-        super_cfg = ConfigManager(dataset=ds, source='dataset-local')
+        super_cfg = ConfigManager(dataset=ds, source='branch-local')
         need_reload = False
         for rec in cand_cfg:
             # check whether any of this configuration originated from the
