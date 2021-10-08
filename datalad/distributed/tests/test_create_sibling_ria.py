@@ -102,7 +102,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     assert_repo_status(ds.path)
     # don't specify special remote. By default should be git-remote + "-storage"
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
-                                post_update_hook=True, construct_store=True)
+                                post_update_hook=True, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -159,7 +159,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     # now, again but recursive.
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
                                 recursive=True, existing='reconfigure',
-                                construct_store=True)
+                                new_store_ok=True)
     eq_(len(res), 3)
     assert_result_count(res, 1, path=str(ds.pathobj), status='ok', action="create-sibling-ria")
     assert_result_count(res, 1, path=str(subds.pathobj), status='ok', action="create-sibling-ria")
@@ -183,7 +183,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
                               "datastore",
                               existing='reconfigure',
                               trust_level=trust,
-                              construct_store=True)
+                              new_store_ok=True)
         res = ds.repo.repo_info()
         assert_in('[datastore-storage]',
                   [r['description']
@@ -231,7 +231,7 @@ def test_create_push_url(detection_path, ds_path, store_path):
                new=detector(SSHManager.get_connection, detection_path)):
 
         ds.create_sibling_ria(url, "datastore", push_url=push_url,
-                              construct_store=True)
+                              new_store_ok=True)
         # used ssh_manager despite file-url hence used push-url (ria+ssh):
         assert detection_path.exists()
 
@@ -275,7 +275,7 @@ def test_create_alias(ds_path, ria_path, clone_path):
     res = dsa.create_sibling_ria(url="ria+file://{}".format(ria_path),
                                  name="origin",
                                  alias="ds-a",
-                                 construct_store=True)
+                                 new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -289,7 +289,7 @@ def test_create_alias(ds_path, ria_path, clone_path):
     res = dsb.create_sibling_ria(url="ria+file://{}".format(ria_path),
                                  name="origin",
                                  alias="ds-b",
-                                 construct_store=True)
+                                 new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -304,7 +304,7 @@ def test_create_alias(ds_path, ria_path, clone_path):
         res = dsc.create_sibling_ria(url="ria+file://{}".format(ria_path),
                                      name="origin",
                                      alias="ds-a",
-                                     construct_store=True)
+                                     new_store_ok=True)
         assert_in("Alias 'ds-a' already exists in the RIA store, not adding an alias",
                   cml.out)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
@@ -322,7 +322,7 @@ def test_storage_only(base_path, ds_path):
     assert_repo_status(ds.path)
 
     res = ds.create_sibling_ria(store_url, "datastore", storage_sibling='only',
-                                construct_store=True)
+                                new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -350,14 +350,14 @@ def test_no_storage(store1, store2, ds_path):
     assert_repo_status(ds.path)
 
     res = ds.create_sibling_ria(store1_url, "datastore1", storage_sibling=False,
-                                construct_store=True)
+                                new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore1', 'here'},
         {s['name'] for s in ds.siblings(result_renderer=None)})
 
     # deprecated way of disabling storage still works
     res = ds.create_sibling_ria(store2_url, "datastore2",
-                                disable_storage__=True, construct_store=True)
+                                disable_storage__=True, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore2', 'datastore1', 'here'},
         {s['name'] for s in ds.siblings(result_renderer=None)})
@@ -372,7 +372,7 @@ def test_no_storage(store1, store2, ds_path):
 @with_tempfile
 def test_no_store(path):
     ds = Dataset(path).create()
-    # check that we fail without '--create-store' when there is no store
+    # check that we fail without '--new-store-ok' when there is no store
     assert_result_count(
         ds.create_sibling_ria(
             "'ria+file:///no/where'", "datastore",

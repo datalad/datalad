@@ -40,7 +40,7 @@ def test_ephemeral(ds_path, store_path, clone_path):
 
     # put into store:
     ds.create_sibling_ria("ria+{}".format(store.as_uri()), "riastore",
-                          construct_store=True)
+                          new_store_ok=True)
     ds.push(to="riastore", data="anything")
 
     # now, get an ephemeral clone from the RIA store:

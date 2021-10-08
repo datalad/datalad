@@ -525,7 +525,7 @@ def test_ria_push(srcpath, dstpath):
         'ok',
         src.create_sibling_ria(
             "ria+{}".format(get_local_file_url(dstpath, compatibility='git')),
-            "datastore", construct_store=True))
+            "datastore", new_store_ok=True))
     res = src.push(to='datastore')
     assert_in_results(
         res, action='publish', target='datastore', status='ok',
@@ -929,7 +929,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     store_url = 'ria+' + get_local_file_url(storepath)
     with chpwd(orig_super.path):
         run(['datalad', 'create-sibling-ria', '--recursive',
-             '-s', 'store', store_url, '--construct-store'])
+             '-s', 'store', store_url, '--new-store-ok'])
         run(['datalad', 'push', '--recursive', '--to', 'store'])
 
     # we are using the 'store' sibling's URL, which should be a plain path

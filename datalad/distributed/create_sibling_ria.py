@@ -229,8 +229,8 @@ class CreateSiblingRia(Interface):
             repository be forcefully re-initialized, and the sibling
             (re-)configured ('reconfigure'), or the command be instructed to
             fail ('error').""", ),
-        construct_store=Parameter(
-            args=("--construct-store",),
+        new_store_ok=Parameter(
+            args=("--new-store-ok",),
             action='store_true',
             doc="""When set, a new store will be created. Otherwise, a sibling
             will only be created if the url points to an existing RIA store.""",
@@ -266,7 +266,7 @@ class CreateSiblingRia(Interface):
                  group=None,
                  storage_sibling=True,
                  existing='error',
-                 construct_store=False,
+                 new_store_ok=False,
                  trust_level=None,
                  recursive=False,
                  recursion_limit=None,
@@ -408,7 +408,7 @@ class CreateSiblingRia(Interface):
             # to catch it
             io.read_file(Path(base_path) / 'ria-layout-version')
         except FileNotFoundError as e:
-            if not construct_store:
+            if not new_store_ok:
                 # we're instructed to only act in case of an existing RIA store
                 res = get_status_dict(
                     status='error',
