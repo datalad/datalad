@@ -334,7 +334,8 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 res.get('path', None) == dest_path:
             _fixup_submodule_dotgit_setup(ds, sm_path)
 
-            section_name = 'submodule.{}'.format(sm['gitmodule_name'])
+            section_name = 'submodule.{}'.format(
+                sm.get('gitmodule_name', None))
             # register the submodule as "active" in the superdataset
             ds.config.set(
                 '{}.active'.format(section_name),

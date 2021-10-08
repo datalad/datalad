@@ -334,7 +334,8 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     repo.call_git(
                         ['config', '--file', '.gitmodules',
                          '--unset-all',
-                         'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
+                         'submodule.{}.{}'.format(
+                             sm.get('gitmodule_name', None), dprop),
                         ]
                     )
                 except CommandError:
@@ -345,7 +346,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                             "Deleting subdataset property '%s' failed for "
                             "subdataset '%s', possibly did "
                             "not exist",
-                            dprop, sm['gitmodule_name']),
+                            dprop, sm.get('gitmodule_name', None)),
                         logger=lgr,
                         **sm)
                 # also kick from the info we just read above
@@ -366,7 +367,8 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     repo.call_git(
                         ['config', '--file', '.gitmodules',
                          '--replace-all',
-                         'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
+                         'submodule.{}.{}'.format(
+                             sm.get('gitmodule_name', None), prop),
                          str(val),
                         ]
                     )
