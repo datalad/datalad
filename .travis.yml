@@ -97,7 +97,6 @@ script:
   - cd __testhome__
   # Run tests
   - http_proxy=
-    DATALAD_ASSERT_NO_OPEN_FILES=assert
     PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER python -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
