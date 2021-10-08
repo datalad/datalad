@@ -23,6 +23,7 @@ import os
 import datalad
 
 from ..support.exceptions import (
+    CapturedException,
     InsufficientArgumentsError,
     IncompleteResultsError,
     CommandError,
@@ -43,7 +44,6 @@ from .helpers import (
     parser_add_common_opt,
     strip_arg_from_argv,
 )
-from datalad.dochelpers import exc_str
 
 
 # TODO:  OPT look into making setup_parser smarter to become faster
@@ -209,11 +209,13 @@ def main(args=None):
             try:
                 ret = cmdlineargs.func(cmdlineargs)
             except InsufficientArgumentsError as exc:
+                ce = CapturedException(exc)
                 # if the func reports inappropriate usage, give help output
-                lgr.error('%s (%s)', exc_str(exc), exc.__class__.__name__)
+                lgr.error('%s (%s)', ce, exc.__class__.__name__)
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
+                ce = CapturedException(exc)
                 # rendering for almost all commands now happens 'online'
                 # hence we are no longer attempting to render the actual
                 # results in an IncompleteResultsError, ubt rather trust that
@@ -221,10 +223,10 @@ def main(args=None):
 
                 # in general we do not want to see the error again, but
                 # present in debug output
-                lgr.debug('could not perform all requested actions: %s',
-                          exc_str(exc))
+                lgr.debug('could not perform all requested actions: %s', ce)
                 sys.exit(1)
             except CommandError as exc:
+                ce = CapturedException(exc)
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
                 # to not duplicate any captured output in the exception
@@ -241,7 +243,8 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
-                lgr.error('%s (%s)', exc_str(exc), exc.__class__.__name__)
+                ce = CapturedException(exc)
+                lgr.error('%s (%s)', ce, exc.__class__.__name__)
                 sys.exit(1)
     else:
         # just let argparser spit out its error, since there is smth wrong
@@ -255,7 +258,8 @@ def main(args=None):
         if hasattr(cmdlineargs, 'result_renderer'):
             cmdlineargs.result_renderer(ret, cmdlineargs)
     except Exception as exc:
-        lgr.error("Failed to render results due to %s", exc_str(exc))
+        ce = CapturedException(exc)
+        lgr.error("Failed to render results due to %s", ce)
         sys.exit(1)
 
 

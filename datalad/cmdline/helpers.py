@@ -25,6 +25,7 @@ from textwrap import wrap
 from ..cmd import WitlessRunner as Runner
 from ..interface.common_opts import eval_defaults
 from ..log import is_interactive
+from datalad.support.exceptions import CapturedException
 from ..ui.utils import get_console_width
 from ..utils import (
     ensure_unicode,
@@ -33,7 +34,6 @@ from ..utils import (
     get_suggestions_msg,
 )
 from ..version import __version__, __full_version__
-from ..dochelpers import exc_str
 
 from appdirs import AppDirs
 from os.path import join as opj
@@ -77,7 +77,8 @@ class HelpAction(argparse.Action):
                     shell=True)
                 sys.exit(0)
             except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
-                lgr.debug("Did not use manpage since %s", exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Did not use manpage since %s", ce)
         if option_string == '-h':
             usage = parser.format_usage()
             ucomps = re.match(
@@ -410,7 +411,8 @@ def _maybe_get_single_subparser(cmdlineargs, parser, interface_groups,
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
                   __full_version__, parsed_args, unparsed_args)
     except Exception as exc:
-        lgr.debug("Early parsing failed with %s", exc_str(exc))
+        ce = CapturedException(exc)
+        lgr.debug("Early parsing failed with %s", ce)
         need_single_subparser = False
         unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
     # First unparsed could be either unknown option to top level "datalad"
@@ -534,7 +536,8 @@ def add_entrypoints_to_interface_groups(interface_groups):
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
-            lgr.warning('Failed to load entrypoint %s: %s', ep.name, exc_str(e))
+            ce = CapturedException(ce)
+            lgr.warning('Failed to load entrypoint %s: %s', ep.name, ce)
             continue
 
 
