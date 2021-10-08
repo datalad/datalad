@@ -37,7 +37,6 @@ from datalad.utils import (
     ensure_bytes,
     ensure_unicode,
     unlink,
-    rmdir,
     rmtemp,
     rmtree,
     get_tempfile_kwargs,
@@ -93,7 +92,8 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
             for f in subdirs_ + files_:
                 os.rename(opj(subdir, f), opj(dir_, f))
-            rmdir(widow_dir)
+            # NFS might hold it victim so use rmtree so it tries a few times
+            rmtree(widow_dir)
     elif leading_directories is None:
         pass   # really do nothing
     else:
