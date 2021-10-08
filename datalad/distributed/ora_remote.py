@@ -721,14 +721,19 @@ def handle_errors(func):
                 # the moment, this is only relevant for SSHRemoteIO, in which
                 # case it cleans up the SSH socket and prevents a hang with
                 # git-annex 8.20201103 and later.
-                self.io.close()
-            except AttributeError:
-                pass
-            else:
-                # Note: It is documented as safe to unregister a function even
-                # if it hasn't been registered.
                 from atexit import unregister
-                unregister(self.io.close)
+                if self._io:
+                    self._io.close()
+                    unregister(self._io.close)
+                if self._push_io:
+                    self._push_io.close()
+                    unregister(self._push_io.close)
+            except AttributeError:
+                # seems like things are already being cleaned up -> a good
+                pass
+            except Exception:
+                # anything else: Not a problem. We are about to exit anyway
+                pass
 
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
