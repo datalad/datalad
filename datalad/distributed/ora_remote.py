@@ -694,17 +694,27 @@ def handle_errors(func):
             return func(self, *args, **kwargs)
         except Exception as e:
             if self.remote_log_enabled:
-                from datetime import datetime
-                from traceback import format_exc
-                exc_str = format_exc()
-                entry = "{time}: Error:\n{exc_str}\n" \
-                        "".format(time=datetime.now(),
-                                  exc_str=exc_str)
-                # ensure base path is platform path
-                log_target = Path(self.store_base_path) / 'error_logs' / \
-                    "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                               uuid=self.uuid)
-                self.io.write_file(log_target, entry, mode='a')
+                try:
+                    from datetime import datetime
+                    from traceback import format_exc
+                    exc_str = format_exc()
+                    entry = "{time}: Error:\n{exc_str}\n" \
+                            "".format(time=datetime.now(),
+                                      exc_str=exc_str)
+                    # ensure base path is platform path
+                    log_target = Path(self.store_base_path) / 'error_logs' / \
+                        "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                                   uuid=self.uuid)
+                    self.io.write_file(log_target, entry, mode='a')
+                except Exception:
+                    # If logging of the exception does fail itself, there's
+                    # nothing we can do about it. Hence, don't log and report
+                    # the original issue only.
+                    # TODO: With a logger that doesn't sabotage the
+                    #  communication with git-annex, we should be abe to use
+                    #  CapturedException here, in order to get an informative
+                    #  traceback in a debug message.
+                    pass
 
             try:
                 # We're done using io, so let it perform any needed cleanup. At
