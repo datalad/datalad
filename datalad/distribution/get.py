@@ -953,7 +953,7 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
-                if res['path'] not in content_by_ds:
+                if 'path' not in res or res['path'] not in content_by_ds:
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res
