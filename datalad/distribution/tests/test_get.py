@@ -707,3 +707,43 @@ def test_get_relays_command_errors(path):
     assert_result_count(
         ds.get("foo", on_failure="ignore", result_renderer=None),
         1, action="get", type="file", status="error")
+
+
+@with_tempfile()
+def test_missing_path_handling(path):
+    ds = Dataset(path).create()
+    ds.save()
+
+    class Struct:
+        pass
+
+    refds = Struct()
+    refds.pathobj = Path("foo")
+    refds.subdatasets = []
+    refds.path = "foo"
+
+    with \
+            patch("datalad.distribution.get._get_targetpaths") as get_target_path, \
+            patch("datalad.distribution.get.Interface.get_refds_path") as get_refds_path, \
+            patch("datalad.distribution.get.require_dataset") as require_dataset, \
+            patch("datalad.distribution.get._install_targetpath") as _install_targetpath, \
+            patch("datalad.distribution.get.Subdatasets") as subdatasets:
+
+        get_target_path.return_value = [{
+            "status": "error"
+        }]
+        get_refds_path.return_value = None
+        require_dataset.return_value = refds
+        _install_targetpath.return_value = [{
+            "status": "notneeded",
+            "path": "foo",
+            "contains": "xxx"
+        }]
+        subdatasets.return_value = [{
+            "type": "file",
+            "status": "impossible",
+            "path": "foo",
+            "message": "path not contained in any matching subdataset"}]
+
+        # Check for guarded access in error results
+        ds.get("foo")
