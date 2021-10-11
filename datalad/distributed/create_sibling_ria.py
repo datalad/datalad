@@ -413,7 +413,7 @@ class CreateSiblingRia(Interface):
                 res = get_status_dict(
                     status='error',
                     message="No store found at '{}'. Forgot "
-                            "--construct-store?".format(
+                            "--new-store-ok ?".format(
                         Path(base_path), **res_kwargs),
                     )
                 yield res
