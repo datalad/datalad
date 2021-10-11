@@ -232,7 +232,7 @@ class CreateSiblingRia(Interface):
         new_store_ok=Parameter(
             args=("--new-store-ok",),
             action='store_true',
-            doc="""When set, a new store will be created. Otherwise, a sibling
+            doc="""When set, a new store will be created, if necessary. Otherwise, a sibling
             will only be created if the url points to an existing RIA store.""",
         ),
         recursive=recursion_flag,
