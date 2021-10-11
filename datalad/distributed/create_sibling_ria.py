@@ -41,6 +41,8 @@ from datalad.distribution.dataset import (
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
+    RIARemoteError,
+    RemoteCommandFailedError,
     SSHRemoteIO,
 )
 from datalad.utils import (
@@ -407,7 +409,7 @@ class CreateSiblingRia(Interface):
             # Because this raises a FileNotFound error if non-existent, we need
             # to catch it
             io.read_file(Path(base_path) / 'ria-layout-version')
-        except FileNotFoundError as e:
+        except (FileNotFoundError, RIARemoteError, RemoteCommandFailedError) as e:
             if not new_store_ok:
                 # we're instructed to only act in case of an existing RIA store
                 res = get_status_dict(
