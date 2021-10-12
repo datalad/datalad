@@ -694,31 +694,46 @@ def handle_errors(func):
             return func(self, *args, **kwargs)
         except Exception as e:
             if self.remote_log_enabled:
-                from datetime import datetime
-                from traceback import format_exc
-                exc_str = format_exc()
-                entry = "{time}: Error:\n{exc_str}\n" \
-                        "".format(time=datetime.now(),
-                                  exc_str=exc_str)
-                # ensure base path is platform path
-                log_target = Path(self.store_base_path) / 'error_logs' / \
-                    "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                               uuid=self.uuid)
-                self.io.write_file(log_target, entry, mode='a')
+                try:
+                    from datetime import datetime
+                    from traceback import format_exc
+                    exc_str = format_exc()
+                    entry = "{time}: Error:\n{exc_str}\n" \
+                            "".format(time=datetime.now(),
+                                      exc_str=exc_str)
+                    # ensure base path is platform path
+                    log_target = Path(self.store_base_path) / 'error_logs' / \
+                        "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                                   uuid=self.uuid)
+                    self.io.write_file(log_target, entry, mode='a')
+                except Exception:
+                    # If logging of the exception does fail itself, there's
+                    # nothing we can do about it. Hence, don't log and report
+                    # the original issue only.
+                    # TODO: With a logger that doesn't sabotage the
+                    #  communication with git-annex, we should be abe to use
+                    #  CapturedException here, in order to get an informative
+                    #  traceback in a debug message.
+                    pass
 
             try:
                 # We're done using io, so let it perform any needed cleanup. At
                 # the moment, this is only relevant for SSHRemoteIO, in which
                 # case it cleans up the SSH socket and prevents a hang with
                 # git-annex 8.20201103 and later.
-                self.io.close()
-            except AttributeError:
-                pass
-            else:
-                # Note: It is documented as safe to unregister a function even
-                # if it hasn't been registered.
                 from atexit import unregister
-                unregister(self.io.close)
+                if self._io:
+                    self._io.close()
+                    unregister(self._io.close)
+                if self._push_io:
+                    self._push_io.close()
+                    unregister(self._push_io.close)
+            except AttributeError:
+                # seems like things are already being cleaned up -> a good
+                pass
+            except Exception:
+                # anything else: Not a problem. We are about to exit anyway
+                pass
 
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
