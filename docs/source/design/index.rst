@@ -20,3 +20,4 @@ subsystems in DataLad.
    miscpatterns
    exception_handling
    credentials
+   url_substitution
