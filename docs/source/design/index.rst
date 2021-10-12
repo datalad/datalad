@@ -15,4 +15,8 @@ subsystems in DataLad.
 
    dataset_argument
    log_levels
+   drop
+   python_imports
    miscpatterns
+   exception_handling
+   credentials

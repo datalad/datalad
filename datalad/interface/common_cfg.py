@@ -270,13 +270,13 @@ definitions = {
     'datalad.log.result-level': {
         'ui': ('question', {
                'title': 'Log level for command result messages',
-               'text': "Overrides the default behavior of logging 'impossible' "
+               'text': "If 'match-status', it will log 'impossible' "
                        "results as a warning, 'error' results as errors, and "
-                       "everything else as 'debug' with a single alternative "
-                       "log level"}),
-        'type': EnsureChoice('debug', 'info', 'warning', 'error'),
-        # None keeps the default behavior
-        'default': 'None',
+                       "everything else as 'debug'. Otherwise the indicated "
+                       "log-level will be used for all such messages"}),
+        'type': EnsureChoice('debug', 'info', 'warning', 'error',
+                             'match-status'),
+        'default': 'debug',
     },
     'datalad.log.name': {
         'ui': ('question', {
@@ -308,12 +308,6 @@ definitions = {
     'datalad.log.traceback': {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
-    },
-    'datalad.log.exc': {
-        'ui': ('yesno', {
-               'title': 'Include exceptions and their traceback in log messages. If set, \'datalad.exc.str.tblimit\' applies.'}),
-        'default': False,
-        'type': EnsureBool(),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {

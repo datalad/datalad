@@ -31,8 +31,8 @@ lgr.log(5, "Importing datalad.customremotes.main")
 
 from ..ui import ui
 from ..support.cache import DictCache
+from datalad.support.exceptions import CapturedException
 from ..cmdline.helpers import get_repo_instance
-from ..dochelpers import exc_str
 from datalad.utils import (
     getargspec,
 )
@@ -320,8 +320,9 @@ class AnnexCustomRemote(object):
             try:
                 method(*req_load)
             except Exception as e:
+                ce = CapturedException(e)
                 self.error("Problem processing %r with parameters %r: %s"
-                           % (req, req_load, exc_str(e)))
+                           % (req, req_load, ce))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s", format_exc())
 
@@ -389,8 +390,9 @@ class AnnexCustomRemote(object):
             try:
                 self._transfer(cmd, key, file)
             except Exception as exc:
+                ce = CapturedException(exc)
                 self.send(
-                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc_str(exc))
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, ce)
                 )
         else:
             self.send_unsupported(

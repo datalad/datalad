@@ -859,7 +859,8 @@ class Get(Interface):
                 recursive=True if path else recursive,
                 recursion_limit=None if path else recursion_limit,
                 return_type='generator',
-                on_failure='ignore'):
+                on_failure='ignore',
+                result_renderer='disabled'):
             if sdsres.get('type', None) != 'dataset':
                 # if it is not about a 'dataset' it is likely content in
                 # the root dataset

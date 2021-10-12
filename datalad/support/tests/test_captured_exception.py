@@ -56,7 +56,8 @@ def test_CapturedException():
     assert_re_in("new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
     assert_re_in("new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
     assert_re_in("new message \[test_captured_exception.py:f2:[0-9]+\]", estr1)
-    assert_equal(estr_, estr1)
+    # default: no limit:
+    assert_equal(estr_, estr_full)
 
     # standard output
     full_display = captured_exc.format_standard().splitlines()
@@ -74,15 +75,6 @@ def test_CapturedException():
     # ...
     assert_equal(full_display[-1].strip(), "RuntimeError: new message")
 
-    # now logging / __str__:
-    try:
-        with patch.dict('os.environ', {'DATALAD_LOG_EXC': '1'}):
-            cfg.reload()
-            assert_re_in("new message \[test_captured_exception.py:f2:[0-9]+\]",
-                         str(captured_exc))
-
-        with patch.dict('os.environ', {'DATALAD_LOG_EXC': '0'}):
-            cfg.reload()
-            assert_equal("", str(captured_exc))
-    finally:
-        cfg.reload()  # make sure we don't have a side effect on other tests
+    # CapturedException.__repr__:
+    assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",
+                 captured_exc.__repr__())

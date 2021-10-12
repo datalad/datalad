@@ -16,12 +16,19 @@ import queue
 import subprocess
 import threading
 import time
-from typing import Any, Dict, IO, List, Type, Union, Optional
+from typing import (
+    IO,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Type,
+    Union,
+)
 
-from .cmd_protocols import WitlessProtocol
+from .protocol import WitlessProtocol
 
-
-lgr = logging.getLogger("datalad.runner")
+lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1
@@ -246,5 +253,8 @@ def run_command(cmd: Union[str, List],
     result = protocol._prepare_result()
     protocol.process_exited()
     protocol.connection_lost(None)  # TODO: check exception
+    for fd in (process.stdin, process.stdout, process.stderr):
+        if fd is not None:
+            fd.close()
 
     return result

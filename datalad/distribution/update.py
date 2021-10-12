@@ -32,7 +32,10 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import (
     recursion_flag,
@@ -80,8 +83,8 @@ def _process_how_args(merge, how, how_subds):
     return how, how_subds
 
 
-_how_constraints = EnsureNone() | EnsureChoice(
-    "fetch", "merge", "ff-only", "reset", "checkout")
+_how_constraints = EnsureChoice(
+    "fetch", "merge", "ff-only", "reset", "checkout", None)
 
 
 @build_doc
@@ -159,7 +162,6 @@ class Update(Interface):
             how="ff-only" PY]."""),
         how=Parameter(
             args=("--how",),
-            metavar="ACTION",
             nargs="?",
             constraints=_how_constraints,
             doc="""how to update the dataset. The default ("fetch") simply
@@ -176,7 +178,6 @@ class Update(Interface):
             `how_subds` PY]."""),
         how_subds=Parameter(
             args=("--how-subds",),
-            metavar="ACTION",
             nargs="?",
             constraints=_how_constraints,
             doc="""Override the behavior of [CMD: --how CMD][PY: `how` PY] in
@@ -318,8 +319,11 @@ class Update(Interface):
                 try:
                     repo.fetch(**fetch_kwargs)
                 except CommandError as exc:
-                    yield dict(res, status="error",
-                               message=("Fetch failed: %s", exc_str(exc)))
+                    ce = CapturedException(exc)
+                    yield get_status_dict(status="error",
+                                          message=("Fetch failed: %s", ce),
+                                          exception=ce,
+                                          **res,)
                     continue
 
             # NOTE reevaluate ds.repo again, as it might have be converted from
@@ -334,12 +338,15 @@ class Update(Interface):
                         repo.fetch(remote=sibling_, refspec=revision,
                                    git_options=["--recurse-submodules=no"])
                     except CommandError as exc:
+                        ce = CapturedException(exc)
                         yield dict(
                             res,
                             status="impossible",
                             message=(
                                 "Attempt to fetch %s from %s failed: %s",
-                                revision, sibling_, exc_str(exc)))
+                                revision, sibling_, ce),
+                            exception=ce
+                        )
                         continue
                 else:
                     yield dict(res,
@@ -520,7 +527,8 @@ def _try_command(record, fn, *args, **kwargs):
     try:
         fn(*args, **kwargs)
     except CommandError as exc:
-        return dict(record, status="error", message=exc_str(exc))
+        ce = CapturedException(exc)
+        return dict(record, status="error", message=str(ce))
     else:
         return dict(record, status="ok")
 

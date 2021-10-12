@@ -243,7 +243,8 @@ class Remove(Interface):
                         # remove submodule reference
                         parentds = Dataset(ap['parentds'])
                         # play safe, will fail on dirty
-                        parentds.repo.deinit_submodule(ap['path'])
+                        parentds.repo.call_git(
+                            ['submodule', 'deinit'], files=[ap['path']])
                         # remove now empty submodule link
                         parentds.repo.remove(ap['path'])
                         # make a record that we removed this already, should it be

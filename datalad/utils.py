@@ -107,9 +107,6 @@ def get_linux_distribution():
     return result
 
 
-# TODO: deprecated, remove in 0.15
-# Wheezy EOLed 2 years ago, no new datalad builds from neurodebian
-on_debian_wheezy = False
 # Those weren't used for any critical decision making, thus we just set them to None
 # Use get_linux_distribution() directly where needed
 linux_distribution_name = linux_distribution_release = None
@@ -122,9 +119,13 @@ CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
     CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
     assert CMD_MAX_ARG > 0
-    if sys.version_info[:2] == (3, 4):
+    if CMD_MAX_ARG > CMD_MAX_ARG_HARDCODED * 1e6:
         # workaround for some kind of a bug which comes up with python 3.4
         # see https://github.com/datalad/datalad/issues/3150
+        # or on older CentOS with conda and python as new as 3.9
+        # see https://github.com/datalad/datalad/issues/5943
+        # TODO: let Yarik know that the world is a paradise now whenever 1e6
+        # is not large enough
         CMD_MAX_ARG = min(CMD_MAX_ARG, CMD_MAX_ARG_HARDCODED)
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
@@ -537,7 +538,7 @@ if _assert_no_open_files_cfg:
     def assert_no_open_files(path):
         files = get_open_files(path, log_open=40)
         if _assert_no_open_files_cfg == 'assert':
-            assert not files
+            assert not files, "Got following files still open: %s" % ','.join(files)
         elif files:
             if _assert_no_open_files_cfg == 'pdb':
                 import pdb
@@ -2223,9 +2224,10 @@ def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug
                 pkg)
             mods_loaded.append(mod)
         except Exception as exc:
-            from datalad.dochelpers import exc_str
+            from datalad.support.exceptions import CapturedException
+            ce = CapturedException(exc)
             log((msg + ': {exception}').format(
-                module=modname, package=pkg, exception=exc_str(exc)))
+                module=modname, package=pkg, exception=ce.message))
     return mods_loaded
 
 
@@ -2417,6 +2419,9 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             open_func = open
             if full_name.endswith('.gz'):
                 open_func = gzip.open
+            elif full_name.split('.')[-1] in ('xz', 'lzma'):
+                import lzma
+                open_func = lzma.open
             with open_func(full_name, "wb") as f:
                 f.write(ensure_bytes(load, 'utf-8'))
         if executable:

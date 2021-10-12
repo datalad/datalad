@@ -45,6 +45,7 @@ from ..support.exceptions import (
 from ..support.locking import (
     InterProcessLock,
     try_lock,
+    try_lock_informatively,
 )
 
 from ..support.network import RI
@@ -155,12 +156,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
             supported_auth_types = []
             used_old_session = False
             try:
-                lgr.debug("Acquiring a currently %s lock to establish download session. "
-                          "If stalls - check which process holds %s",
-                          "existing" if self._lock.exists() else "absent",
-                          self._lock.path)
-                with self._lock:
-                    # Locking since it might desire to ask for credentials
+                # Try to lock since it might desire to ask for credentials, but still allow to time out at 5 minutes
+                # while providing informative message on what other process might be holding it.
+                with try_lock_informatively(self._lock, purpose="establish download session", proceed_unlocked=False):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -438,9 +436,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         else:
             filepath = downloader_session.filename
 
-        existed = exists(filepath)
+        existed = op.lexists(filepath)
         if existed and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
+            raise DownloadError("Path %s already exists" % filepath)
 
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])

@@ -25,6 +25,7 @@ from textwrap import wrap
 from ..cmd import WitlessRunner as Runner
 from ..interface.common_opts import eval_defaults
 from ..log import is_interactive
+from datalad.support.exceptions import CapturedException
 from ..ui.utils import get_console_width
 from ..utils import (
     ensure_unicode,
@@ -33,7 +34,6 @@ from ..utils import (
     get_suggestions_msg,
 )
 from ..version import __version__, __full_version__
-from ..dochelpers import exc_str, exc_str_old
 
 from appdirs import AppDirs
 from os.path import join as opj
@@ -77,7 +77,8 @@ class HelpAction(argparse.Action):
                     shell=True)
                 sys.exit(0)
             except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
-                lgr.debug("Did not use manpage since %s", exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Did not use manpage since %s", ce)
         if option_string == '-h':
             usage = parser.format_usage()
             ucomps = re.match(
@@ -216,7 +217,6 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
 
 def parser_add_common_options(parser, version=None):
     parser_add_common_opt(parser, 'log_level')
-    parser_add_common_opt(parser, 'pbs_runner')
     parser_add_common_opt(parser, 'change_path')
     if version is not None:
         warnings.warn("Passing 'version' to parser_add_common_options "
@@ -296,7 +296,7 @@ def strip_arg_from_argv(args, value, opt_names):
     # Yarik doesn't know better
     if args is None:
         args = sys.argv
-    # remove present pbs-runner option
+    # remove present opt_names
     args_clean = []
     skip = 0
     for i, arg in enumerate(args):
@@ -310,35 +310,6 @@ def strip_arg_from_argv(args, value, opt_names):
             # we need to skip this one and next one
             skip = 1
     return args_clean
-
-
-def run_via_pbs(args, pbs):
-    assert(pbs in ('condor',))  # for now
-
-    # TODO: RF to support multiple backends, parameters, etc, for now -- just condor, no options
-    f = NamedTemporaryFile('w', prefix='datalad-%s-' % pbs, suffix='.submit', delete=False)
-    try:
-        pwd = getpwd()
-        logs = f.name.replace('.submit', '.log')
-        exe = args[0]
-        # TODO: we might need better way to join them, escaping spaces etc.  There must be a stock helper
-        #exe_args = ' '.join(map(repr, args[1:])) if len(args) > 1 else ''
-        exe_args = ' '.join(args[1:]) if len(args) > 1 else ''
-        f.write("""\
-Executable = %(exe)s
-Initialdir = %(pwd)s
-Output = %(logs)s
-Error = %(logs)s
-getenv = True
-
-arguments = %(exe_args)s
-queue
-""" % locals())
-        f.close()
-        Runner().run(['condor_submit', f.name])
-        lgr.info("Scheduled execution via %s.  Logs will be stored under %s", pbs, logs)
-    finally:
-        unlink(f.name)
 
 
 def get_repo_instance(path=os.curdir, class_=None):
@@ -433,11 +404,15 @@ def _maybe_get_single_subparser(cmdlineargs, parser, interface_groups,
         if not unparsed_args and getattr(parsed_args, 'version', None):
             parsed_args.version()  # will exit with 0
         if not (completing or unparsed_args):
-            fail_handler(parser, msg="too few arguments", exit_code=2)
+            fail_handler(
+                parser,
+                msg="too few arguments, run with --help or visit https://handbook.datalad.org",
+                exit_code=2)
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
                   __full_version__, parsed_args, unparsed_args)
     except Exception as exc:
-        lgr.debug("Early parsing failed with %s", exc_str_old(exc))
+        ce = CapturedException(exc)
+        lgr.debug("Early parsing failed with %s", ce)
         need_single_subparser = False
         unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
     # First unparsed could be either unknown option to top level "datalad"
@@ -561,7 +536,8 @@ def add_entrypoints_to_interface_groups(interface_groups):
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
-            lgr.warning('Failed to load entrypoint %s: %s', ep.name, exc_str_old(e))
+            ce = CapturedException(ce)
+            lgr.warning('Failed to load entrypoint %s: %s', ep.name, ce)
             continue
 
 
@@ -591,6 +567,7 @@ def fail_with_short_help(parser=None,
         out.write("error: %s\n" % msg)
     if not known:
         if parser:
+            parser_add_common_opt(parser, 'help')
             # just to appear in print_usage also consistent with --help output
             parser.add_argument("command [command-opts]")
             parser.print_usage(file=out)

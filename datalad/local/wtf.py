@@ -25,9 +25,9 @@ from datalad.utils import (
     unlink,
     Path,
 )
-from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InvalidGitRepositoryError,
 )
@@ -60,7 +60,6 @@ def get_max_path_length(top_path=None, maxl=1000):
         top_path = getpwd()
     import random
     from datalad import lgr
-    from datalad.dochelpers import exc_str
     from datalad.support import path
     prefix = path.join(top_path, "dl%d" % random.randint(1 ,100000))
     # some smart folks could implement binary search for this
@@ -72,9 +71,10 @@ def get_max_path_length(top_path=None, maxl=1000):
             with open(filename, 'w') as f:
                 max_path_length = path_length
         except Exception as exc:
+            ce = CapturedException(exc)
             lgr.debug(
                 "Failed to create sample file for length %d. Last succeeded was %s. Exception: %s",
-                path_length, max_path_length, exc_str(exc))
+                path_length, max_path_length, ce)
             break
         unlink(filename)
     return max_path_length
@@ -99,9 +99,10 @@ def _describe_annex():
         out = runner.run(
             ['git', 'annex', 'version'], protocol=StdOutErrCapture)
     except CommandError as e:
+        ce = CapturedException(e)
         return dict(
             version='not available',
-            message=exc_str(e),
+            message=ce.format_short(),
         )
     info = {}
     for line in out['stdout'].split(os.linesep):
@@ -123,7 +124,8 @@ def _describe_system():
     try:
         dist = get_linux_distribution()
     except Exception as exc:
-        lgr.warning("Failed to get distribution information: %s", exc_str(exc))
+        ce = CapturedException(exc)
+        lgr.warning("Failed to get distribution information: %s", ce)
         dist = tuple()
 
     return {
@@ -184,7 +186,8 @@ def _describe_extensions():
             mod = import_module(e.module_name, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
         except Exception as e:
-            info['load_error'] = exc_str(e)
+            ce = CapturedException(e)
+            info['load_error'] = ce.format_short()
             continue
         info['entrypoints'] = entry_points = {}
         for ep in ext[1]:
@@ -198,7 +201,8 @@ def _describe_extensions():
                 import_module(ep[0], package='datalad')
                 ep_info['load_error'] = None
             except Exception as e:
-                ep_info['load_error'] = exc_str(e)
+                ce = CapturedException(e)
+                ep_info['load_error'] = ce.format_short()
                 continue
     return infos
 
@@ -219,7 +223,8 @@ def _describe_metadata_elements(group):
             e.load()
             info['load_error'] = None
         except Exception as e:
-            info['load_error'] = exc_str(e)
+            ce = CapturedException(e)
+            info['load_error'] = ce.format_short()
             continue
     return infos
 
@@ -261,7 +266,8 @@ def _describe_dataset(ds, sensitive):
                 infos['metadata'] = None
         return infos
     except InvalidGitRepositoryError as e:
-        return {"invalid": exc_str(e)}
+        ce = CapturedException(e)
+        return {"invalid": ce.message}
 
 
 def _describe_location(res):

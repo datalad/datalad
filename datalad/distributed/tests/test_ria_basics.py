@@ -8,13 +8,31 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
+
 from datalad.api import (
     Dataset,
     clone,
     create_sibling_ria,
 )
-from datalad.utils import Path
+from datalad.cmd import NoCapture
+from datalad.customremotes.ria_utils import (
+    create_ds_in_store,
+    create_store,
+    get_layout_locations,
+)
+from datalad.distributed.ora_remote import (
+    LocalIO,
+    SSHRemoteIO,
+    _sanitize_key,
+)
+from datalad.distributed.tests.ria_utils import (
+    common_init_opts,
+    get_all_files,
+    populate_dataset,
+)
+from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
+    SkipTest,
     assert_equal,
     assert_in,
     assert_not_in,
@@ -23,7 +41,6 @@ from datalad.tests.utils import (
     assert_status,
     assert_true,
     has_symlink_capability,
-    SkipTest,
     known_failure_windows,
     skip_if_adjusted_branch,
     skip_if_no_network,
@@ -32,30 +49,9 @@ from datalad.tests.utils import (
     slow,
     swallow_logs,
     turtle,
-    with_tempfile
+    with_tempfile,
 )
-from datalad.distributed.ora_remote import (
-    LocalIO,
-    SSHRemoteIO,
-    _sanitize_key,
-)
-from datalad.support.exceptions import (
-    CommandError,
-)
-from datalad.distributed.tests.ria_utils import (
-    get_all_files,
-    populate_dataset,
-    common_init_opts
-)
-from datalad.customremotes.ria_utils import (
-    create_store,
-    create_ds_in_store,
-    get_layout_locations
-)
-from datalad.cmd import (
-    NoCapture,
-)
-
+from datalad.utils import Path
 
 # Note, that exceptions to test for are generally CommandError since we are
 # talking to the special remote via annex.
@@ -628,6 +624,7 @@ def test_push_url(storepath, dspath, blockfile):
     assert_in(store_uuid, known_sources)
 
 
+@skip_if_no_network
 @known_failure_windows
 @with_tempfile
 @with_tempfile

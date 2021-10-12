@@ -301,12 +301,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
 
-        if config.get("annex.retry") is None:
-            self._annex_common_options.extend(
-                ["-c",
-                 "annex.retry={}".format(
-                     config.obtain("datalad.annex.retry"))])
-
         # will be evaluated lazily
         self._n_auto_jobs = None
 
@@ -1381,6 +1375,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         files : list of dict
         """
         options = options[:] if options else []
+
+        if self.config.get("annex.retry") is None:
+            options.extend(
+                ["-c",
+                 "annex.retry={}".format(
+                     self.config.obtain("datalad.annex.retry"))])
 
         if remote:
             if remote not in self.get_remotes():
@@ -3536,11 +3536,14 @@ class AnnexJsonProtocol(WitlessProtocol):
         pbar_id = self._get_pbar_id(j)
         known_pbar = pbar_id in self._pbars
         action = j.get('action')
-        if action:
+
+        is_progress = action and 'byte-progress' in j
+        # ignore errors repeatedly reported in progress messages. Final message
+        # will contain them
+        if action and not is_progress:
             for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
 
-        is_progress = action and 'byte-progress' in j
         if known_pbar and (not is_progress or
                            j.get('byte-progress') == j.get('total-size')):
             # take a known pbar down, completion or broken report

@@ -362,7 +362,7 @@ def eval_results(func):
         if not result_renderer:
             result_renderer = dlcfg.get('datalad.api.result-renderer', None)
         # look for potential override of logging behavior
-        result_log_level = dlcfg.get('datalad.log.result-level', None)
+        result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
 
         # query cfg for defaults
         # .is_installed and .config can be costly, so ensure we do
@@ -595,7 +595,7 @@ def _process_results(
                 res_lgr = getattr(
                     res_lgr,
                     default_logchannels[res['status']]
-                    if result_log_level is None
+                    if result_log_level == 'match-status'
                     else result_log_level)
             msg = res['message']
             msgargs = None

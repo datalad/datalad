@@ -11,6 +11,7 @@
 import glob
 import gzip
 import inspect
+import lzma
 import shutil
 import stat
 from json import dumps
@@ -513,6 +514,8 @@ def ok_file_has_content(path, content, strip=False, re_=False,
     if decompress:
         if path.suffix == '.gz':
             open_func = gzip.open
+        elif path.suffix in ('.xz', '.lzma'):
+            open_func = lzma.open
         else:
             raise NotImplementedError("Don't know how to decompress %s" % path)
     else:
@@ -1708,9 +1711,11 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     assert_repo_status(pdspath)
     # staged subds, and files
     create(opj(ds.path, 'subds_added'))
-    ds.repo.add_submodule('subds_added')
+    # use internal helper to get subdataset into an 'added' state
+    # that would not happen in standard datalad workflows
+    list(ds.repo._save_add_submodules([ds.pathobj / 'subds_added']))
     create(opj(ds.path, 'subdir', 'subds_added'))
-    ds.repo.add_submodule(opj('subdir', 'subds_added'))
+    list(ds.repo._save_add_submodules([ds.pathobj / 'subdir' / 'subds_added']))
     # some more untracked files
     create_tree(
         ds.path,

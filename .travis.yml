@@ -23,7 +23,7 @@ env:
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow or network"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
-    - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
+    - DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"
@@ -192,6 +192,7 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - tools/ci/prep-travis-forssh.sh
+  - tools/ci/debians_disable_outdated_ssl_cert
   # Install various basic depedencies
   - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   # needed for tests of patool compression fall-back solution
@@ -234,7 +235,7 @@ script:
   # Run tests
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER `which nosetests` "${NOSE_OPTS[@]}"
+    $NOSE_WRAPPER python -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
       --with-cov --cover-package datalad
@@ -243,10 +244,12 @@ script:
   - cd ..
 
 after_success:
-  # submit only what we have covered in the PRs
+  # cron jobs test more and then PRs will be falling behind since they would not
+  # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
+  - cd __testhome__;
+  - python -m coverage combine -a /tmp/.coverage-entrypoints-*;
+  - python -m coverage report;
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
-      cd __testhome__;
-      coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi
 

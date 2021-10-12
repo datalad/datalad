@@ -17,6 +17,7 @@ import os
 import warnings
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import default_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
@@ -26,7 +27,10 @@ from datalad.support.constraints import (
     NoneDeprecated,
 )
 from datalad.support.param import Parameter
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.interface.common_opts import (
     contains,
     dataset_state,
@@ -39,7 +43,6 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     getpwd,
@@ -196,6 +199,8 @@ class Subdatasets(Interface):
             option can be given multiple times. CMD]""",
             constraints=EnsureStr() | EnsureNone()))
 
+    result_renderer = "tailored"
+
     @staticmethod
     @datasetmethod(name='subdatasets')
     @eval_results
@@ -293,6 +298,9 @@ class Subdatasets(Interface):
                     #logger=lgr
                 )
 
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        default_result_renderer(res)
 
 
 # internal helper that needs all switches, simply to avoid going through
@@ -378,12 +386,12 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     # variable name validity is checked before and Git
                     # replaces the file completely, resolving any permission
                     # issues, if the file could be read (already done above)
+                    ce = CapturedException(e)
                     yield get_status_dict(
                         'subdataset',
                         status='error',
-                        message=(
-                            "Failed to set property '%s': %s",
-                            prop, exc_str(e)),
+                        message=("Failed to set property '%s': %s", prop, ce),
+                        exception=ce,
                         type='dataset',
                         logger=lgr,
                         **sm)

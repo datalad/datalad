@@ -21,8 +21,8 @@ import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 lgr.log(5, "Importing datalad.customremotes.archive")
 
-from ..dochelpers import exc_str
 from ..support.archives import ArchivesCache
+from datalad.support.exceptions import CapturedException
 from ..support.network import URL
 from ..support.locking import lock_if_check_fails
 from ..support.path import exists
@@ -407,10 +407,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
+                ce = CapturedException(exc)
                 # from celery.contrib import rdb
                 # rdb.set_trace()
-                exc_ = exc_str(exc)
-                self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
+                self.debug("Failed to fetch {akey} containing {key}: {ce}".format(**locals()))
                 continue
 
         raise RuntimeError(

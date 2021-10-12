@@ -13,38 +13,37 @@ import os
 import signal
 import sys
 import unittest.mock
-
 from time import (
     sleep,
     time,
 )
+
 from nose.tools import timed
 
-
 from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_cwd_unchanged,
     assert_in,
     assert_raises,
     eq_,
     integration,
-    OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
-    SkipTest,
     with_tempfile,
 )
-from datalad.cmd import (
-    readline_rstripped,
+from datalad.utils import (
+    Path,
+    on_windows,
+)
+
+from .. import (
+    CommandError,
+    Protocol,
+    Runner,
     StdOutCapture,
     StdOutErrCapture,
-    WitlessProtocol,
-    WitlessRunner as Runner,
 )
-from datalad.utils import (
-    on_windows,
-    Path,
-)
-from datalad.support.exceptions import CommandError
 
 
 def py2cmd(code):
@@ -168,7 +167,7 @@ def test_runner_no_stdin_no_capture():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
     runner.run(
-        ["echo", "a", "b", "c"],
+        (["cmd.exe", "/c"] if on_windows else []) + ["echo", "a", "b", "c"],
         stdin=None,
         protocol=None
     )
@@ -276,21 +275,12 @@ def test_asyncio_forked(temp):
 
 def test_done_deprecation():
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
-        _ = WitlessProtocol("done")
+        _ = Protocol("done")
         warn_mock.assert_called_once()
 
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
-        _ = WitlessProtocol()
+        _ = Protocol()
         warn_mock.assert_not_called()
-
-
-def test_readline_rstripped_deprecation():
-    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
-        class StdoutMock:
-            def readline(self):
-                return "abc\n"
-        readline_rstripped(StdoutMock())
-        warn_mock.assert_called_once()
 
 
 def test_faulty_poll_detection():
@@ -301,6 +291,6 @@ def test_faulty_poll_detection():
         def poll(self):
             return None
 
-    protocol = WitlessProtocol()
+    protocol = Protocol()
     protocol.process = PopenMock()
     assert_raises(CommandError, protocol._prepare_result)

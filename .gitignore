@@ -27,3 +27,5 @@ tmp
 .*.swp
 .travis.yml.evil-bd
 .asv
+bin/
+tools/bisect-git-annex.simg

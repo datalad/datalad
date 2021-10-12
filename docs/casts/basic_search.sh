@@ -3,7 +3,7 @@ full_title="Demo of basic datasets meta-data search using DataLad"
 
 say "DataLad allows to aggregate dataset-level meta-data, i.e. data describing the dataset (description, authors, etc), from a variety of formats (see http://docs.datalad.org/en/latest/metadata.html for more info)."
 say 'In this example we will start from a point where someone who has not used datalad before decided to find datasets which related to "raiders" (after "Raiders of the Lost Ark" movie) and neuroimaging.'
-say 'As you will see below, upon the very first invocation of "datalad search" command, DataLad will need first to acquire aggregated meta-data for our collection of datasets available at http://datasets.datalad.org and for that it will install that top level super-dataset (a pure git repository) under ~/datalad:'
+say 'As you will see below, upon the very first invocation of "datalad search" command, DataLad will need first to acquire aggregated meta-data for our collection of datasets available at https://datasets.datalad.org and for that it will install that top level super-dataset (a pure git repository) under ~/datalad:'
 ( sleep 4; type yes; key Return; ) &
 run "datalad search raiders neuroimaging"
 

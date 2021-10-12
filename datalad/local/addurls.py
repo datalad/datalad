@@ -26,7 +26,6 @@ from datalad.support.external_versions import external_versions
 import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import (
-    exc_str,
     single_or_plural,
 )
 from datalad.log import log_progress, with_result_progress
@@ -41,7 +40,10 @@ from datalad.interface.common_opts import (
     jobs_opt,
     nosave_opt,
 )
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+)
 from datalad.support.itertools import groupby_sorted
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
@@ -299,8 +301,8 @@ class AnnexKeyParser(object):
         try:
             key = self.format_fn(self.format_string, row)
         except KeyError as exc:
-            lgr.debug("Row missing fields for --key: %s",
-                      exc_str(exc))
+            ce = CapturedException(exc)
+            lgr.debug("Row missing fields for --key: %s", ce)
             return {}
 
         if key == self.empty:
@@ -396,8 +398,7 @@ def _read(stream, input_type):
             rows = json.load(stream)
         except json.decoder.JSONDecodeError as e:
             raise ValueError(
-                "Failed to read JSON from stream {}: {}"
-                .format(stream, exc_str(e)))
+                f"Failed to read JSON from stream {stream}") from e
         # For json input, we do not support indexing by position,
         # only names.
         idx_map = {}
@@ -825,11 +826,13 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
         out_json = repo.add_url_to_file(filename, row["url"],
                                         batch=True, options=options)
     except CommandError as exc:
+        ce = CapturedException(exc)
         yield get_status_dict(action="addurls",
                               ds=ds,
                               type="file",
                               path=filename_abs,
-                              message=exc_str(exc),
+                              message=str(ce),
+                              exception=ce,
                               status="error")
         return
 
@@ -851,7 +854,9 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
             repo.drop_key(res_addurls['annexkey'], batch=True)
             st_kwargs = dict(status="ok")
         except (AssertionError, CommandError) as exc:
-            st_kwargs = dict(message=exc_str(exc),
+            ce = CapturedException(exc)
+            st_kwargs = dict(message=str(ce),
+                             exception=ce,
                              status="error")
         yield get_status_dict(action="drop",
                               ds=ds,
@@ -894,13 +899,17 @@ class RegisterUrl(object):
             fname.parent.mkdir(exist_ok=True, parents=True)
             fname.write_text(ek_info["objectpointer"])
         except Exception as exc:
-            message = exc_str(exc)
+            ce = CapturedException(exc)
+            message = str(ce)
             status = "error"
+            exception = ce
         else:
             message = "registered URL"
             status = "ok"
+            exception = None
         return get_status_dict(action="addurls", ds=self.ds, type="file",
-                               status=status, message=message)
+                               status=status, message=message,
+                               exception=exception)
 
     def __call__(self, row):
         filename = row["ds_filename"]
@@ -931,9 +940,11 @@ class RegisterUrl(object):
                 if not res.get("message"):
                     res["message"] = "registered URL"
         except CommandError as exc:
+            ce = CapturedException(exc)
             yield dict(self._err_res,
                        path=row["filename_abs"],
-                       message=exc_str(exc))
+                       message=str(ce),
+                       exception=ce)
         else:
             yield res
 
@@ -1342,10 +1353,12 @@ class Addurls(Interface):
                 records, colidx_to_name = _read_from_file(
                     url_file, input_type)
             except ValueError as exc:
+                ce = CapturedException(exc)
                 yield get_status_dict(action="addurls",
                                       ds=ds,
                                       status="error",
-                                      message=exc_str(exc))
+                                      message=str(ce),
+                                      exception=ce)
                 return
             displayed_source = "'{}'".format(urlfile)
         else:
@@ -1362,7 +1375,9 @@ class Addurls(Interface):
                                          dry_run,
                                          missing_value)
             except (ValueError, RequestException) as exc:
-                yield dict(st_dict, status="error", message=exc_str(exc))
+                ce = CapturedException(exc)
+                yield dict(st_dict, status="error", message=str(ce),
+                           exception=ce)
                 return
 
         if not rows:
@@ -1456,12 +1471,12 @@ class Addurls(Interface):
                         # through the same bucket(s)
                         row["url"] = get_versioned_url(url)
                     except (ValueError, NotImplementedError) as exc:
+                        ce = CapturedException(exc)
                         # We don't expect this to happen because get_versioned_url
                         # should return the original URL if it isn't an S3 bucket.
                         # It only raises exceptions if it doesn't know how to
                         # handle the scheme for what looks like an S3 bucket.
-                        lgr.warning("error getting version of %s: %s",
-                                    row["url"], exc_str(exc))
+                        lgr.warning("error getting version of %s: %s", row["url"], ce)
                     log_progress(lgr.info, "addurls_versionurls",
                                  "Versioned result for %s: %s", url, row["url"],
                                  update=1, increment=True)

@@ -1212,12 +1212,16 @@ def test_create_tree(path):
             # right away an obscure case where we have both 1 and 1.gz
                 ('1', content*2),
                 ('1.gz', content*3),
+                ('1.xz', content*4),
+                ('1.lzma', content*5),
             ]
         )),
     ]))
     ok_file_has_content(op.join(path, '1'), content)
     ok_file_has_content(op.join(path, 'sd', '1'), content*2)
     ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+    ok_file_has_content(op.join(path, 'sd', '1.xz'), content*4, decompress=True)
+    ok_file_has_content(op.join(path, 'sd', '1.lzma'), content*5, decompress=True)
 
 
 def test_never_fail():

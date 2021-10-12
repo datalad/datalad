@@ -303,7 +303,10 @@ class EnsureChoice(Constraint):
         return value
 
     def long_description(self):
-        return 'value must be one of %s' % (str(self._allowed),)
+        return 'value must be one of [CMD: %s CMD][PY: %s PY]' % (
+            str(tuple(i for i in self._allowed if i is not None)),
+            str(self._allowed)
+        )
 
     def short_description(self):
         return '{%s}' % ', '.join([repr(c) for c in self._allowed])
