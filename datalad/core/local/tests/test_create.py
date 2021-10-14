@@ -71,7 +71,7 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create(force=False, **raw),
         status='error',
-        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
+        message='will not create a dataset in a non-empty directory, use `--force` option to ignore')
     # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
@@ -356,7 +356,7 @@ def test_nested_create(path):
     assert_in_results(
         ds.create(lvl2relpath, **raw),
         status='error',
-        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
+        message='will not create a dataset in a non-empty directory, use `--force` option to ignore')
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
     ds.create(lvl2relpath, force=True)
