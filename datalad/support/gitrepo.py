@@ -3087,7 +3087,7 @@ class GitRepo(CoreGitRepo):
 
         Parameters
         ----------
-        paths : list or None
+        paths : str, list of str, or None
           If given, limits the query to the specified paths. To query all
           paths specify `None`, not an empty list. If a query path points
           into a subdataset, a report is made on the subdataset record
@@ -3118,6 +3118,8 @@ class GitRepo(CoreGitRepo):
           `state`
             Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
+        paths = ensure_list(paths)
+
         lgr.debug('Query status of %r for %s paths',
                   self, len(paths) if paths else 'all')
         return self.diffstatus(

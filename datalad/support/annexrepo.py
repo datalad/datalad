@@ -3130,7 +3130,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         Parameters
         ----------
-        paths : list or None
+        paths : str, list of str, or None
           Specific paths to query info for. In `None`, info is reported for all
           content.
         init : 'git' or dict-like or None
@@ -3171,6 +3171,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             pathlib.Path of the content object in the local annex, if one
             is available (with `eval_availability`)
         """
+        paths = ensure_list(paths)
+
         if init is None:
             info = OrderedDict()
         elif init == 'git':
