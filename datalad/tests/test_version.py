@@ -10,9 +10,7 @@
 import re
 from distutils.version import LooseVersion
 
-from ..version import (
-    __version__,
-)
+from .. import __version__
 from datalad.support import path as op
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
