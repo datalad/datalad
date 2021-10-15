@@ -52,6 +52,6 @@ jobs:
         python -m nose -s -v --with-cov --cover-package datalad --cover-xml datalad.core datalad.support
 
     - name: Upload coverage report to Codecov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v2
       with:
         file: __testhome__/coverage.xml

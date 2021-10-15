@@ -13,7 +13,6 @@ from os import linesep
 
 from datalad import __version__
 from datalad.dochelpers import exc_str
-from datalad.version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
 from datalad.support.exceptions import (
     CommandError,

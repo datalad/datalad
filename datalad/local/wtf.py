@@ -31,7 +31,7 @@ from datalad.support.exceptions import (
     CommandError,
     InvalidGitRepositoryError,
 )
-from datalad.version import __version__, __full_version__
+from datalad import __version__
 
 lgr = logging.getLogger('datalad.local.wtf')
 
@@ -84,7 +84,6 @@ def _describe_datalad():
 
     return {
         'version': ensure_unicode(__version__),
-        'full_version': ensure_unicode(__full_version__),
     }
 
 
