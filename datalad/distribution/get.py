@@ -436,7 +436,9 @@ def _install_necessary_subdatasets(
                 else:
                     # report unconditionally to caller
                     yield res
-
+        if sd.pathobj == path:
+            # we've just got the target subdataset, we're done
+            return
         # now check whether the just installed subds brought us any closer to
         # the target path
         subds_trail = sd.subdatasets(contains=path, recursive=False,
