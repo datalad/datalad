@@ -240,7 +240,7 @@ def annexjson2result(d, ds, **kwargs):
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
     if d.get('error-messages', None):
-        res['error_message'] = '\n'.join(m.strip() for m in d['error-messages'])
+        res['error_message'] = d['error-messages']
     # avoid meaningless standard messages, and collision with actual error
     # messages
     elif 'note' in d:
@@ -250,7 +250,7 @@ def annexjson2result(d, ds, **kwargs):
         if note:
             messages.append(translate_annex_notes.get(note, note))
     if messages:
-        res['message'] = '\n'.join(m.strip() for m in messages)
+        res['message'] = messages
     return res
 
 

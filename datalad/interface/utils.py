@@ -507,16 +507,20 @@ def default_result_renderer(res):
             type=' ({})'.format(
                 ac.color_word(res['type'], ac.MAGENTA)
             ) if 'type' in res else '',
-            msg=' [{}]'.format(
+            msg=' {}{}{}'.format(
+                ac.color_word('[', ac.GREEN),
                 res['message'][0] % res['message'][1:]
-                if isinstance(res['message'], tuple) else res[
-                    'message'])
-            if res.get('message', None) else '',
-            err=ac.color_word(' [{}]'.format(
-                res['error_message'][0] % res['error_message'][1:]
-                if isinstance(res['error_message'], tuple) else res[
-                    'error_message']), ac.RED)
-            if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+                if isinstance(res['message'], tuple)
+                else ac.color_word(' | ', ac.GREEN).join(m.strip() for m in res['message']),
+                ac.color_word(']', ac.GREEN))
+            if res.get('message', None)
+            else '',
+            err=' [{}]'.format(
+                ac.color_word(res['error_message'][0] % res['error_message'][1:], ac.RED)
+                if isinstance(res['error_message'], tuple)
+                else ' | '.join(ac.color_word(m.strip(), ac.RED) for m in res['error_message']))
+            if res.get('error_message', None) and res.get('status', None) != 'ok'
+            else ''))
 
 
 def render_action_summary(action_summary):
