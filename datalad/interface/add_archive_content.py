@@ -78,76 +78,92 @@ _KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
 
-    This results in the files within archive (which must be already under annex
-    control itself) added under annex referencing original archive via
-    custom special remotes mechanism
-
-    Example:
-
-        annex-repo$ datalad add-archive-content my_big_tarball.tar.gz
+    Given an archive under annex control, extract and add its files to the
+    dataset, and reference the original archive as a custom special remote.
 
     """
+    _examples_ = [
+        dict(text="""Add files from the archive 'big_tarball.tar.gz', but
+                     keep big_tarball.tar.gz in the index""",
+             code_py="add_archive_content(path='big_tarball.tar.gz')",
+             code_cmd="datalad add-archive-content big_tarball.tar.gz"),
+        dict(text="""Add files from the archive 'tarball.tar.gz', and
+                     remove big_tarball.tar.gz from the index""",
+             code_py="add_archive_content(path='big_tarball.tar.gz', delete=True)",
+             code_cmd="datalad add-archive-content big_tarball.tar.gz --delete"),
+        dict(text="""Add files from the archive 's3.zip' but remove the leading
+                     directory""",
+             code_py="add_archive_content(path='s3.zip', strip_leading_dirs=True)",
+             code_cmd="datalad add-archive-content s3.zip --strip-leading-dirs"),
+        ]
+
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
     _params_ = dict(
         delete=Parameter(
             args=("-d", "--delete"),
             action="store_true",
-            doc="""flag to delete original archive from the filesystem/git in current tree.
-                   %s""" % _KEY_OPT_NOTE),
+            doc="""delete original archive from the filesystem/Git in current
+            tree. %s""" % _KEY_OPT_NOTE),
         add_archive_leading_dir=Parameter(
             args=("--add-archive-leading-dir",),
             action="store_true",
-            doc="""flag to place extracted content under a directory which would correspond
-                   to archive name with suffix stripped.  E.g. for archive `example.zip` its
-                   content will be extracted under a directory `example/`"""),
+            doc="""place extracted content under a directory which would
+            correspond to the archive name with suffix stripped. E.g. the
+            content of `example.zip` will be extracted under `example/`"""),
         strip_leading_dirs=Parameter(
             args=("--strip-leading-dirs",),
             action="store_true",
-            doc="""flag to move all files directories up, from how they were stored in an archive,
-                   if that one contained a number (possibly more than 1 down) single leading
-                   directories"""),
+            doc="""move all archive contents up from how they are stored in the
+             archive, if the archive contains a number (possibly more than 1
+             down) single leading directories"""),
         leading_dirs_depth=Parameter(
             args=("--leading-dirs-depth",),
             action="store",
             type=int,
-            doc="""maximal depth to strip leading directories to.  If not specified (None), no limit"""),
+            doc="""maximal depth to strip leading directories to.
+            If not specified (None), no limit"""),
         leading_dirs_consider=Parameter(
             args=("--leading-dirs-consider",),
             action="append",
-            doc="""regular expression(s) for directories to consider to strip away""",
+            doc="""regular expression(s) for directories to consider to strip
+            away""",
             constraints=EnsureStr() | EnsureNone(),
         ),
         use_current_dir=Parameter(
             args=("--use-current-dir",),
             action="store_true",
-            doc="""flag to extract archive under the current directory,  not the directory where archive is located.
-                   %s""" % _KEY_OPT_NOTE),
+            doc="""extract the archive under the current directory, not the
+             directory where archive is located. %s""" % _KEY_OPT_NOTE),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
             default="fail",
-            doc="""what operation to perform a file from archive tries to overwrite an existing
-             file with the same name.  'fail' (default) leads to RuntimeError exception.
-             'overwrite' silently replaces existing file.  'archive-suffix' instructs to add
-             a suffix (prefixed with a '-') matching archive name from which file gets extracted,
-             and if that one present, 'numeric-suffix' is in effect in addition, when incremental
-             numeric suffix (prefixed with a '.') is added until no name collision is longer detected"""
+            doc="""what operation to perform if a file from an archive tries to
+            overwrite an existing file with the same name.  'fail' (default)
+            leads to RuntimeError exception, 'overwrite' silently replaces
+            existing file, 'archive-suffix' instructs to add a suffix (prefixed
+            with a '-') matching archive name from which file gets extracted,
+            and if that one is present as well, 'numeric-suffix' is in effect in
+            addition, when incremental numeric suffix (prefixed with a '.') is
+            added until no name collision is longer detected"""
         ),
         exclude=Parameter(
             args=("-e", "--exclude"),
             action='append',
-            doc="""regular expressions for filenames which to exclude from being added to annex.
-            Applied after --rename if that one is specified.  For exact matching, use anchoring""",
+            doc="""regular expressions for filenames which to exclude from being
+            added to annex. Applied after --rename if that one is specified.
+            For exact matching, use anchoring""",
             constraints=EnsureStr() | EnsureNone()
         ),
         rename=Parameter(
             args=("-r", "--rename"),
             action='append',
-            doc="""regular expressions to rename files before being added under git.
-            First letter defines how to split provided string into two parts:
-            Python regular expression (with groups), and replacement string""",
+            doc="""regular expressions to rename files before added them under
+            to Git. The first defines how to split provided string into
+            two parts: Python regular expression (with groups), and replacement
+            string""",
             constraints=EnsureStr(min_len=2) | EnsureNone()
         ),
         annex_options=Parameter(
@@ -167,17 +183,18 @@ class AddArchiveContent(Interface):
         key=Parameter(
             args=("--key",),
             action="store_true",
-            doc="""flag to signal if provided archive is not actually a filename on its own but an annex key"""),
+            doc="""signal if provided archive is not actually a filename on its
+            own but an annex key"""),
         copy=Parameter(
             args=("--copy",),
             action="store_true",
-            doc="""flag to copy the content of the archive instead of moving"""),
+            doc="""copy the content of the archive instead of moving"""),
         allow_dirty=allow_dirty,
         commit=Parameter(
             args=("--no-commit",),
             action="store_false",
             dest="commit",
-            doc="""flag to not commit upon completion"""),
+            doc="""don't commit upon completion"""),
         drop_after=Parameter(
             args=("--drop-after",),
             action="store_true",
@@ -186,9 +203,10 @@ class AddArchiveContent(Interface):
         delete_after=Parameter(
             args=("--delete-after",),
             action="store_true",
-            doc="""extract under a temporary directory, git-annex add, and delete after.  To
-             be used to "index" files within annex without actually creating corresponding
-             files under git.  Note that `annex dropunused` would later remove that load"""),
+            doc="""extract under a temporary directory, git-annex add, and
+            delete afterwards. To be used to "index" files within annex without
+            actually creating corresponding files under git. Note that
+            `annex dropunused` would later remove that load"""),
 
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
