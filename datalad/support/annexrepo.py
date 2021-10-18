@@ -3225,6 +3225,14 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # remove the field completely to avoid ambiguous semantics
                     # of None/NaN etc.
                     del rec['bytesize']
+            if rec.get('type') == 'symlink' and rec.get('key') is not None:
+                # we have a tracked symlink with an associated annex key
+                # this is only a symlink for technical reasons, but actually
+                # a file from the user perspective.
+                # homogenization of this kind makes the report more robust
+                # across different representations of a repo
+                # (think adjusted branches ...)
+                rec['type'] = 'file'
             info[path] = rec
         # TODO make annex availability checks optional and move in here
         if eval_availability:

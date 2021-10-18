@@ -136,18 +136,12 @@ def test_status(_path, linkpath):
         'MD5E-s5--275876e34cf609db118f3d84b799a790.txt'))
 
     plain_recursive = ds.status(recursive=True, result_renderer=None)
-    # check integrity of individual reports with a focus on how symlinks
-    # are reported
+    # check integrity of individual reports
     for res in plain_recursive:
         # anything that is an "intended" symlink should be reported
-        # as such. In contrast, anything that is a symlink for mere
-        # technical reasons (annex using it for something in some mode)
-        # should be reported as the thing it is representing (i.e.
-        # a file)
+        # as such
         if 'link2' in str(res['path']):
             assert res['type'] == 'symlink', res
-        else:
-            assert res['type'] != 'symlink', res
         # every item must report its parent dataset
         assert_in('parentds', res)
 
@@ -215,6 +209,22 @@ def test_status(_path, linkpath):
         ds.status(recursive=True, recursion_limit=-1, result_renderer=None),
         ds.status(recursive=True, result_renderer=None)
     )
+
+    # check integrity of individual reports with a focus on how symlinks
+    # are reported in annex-mode
+    # this is different from plain git-mode, which reports types as-is
+    # from the git record
+    for res in ds.status(recursive=True, annex='basic',
+                         result_renderer=None):
+        # anything that is an "intended" symlink should be reported
+        # as such. In contrast, anything that is a symlink for mere
+        # technical reasons (annex using it for something in some mode)
+        # should be reported as the thing it is representing (i.e.
+        # a file)
+        if 'link2' in str(res['path']):
+            assert res['type'] == 'symlink', res
+        else:
+            assert res['type'] != 'symlink', res
 
 
 # https://github.com/datalad/datalad-revolution/issues/64
