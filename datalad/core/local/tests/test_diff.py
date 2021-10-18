@@ -299,7 +299,8 @@ def test_diff_recursive(path):
     head_ref = DEFAULT_BRANCH if ds.repo.is_managed_branch() else 'HEAD'
 
     # look at the last change, only one file was added
-    res = ds.diff(fr=head_ref + '~1', to=head_ref, result_renderer=None)
+    res = ds.diff(fr=head_ref + '~1', to=head_ref, annex='basic',
+                  result_renderer=None)
     assert_result_count(_dirty_results(res), 1)
     assert_result_count(
         res, 1,
@@ -309,7 +310,7 @@ def test_diff_recursive(path):
     # now the exact same thing with recursion, must not be different from the
     # call above
     res = ds.diff(recursive=True, fr=head_ref + '~1', to=head_ref,
-                  result_renderer=None)
+                  annex='basic', result_renderer=None)
     assert_result_count(_dirty_results(res), 1)
     # last change in parent
     assert_result_count(
@@ -322,7 +323,7 @@ def test_diff_recursive(path):
     # one further back brings in the modified subdataset, and the added file
     # within it
     res = ds.diff(recursive=True, fr=head_ref + '~2', to=head_ref,
-                  result_renderer=None)
+                  annex='basic', result_renderer=None)
     assert_result_count(_dirty_results(res), 3)
     assert_result_count(
         res, 1,

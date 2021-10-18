@@ -15,6 +15,7 @@ import logging
 import os
 import os.path as op
 from collections import OrderedDict
+import warnings
 
 from datalad.utils import (
     bytes2human,
@@ -124,10 +125,8 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
       Will be populated with a Path instance for each queried dataset.
     eval_submodule_state : str
       Submodule evaluation mode setting for Repo.diffstatus().
-    eval_file_type : bool, optional
-      Whether to perform file type discrimination between real symlinks
-      and symlinks representing annex'ed files. This can be expensive
-      in datasets with many files.
+    eval_filetype : bool, optional
+      THIS OPTION IS IGNORED. It will be removed in a future release.
     cache : dict
       Cache to be passed on to all Repo.diffstatus() calls to avoid duplicate
       queries.
@@ -142,6 +141,12 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
     dict
       DataLad result records.
     """
+    if eval_filetype is not None:
+        warnings.warn(
+            "yield_dataset_status(eval_filetype=) no longer supported, "
+            "and will be removed in a future release",
+            DeprecationWarning)
+
     if reporting_order not in ('depth-first', 'breadth-first'):
         raise ValueError('Unknown reporting order: {}'.format(reporting_order))
 
@@ -157,7 +162,6 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
         paths=paths,
         untracked=untracked,
         eval_submodule_state=eval_submodule_state,
-        eval_file_type=eval_filetype,
         _cache=cache)
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
         lgr.debug('query %s.get_content_annexinfo() for paths: %s', repo, paths)
@@ -197,7 +201,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
                     recursion_limit - 1,
                     queried,
                     eval_submodule_state,
-                    eval_filetype,
+                    None,
                     cache,
                 )
                 call_kwargs = dict(
@@ -268,7 +272,7 @@ class Status(Interface):
       registered in superdataset
     - 'directory' -- any directory that does not qualify for type 'dataset'
     - 'file' -- any file, or any symlink that is placeholder to an annexed
-      file
+      file when annex-status reporting is enabled
     - 'symlink' -- any symlink that is not used as a placeholder for an annexed
       file
 
@@ -339,15 +343,13 @@ class Status(Interface):
             modification testing)."""),
         report_filetype=Parameter(
             args=("-t", "--report-filetype",),
-            constraints=EnsureChoice('raw', 'eval'),
-            doc="""Report mode for file types. With 'eval' each symlink
-            is inspected whether it is a pointer to an annex'ed file, and
-            is reported as 'type=file' in this case, and 'type=symlink'
-            otherwise. With 'raw' no type inspection is performed, and
-            symlinks representing annex'ed files are indistinguishable
-            from other symlinks. Type inspection is relatively expensive
-            and can lead to slow operation in datasets with a large number
-            of files."""),
+            constraints=EnsureChoice('raw', 'eval', None),
+            doc="""THIS OPTION IS IGNORED. It will be removed in a future
+            release. Dataset component types are always reported
+            as-is (previous 'raw' mode), unless annex-reporting is enabled
+            with the [CMD: --annex CMD][PY: `annex` PY] option, in which
+            case symlinks that represent annexed files will be reported
+            as type='file'."""),
     )
 
     @staticmethod
@@ -361,7 +363,13 @@ class Status(Interface):
             recursive=False,
             recursion_limit=None,
             eval_subdataset_state='full',
-            report_filetype='eval'):
+            report_filetype=None):
+        if report_filetype is not None:
+            warnings.warn(
+                "status(repor_filetype=) no longer supported, and will be removed "
+                "in a future release",
+                DeprecationWarning)
+
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
@@ -479,7 +487,7 @@ class Status(Interface):
                     if recursive else 0,
                     queried,
                     eval_subdataset_state,
-                    report_filetype == 'eval',
+                    None,
                     content_info_cache,
                     reporting_order='depth-first'):
                 yield dict(

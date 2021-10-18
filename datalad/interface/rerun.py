@@ -708,6 +708,7 @@ def new_or_modified(diff_results):
     """Filter diff result records to those for new or modified files.
     """
     for r in diff_results:
-        if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
+        if r.get('type') in ('file', 'symlink') \
+                and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r

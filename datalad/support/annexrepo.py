@@ -3152,14 +3152,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         dict
-          Each content item has an entry under its relative path within
-          the repository. Each value is a dictionary with properties:
+          The keys/values match those reported by GitRepo.get_content_info().
+          In addition, the following properties are added to each value
+          dictionary:
 
           `type`
-            Can be 'file', 'symlink', 'dataset', 'directory'
-          `revision`
-            SHASUM is last commit affecting the item, or None, if not
-            tracked.
+            Can be 'file', 'symlink', 'dataset', 'directory', where 'file'
+            is also used for annex'ed files (corrects a 'symlink' report
+            made by `get_content_info()`.
           `key`
             Annex key of a file (if an annex'ed file)
           `bytesize`
@@ -3225,6 +3225,14 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # remove the field completely to avoid ambiguous semantics
                     # of None/NaN etc.
                     del rec['bytesize']
+            if rec.get('type') == 'symlink' and rec.get('key') is not None:
+                # we have a tracked symlink with an associated annex key
+                # this is only a symlink for technical reasons, but actually
+                # a file from the user perspective.
+                # homogenization of this kind makes the report more robust
+                # across different representations of a repo
+                # (think adjusted branches ...)
+                rec['type'] = 'file'
             info[path] = rec
         # TODO make annex availability checks optional and move in here
         if eval_availability:
