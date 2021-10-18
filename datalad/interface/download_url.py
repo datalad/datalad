@@ -48,13 +48,14 @@ class DownloadURL(Interface):
     """Download content
 
     It allows for a uniform download interface to various supported URL
-    schemes, re-using or asking for authentication details maintained by
-    datalad.
+    schemes ('http', 'https', 'shub', 'ftp', 's3'), re-using or asking for
+    authentication details maintained by datalad.
     """
 
     _params_ = dict(
         urls=Parameter(
-            doc="URL(s) to be downloaded",
+            doc="""URL(s) to be downloaded. Supported protocols: 'http',
+            'https', 'shub', 'ftp', and 's3'""",
             constraints=EnsureStr(),  # TODO: EnsureURL
             metavar='url',
             nargs='+'),
