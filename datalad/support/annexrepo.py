@@ -3152,14 +3152,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         dict
-          Each content item has an entry under its relative path within
-          the repository. Each value is a dictionary with properties:
+          The keys/values match those reported by GitRepo.get_content_info().
+          In addition, the following properties are added to each value
+          dictionary:
 
           `type`
-            Can be 'file', 'symlink', 'dataset', 'directory'
-          `revision`
-            SHASUM is last commit affecting the item, or None, if not
-            tracked.
+            Can be 'file', 'symlink', 'dataset', 'directory', where 'file'
+            is also used for annex'ed files (corrects a 'symlink' report
+            made by `get_content_info()`.
           `key`
             Annex key of a file (if an annex'ed file)
           `bytesize`
