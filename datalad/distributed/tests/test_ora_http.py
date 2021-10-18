@@ -117,9 +117,11 @@ def test_read_access(store_path, store_url, ds_path):
     ds.repo.init_remote('ora-remote', options=init_opts)
     ds.repo.fsck(remote='ora-remote', fast=True)
     store_uuid = ds.siblings(name='ora-remote',
-                             return_type='item-or-list')['annex-uuid']
+                             return_type='item-or-list',
+                             result_renderer='disabled')['annex-uuid']
     here_uuid = ds.siblings(name='here',
-                            return_type='item-or-list')['annex-uuid']
+                            return_type='item-or-list',
+                            result_renderer='disabled')['annex-uuid']
 
     # nothing in store yet:
     for f in files:
