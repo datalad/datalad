@@ -285,6 +285,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # take out any duplicate source candidates
     # unique() takes out the duplicated at the tail end
     clone_urls = unique(clone_urls, lambda x: x['url'])
+    lgr.debug('Assembled %i clone candidates for %s: %s',
+              len(clone_urls), sm_path, [cand['url'] for cand in clone_urls])
 
     return clone_urls
 
