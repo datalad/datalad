@@ -71,6 +71,13 @@ provide recent releases of DataLad. Once enabled, just do:
 
     apt-get install datalad
 
+## Gentoo-based systems
+
+On Gentoo-based systems (i.e. all systems whose package manager can parse ebuilds as per the [Package Manager Specification]), we recommend [enabling the ::science overlay], via which we
+provide recent releases of DataLad. Once enabled, just run:
+
+    emerge datalad
+
 ## Other Linux'es via conda
 
     conda install -c conda-forge datalad
@@ -194,5 +201,7 @@ project (NIH 1P41EB019936-01A1).
 [Git-annex]: http://git-annex.branchable.com
 [setup.py]: https://github.com/datalad/datalad/blob/master/setup.py
 [NeuroDebian]: http://neuro.debian.net
+[Package Manager Specification]: https://projects.gentoo.org/pms/latest/pms.html
+[enabling the ::science overlay]: https://github.com/gentoo/sci#manual-install-
 
 [DataLad Handbook: Installation]: http://handbook.datalad.org/en/latest/intro/installation.html
