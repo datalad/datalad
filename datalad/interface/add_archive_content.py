@@ -100,8 +100,12 @@ class AddArchiveContent(Interface):
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
     _params_ = dict(
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc=""""specify the dataset to save""",
+            constraints=EnsureDataset() | EnsureNone()),
         delete=Parameter(
-            args=("-d", "--delete"),
+            args=("-D", "--delete"),
             action="store_true",
             doc="""delete original archive from the filesystem/Git in current
             tree. %s""" % _KEY_OPT_NOTE),
@@ -226,7 +230,8 @@ class AddArchiveContent(Interface):
         #     ),
 
     @staticmethod
-    def __call__(archive, annex=None,
+    @eval_results
+    def __call__(archive, dataset=None, annex=None,
                  add_archive_leading_dir=False,
                  strip_leading_dirs=False, leading_dirs_depth=None, leading_dirs_consider=None,
                  use_current_dir=False,
