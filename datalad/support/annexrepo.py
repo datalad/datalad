@@ -1613,80 +1613,65 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_paths
     def get_file_key(self, files, batch=None):
-        """Get key of an annexed file.
+        """DEPRECATED. Use get_content_annexinfo()
 
-        Parameters
-        ----------
-        files: str or list
-            file(s) to look up
-        batch: None or bool, optional
-            If True, `lookupkey --batch` process will be used, which would
-            not crash even if provided file is not under annex (but directly
-            under git), but rather just return an empty string. If False,
-            invokes without --batch. If None, use batch mode if more than a
-            single file is provided.
+        See the method body for how to use get_content_annexinfo() to
+        replace get_file_key().
 
-        Returns
-        -------
-        str or list
-            keys used by git-annex for each of the files;
-            in case of a list an empty string is returned if there was no key
-            for that file
-
-        Raises
-        ------
-        FileInGitError
-             If running in non-batch mode and a file is under git, not annex
-        FileNotInAnnexError
-             If running in non-batch mode and a file is not under git at all
+        For single-file queries it is recommended to consider
+        get_file_annexinfo()
         """
+        import warnings
+        warnings.warn(
+            "AnnexRepo.get_file_key() is deprecated, "
+            "use get_content_annexinfo() instead.",
+            DeprecationWarning)
 
-        if batch or (batch is None and len(files) > 1):
-            return self._batched.get('lookupkey', path=self.path)(files)
-        else:
-            files = files[0]
-            # single file
-            # keep current implementation
-            # TODO: This should change, but involves more RF'ing and an
-            # alternative regarding FileNotInAnnexError
-            cmd_str = 'git annex lookupkey %s' % files  # have a string for messages
+        # this is only needed, because a previous implementation wanted to
+        # disect reasons for not being able to report a key: file not there,
+        # file in git, but not annexed. If not for that, this could be
+        #init = None
+        init = dict(
+            zip(
+                [self.pathobj / f for f in files],
+                [{} for i in range(len(files))]
+            )
+        )
+        info = self.get_content_annexinfo(
+            files,
+            init=init,
+        )
+        keys = [r.get('key', '') for r in info.values()]
 
-            try:
-                # it is important to unwind the generator here to have the exception
-                # handling capture a potential command failure
-                entries = list(self.call_annex_items_(
-                    ['lookupkey'],
-                    files=[files]
-                ))
-            except CommandError as e:
-                if e.code == 1:
-                    if not exists(opj(self.path, files)):
-                        raise IOError(e.code, "File not found.", files)
-                    # XXX you don't like me because I can be real slow!
-                    elif files in self.get_indexed_files():
-                        # if we got here, the file is present and in git,
-                        # but not in the annex
-                        raise FileInGitError(cmd=cmd_str,
-                                             msg="File not in annex, but git: %s"
-                                                 % files,
-                                             filename=files)
-                    else:
-                        raise FileNotInAnnexError(cmd=cmd_str,
-                                                  msg="File not in annex: %s"
-                                                      % files,
-                                                  filename=files)
-                else:
-                    # Not sure, whether or not this can actually happen
-                    raise e
+        # everything below is only needed to achieve compatibility with the
+        # complex behavior of a previous implementation if not for that, we
+        # could achieve uniform behavior regardless of input specifics with a
+        # simple
+        #return keys
 
-            # filter out the ones which start with (: http://git-annex.branchable.com/bugs/lookupkey_started_to_spit_out___34__debug__34___messages_to_stdout/?updated
-            entries = list(filter(lambda x: not x.startswith('('), entries))
-            if len(entries) > 1:
-                lgr.warning("Got multiple entries in reply asking for a key of a file: %s"
-                            % (str(entries)))
-            elif not entries:
-                raise FileNotInAnnexError("Could not get a key for a file(s) %s -- empty output" % files)
-            return entries[0]
+        if batch is not True and len(files) == 1 and '' in keys:
+            not_found = [
+                p
+                for p, r in info.items()
+                if r.get('success') is False and r.get('note') == 'not found'
+            ]
+            if not_found:
+                raise FileNotInAnnexError(
+                    cmd='find',
+                    msg=f"File not in annex: {not_found}",
+                    filename=not_found)
+
+            no_annex = [p for p, r in info.items() if not r]
+            if no_annex:
+                raise FileInGitError(
+                    cmd='find',
+                    msg=f"File not in annex, but git: {no_annex}",
+                    filename=no_annex)
+
+        if batch is True and len(files) == 1 and len(keys) == 1:
+            keys = keys[0]
+
+        return keys
 
     @normalize_paths
     def unlock(self, files):
