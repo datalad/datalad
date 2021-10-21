@@ -381,18 +381,65 @@ class Save(Interface):
         # and more "dynamic" feedback than jumpy datasets count.
         # See addurls where it is implemented that way by providing agg and another
         # log_filter
-        yield from ProducerConsumerProgressLog(
-            sorted(paths_by_ds.items(), key=lambda v: v[0], reverse=True),
-            partial(save_ds, version_tag=version_tag),
-            safe_to_consume=no_subds_in_futures,
-            producer_future_key=lambda ds_items: ds_items[0],
-            jobs=jobs,
-            log_filter=_log_filter_save_dataset,
-            unit="datasets",
-            lgr=lgr,
-        )
+
+        import os
+        from datalad import cfg as dlcfg
+        # max acceptable git (non-annex) commit size
+        check_git_commit = dlcfg.obtain('datalad.ui.git-commit-notification')
+        max_size = dlcfg.obtain('datalad.ui.git-commit-notification-threshold')
+        biggest_files = [0, 'none']
+        n_git_files = 0
+        tot_size = 0
+
+        for entry in ProducerConsumerProgressLog(
+                sorted(paths_by_ds.items(), key=lambda v: v[0], reverse=True),
+                partial(save_ds, version_tag=version_tag),
+                safe_to_consume=no_subds_in_futures,
+                producer_future_key=lambda ds_items: ds_items[0],
+                jobs=jobs,
+                log_filter=_log_filter_save_dataset,
+                unit="datasets",
+                lgr=lgr, ):
+            if check_git_commit:
+                if ('key' in entry) and ('action' in entry):
+                    if (not entry['key']) and ('delete' != entry['action']):
+                        # collect cumulative size of all files directly saved in git (no key)
+                        # for notifying the user in case of excessive commit size
+                        entry_path = entry.get('path')
+                        if entry_path:
+                            n_git_files += 1
+                            file_size = os.path.getsize(entry_path)
+                            if biggest_files[0] < file_size:
+                                biggest_files = [file_size, entry_path]
+                            elif biggest_files[0] == file_size:
+                                biggest_files.append(entry_path)
+                        else:
+                            file_size = 0
+
+                        tot_size += file_size
+
+            yield entry
+
+        if 0 < n_git_files and max_size < tot_size:
+            from datalad.ui import ui
+            from datalad.dochelpers import single_or_plural
+            ui.message('  [{} {} committed to git (total size: {}); consider saving to annex.\n'
+                       '   Biggest {} (file size: {}):\n'
+                       '   {}\n'
+                       '   Disable this notification with datalad.ui.git-commit-notification=off]'
+                       .format(n_git_files,
+                               single_or_plural("file was",
+                                                "files were",
+                                                n_git_files, False),
+                               ut.bytes2human(tot_size),
+                               single_or_plural("file is",
+                                                "files were",
+                                                len(biggest_files) - 1, False),
+                               ut.bytes2human(biggest_files[0]),
+                               '\n  '.join(biggest_files[1:])
+                               )
+                       )
 
 
 def _log_filter_save_dataset(res):
     return res.get('type') == 'dataset' and res.get('action') == 'save'
-
