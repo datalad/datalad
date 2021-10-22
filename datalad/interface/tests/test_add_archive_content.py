@@ -405,7 +405,6 @@ def test_add_archive_content_zip(repo_path):
         ok_archives_caches(ds.path, 0)
 
 
-@known_failure_windows
 @with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
@@ -430,7 +429,6 @@ def test_add_archive_content_absolute_path(path):
     )
 
 
-@known_failure_windows
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
@@ -515,7 +513,6 @@ class TestAddArchiveOptions():
         self.annex.precommit()
         rmtemp(self.ds.path)
 
-    @known_failure_windows
     def test_add_delete(self):
         # To test that .tar gets removed
         self.ds.add_archive_content('1.tar', strip_leading_dirs=True,
@@ -631,7 +628,6 @@ class TestAddArchiveOptions():
             []
         )
 
-    @known_failure_windows
     def test_override_existing_under_git(self):
         create_tree(self.ds.path, {'1.dat': 'load2'})
         self.ds.save('1.dat', to_git=True, message='added to git')
