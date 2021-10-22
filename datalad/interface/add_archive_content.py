@@ -9,7 +9,6 @@
 """High-level interface for adding content of an archive under annex control
 
 """
-from __future__ import print_function
 
 __docformat__ = 'restructuredtext'
 
