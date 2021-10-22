@@ -139,7 +139,9 @@ class WriterThread(DataCopyThread):
 
     def write_data(self, data: Union[str, bytes]):
         try:
-            os.write(self.destination.fileno(), data.encode())
+            os.write(
+                self.destination.fileno(),
+                data.encode() if isinstance(data, str) else data)
         except BrokenPipeError:
             lgr.debug(f"{self} broken pipe")
             self.request_exit()

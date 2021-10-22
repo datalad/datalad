@@ -26,12 +26,12 @@ from datalad.tests.utils import (
 )
 from datalad.utils import on_windows
 
-from .. import (
+from datalad.runner import (
     Protocol,
     Runner,
     StdOutCapture,
 )
-from ..nonasyncrunner import (
+from datalad.runner.nonasyncrunner import (
     ReaderThread,
     run_command,
 )
@@ -142,11 +142,14 @@ def test_thread_exit():
     sleep(5)
     assert_true(reader_thread.is_alive())
 
-    # Check actual exit
+    # Check actual exit, we will not get
+    # "more data" when exit was requested,
+    # because the thread will not attempt
+    # a write
     os.write(write_descriptor, b"more data")
     reader_thread.join()
     data = read_queue.get()
-    eq_(data[1], b"more data")
+    eq_(data[1], None)
     assert_true(read_queue.empty())
 
 

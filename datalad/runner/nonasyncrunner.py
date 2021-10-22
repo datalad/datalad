@@ -83,7 +83,7 @@ def run_command(cmd: Union[str, List],
     catch_stdout = protocol.proc_out is not None
     catch_stderr = protocol.proc_err is not None
 
-    if isinstance(stdin, (IO, type(None))):
+    if isinstance(stdin, (int, IO, type(None))):
         # indicate that we will not write anything to stdin, that
         # means the user can pass None, or he can pass a
         # file-like and write to it from a different thread.
