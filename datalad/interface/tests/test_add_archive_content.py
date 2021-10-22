@@ -413,13 +413,13 @@ def test_add_archive_content_absolute_path(path):
     ds.create(force=True)
     ds.save("1.tar.gz", message="1.tar.gz")
     abs_tar_gz = opj(path, "ds", "1.tar.gz")
-    add_archive_content(abs_tar_gz, dataset=ds, annex=ds.repo)
+    add_archive_content(abs_tar_gz, dataset=ds)
     ok_file_under_git(opj(path, "ds", "1", "foo"), annexed=True)
     commit_msg = ds.repo.format_commit("%B")
     # The commit message uses relative paths.
     assert_not_in(abs_tar_gz, commit_msg)
     assert_in("1.tar.gz", commit_msg)
-    res = add_archive_content(opj(path, "notds", "2.tar.gz"), annex=ds,
+    res = add_archive_content(opj(path, "notds", "2.tar.gz"),
                               dataset=ds, on_failure='ignore')
 
     assert_in_results(
@@ -519,7 +519,7 @@ class TestAddArchiveOptions():
     def test_add_delete(self):
         # To test that .tar gets removed
         self.ds.add_archive_content('1.tar', strip_leading_dirs=True,
-                                    delete=True, annex=self.annex)
+                                    delete=True)
         assert_false(lexists(self.ds.pathobj / '1.tar'))
 
     @known_failure_windows
@@ -533,7 +533,6 @@ class TestAddArchiveOptions():
 
         self.ds.add_archive_content(
             f123,
-            annex=self.ds.repo,
             add_archive_leading_dir=True,
             strip_leading_dirs=True
         )
@@ -554,7 +553,7 @@ class TestAddArchiveOptions():
         assert_equal(self.ds.repo.whereis(key1, key=True, output='full'), {})
 
         commits_prior = list(self.ds.repo.get_branch_commits_('git-annex'))
-        self.ds.add_archive_content('1.tar', annex=self.ds.repo,
+        self.ds.add_archive_content('1.tar',
                                     strip_leading_dirs=True, delete_after=True)
         commits_after = list(self.ds.repo.get_branch_commits_('git-annex'))
         # There should be a single commit for all additions +1 to initiate
@@ -570,7 +569,7 @@ class TestAddArchiveOptions():
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
 
         # Let's now do the same but also drop content
-        self.ds.add_archive_content('1.tar', annex=self.ds.repo,
+        self.ds.add_archive_content('1.tar',
                                     strip_leading_dirs=True, delete_after=True,
                                     drop_after=True)
         assert_equal(prev_files, list(find_files('.*', self.ds.path)))
@@ -637,7 +636,7 @@ class TestAddArchiveOptions():
         create_tree(self.ds.path, {'1.dat': 'load2'})
         self.ds.save('1.dat', to_git=True, message='added to git')
         self.ds.add_archive_content(
-            '1.tar', annex=self.annex, strip_leading_dirs=True,
+            '1.tar', strip_leading_dirs=True,
         )
         # and we did not bother adding it to annex (for now) -- just skipped
         # since we have it and it is the same
@@ -645,7 +644,7 @@ class TestAddArchiveOptions():
 
         # but if we say 'overwrite' -- we would remove and replace
         self.ds.add_archive_content(
-            '1.tar', annex=self.annex, strip_leading_dirs=True, delete=True
+            '1.tar', strip_leading_dirs=True, delete=True
             , existing='overwrite'
         )
         ok_file_under_git(self.ds.path, '1.dat', annexed=True)

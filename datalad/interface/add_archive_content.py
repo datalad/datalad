@@ -17,6 +17,7 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 import tempfile
+import warnings
 from os.path import join as opj
 from os.path import (
     basename,
@@ -168,13 +169,12 @@ class AddArchiveContent(Interface):
         ),
         annex_options=Parameter(
             args=("-o", "--annex-options"),
-            doc="""additional options to pass to git-annex""",
+            doc="""additional options to pass to git-annex. """,
             constraints=EnsureStr() | EnsureNone()
         ),
-        # TODO: Python only???
         annex=Parameter(
-            doc="""annex instance to use"""
-            #constraints=EnsureStr() | EnsureNone()
+            doc="""annex instance to use. This parameter will
+            be deprecated. Use the 'dataset' parameter instead."""
         ),
         # TODO: Python only!
         stats=Parameter(
@@ -272,7 +272,12 @@ class AddArchiveContent(Interface):
                 **res_kwargs
             )
             return
-
+        if annex:
+            warnings.warn(
+                "datalad add_archive_content's `annex` parameter is "
+                "deprecated and will be removed in a future release. "
+                "Use the 'dataset' parameter instead.",
+                DeprecationWarning)
         annex = ds.repo
         # get the archive path relative from the ds root
         archive_path = resolve_path(archive, ds=dataset)
