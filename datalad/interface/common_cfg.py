@@ -482,7 +482,7 @@ definitions = {
             'text': "If enabled, a notification listing the number of files, "
                     "total file size & biggest file committed will be displayed "
                     "if a commit saved to git exceeds the size set by "
-                    "datalad.ui.git-commit-notification-threshold. "}),
+                    "datalad.ui.git-commit-notification-threshold."}),
         'default': True,
         'type': EnsureBool(),
     },
@@ -490,7 +490,7 @@ definitions = {
         'ui': ('question', {
             'title': 'Threshold for notification on possibly excessive git commit',
             'text': "Maximum acceptable size (in bytes) of a git commit, "
-                    "before a notifiaction is displayed. "
+                    "before a notification is displayed. "
                     "See 'datalad.ui.git-commit-notification' for more "
                     "information."}),
         'default': 104857600,  # 100 MiB

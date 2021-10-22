@@ -12,9 +12,17 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
+
 import logging
 
 from functools import partial
+
+from datalad import cfg as dlcfg
+
+from datalad.ui import ui
+
+from datalad.dochelpers import single_or_plural
 
 from datalad.interface.base import (
     Interface,
@@ -382,63 +390,90 @@ class Save(Interface):
         # See addurls where it is implemented that way by providing agg and another
         # log_filter
 
-        import os
-        from datalad import cfg as dlcfg
-        # max acceptable git (non-annex) commit size
+        saver = ProducerConsumerProgressLog(
+            sorted(paths_by_ds.items(), key=lambda v: v[0], reverse=True),
+            partial(save_ds, version_tag=version_tag),
+            safe_to_consume=no_subds_in_futures,
+            producer_future_key=lambda ds_items: ds_items[0],
+            jobs=jobs,
+            log_filter=_log_filter_save_dataset,
+            unit="datasets",
+            lgr=lgr,
+        )
+
         check_git_commit = dlcfg.obtain('datalad.ui.git-commit-notification')
-        max_size = dlcfg.obtain('datalad.ui.git-commit-notification-threshold')
-        biggest_files = [0, 'none']
-        n_git_files = 0
-        tot_size = 0
+        if not check_git_commit:
+            yield from saver
+        else:
+            yield from with_gitsize_investigation(saver)
 
-        for entry in ProducerConsumerProgressLog(
-                sorted(paths_by_ds.items(), key=lambda v: v[0], reverse=True),
-                partial(save_ds, version_tag=version_tag),
-                safe_to_consume=no_subds_in_futures,
-                producer_future_key=lambda ds_items: ds_items[0],
-                jobs=jobs,
-                log_filter=_log_filter_save_dataset,
-                unit="datasets",
-                lgr=lgr, ):
-            if check_git_commit:
-                if ('key' in entry) and ('action' in entry):
-                    if (not entry['key']) and ('delete' != entry['action']):
-                        # collect cumulative size of all files directly saved in git (no key)
-                        # for notifying the user in case of excessive commit size
-                        entry_path = entry.get('path')
-                        if entry_path:
-                            n_git_files += 1
-                            file_size = os.path.getsize(entry_path)
-                            if biggest_files[0] < file_size:
-                                biggest_files = [file_size, entry_path]
-                            elif biggest_files[0] == file_size:
-                                biggest_files.append(entry_path)
-                        else:
-                            file_size = 0
 
-                        tot_size += file_size
+def with_gitsize_investigation(saver):
+    """Notify user if a large amount of files was saved to git
 
-            yield entry
+    Determines the total size of files saved directly to git rather than to annex.
+    If this size is greater than datalad.ui.git-commit-notification-threshold,
+    a note is generated to inform the user to consider saving to annex.
 
-        if 0 < n_git_files and max_size < tot_size:
-            from datalad.ui import ui
-            from datalad.dochelpers import single_or_plural
-            ui.message('  [{} {} committed to git (total size: {}); consider saving to annex.\n'
-                       '   Biggest {} (file size: {}):\n'
-                       '   {}\n'
-                       '   Disable this notification with datalad.ui.git-commit-notification=off]'
-                       .format(n_git_files,
-                               single_or_plural("file was",
-                                                "files were",
-                                                n_git_files, False),
-                               ut.bytes2human(tot_size),
-                               single_or_plural("file is",
-                                                "files were",
-                                                len(biggest_files) - 1, False),
-                               ut.bytes2human(biggest_files[0]),
-                               '\n  '.join(biggest_files[1:])
-                               )
-                       )
+    Parameters
+    ----------
+    saver : Iterable
+      An iterable containing the individual results of the save.
+
+    Returns
+    -------
+    Generator
+        Yields the unmodified elements of saver.
+    """
+
+    # max acceptable git (non-annex) commit size
+    max_allowed_size = dlcfg.obtain('datalad.ui.git-commit-notification-threshold')
+    files = {}
+
+    for entry in saver:
+        if ('key' in entry) and ('action' in entry):
+            if (not entry['key']) and ('delete' != entry['action']):
+                # collect cumulative size of all files directly saved in git (no key)
+                # for notifying the user in case of excessive commit size
+                entry_path = entry.get('path')
+                if entry_path:  # sanity check
+                    files[entry_path] = os.path.getsize(entry_path)  # 0  # consider for performance
+        yield entry
+
+    num_files = len(files)
+
+    # TODO: consider for performance -> count first, getsize later
+    # if num_files > some_limit:
+    #     ui.message('  [A large number of files ({}) was saved directly to git;\n'
+    #                '   please be mindful of the file sizes and consider adjusting\n'
+    #                '   the settings in .gitattributes to optimize annex utilisation\n'
+    #                '   Disable this notification with datalad.ui.git-commit-notification=off]'
+    #                .format(num_files),
+    #     )
+    #     return
+    # else:
+    #     for file in files:
+    #         files[file] = os.path.getsize(file)
+    tot_size = sum(files.values())
+    if 0 < num_files and max_allowed_size < tot_size:
+        ui.message('  [{} {} committed to git (total size: {}); consider adjusting settings in\n'
+                   '   .gitattributes to include more files in the annex\n'
+                   '   Biggest {}:\n'
+                   '   {}\n'
+                   '   Disable this notification with datalad.ui.git-commit-notification=off]'
+                   .format(num_files,
+                           single_or_plural("file was",
+                                            "files were",
+                                            num_files, False),
+                           ut.bytes2human(tot_size),
+                           single_or_plural("file is",
+                                            "files are",
+                                            num_files, False),
+                           '\n'.join(("{} ({})".format(file, ut.bytes2human(size))
+                                      for file, size in files.items()[:num_files
+                                                                      if 10 > num_files else 10])),
+                           )
+                   )
 
 
 def _log_filter_save_dataset(res):
