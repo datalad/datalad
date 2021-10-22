@@ -32,7 +32,7 @@ from .. import (
     StdOutCapture,
 )
 from ..nonasyncrunner import (
-    _ReaderThread,
+    ReaderThread,
     run_command,
 )
 
@@ -128,7 +128,7 @@ def test_thread_exit():
     read_file = os.fdopen(read_descriptor, "rb")
     read_queue = queue.Queue()
 
-    reader_thread = _ReaderThread(read_file, read_queue, "test")
+    reader_thread = ReaderThread(read_file, read_queue, "test")
     reader_thread.start()
 
     os.write(write_descriptor, b"some data")

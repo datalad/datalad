@@ -11,11 +11,8 @@ Thread based subprocess execution with stdout and stderr passed to protocol obje
 """
 
 import logging
-import os
-import queue
 import subprocess
-import threading
-import time
+from queue import Queue
 from typing import (
     IO,
     Any,
@@ -26,108 +23,19 @@ from typing import (
     Union,
 )
 
-from .protocol import WitlessProtocol
+from datalad.runner.protocol import WitlessProtocol
+
+from .runnerthreads import (
+    ReaderThread,
+    WriterThread,
+)
+
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1
 STDERR_FILENO = 2
-
-
-class _ReaderThread(threading.Thread):
-
-    def __init__(self,
-                 file: IO,
-                 q: queue.Queue,
-                 command: Union[str, List]):
-        """
-        Parameters
-        ----------
-        file:
-          File object from which the thread will read data
-          and write it into the queue. This is usually the
-          read end of a pipe.
-        q:
-          A queue into which the thread writes what it reads
-          from file.
-        command:
-          The command for which the thread was created. This
-          is mainly used to improve debug output messages.
-        """
-        super().__init__(daemon=True)
-        self.file = file
-        self.queue = q
-        self.command = command
-        self.quit = False
-
-    def __str__(self):
-        return f"ReaderThread({self.file}, {self.queue}, {self.command})"
-
-    def request_exit(self):
-        """
-        Request the thread to exit. This is not guaranteed to
-        have any effect, because the thread might be waiting in
-        `os.read()` or on `queue.put()`, if the queue size is finite.
-        To ensure thread termination, you can ensure that another thread
-        empties the queue, and try to trigger a read on `self.file.fileno()`,
-        e.g. by writing into the write-end of a pipe that is connected to
-        `self.file.fileno()`.
-        """
-        self.quit = True
-
-    def run(self):
-        lgr.log(5, "%s started", self)
-
-        while not self.quit:
-
-            data = os.read(self.file.fileno(), 1024)
-            if data == b"":
-                lgr.log(5, "%s exiting (stream end)", self)
-                self.queue.put((self.file.fileno(), None, time.time()))
-                return
-
-            self.queue.put((self.file.fileno(), data, time.time()))
-
-
-class _StdinWriterThread(threading.Thread):
-    def __init__(self, stdin_data, process, stdin_fileno, q, command=""):
-        """
-        Parameters
-        ----------
-        stdin_data:
-          Data that should be written to the file given by `stdin_fileno´.
-        process:
-          a subprocess.Popen-instance. It is mainly used to access
-          popen._stdin_write(...)
-        q:
-          A queue into which the thread writes a None-data object to
-          indicate that all stdin_data was written.
-        command:
-          The command for which the thread was created. This
-          is mainly used to improve debug output messages.
-        """
-        super().__init__(daemon=True)
-        self.stdin_data = stdin_data
-        self.process = process
-        self.stdin_fileno = stdin_fileno
-        self.queue = q
-        self.command = command
-
-    def __str__(self):
-        return (
-            f"WriterThread(stdin_data[0 ... {len(self.stdin_data) - 1}], "
-            f"{self.process}, {self.stdin_fileno}, {self.command})")
-
-    def run(self):
-        lgr.log(5, "%s started", self)
-
-        # (ab)use internal helper that takes care of a bunch of corner cases
-        # and closes stdin at the end
-        self.process._stdin_write(self.stdin_data)
-
-        lgr.log(5, "%s exiting (write completed or interrupted)", self)
-        self.queue.put((self.stdin_fileno, None, time.time()))
 
 
 def run_command(cmd: Union[str, List],
@@ -175,15 +83,24 @@ def run_command(cmd: Union[str, List],
     catch_stdout = protocol.proc_out is not None
     catch_stderr = protocol.proc_err is not None
 
-    if isinstance(stdin, (str, bytes)):
-        # we got something that is not readily usable stdin, but must be
-        # fed to the processes stdin
-        stdin_data = stdin
-    else:
-        # indicate that there is nothing to write to stdin
-        stdin_data = None
+    if isinstance(stdin, (IO, type(None))):
+        # indicate that we will not write anything to stdin, that
+        # means the user can pass None, or he can pass a
+        # file-like and write to it from a different thread.
+        write_stdin = False  # the caller will write to the parameter
 
-    write_stdin = stdin_data is not None
+    elif isinstance(stdin, (str, bytes, Queue)):
+        # establish infrastructure to write to the process
+        write_stdin = True
+        if not isinstance(stdin, Queue):
+            # if input is already provided, enqueue it.
+            stdin_queue = Queue()
+            stdin_queue.put(stdin)
+            stdin_queue.put(None)
+        else:
+            stdin_queue = stdin
+    else:
+        raise ValueError(f"unsupported stdin type: {type(stdin)}")
 
     kwargs = {
         **kwargs,
@@ -217,19 +134,19 @@ def run_command(cmd: Union[str, List],
 
     if catch_stdout or catch_stderr or write_stdin:
 
-        output_queue = queue.Queue()
+        output_queue = Queue()
         active_file_numbers = set()
         if catch_stderr:
             active_file_numbers.add(process_stderr_fileno)
-            stderr_reader_thread = _ReaderThread(process.stderr, output_queue, cmd)
+            stderr_reader_thread = ReaderThread(process.stderr, output_queue, cmd)
             stderr_reader_thread.start()
         if catch_stdout:
             active_file_numbers.add(process_stdout_fileno)
-            stdout_reader_thread = _ReaderThread(process.stdout, output_queue, cmd)
+            stdout_reader_thread = ReaderThread(process.stdout, output_queue, cmd)
             stdout_reader_thread.start()
         if write_stdin:
             active_file_numbers.add(process_stdin_fileno)
-            stdin_writer_thread = _StdinWriterThread(stdin_data, process, process_stdin_fileno, output_queue, cmd)
+            stdin_writer_thread = WriterThread(stdin_queue, process.stdin, output_queue, cmd)
             stdin_writer_thread.start()
 
         while True:

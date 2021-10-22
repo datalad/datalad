@@ -15,145 +15,28 @@ import os
 import subprocess
 import threading
 import time
+from abc import (
+    abstractmethod,
+    ABCMeta,
+)
 from queue import Queue
 from typing import (
     IO,
-    Any,
-    Dict,
     List,
     Optional,
-    Type,
     Union,
 )
 
+from .runnerthreads import (
+    ReaderThread,
+    WriterThread,
+)
 
-lgr = logging.getLogger("datalad.runner.nonasyncrunner")
-logging.basicConfig(level=3)
+lgr = logging.getLogger("datalad.runner.yieldingrunner")
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1
 STDERR_FILENO = 2
-
-
-class _ReaderThread(threading.Thread):
-
-    def __init__(self,
-                 file: IO,
-                 q: Queue,
-                 command: Union[str, List]):
-        """
-        Parameters
-        ----------
-        file:
-          File object from which the thread will read data
-          and write it into the queue. This is usually the
-          read end of a pipe.
-        q:
-          A queue into which the thread writes what it reads
-          from file.
-        command:
-          The command for which the thread was created. This
-          is mainly used to improve debug output messages.
-        """
-        super().__init__(daemon=True)
-        self.file = file
-        self.queue = q
-        self.command = command
-        self.quit = False
-
-    def __str__(self):
-        return f"ReaderThread({self.queue}, {self.file}, {self.command})"
-
-    def request_exit(self):
-        """
-        Request the thread to exit. This is not guaranteed to
-        have any effect, because the thread might be waiting in
-        `os.read()` or on `queue.put()`, if the queue size is finite.
-        To ensure thread termination, you can ensure that another thread
-        empties the queue, and try to trigger a read on `self.file.fileno()`,
-        e.g. by writing into the write-end of a pipe that is connected to
-        `self.file.fileno()`.
-        """
-        self.quit = True
-
-    def run(self):
-        lgr.log(5, "%s started", self)
-
-        while not self.quit:
-            data = os.read(self.file.fileno(), 1024)
-            print(f"READER: {data}")
-            if data == b"" or self.quit is True:
-                break
-            self.queue.put((self.file.fileno(), data, time.time()))
-
-        lgr.log(5, "%s exiting (stream end or quit requested)", self)
-        print("READER EXITING")
-        self.queue.put((self.file.fileno(), None, time.time()))
-
-
-class _StdinWriterThread(threading.Thread):
-    def __init__(self,
-                 file: IO,
-                 input_queue: Queue,
-                 output_queue: Queue,
-                 command: Union[str, List] = ""):
-        """
-        Parameters
-        ----------
-        file:
-          file-like representing stdin of the subprocess
-        input_queue:
-          A queue from which data is read and written to the process,
-          a None-data object indicates that all stdin_data was written
-          and will lead to this thread exiting.
-        output_queue:
-          A queue to signal the main thread, when we are exiting.
-        command:
-          The command for which the thread was created. This
-          is mainly used to improve debug output messages.
-        """
-        super().__init__(daemon=True)
-        self.file = file
-        self.input_queue = input_queue
-        self.output_queue = output_queue
-        self.command = command
-        self.quit = False
-
-    def __str__(self):
-        return (
-            f"WriterThread({self.file}, {self.input_queue}, "
-            f"{self.output_queue}, {self.command})")
-
-    def request_exit(self):
-        """
-        Request the thread to exit. This is not guaranteed to
-        have any effect, because the thread might be waiting in
-        `os.write()` or on `queue.get()`, if the queue is empty.
-        To ensure thread termination, you can ensure that another thread
-        writes None to the queue, and ensure that the sub process is
-        actually reading from stdin`.
-        """
-        self.quit = True
-
-    def _write(self, data):
-        try:
-            os.write(self.file.fileno(), data.encode())
-        except BrokenPipeError:
-            lgr.debug(f"{self} broken pipe")
-
-    def run(self):
-        lgr.log(5, "%s started", self)
-
-        while not self.quit:
-            data = self.input_queue.get()
-            print(f"WRITER: {data}")
-            if data is None or self.quit is True:
-                break
-            self._write(data)
-
-        print("WRITER EXITING")
-        lgr.log(5, "%s exiting (read completed or interrupted)", self)
-        self.output_queue.put((self.file.fileno(), None, time.time()))
 
 
 def yielding_run_command(cmd: Union[str, List],
@@ -238,24 +121,32 @@ def yielding_run_command(cmd: Union[str, List],
         active_file_numbers = set()
         if catch_stderr:
             active_file_numbers.add(process_stderr_fileno)
-            stderr_reader_thread = _ReaderThread(process.stderr, output_queue, cmd)
+            stderr_reader_thread = ReaderThread(process.stderr, output_queue, cmd)
             stderr_reader_thread.start()
         if catch_stdout:
             active_file_numbers.add(process_stdout_fileno)
-            stdout_reader_thread = _ReaderThread(process.stdout, output_queue, cmd)
+            stdout_reader_thread = ReaderThread(process.stdout, output_queue, cmd)
             stdout_reader_thread.start()
         if write_stdin:
             active_file_numbers.add(process_stdin_fileno)
-            stdin_writer_thread = _StdinWriterThread(process.stdin,
-                                                     stdin_queue,
-                                                     output_queue,
-                                                     cmd)
+            stdin_writer_thread = WriterThread(stdin_queue, process.stdin, output_queue, cmd)
             stdin_writer_thread.start()
 
-        process_exited = process.poll() is not None
+        process_exited = False
         while not process_exited and active_file_numbers:
 
             process_exited = process.poll() is not None
+            #if process_exited:
+            #    if catch_stderr:
+            #        stderr_reader_thread.request_exit()
+            #        process.stderr.close()
+            #    if catch_stdout:
+            #        stdout_reader_thread.request_exit()
+            #        process.stdout.close()
+            #    if write_stdin:
+            #        stdin_writer_thread.request_exit()
+            #        stdin_queue.put(None)
+            #    break
 
             file_number, data, time_stamp = output_queue.get()
 
@@ -282,17 +173,3 @@ def yielding_run_command(cmd: Union[str, List],
             fd.close()
 
     return process.returncode
-
-
-for i in yielding_run_command("python3 -i -", "print('aaa'); exit(0)\n", True, True):
-    print(repr(i))
-
-stdin_queue = Queue()
-j = 0
-for i in yielding_run_command("python3 -i -", stdin_queue, True, True):
-    print(i[1])
-    command = f"print({j} * {j})\n"
-    stdin_queue.put(command)
-    j += 1
-    if j == 10:
-        stdin_queue.put("exit(0)\n")
