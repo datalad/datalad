@@ -252,21 +252,14 @@ def yielding_run_command(cmd: Union[str, List],
                                                      cmd)
             stdin_writer_thread.start()
 
-        process_exited = False
+        process_exited = process.poll() is not None
         while not process_exited and active_file_numbers:
 
-            return_value = process.poll()
-            if return_value is not None:
-                process_exited = True
-                print("PROCESS EXITED 1")
+            process_exited = process.poll() is not None
 
             file_number, data, time_stamp = output_queue.get()
 
-            return_value = process.poll()
-            if return_value is not None:
-                process_exited = True
-                print("PROCESS EXITED 2")
-
+            process_exited = process.poll() is not None
             if write_stdin and file_number == process_stdin_fileno:
                 # If we receive anything from the writer thread, it should
                 # be `None`, indicating that all data was written.
@@ -289,3 +282,17 @@ def yielding_run_command(cmd: Union[str, List],
             fd.close()
 
     return process.returncode
+
+
+for i in yielding_run_command("python3 -i -", "print('aaa'); exit(0)\n", True, True):
+    print(repr(i))
+
+stdin_queue = Queue()
+j = 0
+for i in yielding_run_command("python3 -i -", stdin_queue, True, True):
+    print(i[1])
+    command = f"print({j} * {j})\n"
+    stdin_queue.put(command)
+    j += 1
+    if j == 10:
+        stdin_queue.put("exit(0)\n")
