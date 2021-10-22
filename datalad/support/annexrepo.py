@@ -3124,6 +3124,61 @@ class AnnexRepo(GitRepo, RepoInterface):
                     r['has_content'] = True
                     break
 
+    def get_file_annexinfo(self, path, ref=None, eval_availability=False,
+                           key_prefix=''):
+        """Query annex properties for a single file
+
+        This is the companion to get_content_annexinfo() and offers
+        simplified usage for single-file queries (the result lookup
+        based on a path is not necessary.
+
+        All keyword arguments have identical names and semantics as
+        their get_content_annexinfo() counterparts. See their
+        documentation for more information.
+
+        Parameters
+        ----------
+        path : Path or str
+          A single path to a file in the repository.
+
+        Returns
+        -------
+        dict
+          Keys and values match the values returned by get_content_annexinfo().
+          If a file has no annex properties (i.e., a file that is directly
+          checked into Git and is not annexed), the returned dictionary is
+          empty.
+
+        Raises
+        ------
+        ValueError
+          When a given path is not matching a single file, but resolves to
+          multiple files (e.g. a directory path)
+        NoSuchPathError
+          When the given path does not match any file in a repository
+        """
+        info = {k: v
+                for k, v in self.get_content_annexinfo(
+                    [path],
+                    init=None,
+                    ref=ref,
+                    eval_availability=eval_availability).items()}
+        if len(info) > 1:
+            raise ValueError(
+                "AnnexRepo.get_file_annexinfo() can handle handle a single "
+                f"file path, but {path} resolved to {len(info)} paths")
+        elif not info:
+            # no error, there is a file, but we know nothing about it
+            return {}
+        path, props = info.popitem()
+        # turn a file not found situation into an exception
+        if props.get('success') is False and props.get('note') == 'not found':
+            raise NoSuchPathError(path)
+        # fold path into the report to give easy access to a normalized,
+        # resolved Path instance
+        props['path'] = path
+        return props
+
     def get_content_annexinfo(
             self, paths=None, init='git', ref=None, eval_availability=False,
             key_prefix='', **kwargs):
