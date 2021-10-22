@@ -283,6 +283,5 @@ URLs:
                                         path, url, exc_str(exc))
 
                     if archive:
-                        from datalad.api import add_archive_content
                         for path in annex_paths:
-                            add_archive_content(path, annex=ds_repo, delete=True)
+                            ds.add_archive_content(path, delete=True)
