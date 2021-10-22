@@ -323,17 +323,16 @@ class AddArchiveContent(Interface):
             )
             return
 
-        if str(archive_path.relative_to(annex.path)) not in \
-                annex.get_annexed_files():
-            raise RuntimeError(
-                "Can not add an archive that is not under annex control.")
-
         if not key:
-            # we were given a file which must exist
+            check_path = archive_path.relative_to(ds.pathobj)
             # TODO: support adding archives content from outside the annex/repo
             origin = 'archive'
-            files = annex.get_content_annexinfo([archive_path], init=None)
-            key = files[archive_path]['key']
+            # can become get_file_annexinfo once #6104 is merged
+            files = annex.get_content_annexinfo([check_path], init=None)
+            key = files.get(annex.pathobj / check_path, {}).get('key')
+            if not key:
+                raise RuntimeError(
+                    f"Archive must be an annexed file in {ds}")
             archive_dir = Path(archive_path).parent
         else:
             origin = 'key'
@@ -359,12 +358,13 @@ class AddArchiveContent(Interface):
         # subdirectory,
         # get the path relative to the repo top
         if use_current_dir:
-            # if outside -- extract to the top of repo
-            extract_rpath = Path(pwd).relative_to(annex.path) \
+            # extract the archive under the current directory, not the directory
+            # where the archive is located
+            extract_rpath = Path(pwd).relative_to(ds.path) \
                 if not pwd_in_root \
                 else None
         else:
-            extract_rpath = archive_dir.relative_to(annex.path)
+            extract_rpath = archive_dir.relative_to(ds.path)
 
         # TODO
         # relpath might return '.' as the relative path to curdir, which then normalize_paths
