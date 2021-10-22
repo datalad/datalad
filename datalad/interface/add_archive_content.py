@@ -267,7 +267,7 @@ class AddArchiveContent(Interface):
                 raise ValueError("Archive {} does not exist".format(archive))
             # TODO: support adding archives content from outside the annex/repo
             origin = 'archive'
-            key = annex.get_file_key(archive_rpath)
+            key = annex.get_file_annexinfo(archive_rpath)['key']
             archive_dir = dirname(archive_path)
         else:
             origin = 'key'

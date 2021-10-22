@@ -2617,7 +2617,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if key:
             key_ = file_
         else:
-            key_ = self.get_file_key(file_)  # ?, batch=batch
+            # TODO with eval_availability=True, the following call
+            # would already provide the answer to is_available? for
+            # the local annex
+            key_ = self.get_file_annexinfo(file_)['key']  # ?, batch=batch
 
         annex_input = [key_,] if not remote else [key_, remote]
 
@@ -2699,8 +2702,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         return [
-            self.get_key_backend(self.get_file_key(f))
-            for f in files
+            p.get('backend', '')
+            for p in self.get_content_annexinfo(files, init=None).values()
         ]
 
     @property
@@ -2824,7 +2827,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(files) == 1:
             # Note, that for isdir we actually need an absolute path (which we don't get via normalize_paths)
             if not isdir(opj(self.path, files[0])):
-                self.get_file_key(files[0])
+                # for non-existing paths, get_file_annexinfo() will raise already
+                if self.get_file_annexinfo(files[0]).get('key') is None:
+                    raise FileInGitError(f'No known annex key for a file {files[0]}. Cannot copy')
 
         # TODO: RF -- logic is duplicated with get() -- the only difference
         # is the verb (copy, copy) or (get, put) and remote ('here', remote)?

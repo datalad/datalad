@@ -644,15 +644,15 @@ tree1_md5e_keys = {
     'remotefile': 'MD5E-s21--bf7654b3de20d5926d407ea7d913deb0'
 }
 
-
-@with_tree(**tree1args)
-def __test_get_md5s(path):
-    # was used just to generate above dict
-    annex = AnnexRepo(path, init=True, backend='MD5E')
-    files = [basename(f) for f in find_files('.*', path)]
-    annex.add(files)
-    annex.commit()
-    print({f: annex.get_file_key(f) for f in files})
+# this code is only here for documentation purposes
+# @with_tree(**tree1args)
+# def __test_get_md5s(path):
+#     # was used just to generate above dict
+#     annex = AnnexRepo(path, init=True, backend='MD5E')
+#     files = [basename(f) for f in find_files('.*', path)]
+#     annex.add(files)
+#     annex.commit()
+#     print({f: p['key'] for f, p in annex.get_content_annexinfo(files)})
 
 
 @with_parametric_batch
@@ -834,7 +834,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.is_under_annex(filename_abs),
         "Annexed file is not a link.")
     assert_in('key', out_json)
-    key = repo.get_file_key(filename)
+    key = repo.get_file_annexinfo(filename)['key']
     assert_false(key == '')
     assert_equal(key, out_json['key'])
     ok_(repo.file_has_content(filename))
@@ -853,8 +853,9 @@ def test_AnnexRepo_add_to_annex(path):
     repo.add(filename)
     repo.commit(msg="Added another file to annex.")
     # known to annex:
-    ok_(repo.get_file_key(filename))
-    ok_(repo.file_has_content(filename))
+    fileprops = repo.get_file_annexinfo(filename, eval_availability=True)
+    ok_(fileprops['key'])
+    ok_(fileprops['has_content'])
 
     # and committed:
     assert_repo_status(repo, annex=True)
@@ -871,7 +872,7 @@ def test_AnnexRepo_add_to_git(path):
     repo.add(filename, git=True)
 
     # not in annex, but in git:
-    assert_raises(FileInGitError, repo.get_file_key, filename)
+    eq_(repo.get_file_annexinfo(filename), {})
     # uncommitted:
     ok_(repo.dirty)
     repo.commit("Added file to annex.")
@@ -885,7 +886,7 @@ def test_AnnexRepo_add_to_git(path):
     repo.add(filename, git=True)
     repo.commit(msg="Added another file to annex.")
     # not in annex, but in git:
-    assert_raises(FileInGitError, repo.get_file_key, filename)
+    eq_(repo.get_file_annexinfo(filename), {})
 
     # and committed:
     assert_repo_status(repo, annex=True)
@@ -968,7 +969,14 @@ def _test_AnnexRepo_get_contentlocation(batch, src, path, work_dir_outside):
 
     annex = AnnexRepo.clone(src, path)
     fname = 'test-annex.dat'
-    key = annex.get_file_key(fname)
+    key = annex.get_file_annexinfo(fname)['key']
+    # MIH at this point the whole test and get_contentlocation() itself
+    # is somewhat moot. The above call already has properties like
+    # 'hashdirmixed', 'hashdirlower', and 'key' from which the location
+    # could be built.
+    # with eval_availability=True, it also has 'objloc' with a absolute
+    # path to a verified annex key location
+
     # TODO: see if we can avoid this or specify custom exception
     eq_(annex.get_contentlocation(key, batch=batch), '')
 
@@ -1124,9 +1132,10 @@ def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
 
     ar.add("bar")
     ar.commit("add bar")
+    key = ar.get_content_annexinfo(["bar"]).popitem()[1]['key']
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        ar.drop_key(ar.get_file_key(["bar"]), batch=True)
+        ar.drop_key(key, batch=True)
         cml.assert_logged(
             msg="Not batching drop_key call because fake dates are enabled",
             level="DEBUG",
@@ -1439,7 +1448,7 @@ def test_annex_drop(src, dst):
     ar.get(testfile)
 
     # drop file by key:
-    testkey = ar.get_file_key(testfile)
+    testkey = ar.get_file_annexinfo(testfile)['key']
     result = ar.drop([testkey], key=True)
     assert_false(ar.file_has_content(testfile))
     ok_(isinstance(result, list))
@@ -1509,7 +1518,7 @@ def test_is_available(batch, p):
         is_available = annex.is_available
 
     fname = 'test-annex.dat'
-    key = annex.get_file_key(fname)
+    key = annex.get_content_annexinfo([fname]).popitem()[1]['key']
 
     # explicit is to verify data type etc
     assert is_available(key, key=True) is True
@@ -1538,7 +1547,7 @@ def test_is_available(batch, p):
 
     assert(len(urls) == 1)
     eq_(urls,
-        annex.whereis(annex.get_file_key(fname), key=True, output="full")
+        annex.whereis(key, key=True, output="full")
         .get(uuid, {}).get("urls"))
     annex.rm_url(fname, urls[0])
 
