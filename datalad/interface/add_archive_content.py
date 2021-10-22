@@ -213,17 +213,6 @@ class AddArchiveContent(Interface):
             constraints=EnsureStr()),
     )
 
-        # use-case from openfmri pipeline
-        #     ExtractArchives(
-        #         # will do the merge of 'replace' strategy
-        #         source_branch="incoming",
-        #         regex="\.(tgz|tar\..*)$",
-        #         renames=[
-        #             ("^[^/]*/(.*)", "\1") # e.g. to strip leading dir, or could prepend etc
-        #         ],
-        #         #exclude="license.*",  # regexp
-        #     ),
-
     @staticmethod
     @datasetmethod(name='add_archive_content')
     @eval_results
