@@ -1812,7 +1812,7 @@ def get_deeply_nested_structure(path):
     )
     create_tree(
         str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
-        {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
+        {OBSCURE_FILENAME + u'_directory_untracked': {"untracked_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')

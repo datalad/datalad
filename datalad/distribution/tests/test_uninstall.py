@@ -78,7 +78,7 @@ def test_uninstall_uninstalled(path):
     # goal oriented error reporting. here:
     # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
-    assert_status('error', ds.drop(on_failure="ignore"))
+    assert_raises(ValueError, ds.drop)
     assert_raises(ValueError, ds.uninstall)
     assert_status('notneeded', ds.remove())
 
@@ -205,7 +205,9 @@ def test_uninstall_subdataset(src, dst):
         repo.get([str(f) for f in annexed_files])
 
         # drop data of subds:
-        res = ds.drop(path=subds.path, result_xfm='paths')
+        # must append trailing "slash" to match status()'s path
+        # declaration semantics
+        res = ds.drop(path=subds.path + os.sep, result_xfm='paths')
         ok_(all(str(f) in res for f in annexed_files))
         ainfo = repo.get_content_annexinfo(paths=annexed_files,
                                            eval_availability=True)

@@ -27,7 +27,7 @@ _group_dataset = (
         ('datalad.distribution.get', 'Get'),
         ('datalad.core.distributed.push', 'Push', 'push'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
-        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
+        ('datalad.distributed.drop', 'Drop'),
         ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
