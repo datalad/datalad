@@ -42,6 +42,7 @@ requires = {
         'iso8601',
         'humanize',
         'fasteners>=0.14',
+        'packaging',
         'patool>=1.7',
         'tqdm',
         'wrapt',

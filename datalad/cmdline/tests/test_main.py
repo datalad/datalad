@@ -211,8 +211,8 @@ def test_script_shims():
             with open(which.rstrip()) as f:
                 content = f.read()
         else:
-            from distutils.spawn import find_executable
-            content = find_executable(script)
+            from shutil import which
+            content = which(script)
 
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)
