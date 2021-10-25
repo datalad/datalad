@@ -13,13 +13,11 @@ import setuptools
 import sys
 
 
-from distutils.core import Command
-from distutils.errors import DistutilsOptionError
-from distutils.version import LooseVersion
 from genericpath import exists
 from os import linesep, makedirs
 from os.path import dirname, join as opj, sep as pathsep, splitext
-from setuptools import findall, find_packages, setup
+from setuptools import Command, DistutilsOptionError, findall, find_packages, setup
+from packaging.version import Version
 
 from . import formatters as fmt
 
@@ -363,7 +361,7 @@ def get_long_description_from_README():
     README = opj(_path_rel2file('README.md'))
 
     ret = {}
-    if LooseVersion(setuptools.__version__) >= '38.6.0':
+    if Version(setuptools.__version__) >= Version('38.6.0'):
         # check than this
         ret['long_description'] = open(README).read()
         ret['long_description_content_type'] = 'text/markdown'
