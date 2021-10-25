@@ -31,10 +31,7 @@ from datalad.runner import (
     Runner,
     StdOutCapture,
 )
-from datalad.runner.nonasyncrunner import (
-    ReaderThread,
-    run_command,
-)
+from datalad.runner.nonasyncrunner import run_command
 
 
 def test_subprocess_return_code_capture():
@@ -122,35 +119,35 @@ def test_interactive_communication():
     assert_true(result_pool["process_exited_called"], True)
 
 
-def test_thread_exit():
-
-    (read_descriptor, write_descriptor) = os.pipe()
-    read_file = os.fdopen(read_descriptor, "rb")
-    read_queue = queue.Queue()
-
-    reader_thread = ReaderThread(read_file, read_queue, "test")
-    reader_thread.start()
-
-    os.write(write_descriptor, b"some data")
-    assert_true(reader_thread.is_alive())
-    data = read_queue.get()
-    eq_(data[1], b"some data")
-
-    reader_thread.request_exit()
-
-    # Check the blocking part
-    sleep(5)
-    assert_true(reader_thread.is_alive())
-
-    # Check actual exit, we will not get
-    # "more data" when exit was requested,
-    # because the thread will not attempt
-    # a write
-    os.write(write_descriptor, b"more data")
-    reader_thread.join()
-    data = read_queue.get()
-    eq_(data[1], None)
-    assert_true(read_queue.empty())
+# def test_blocking_thread_exit():
+#
+#     (read_descriptor, write_descriptor) = os.pipe()
+#     read_file = os.fdopen(read_descriptor, "rb")
+#     read_queue = queue.Queue()
+#
+#     reader_thread = ReadThread(read_file, read_queue, "test")
+#     reader_thread.start()
+#
+#     os.write(write_descriptor, b"some data")
+#     assert_true(reader_thread.is_alive())
+#     data = read_queue.get()
+#     eq_(data[1], b"some data")
+#
+#     reader_thread.request_exit()
+#
+#     # Check the blocking part
+#     sleep(5)
+#     assert_true(reader_thread.is_alive())
+#
+#     # Check actual exit, we will not get
+#     # "more data" when exit was requested,
+#     # because the thread will not attempt
+#     # a write
+#     os.write(write_descriptor, b"more data")
+#     reader_thread.join()
+#     data = read_queue.get()
+#     eq_(data[1], None)
+#     assert_true(read_queue.empty())
 
 
 def test_inside_async():

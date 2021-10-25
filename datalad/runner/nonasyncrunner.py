@@ -12,7 +12,10 @@ Thread based subprocess execution with stdout and stderr passed to protocol obje
 
 import logging
 import subprocess
-from queue import Queue
+from queue import (
+    Empty,
+    Queue,
+)
 from typing import (
     IO,
     Any,
@@ -26,12 +29,16 @@ from typing import (
 from datalad.runner.protocol import WitlessProtocol
 
 from .runnerthreads import (
-    ReaderThread,
-    WriterThread,
+    BlockingOSReaderThread,
+    BlockingOSWriterThread,
+    IOState,
+    ReadThread,
+    WriteThread,
 )
 
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
+logging.basicConfig(level=5)
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1
@@ -42,6 +49,7 @@ def run_command(cmd: Union[str, List],
                 protocol: Type[WitlessProtocol],
                 stdin: Any,
                 protocol_kwargs: Optional[Dict] = None,
+                timeout: Optional[float] = None,
                 **kwargs) -> Any:
     """
     Run a command in a subprocess
@@ -129,39 +137,99 @@ def run_command(cmd: Union[str, List],
     # the latter are hardcoded in the protocol code
     fileno_mapping = {
         process_stdout_fileno: STDOUT_FILENO,
-        process_stderr_fileno: STDERR_FILENO
+        process_stderr_fileno: STDERR_FILENO,
+        process_stdin_fileno: STDIN_FILENO,
     }
 
     if catch_stdout or catch_stderr or write_stdin:
 
         output_queue = Queue()
         active_file_numbers = set()
+        active_threads = set()
+
         if catch_stderr:
             active_file_numbers.add(process_stderr_fileno)
-            stderr_reader_thread = ReaderThread(process.stderr, output_queue, cmd)
+            stderr_reader_thread = BlockingOSReaderThread(process.stderr)
+            stderr_enqueueing_thread = ReadThread(
+                identifier=process_stderr_fileno,
+                source_blocking_queue=stderr_reader_thread.queue,
+                destination_queue=output_queue,
+                signal_queue=output_queue,
+                timeout=timeout)
+            active_threads.add(stderr_reader_thread)
+            active_threads.add(stderr_enqueueing_thread)
             stderr_reader_thread.start()
+            stderr_enqueueing_thread.start()
+
         if catch_stdout:
             active_file_numbers.add(process_stdout_fileno)
-            stdout_reader_thread = ReaderThread(process.stdout, output_queue, cmd)
+            stdout_reader_thread = BlockingOSReaderThread(process.stdout)
+            stdout_enqueueing_thread = ReadThread(
+                identifier=process_stdout_fileno,
+                source_blocking_queue=stdout_reader_thread.queue,
+                destination_queue=output_queue,
+                signal_queue=output_queue,
+                timeout=timeout)
+            active_threads.add(stdout_reader_thread)
+            active_threads.add(stdout_enqueueing_thread)
             stdout_reader_thread.start()
+            stdout_enqueueing_thread.start()
+
         if write_stdin:
             active_file_numbers.add(process_stdin_fileno)
-            stdin_writer_thread = WriterThread(stdin_queue, process.stdin, output_queue, cmd)
+            stdin_writer_thread = BlockingOSWriterThread(process.stdin)
+            stdin_enqueueing_thread = WriteThread(
+                identifier=process_stdin_fileno,
+                source_queue=stdin_queue,
+                destination_blocking_queue=stdin_writer_thread.queue,
+                signal_queue=output_queue,
+                timeout=timeout)
+            active_threads.add(stdin_writer_thread)
+            active_threads.add(stdin_enqueueing_thread)
             stdin_writer_thread.start()
+            stdin_enqueueing_thread.start()
 
         while True:
 
-            file_number, data, time_stamp = output_queue.get()
+            active_threads = set([
+                thread
+                for thread in active_threads
+                if thread.is_alive()
+            ])
+
+            if len(active_threads) == 0:
+                lgr.warning("All threads exited")
+                break
+
+            while True:
+                try:
+                    file_number, state, data = output_queue.get(timeout=timeout)
+                except Empty:
+                    lgr.warning(f"TIMEOUT on output queue")
+                    continue
+
+                if state == IOState.ok:
+                    break
+
+                # Handle timeouts
+                if state == IOState.timeout:
+                    lgr.warning(f"TIMEOUT on {fileno_mapping[file_number]}")
+                    if process.poll() is not None:
+                        lgr.warning(f"PROCESS exited with {process.poll()}")
+
+            # No timeout occurred, we have proper data or stream end marker, i.e. None
             if write_stdin and file_number == process_stdin_fileno:
-                # Input writing is transparent to the main thread,
-                # we just check whether the input writer is still running.
+                # The only data-signal we expect from stdin thread
+                # is None, indicating that the thread ended
+                assert data is None
                 active_file_numbers.remove(process_stdin_fileno)
-            else:
-                if isinstance(data, bytes):
-                    protocol.pipe_data_received(fileno_mapping[file_number], data)
-                else:
-                    protocol.pipe_connection_lost(fileno_mapping[file_number], data)
+            elif catch_stderr or catch_stdout:
+                if data is None:
+                    protocol.pipe_connection_lost(fileno_mapping[file_number], None) # TODO: check exception
                     active_file_numbers.remove(file_number)
+                else:
+                    assert isinstance(data, bytes)
+                    protocol.pipe_data_received(fileno_mapping[file_number], data)
 
             if not active_file_numbers:
                 break

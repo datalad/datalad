@@ -2,14 +2,22 @@ import logging
 import os
 import threading
 import time
+from enum import Enum
 from abc import (
     abstractmethod,
     ABCMeta,
 )
-from queue import Queue
+from queue import (
+    Empty,
+    Full,
+    Queue,
+)
 from typing import (
+    Any,
     IO,
     List,
+    Optional,
+    Tuple,
     Union,
 )
 
@@ -17,136 +25,232 @@ from typing import (
 lgr = logging.getLogger("datalad.runner.runnerthreads")
 
 
-class DataCopyThread(threading.Thread, metaclass=ABCMeta):
+class IOState(Enum):
+    ok = "ok"
+    timeout = "timeout"
 
-    def __init__(self,
-                 source: Union[IO, Queue],
-                 destination: Union[IO, Queue],
-                 ):
 
+class ExitingThread(threading.Thread):
+    def __init__(self):
         super().__init__(daemon=True)
-
-        self.source = source
-        self.destination = destination
         self.exit_requested = False
 
     def request_exit(self):
         """
         Request the thread to exit. This is not guaranteed to
-        have any effect, because the thread might be waiting in
-        self.get_data() or on self.write_data().
+        have any effect, because the instance has to check for
+        self.exit_requested and act accordingly. It might not
+        do that.
         """
         self.exit_requested = True
 
-    @abstractmethod
-    def read_data(self) -> Union[str, bytes, None]:
-        raise NotImplementedError
 
-    @abstractmethod
-    def write_data(self, data: Union[str, bytes]):
-        raise NotImplementedError
+class BlockingOSReaderThread(ExitingThread):
+    """
+    A blocking OS file reader. If it reads
+    anything, it stores its data in a queue.
+    That allows a consumer to block
+    on OS-reads with timeout, independent from
+    the OS read capabilities.
+    It enqueues bytes if something is read. If
+    the file is close, it will enqueue None and
+    exit.
+    """
+    def __init__(self,
+                 source: IO,
+                 length: int = 1024,
+                 ):
 
-    def signal_termination(self):
-        pass
+        super().__init__()
+        self.source = source
+        self.length = length
+        self.queue = Queue(1)
 
     def run(self):
+
         lgr.log(5, "%s started", self)
 
+        while not self.exit_requested:
+            data = os.read(self.source.fileno(), self.length)
+            if data == b"":
+                self.queue.put(None)
+                break
+            if self.exit_requested:
+                break
+
+            self.queue.put(data)
+
+        lgr.log(5, "%s exiting", self)
+
+
+class BlockingOSWriterThread(ExitingThread):
+    """
+    A blocking OS file writer. It fetches
+    data from the queue and writes it via
+    OS-level write functions. The queue has
+    size 1. That allows a producer to block
+    on OS-writes with timeout, independent from
+    the OS write capabilities.
+    It expects bytes in the Queue or None.
+    Bytes will be written, if None is fetched
+    from the queue, the thread will exit.
+    """
+    def __init__(self,
+                 destination: IO,
+                 ):
+
+        super().__init__()
+        self.destination = destination
+        self.queue = Queue(1)
+
+    def run(self):
+
+        lgr.log(5, "%s started", self)
+
+        while not self.exit_requested:
+            data = self.queue.get()
+            if data is None:
+                break
+
+            written = 0
+            while written < len(data) and not self.exit_requested:
+                written += os.write(
+                    self.destination.fileno(),
+                    data[written:])
+
+        lgr.log(5, "%s exiting", self)
+
+
+class ReadThread(ExitingThread):
+    def __init__(self,
+                 identifier: Any,
+                 source_blocking_queue: Queue,
+                 destination_queue: Queue,
+                 signal_queue: Queue,
+                 timeout: Optional[float] = None,
+                 ):
+
+        super().__init__()
+        self.identifier = identifier
+        self.source_blocking_queue = source_blocking_queue
+        self.destination_queue = destination_queue
+        self.signal_queue = signal_queue
+        self.timeout = timeout
+
+    def read_blocking(self,
+                      timeout: Optional[float] = None,
+                      ) -> Tuple[IOState, Union[bytes, None]]:
+
+        try:
+            data = self.source_blocking_queue.get(block=True, timeout=timeout)
+            return IOState.ok, data
+        except Empty:
+            return IOState.timeout, None
+
+    def write(self,
+              state: IOState,
+              data: Union[bytes, None]):
+        self.destination_queue.put((self.identifier, state, data))
+
+    def signal(self,
+               state: IOState,
+               data: Union[bytes, None]):
+        self.signal_queue.put((self.identifier, state, data))
+
+    def run(self):
+
+        lgr.log(5, "%s started", self)
+
+        # Get data from source queue until exit is requested.
         data = None
         while not self.exit_requested:
-            data = self.read_data()
-            if data in (b"", None) or self.exit_requested:
-                break
-            self.write_data(data)
 
-        self.signal_termination()
+            # Get data or timeout until exit is requested.
+            while not self.exit_requested:
+                state, data = self.read_blocking(self.timeout)
+                # On timeout, send timeout info to signal queue
+                if state == IOState.ok:
+                    break
+                elif state == IOState.timeout:
+                    self.signal(state, None)
+                else:
+                    raise RuntimeError(f"invalid IOState {state}")
+
+            # If an exit was requested, exit from this thread
+            # before trying to put data into the output queue.
+            if self.exit_requested:
+                break
+
+            # If we received None, the source is closed,
+            # send closed indicator to signal queue and exit
+            # the thread.
+            if data is None:
+                self.signal(IOState.ok, None)
+                break
+
+            # We received proper date, enqueue
+            # it to the destination queue
+            self.write(IOState.ok, data)
+
         lgr.log(5, "%s exiting (last data was: %s)", self, data)
 
 
-class ReaderThread(DataCopyThread):
-
+class WriteThread(ExitingThread):
     def __init__(self,
-                 file: IO,
-                 q: Queue,
-                 command: Union[str, List]):
-        """
-        Parameters
-        ----------
-        file:
-          File object from which the thread will read data
-          and write it into the queue. This is usually the
-          read end of a pipe.
-        q:
-          A queue into which the thread writes what it reads
-          from file.
-        command:
-          The command for which the thread was created. This
-          is mainly used to improve debug output messages.
-        """
-        super().__init__(source=file, destination=q)
-        self._file = file
-        self._queue = q
-        self.command = command
-
-    def __str__(self):
-        return f"{type(self).__name__}({self._file}, " \
-               f"{self._queue}, {self.command})"
-
-    def read_data(self) -> Union[str, bytes, None]:
-        return os.read(self.source.fileno(), 1024)
-
-    def write_data(self, data: Union[str, bytes]):
-        self.destination.put((self.source.fileno(), data, time.time()))
-
-    def signal_termination(self):
-        self.destination.put((self.source.fileno(), None, time.time()))
-
-
-class WriterThread(DataCopyThread):
-    def __init__(self,
-                 input_queue: Queue,
-                 file: IO,
+                 identifier: Any,
+                 source_queue: Queue,
+                 destination_blocking_queue: Queue,
                  signal_queue: Queue,
-                 command: Union[str, List] = ""):
-        """
-        Parameters
-        ----------
-        input_queue:
-          A queue from which data is read and written to the process,
-          a None-data object indicates that all stdin_data was written
-          and will lead to this thread exiting.
-        file:
-          file-like representing stdin of the subprocess
-        signal_queue:
-          A queue to signal the main thread, when we are exiting.
-        command:
-          The command for which the thread was created. This
-          is mainly used to improve debug output messages.
-        """
-        super().__init__(source=input_queue, destination=file)
-        self._input_queue = input_queue
-        self._file = file
+                 timeout: Optional[float] = None,
+                 ):
+
+        super().__init__()
+        self.identifier = identifier
+        self.source_queue = source_queue
+        self.destination_blocking_queue = destination_blocking_queue
         self.signal_queue = signal_queue
-        self.command = command
+        self.timeout = timeout
 
-    def __str__(self):
-        return (
-            f"{type(self).__name__}({self._input_queue}, {self._file}, "
-            f"{self.signal_queue}, {self.command})")
+    def write_blocking(self,
+                       data: bytes,
+                       timeout: Optional[float] = None,
+                       ) -> IOState:
 
-    def read_data(self) -> Union[str, bytes, None]:
-        return self.source.get()
-
-    def write_data(self, data: Union[str, bytes]):
         try:
-            os.write(
-                self.destination.fileno(),
-                data.encode() if isinstance(data, str) else data)
-        except BrokenPipeError:
-            lgr.debug(f"{self} broken pipe")
-            self.request_exit()
+            self.destination_blocking_queue.put(
+                data, block=True, timeout=timeout)
+            return IOState.ok
+        except Full:
+            return IOState.timeout
 
-    def signal_termination(self):
-        self.signal_queue.put((self._file.fileno(), None, time.time()))
+    def signal(self,
+               state: IOState,
+               data: Union[bytes, None]):
+        self.signal_queue.put((self.identifier, state, data))
 
+    def run(self):
 
+        lgr.log(5, "%s started", self)
+
+        # Get data from source queue until exit is requested.
+        data = None
+        while not self.exit_requested:
+
+            # Get data, if None was enqueued, the source wants
+            # us to exit the thread.
+            data = self.source_queue.get()
+            if data is None:
+                self.signal(IOState.ok, None)
+                break
+
+            # Received proper data, try to write it to
+            # the destination queue.
+            while not self.exit_requested:
+                state = self.write_blocking(data, self.timeout)
+                if state == IOState.ok:
+                    break
+                elif state == IOState.timeout:
+                    self.signal(state, None)
+                else:
+                    raise RuntimeError(f"invalid IOState: {state}")
+        lgr.log(5, "%s exiting (last data was: %s)", self, data)
