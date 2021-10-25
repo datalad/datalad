@@ -341,12 +341,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
     assert_in(file_repo_path, repo.get_indexed_files())  # file is known to Git
 
     if annex:
-        try:
-            # operates on relative to curdir path
-            repo.get_file_key(file_repo_path)
-            in_annex = True
-        except FileNotInAnnexError as e:
-            in_annex = False
+        in_annex = 'key' in repo.get_file_annexinfo(file_repo_path)
     else:
         in_annex = False
 

@@ -206,7 +206,7 @@ def test_add_archive_content(path_orig, url, repo_path):
                 repo.add_urls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
         repo.commit("added 1.tar.gz")
 
-        key_1tar = repo.get_file_key('1.tar.gz')  # will be used in the test later
+        key_1tar = repo.get_file_annexinfo('1.tar.gz')['key']  # will be used in the test later
 
         def d1_basic_checks():
             ok_(exists('1'))

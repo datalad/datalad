@@ -335,7 +335,7 @@ class ExportToFigshare(Interface):
             lgr.info("'Registering' %s within annex", fname)
             repo = dataset.repo
             repo.add(fname, git=False)
-            key = repo.get_file_key(fname)
+            key = repo.get_file_annexinfo(fname)['key']
             lgr.info("Adding URL %(download_url)s for it", file_info)
             repo.call_annex([
                 "registerurl", '-c', 'annex.alwayscommit=false',
