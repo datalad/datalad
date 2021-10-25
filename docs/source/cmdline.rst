@@ -119,6 +119,7 @@ Helpers and support utilities
    datalad annotate-paths: Obsolete helper <generated/man/datalad-annotate-paths>
    datalad clean: Remove temporary left-overs of DataLad operations <generated/man/datalad-clean>
    datalad check-dates: Scan a dataset for dates and timestamps <generated/man/datalad-check-dates>
+   datalad configuration: Configuration manipulation commands <generated/man/datalad-configuration>
    datalad create-test-dataset: Test helper <generated/man/datalad-create-test-dataset>
    datalad download-url: Download helper with support for DataLad's credential system <generated/man/datalad-download-url>
    datalad sshrun: Remote command execution using DataLad's connection management <generated/man/datalad-sshrun>
