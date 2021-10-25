@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+from itertools import chain
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
@@ -43,10 +44,13 @@ from datalad.interface.results import (
 from datalad.interface.utils import (
     eval_results,
 )
-from datalad.local.subdatasets import Subdatasets
-from datalad.utils import ensure_list
+from datalad.utils import (
+    ensure_list,
+    rmtree,
+)
 from datalad.core.local.status import get_paths_by_ds
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CapturedException
 from datalad.runner.exception import CommandError
 
 lgr = logging.getLogger('datalad.distributed.drop')
@@ -76,11 +80,13 @@ class Drop(Interface):
         reckless=Parameter(
             args=("--reckless",),
             doc="""""",
-            constraints=EnsureChoice('modification', 'availability', 'undead', None)),
+            constraints=EnsureChoice(
+                'modification', 'availability', 'undead', None)),
         what=Parameter(
             args=("--what",),
             doc="""""",
-            constraints=EnsureChoice('filecontent', 'notpreferred', 'allkeys', 'all')),
+            # add 'unwanted'
+            constraints=EnsureChoice('filecontent', 'allkeys', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -128,7 +134,16 @@ class Drop(Interface):
         )
         # if not paths are given, there will still be a single dataset record
         # with paths==None
-        paths_by_ds, errors = get_paths_by_ds(ds, dataset, ensure_list(path))
+        paths_by_ds, errors = get_paths_by_ds(
+            ds,
+            dataset,
+            ensure_list(path),
+            # XXX this needs more though!! Maybe this is what the mode should be
+            # in general?!
+            # when we want to drop entire datasets, it is much more useful
+            # to have subdatasets be their own record
+            subdsroot_mode='sub' if what == 'all' else 'rsync',
+        )
         for e in errors:
             yield dict(
                 action='drop',
@@ -164,6 +179,7 @@ class Drop(Interface):
 def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     # we know that any given path is part of `ds` and not any of its
     # subdatasets!
+
     if recursive:
         # process subdatasets first with recursion
         for sub in ds.subdatasets(
@@ -190,7 +206,73 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 recursion_limit=None,
                 jobs=jobs)
 
-    if what in ('allkeys', 'all') and paths is not None:
+    repo = ds.repo
+    is_annex = isinstance(repo, AnnexRepo)
+
+    # first critical checks that might prevent further operation
+    had_fatality = False
+    for res in _fatal_pre_drop_checks(
+            ds, repo, paths, what, reckless, is_annex):
+        had_fatality = True
+        yield res
+    if had_fatality:
+        return
+
+    # now conditional/informative checks
+    yield from _pre_drop_checks(ds, repo, paths, what, reckless, is_annex)
+
+    if is_annex and what == 'filecontent':
+        # XXX should we only drop filecontent with particular paths
+        # specified? e.g. '.'
+        # MIH: right now I don't think so, because running drop without
+        # should be safe by default in the end
+        yield from _drop_files(
+            ds,
+            repo,
+            # give paths or '.' with no constraint
+            paths=[str(p.relative_to(ds.pathobj))
+                   for p in paths] if paths else '.',
+            force=reckless in ('availability',),
+            jobs=jobs,
+        )
+    if is_annex and what in ('allkeys', 'all'):
+        # XXX maybe conditional on a reckless mode, i.e. kill
+        for r in _drop_allkeys(
+                ds,
+                repo,
+                force=reckless in ('availability',),
+                jobs=jobs):
+            res = dict(
+                action='drop',
+                type='key',
+                # use the path of the containing dataset
+                # using the location of the key does not add any
+                # practical value, and is expensive to obtain
+                path=ds.path,
+                status='ok' if r.get('success') else 'error',
+                key=r.get('key'),
+            )
+            # pull any note, and rename recommended parameter to
+            # avoid confusion
+            message = r.get('note', '').replace('--force', '--reckless')
+            if message:
+                res['message'] = message
+            error_messages = r.get('error-messages')
+            if error_messages:
+                res['error_messages'] = error_messages
+            yield res
+
+    if what == 'all':
+        if reckless == 'noavailability':
+            # wipe out dataset
+            return
+        # kill repository
+        yield from _uninstall_dataset(ds)
+    return
+
+
+def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
+    if what in ('allkeys', 'all') and paths is not None and paths != [ds.pathobj]:
         yield dict(
             action='drop',
             path=ds.path,
@@ -202,6 +284,56 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         )
         return
 
+    if what == 'all':
+        # we must not have subdatasets anymore
+        # if we do, --recursive was forgotton
+        subdatasets = ds.subdatasets(
+            # we only care about the present ones
+            fulfilled=True,
+            # first-level is enough, if that has none, there will be none
+            recursive=False,
+            result_xfm='paths',
+            result_renderer='disabled')
+        if subdatasets:
+            yield dict(
+                action='drop',
+                path=ds.path,
+                type='dataset',
+                status='error',
+                message=('cannot drop dataset, subdataset(s) still present '
+                         '(forgot --recursive?): %s', subdatasets)
+            )
+            # this is fatal
+            return
+
+    if is_annex and what == 'all' and reckless != 'undead':
+        # this annex is about to die, test if it is still considered
+        # not-dead. if so, complain to avoid generation of zombies
+        # (annexed that are floating around, but are actually dead).
+        remotes_that_know_this_annex = [
+            r
+            for r in _detect_nondead_annex_at_remotes(repo, repo.uuid)
+            # filter out "here"
+            if r is not None
+        ]
+        if remotes_that_know_this_annex:
+            yield dict(
+                action='drop',
+                path=ds.path,
+                type='dataset',
+                status='error',
+                message=(
+                    "to-be-deleted local annex not declared 'dead' at the "
+                    "following remotes. Announce death "
+                    "(`git annex dead here` + `datalad push --to ...`), "
+                    "or ignore via `--reckless undead`: %s",
+                    remotes_that_know_this_annex)
+            )
+            # this is fatal
+            return
+
+
+def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
     if reckless not in ('modification',):
         # do a cheaper status run to discover any kind of modification and
         # generate results based on the `what` mode of operation
@@ -238,8 +370,6 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 lgr.debug(
                     'Status record not considered for drop '
                     'state inspection: %s', res)
-    repo = ds.repo
-    is_annex = isinstance(repo, AnnexRepo)
 
     if not is_annex and paths:
         # we cannot drop content in non-annex repos, issue same
@@ -264,73 +394,92 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         )
         # continue, this is nothing fatal
 
-    if is_annex and what == 'filecontent':
-        # XXX should we only drop filecontent with particular paths
-        # specified? e.g. '.'
-        # MIH: right now I don't think so, because running drop without
-        # should be safe by default in the end
-        yield from _drop_files(
-            ds,
-            repo,
-            # give paths or '.' with no constraint
-            paths=[str(p.relative_to(ds.pathobj))
-                   for p in paths] if paths else '.',
-            force=reckless in ('availability',),
-            jobs=jobs,
+
+def _detect_nondead_annex_at_remotes(repo, annex_uuid):
+    """Return list of remote names that know about a given (not-dead) annex
+
+    This only uses the state of remotes known to the local remote state.
+    No remote synchronization is performed.
+
+    Parameters
+    ----------
+    repo: AnnexRepo or GitRepo
+      Repository to evaluated
+    annex_uuid: str
+      UUID string of a particular annex
+
+    Returns
+    -------
+    list
+      Names of any matching remote, the local repository is indicated using
+      a `None` label.
+    """
+    # build the refs for all remotes and local
+    remotes_w_registration = []
+    for remote in chain([''], repo.get_remotes()):
+        refprefix = '{}{}git-annex:'.format(
+            remote,
+            '/' if remote else '',
         )
-    if is_annex and what == 'allkeys':
-        for r in _drop_allkeys(
-                ds,
-                repo,
-                force=reckless in ('availability',),
-                jobs=jobs):
-            res = dict(
-                action='drop',
-                type='key',
-                # use the path of the containing dataset
-                # using the location of the key does not add any
-                # practical value, and is expensive to obtain
-                path=ds.path,
-                status='ok' if r.get('success') else 'error',
-                key=r.get('key'),
-            )
-            # pull any note, and rename recommended parameter to
-            # avoid confusion
-            message = r.get('note', '').replace('--force', '--reckless')
-            if message:
-                res['message'] = message
-            error_messages = r.get('error-messages')
-            if error_messages:
-                res['error_messages'] = error_messages
-            yield res
+        uuid_known = False
+        try:
+            for line in repo.call_git_items_(
+                    ['cat-file', '-p', refprefix + 'uuid.log']):
+                if line.startswith(annex_uuid):
+                    # use None to label the local repo
+                    uuid_known = True
+                    break
+        except CommandError as e:
+            CapturedException(e)
+            # this is not a problem per-se, logged above, just continue
+            continue
+        if not uuid_known:
+            # if an annex id is not even in the uuid.log, we can stop here
+            # (for this remote)
+            continue
 
-    # all subdatasets are taken care of. now we have a a single dataset to
-    # process
-    # first some checks
-    if what == 'all':
-        # check for installed subdatasets, none should have remained by now
-        # or recursive was forgotten
+        # annex is known, but maybe is declared dead already, must check
+        # trust.log in addition
+        try:
+            for line in repo.call_git_items_(
+                    ['cat-file', '-p', refprefix + 'trust.log']):
+                columns = line.split()
+                if columns[0] == annex_uuid:
+                    # not known if dead
+                    uuid_known = False if columns[1] == 'X' else True
+                    break
+        except CommandError as e:
+            CapturedException(e)
+            # this is not a problem per-se, logged above, just continue
+            continue
+        finally:
+            if uuid_known:
+                remotes_w_registration.append(remote or None)
+    return(remotes_w_registration)
 
-        if reckless == 'noavailability':
-            # wipe out dataset
-            return
-    if what in ('all', 'allkeys'):
-        # yield impossible result, with a path constraint
-        # either we drop all, or by path, but not both
 
-        # check for configured availability of all present keys (not just
-        # for files in branch)
-        #drop-all-keys
-        pass
-
-    if what == 'all':
-        if reckless != 'undead':
-            # announce local annex to be dead
-            #push-annex-branch-to-remotes
-            pass
-
-        # kill repository
-    return
+def _uninstall_dataset(ds):
+    """This is a harsh internal helper: it will wipe out a dataset, no checks
+    """
+    # figure out whether we should be nice to a superdataset later on
+    has_super = ds.get_superdataset(topmost=False, registered_only=True)
+    # Close any possibly associated process etc with underlying repo.
+    # Otherwise - rmtree could fail to remove e.g. under NFS which would
+    # still have some files opened by them (thus having .nfs00000xxxx
+    # files) forbidding rmdir to work in rmtree
+    ds.close()
+    rmtree(ds.path)
+    # invalidate loaded ConfigManager -- datasets are singletons!!
+    ds._cfg = None
+    if has_super:
+        # recreate an empty mountpoint to make Git happier
+        ds.pathobj.mkdir(exist_ok=True)
+    yield dict(
+        action='drop',
+        path=ds.path,
+        type='dataset',
+        status='ok',
+    )
 
 
 def _drop_allkeys(ds, repo, force=False, jobs=None):
