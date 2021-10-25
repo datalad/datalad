@@ -76,11 +76,11 @@ class Drop(Interface):
         reckless=Parameter(
             args=("--reckless",),
             doc="""""",
-            constraints=EnsureChoice(None)),
+            constraints=EnsureChoice('modification', 'availability', 'undead', None)),
         what=Parameter(
             args=("--what",),
             doc="""""",
-            constraints=EnsureChoice('filecontent', 'allkeys', 'all')),
+            constraints=EnsureChoice('filecontent', 'notpreferred', 'allkeys', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -115,6 +115,10 @@ class Drop(Interface):
         if check is False:
             # TODO check for conflict with new reckless parameter
             reckless = 'availability'
+
+        # we cannot test for what=='allkeys' and path==None here,
+        # on per each dataset. otherwise we will not be able to drop
+        # from a subdataset, by given its path -- desirable MIH thinks
 
         ds = require_dataset(dataset, check_installed=True, purpose='drop')
 
@@ -186,6 +190,18 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 recursion_limit=None,
                 jobs=jobs)
 
+    if what in ('allkeys', 'all') and paths is not None:
+        yield dict(
+            action='drop',
+            path=ds.path,
+            type='dataset',
+            status='impossible',
+            message=(
+                'cannot drop %s, with path constraints given: %s',
+                what, paths),
+        )
+        return
+
     if reckless not in ('modification',):
         # do a cheaper status run to discover any kind of modification and
         # generate results based on the `what` mode of operation
@@ -225,33 +241,68 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     repo = ds.repo
     is_annex = isinstance(repo, AnnexRepo)
 
-    if what == 'filecontent':
-        if not is_annex:
-            # TODO maybe play save and ensure_list(paths), it could be None
-            # or just one 'notneeded' result for the entire dataset with
-            # paths=None
-            for p in paths:
-                yield dict(
-                    action='drop',
-                    path=str(p),
-                    status='notneeded',
-                    message="no annex'ed content",
-                )
-        elif not paths:
-            # XXX should we only drop filecontent with particular paths
-            # specified? e.g. '.'
-            # MIH: right now I don't think so, because running drop without
-            # should be safe by default in the end
-            pass
-        else:
-            # we have an annex and paths
-            yield from _drop_files(
+    if not is_annex and paths:
+        # we cannot drop content in non-annex repos, issue same
+        # 'notneeded' as for git-file in annex repo
+        for p in paths:
+            yield dict(
+                action='drop',
+                path=str(p),
+                status='notneeded',
+                message="no annex'ed content",
+            )
+        # continue, this is nothing fatal
+
+    if not is_annex and what in ('allkeys', 'unwanted'):
+        # these drop modes are meaningless without an annex
+        yield dict(
+            action='drop',
+            path=ds.path,
+            status='notneeded',
+            message="dataset with no annex",
+            type='dataset',
+        )
+        # continue, this is nothing fatal
+
+    if is_annex and what == 'filecontent':
+        # XXX should we only drop filecontent with particular paths
+        # specified? e.g. '.'
+        # MIH: right now I don't think so, because running drop without
+        # should be safe by default in the end
+        yield from _drop_files(
+            ds,
+            repo,
+            # give paths or '.' with no constraint
+            paths=[str(p.relative_to(ds.pathobj))
+                   for p in paths] if paths else '.',
+            force=reckless in ('availability',),
+            jobs=jobs,
+        )
+    if is_annex and what == 'allkeys':
+        for r in _drop_allkeys(
                 ds,
                 repo,
-                paths=[str(p.relative_to(ds.pathobj)) for p in paths],
                 force=reckless in ('availability',),
-                jobs=jobs,
+                jobs=jobs):
+            res = dict(
+                action='drop',
+                type='key',
+                # use the path of the containing dataset
+                # using the location of the key does not add any
+                # practical value, and is expensive to obtain
+                path=ds.path,
+                status='ok' if r.get('success') else 'error',
+                key=r.get('key'),
             )
+            # pull any note, and rename recommended parameter to
+            # avoid confusion
+            message = r.get('note', '').replace('--force', '--reckless')
+            if message:
+                res['message'] = message
+            error_messages = r.get('error-messages')
+            if error_messages:
+                res['error_messages'] = error_messages
+            yield res
 
     # all subdatasets are taken care of. now we have a a single dataset to
     # process
@@ -282,6 +333,23 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     return
 
 
+def _drop_allkeys(ds, repo, force=False, jobs=None):
+    """
+    """
+    cmd = ['drop', '--all']
+    if force:
+        cmd.append('--force')
+    if jobs:
+        cmd.extend(['--jobs', str(jobs)])
+
+    try:
+        yield from repo._call_annex_records(cmd)
+    except CommandError as e:
+        # pick up the results captured so far and yield them
+        # the error will be amongst them
+        yield from e.kwargs.get('stdout_json', [])
+
+
 def _drop_files(ds, repo, paths, force=False, jobs=None):
     """Helper to drop content in datasets.
 
@@ -302,7 +370,7 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
     if force:
         cmd.append('--force')
     if jobs:
-        cmd.extend(['jobs', jobs])
+        cmd.extend(['--jobs', str(jobs)])
 
     respath_by_status = {}
     try:
@@ -328,6 +396,7 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
 
 
 def _postproc_annexdrop_result(res, respath_by_status, ds, **kwargs):
+    # TODO this should extract any error messages and report them!
     res = annexjson2result(
         # annex reports are always about files
         res, ds, type='file', **kwargs)
