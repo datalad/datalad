@@ -470,8 +470,12 @@ def with_gitsize_investigation(saver):
                                             "files are",
                                             num_files, False),
                            '\n'.join(("{} ({})".format(file, ut.bytes2human(size))
-                                      for file, size in files.items()[:num_files
-                                                                      if 10 > num_files else 10])),
+                                      for file, size in
+                                      sorted(files.items(), key=lambda x: x[1],
+                                             reverse=True)[:num_files
+                                                           if 10 > num_files else 10]
+                                      )
+                                     )
                            )
                    )
 
