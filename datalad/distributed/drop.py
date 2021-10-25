@@ -249,7 +249,8 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 ds,
                 repo,
                 paths=[str(p.relative_to(ds.pathobj)) for p in paths],
-                force=reckless in ('availability',)
+                force=reckless in ('availability',),
+                jobs=jobs,
             )
 
     # all subdatasets are taken care of. now we have a a single dataset to
@@ -281,7 +282,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     return
 
 
-def _drop_files(ds, repo, paths, force=False):
+def _drop_files(ds, repo, paths, force=False, jobs=None):
     """Helper to drop content in datasets.
 
     Parameters
@@ -300,6 +301,8 @@ def _drop_files(ds, repo, paths, force=False):
     cmd = ['drop']
     if force:
         cmd.append('--force')
+    if jobs:
+        cmd.extend(['jobs', jobs])
 
     respath_by_status = {}
     try:
