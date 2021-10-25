@@ -16,7 +16,9 @@ from datalad.utils import (
     on_windows,
 )
 from datalad.tests.utils import (
+    assert_dict_equal,
     assert_in,
+    assert_in_results,
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -38,6 +40,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.api import (
     status,
 )
+from datalad.core.local.status import get_paths_by_ds
 
 
 @with_tempfile(mkdir=True)
@@ -89,18 +92,14 @@ def test_status_nods(path, otherpath):
         ds.status(path=otherpath, on_failure='ignore', result_renderer=None),
         1,
         status='error',
-        message='path not underneath this dataset')
+        message=('path not underneath the reference dataset %s', ds.path))
     otherds = Dataset(otherpath).create()
     assert_result_count(
         ds.status(path=otherpath, on_failure='ignore', result_renderer=None),
         1,
         path=otherds.path,
         status='error',
-        message=(
-            'dataset containing given paths is not underneath the reference '
-            'dataset %s: %s',
-            ds, [])
-        )
+        message=('path not underneath the reference dataset %s', ds.path))
 
 
 @with_tempfile(mkdir=True)
@@ -310,3 +309,114 @@ def test_status_symlinked_dir_within_repo(path):
         # TODO: Consider providing better error handling in this case.
         with assert_raises(CommandError):
             call()
+
+
+@with_tempfile
+@with_tempfile
+def test_get_paths_by_ds(path, otherdspath):
+    otherds = Dataset(otherdspath).create()
+    ds = get_deeply_nested_structure(path)
+
+    # for testing below, a shortcut
+    subds_modified = Dataset(ds.pathobj / 'subds_modified')
+
+    # check docstrong of get_deeply_nested_structure() to understand
+    # what is being tested here
+    testcases = (
+        # (
+        #   (<dataset_arg>, <path arg>),
+        #   {<path by ds dict>}
+        #   [<error list>]
+        # ),
+
+        # find main dataset, pass-through arbitrary arguments, if no paths
+        # go in, also no paths come out
+        ((path, None), {ds.pathobj: None}, []),
+        # a simple path in the rootds, stays just that, not traversal
+        # into files underneaths
+        ((ds, ['subdir']), {ds.pathobj: [ds.pathobj / 'subdir']}, []),
+        # same for files, any number,
+        # one record per dataset with multiple files
+        ((ds, [op.join('subdir', 'git_file.txt'), 'directory_untracked']),
+         {ds.pathobj: [ds.pathobj / 'directory_untracked',
+                       ds.pathobj / 'subdir' / 'git_file.txt']},
+         []),
+        # same for a subdataset root -- still reported as part of
+        # the superdataset!
+        ((ds, ['subds_modified']),
+         {ds.pathobj: [subds_modified.pathobj]},
+         []),
+        # but not with a trailing slash, then it is the subdataset root
+        # itself that becomes the record!!!
+        ((ds, ['subds_modified' + op.sep]),
+         {subds_modified.pathobj: [subds_modified.pathobj]},
+         []),
+        # however, regardless of the path syntax, each behavior can be forced
+        ((ds, ['subds_modified'], 'sub'),
+         {subds_modified.pathobj: [subds_modified.pathobj]},
+         []),
+        ((ds, ['subds_modified' + op.sep], 'super'),
+         {ds.pathobj: [subds_modified.pathobj]},
+         []),
+        # subdataset content is sorted into a subdataset record
+        ((ds, [op.join('subds_modified', 'subdir')]),
+         {subds_modified.pathobj: [ds.pathobj / 'subds_modified' / 'subdir']},
+         []),
+        # content from different datasets ends up in different records
+        ((ds, [op.join('subdir', 'git_file.txt'),
+               op.join('subds_modified', 'subdir'),
+               op.join('subds_modified', 'subds_lvl1_modified')]),
+         {ds.pathobj: [ds.pathobj / 'subdir' / 'git_file.txt'],
+          subds_modified.pathobj: [
+              subds_modified.pathobj / 'subdir',
+              subds_modified.pathobj / 'subds_lvl1_modified']},
+         []),
+        # paths not matching existing content are no problem
+        ((ds, ['doesnotexist',
+               op.join('subdir', 'nothere'),
+               op.join('subds_modified', 'subdir', 'gone')]),
+         {ds.pathobj: [ds.pathobj / 'doesnotexist',
+                       ds.pathobj / 'subdir' / 'nothere'],
+          subds_modified.pathobj: [
+              subds_modified.pathobj / 'subdir' / 'gone']},
+         []),
+        #
+        # now error case
+        #
+        # a path that does sort under the root dataset
+        ((path, [otherds.pathobj / 'totally' / 'different']),
+         {},
+         [otherds.pathobj / 'totally' / 'different']),
+    )
+    # evaluate the test cases
+    for inp, pbd_target, error_target in testcases:
+        print('TTT', inp)
+        paths_by_ds, errors = get_paths_by_ds(ds, *inp)
+        assert_dict_equal(pbd_target, paths_by_ds)
+        eq_(error_target, errors)
+
+    # lastly, some more specialized test
+    # paths get collapsed into dataset records, even when the path
+    # order is not presorted to match individual datasets sequentially
+    paths_by_ds, errors = get_paths_by_ds(
+        ds, ds, [
+            op.join('subdir', 'git_file.txt'),
+            op.join('subds_modified', 'subdir'),
+            op.join('subdir', 'annexed_file.txt'),
+        ])
+    eq_(
+        list(paths_by_ds.keys()),
+        [ds.pathobj, subds_modified.pathobj]
+    )
+    # result order (top-level first) is stable, even when a path comes first
+    # that sorts later. Also mixed types are not a problem
+    paths_by_ds, errors = get_paths_by_ds(
+        ds, ds, [
+            ds.pathobj / 'subds_modified' / 'subdir',
+            op.join('subdir', 'git_file.txt'),
+            op.join('subds_modified', 'subdir', 'annexed_file.txt'),
+        ])
+    eq_(
+        list(paths_by_ds.keys()),
+        [ds.pathobj, subds_modified.pathobj]
+    )
