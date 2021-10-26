@@ -27,7 +27,10 @@ from datalad.tests.utils import (
     DEFAULT_REMOTE,
     OBSCURE_FILENAME,
 )
-from datalad.distributed.drop import _detect_nondead_annex_at_remotes
+from datalad.distributed.drop import (
+    _detect_nondead_annex_at_remotes,
+    _detect_unpushed_revs,
+)
 
 
 @with_tempfile
@@ -283,3 +286,42 @@ def test_uninstall_recursive(path):
     eq_(ds.is_installed(), False)
     # not even a trace
     eq_(ds.pathobj.exists(), False)
+
+
+@with_tempfile
+@with_tempfile
+def test_unpushed_state_detection(origpath, clonepath):
+    origds = Dataset(origpath).create()
+    origrepo = origds.repo
+    # this is still a unique repo, all payload branches are
+    # unpushed
+    eq_([DEFAULT_BRANCH], _detect_unpushed_revs(origrepo))
+    origrepo.call_git(['checkout', '-b', 'otherbranch'])
+    eq_([DEFAULT_BRANCH, 'otherbranch'],
+        _detect_unpushed_revs(origrepo))
+    # let's advance the state by one
+    (origds.pathobj / 'file1').write_text('some text')
+    origds.save()
+    # same picture
+    eq_([DEFAULT_BRANCH, 'otherbranch'],
+        _detect_unpushed_revs(origrepo))
+    # back to original branch
+    origrepo.call_git(['checkout', DEFAULT_BRANCH])
+
+    # now lets clone
+    cloneds = clone(origds, clonepath)
+    clonerepo = cloneds.repo
+    # right after the clone there will be no unpushed changes
+    eq_([], _detect_unpushed_revs(clonerepo))
+    # even with more than one branch in the clone
+    clonerepo.call_git(['checkout', '-t', f'{DEFAULT_REMOTE}/otherbranch'])
+    eq_([], _detect_unpushed_revs(clonerepo))
+
+    # let's advance the local state now
+    (cloneds.pathobj / 'file2').write_text('some other text')
+    cloneds.save()
+    # only the modified branch is detected
+    eq_(['otherbranch'], _detect_unpushed_revs(clonerepo))
+    # a push will bring things into the clear
+    cloneds.push()
+    eq_([], _detect_unpushed_revs(clonerepo))

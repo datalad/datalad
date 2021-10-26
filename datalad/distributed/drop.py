@@ -395,6 +395,45 @@ def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         # continue, this is nothing fatal
 
 
+def _detect_unpushed_revs(repo):
+    """Check if all local branch states (and HEAD) are available at a remote
+
+    There need not be a 1:1 correspondence. What is tested is whether
+    each commit corresponding to a local branch tip (or HEAD), is also an
+    ancestor of any remote branch. It is not required that there is a single
+    remote that has all commits.
+
+    This only uses the state of remotes known to the local remote state.
+    No remote synchronization is performed.
+
+    Parameters
+    ----------
+    repo: GitRepo
+      Repository to evaluated
+
+    Returns
+    -------
+    list
+      Names of local states/refs that are no available at a remote.
+    """
+    # we do not want to check this for the managed git-annex branch
+    # it can behave in complex ways
+    local_refs = [lb for lb in repo.get_branches() if lb != 'git-annex']
+    if not repo.get_active_branch():
+        # check for HEAD, in case we are on a detached HEAD
+        local_refs.append('HEAD')
+    # extend to tags?
+    remote_refs = repo.get_remote_branches()
+
+    unpushed_refs = [
+        local_ref
+        for local_ref in local_refs
+        if not any(repo.is_ancestor(local_ref, remote_ref)
+                   for remote_ref in remote_refs)
+    ]
+    return unpushed_refs
+
+
 def _detect_nondead_annex_at_remotes(repo, annex_uuid):
     """Return list of remote names that know about a given (not-dead) annex
 
