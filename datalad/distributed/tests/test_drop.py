@@ -11,6 +11,7 @@ import os.path as op
 
 from datalad.api import (
     clone,
+    drop,
     Dataset,
 )
 from datalad.support.exceptions import IncompleteResultsError
@@ -20,6 +21,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_result_count,
     assert_status,
+    assert_true,
     eq_,
     get_deeply_nested_structure,
     with_tempfile,
@@ -31,6 +33,8 @@ from datalad.distributed.drop import (
     _detect_nondead_annex_at_remotes,
     _detect_unpushed_revs,
 )
+from datalad.utils import chpwd
+from datalad.support.exceptions import NoDatasetFound
 
 
 @with_tempfile
@@ -117,14 +121,6 @@ def test_drop_file_content(path, outside_path):
         path=str(modfile),
         refds=ds.path,
     )
-    # but because we disabled failure handling above, we still get
-    # to the file drop stage
-    assert_in_results(
-        res,
-        status='notneeded',
-        message="no annex'ed content",
-        path=str(modfile),
-    )
 
     # detection of untracked content
     untrackeddir = ds.pathobj / 'subds_modified' / 'subds_lvl1_modified' / \
@@ -138,15 +134,6 @@ def test_drop_file_content(path, outside_path):
         path=str(untrackeddir),
         type='directory',
         refds=ds.path,
-    )
-    # and again, because we disabled failure handling above, we still get
-    # to the file drop stage
-    assert_in_results(
-        res,
-        status='notneeded',
-        message=("nothing to drop from %s", str(untrackeddir)),
-        path=str(untrackeddir),
-        type='directory',
     )
 
     # and lastly, recursive drop
@@ -265,7 +252,8 @@ def test_uninstall_recursive(path):
     subds = ds.create('sub')
 
     # fail to uninstall with subdatasets present
-    res = ds.drop(what='all', on_failure='ignore')
+    res = ds.drop(
+        what='all', reckless='availability', on_failure='ignore')
     assert_in_results(
         res,
         action='drop',
@@ -275,7 +263,9 @@ def test_uninstall_recursive(path):
         message=('cannot drop dataset, subdataset(s) still present '
                  '(forgot --recursive?): %s', [subds.path]),
     )
-    res = ds.drop(what='all', recursive=True, on_failure='ignore')
+    res = ds.drop(
+        what='all', reckless='availability', recursive=True,
+        on_failure='ignore')
     # both datasets gone
     assert_result_count(res, 2)
     assert_result_count(res, 2, type='dataset', status='ok')
@@ -323,5 +313,90 @@ def test_unpushed_state_detection(origpath, clonepath):
     # only the modified branch is detected
     eq_(['otherbranch'], _detect_unpushed_revs(clonerepo))
     # a push will bring things into the clear
-    cloneds.push()
+    cloneds.push(to=DEFAULT_REMOTE)
     eq_([], _detect_unpushed_revs(clonerepo))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile
+@with_tempfile
+def test_safetynet(otherpath, origpath, clonepath):
+    # we start with a dataset that is hosted somewhere
+    origds = Dataset(origpath).create()
+    # a clone is made to work on the dataset
+    cloneds = clone(origds, clonepath)
+    # checkout a different branch at origin to simplify testing below
+    origds.repo.call_git(['checkout', '-b', 'otherbranch'])
+
+    # an untracked file is added to simulate some work
+    (cloneds.pathobj / 'file1').write_text('some text')
+    # now we try to drop the entire dataset in a variety of ways
+    # to check that it does not happen too quickly
+
+    # cannot simple run drop somewhere and give a path to a dataset
+    # to drop
+    with chpwd(otherpath):
+        assert_raises(NoDatasetFound, drop, clonepath, what='all')
+    assert_true(cloneds.is_installed())
+
+    # refuse to remove the CWD
+    with chpwd(clonepath):
+        assert_raises(RuntimeError, drop, what='all')
+    assert_true(cloneds.is_installed())
+
+    assert_in_results(
+        cloneds.drop(what='all', on_failure='ignore'),
+        message='cannot drop untracked content, save first',
+        status='impossible')
+    assert_true(cloneds.is_installed())
+
+    # so let's save...
+    cloneds.save()
+    # - branch is progressed
+    # - a new key is only available here
+    res = cloneds.drop(what='all', on_failure='ignore')
+    assert_in_results(res, action="drop", status="error")
+    assert_true(res[0]['message'][0].startswith(
+        "to-be-dropped dataset has the following revisions "
+        "that are not available at any known sibling"))
+    assert_true(cloneds.is_installed())
+
+    # so let's push -- git only
+    cloneds.repo.call_git(['push'])
+
+    res = cloneds.drop(what='all', on_failure='ignore')
+    assert_in_results(res, action="drop", status="error")
+    assert_true(res[0]['message'].startswith(
+        "unsafe\nCould only verify the existence of "
+        "0 out of 1 necessary copy"))
+    assert_true(cloneds.is_installed())
+
+    # so let's push all
+    cloneds.push()
+
+    res = cloneds.drop(what='all', on_failure='ignore')
+    assert_in_results(res, action="drop", status="error")
+    assert_true(res[0]['message'][0].startswith(
+        "to-be-deleted local annex not declared 'dead'"))
+    eq_(['dl-test-remote'], res[0]['message'][1])
+    assert_true(cloneds.is_installed())
+
+    # announce dead
+    cloneds.repo.call_annex(['dead', 'here'])
+    # but just a local declaration is not good enough
+    assert_in_results(
+        cloneds.drop(what='all', on_failure='ignore'),
+        status='error')
+    assert_true(cloneds.is_installed())
+
+    # so let's push that announcement also
+    cloneds.push()
+
+    # and kill the beast!
+    res = cloneds.drop(what='all', on_failure='ignore')
+    # only now we also drop the key!
+    assert_result_count(res, 2)
+    assert_in_results(
+        res, action='drop', type='key', status='ok', path=cloneds.path)
+    assert_in_results(
+        res, action='drop', type='dataset', status='ok', path=cloneds.path)

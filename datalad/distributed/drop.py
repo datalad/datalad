@@ -153,7 +153,14 @@ class Drop(Interface):
                 **res_props)
             # we are not returning, a caller could decide on failure mode
 
-        lgr.debug('Discovered %i datasets to drop (from)',len(paths_by_ds))
+        if what == 'all':
+            cwd = ds.pathobj.cwd()
+            if any(d == cwd or d in cwd.parents for d in paths_by_ds.keys()):
+                raise RuntimeError(
+                    'refuse to perform actions that would remove the current '
+                    'working directory')
+
+        lgr.debug('Discovered %i datasets to drop (from)', len(paths_by_ds))
 
         # a dataset paths are normalized and guaranteed to be under the same
         # root dataset
@@ -235,6 +242,11 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
             force=reckless in ('availability',),
             jobs=jobs,
         )
+        # end it here for safety, the rest of the function deals with
+        # dropping more and more fundamentally
+        return
+
+    drop_all_errored = False
     if is_annex and what in ('allkeys', 'all'):
         # XXX maybe conditional on a reckless mode, i.e. kill
         for r in _drop_allkeys(
@@ -260,7 +272,15 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
             error_messages = r.get('error-messages')
             if error_messages:
                 res['error_messages'] = error_messages
+            # play safe, if there is no status, assume error
+            if res.get('status', 'error') != 'ok':
+                drop_all_errored = True
             yield res
+
+    if drop_all_errored:
+        # end it here, if there is any indication that wiping out the
+        # repo is unsafe
+        return
 
     if what == 'all':
         if reckless == 'noavailability':
@@ -306,6 +326,25 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
+    if what == 'all' and reckless != 'availability':
+        unpushed = _detect_unpushed_revs(repo)
+        if unpushed:
+            yield dict(
+                action='drop',
+                path=ds.path,
+                type='dataset',
+                status='error',
+                message=(
+                    "to-be-dropped dataset has the following revisions that "
+                    "are not available at any known sibling. Use "
+                    "`datalad push --to ...` to push "
+                    "these before dropping the local dataset, "
+                    "or ignore via `--reckless availability`: %s",
+                    unpushed)
+            )
+            # this is fatal
+            return
+
     if is_annex and what == 'all' and reckless != 'undead':
         # this annex is about to die, test if it is still considered
         # not-dead. if so, complain to avoid generation of zombies
@@ -324,7 +363,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
                 status='error',
                 message=(
                     "to-be-deleted local annex not declared 'dead' at the "
-                    "following remotes. Announce death "
+                    "following siblings. Announce death "
                     "(`git annex dead here` + `datalad push --to ...`), "
                     "or ignore via `--reckless undead`: %s",
                     remotes_that_know_this_annex)
@@ -332,8 +371,6 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
-
-def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
     if reckless not in ('modification',):
         # do a cheaper status run to discover any kind of modification and
         # generate results based on the `what` mode of operation
@@ -371,6 +408,8 @@ def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
                     'Status record not considered for drop '
                     'state inspection: %s', res)
 
+
+def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
     if not is_annex and paths:
         # we cannot drop content in non-annex repos, issue same
         # 'notneeded' as for git-file in annex repo
