@@ -548,9 +548,9 @@ class CreateSibling(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""limit processing to datasets that have been changed since a given
-            state (by tag, branch, commit, etc). This can be used to create siblings
-            for recently added subdatasets."""),
+            doc="""limit processing to subdatasets that have been changed since
+            a given state (by tag, branch, commit, etc). This can be used to
+            create siblings for recently added subdatasets."""),
     )
 
     @staticmethod
@@ -691,11 +691,13 @@ class CreateSibling(Interface):
                 )
                 if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
             ]
-            cand_ds = [ds] + cand_ds
+            if not since:
+                # not only subdatasets
+                cand_ds = [ds] + cand_ds
         else:
             # only the current ds
             cand_ds = [ds]
-        # check remotes setup
+        # check remotes setup()
         for d in cand_ds:
             d_repo = d.repo
             if d_repo is None:
