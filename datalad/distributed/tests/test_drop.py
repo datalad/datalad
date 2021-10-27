@@ -20,7 +20,6 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_raises,
     assert_result_count,
-    assert_status,
     assert_true,
     eq_,
     get_deeply_nested_structure,
@@ -402,3 +401,25 @@ def test_safetynet(otherpath, origpath, clonepath):
         res, action='drop', type='key', status='ok', path=cloneds.path)
     assert_in_results(
         res, action='drop', type='dataset', status='ok', path=cloneds.path)
+
+
+@with_tempfile
+def test_kill(path):
+    # create a complicated and dirty mess
+    ds = get_deeply_nested_structure(path)
+    # cannot use kill without recursion enabled, because there will be no
+    # checks for subdatasets, hence we cannot make the impression that
+    # this would be a surgical operation
+    assert_raises(ValueError, ds.drop, what='all', reckless='kill')
+    # wipe it out
+    res = ds.drop(what='all', reckless='kill', recursive=True)
+    assert_result_count(res, 1)
+    assert_in_results(
+        res,
+        status='ok',
+        path=ds.path,
+        type='dataset',
+        action='drop',
+    )
+    eq_(False, ds.is_installed())
+    eq_(False, ds.pathobj.exists())

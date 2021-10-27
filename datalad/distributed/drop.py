@@ -81,7 +81,7 @@ class Drop(Interface):
             args=("--reckless",),
             doc="""""",
             constraints=EnsureChoice(
-                'modification', 'availability', 'undead', None)),
+                'modification', 'availability', 'undead', 'kill', None)),
         what=Parameter(
             args=("--what",),
             doc="""""",
@@ -121,6 +121,12 @@ class Drop(Interface):
         if check is False:
             # TODO check for conflict with new reckless parameter
             reckless = 'availability'
+
+        if what == 'all' and reckless == 'kill' and not recursive:
+            raise ValueError(
+                'A reckless kill is requested by no recursion flag is set. '
+                "With 'kill' no checks for subdatasets will be made, "
+                'acknowledge by setting the recursive flag')
 
         # we cannot test for what=='allkeys' and path==None here,
         # on per each dataset. otherwise we will not be able to drop
@@ -187,7 +193,8 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     # we know that any given path is part of `ds` and not any of its
     # subdatasets!
 
-    if recursive:
+    # by-passing this completely with reckless=kill
+    if recursive and not reckless == 'kill':
         # process subdatasets first with recursion
         for sub in ds.subdatasets(
                 # must be resolved!
@@ -213,6 +220,18 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 recursion_limit=None,
                 jobs=jobs)
 
+    if not ds.pathobj.exists():
+        # basic protection against something hvaing wiped it out already.
+        # should not happen, but better than a crash, if it does
+        yield dict(
+            action='drop',
+            path=ds.path,
+            status='notneeded',
+            message="does not exist",
+            type='dataset',
+        )
+        return
+
     repo = ds.repo
     is_annex = isinstance(repo, AnnexRepo)
 
@@ -228,7 +247,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     # now conditional/informative checks
     yield from _pre_drop_checks(ds, repo, paths, what, reckless, is_annex)
 
-    if is_annex and what == 'filecontent':
+    if is_annex and what == 'filecontent' and not reckless == 'kill':
         # XXX should we only drop filecontent with particular paths
         # specified? e.g. '.'
         # MIH: right now I don't think so, because running drop without
@@ -247,8 +266,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         return
 
     drop_all_errored = False
-    if is_annex and what in ('allkeys', 'all'):
-        # XXX maybe conditional on a reckless mode, i.e. kill
+    if is_annex and what in ('allkeys', 'all') and not reckless == 'kill':
         for r in _drop_allkeys(
                 ds,
                 repo,
@@ -283,16 +301,13 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         return
 
     if what == 'all':
-        if reckless == 'noavailability':
-            # wipe out dataset
-            return
-        # kill repository
-        yield from _uninstall_dataset(ds)
+        yield from _kill_dataset(ds)
     return
 
 
 def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
-    if what in ('allkeys', 'all') and paths is not None and paths != [ds.pathobj]:
+    if what in ('allkeys', 'all') and paths is not None \
+            and paths != [ds.pathobj]:
         yield dict(
             action='drop',
             path=ds.path,
@@ -304,7 +319,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         )
         return
 
-    if what == 'all':
+    if what == 'all' and not reckless == 'kill':
         # we must not have subdatasets anymore
         # if we do, --recursive was forgotton
         subdatasets = ds.subdatasets(
@@ -326,7 +341,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
-    if what == 'all' and reckless != 'availability':
+    if what == 'all' and reckless not in ('availability', 'kill'):
         unpushed = _detect_unpushed_revs(repo)
         if unpushed:
             yield dict(
@@ -345,7 +360,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
-    if is_annex and what == 'all' and reckless != 'undead':
+    if is_annex and what == 'all' and reckless not in ('undead', 'kill'):
         # this annex is about to die, test if it is still considered
         # not-dead. if so, complain to avoid generation of zombies
         # (annexed that are floating around, but are actually dead).
@@ -371,7 +386,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
-    if reckless not in ('modification',):
+    if reckless not in ('modification', 'kill'):
         # do a cheaper status run to discover any kind of modification and
         # generate results based on the `what` mode of operation
         for res in ds.status(
@@ -410,7 +425,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
 
 
 def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
-    if not is_annex and paths:
+    if not is_annex and paths and not reckless == 'kill':
         # we cannot drop content in non-annex repos, issue same
         # 'notneeded' as for git-file in annex repo
         for p in paths:
@@ -422,7 +437,8 @@ def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             )
         # continue, this is nothing fatal
 
-    if not is_annex and what in ('allkeys', 'unwanted'):
+    if not is_annex and what in ('allkeys', 'unwanted') \
+            and not reckless == 'kill':
         # these drop modes are meaningless without an annex
         yield dict(
             action='drop',
@@ -541,7 +557,7 @@ def _detect_nondead_annex_at_remotes(repo, annex_uuid):
     return(remotes_w_registration)
 
 
-def _uninstall_dataset(ds):
+def _kill_dataset(ds):
     """This is a harsh internal helper: it will wipe out a dataset, no checks
     """
     # figure out whether we should be nice to a superdataset later on
