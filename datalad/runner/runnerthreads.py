@@ -1,12 +1,8 @@
 import logging
 import os
 import threading
-import time
+from abc import ABCMeta
 from enum import Enum
-from abc import (
-    abstractmethod,
-    ABCMeta,
-)
 from queue import (
     Empty,
     Full,
@@ -15,7 +11,6 @@ from queue import (
 from typing import (
     Any,
     IO,
-    List,
     Optional,
     Tuple,
     Union,
@@ -121,7 +116,23 @@ class BlockingOSWriterThread(ExitingThread):
         lgr.log(5, "%s exiting", self)
 
 
-class ReadThread(ExitingThread):
+class SignalingThread(ExitingThread, metaclass=ABCMeta):
+    def __init__(self,
+                 identifier: str,
+                 signal_queue: Queue,
+                 ):
+
+        super().__init__()
+        self.identifier = identifier
+        self.signal_queue = signal_queue
+
+    def signal(self,
+               state: IOState,
+               data: Union[bytes, None]):
+        self.signal_queue.put((self.identifier, state, data))
+
+
+class ReadThread(SignalingThread):
     def __init__(self,
                  identifier: Any,
                  source_blocking_queue: Queue,
@@ -130,11 +141,9 @@ class ReadThread(ExitingThread):
                  timeout: Optional[float] = None,
                  ):
 
-        super().__init__()
-        self.identifier = identifier
+        super().__init__(identifier, signal_queue)
         self.source_blocking_queue = source_blocking_queue
         self.destination_queue = destination_queue
-        self.signal_queue = signal_queue
         self.timeout = timeout
 
     def read_blocking(self,
@@ -195,7 +204,7 @@ class ReadThread(ExitingThread):
         lgr.log(5, "%s exiting (last data was: %s)", self, data)
 
 
-class WriteThread(ExitingThread):
+class WriteThread(SignalingThread):
     def __init__(self,
                  identifier: Any,
                  source_queue: Queue,
@@ -204,11 +213,9 @@ class WriteThread(ExitingThread):
                  timeout: Optional[float] = None,
                  ):
 
-        super().__init__()
-        self.identifier = identifier
+        super().__init__(identifier, signal_queue)
         self.source_queue = source_queue
         self.destination_blocking_queue = destination_blocking_queue
-        self.signal_queue = signal_queue
         self.timeout = timeout
 
     def write_blocking(self,
@@ -223,17 +230,11 @@ class WriteThread(ExitingThread):
         except Full:
             return IOState.timeout
 
-    def signal(self,
-               state: IOState,
-               data: Union[bytes, None]):
-        self.signal_queue.put((self.identifier, state, data))
-
     def run(self):
 
         lgr.log(5, "%s started", self)
 
         # Get data from source queue until exit is requested.
-        data = None
         while not self.exit_requested:
 
             # Get data, if None was enqueued, the source wants
@@ -253,4 +254,5 @@ class WriteThread(ExitingThread):
                     self.signal(state, None)
                 else:
                     raise RuntimeError(f"invalid IOState: {state}")
-        lgr.log(5, "%s exiting (last data was: %s)", self, data)
+
+        lgr.log(5, "%s exiting", self)

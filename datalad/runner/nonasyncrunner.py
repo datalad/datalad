@@ -189,7 +189,7 @@ def run_command(cmd: Union[str, List],
             stdin_writer_thread.start()
             stdin_enqueueing_thread.start()
 
-        while True:
+        while active_file_numbers:
 
             active_threads = set([
                 thread
@@ -230,9 +230,6 @@ def run_command(cmd: Union[str, List],
                 else:
                     assert isinstance(data, bytes)
                     protocol.pipe_data_received(fileno_mapping[file_number], data)
-
-            if not active_file_numbers:
-                break
 
     process.wait()
     result = protocol._prepare_result()
