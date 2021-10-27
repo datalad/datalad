@@ -172,8 +172,16 @@ def yielding_run_command(cmd: Union[str, List],
                 if thread.is_alive()
             ])
 
-            if len(active_threads) == 0:
-                lgr.warning("All threads exited")
+            process_exited = process.poll() is not None
+
+            if not active_threads and output_queue.empty():
+                lgr.log(5, "All threads exited and output queue is empty, exiting runner.")
+                break
+            elif not active_file_numbers and output_queue.empty():
+                lgr.log(5, "No active queue filling threads and output queue is empty, exiting runner.")
+                break
+            elif process_exited and output_queue.empty():
+                lgr.log(5, "Process exited and output queue is empty, exiting runner.")
                 break
 
             while True:
@@ -198,13 +206,16 @@ def yielding_run_command(cmd: Union[str, List],
                 # indicating that all data was written.
                 assert data is None, \
                     f"expected None-data from writer thread, got {data}"
-                active_file_numbers.remove(process_stdin_fileno)
+                if process_stdin_fileno in active_file_numbers:
+                    active_file_numbers.remove(process_stdin_fileno)
             else:
                 if data is None:
-                    active_file_numbers.remove(file_number)
+                    if file_number in active_file_numbers:
+                        active_file_numbers.remove(file_number)
                 else:
                     yield fileno_mapping[file_number], data
 
+    print("YR: waiting for process")
     process.wait()
 
     for fd in (process.stdin, process.stdout, process.stderr):

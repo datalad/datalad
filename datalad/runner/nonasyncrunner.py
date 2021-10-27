@@ -86,7 +86,7 @@ def run_command(cmd: Union[str, List],
       `_prepare_result` of the given protocol class or its superclass.
     """
 
-    protocol_kwargs = {} if protocol_kwargs is None else protocol_kwargs
+    protocol_kwargs = protocol_kwargs or {}
 
     catch_stdout = protocol.proc_out is not None
     catch_stderr = protocol.proc_err is not None
@@ -108,7 +108,11 @@ def run_command(cmd: Union[str, List],
         else:
             stdin_queue = stdin
     else:
-        raise ValueError(f"unsupported stdin type: {type(stdin)}")
+        # indicate that we will not write anything to stdin, that
+        # means the user can pass None, or he can pass a
+        # file-like and write to it from a different thread.
+        lgr.warning(f"unknown instance class: {type(stdin)}, assuming file-like input: {stdin}")
+        write_stdin = False  # the caller will write to the parameter
 
     kwargs = {
         **kwargs,
@@ -197,8 +201,16 @@ def run_command(cmd: Union[str, List],
                 if thread.is_alive()
             ])
 
-            if len(active_threads) == 0:
-                lgr.warning("All threads exited")
+            process_exited = process.poll() is not None
+
+            if not active_threads and output_queue.empty():
+                lgr.log(5, "All threads exited and output queue is empty, exiting runner.")
+                break
+            elif not active_file_numbers and output_queue.empty():
+                lgr.log(5, "No active queue filling threads and output queue is empty, exiting runner.")
+                break
+            elif process_exited and output_queue.empty():
+                lgr.log(5, "Process exited and output queue is empty, exiting runner.")
                 break
 
             while True:
@@ -222,11 +234,13 @@ def run_command(cmd: Union[str, List],
                 # The only data-signal we expect from stdin thread
                 # is None, indicating that the thread ended
                 assert data is None
-                active_file_numbers.remove(process_stdin_fileno)
+                if process_stdin_fileno in active_file_numbers:
+                    active_file_numbers.remove(process_stdin_fileno)
             elif catch_stderr or catch_stdout:
                 if data is None:
                     protocol.pipe_connection_lost(fileno_mapping[file_number], None) # TODO: check exception
-                    active_file_numbers.remove(file_number)
+                    if file_number in active_file_numbers:
+                        active_file_numbers.remove(file_number)
                 else:
                     assert isinstance(data, bytes)
                     protocol.pipe_data_received(fileno_mapping[file_number], data)

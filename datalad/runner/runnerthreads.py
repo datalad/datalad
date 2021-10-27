@@ -1,3 +1,4 @@
+import errno
 import logging
 import os
 import threading
@@ -69,7 +70,11 @@ class BlockingOSReaderThread(ExitingThread):
         lgr.log(5, "%s started", self)
 
         while not self.exit_requested:
-            data = os.read(self.source.fileno(), self.length)
+            try:
+                data = os.read(self.source.fileno(), self.length)
+            except (ValueError, OSError):
+                data = b""
+
             if data == b"":
                 self.queue.put(None)
                 break
@@ -108,14 +113,21 @@ class BlockingOSWriterThread(ExitingThread):
         while not self.exit_requested:
             data = self.queue.get()
             if data is None:
+                self.destination.close()
                 break
 
-            written = 0
-            while written < len(data) and not self.exit_requested:
-                written += os.write(
-                    self.destination.fileno(),
-                    data[written:])
+            try:
+                written = 0
+                while written < len(data) and not self.exit_requested:
+                    written += os.write(
+                        self.destination.fileno(),
+                        data[written:])
+            except (BrokenPipeError, OSError):
+                # the destination was most likely closed
+                print("BW: broken pipe or EINVAL")
+                break
 
+        print("BW: exiting")
         lgr.log(5, "%s exiting", self)
 
 
@@ -171,12 +183,17 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
                 assert state == IOState.ok
                 break
 
-            print(f"{self} {self.identifier} read: {data}")
-
-            # Get data, if None was enqueued, the source wants
-            # us to exit the thread.
+            print("T: got: ", data)
+            # If the source sends None-data it wants
+            # us to exit the thread. Signal this to
+            # the signal queue (which might or might
+            # not be identical to the output queue),
+            # and exit the thread
             if data is None:
+                self.write(None)
                 self.signal(IOState.ok, None)
+                print("T: wrote: ", data)
+                print("T: signal: ", data)
                 break
 
             while not self.exit_requested:
@@ -190,8 +207,9 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
                 assert state == IOState.ok
                 break
 
-            print(f"{self} {self.identifier} wrote: {data}")
+            print("T: wrote: ", data)
 
+        print("T: exiting: ")
         lgr.log(5, "%s exiting (exit_requested: %s, last data: %s)", self, self.exit_requested, data)
 
 
@@ -223,7 +241,8 @@ class ReadThread(TransportThread):
               data: Union[bytes, None],
               timeout: Optional[float] = None
               ) -> IOState:
-        """ we write to an unlimited queue, no need for timeout checking"""
+
+        # We write to an unlimited queue, no need for timeout checking.
         self.destination_queue.put((self.identifier, IOState.ok, data))
         return IOState.ok
 
@@ -245,6 +264,7 @@ class WriteThread(TransportThread):
     def read(self,
              timeout: Optional[float] = None,
              ) -> Tuple[IOState, Union[bytes, None]]:
+
         return IOState.ok, self.source_queue.get()
 
     def write(self,
