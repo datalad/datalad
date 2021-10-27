@@ -902,7 +902,7 @@ def check_datasets_datalad_org(suffix, tdir):
         ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
         1,
         status='ok')
-    assert_status('ok', ds.remove())
+    assert_status('ok', ds.drop(what='all', reckless='kill', recursive=True))
 
 
 def test_datasets_datalad_org():

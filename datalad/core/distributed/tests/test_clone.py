@@ -1606,7 +1606,7 @@ def test_clone_url_mapping(src_path, dest_path):
             with patch.dict(dest.config._merged_store, specs):
                 clone('rambo', dest_path)
         finally:
-            dest.remove(check=False)
+            dest.drop(what='all', reckless='kill', recursive=True)
 
     # check submodule config impact
     dest.create()

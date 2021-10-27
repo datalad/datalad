@@ -376,7 +376,7 @@ def test_recurseinto(dspath, dest):
     assert(not Dataset(opj(dest, 'b', 'bb')).is_installed())
 
     # cleanup
-    Dataset(dest).remove(recursive=True)
+    Dataset(dest).drop(what='all', reckless='kill', recursive=True)
     assert(not lexists(dest))
     # again but just clone the base, and then get content and grab 'bb'
     # explicitly -- must get it installed
