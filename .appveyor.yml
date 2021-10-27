@@ -69,6 +69,7 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     # Windows core tests
@@ -93,6 +94,7 @@ environment:
       #INSTALL_GITANNEX: git-annex=8.20201129
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Additional test runs
     - ID: WinP39a1
@@ -130,6 +132,7 @@ environment:
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
     - ID: MacP38a2
       # ~35min
       DTS: >
@@ -142,6 +145,7 @@ environment:
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Test alternative Python versions
     - ID: Ubu20P36
@@ -149,6 +153,7 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     - ID: Ubu20P37
@@ -156,6 +161,7 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
 
@@ -293,15 +299,12 @@ test_script:
 
 
 after_test:
-  # move coverage into the project dir to make default handling applicable
-  - cmd: move .coverage ..
-  - sh: mv .coverage ..
-  - cd ..
-  # use windows codecov uploader package
-  - cmd: choco install codecov
-  - cmd: python -m coverage xml
-  - cmd: codecov -f coverage.xml
-  - sh: bash <(curl -sfS https://codecov.io/bash)
+  - python -m coverage xml
+  - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
+  - cmd: .\codecov.exe -f "coverage.xml"
+  - sh: "curl -Os $CODECOV_BINARY"
+  - sh: chmod +x codecov
+  - sh: ./codecov
 
 
 #on_success:
