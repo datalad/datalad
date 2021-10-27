@@ -195,24 +195,7 @@ def run_command(cmd: Union[str, List],
 
         while active_file_numbers:
 
-            active_threads = set([
-                thread
-                for thread in active_threads
-                if thread.is_alive()
-            ])
-
-            process_exited = process.poll() is not None
-
-            if not active_threads and output_queue.empty():
-                lgr.log(5, "All threads exited and output queue is empty, exiting runner.")
-                break
-            elif not active_file_numbers and output_queue.empty():
-                lgr.log(5, "No active queue filling threads and output queue is empty, exiting runner.")
-                break
-            elif process_exited and output_queue.empty():
-                lgr.log(5, "Process exited and output queue is empty, exiting runner.")
-                break
-
+            # Read from queue
             while True:
                 try:
                     file_number, state, data = output_queue.get(timeout=timeout)
@@ -234,13 +217,18 @@ def run_command(cmd: Union[str, List],
                 # The only data-signal we expect from stdin thread
                 # is None, indicating that the thread ended
                 assert data is None
-                if process_stdin_fileno in active_file_numbers:
-                    active_file_numbers.remove(process_stdin_fileno)
+                active_file_numbers.remove(process_stdin_fileno)
+                process.stdin.close()
+
             elif catch_stderr or catch_stdout:
                 if data is None:
                     protocol.pipe_connection_lost(fileno_mapping[file_number], None) # TODO: check exception
-                    if file_number in active_file_numbers:
-                        active_file_numbers.remove(file_number)
+                    active_file_numbers.remove(file_number)
+                    # TODO: fix this
+                    if file_number == process_stdout_fileno:
+                        process.stdout.close()
+                    if file_number == process_stderr_fileno:
+                        process.stderr.close()
                 else:
                     assert isinstance(data, bytes)
                     protocol.pipe_data_received(fileno_mapping[file_number], data)

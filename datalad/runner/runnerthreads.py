@@ -190,10 +190,8 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
             # not be identical to the output queue),
             # and exit the thread
             if data is None:
-                self.write(None)
                 self.signal(IOState.ok, None)
-                print("T: wrote: ", data)
-                print("T: signal: ", data)
+                print("T: signal: ", None)
                 break
 
             while not self.exit_requested:
@@ -207,7 +205,7 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
                 assert state == IOState.ok
                 break
 
-            print("T: wrote: ", data)
+            print(f"T{self.identifier}: wrote: ", data)
 
         print("T: exiting: ")
         lgr.log(5, "%s exiting (exit_requested: %s, last data: %s)", self, self.exit_requested, data)
