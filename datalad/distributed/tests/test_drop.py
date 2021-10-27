@@ -362,17 +362,9 @@ def test_safetynet(otherpath, origpath, clonepath):
     assert_true(cloneds.is_installed())
 
     # so let's push -- git only
-    cloneds.repo.call_git(['push'])
-
-    res = cloneds.drop(what='all', on_failure='ignore')
-    assert_in_results(res, action="drop", status="error")
-    assert_true(res[0]['message'].startswith(
-        "unsafe\nCould only verify the existence of "
-        "0 out of 1 necessary copy"))
-    assert_true(cloneds.is_installed())
-
-    # so let's push all
-    cloneds.push()
+    # we cannot use git-push directly, it would not handle
+    # managed branches properly
+    cloneds.push(data='nothing')
 
     res = cloneds.drop(what='all', on_failure='ignore')
     assert_in_results(res, action="drop", status="error")
@@ -390,6 +382,16 @@ def test_safetynet(otherpath, origpath, clonepath):
     assert_true(cloneds.is_installed())
 
     # so let's push that announcement also
+    cloneds.push(data='nothing')
+
+    res = cloneds.drop(what='all', on_failure='ignore')
+    assert_in_results(res, action="drop", status="error")
+    assert_true(res[0]['message'].startswith(
+        "unsafe\nCould only verify the existence of "
+        "0 out of 1 necessary copy"))
+    assert_true(cloneds.is_installed())
+
+    # so let's push all
     cloneds.push()
 
     # and kill the beast!

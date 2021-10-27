@@ -455,9 +455,14 @@ def _detect_unpushed_revs(repo):
     list
       Names of local states/refs that are no available at a remote.
     """
-    # we do not want to check this for the managed git-annex branch
-    # it can behave in complex ways
-    local_refs = [lb for lb in repo.get_branches() if lb != 'git-annex']
+    # consolidate corresponding branches to get reliable detection
+    repo.localsync(managed_only=True)
+    # we do not want to check this for any managed branches
+    # that are not meant to be pushed without consolidation
+    # or even at all (incl. git-annex, it can behave in complex ways)
+    local_refs = [
+        lb for lb in repo.get_branches()
+        if not (lb == 'git-annex' or repo.is_managed_branch(lb))]
     if not repo.get_active_branch():
         # check for HEAD, in case we are on a detached HEAD
         local_refs.append('HEAD')
