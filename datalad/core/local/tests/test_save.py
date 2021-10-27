@@ -44,6 +44,7 @@ from datalad.tests.utils import (
 )
 
 import datalad.utils as ut
+from datalad import cfg as dlcfg
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
@@ -52,7 +53,6 @@ from datalad.api import (
     install,
     save,
 )
-
 
 tree_arg = dict(tree={'test.txt': 'some',
                       'test_annex.txt': 'some annex',
@@ -66,7 +66,6 @@ tree_arg = dict(tree={'test.txt': 'some',
 
 @with_testrepos('.*git.*', flavors=['clone'])
 def test_save(path):
-
     ds = Dataset(path)
 
     with open(op.join(path, "new_file.tst"), "w") as f:
@@ -99,6 +98,29 @@ def test_save(path):
     with chpwd(path):
         save(message="love marsians")
     assert_repo_status(path, annex=isinstance(ds.repo, AnnexRepo))
+
+    git_file_path = op.join(path, "new_git_file.tst")
+    with open(git_file_path, "w") as f:
+        f.write("123456")
+
+    # test for notification for large saves directly to git
+    with patch.dict(dlcfg._merged_store, {'datalad.ui.git-commit-notification-threshold': 1}):
+        with patch.dict(dlcfg._merged_store, {'datalad.ui.git-commit-notification': 'yes'}):
+            # should result in a notification
+            with swallow_outputs() as cmo:
+                ds.save(message="add a new file to git", to_git=True)
+                assert_in('  [1 file was committed to git (total size: 6.0 B);\n'
+                          '   consider adjusting settings in .gitattributes to include\n'
+                          '   more files in the annex (datalad handbook ch. 5.2.1)\n'
+                          '   Biggest file is:\n'
+                          '   {} (6.0 B)\n'
+                          '   Disable this notification with datalad.ui.git-commit-notification=off]'
+                          .format(git_file_path), cmo.out)
+        with patch.dict(dlcfg._merged_store, {'datalad.ui.git-commit-notification': 'no'}):
+            # should NOT result in a notification
+            with swallow_outputs() as cmo:
+                ds.save(message="add a new file to git", to_git=True)
+                assert_not_in("committed to git", cmo.out)
 
     files = ['one.txt', 'two.txt']
     for fn in files:
@@ -170,7 +192,7 @@ def test_renamed_file():
         ds.save(recursive=recursive)
         assert_repo_status(path)
 
-    for recursive in False,:  #, True TODO when implemented
+    for recursive in False,:  # , True TODO when implemented
         for annex in True, False:
             yield check_renamed_file, recursive, annex
 
@@ -253,7 +275,7 @@ def test_symlinked_relpath(path):
         "mike1": 'mike1',  # will be added from topdir
         "later": "later",  # later from within subdir
         "d": {
-            "mike2": 'mike2', # to be added within subdir
+            "mike2": 'mike2',  # to be added within subdir
         }
     })
 
@@ -476,11 +498,11 @@ def test_add_mimetypes(path):
     # check annex file status
     annexinfo = ds.repo.get_content_annexinfo()
     for path, in_annex in (
-           # Empty one considered to be  application/octet-stream
-           # i.e. non-text
-           ('empty', True),
-           ('file.txt', False),
-           ('file2.txt', True)):
+            # Empty one considered to be  application/octet-stream
+            # i.e. non-text
+            ('empty', True),
+            ('file.txt', False),
+            ('file2.txt', True)):
         # low-level API report -> repo path reference, no ds path
         p = ds.repo.pathobj / path
         assert_in(p, annexinfo)
@@ -518,7 +540,7 @@ def test_gh1597_simpler(path):
     ds.save('.gitignore')
     assert_repo_status(ds.path)
     # put .gitattributes in some subdir and add all, should also go into Git
-    attrfile = op.join ('subdir', '.gitattributes')
+    attrfile = op.join('subdir', '.gitattributes')
     ds.repo.set_gitattributes(
         [('*', dict(mycustomthing='this'))],
         attrfile)
@@ -538,6 +560,7 @@ def test_update_known_submodule(path):
         sub = create(str(ds.pathobj / 'sub'))
         assert_repo_status(ds.path, untracked=['sub'])
         return ds
+
     # attempt one
     ds = get_baseline(op.join(path, 'wo_ref'))
     with chpwd(ds.path):
@@ -676,7 +699,7 @@ def test_path_arg_call(path):
         testfile.write_text(u'123')
         # we used to resolve relative paths against a dataset just given by
         # a path, but we no longer do that
-        #save(dataset=ds.path, path=[testfile.name], to_git=True)
+        # save(dataset=ds.path, path=[testfile.name], to_git=True)
         save(dataset=ds, path=[testfile.name], to_git=True)
 
 
@@ -870,7 +893,6 @@ def test_save_diff_ignore_submodules_config(path):
 @with_tree(tree={'somefile': 'file content',
                  'subds': {'file_in_sub': 'other'}})
 def test_save_amend(dspath):
-
     dspath = Path(dspath)
     file_in_super = dspath / 'somefile'
     file_in_sub = dspath / 'subds' / 'file_in_sub'
