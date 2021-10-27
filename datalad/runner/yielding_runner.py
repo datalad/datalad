@@ -120,7 +120,6 @@ def yielding_run_command(cmd: Union[str, List],
 
         output_queue = Queue()
         active_file_numbers = set()
-        active_threads = set()
 
         if catch_stderr:
             active_file_numbers.add(process_stderr_fileno)
@@ -129,10 +128,8 @@ def yielding_run_command(cmd: Union[str, List],
                 identifier=process_stderr_fileno,
                 source_blocking_queue=stderr_reader_thread.queue,
                 destination_queue=output_queue,
-                signal_queue=output_queue,
+                signal_queues=[output_queue],
                 timeout=timeout)
-            active_threads.add(stderr_reader_thread)
-            active_threads.add(stderr_enqueueing_thread)
             stderr_reader_thread.start()
             stderr_enqueueing_thread.start()
 
@@ -143,10 +140,8 @@ def yielding_run_command(cmd: Union[str, List],
                 identifier=process_stdout_fileno,
                 source_blocking_queue=stdout_reader_thread.queue,
                 destination_queue=output_queue,
-                signal_queue=output_queue,
+                signal_queues=[output_queue],
                 timeout=timeout)
-            active_threads.add(stdout_reader_thread)
-            active_threads.add(stdout_enqueueing_thread)
             stdout_reader_thread.start()
             stdout_enqueueing_thread.start()
 
@@ -157,32 +152,12 @@ def yielding_run_command(cmd: Union[str, List],
                 identifier=process_stdin_fileno,
                 source_queue=stdin_queue,
                 destination_blocking_queue=stdin_writer_thread.queue,
-                signal_queue=output_queue,
+                signal_queues=[output_queue, stdin_writer_thread.queue],
                 timeout=timeout)
-            active_threads.add(stdin_writer_thread)
-            active_threads.add(stdin_enqueueing_thread)
             stdin_writer_thread.start()
             stdin_enqueueing_thread.start()
 
         while active_file_numbers:
-
-            active_threads = set([
-                thread
-                for thread in active_threads
-                if thread.is_alive()
-            ])
-
-            process_exited = process.poll() is not None
-
-            if not active_threads and output_queue.empty():
-                lgr.log(5, "All threads exited and output queue is empty, exiting runner.")
-                break
-            elif not active_file_numbers and output_queue.empty():
-                lgr.log(5, "No active queue filling threads and output queue is empty, exiting runner.")
-                break
-            elif process_exited and output_queue.empty():
-                lgr.log(5, "Process exited and output queue is empty, exiting runner.")
-                break
 
             while True:
                 try:
@@ -206,16 +181,18 @@ def yielding_run_command(cmd: Union[str, List],
                 # indicating that all data was written.
                 assert data is None, \
                     f"expected None-data from writer thread, got {data}"
-                if process_stdin_fileno in active_file_numbers:
-                    active_file_numbers.remove(process_stdin_fileno)
-            else:
+                active_file_numbers.remove(process_stdin_fileno)
+
+            elif catch_stderr or catch_stdout:
                 if data is None:
-                    if file_number in active_file_numbers:
-                        active_file_numbers.remove(file_number)
+                    active_file_numbers.remove(file_number)
+                    if file_number == process_stdout_fileno:
+                        process.stdout.close()
+                    if file_number == process_stderr_fileno:
+                        process.stderr.close()
                 else:
                     yield fileno_mapping[file_number], data
 
-    print("YR: waiting for process")
     process.wait()
 
     for fd in (process.stdin, process.stdout, process.stderr):

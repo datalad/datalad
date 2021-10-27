@@ -160,7 +160,6 @@ def test_runner_stdin_no_capture():
         stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 2 + '\n').encode('utf-8'),
         protocol=None
     )
-    print("XXX")
 
 
 @timed(3)

@@ -158,7 +158,7 @@ def run_command(cmd: Union[str, List],
                 identifier=process_stderr_fileno,
                 source_blocking_queue=stderr_reader_thread.queue,
                 destination_queue=output_queue,
-                signal_queue=output_queue,
+                signal_queues=[output_queue],
                 timeout=timeout)
             active_threads.add(stderr_reader_thread)
             active_threads.add(stderr_enqueueing_thread)
@@ -172,7 +172,7 @@ def run_command(cmd: Union[str, List],
                 identifier=process_stdout_fileno,
                 source_blocking_queue=stdout_reader_thread.queue,
                 destination_queue=output_queue,
-                signal_queue=output_queue,
+                signal_queues=[output_queue],
                 timeout=timeout)
             active_threads.add(stdout_reader_thread)
             active_threads.add(stdout_enqueueing_thread)
@@ -186,7 +186,7 @@ def run_command(cmd: Union[str, List],
                 identifier=process_stdin_fileno,
                 source_queue=stdin_queue,
                 destination_blocking_queue=stdin_writer_thread.queue,
-                signal_queue=output_queue,
+                signal_queues=[output_queue, stdin_writer_thread.queue],
                 timeout=timeout)
             active_threads.add(stdin_writer_thread)
             active_threads.add(stdin_enqueueing_thread)
@@ -209,8 +209,6 @@ def run_command(cmd: Union[str, List],
                 # Handle timeouts
                 if state == IOState.timeout:
                     lgr.warning(f"TIMEOUT on {fileno_mapping[file_number]}")
-                    if process.poll() is not None:
-                        lgr.warning(f"PROCESS exited with {process.poll()}")
 
             # No timeout occurred, we have proper data or stream end marker, i.e. None
             if write_stdin and file_number == process_stdin_fileno:
@@ -218,7 +216,6 @@ def run_command(cmd: Union[str, List],
                 # is None, indicating that the thread ended
                 assert data is None
                 active_file_numbers.remove(process_stdin_fileno)
-                process.stdin.close()
 
             elif catch_stderr or catch_stdout:
                 if data is None:
