@@ -63,14 +63,12 @@ def test_safetynet(path):
         with chpwd(p):
             # will never remove PWD, or anything outside the dataset
             for target in (ds.path, os.curdir, os.pardir, opj(os.pardir, os.pardir)):
-                assert_status(
-                    ('error', 'impossible'),
-                    uninstall(path=target, on_failure='ignore'))
+                assert_raises(RuntimeError, uninstall, path=target)
     sub = ds.create('sub')
     subsub = sub.create('subsub')
     for p in (sub.path, subsub.path):
         with chpwd(p):
-            assert_status('error', uninstall(on_failure='ignore'))
+            assert_raises(RuntimeError, uninstall)
 
 
 @with_tempfile()
@@ -91,7 +89,7 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['one', 'two'])
     assert_repo_status(ds.path)
     # now kill one
-    res = ds.remove('one', result_xfm=None)
+    res = ds.remove('one', check=False, result_xfm=None)
     # subds1 got uninstalled, and ds got the removal of subds1 saved
     assert_result_count(res, 1, path=subds1.path, action='uninstall', status='ok')
     assert_result_count(res, 1, path=subds1.path, action='remove', status='ok')
@@ -105,30 +103,17 @@ def test_clean_subds_removal(path):
     # and now again, but this time remove something that is not installed
     ds.create('three')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
-    ds.uninstall('two')
+    ds.uninstall('two', check=False)
     assert_repo_status(ds.path)
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ok_(not subds2.is_installed())
     assert(exists(subds2.path))
-    res = ds.remove('two', result_xfm='datasets')
+    res = ds.remove('two', check=False, result_xfm='datasets')
     assert_repo_status(ds.path)
     # subds2 was already uninstalled, now ds got the removal of subds2 saved
     assert(not exists(subds2.path))
     eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
     eq_(res, [subds2, ds])
-
-
-@with_tempfile()
-def test_uninstall_invalid(path):
-    ds = Dataset(path).create(force=True)
-    # no longer a uniform API for uninstall, drop, and remove
-    for method in (uninstall,): #  remove, drop):
-        with chpwd(ds.path):
-            assert_status('error', method(on_failure='ignore'))
-        # refuse to touch stuff outside the dataset
-        assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
-        # same if it doesn't exist, for consistency
-        assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:489
@@ -178,8 +163,8 @@ def test_uninstall_git_file(path):
         message="no annex'ed content")
 
     res = ds.uninstall(path="INFO.txt", on_failure='ignore')
-    # no matching subdataset
-    assert_result_count(res, 0)
+    # no matching subdataset, cannot uninstall a file
+    assert_result_count(res, 1, status='impossible')
 
     # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
@@ -373,7 +358,7 @@ def test_remove_dataset_hierarchy(path):
     # fail on missing --recursive because subdataset is present
     assert_raises(IncompleteResultsError, ds.remove)
     assert_repo_status(ds.path)
-    ds.remove(recursive=True)
+    ds.remove(recursive=True, check=False)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -381,7 +366,7 @@ def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
     assert_repo_status(ds.path)
-    remove(dataset=ds.path, recursive=True)
+    remove(dataset=ds.path, check=False, recursive=True)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -396,7 +381,7 @@ def test_careless_subdataset_uninstall(path):
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
     assert_repo_status(ds.path)
     # now we kill the sub without the parent knowing
-    subds1.uninstall()
+    subds1.uninstall(check=False)
     ok_(not subds1.is_installed())
     # mountpoint exists
     ok_(exists(subds1.path))
@@ -526,7 +511,8 @@ def test_uninstall_without_super(path):
     # explicitly calling the uninstall methods of the parent -- things should
     # be figured out by datalad
     with chpwd(parent.path):
-        uninstall(sub.path)
+        # check False because revisions are not pushed
+        uninstall(sub.path, check=False)
     assert not sub.is_installed()
     # no present subdatasets anymore
     subreport = parent.subdatasets()
@@ -535,17 +521,14 @@ def test_uninstall_without_super(path):
     assert_result_count(subreport, 0, path=nosub.path)
     # but we should fail on an attempt to uninstall the non-subdataset
     with chpwd(nosub.path):
-        res = uninstall(on_failure='ignore')
-    assert_result_count(
-        res, 1, path=nosub.path, status='error',
-        message="will not uninstall top-level dataset (consider `remove` command)")
+        assert_raises(RuntimeError, uninstall)
 
 
 @with_tempfile(mkdir=True)
 def test_drop_nocrash_absent_subds(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')
-    parent.uninstall('sub')
+    parent.uninstall('sub', check=False)
     assert_repo_status(parent.path)
     with chpwd(path):
         assert_status('notneeded', drop('.', recursive=True))

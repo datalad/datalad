@@ -190,6 +190,7 @@ class Drop(Interface):
 
 
 def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
+    lgr.debug('Start dropping for %s', ds)
     # we know that any given path is part of `ds` and not any of its
     # subdatasets!
 
@@ -302,6 +303,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
 
     if what == 'all':
         yield from _kill_dataset(ds)
+    lgr.debug('Done dropping for %s', ds)
     return
 
 
@@ -342,7 +344,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             return
 
     if what == 'all' and reckless not in ('availability', 'kill'):
-        unpushed = _detect_unpushed_revs(repo)
+        unpushed = _detect_unpushed_revs(repo, is_annex)
         if unpushed:
             yield dict(
                 action='drop',
@@ -450,7 +452,7 @@ def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         # continue, this is nothing fatal
 
 
-def _detect_unpushed_revs(repo):
+def _detect_unpushed_revs(repo, consider_managed_branches):
     """Check if all local branch states (and HEAD) are available at a remote
 
     There need not be a 1:1 correspondence. What is tested is whether
@@ -465,20 +467,24 @@ def _detect_unpushed_revs(repo):
     ----------
     repo: GitRepo
       Repository to evaluated
+    consider_managed_branches: bool
+      Whether to enable handling of managed branches.
 
     Returns
     -------
     list
       Names of local states/refs that are no available at a remote.
     """
-    # consolidate corresponding branches to get reliable detection
-    repo.localsync(managed_only=True)
+    if consider_managed_branches:
+        # consolidate corresponding branches to get reliable detection
+        repo.localsync(managed_only=True)
     # we do not want to check this for any managed branches
     # that are not meant to be pushed without consolidation
     # or even at all (incl. git-annex, it can behave in complex ways)
     local_refs = [
         lb for lb in repo.get_branches()
-        if not (lb == 'git-annex' or repo.is_managed_branch(lb))]
+        if not (not consider_managed_branches
+            or lb == 'git-annex' or repo.is_managed_branch(lb))]
     if not repo.get_active_branch():
         # check for HEAD, in case we are on a detached HEAD
         local_refs.append('HEAD')
@@ -574,7 +580,9 @@ def _kill_dataset(ds):
         # recreate an empty mountpoint to make Git happier
         ds.pathobj.mkdir(exist_ok=True)
     yield dict(
-        action='drop',
+        # keep uninstall to please the gods of a distant past
+        #action='drop',
+        action='uninstall',
         path=ds.path,
         type='dataset',
         status='ok',

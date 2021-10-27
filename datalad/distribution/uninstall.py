@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for uninstalling datasets
+"""Thin shim around drop to preserve some backward-compatibility
 
 """
 
@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 import os
 import logging
-import itertools
 import os.path as op
 
 from datalad.support.param import Parameter
@@ -22,10 +21,10 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
-from datalad.local.subdatasets import Subdatasets
 from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
+    Dataset,
 )
 from datalad.distribution.drop import (
     _drop_files,
@@ -44,9 +43,11 @@ from datalad.interface.utils import (
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.utils import (
+    ensure_list,
     rmtree,
     Path,
 )
+from datalad.core.local.status import get_paths_by_ds
 
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
@@ -107,24 +108,7 @@ def _uninstall_dataset(ds, check, has_super, **kwargs):
 
 @build_doc
 class Uninstall(Interface):
-    """Uninstall subdatasets
-
-    This command can be used to uninstall any number of installed subdatasets.
-    This command will error if individual files or non-dataset directories are
-    given as input (use the drop or remove command depending on the desired
-    goal), nor will it uninstall top-level datasets (i.e. datasets that are not
-    a subdataset in another dataset; use the remove command for this purpose).
-
-    By default, the availability of at least one remote copy for each currently
-    available file in any dataset is verified. As these checks could lead to
-    slow operation (network latencies, etc), they can be disabled.
-
-    Any number of paths to process can be given as input. Recursion into
-    subdatasets needs to be explicitly enabled, while recursion into
-    subdirectories within a dataset is done automatically. An optional
-    recursion limit is applied relative to each given input path.
-
-    """
+    """DEPRECATED: use the `drop` command"""
     _action = 'uninstall'
 
     _params_ = dict(
@@ -140,18 +124,6 @@ class Uninstall(Interface):
         if_dirty=if_dirty_opt,
     )
 
-    _examples_ = [
-        dict(text="Uninstall a subdataset (undo installation)",
-             code_py="uninstall(path='path/to/subds')",
-             code_cmd="datalad uninstall <path/to/subds>"),
-        dict(text="Uninstall a subdataset and all potential subdatasets",
-             code_py="uninstall(path='path/to/subds', recursive=True)",
-             code_cmd="datalad uninstall -r <path/to/subds>"),
-        dict(text="Skip checks that ensure a minimal number of (remote) sources",
-             code_py="uninstall(path='path/to/subds', check=False)",
-             code_cmd="datalad uninstall <path/to/subds> --nocheck"),
-    ]
-
     @staticmethod
     @datasetmethod(name=_action)
     @eval_results
@@ -161,61 +133,60 @@ class Uninstall(Interface):
             recursive=False,
             check=True,
             if_dirty='save-before'):
-        refds = require_dataset(dataset, check_installed=True,
-                                purpose='uninstall')
-        res_kwargs = dict(action='uninstall', logger=lgr, refds=refds.path)
-        if not path:
-            # if no path is given, ie. refds is supposed to be uninstalled
-            # check if refds is a subdataset itself, if not die
-            # we only need to test that for the refds, everything else
-            # will be guaranteed to be a subdataset
-            parentds = refds.get_superdataset(
-                datalad_only=False,
-                topmost=False,
-                # unless it is properly registered we have no way of
-                # reinstalling it
-                registered_only=True)
-            if parentds is None:
-                yield dict(
-                    res_kwargs,
-                    path=refds.path,
-                    type='dataset',
-                    status='error',
-                    message="will not uninstall top-level dataset "
-                            "(consider `remove` command)",
-                )
-                return
+        # all this command does is to map legacy call to their replacement
+        # with drop()
+        import warnings
+        warnings.warn(
+            "The `uninstall` command is deprecated and will be removed in "
+            "a future release. "
+            "Use the `drop` command for safer operation instead.",
+            DeprecationWarning)
 
-        saw_subds = False
-        for ds in itertools.chain(Subdatasets.__call__(
-                # it is critical to pass the dataset arg as-is
-                # to not invalidate the path argument semantics
-                # in subdatasets()
-                dataset=dataset,
-                path=path,
-                fulfilled=True,
-                # makes no sense to ignore subdatasets further down
-                recursive=True,
-                # important to start at the bottom for proper deinit
-                bottomup=True,
-                # doesn't make sense for uninstall
-                #recursion_limit=recursion_limit,
-                return_type='generator',
-                result_renderer='disabled',
-                result_xfm='datasets') if path or recursive else [],
-                [refds] if not path else []):
-            if ds != refds:
-                saw_subds = True
+        reckless = None
+        if not check:
+            # the old uninstall/drop combo had no checks beyond git-annex
+            # key copy redundancy
+            reckless = 'kill'
 
-            # TODO generator
-            # this should yield what it did
-            handle_dirty_dataset(ds, mode=if_dirty)
-            # we confirmed the super dataset presence above
-            for r in _uninstall_dataset(ds, check=check, has_super=True,
-                                        **res_kwargs):
-                yield r
-        # there is nothing to save at the end
-        if path and not saw_subds:
-            lgr.warning(
-                'path constraints did not match an installed subdataset: %s',
-                path)
+        paths_by_ds = None
+        if (reckless == 'kill' and not recursive) or if_dirty != 'ignore':
+            refds = require_dataset(dataset, check_installed=True,
+                                    purpose='uninstall')
+            # same path resolution that drop will do
+            paths_by_ds, errors = get_paths_by_ds(
+                refds, dataset, ensure_list(path),
+                subdsroot_mode='sub')
+
+        if reckless == 'kill' and not recursive:
+            # drop requires recursive with kill
+            # check check of the subdatasets to see if it is safe to enable it
+            if all(not len(Dataset(d).subdatasets(
+                    fulfilled=True,
+                    result_xfm='paths',
+                    return_type='list',
+                    result_renderer='disabled'))
+                    for d in paths_by_ds.keys()):
+                # no dataset has any subdatasets, this is fine to set
+                recursive = True
+        # it has never made sense, but for "compatibility" reasons, and to keep
+        # the "old" implementation slower, even it uses the new implementation
+        if if_dirty != 'ignore':
+            for d in paths_by_ds.keys():
+                handle_dirty_dataset(Dataset(d), mode=if_dirty)
+
+        from datalad.api import drop
+        lgr.debug(
+            "Calling "
+            "drop(dataset=%r, path=%r, recursive=%r, what='all', reckless=%r)",
+            dataset, path, recursive, reckless)
+        yield from drop(
+            path=path,
+            dataset=dataset,
+            recursive=recursive,
+            what='all',
+            reckless=reckless,
+            return_type='generator',
+            result_renderer='disabled',
+            # we need to delegate the decision making to this uninstall shim
+            on_failure='ignore')
+        return

@@ -281,19 +281,22 @@ def test_uninstall_recursive(path):
 @with_tempfile
 def test_unpushed_state_detection(origpath, clonepath):
     origds = Dataset(origpath).create()
+    # always test in annex mode
+    tester = lambda x: _detect_unpushed_revs(x, True)
+
     origrepo = origds.repo
     # this is still a unique repo, all payload branches are
     # unpushed
-    eq_([DEFAULT_BRANCH], _detect_unpushed_revs(origrepo))
+    eq_([DEFAULT_BRANCH], tester(origrepo))
     origrepo.call_git(['checkout', '-b', 'otherbranch'])
     eq_([DEFAULT_BRANCH, 'otherbranch'],
-        _detect_unpushed_revs(origrepo))
+        tester(origrepo))
     # let's advance the state by one
     (origds.pathobj / 'file1').write_text('some text')
     origds.save()
     # same picture
     eq_([DEFAULT_BRANCH, 'otherbranch'],
-        _detect_unpushed_revs(origrepo))
+        tester(origrepo))
     # back to original branch
     origrepo.call_git(['checkout', DEFAULT_BRANCH])
 
@@ -301,19 +304,19 @@ def test_unpushed_state_detection(origpath, clonepath):
     cloneds = clone(origds, clonepath)
     clonerepo = cloneds.repo
     # right after the clone there will be no unpushed changes
-    eq_([], _detect_unpushed_revs(clonerepo))
+    eq_([], tester(clonerepo))
     # even with more than one branch in the clone
     clonerepo.call_git(['checkout', '-t', f'{DEFAULT_REMOTE}/otherbranch'])
-    eq_([], _detect_unpushed_revs(clonerepo))
+    eq_([], tester(clonerepo))
 
     # let's advance the local state now
     (cloneds.pathobj / 'file2').write_text('some other text')
     cloneds.save()
     # only the modified branch is detected
-    eq_(['otherbranch'], _detect_unpushed_revs(clonerepo))
+    eq_(['otherbranch'], tester(clonerepo))
     # a push will bring things into the clear
     cloneds.push(to=DEFAULT_REMOTE)
-    eq_([], _detect_unpushed_revs(clonerepo))
+    eq_([], tester(clonerepo))
 
 
 @with_tempfile(mkdir=True)
@@ -400,7 +403,7 @@ def test_safetynet(otherpath, origpath, clonepath):
     assert_in_results(
         res, action='drop', type='key', status='ok', path=cloneds.path)
     assert_in_results(
-        res, action='drop', type='dataset', status='ok', path=cloneds.path)
+        res, action='uninstall', type='dataset', status='ok', path=cloneds.path)
 
 
 @with_tempfile
@@ -419,7 +422,7 @@ def test_kill(path):
         status='ok',
         path=ds.path,
         type='dataset',
-        action='drop',
+        action='uninstall',
     )
     eq_(False, ds.is_installed())
     eq_(False, ds.pathobj.exists())
