@@ -807,8 +807,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             if repo.dirty and not explicit:
                 # Give clean-up hints if a formerly clean repo is left dirty
                 lgr.info(
-                    "The commands 'git reset --hard' and/or 'git clean -df' "
-                    "could be used to get to a clean dataset state again."
+                    "The commands 'git clean -di' and/or 'git reset' "
+                    "could be used to get to a clean dataset state again. "
+                    "Consult their man pages for more information."
                 )
         raise exc
     elif do_save:
