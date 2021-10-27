@@ -677,7 +677,7 @@ def test_dry_run(path):
             cmo.out)
 
     # However, a dry run will not do the install/reglob procedure.
-    ds.uninstall("sub", check=False)
+    ds.drop("sub", what='all', reckless='kill', recursive=True)
     with swallow_outputs() as cmo:
         ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
         assert_in("sub/b*", cmo.out)

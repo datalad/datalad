@@ -986,7 +986,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     eq_(len(sds), 1)
     eq_(sds[0]['gitmodule_datalad-url'], ria_url)
     assert_repo_status(ds.path)
-    ds.uninstall('sub', check=False)
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     assert_repo_status(ds.path)
 
     # .gitmodules still there:

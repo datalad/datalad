@@ -748,7 +748,7 @@ def test_run_inputs_outputs(src, path):
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
     # We uninstall subdatasets to fully resolve globs.
-    ds.uninstall("s0")
+    ds.drop("s0", what='all', reckless='kill', recursive=True)
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
     ok_file_has_content(
