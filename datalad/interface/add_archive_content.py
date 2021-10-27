@@ -134,7 +134,8 @@ class AddArchiveContent(Interface):
             args=("--use-current-dir",),
             action="store_true",
             doc="""extract the archive under the current directory, not the
-             directory where archive is located. %s""" % _KEY_OPT_NOTE),
+             directory where the archive is located. This parameter is applied
+             automatically if [PY: `key=True` PY][CMD: --key CMD] was used."""),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
@@ -183,7 +184,8 @@ class AddArchiveContent(Interface):
             args=("--key",),
             action="store_true",
             doc="""signal if provided archive is not actually a filename on its
-            own but an annex key"""),
+            own but an annex key. The archive will be extracted in the current
+            directory."""),
         copy=Parameter(
             args=("--copy",),
             action="store_true",
@@ -339,6 +341,8 @@ class AddArchiveContent(Interface):
             key = archive
             # We must not have anything to do with the location under .git/annex
             archive_dir = None
+            # instead, we will go from the current directory
+            use_current_dir = True
 
         archive_basename = file_basename(archive)
 
