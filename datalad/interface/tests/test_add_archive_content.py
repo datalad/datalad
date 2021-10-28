@@ -233,9 +233,7 @@ def test_add_archive_content(path_orig, url, repo_path):
                                  options=["--pathdepth", "-2"])
             ds.repo.commit("added 1.tar.gz")
 
-        # will be used in the test later
-        files = ds.repo.get_content_annexinfo(['1.tar.gz'], init=None)
-        key_1tar = files[Path('1.tar.gz').absolute()]['key']
+        key_1tar = ds.repo.get_file_annexinfo('1.tar.gz')['key']  # will be used in the test later
 
         def d1_basic_checks():
             ok_(exists('1'))

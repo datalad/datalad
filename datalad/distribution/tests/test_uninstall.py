@@ -297,10 +297,10 @@ def test_remove_file_handle_only(path):
     ds.save()
     assert_repo_status(ds.path)
     # make sure there is any key
-    ok_(len(ds.repo.get_file_key('one')))
+    ok_(ds.repo.get_file_annexinfo('one')['key'])
     # both files link to the same key
-    eq_(ds.repo.get_file_key('one'),
-        ds.repo.get_file_key('two'))
+    eq_(ds.repo.get_file_annexinfo('one')['key'],
+        ds.repo.get_file_annexinfo('two')['key'])
     rpath_one = (ds.pathobj / 'one').resolve()
     eq_(rpath_one, (ds.pathobj / 'two').resolve())
     path_two = ds.pathobj / 'two'

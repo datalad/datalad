@@ -168,17 +168,13 @@ def _the_same_across_datasets(relpath, *dss):
         key = None
         present = True
         if isinstance(repo, AnnexRepo):
-            try:
-                key = repo.get_file_key(relpath)
-            except FileInGitError:
+            annexprops = repo.get_file_annexinfo(
+                relpath, eval_availability=True)
+            if 'key' not in annexprops:
                 continue
-            if not key:
-                raise ValueError(
-                    "Must have got a key, unexpectedly got %r for %s within %s"
-                    % (key, relpath, ds)
-                )
+            key = annexprops['key']
             # For now the rest (e.g. not tracked) remains an error
-            if not repo.file_has_content(relpath):
+            if not annexprops['has_content']:
                 present = False
                 backends.append(repo.get_key_backend(key))
         keys.append(key)

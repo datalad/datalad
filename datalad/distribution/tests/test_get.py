@@ -244,8 +244,10 @@ def test_get_single_file(path):
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
-    eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    annexprops = ds.repo.get_file_annexinfo('test-annex.dat',
+                                            eval_availability=True)
+    eq_(result[0]['annexkey'], annexprops['key'])
+    ok_(annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)

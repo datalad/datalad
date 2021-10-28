@@ -112,7 +112,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
 
     Parameters
     ----------
-    dataset : Dataset
+    ds : Dataset
       Dataset to get the status of.
     path : Path-like, optional
       Paths to constrain the status to (see main status() command).
@@ -150,6 +150,9 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
     if reporting_order not in ('depth-first', 'breadth-first'):
         raise ValueError('Unknown reporting order: {}'.format(reporting_order))
 
+    if ds.pathobj in queried:
+        # do not report on a single dataset twice
+        return
     # take the dataset that went in first
     repo = ds.repo
     repo_path = repo.pathobj
@@ -385,101 +388,16 @@ class Status(Interface):
         ds = require_dataset(
             dataset, check_installed=True, purpose='report status')
         ds_path = ds.path
-        paths_by_ds = OrderedDict()
-        if path:
-            # sort any path argument into the respective subdatasets
-            for p in sorted(map(ensure_unicode, ensure_list(path))):
-                # it is important to capture the exact form of the
-                # given path argument, before any normalization happens
-                # for further decision logic below
-                orig_path = str(p)
-                p = resolve_path(p, dataset)
-                # TODO(OPT)? YOH does not spot any optimization for paths under the same
-                # directory: if not isdir(path) - files would all have the same
-                # "root", and we could avoid doing full `get_dataset_root` check for
-                # those. Moreover, if some path points UNDER that path which isdir, and
-                # we have some other path already with the root above - we can just take
-                # the same. Altogether sounds like a logic duplicated with
-                # discover_dataset_trace_to_targets and even get_tree_roots
-                # of save.
-                root = get_dataset_root(str(p))
-                if root is None:
-                    # no root, not possibly underneath the refds
-                    yield dict(
-                        action='status',
-                        path=p,
-                        refds=ds_path,
-                        status='error',
-                        message='path not underneath this dataset',
-                        logger=lgr)
-                    continue
-                else:
-                    if dataset and root == str(p) and \
-                            not (orig_path.endswith(op.sep) or
-                                 # Note: Compare to Dataset(root).path rather
-                                 # than root to get same path normalization.
-                                 Dataset(root).path == ds_path):
-                        # the given path is pointing to a dataset
-                        # distinguish rsync-link syntax to identify
-                        # the dataset as whole (e.g. 'ds') vs its
-                        # content (e.g. 'ds/')
-                        super_root = get_dataset_root(op.dirname(root))
-                        if super_root:
-                            # the dataset identified by the path argument
-                            # is contained in a superdataset, and no
-                            # trailing path separator was found in the
-                            # argument -> user wants to address the dataset
-                            # as a whole (in the superdataset)
-                            root = super_root
-
-                root = ut.Path(root)
-                ps = paths_by_ds.get(root, [])
-                ps.append(p)
-                paths_by_ds[root] = ps
-        else:
-            paths_by_ds[ds.pathobj] = None
-
         queried = set()
         content_info_cache = {}
-        while paths_by_ds:
-            qdspath, qpaths = paths_by_ds.popitem(last=False)
-            if qpaths and qdspath in qpaths:
-                # this is supposed to be a full query, save some
-                # cycles sifting through the actual path arguments
-                qpaths = []
-            # try to recode the dataset path wrt to the reference
-            # dataset
-            # the path that it might have been located by could
-            # have been a resolved path or another funky thing
-            qds_inrefds = path_under_rev_dataset(ds, qdspath)
-            if qds_inrefds is None:
-                # nothing we support handling any further
-                # there is only a single refds
-                yield dict(
-                    path=str(qdspath),
-                    refds=ds_path,
-                    action='status',
-                    status='error',
-                    message=(
-                        "dataset containing given paths is not underneath "
-                        "the reference dataset %s: %s",
-                        ds, qpaths),
-                    logger=lgr,
-                )
+        for res in _yield_paths_by_ds(ds, dataset, ensure_list(path)):
+            if 'status' in res:
+                # this is an error
+                yield res
                 continue
-            elif qds_inrefds != qdspath:
-                # the path this dataset was located by is not how it would
-                # be referenced underneath the refds (possibly resolved
-                # realpath) -> recode all paths to be underneath the refds
-                qpaths = [qds_inrefds / p.relative_to(qdspath) for p in qpaths]
-                qdspath = qds_inrefds
-            if qdspath in queried:
-                # do not report on a single dataset twice
-                continue
-            qds = Dataset(str(qdspath))
             for r in yield_dataset_status(
-                    qds,
-                    qpaths,
+                    res['ds'],
+                    res['paths'],
                     annex,
                     untracked,
                     recursion_limit
@@ -490,11 +408,12 @@ class Status(Interface):
                     None,
                     content_info_cache,
                     reporting_order='depth-first'):
+                if 'status' not in r:
+                    r['status'] = 'ok'
                 yield dict(
                     r,
                     refds=ds_path,
                     action='status',
-                    status='ok',
                 )
 
     @staticmethod
@@ -557,3 +476,144 @@ class Status(Interface):
                for r in results):
             from datalad.ui import ui
             ui.message("nothing to save, working tree clean")
+
+
+def get_paths_by_ds(refds, dataset_arg, paths, subdsroot_mode='rsync'):
+    """Resolve and sort any paths into their containing datasets
+
+    Any path will be associated (sorted into) its nearest containing dataset.
+    It is irrelevant whether or not a path presently exists on the file system.
+    However, only datasets that exist on the file system are used for
+    sorting/association -- known, but non-existent subdatasets are not
+    considered.
+
+    Parameters
+    ----------
+    refds: Dataset
+    dataset_arg: Dataset or str or Path or None
+      Any supported value given to a command's `dataset` argument. Given
+      to `resolve_path()`.
+    paths: list
+      Any number of absolute or relative paths, in str-form or as
+      Path instances, to be sorted into their respective datasets. See also
+      the `subdsroot_mode` parameter.
+    subdsroot_mode: {'rsync', 'super', 'sub'}
+      Switch behavior for paths that are the root of a subdataset. By default
+      ('rsync'), such a path is associated with its parent/superdataset,
+      unless the path ends with a trailing directory separator, in which case
+      it is sorted into the subdataset record (this resembles the path
+      semantics of rsync, hence the label). In 'super' mode, the path is always
+      placed with the superdataset record. Likewise, in 'sub' mode the path
+      is always placed into the subdataset record.
+
+    Returns
+    -------
+    dict, list
+      The first return value is the main result, a dictionary with root
+      directories of all discovered datasets as keys and a list of the
+      associated paths inside these datasets as values.  Keys and values are
+      normalized to be Path instances of absolute paths.
+      The second return value is a list of all paths (again Path instances)
+      that are not located underneath the reference dataset.
+    """
+    ds_path = refds.path
+    paths_by_ds = OrderedDict()
+    errors = []
+
+    if not paths:
+        # that was quick
+        paths_by_ds[refds.pathobj] = None
+        return paths_by_ds, errors
+
+    # in order to guarantee proper path sorting, we first need to resolve all
+    # of them (some may be str, some Path, some relative, some absolute)
+    # step 1: normalize to unicode
+    paths = map(ensure_unicode, paths)
+    # step 2: resolve
+    # for later comparison, we need to preserve the original value too
+    paths = [(resolve_path(p, dataset_arg), str(p)) for p in paths]
+    # sort any path argument into the respective subdatasets
+    # sort by comparing the resolved Path instances, this puts top-level
+    # paths first, leading to their datasets to be injected into the result
+    # dict first
+    for p, orig_path in sorted(paths, key=lambda x: x[0]):
+        # TODO(OPT)? YOH does not spot any optimization for paths under the same
+        # directory: if not isdir(path) - files would all have the same
+        # "root", and we could avoid doing full `get_dataset_root` check for
+        # those. Moreover, if some path points UNDER that path which isdir, and
+        # we have some other path already with the root above - we can just take
+        # the same. Altogether sounds like a logic duplicated with
+        # discover_dataset_trace_to_targets and even get_tree_roots
+        # of save.
+        str_p = str(p)
+        # the dataset root containing the path in question
+        root = get_dataset_root(str_p)
+        # to become the root of the dataset that contains the path in question
+        # in the context of (same basepath) as the reference dataset
+        qds_inrefds = None
+        if root is not None:
+            qds_inrefds = path_under_rev_dataset(refds, root)
+        if root is None or qds_inrefds is None:
+            # no root, not possibly underneath the refds
+            # or root that is not underneath/equal the reference dataset root
+            errors.append(p)
+            continue
+
+        if root != qds_inrefds:
+            # try to recode the dataset path wrt to the reference
+            # dataset
+            # the path that it might have been located by could
+            # have been a resolved path or another funky thing
+            # the path this dataset was located by is not how it would
+            # be referenced underneath the refds (possibly resolved
+            # realpath) -> recode all paths to be underneath the refds
+            p = qds_inrefds / p.relative_to(root)
+            root = qds_inrefds
+
+        # Note: Compare to Dataset(root).path rather
+        # than root to get same path normalization.
+        if root == str_p and not Dataset(root).path == ds_path and (
+                subdsroot_mode == 'super' or (
+                subdsroot_mode == 'rsync' and dataset_arg and
+                not orig_path.endswith(op.sep))):
+            # the given path is pointing to a subdataset
+            # and we are either in 'super' mode, or in 'rsync' and found
+            # rsync-link syntax to identify the dataset as whole
+            # (e.g. 'ds') vs its content (e.g. 'ds/')
+            super_root = get_dataset_root(op.dirname(root))
+            if super_root:
+                # the dataset identified by the path argument
+                # is contained in a superdataset, and no
+                # trailing path separator was found in the
+                # argument -> user wants to address the dataset
+                # as a whole (in the superdataset)
+                root = super_root
+
+        root = ut.Path(root)
+        ps = paths_by_ds.get(root, [])
+        ps.append(p)
+        paths_by_ds[root] = ps
+    return paths_by_ds, errors
+
+
+def _yield_paths_by_ds(refds, dataset_arg, paths):
+    """Status-internal helper to yield get_paths_by_ds() items"""
+    paths_by_ds, errors = get_paths_by_ds(refds, dataset_arg, paths)
+    # communicate all the problems
+    for e in errors:
+        yield dict(
+            path=str(e),
+            action='status',
+            refds=refds.path,
+            status='error',
+            message=('path not underneath the reference dataset %s',
+                     refds.path),
+            logger=lgr)
+
+    while paths_by_ds:
+        qdspath, qpaths = paths_by_ds.popitem(last=False)
+        if qpaths and qdspath in qpaths:
+            # this is supposed to be a full status query, save some
+            # cycles sifting through the actual path arguments
+            qpaths = []
+        yield dict(ds=Dataset(qdspath), paths=qpaths)

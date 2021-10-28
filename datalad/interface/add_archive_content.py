@@ -281,7 +281,7 @@ class AddArchiveContent(Interface):
                 on_failure='ignore',
                 result_renderer='disabled'):
             if s['status'] == 'error':
-                if s['message'] == 'path not underneath this dataset':
+                if 'path not underneath the reference dataset %s' in s['message']:
                     yield get_status_dict(
                         ds=ds,
                         status='impossible',
@@ -333,8 +333,7 @@ class AddArchiveContent(Interface):
             # TODO: support adding archives content from outside the annex/repo
             origin = 'archive'
             # can become get_file_annexinfo once #6104 is merged
-            files = annex.get_content_annexinfo([check_path], init=None)
-            key = files.get(annex.pathobj / check_path, {}).get('key')
+            key = annex.get_file_annexinfo(check_path)['key']
             if not key:
                 raise RuntimeError(
                     f"Archive must be an annexed file in {ds}")

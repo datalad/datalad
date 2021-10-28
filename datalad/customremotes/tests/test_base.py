@@ -46,7 +46,8 @@ def test_get_contentlocation(tdir):
     repo.add('file.dat')
     repo.commit('added file.dat')
 
-    key = repo.get_file_key('file.dat')
+    # TODO contentlocation would come with eval_availability=True
+    key = repo.get_file_annexinfo('file.dat')['key']
     cr = AnnexCustomRemote(tdir)
     key_path = cr.get_contentlocation(key, absolute=False)
     assert not isabs(key_path)
