@@ -12,12 +12,24 @@
 import asyncio
 import logging
 import warnings
+from collections import deque
 from locale import getpreferredencoding
 
 from .exception import CommandError
 from .utils import ensure_unicode
 
 lgr = logging.getLogger('datalad.runner.protocol')
+
+
+class GeneratorMixIn:
+
+    generator = True
+
+    def __init__(self):
+        self.result_queue = deque()
+
+    def send_result(self, result):
+        self.result_queue.append(result)
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
@@ -36,6 +48,8 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     proc_out = None
     proc_err = None
+
+    generator = None
 
     def __init__(self, done_future=None, encoding=None):
         """
