@@ -37,7 +37,10 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import build_doc
 from datalad.interface.utils import eval_results
 from datalad.interface.results import get_status_dict
-from datalad.log import logging
+from datalad.log import (
+    logging,
+    log_progress,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureNone,
@@ -422,9 +425,16 @@ class AddArchiveContent(Interface):
         stats = ActivityStats()
 
         try:
+            # keep track of extracted files for progress bar logging
+            file_counter = 0
             # iterative over all files in the archive
             extracted_files = list(earchive.get_extracted_files())
             for extracted_file in extracted_files:
+                file_counter += 1
+                log_progress(
+                    lgr.info, 'archive-content', 'Extracting archive',
+                    label="Extracting archive",
+                    update=file_counter, total=len(extracted_files))
                 stats.files += 1
                 extracted_path = Path(earchive.path) / Path(extracted_file)
 
@@ -652,6 +662,9 @@ class AddArchiveContent(Interface):
                 # don't commit upon completion
                 pass
         finally:
+            # take down the progress bar
+            log_progress(
+                lgr.info, 'archive-content', 'Finished extraction')
             # since we batched addurl, we should close those batched processes
             # if haven't done yet.  explicitly checked to avoid any possible
             # "double-action"
