@@ -159,7 +159,7 @@ def _test_initremote_basic(host, ds_path, store, link):
             # annex too old - doesn't know --sameas
             pass
         else:
-            raise 
+            raise
     # TODO: - check output of failures to verify it's failing the right way
     #       - might require to run initremote directly to get the output
 
@@ -345,6 +345,11 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         # now fsck the new remote to get the new special remote indexed
         ds.repo.fsck(remote='archive', fast=True)
         assert_equal(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
+        # test creating an archive with filters on files
+        ds.export_archive_ora(archive_dir / 'archive2.7z', annex_wanted='include=*.txt')
+        # test with wanted expression of a specific remote
+        ds.repo.set_preferred_content("wanted", "include=subdir/*", remote="store")
+        ds.export_archive_ora(archive_dir / 'archive3.7z', remote="store")
 
 
 @slow  # 12sec + ? on travis
