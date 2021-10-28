@@ -137,6 +137,9 @@ class ExportArchiveORA(Interface):
         else:
             archive.parent.mkdir(exist_ok=True, parents=True)
 
+        if isinstance(froms, str):
+            froms = [froms]
+
         if not opts:
             # uncompressed by default
             opts = ['-mx0']
