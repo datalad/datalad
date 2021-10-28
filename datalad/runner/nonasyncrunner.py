@@ -19,7 +19,6 @@ from queue import (
 )
 from typing import (
     Any,
-    Callable,
     Dict,
     IO,
     List,
@@ -50,30 +49,40 @@ STDOUT_FILENO = 1
 STDERR_FILENO = 2
 
 
+# TODO: add state for pipe_data, process_exited, and connection_lost
 class _ResultIterator:
     def __init__(self,
-                 result_queue: deque,
-                 result_getter: Callable,
-                 result_getter_args: List,
-                 result_getter_kwargs: Dict,
+                 runner: "ThreadedRunner",
+                 result_queue: deque
                  ):
+        self.runner = runner
         self.result_queue = result_queue
-        self.result_getter = result_getter
-        self.result_getter_args = result_getter_args
-        self.result_getter_kwargs = result_getter_kwargs
+        self.return_code = None
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        while not self.result_getter_kwargs["active_threads"].empty() and len(self.result_queue) == 0:
-            self.result_getter(*self.result_getter_args, **self.result_getter_kwargs)
+        active_files = self.runner.active_file_numbers
+
+        if len(self.result_queue) == 0 and not active_files:
+            raise StopIteration
+
+        while len(self.result_queue) == 0 and active_files:
+            self.runner.process_queue()
 
         if len(self.result_queue) > 0:
             return self.result_queue.popleft()
         else:
-            self.result_getter_kwargs["process"].wait()
-            return self.result_getter_kwargs["process"].wait()
+            # If the result queue is still empty, there are no more file
+            # numbers and no more message from the protocol
+            self.runner.process.wait()
+            self.return_code = self.runner.process.poll()
+
+            self.runner.protocol.process_exited()
+            self.runner.protocol.connection_lost(None)  # TODO: check exception
+
+            raise StopIteration(self.return_code)
 
 
 class ThreadedRunner:
@@ -248,10 +257,12 @@ class ThreadedRunner:
                 self.stdin_enqueueing_thread.start()
 
         if issubclass(self.protocol_class, GeneratorMixIn):
-            pass
+            assert isinstance(self.protocol, GeneratorMixIn)
+            return _ResultIterator(self, self.protocol.result_queue)
         else:
             while self.active_file_numbers:
                 self.process_queue()
+
             self.process.wait()
             result = self.protocol._prepare_result()
             self.protocol.process_exited()
