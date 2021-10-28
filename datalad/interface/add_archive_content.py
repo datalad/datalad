@@ -27,7 +27,7 @@ from os.path import (
 from os.path import sep as opsep
 
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
-from datalad.customremotes.base import init_datalad_remote
+from datalad.customremotes.base import ensure_datalad_remote
 from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
@@ -397,13 +397,10 @@ class AddArchiveContent(Interface):
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True
         earchive = annexarchive.cache[key_rpath]
+        # make sure there is an enabled datalad-archives special remote
+        ensure_datalad_remote(ds.repo, remote=ARCHIVES_SPECIAL_REMOTE,
+                              autoenable=True)
 
-        # TODO: check if may be it was already added
-        if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
-            init_datalad_remote(annex, ARCHIVES_SPECIAL_REMOTE, autoenable=True)
-        else:
-            # no need to init the special remote, it already exists
-            lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
         precommitted = False
         old_always_commit = annex.always_commit
         # batch mode is disabled when faking dates, we want to always commit
