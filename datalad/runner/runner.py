@@ -18,6 +18,7 @@ import warnings
 from .coreprotocols import NoCapture
 from .exception import CommandError
 from .nonasyncrunner import run_command
+from .protocol import GeneratorMixIn
 from .utils import (
     auto_repr,
     ensure_unicode,
@@ -123,7 +124,7 @@ class WitlessRunner(object):
         )
 
         lgr.debug('Run %r (cwd=%s)', cmd, cwd)
-        results = run_command(
+        results_or_iterator = run_command(
             cmd,
             protocol,
             stdin,
@@ -131,6 +132,11 @@ class WitlessRunner(object):
             cwd=cwd,
             env=env,
         )
+
+        if issubclass(protocol, GeneratorMixIn):
+            return results_or_iterator
+        else:
+            results = results_or_iterator
 
         # log before any exception is raised
         lgr.debug("Finished %r with status %s", cmd, results['code'])
