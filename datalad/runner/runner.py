@@ -10,21 +10,12 @@
 """
 
 import logging
-import os
-import subprocess
-import tempfile
-import warnings
 
 from .coreprotocols import NoCapture
 from .exception import CommandError
 from .nonasyncrunner import run_command
 from .protocol import GeneratorMixIn
-from .utils import (
-    auto_repr,
-    ensure_unicode,
-    try_multiple,
-    unlink,
-)
+
 
 lgr = logging.getLogger('datalad.runner.runner')
 
@@ -80,9 +71,16 @@ class WitlessRunner(object):
           Protocol class handling interaction with the running process
           (e.g. output capture). A number of pre-crafted classes are
           provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
-        stdin : byte stream, optional
-          File descriptor like, or bytes objects used as stdin for the process.
-          Passed verbatim to run_command().
+          If the protocol has the GeneratorMixIn-mixin, the run-method
+          will return an iterator and can therefore be used in a for-clause.
+        stdin : file-like, string, bytes, Queue, or None
+          If stdin is a file-like, it will be directly used as stdin for the
+          subprocess. The caller is resonsible for writing to it and closing it.
+          If stdin is a string or bytes, those will be fed to stdin of the
+          subprocess. If all data is written, stdin will be closed.
+          If stdin is a Queue, all elements (bytes) put into the Queue will
+          be passed to stdin until None is read from the queue. If None is read,
+          stdin of the subprocess is closed.
         cwd : path-like, optional
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise. Overrides
@@ -99,9 +97,33 @@ class WitlessRunner(object):
         Returns
         -------
         dict
+          If the protocol does not have a GeneratorMixIn-mixin, the
+          result will be a dictionary.
           At minimum there will be keys 'stdout', 'stderr' with
           unicode strings of the cumulative standard output and error
           of the process as values.
+
+        Generator
+            If the protocol has a GeneratorMixIn-mixin, a Generator will be
+            returned. This allows to use this function in constructs like:
+
+                for protocol_output in runner.run():
+                    ...
+
+            Where the iterator yields whatever protocol.pipe_data_received
+            sends into the generator.
+            If all output was yielded and the process has terminated, the
+            generator will raise StopIteration(return_code), where
+            return_code is the return code of the process. The return code
+            of the process will also be stored in the "return_code"-attribute
+            of the runner. So you could write:
+
+               gen = runner.run()
+               for file_descriptor, data in gen:
+                   ...
+
+               # get the return code of the process
+               result = gen.return_code
 
         Raises
         ------
