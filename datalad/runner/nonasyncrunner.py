@@ -10,6 +10,7 @@
 Thread based subprocess execution with stdout and stderr passed to protocol objects
 """
 
+import enum
 import logging
 import subprocess
 from collections import deque
@@ -52,6 +53,12 @@ STDERR_FILENO = 2
 
 # TODO: add state for pipe_data, process_exited, and connection_lost
 class _ResultGenerator(Generator):
+
+    class GeneratorState(enum.Enum):
+        process_running = 0
+        process_exited = 1
+        connection_lost = 2
+
     def __init__(self,
                  runner: "ThreadedRunner",
                  result_queue: deque
@@ -61,27 +68,42 @@ class _ResultGenerator(Generator):
         self.runner = runner
         self.result_queue = result_queue
         self.return_code = None
+        self.state = self.GeneratorState.process_running
 
     def send(self, _):
-        active_files = self.runner.active_file_numbers
+        if self.state == self.GeneratorState.process_running:
 
-        if len(self.result_queue) == 0 and not active_files:
-            raise StopIteration
+            # if the result queue is empty and no more reading/writing
+            # threads are active, progress to next state
+            if len(self.result_queue) == 0 and not self.runner.active_file_numbers:
+                self.runner.process.wait()
+                self.return_code = self.runner.process.poll()
+                self.runner.protocol.process_exited()
+                self.state = self.GeneratorState.process_exited
+            else:
+                # If we have no results in the queue, but still active
+                # reading/writing threads, wait on the threaded runner queue
+                while len(self.result_queue) == 0 and self.runner.active_file_numbers:
+                    self.runner.process_queue()
+                if len(self.result_queue) > 0:
+                    return self.result_queue.popleft()
+                else:
+                    self.runner.process.wait()
+                    self.return_code = self.runner.process.poll()
+                    self.runner.protocol.process_exited()
+                    self.state = self.GeneratorState.process_exited
 
-        while len(self.result_queue) == 0 and active_files:
-            self.runner.process_queue()
+        if self.state == self.GeneratorState.process_exited:
+            if len(self.result_queue) > 0:
+                return self.result_queue.popleft()
+            else:
+                # TODO: check exception
+                self.runner.protocol.connection_lost(None)
+                self.state = self.GeneratorState.connection_lost
 
-        if len(self.result_queue) > 0:
-            return self.result_queue.popleft()
-        else:
-            # If the result queue is still empty, there are no more file
-            # numbers and no more message from the protocol
-            self.runner.process.wait()
-            self.return_code = self.runner.process.poll()
-
-            self.runner.protocol.process_exited()
-            self.runner.protocol.connection_lost(None)  # TODO: check exception
-
+        if self.state == self.GeneratorState.connection_lost:
+            if len(self.result_queue) > 0:
+                return self.result_queue.popleft()
             raise StopIteration(self.return_code)
 
     def throw(self, exception_type, value=None, trace_back=None):
@@ -135,10 +157,16 @@ class ThreadedRunner:
             is a str, `subprocess.Popen will be called with `shell=True`.
         protocol : WitlessProtocol class or subclass which will be
             instantiated for managing communication with the subprocess.
-        stdin : file-like, subprocess.PIPE, str, bytes or None
-            Passed to the subprocess as its standard input. In the case of a str
-            or bytes objects, the subprocess stdin is set to subprocess.PIPE
-            and the given input is written to it after the process has started.
+            If the protocol has the GeneratorMixIn-mixin, the run-method
+            will return an iterator and can therefore be used in a for-clause.
+        stdin : file-like, string, bytes, Queue, or None
+            If stdin is a file-like, it will be directly used as stdin for the
+            subprocess. The caller is resonsible for writing to it and closing
+            it. If stdin is a string or bytes, those will be fed to stdin of the
+            subprocess. If all data is written, stdin will be closed.
+            If stdin is a Queue, all elements (bytes) put into the Queue will
+            be passed to stdin until None is read from the queue. If None is
+            read, stdin of the subprocess is closed.
         protocol_kwargs : dict, optional
             Passed to the Protocol class constructor.
         popen_kwargs : Pass to `subprocess.Popen`, will typically be parameters
@@ -153,14 +181,26 @@ class ThreadedRunner:
             of protocol._prepare_result will be returned.
 
         Generator
-            If the protocol has a GeneratorMixIn-mixin, an iterator will be
+            If the protocol has a GeneratorMixIn-mixin, a Generator will be
             returned. This allows to use this function in constructs like:
 
-                for i in threaded_runner.run():
+                for protocol_output in runner.run():
                     ...
 
-            Where the iterator yield output from stdout, stderr, or the
-            result of the process
+            Where the iterator yields whatever protocol.pipe_data_received
+            sends into the generator.
+            If all output was yielded and the process has terminated, the
+            generator will raise StopIteration(return_code), where
+            return_code is the return code of the process. The return code
+            of the process will also be stored in the "return_code"-attribute
+            of the runner. So you could write:
+
+               gen = runner.run()
+               for file_descriptor, data in gen:
+                   ...
+
+               # get the return code of the process
+               result = gen.return_code
         """
 
         if isinstance(self.stdin, (int, IO, type(None))):
@@ -185,7 +225,9 @@ class ThreadedRunner:
             # file-like and write to it from a different thread.
             lgr.warning(f"unknown instance class: {type(self.stdin)}, "
                         f"assuming file-like input: {self.stdin}")
-            self.write_stdin = False  # the caller will write to the parameter
+            # We assume that the caller will write to the given
+            # file descriptor.
+            self.write_stdin = False
 
         self.protocol = self.protocol_class(**self.protocol_kwargs)
 
