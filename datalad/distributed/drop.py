@@ -159,12 +159,11 @@ class Drop(Interface):
                 **res_props)
             # we are not returning, a caller could decide on failure mode
 
-        if what == 'all':
-            cwd = ds.pathobj.cwd()
-            if any(d == cwd or d in cwd.parents for d in paths_by_ds.keys()):
-                raise RuntimeError(
-                    'refuse to perform actions that would remove the current '
-                    'working directory')
+        if what in ('all', 'datasets') and _paths_atunder_dir(
+                paths_by_ds, ds.pathobj.cwd()):
+            raise RuntimeError(
+                'refuse to perform actions that would remove the current '
+                'working directory')
 
         lgr.debug('Discovered %i datasets to drop (from)', len(paths_by_ds))
 
@@ -187,6 +186,27 @@ class Drop(Interface):
                 yield dict(res, **res_props)
             lgr.debug('Finished dropping %s at %s', what, d)
         return
+
+
+def _paths_atunder_dir(pbd, dirpath):
+    """Whether any of the paths is at or under a reference path
+
+    Parameters
+    ----------
+    pbd: dict
+      Dataset path dict is produced by get_paths_by_ds()
+    dirpath: Path
+      Reference path
+
+    Returns
+    -------
+    bool
+    """
+    for dpath, paths in pbd.items():
+        for p in ([dpath] if paths is None else paths):
+            if p == dirpath or p in dirpath.parents:
+                return True
+    return False
 
 
 def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
@@ -222,7 +242,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 jobs=jobs)
 
     if not ds.pathobj.exists():
-        # basic protection against something hvaing wiped it out already.
+        # basic protection against something having wiped it out already.
         # should not happen, but better than a crash, if it does
         yield dict(
             action='drop',
