@@ -232,6 +232,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 bottomup=True,
                 result_xfm='datasets',
                 on_failure='ignore',
+                return_type='generator',
                 result_renderer='disabled'):
             yield from _drop_dataset(
                 ds=sub,
@@ -438,6 +439,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
                 # recursion is handled outside this function
                 recursive=False,
                 result_renderer='disabled',
+                return_type='generator',
                 on_failure='ignore'):
             state = res.get('state')
             if state == 'clean':
