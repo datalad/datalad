@@ -13,45 +13,44 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+from itertools import chain
 
 from os.path import (
-    exists,
-    join as opj,
-    pardir,
-    relpath,
+    lexists,
 )
-from datalad.utils import rmdir
+from datalad.utils import (
+    ensure_list,
+    rmdir,
+)
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.constraints import (
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
 from datalad.support.gitrepo import GitRepo
-from datalad.distribution.dataset import Dataset, \
-    datasetmethod
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
+from datalad.distribution.dataset import (
+    datasetmethod,
+    require_dataset,
+)
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import (
-    if_dirty_opt,
+    jobs_opt,
     nosave_opt,
-    recursion_flag,
     save_message_opt,
 )
 from datalad.interface.utils import (
-    path_is_under,
     eval_results,
 )
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.core.local.save import Save
-from datalad.distribution.drop import (
-    check_argument,
-    dataset_argument,
-    _drop_files,
-)
 from datalad.distribution.uninstall import (
-    _uninstall_dataset,
-    Uninstall,
+    dataset_argument,
 )
+from datalad.distributed.drop import (
+    Drop,
+)
+from datalad.core.local.status import get_paths_by_ds
+from datalad.core.local.save import Save
 
 
 lgr = logging.getLogger('datalad.distribution.remove')
@@ -82,12 +81,22 @@ class Remove(Interface):
             doc="path/name of the component to be removed",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        recursive=recursion_flag,
-        check=check_argument,
+        what=Parameter(
+            args=("--what",),
+            doc="""""",
+            constraints=EnsureChoice('datasets', 'all')),
+        recursive=Parameter(
+            args=("--recursive", '-r',),
+            doc="""DPERECATED and IGNORED"""),
+        jobs=jobs_opt,
+        # XXX deprecate!
         save=nosave_opt,
         message=save_message_opt,
-        if_dirty=if_dirty_opt,
     )
+    # inherit some from Drop
+    # if_dirty and check as deprecated
+    for p in ('reckless', 'if_dirty', 'check',):
+        _params_[p] = Drop._params_[p]
 
     _examples_ = [
         dict(text="Permanently remove a subdataset from a dataset and wipe out "
@@ -110,212 +119,97 @@ class Remove(Interface):
     def __call__(
             path=None,
             dataset=None,
-            recursive=False,
-            check=True,
-            save=True,
+            what='all',
+            reckless=None,
             message=None,
+            jobs=None,
+            # deprecated below
+            recursive=None,
+            check=None,
+            save=None,
             if_dirty='save-before'):
-        res_kwargs = dict(action='remove', logger=lgr)
-        if not dataset and not path:
-            raise InsufficientArgumentsError(
-                "insufficient information for `remove`: requires at least a path or dataset")
-        refds_path = Interface.get_refds_path(dataset)
-        res_kwargs['refds'] = refds_path
-        if refds_path and not path and not GitRepo.is_valid_repo(refds_path):
-            # nothing here, nothing to remove
-            yield get_status_dict(path=refds_path, status='notneeded', **res_kwargs)
-            return
-        if refds_path and not path:
-            # act on the whole dataset if nothing else was specified
-            # TODO i think that would happen automatically in annotation?
-            path = refds_path
 
-        to_process = []
+        # deprecate checks
+        if check is False:
+            reckless = 'availability'
 
-        for ap in AnnotatePaths.__call__(
+        refds = require_dataset(dataset, check_installed=True,
+                                purpose='remove')
+        # same path resolution that drop will do
+        paths_by_ds, errors = get_paths_by_ds(
+            refds, dataset, ensure_list(path),
+            # super-mode will readily tell us which datasets to
+            # save as the end
+            subdsroot_mode='super')
+
+        drop_success = True
+        for res in Drop.__call__(
+                dataset=dataset,
                 path=path,
-                dataset=refds_path,
-                recursive=recursive,
-                # we only ever want to discover immediate subdatasets, the rest
-                # will happen in `uninstall`
-                recursion_limit=1,
-                action='remove',
-                unavailable_path_status='',
-                nondataset_path_status='error',
+                what=what,
+                reckless=reckless,
+                recursive=True,
+                recursion_limit=None,
+                jobs=jobs,
+                result_xfm=None,
                 return_type='generator',
+                result_renderer='disabled',
+                # delegate error handling here
                 on_failure='ignore'):
-            if ap.get('status', None):
-                # this is done
-                yield ap
-                continue
-            if ap.get('state', None) == 'absent' and \
-                    ap.get('parentds', None) is None:
-                # nothing exists at location, and there is no parent to
-                # remove from
-                ap['status'] = 'notneeded'
-                ap['message'] = "path does not exist and is not in a dataset"
-                yield ap
-                continue
-            if ap.get('raw_input', False) and ap.get('type', None) == 'dataset':
-                # make sure dataset sorting yields a dedicted entry for this one
-                ap['process_content'] = True
-            to_process.append(ap)
+            if res.get('status') not in ('ok', 'notneeded'):
+                drop_success = False
+            yield res
 
-        if not to_process:
-            # nothing left to do, potentially all errored before
+        if not drop_success:
+            # there will be 'rm -rf' below, so play safe
+            lgr.debug('Observed drop failure, will not attempt remove')
             return
 
-        if path_is_under([ap['path'] for ap in to_process]):
-            # behave like `rm` and refuse to remove where we are
-            raise ValueError(
-                "refusing to uninstall current or parent directory")
+        for dpath, paths in paths_by_ds.items():
+            for delpath in ([dpath] if paths is None else paths):
+                if lexists(str(delpath)):
+                    # here we still have something around on the
+                    # filesystem. There is no need to fiddle with
+                    # Git, just wipe it out. A later save() will
+                    # act on it properly
+                    if delpath.is_dir():
+                        lgr.debug('Remove directory: %s', delpath)
+                        rmdir(delpath)
+                    # cannot use .exists() must forsee dead symlinks
+                    else:
+                        lgr.debug('Remove file: %s', delpath)
+                        delpath.unlink()
+                    continue
+                # if we get here, there is nothing on the file system
+                # anymore at this path. Either because the parent
+                # dataset vanished already, or because we dropped a
+                # dataset, and it still needs to be unregistered
+                # from its parent -> `git rm`
+                if dpath.exists():
+                    GitRepo.call_git(
+                        # no need for recursion, we know that even the root
+                        # path not longer exists
+                        ['rm', '-q'],
+                        files=[str(delpath.relative_to(dpath))]
+                    )
+                    # this path was already being removed by drop
+                    # so it must belong to a dropped dataset
+                    pass
 
-        # now sort into datasets so we can process them one by one
-        content_by_ds, ds_props, completed, nondataset_paths = \
-            annotated2content_by_ds(
-                to_process,
-                refds_path=refds_path)
-        assert(not completed)
-
-        # iterate over all datasets, starting at the bottom
-        # to make the removal of dataset content known upstairs
-        to_save = []
-        # track which submodules we have removed in the process, to avoid
-        # failure in case we revisit them due to a subsequent path argument
-        subm_removed = []
-        for ds_path in sorted(content_by_ds, reverse=True):
-            ds = Dataset(ds_path)
-            paths = content_by_ds[ds_path]
-            to_reporemove = dict()
-            # PLAN any dataset that was not raw_input, uninstall (passing recursive flag)
-            # if dataset itself is in paths, skip any nondataset
-            # sort reverse so we get subdatasets first
-            for ap in sorted(paths, key=lambda x: x['path'], reverse=True):
-                if ap.get('type', None) == 'dataset':
-                    # entire dataset needs to go, uninstall if present, pass recursive!
-                    uninstall_failed = False
-                    if ap['path'] == refds_path or \
-                            (refds_path is None and ap.get('raw_input', False)):
-                        # top-level handling, cannot use regular uninstall call, as
-                        # it will refuse to uninstall a top-level dataset
-                        # and rightfully so, it is really a remove in that case
-                        # bypass all the safety by using low-level helper
-                        for r in _uninstall_dataset(ds, check=check, has_super=False,
-                                                    **res_kwargs):
-                            if r['status'] in ('impossible', 'error'):
-                                # we need to inspect if something went wrong, in order
-                                # to prevent failure from removing a non-empty dir below,
-                                # but at the same time allow for continued processing
-                                uninstall_failed = True
-                            r['refds'] = refds_path
-                            yield r
-                    # recheck that it wasn't removed during a previous iteration
-                    elif ap.get('state', None) != 'absent' and GitRepo.is_valid_repo(ap['path']):
-                        # anything that is not the top-level -> regular uninstall
-                        # this is for subdatasets of the to-be-removed dataset
-                        # we want to simply uninstall them in a regular manner
-                        for r in Uninstall.__call__(
-                                ap['path'],
-                                dataset=refds_path, recursive=recursive, check=check,
-                                if_dirty=if_dirty, result_xfm=None, result_filter=None,
-                                on_failure='ignore'):
-                            if r['status'] in ('impossible', 'error'):
-                                # we need to inspect if something went wrong, in order
-                                # to prevent failure from removing a non-empty dir below,
-                                # but at the same time allow for continued processing
-                                uninstall_failed = True
-                            yield r
-                    if not ap.get('raw_input', False):
-                        # we only ever want to actually unregister subdatasets that
-                        # were given explicitly
-                        continue
-                    if not uninstall_failed and \
-                            not ap['path'] in subm_removed and \
-                            refds_path and \
-                            ap.get('parentds', None) and \
-                            not (relpath(ap['path'], start=refds_path).startswith(pardir) or
-                                 ap['path'] == refds_path) and \
-                            ap.get('registered_subds', False):
-                        # strip from superdataset, but only if a dataset was given explcitly
-                        # as in "remove from this dataset", but not when just a path was given
-                        # as in "remove from the filesystem"
-                        subds_relpath = relpath(ap['path'], start=ap['parentds'])
-                        # remove submodule reference
-                        parentds = Dataset(ap['parentds'])
-                        # play safe, will fail on dirty
-                        parentds.repo.call_git(
-                            ['submodule', 'deinit'], files=[ap['path']])
-                        # remove now empty submodule link
-                        parentds.repo.remove(ap['path'])
-                        # make a record that we removed this already, should it be
-                        # revisited via another path argument, because do not reannotate
-                        # the paths after every removal
-                        subm_removed.append(ap['path'])
-                        yield dict(ap, status='ok', **res_kwargs)
-                        # need .gitmodules update in parent
-                        to_save.append(dict(
-                            path=opj(parentds.path, '.gitmodules'),
-                            parents=parentds.path,
-                            type='file'))
-                        # and the removal itself needs to be committed
-                        # inform `save` that it is OK that this path
-                        # doesn't exist on the filesystem anymore
-                        ap['unavailable_path_status'] = ''
-                        ap['process_content'] = False
-                        to_save.append(ap)
-                    if not uninstall_failed and exists(ap['path']):
-                        # could be an empty dir in case an already uninstalled subdataset
-                        # got removed
-                        rmdir(ap['path'])
-                else:
-                    # anything that is not a dataset can simply be passed on
-                    to_reporemove[ap['path']] = ap
-            # avoid unnecessary git calls when there is nothing to do
-            if to_reporemove:
-                if check and hasattr(ds.repo, 'drop'):
-                    for r in _drop_files(ds, list(to_reporemove),
-                                         check=True):
-                        if r['status'] == 'error':
-                            # if drop errored on that path, we can't remove it
-                            to_reporemove.pop(r['path'], 'avoidKeyError')
-                        yield r
-
-                if to_reporemove:
-                    for r in ds.repo.remove(list(to_reporemove), r=True):
-                        # these were removed, but we still need to save the
-                        # removal
-
-                        r_abs = opj(ds.path, r)
-                        if r_abs in to_reporemove:
-                            ap = to_reporemove[r_abs]
-                        else:
-                            ap = {'path': r_abs,
-                                  'parentds': ds.path,
-                                  'refds': refds_path
-                                  }
-                        ap['unavailable_path_status'] = ''
-                        to_save.append(ap)
-                        yield get_status_dict(
-                            status='ok',
-                            path=r,
-                            **res_kwargs)
-
-        if not to_save:
-            # nothing left to do, potentially all errored before
-            return
-        if not save:
-            lgr.debug('Not calling `save` as instructed')
+        if not refds.is_installed():
+            # we already dropped the whole thing
             return
 
         for res in Save.__call__(
-                path=[ap["path"] for ap in to_save],
+                dataset=dataset,
+                path=path,
                 # we might have removed the reference dataset by now, recheck
-                dataset=refds_path
-                        if (refds_path and GitRepo.is_valid_repo(refds_path))
-                        else None,
                 message=message if message else '[DATALAD] removed content',
                 return_type='generator',
                 result_xfm=None,
                 result_filter=None,
                 on_failure='ignore'):
+            if res.get('action') == 'delete':
+                # normalize to previous remove results
+                res['action'] = 'remove'
             yield res
