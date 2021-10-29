@@ -201,7 +201,8 @@ def test_annotate_paths(dspath, nodspath):
                                    unavailable_path_status='error')
     assert_result_count(before_res, 3, status='', type='dataset')
     uninstall_res = ds.uninstall(subdspath, recursive=True, check=False)
-    assert_result_count(uninstall_res, 3, status='ok', type='dataset')
+    # above does "kill", no deeper inspection anymore, only a single results
+    assert_result_count(uninstall_res, 1, status='ok', type='dataset')
     # after
     after_res = ds.annotate_paths(subdspath,
                                   unavailable_path_status='error',

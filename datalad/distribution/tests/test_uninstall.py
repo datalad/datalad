@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_status,
     assert_in,
+    assert_in_results,
     assert_repo_status,
     assert_result_count,
     assert_result_values_cond,
@@ -78,7 +79,7 @@ def test_uninstall_uninstalled(path):
     ds = Dataset(path)
     assert_raises(ValueError, ds.drop)
     assert_raises(ValueError, ds.uninstall)
-    assert_status('notneeded', ds.remove())
+    assert_raises(ValueError, ds.remove)
 
 
 @with_tempfile()
@@ -108,12 +109,15 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ok_(not subds2.is_installed())
     assert(exists(subds2.path))
-    res = ds.remove('two', check=False, result_xfm='datasets')
+    res = ds.remove('two', check=False)
+    assert_in_results(
+        res,
+        path=str(ds.pathobj / 'two'),
+        action='remove')
     assert_repo_status(ds.path)
     # subds2 was already uninstalled, now ds got the removal of subds2 saved
     assert(not exists(subds2.path))
     eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
-    eq_(res, [subds2, ds])
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:489
@@ -162,16 +166,12 @@ def test_uninstall_git_file(path):
         status='notneeded',
         message="no annex'ed content")
 
-    res = ds.uninstall(path="INFO.txt", on_failure='ignore')
-    # no matching subdataset, cannot uninstall a file
-    assert_result_count(res, 1, status='impossible')
-
     # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
                     result_filter=lambda x: x['action'] == 'remove')
     assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'INFO.txt')
     ok_(not exists(opj(path, 'INFO.txt')))
-    eq_(res, ['INFO.txt'])
+    eq_(res, [str(ds.pathobj / 'INFO.txt')])
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -271,7 +271,7 @@ def test_uninstall_dataset(path):
     # removing entire dataset, uninstall will refuse to act on top-level
     # datasets
     assert_raises(IncompleteResultsError, ds.uninstall)
-    ds.remove()
+    ds.remove(reckless='availability')
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -293,7 +293,8 @@ def test_remove_file_handle_only(path):
     path_two = ds.pathobj / 'two'
     ok_(path_two.exists())
     # remove one handle, should not affect the other
-    ds.remove('two', check=False, message="custom msg")
+    # what=dataset prevents the dropping of individual keys
+    ds.remove('two', what='dataset', message="custom msg")
     eq_(ds.repo.format_commit("%B").rstrip(), "custom msg")
     eq_(rpath_one, (ds.pathobj / 'one').resolve())
     ok_(rpath_one.exists())
@@ -302,9 +303,6 @@ def test_remove_file_handle_only(path):
     with chpwd(path):
         remove('one', check=False)
         ok_(not exists("one"))
-    # and we should be able to remove without saving
-    ds.remove('three', check=False, save=False)
-    ok_(ds.repo.dirty)
 
 
 @known_failure_windows
@@ -402,21 +400,15 @@ def test_kill(path):
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1'])
     assert_repo_status(ds.path)
 
-    # and we fail to remove since content can't be dropped
+    # and we fail to remove for many reasons
+    # - unpushed commits
+    # - a subdataset present
+    # - unique annex key
     res = ds.remove(on_failure='ignore')
     assert_result_count(
         res, 1,
-        status='error', path=testfile)
-    # Following two assertions on message are relying on the actual error.
-    # We have a second result with status 'impossible' for the ds, that we need
-    # to filter out for those assertions:
-    err_result = [r for r in res if r['status'] == 'error'][0]
-    assert_result_values_cond(
-        [err_result], 'message',
-        lambda x: "configured minimum number of copies not found" in x or
-        "Could only verify the existence of 0 out of 1 necessary cop" in x
-    )
-    eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
+        status='error', path=ds.path)
+    eq_(ds.remove(recursive=True, reckless='availability', result_xfm='datasets'),
         [subds, ds])
     ok_(not exists(path))
 
@@ -429,7 +421,7 @@ def test_remove_recreation(path):
     # see issue #1311
 
     ds = create(path)
-    ds.remove()
+    ds.remove(reckless='availability')
     ds = create(path)
     assert_repo_status(ds.path)
     ok_(ds.is_installed())
@@ -456,7 +448,7 @@ def test_remove_nowhining(path):
     # just install/clone inside of it
     subds_path = _path_(path, 'subds')
     install(subds_path, source=path)
-    remove(subds_path)  # should remove just fine
+    remove(dataset=subds_path)  # should remove just fine
 
 
 @usecase
