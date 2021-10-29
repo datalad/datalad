@@ -13,6 +13,7 @@ Thread based subprocess execution with stdout and stderr passed to protocol obje
 import logging
 import subprocess
 from collections import deque
+from collections.abc import Generator
 from queue import (
     Empty,
     Queue,
@@ -50,19 +51,18 @@ STDERR_FILENO = 2
 
 
 # TODO: add state for pipe_data, process_exited, and connection_lost
-class _ResultIterator:
+class _ResultGenerator(Generator):
     def __init__(self,
                  runner: "ThreadedRunner",
                  result_queue: deque
                  ):
+
+        super().__init__()
         self.runner = runner
         self.result_queue = result_queue
         self.return_code = None
 
-    def __iter__(self):
-        return self
-
-    def __next__(self):
+    def send(self, _):
         active_files = self.runner.active_file_numbers
 
         if len(self.result_queue) == 0 and not active_files:
@@ -83,6 +83,9 @@ class _ResultIterator:
             self.runner.protocol.connection_lost(None)  # TODO: check exception
 
             raise StopIteration(self.return_code)
+
+    def throw(self, exception_type, value=None, trace_back=None):
+        return Generator.throw(self, exception_type, value, trace_back)
 
 
 class ThreadedRunner:
@@ -149,7 +152,7 @@ class ThreadedRunner:
             If the protocol does not have a GeneratorMixIn-mixin, the result
             of protocol._prepare_result will be returned.
 
-        Iterator
+        Generator
             If the protocol has a GeneratorMixIn-mixin, an iterator will be
             returned. This allows to use this function in constructs like:
 
@@ -258,7 +261,7 @@ class ThreadedRunner:
 
         if issubclass(self.protocol_class, GeneratorMixIn):
             assert isinstance(self.protocol, GeneratorMixIn)
-            return _ResultIterator(self, self.protocol.result_queue)
+            return _ResultGenerator(self, self.protocol.result_queue)
         else:
             while self.active_file_numbers:
                 self.process_queue()
