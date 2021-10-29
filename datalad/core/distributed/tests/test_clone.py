@@ -124,7 +124,6 @@ def test_invalid_args(path, otherpath, alienpath):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir, ds_path):
@@ -143,7 +142,6 @@ def test_clone_crcns(tdir, ds_path):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir):
     tdir = Path(tdir)
