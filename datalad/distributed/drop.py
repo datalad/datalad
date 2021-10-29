@@ -86,7 +86,7 @@ class Drop(Interface):
             args=("--what",),
             doc="""""",
             # add 'unwanted'
-            constraints=EnsureChoice('filecontent', 'allkeys', 'all')),
+            constraints=EnsureChoice('filecontent', 'allkeys', 'datasets', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -144,11 +144,13 @@ class Drop(Interface):
             ds,
             dataset,
             ensure_list(path),
-            # XXX this needs more though!! Maybe this is what the mode should be
+            # XXX this needs more thought!! Maybe this is what the mode should be
             # in general?!
             # when we want to drop entire datasets, it is much more useful
             # to have subdatasets be their own record
-            subdsroot_mode='sub' if what == 'all' else 'rsync',
+            subdsroot_mode='sub'
+            if what in ('all', 'datasets')
+            else 'rsync',
         )
         for e in errors:
             yield dict(
@@ -253,6 +255,17 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         )
         return
 
+    if paths is not None and paths != [ds.pathobj]:
+        # so we have paths constraints that prevent dropping the full dataset
+        if what == 'dataset':
+            # there is nothing to do here, but to drop keys, which we must not
+            # done
+            return
+        elif what == 'all':
+            lgr.debug('Only dropping file content for given paths in %s, '
+                      'allthough instruction was to drop %s', ds, what)
+            what = 'filecontent'
+
     repo = ds.repo
     is_annex = isinstance(repo, AnnexRepo)
 
@@ -328,7 +341,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
 
 
 def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
-    if what in ('allkeys', 'all') and paths is not None \
+    if what == 'allkeys' and paths is not None \
             and paths != [ds.pathobj]:
         yield dict(
             action='drop',
