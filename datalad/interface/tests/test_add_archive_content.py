@@ -97,7 +97,6 @@ treeargs = dict(
 )
 
 
-@known_failure_windows
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**treeargs)
 @serve_path_via_http()
@@ -132,11 +131,13 @@ def test_add_archive_dirs(path_orig, url, repo_path):
             '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
         all_files = sorted(find_files('.'))
+        # posixify paths to make it work on Windows as well
+        all_files = [Path(file).as_posix() for file in all_files]
         target_files = {
-            './CR24A/behaving1/1 f.txt',
-            './CR24C/behaving3/3 f.txt',
-            './CR24D/behaving2/2 f.txt',
-            './.datalad/config',
+            'CR24A/behaving1/1 f.txt',
+            'CR24C/behaving3/3 f.txt',
+            'CR24D/behaving2/2 f.txt',
+            '.datalad/config',
         }
         eq_(set(all_files), target_files)
 
@@ -495,7 +496,6 @@ class TestAddArchiveOptions():
     # few tests bundled with a common setup/teardown to minimize boiler plate
     # nothing here works on windows, no even teardown(), prevent failure at the
     # origin
-    @known_failure_windows
     @with_tree(tree={'1.tar': {'file.txt': 'load',
                                '1.dat': 'load2'}},
                delete=False)
@@ -517,7 +517,6 @@ class TestAddArchiveOptions():
                                     delete=True)
         assert_false(lexists(self.ds.pathobj / '1.tar'))
 
-    @known_failure_windows
     def test_add_archive_leading_dir(self):
         import os
         os.mkdir(self.ds.pathobj / 'sub')
