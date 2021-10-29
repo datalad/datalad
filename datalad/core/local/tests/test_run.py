@@ -389,7 +389,6 @@ def test_run_explicit(path):
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 
-@known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})

@@ -65,7 +65,6 @@ def test_invalid_call(path):
         assert_in_results(res, status="impossible")
 
 
-@known_failure_windows  #FIXME
 @with_tree(tree={'README.md': 'dirty'})
 def test_dirty(path):
     ds = Dataset(path).create(force=True)
@@ -285,7 +284,6 @@ def test_configs(path):
     assert_in_results(r, message="This is a help message", status='ok')
 
 
-@known_failure_windows
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys

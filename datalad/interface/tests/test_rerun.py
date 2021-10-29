@@ -466,7 +466,6 @@ def test_rerun_outofdate_tree(path):
         assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
