@@ -64,6 +64,7 @@ from datalad.cmd import (
     StdOutErrCapture,
     WitlessProtocol,
 )
+from datalad.runner.protocol import GeneratorMixIn
 
 # imports from same module:
 from datalad.dataset.repo import RepoInterface
@@ -3445,6 +3446,9 @@ class AnnexJsonProtocol(WitlessProtocol):
         self.total_nbytes = total_nbytes
         self._unprocessed = None
 
+    def add_to_output(self, json_object):
+        self.json_out.append(json_object)
+
     def connection_made(self, transport):
         super().connection_made(transport)
         self._pbars = set()
@@ -3590,7 +3594,7 @@ class AnnexJsonProtocol(WitlessProtocol):
         # TODO the protocol could be made aware of the runner's CWD and
         # also any dataset the annex command is operating on. This would
         # enable 'file' property conversion to absolute paths
-        self.json_out.append(j)
+        self.add_to_output(j)
 
         if self.total_nbytes:
             if self.total_nbytes <= self._byte_count:
@@ -3636,6 +3640,17 @@ class AnnexJsonProtocol(WitlessProtocol):
                 len(self._unprocessed), self._unprocessed
             )
         super().process_exited()
+
+
+class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
+    def __init__(self,
+                 done_future=None,
+                 total_nbytes=None):
+        GeneratorMixIn.__init__(self)
+        AnnexJsonProtocol.__init__(self, done_future, total_nbytes)
+
+    def add_to_output(self, json_object):
+        self.send_result(json_object)
 
 
 class AnnexInitOutput(WitlessProtocol):
