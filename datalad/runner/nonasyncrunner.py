@@ -44,7 +44,6 @@ from .runnerthreads import (
 
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
-logging.basicConfig(level=5)
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1
