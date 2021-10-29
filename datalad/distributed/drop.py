@@ -301,7 +301,8 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         return
 
     drop_all_errored = False
-    if is_annex and what in ('allkeys', 'all') and not reckless == 'kill':
+    if is_annex and what in ('allkeys', 'datasets', 'all') \
+            and not reckless == 'kill':
         for r in _drop_allkeys(
                 ds,
                 repo,
@@ -335,7 +336,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         # repo is unsafe
         return
 
-    if what == 'all':
+    if what in ('all', 'datasets'):
         yield from _kill_dataset(ds)
     lgr.debug('Done dropping for %s', ds)
     return
