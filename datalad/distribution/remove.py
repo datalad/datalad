@@ -20,7 +20,7 @@ from os.path import (
 )
 from datalad.utils import (
     ensure_list,
-    rmdir,
+    rmtree,
 )
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
@@ -174,7 +174,7 @@ class Remove(Interface):
                     # act on it properly
                     if delpath.is_dir():
                         lgr.debug('Remove directory: %s', delpath)
-                        rmdir(delpath)
+                        rmtree(delpath)
                     # cannot use .exists() must forsee dead symlinks
                     else:
                         lgr.debug('Remove file: %s', delpath)
