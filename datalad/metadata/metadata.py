@@ -21,7 +21,7 @@ from collections import (
 )
 
 from datalad import cfg
-from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import _minimal_annotate_paths
 from datalad.interface.base import Interface
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
@@ -67,6 +67,7 @@ from datalad.consts import (
     OLDMETADATA_FILENAME,
 )
 from datalad.log import log_progress
+from datalad.core.local.status import get_paths_by_ds
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -940,24 +941,17 @@ class Metadata(Interface):
             # error generation happens during annotation
             path = op.curdir
 
+        paths_by_ds, errors = get_paths_by_ds(
+            require_dataset(dataset),
+            dataset,
+            paths=ensure_list(path),
+            subdsroot_mode='super')
         content_by_ds = OrderedDict()
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                path=path,
-                # MIH: we are querying the aggregated metadata anyways, and that
-                # mechanism has its own, faster way to go down the hierarchy
-                #recursive=recursive,
-                #recursion_limit=recursion_limit,
+        for ap in _minimal_annotate_paths(
+                paths_by_ds,
+                errors,
                 action='metadata',
-                # uninstalled subdatasets could be queried via aggregated metadata
-                # -> no 'error'
-                unavailable_path_status='',
-                nondataset_path_status='error',
-                # we need to know when to look into aggregated data
-                force_subds_discovery=True,
-                force_parentds_discovery=True,
-                return_type='generator',
-                on_failure='ignore'):
+                refds=refds_path):
             if ap.get('status', None):
                 # this is done
                 yield ap
