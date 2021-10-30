@@ -440,6 +440,8 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
 
     Parameters
     ----------
+    path: Path or str
+       Path to remove
     chmod_files : string or bool, optional
        Whether to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
@@ -460,6 +462,10 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     #        to do it on case by case
     # Check for open files
     assert_no_open_files(path)
+
+    # TODO the whole thing should be reimplemented with pathlib, but for now
+    # at least accept Path
+    path = str(path)
 
     if children_only:
         if not isdir(path):
