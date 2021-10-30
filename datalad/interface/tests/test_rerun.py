@@ -78,7 +78,7 @@ from datalad.tests.utils import (
 )
 
 from datalad.core.local.tests.test_run import last_commit_msg
-
+cat_command = 'cat' if not on_windows else 'type'
 
 @slow  # 17.1880s
 @known_failure_windows
@@ -91,7 +91,7 @@ def test_rerun(path, nodspath):
     # run inside the dataset
     with chpwd(path), \
             swallow_outputs():
-        ds.run('echo x$(cat sub/sequence) > sub/sequence')
+        ds.run(f'echo x$({cat_command} sub/sequence) > sub/sequence')
     # command ran once, all clean
     assert_repo_status(ds.path)
     eq_('x\n', open(probe_path).read())
@@ -170,7 +170,6 @@ def test_rerun_empty_branch(path):
     assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
     ds = Dataset(path).create()
@@ -194,7 +193,7 @@ def test_rerun_onto(path):
     ds.run('echo static-content > static')
     ds.repo.tag("static")
     with swallow_outputs():
-        ds.run('echo x$(cat grows) > grows')
+        ds.run(f'echo x$({cat_command} grows) > grows')
     ds.rerun()
     eq_('xx\n', open(grow_file).read())
 
@@ -259,7 +258,7 @@ def test_rerun_chain(path):
     commits = []
 
     with swallow_outputs():
-        ds.run('echo x$(cat grows) > grows')
+        ds.run(f'echo x$({cat_command} grows) > grows')
     ds.repo.tag("first-run", commit=DEFAULT_BRANCH)
 
     for _ in range(3):
@@ -300,7 +299,6 @@ def test_rerun_just_one_commit(path):
                   report=True, return_type="list")
 
 
-@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
@@ -315,8 +313,8 @@ def test_run_failure(path):
                 # but is close enough to make running the test worthwhile
                 ds.run("echo x>{} & false".format(op.join("sub", "grows")))
             else:
-                ds.run("echo x$(cat {0}) > {0} && false"
-                       .format(op.join("sub", "grows")))
+                ds.run("echo x$({0} {1}) > {1} && false"
+                       .format(cat_command, op.join("sub", "grows")))
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -366,7 +364,7 @@ def test_rerun_branch(path):
     outfile = op.join(path, "run-file")
 
     with swallow_outputs():
-        ds.run('echo x$(cat run-file) > run-file')
+        ds.run(f'echo x$({cat_command} run-file) > run-file')
     ds.rerun()
     eq_('xx\n', open(outfile).read())
 
@@ -466,7 +464,6 @@ def test_rerun_outofdate_tree(path):
         assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
