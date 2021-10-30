@@ -6,12 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Residual functionality for dropping dataset content
-
+"""Obsolete module: moved to `distributed.drop`
 """
 
-__docformat__ = 'restructuredtext'
-
-import logging
-
-lgr = logging.getLogger('datalad.distribution.drop')
+# Import command class to ease 3rd-party transitions
+from datalad.distributed.drop import Drop

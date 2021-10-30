@@ -26,9 +26,10 @@ _group_dataset = (
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
         ('datalad.core.distributed.push', 'Push', 'push'),
+        # deprecated
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
         ('datalad.distributed.drop', 'Drop'),
-        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
+        ('datalad.local.remove', 'Remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
