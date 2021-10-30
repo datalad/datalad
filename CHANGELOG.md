@@ -1,3 +1,51 @@
+# 0.15.3 (Sat Oct 30 2021)
+
+#### 🐛 Bug Fix
+
+- BF: Don't make create-sibling recursive by default [#6116](https://github.com/datalad/datalad/pull/6116) ([@adswa](https://github.com/adswa))
+- BF: Add dashes to 'force' option in non-empty directory error message [#6078](https://github.com/datalad/datalad/pull/6078) ([@DisasterMo](https://github.com/DisasterMo))
+- DOC: Add supported URL types to download-url's docstring [#6098](https://github.com/datalad/datalad/pull/6098) ([@adswa](https://github.com/adswa))
+- BF: Retain git-annex error messages & don't show them if operation successful [#6070](https://github.com/datalad/datalad/pull/6070) ([@DisasterMo](https://github.com/DisasterMo))
+- Remove uses of `__full_version__` and `datalad.version` [#6073](https://github.com/datalad/datalad/pull/6073) ([@jwodder](https://github.com/jwodder))
+- BF: ORA shouldn't crash while handling a failure [#6063](https://github.com/datalad/datalad/pull/6063) ([@bpoldrack](https://github.com/bpoldrack))
+- DOC: Refine --reckless docstring on usage and wording [#6043](https://github.com/datalad/datalad/pull/6043) ([@adswa](https://github.com/adswa))
+- BF: archives upon strip - use rmtree which retries etc instead of rmdir [#6064](https://github.com/datalad/datalad/pull/6064) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: do not leave test in a tmp dir destined for removal [#6059](https://github.com/datalad/datalad/pull/6059) ([@yarikoptic](https://github.com/yarikoptic))
+- Next wave of exc_str() removals [#6022](https://github.com/datalad/datalad/pull/6022) ([@mih](https://github.com/mih))
+
+#### ⚠️ Pushed to `maint`
+
+- CI: Enable new codecov uploader in Appveyor CI ([@adswa](https://github.com/adswa))
+
+#### 🏠 Internal
+
+- UX: Log clone-candidate number and URLs [#6092](https://github.com/datalad/datalad/pull/6092) ([@adswa](https://github.com/adswa))
+- UX/ENH: Disable reporting, and don't do superfluous internal subdatasets calls [#6094](https://github.com/datalad/datalad/pull/6094) ([@adswa](https://github.com/adswa))
+- Update codecov action to v2 [#6072](https://github.com/datalad/datalad/pull/6072) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- Design document on URL substitution feature [#6065](https://github.com/datalad/datalad/pull/6065) ([@mih](https://github.com/mih))
+
+#### 🧪 Tests
+
+- BF(TST): remove reuse of the same tape across unrelated tests [#6127](https://github.com/datalad/datalad/pull/6127) ([@yarikoptic](https://github.com/yarikoptic))
+- Fail Travis tests on deprecation warnings [#6074](https://github.com/datalad/datalad/pull/6074) ([@jwodder](https://github.com/jwodder))
+- Ux get result handling broken [#6052](https://github.com/datalad/datalad/pull/6052) ([@christian-monch](https://github.com/christian-monch))
+- enable metalad tests again [#6060](https://github.com/datalad/datalad/pull/6060) ([@christian-monch](https://github.com/christian-monch))
+
+#### Authors: 7
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Burgardt ([@DisasterMo](https://github.com/DisasterMo))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.15.2 (Wed Oct 06 2021)
 
 #### 🐛 Bug Fix
