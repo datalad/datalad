@@ -50,7 +50,6 @@ STDOUT_FILENO = 1
 STDERR_FILENO = 2
 
 
-# TODO: add state for pipe_data, process_exited, and connection_lost
 class _ResultGenerator(Generator):
 
     class GeneratorState(enum.Enum):
@@ -259,10 +258,10 @@ class ThreadedRunner:
             self.process_stdin_fileno: STDIN_FILENO,
         }
 
-        if self.catch_stdout or self.catch_stderr or self.write_stdin:
+        self.active_file_numbers = set()
+        self.output_queue = Queue()
 
-            self.output_queue = Queue()
-            self.active_file_numbers = set()
+        if self.catch_stdout or self.catch_stderr or self.write_stdin:
 
             if self.catch_stderr:
                 self.active_file_numbers.add(self.process_stderr_fileno)
@@ -325,7 +324,7 @@ class ThreadedRunner:
             try:
                 file_number, state, data = self.output_queue.get(timeout=self.timeout)
             except Empty:
-                lgr.warning(f"TIMEOUT on output queue")
+                lgr.log(5, f"TIMEOUT on output queue")
                 continue
 
             if state == IOState.ok:
@@ -333,13 +332,16 @@ class ThreadedRunner:
 
             # Handle timeouts
             if state == IOState.timeout:
-                lgr.warning(f"TIMEOUT on {self.fileno_mapping[file_number]}")
+                lgr.log(5, f"TIMEOUT on {self.fileno_mapping[file_number]}")
 
         # No timeout occurred, we have proper data or stream end marker, i.e. None
         if self.write_stdin and file_number == self.process_stdin_fileno:
             # The only data-signal we expect from stdin thread
             # is None, indicating that the thread ended
             assert data is None
+            self.protocol.pipe_connection_lost(
+                self.fileno_mapping[self.process_stdin_fileno],
+                None)  # TODO: check exception
             self.active_file_numbers.remove(self.process_stdin_fileno)
 
         elif self.catch_stderr or self.catch_stdout:

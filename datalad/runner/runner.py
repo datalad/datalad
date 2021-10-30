@@ -96,14 +96,14 @@ class WitlessRunner(object):
 
         Returns
         -------
-        dict
-          If the protocol does not have a GeneratorMixIn-mixin, the
-          result will be a dictionary.
-          At minimum there will be keys 'stdout', 'stderr' with
-          unicode strings of the cumulative standard output and error
-          of the process as values.
+        Union[dict, Generator]
 
-        Generator
+            If the protocol does not have a GeneratorMixIn-mixin, the
+            result will be a dictionary.
+            At minimum there will be keys 'stdout', 'stderr' with
+            unicode strings of the cumulative standard output and error
+            of the process as values.
+
             If the protocol has a GeneratorMixIn-mixin, a Generator will be
             returned. This allows to use this function in constructs like:
 
