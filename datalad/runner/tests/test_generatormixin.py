@@ -1,3 +1,4 @@
+import sys
 from queue import Queue
 
 from datalad.runner.nonasyncrunner import run_command
@@ -17,7 +18,7 @@ def test_generator_mixin_basic():
     stdin_queue = Queue()
 
     i = 0
-    for fd, data in run_command("python3 -i -", TestProtocol, stdin_queue):
+    for fd, data in run_command([sys.executable, "-i", "-"], TestProtocol, stdin_queue):
         print(f"[{fd}]: {repr(data)}")
         if i > 10:
             stdin_queue.put(b"exit(0)\n")
@@ -33,7 +34,7 @@ def test_generator_mixin_runner():
 
     runner = WitlessRunner()
     i = 0
-    for fd, data in runner.run(cmd="python3 -i -", protocol=TestProtocol, stdin=stdin_queue):
+    for fd, data in runner.run(cmd=[sys.executable, "-i", "-"], protocol=TestProtocol, stdin=stdin_queue):
         print(f"[{fd}]: {repr(data)}")
         if i > 10:
             stdin_queue.put(b"exit(0)\n")
