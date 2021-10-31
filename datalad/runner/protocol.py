@@ -14,6 +14,7 @@ import logging
 import warnings
 from collections import deque
 from locale import getpreferredencoding
+from typing import Optional
 
 from .exception import CommandError
 from .utils import ensure_unicode
@@ -115,6 +116,29 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         fd_name, buffer = self.fd_infos[fd]
         if buffer is not None:
             buffer.extend(data)
+
+    def timeout(self, fd: Optional[int]):
+        """
+        Called if the timeout parameter to WitlessRunner.run()
+        is not `None` and a process file descriptor could not
+        be read (stdout or stderr) or not be written (stdin)
+        within the specified time in seconds.
+
+        stdin timeouts are only caught when the `stdin`-
+        parameter to WitlessRunner.run() was either a `Queue`,
+        a `str`, or `bytes`. Stdout or stderr timeouts
+        are only caught of proc_out and proc_err are
+        not None in the protocol class. Wihout stdin, stderr,
+        and stdout-timeouts the process runtime can still
+        generate a timeout.
+
+        :param fd:
+        The file descriptor that timed out or `None` if no
+        progress was made at all, i.e. no stdin element was
+        enqueued and no output was read from either stdout
+        or stderr.
+        """
+        pass
 
     def _prepare_result(self):
         """Prepares the final result to be returned to the runner

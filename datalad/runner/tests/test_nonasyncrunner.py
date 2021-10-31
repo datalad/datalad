@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 from time import sleep
+from typing import Optional
 
 from datalad.tests.utils import (
     assert_false,
@@ -31,6 +32,7 @@ from datalad.runner import (
     Runner,
     StdOutCapture,
 )
+from datalad.runner.protocol import WitlessProtocol
 from datalad.runner.nonasyncrunner import run_command
 
 
@@ -184,3 +186,17 @@ def test_popen_invocation(src_path, dest_path):
     fetching_data.start()
     fetching_data.join(5.0)
     assert_false(fetching_data.is_alive(), "Child is stuck!")
+
+
+def test_timeout():
+
+    class TestProtocol(WitlessProtocol):
+        def timeout(self, fd: Optional[int]):
+            print("YYY")
+
+    result = run_command(
+        ['timeout', '3'] if on_windows else ["sleep", "20"],
+        stdin=None,
+        protocol=TestProtocol,
+        timeout=1
+    )

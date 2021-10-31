@@ -59,7 +59,7 @@ class WitlessRunner(object):
             env['PWD'] = cwd
         return env
 
-    def run(self, cmd, protocol=None, stdin=None, cwd=None, env=None, **kwargs):
+    def run(self, cmd, protocol=None, stdin=None, cwd=None, env=None, timeout=None, **kwargs):
         """Execute a command and communicate with it.
 
         Parameters
@@ -91,6 +91,10 @@ class WitlessRunner(object):
           This must be a complete environment definition, no values
           from the current environment will be inherited. Overrides
           any `env` given to the constructor.
+        timeout:
+          None or the seconds after which a timeout callback is
+          invoked, if no progress was made in communicating with
+          the sub-process
         kwargs :
           Passed to the Protocol class constructor.
 
@@ -153,6 +157,7 @@ class WitlessRunner(object):
             protocol_kwargs=kwargs,
             cwd=cwd,
             env=env,
+            timeout=timeout
         )
 
         if issubclass(protocol, GeneratorMixIn):

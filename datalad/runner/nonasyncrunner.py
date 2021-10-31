@@ -86,7 +86,13 @@ class _ResultGenerator(Generator):
                 if len(self.result_queue) > 0:
                     return self.result_queue.popleft()
                 else:
-                    self.runner.process.wait()
+                    while True:
+                        try:
+                            self.runner.process.wait(timeout=self.runner.timeout)
+                            break
+                        except subprocess.TimeoutExpired:
+                            self.runner.protocol.timeout(None)
+
                     self.return_code = self.runner.process.poll()
                     self.runner.protocol.process_exited()
                     self.state = self.GeneratorState.process_exited
@@ -306,7 +312,13 @@ class ThreadedRunner:
             while self.active_file_numbers:
                 self.process_queue()
 
-            self.process.wait()
+            while True:
+                try:
+                    self.process.wait(timeout=self.timeout)
+                    break
+                except subprocess.TimeoutExpired:
+                    self.protocol.timeout(None)
+
             result = self.protocol._prepare_result()
             self.protocol.process_exited()
             self.protocol.connection_lost(None)  # TODO: check exception
@@ -324,7 +336,7 @@ class ThreadedRunner:
             try:
                 file_number, state, data = self.output_queue.get(timeout=self.timeout)
             except Empty:
-                lgr.log(5, f"TIMEOUT on output queue")
+                self.protocol.timeout(None)
                 continue
 
             if state == IOState.ok:
@@ -332,7 +344,7 @@ class ThreadedRunner:
 
             # Handle timeouts
             if state == IOState.timeout:
-                lgr.log(5, f"TIMEOUT on {self.fileno_mapping[file_number]}")
+                self.protocol.timeout(self.fileno_mapping[file_number])
 
         # No timeout occurred, we have proper data or stream end marker, i.e. None
         if self.write_stdin and file_number == self.process_stdin_fileno:
