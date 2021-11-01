@@ -98,7 +98,7 @@ _group_plumbing = (
         ('datalad.core.distributed.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
-        ('datalad.local.configuration', 'Configuration', 'configuration'),
+        ('datalad.local.configuration', 'Configuration', 'config'),
         ('datalad.core.local.status', 'Status', 'status'),
         ('datalad.core.local.diff', 'Diff', 'diff'),
         ('datalad.distribution.siblings', 'Siblings', 'siblings'),
