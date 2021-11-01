@@ -44,8 +44,8 @@ except ImportError as e:
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
 
-from .config import ConfigManager
-cfg = ConfigManager()
+from . import config
+cfg = config.ConfigManager()
 
 from .log import lgr
 from datalad.utils import (
@@ -318,5 +318,20 @@ if str(__version__) == '0' or __version__.startswith('0+'):
         "We advise to re-install datalad or downstream projects might not operate correctly.",
         __version__
     )
+
+# Let's try to make a mule and replace the ponny with it.
+# If overall "works" we just need to approach RFing of Interface support so
+# there would be no circular importing etc needed.
+# print("Making a mule")
+from . import config
+from .local.configuration import Configuration
+
+
+class ConfigManagerConfiguration(config.ConfigManager, Configuration):
+    pass
+
+config.ConfigManager = ConfigManagerConfiguration
+# print("Made a mule")
+
 
 lgr.log(5, "Done importing main __init__")

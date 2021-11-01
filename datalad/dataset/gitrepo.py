@@ -33,7 +33,6 @@ from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
 )
-from datalad.config import ConfigManager
 from datalad.dataset.repo import (
     PathBasedFlyweight,
     RepoInterface,
@@ -165,6 +164,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ConfigManager
         """
         if self._cfg is None:
+            # TEMP: delayed import to avoid early binding of ConfigManager
+            from datalad.config import ConfigManager
             # associate with this dataset and read the entire config hierarchy
             self._cfg = ConfigManager(dataset=self, source='any')
         return self._cfg

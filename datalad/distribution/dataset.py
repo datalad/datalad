@@ -21,7 +21,6 @@ from weakref import WeakValueDictionary
 import wrapt
 
 from datalad import cfg
-from datalad.config import ConfigManager
 from datalad.core.local.repo import repo_from_path
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
@@ -329,6 +328,8 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             # However, if this was the case before as well, we don't want a new
             # instance of ConfigManager
             if self._cfg_bound in (True, None):
+                # TEMP: delayed import to avoid early binding of ConfigManager
+                from datalad.config import ConfigManager
                 self._cfg = ConfigManager(dataset=None)
                 self._cfg_bound = False
 
