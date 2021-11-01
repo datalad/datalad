@@ -142,7 +142,7 @@ class Configuration(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='configuration')
+    # @datasetmethod(name='config')
     @eval_results
     def __call__(
             action='dump',
