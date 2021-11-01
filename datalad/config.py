@@ -627,7 +627,8 @@ class ConfigManager(object):
 
     def __repr__(self):
         # give full list of all tracked config files, plus overrides
-        return "ConfigManager({}{})".format(
+        return "{}({}{})".format(
+            self.__class__.__name__,
             [str(p) for p in self._stores['branch']['files'].union(
                 self._stores['git']['files'])],
             ', overrides={!r}'.format(self.overrides) if self.overrides else '',
@@ -635,7 +636,8 @@ class ConfigManager(object):
 
     def __str__(self):
         # give path of dataset, if there is any, plus overrides
-        return "ConfigManager({}{})".format(
+        return "{}({}{})".format(
+            self.__class__.__name__,
             self._repo_pathobj if self._repo_pathobj else '',
             'with overrides' if self.overrides else '',
         )
