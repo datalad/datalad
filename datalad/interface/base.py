@@ -791,8 +791,8 @@ class Interface(object):
             else:
                 raise
 
-    @classmethod
-    def _get_result_filter(cls, args):
+    @staticmethod
+    def _get_result_filter(args):
         from datalad import cfg
         result_filter = None
         if args.common_report_status or 'datalad.runtime.report-status' in cfg:
@@ -812,8 +812,8 @@ class Interface(object):
             result_filter = result_filter & tfilt if result_filter else tfilt
         return result_filter
 
-    @classmethod
-    def get_refds_path(cls, dataset):
+    @staticmethod
+    def get_refds_path(dataset):
         """Return a resolved reference dataset path from a `dataset` argument"""
         # theoretically a dataset could come in as a relative path -> resolve
         if dataset is None:
