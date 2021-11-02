@@ -261,7 +261,7 @@ def test_add_archive_content(path_orig, url, repo_path):
 
         # But that other one carries updated file, so should fail due to
         # overwrite
-        res = add_archive_content(Path('1u') / Path('1.tar.gz'),
+        res = add_archive_content(Path('1u') / '1.tar.gz',
                                   use_current_dir=True, on_failure='ignore')
         assert_in_results(
             res,
@@ -271,13 +271,13 @@ def test_add_archive_content(path_orig, url, repo_path):
         assert_in('exists, but would be overwritten by new file',
                   res[0]['message'])
         # but should do fine if overrides are allowed
-        add_archive_content(Path('1u') / Path('1.tar.gz'), existing='overwrite',
+        add_archive_content(Path('1u') / '1.tar.gz', existing='overwrite',
                             use_current_dir=True)
-        add_archive_content(Path('2u') / Path('1.tar.gz'),
+        add_archive_content(Path('2u') / '1.tar.gz',
                             existing='archive-suffix', use_current_dir=True)
-        add_archive_content(Path('3u') / Path('1.tar.gz'),
+        add_archive_content(Path('3u') / '1.tar.gz',
                             existing='archive-suffix', use_current_dir=True)
-        add_archive_content(Path('4u') / Path('1.tar.gz'),
+        add_archive_content(Path('4u') / '1.tar.gz',
                             existing='archive-suffix', use_current_dir=True)
 
         # rudimentary test
@@ -516,7 +516,7 @@ class TestAddArchiveOptions():
     def test_add_archive_leading_dir(self):
         import os
         os.mkdir(self.ds.pathobj / 'sub')
-        f123 = Path('sub') / Path('123.tar')
+        f123 = Path('sub') / '123.tar'
         Path(self.ds.pathobj / '1.tar').rename(self.ds.pathobj / Path(f123))
         self.annex.remove('1.tar', force=True)
         self.ds.save(message="renamed")
@@ -528,7 +528,7 @@ class TestAddArchiveOptions():
         )
 
         ok_file_under_git(self.ds.path,
-                          str(Path('sub') / Path('123') / Path('file.txt')),
+                          str(Path('sub') / '123' / 'file.txt'),
                           annexed=True)
 
     @known_failure_windows
