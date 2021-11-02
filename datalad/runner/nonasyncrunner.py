@@ -332,6 +332,8 @@ class ThreadedRunner:
                     break
                 except subprocess.TimeoutExpired:
                     if self.protocol.timeout(None) is True:
+                        self.process.terminate()
+                        self.process.wait()
                         break
 
             result = self.protocol._prepare_result()

@@ -14,8 +14,10 @@ import queue
 import signal
 import subprocess
 import sys
-from time import sleep
-from typing import Optional
+from typing import (
+    List,
+    Optional,
+)
 from itertools import count
 
 from datalad.tests.utils import (
@@ -210,20 +212,18 @@ def test_timeout():
     )
 
 
-def test_timeout_all():
+def test_timeout_nothing():
 
     class TestProtocol(NoCapture):
-        def __init__(self):
+        def __init__(self,
+                     timeout_queue: List):
             NoCapture.__init__(self)
-            self.received_timeouts = list()
+            self.timeout_queue = timeout_queue
             self.counter = count()
 
         def timeout(self, fd: Optional[int]) -> bool:
-            print(self.counter.__next__(), "YYY", fd, self.process)
-            print(self.process.pid)
-            self.process.terminate()
-            self.process.wait()
-            print(self.process.poll())
+            if fd is not None:
+                self.timeout_queue.append((self.counter.__next__(), fd))
             return True
 
     stdin_queue = queue.Queue()
@@ -231,16 +231,51 @@ def test_timeout_all():
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    result = run_command(
+    timeout_queue = []
+    run_command(
         [
             "python",
             "-c",
             "import time; time.sleep(5)\n"
-            "print('AAA')\n"
-            "exit(0)"
         ],
         stdin=stdin_queue,
         protocol=TestProtocol,
-        timeout=1
+        timeout=1,
+        protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
-    print(result)
+    print(timeout_queue)
+    eq_(len(timeout_queue), 1)
+
+
+def test_timeout_all():
+
+    class TestProtocol(StdOutErrCapture):
+        def __init__(self,
+                     timeout_queue: List):
+            StdOutErrCapture.__init__(self)
+            self.timeout_queue = timeout_queue
+            self.counter = count()
+
+        def timeout(self, fd: Optional[int]) -> bool:
+            if fd is not None:
+                self.timeout_queue.append((self.counter.__next__(), fd))
+                return True
+
+    stdin_queue = queue.Queue()
+    for i in range(72):
+        stdin_queue.put(b"\x00" * 1024)
+    stdin_queue.put(None)
+
+    timeout_queue = []
+    run_command(
+        [
+            "python",
+            "-c",
+            "import time; time.sleep(5)\n"
+        ],
+        stdin=stdin_queue,
+        protocol=TestProtocol,
+        timeout=1,
+        protocol_kwargs=dict(timeout_queue=timeout_queue)
+    )
+    eq_(len(timeout_queue), 3)

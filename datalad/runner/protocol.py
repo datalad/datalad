@@ -112,31 +112,46 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     def pipe_data_received(self, fd, data):
         self._log(fd, data)
-        # store received output if stream was to be captured
+        # Store received output if stream was to be captured.
         fd_name, buffer = self.fd_infos[fd]
         if buffer is not None:
             buffer.extend(data)
 
-    def timeout(self, fd: Optional[int]):
+    def timeout(self, fd: Optional[int]) -> bool:
         """
         Called if the timeout parameter to WitlessRunner.run()
         is not `None` and a process file descriptor could not
         be read (stdout or stderr) or not be written (stdin)
         within the specified time in seconds.
 
-        stdin timeouts are only caught when the `stdin`-
-        parameter to WitlessRunner.run() was either a `Queue`,
-        a `str`, or `bytes`. Stdout or stderr timeouts
+        stdin timeouts are only caught when the type of the `stdin`-
+        parameter to WitlessRunner.run() is either a `Queue`,
+        a `str`, or `bytes`. `Stdout` or `stderr` timeouts
         are only caught of proc_out and proc_err are
-        not None in the protocol class. Wihout stdin, stderr,
-        and stdout-timeouts the process runtime can still
-        generate a timeout.
+        not None in the protocol class.
+        Even without stdin, stderr, and stdout-timeouts the
+        process runtime can still generate a timeout, e.g.,
+        if the process has to be waited for more than
+        `timeout` seconds. In this case the `fd`-argument
+        will be `None`.
 
-        :param fd:
-        The file descriptor that timed out or `None` if no
-        progress was made at all, i.e. no stdin element was
-        enqueued and no output was read from either stdout
-        or stderr.
+        fd:
+          The file descriptor that timed out or `None` if no
+          progress was made at all, i.e. no stdin element was
+          enqueued and no output was read from either stdout
+          or stderr.
+
+        return:
+          If the callback returns `True`, the file descriptor
+          (if any was given) will be removed from the active
+          descriptor set, the associated files will be closed
+          and it will no longer be monitored.
+          If the return values is anything else than `True`,
+          the file-descriptor will be monitored further
+          and additional timeouts might occur indefinitely.
+          If `None` was given, i.e. process runtime-timeout
+          was detected, and `True` is returned, the process
+          will be terminated.
         """
         pass
 
