@@ -77,7 +77,7 @@ _KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
 
-    Given an archive under annex control, extract and add its files to the
+    Given an already annex'ed archive, extract and add its files to the
     dataset, and reference the original archive as a custom special remote.
 
     """
@@ -112,19 +112,18 @@ class AddArchiveContent(Interface):
             args=("--add-archive-leading-dir",),
             action="store_true",
             doc="""place extracted content under a directory which would
-            correspond to the archive name with suffix stripped. E.g. the
-            content of `example.zip` will be extracted under `example/`"""),
+            correspond to the archive name with all suffixes stripped. E.g. the
+            content of `archive.tar.gz` will be extracted under `archive/`"""),
         strip_leading_dirs=Parameter(
             args=("--strip-leading-dirs",),
             action="store_true",
-            doc="""move all archive contents up from how they are stored in the
-             archive, if the archive contains a number (possibly more than 1
-             down) single leading directories"""),
+            doc="""remove one or more leading directories from the archive
+            layout on extraction"""),
         leading_dirs_depth=Parameter(
             args=("--leading-dirs-depth",),
             action="store",
             type=int,
-            doc="""maximal depth to strip leading directories to.
+            doc="""maximum depth of leading directories to strip.
             If not specified (None), no limit"""),
         leading_dirs_consider=Parameter(
             args=("--leading-dirs-consider",),
@@ -172,12 +171,11 @@ class AddArchiveContent(Interface):
         ),
         annex_options=Parameter(
             args=("-o", "--annex-options"),
-            doc="""additional options to pass to git-annex. """,
+            doc="""additional options to pass to git-annex """,
             constraints=EnsureStr() | EnsureNone()
         ),
         annex=Parameter(
-            doc="""annex instance to use. This parameter will
-            be deprecated. Use the 'dataset' parameter instead."""
+            doc="""DEPRECATED. Use the 'dataset' parameter instead."""
         ),
         # TODO: Python only!
         stats=Parameter(

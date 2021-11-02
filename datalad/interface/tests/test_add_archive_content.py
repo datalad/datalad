@@ -222,7 +222,7 @@ def test_add_archive_content(path_orig, url, repo_path):
             status='impossible',
             type="dataset",
             message="Can not add archive outside of the dataset"
-              )
+        )
 
 
         # Let's add first archive to the repo so we could test
