@@ -124,7 +124,7 @@ class BlockingOSWriterThread(ExitingThread):
                     written += os.write(
                         self.destination.fileno(),
                         data[written:])
-            except (BrokenPipeError, OSError):
+            except (BrokenPipeError, OSError, ValueError):
                 # the destination was most likely closed
                 self.queue.put(None)
                 break

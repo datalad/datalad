@@ -76,7 +76,7 @@ class _ResultGenerator(Generator):
             # if the result queue is empty and no more reading/writing
             # threads are active, progress to next state
             if len(self.result_queue) == 0 and not self.runner.active_file_numbers:
-                print("G: 1")
+                #print("G: 1")
                 # TODO: unify this code with the respective code below
                 for fd in (self.runner.process.stdin, self.runner.process.stdout, self.runner.process.stderr):
                     if fd is not None:
@@ -86,17 +86,17 @@ class _ResultGenerator(Generator):
                 self.runner.protocol.process_exited()
                 self.state = self.GeneratorState.process_exited
             else:
-                print("G: 2")
+                #print("G: 2")
                 # If we have no results in the queue, but still active
                 # reading/writing threads, wait on the threaded runner queue
                 while len(self.result_queue) == 0 and self.runner.active_file_numbers:
-                    print("G: 2.0", self.runner.active_file_numbers)
+                    #print("G: 2.0", self.runner.active_file_numbers)
                     self.runner.process_queue()
                 if len(self.result_queue) > 0:
-                    print("G: 2.1")
+                    #print("G: 2.1")
                     return self.result_queue.popleft()
                 else:
-                    print("G: 2.2")
+                    #print("G: 2.2")
                     while True:
                         try:
                             self.runner.process.wait(timeout=self.runner.timeout)
@@ -118,22 +118,22 @@ class _ResultGenerator(Generator):
                     self.state = self.GeneratorState.process_exited
 
         if self.state == self.GeneratorState.process_exited:
-            print("G: 3")
+            #print("G: 3")
             if len(self.result_queue) > 0:
-                print("G: 3.1")
+                #print("G: 3.1")
                 return self.result_queue.popleft()
             else:
-                print("G: 3.2")
+                #print("G: 3.2")
                 # TODO: check exception
                 self.runner.protocol.connection_lost(None)
                 self.state = self.GeneratorState.connection_lost
 
         if self.state == self.GeneratorState.connection_lost:
-            print("G: 4")
+            #print("G: 4")
             if len(self.result_queue) > 0:
-                print("G: 4.1")
+                #print("G: 4.1")
                 return self.result_queue.popleft()
-            print("G: 4.2")
+            #print("G: 4.2")
             raise StopIteration(self.return_code)
 
     def throw(self, exception_type, value=None, trace_back=None):
@@ -372,25 +372,22 @@ class ThreadedRunner:
 
     def process_queue(self):
         """
-        Get a single event from the queue
+        Get a single event from the queue or handle a timeout
         """
-
-        # Test START
-        if self.process.poll() is not None:
-            if self.process_stdin_fileno in self.active_file_numbers:
-                self.active_file_numbers.remove(self.process_stdin_fileno)
-            if self.process.stdin is not None:
-                self.process.stdin.close()
-        # Test END
-
         data = None
         while True:
             # We do not need a timeout here. If self.timeout is None,
             # no timeouts are reported anyway. If self.timeout is not
-            # None, and any enqueuing (stdin) or dequeuing (stdout,
+            # None, and any enqueuing (stdin) or de-queuing (stdout,
             # stderr) operation took longer than self.timeout, we should
-            # have a queue entry for that.
-            file_number, state, data = self.output_queue.get()
+            # have a queue entry for that. We still use a .1 second
+            # timeout to check whether the process is still running.
+            try:
+                file_number, state, data = self.output_queue.get(.1)
+            except Empty:
+                if self.process.poll() is not None:
+                    for f in (self.process.stdin, self.process.stdout, self.process.stderr):
+                        f.close()
 
             if state == IOState.ok:
                 break
