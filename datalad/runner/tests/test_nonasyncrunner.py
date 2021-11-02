@@ -16,6 +16,7 @@ import subprocess
 import sys
 from time import sleep
 from typing import Optional
+from itertools import count
 
 from datalad.tests.utils import (
     assert_false,
@@ -28,9 +29,11 @@ from datalad.tests.utils import (
 from datalad.utils import on_windows
 
 from datalad.runner import (
+    NoCapture,
     Protocol,
     Runner,
     StdOutCapture,
+    StdOutErrCapture,
 )
 from datalad.runner.protocol import WitlessProtocol
 from datalad.runner.nonasyncrunner import run_command
@@ -191,12 +194,53 @@ def test_popen_invocation(src_path, dest_path):
 def test_timeout():
 
     class TestProtocol(WitlessProtocol):
+        def __init__(self):
+            WitlessProtocol.__init__(self)
+            self.received_timeouts = list()
+            self.counter = count()
+
         def timeout(self, fd: Optional[int]):
-            print("YYY")
+            print(self.counter.__next__(), "YYY", fd)
 
     result = run_command(
-        ['timeout', '3'] if on_windows else ["sleep", "20"],
+        ['timeout', '3'] if on_windows else ["sleep", "5"],
         stdin=None,
         protocol=TestProtocol,
         timeout=1
     )
+
+
+def test_timeout_all():
+
+    class TestProtocol(NoCapture):
+        def __init__(self):
+            NoCapture.__init__(self)
+            self.received_timeouts = list()
+            self.counter = count()
+
+        def timeout(self, fd: Optional[int]) -> bool:
+            print(self.counter.__next__(), "YYY", fd, self.process)
+            print(self.process.pid)
+            self.process.terminate()
+            self.process.wait()
+            print(self.process.poll())
+            return True
+
+    stdin_queue = queue.Queue()
+    for i in range(72):
+        stdin_queue.put(b"\x00" * 1024)
+    stdin_queue.put(None)
+
+    result = run_command(
+        [
+            "python",
+            "-c",
+            "import time; time.sleep(5)\n"
+            "print('AAA')\n"
+            "exit(0)"
+        ],
+        stdin=stdin_queue,
+        protocol=TestProtocol,
+        timeout=1
+    )
+    print(result)

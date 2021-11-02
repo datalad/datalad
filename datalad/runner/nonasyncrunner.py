@@ -213,16 +213,17 @@ class ThreadedRunner:
             # file-like and write to it from a different thread.
             self.write_stdin = False  # the caller will write to the parameter
 
-        elif isinstance(self.stdin, (str, bytes, Queue)):
-            # establish infrastructure to write to the process
+        elif isinstance(self.stdin, (str, bytes)):
+            # Establish a queue to write to the process and
+            # enqueue the input that is already provided.
             self.write_stdin = True
-            if not isinstance(self.stdin, Queue):
-                # if input is already provided, enqueue it.
-                self.stdin_queue = Queue()
-                self.stdin_queue.put(self.stdin)
-                self.stdin_queue.put(None)
-            else:
-                self.stdin_queue = self.stdin
+            self.stdin_queue = Queue()
+            self.stdin_queue.put(self.stdin)
+            self.stdin_queue.put(None)
+        elif isinstance(self.stdin, Queue):
+            # Establish a queue to write to the process.
+            self.write_stdin = True
+            self.stdin_queue = self.stdin
         else:
             # indicate that we will not write anything to stdin, that
             # means the user can pass None, or he can pass a
@@ -312,12 +313,26 @@ class ThreadedRunner:
             while self.active_file_numbers:
                 self.process_queue()
 
+            # The blocking stdin writer thread may not have seen a
+            # close signal (which would have been a None-data object in
+            # its queue) because it is still waiting to write to
+            # the process and has a full queue. This would load to an
+            # indefinite wait for the subprocess exit.
+            # We close stdin therefore here. This might lead to loss of
+            # data, but at some point we have to decide between waiting
+            # and giving up.
+            # TODO: clean up signaling in blocking writer thread, or allow closing in writer thread
+            for fd in (self.process.stdin, self.process.stdout, self.process.stderr):
+                if fd is not None:
+                    fd.close()
+
             while True:
                 try:
                     self.process.wait(timeout=self.timeout)
                     break
                 except subprocess.TimeoutExpired:
-                    self.protocol.timeout(None)
+                    if self.protocol.timeout(None) is True:
+                        break
 
             result = self.protocol._prepare_result()
             self.protocol.process_exited()
@@ -333,18 +348,24 @@ class ThreadedRunner:
         """
         data = None
         while True:
-            try:
-                file_number, state, data = self.output_queue.get(timeout=self.timeout)
-            except Empty:
-                self.protocol.timeout(None)
-                continue
+            # We do not need a timeout here. If self.timeout is None,
+            # no timeouts are reported anyway. If self.timeout is not
+            # None, and any enqueuing (stdin) or dequeuing (stdout,
+            # stderr) operation took longer than self.timeout, we should
+            # have a queue entry for that.
+            file_number, state, data = self.output_queue.get()
 
             if state == IOState.ok:
                 break
 
             # Handle timeouts
             if state == IOState.timeout:
-                self.protocol.timeout(self.fileno_mapping[file_number])
+                # If the timeout handler returns True, remove
+                # the file number that caused the timeout from
+                # active files and return.
+                if self.protocol.timeout(self.fileno_mapping[file_number]):
+                    self.active_file_numbers.remove(file_number)
+                    return
 
         # No timeout occurred, we have proper data or stream end marker, i.e. None
         if self.write_stdin and file_number == self.process_stdin_fileno:

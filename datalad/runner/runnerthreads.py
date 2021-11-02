@@ -126,6 +126,7 @@ class BlockingOSWriterThread(ExitingThread):
                         data[written:])
             except (BrokenPipeError, OSError):
                 # the destination was most likely closed
+                self.queue.put(None)
                 break
 
         lgr.log(5, "%s exiting", self)
@@ -147,7 +148,13 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
                state: IOState,
                data: Union[bytes, None]):
         for queue in self.signal_queues:
-            queue.put((self.identifier, state, data))
+            # Ensure that signal will never block.
+            # TODO: separate the timeout and EOF signal paths?
+            try:
+                queue.put((self.identifier, state, data), block=True, timeout=1)
+            except Full:
+                lgr.debug(f"timeout while trying to signal {(self.identifier, state, data)}")
+                pass
 
     @abstractmethod
     def read(self,
@@ -177,7 +184,7 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
 
                 state, data = self.read(self.timeout)
                 if state == IOState.timeout:
-                    # On timeout, send timeout info to signal queue
+                    # On timeout, send timeout info to signal queues
                     self.signal(state, None)
                     continue
 
@@ -257,7 +264,6 @@ class WriteThread(TransportThread):
     def read(self,
              timeout: Optional[float] = None,
              ) -> Tuple[IOState, Union[bytes, None]]:
-
         return IOState.ok, self.source_queue.get()
 
     def write(self,
