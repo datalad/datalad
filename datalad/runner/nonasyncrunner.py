@@ -51,7 +51,10 @@ STDERR_FILENO = 2
 
 
 class _ResultGenerator(Generator):
-
+    """
+    Generator returned by run_command if the protocol class
+    is a subclass of `datalad.runner.protocol.GeneratorMixIn`
+    """
     class GeneratorState(enum.Enum):
         process_running = 0
         process_exited = 1
@@ -70,44 +73,67 @@ class _ResultGenerator(Generator):
 
     def send(self, _):
         if self.state == self.GeneratorState.process_running:
-
             # if the result queue is empty and no more reading/writing
             # threads are active, progress to next state
             if len(self.result_queue) == 0 and not self.runner.active_file_numbers:
+                print("G: 1")
+                # TODO: unify this code with the respective code below
+                for fd in (self.runner.process.stdin, self.runner.process.stdout, self.runner.process.stderr):
+                    if fd is not None:
+                        fd.close()
                 self.runner.process.wait()
                 self.return_code = self.runner.process.poll()
                 self.runner.protocol.process_exited()
                 self.state = self.GeneratorState.process_exited
             else:
+                print("G: 2")
                 # If we have no results in the queue, but still active
                 # reading/writing threads, wait on the threaded runner queue
                 while len(self.result_queue) == 0 and self.runner.active_file_numbers:
+                    print("G: 2.0", self.runner.active_file_numbers)
                     self.runner.process_queue()
                 if len(self.result_queue) > 0:
+                    print("G: 2.1")
                     return self.result_queue.popleft()
                 else:
+                    print("G: 2.2")
                     while True:
                         try:
                             self.runner.process.wait(timeout=self.runner.timeout)
                             break
                         except subprocess.TimeoutExpired:
-                            self.runner.protocol.timeout(None)
+                            if self.runner.protocol.timeout(None) is True:
+                                # TODO: unify this code with the respective code below
+                                for fd in (
+                                        self.runner.process.stdin, self.runner.process.stdout,
+                                        self.runner.process.stderr):
+                                    if fd is not None:
+                                        fd.close()
+                                self.runner.process.terminate()
+                                self.runner.process.wait()
+                                break
 
                     self.return_code = self.runner.process.poll()
                     self.runner.protocol.process_exited()
                     self.state = self.GeneratorState.process_exited
 
         if self.state == self.GeneratorState.process_exited:
+            print("G: 3")
             if len(self.result_queue) > 0:
+                print("G: 3.1")
                 return self.result_queue.popleft()
             else:
+                print("G: 3.2")
                 # TODO: check exception
                 self.runner.protocol.connection_lost(None)
                 self.state = self.GeneratorState.connection_lost
 
         if self.state == self.GeneratorState.connection_lost:
+            print("G: 4")
             if len(self.result_queue) > 0:
+                print("G: 4.1")
                 return self.result_queue.popleft()
+            print("G: 4.2")
             raise StopIteration(self.return_code)
 
     def throw(self, exception_type, value=None, trace_back=None):
@@ -348,6 +374,15 @@ class ThreadedRunner:
         """
         Get a single event from the queue
         """
+
+        # Test START
+        if self.process.poll() is not None:
+            if self.process_stdin_fileno in self.active_file_numbers:
+                self.active_file_numbers.remove(self.process_stdin_fileno)
+            if self.process.stdin is not None:
+                self.process.stdin.close()
+        # Test END
+
         data = None
         while True:
             # We do not need a timeout here. If self.timeout is None,

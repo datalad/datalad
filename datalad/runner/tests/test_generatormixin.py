@@ -105,3 +105,21 @@ def test_file_number_activity_detection():
     assert_equal(result_generator.send(None), 3)
     assert_equal(result_generator.send(None), 4)
     assert_raises(StopIteration, result_generator.send, None)
+
+
+def test_generator_mixin_interactive():
+
+    stdin_queue = Queue()
+    for fd, data in run_command([sys.executable, "-i", "-v"], TestProtocol, stdin_queue):
+        if fd == 1:
+            sys.stdout.write(f"{data}\n")
+        else:
+            sys.stderr.write(f"{data} ")
+            if data == ">>> ":
+                stdin_queue.put((input() + "\n").encode())
+
+
+def test_exiting_process():
+
+    result = run_command([sys.executable, "-c", "import time\ntime.sleep(3)\nprint('exit')"], protocol=NoCapture, stdin=None)
+    print(result)

@@ -23,7 +23,22 @@ lgr = logging.getLogger('datalad.runner.protocol')
 
 
 class GeneratorMixIn:
+    """ Protocol mix in that will instruct runner.run to return a generator
 
+    When this class is in the parent of a protocol given to runner.run (and
+    some other functions/methods) the run-method will return a generator that
+    will yield stdout and/or stderr output of the sub-process, if `proc_out`
+    and/or `proc_err` are set to not `None` in the protocol class.
+
+    The generator will yield tuples containing a file descriptor and data that
+    was read from the file descriptor: (file_descriptor, data)
+
+    This allows to use runner.run in a construct like:
+
+        for fd, data in runner.run(...):
+            # do something, for example write to stdin of the subprocess
+
+    """
     generator = True
 
     def __init__(self):
