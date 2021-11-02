@@ -105,8 +105,7 @@ def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     with chpwd(repo_path):
         # create annex repo
-        ds = Dataset(repo_path)
-        ds.create(force=True)
+        ds = Dataset(repo_path).create(force=True)
 
         # add archive to the repo so we could test
         with swallow_outputs():
@@ -376,8 +375,7 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tempfile(mkdir=True)
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     with chpwd(repo_path):
-        ds = Dataset(repo_path)
-        ds.create(force=True)
+        ds = Dataset(repo_path).create(force=True)
 
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
@@ -395,8 +393,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
 def test_add_archive_content_zip(repo_path):
-    ds = Dataset(repo_path)
-    ds.create(force=True)
+    ds = Dataset(repo_path).create(force=True)
     with chpwd(repo_path):
         with swallow_outputs():
             ds.save("1.zip", message="add 1.zip")
@@ -409,8 +406,7 @@ def test_add_archive_content_zip(repo_path):
 @with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
-    ds = Dataset(opj(path, "ds"))
-    ds.create(force=True)
+    ds = Dataset(opj(path, "ds")).create(force=True)
     ds.save("1.tar.gz", message="1.tar.gz")
     abs_tar_gz = opj(path, "ds", "1.tar.gz")
     add_archive_content(abs_tar_gz, dataset=ds)
@@ -433,8 +429,7 @@ def test_add_archive_content_absolute_path(path):
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
-    ds = Dataset(repo_path)
-    ds.create(force=True)
+    ds = Dataset(repo_path).create(force=True)
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
@@ -481,8 +476,7 @@ def test_add_archive_use_archive_dir(repo_path):
     }
 )
 def test_add_archive_single_file(repo_path):
-    ds = Dataset(repo_path)
-    ds.create(force=True)
+    ds = Dataset(repo_path).create(force=True)
     with chpwd(repo_path):
         archives = glob('archives/*')
         ds.save(archives, message='Added archives')
