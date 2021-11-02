@@ -933,7 +933,7 @@ def _get_testrepos_uris(regex, flavors):
         _nested_submodule_annex_test_repo = NestedDataset()
         _inner_submodule_annex_test_repo = InnerSubmodule()
         _TESTREPOS = {'basic_annex':
-                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                        {'network': 'https://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
                          'local-url': _basic_annex_test_repo.url},
                       'basic_git':

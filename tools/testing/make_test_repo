@@ -67,7 +67,7 @@ create_github_repo() {
 	cd $repodir
 	# it wouldn't delete or complain in exit code if exists already
 	hub create -d "$descr (otherwise userless)" $ghrepo
-	git remote | grep -q '^origin' || git remote add origin git://github.com/$ghrepo
+	git remote | grep -q '^origin' || git remote add origin https://github.com/$ghrepo
 	git push --set-upstream --all -f origin
 }
 
@@ -119,7 +119,7 @@ register_repo_submodule() {
 	_info "registering git submodule"
 	# TODO: verify if not registered already
 	#git submodule ...
-	git submodule add --force git://github.com/$ghrepo ./$flavor/$name && \
+	git submodule add --force https://github.com/$ghrepo ./$flavor/$name && \
 		git commit -m "Added test $flavor/$name" -a && \
 		git push origin
 }
