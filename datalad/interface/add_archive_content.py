@@ -146,7 +146,7 @@ class AddArchiveContent(Interface):
             default="fail",
             doc="""what operation to perform if a file from an archive tries to
             overwrite an existing file with the same name.  'fail' (default)
-            leads to RuntimeError exception, 'overwrite' silently replaces
+            leads to an error result, 'overwrite' silently replaces
             existing file, 'archive-suffix' instructs to add a suffix (prefixed
             with a '-') matching archive name from which file gets extracted,
             and if that one is present as well, 'numeric-suffix' is in effect in
@@ -528,11 +528,16 @@ class AddArchiveContent(Interface):
                     if not handle_existing:
                         pass  # nothing... just to avoid additional indentation
                     elif existing == 'fail':
-                        raise RuntimeError(
-                            "{} already exists, but new file {} was instructed "
-                            "to be placed there while overwrite=False".format
+                        message = \
+                            "{} exists, but would be overwritten by new file " \
+                            "{}. Consider adjusting --existing".format\
                             (target_file_path, extracted_file)
-                        )
+                        yield get_status_dict(
+                            ds=ds,
+                            status='error',
+                            message=message,
+                            **res_kwargs)
+                        return
                     elif existing == 'overwrite':
                         stats.overwritten += 1
                         # to make sure it doesn't conflict -- might have been a

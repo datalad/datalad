@@ -262,13 +262,15 @@ def test_add_archive_content(path_orig, url, repo_path):
 
         # But that other one carries updated file, so should fail due to
         # overwrite
-        with assert_raises(RuntimeError) as cme:
-            add_archive_content(Path('1u') / Path('1.tar.gz'),
-                                use_current_dir=True)
-
-        # TODO: somewhat not precise since we have two possible "already exists"
-        # -- in caching and overwrite check
-        assert_in("already exists", str(cme.exception))
+        res = add_archive_content(Path('1u') / Path('1.tar.gz'),
+                                  use_current_dir=True, on_failure='ignore')
+        assert_in_results(
+            res,
+            action='add-archive-content',
+            status='error',
+        )
+        assert_in('exists, but would be overwritten by new file',
+                  res[0]['message'])
         # but should do fine if overrides are allowed
         add_archive_content(Path('1u') / Path('1.tar.gz'), existing='overwrite',
                             use_current_dir=True)
