@@ -106,12 +106,12 @@ def test_add_archive_dirs(path_orig, url, repo_path):
     with chpwd(repo_path):
         # create annex repo
         ds = Dataset(repo_path).create(force=True)
-
+        repo = ds.repo
         # add archive to the repo so we could test
         with swallow_outputs():
-            ds.repo.add_urls([opj(url, '1.tar.gz')],
+            repo.add_urls([opj(url, '1.tar.gz')],
                              options=["--pathdepth", "-1"])
-        ds.repo.commit("added 1.tar.gz")
+        repo.commit("added 1.tar.gz")
 
         # test with excludes and annex options
         add_archive_content('1.tar.gz',
@@ -125,7 +125,7 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                             use_current_dir=False,
                             exclude='.*__MACOSX.*')  # some junk penetrates
 
-        eq_(ds.repo.get_description(
+        eq_(repo.get_description(
             uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
             '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
@@ -212,6 +212,7 @@ def test_add_archive_content(path_orig, url, repo_path):
         res = ds.add_archive_content("nonexisting.tar.gz", on_failure='ignore')
         assert_in_results(res, action='add-archive-content',
                           status='impossible')
+        repo = ds.repo
 
         # we can't add a file from outside the repo ATM
         res = ds.add_archive_content(Path(path_orig) / '1.tar.gz',
@@ -227,13 +228,13 @@ def test_add_archive_content(path_orig, url, repo_path):
 
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
-            ds.repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+            repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
             for s in range(1, 5):
-                ds.repo.add_urls([opj(url, '%du/1.tar.gz' % s)],
+                repo.add_urls([opj(url, '%du/1.tar.gz' % s)],
                                  options=["--pathdepth", "-2"])
-            ds.repo.commit("added 1.tar.gz")
+            repo.commit("added 1.tar.gz")
 
-        key_1tar = ds.repo.get_file_annexinfo('1.tar.gz')['key']  # will be used in the test later
+        key_1tar = repo.get_file_annexinfo('1.tar.gz')['key']  # will be used in the test later
 
         def d1_basic_checks():
             ok_(exists('1'))
@@ -283,7 +284,7 @@ def test_add_archive_content(path_orig, url, repo_path):
         # rudimentary test
         assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
                      ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
-        whereis = ds.repo.whereis(glob(opj(repo_path, '1', '1*')))
+        whereis = repo.whereis(glob(opj(repo_path, '1', '1*')))
         # they all must be the same
         assert(all([x == whereis[0] for x in whereis[1:]]))
 
@@ -318,54 +319,54 @@ def test_add_archive_content(path_orig, url, repo_path):
         # Let's add first archive to the repo so we could test
         # named the same way but different content
         with swallow_outputs():
-            ds.repo.add_urls([opj(url, 'd1', '1.tar.gz')], options=["--pathdepth", "-1"],
+            repo.add_urls([opj(url, 'd1', '1.tar.gz')], options=["--pathdepth", "-1"],
                           cwd=getpwd())  # invoke under current subdir
-        ds.repo.commit("added 1.tar.gz in d1")
+        repo.commit("added 1.tar.gz in d1")
 
         def d2_basic_checks():
             ok_(exists('1'))
             ok_file_under_git('1', '2 f.txt', annexed=True)
             ok_file_under_git(opj('1', 'd2', '2d'), annexed=True)
-            ok_archives_caches(ds.repo.path, 0)
+            ok_archives_caches(repo.path, 0)
         add_archive_content('1.tar.gz', dataset=ds.path)
         d2_basic_checks()
 
     # in manual tests ran into the situation of inability to obtain on a single run
     # a file from an archive which was coming from a dropped key.  I thought it was
     # tested in custom remote tests, but I guess not sufficiently well enough
-    ds.repo.drop(opj('1', '1 f.txt'))  # should be all kosher
-    ds.repo.get(opj('1', '1 f.txt'))
-    ok_archives_caches(ds.repo.path, 1, persistent=True)
-    ok_archives_caches(ds.repo.path, 0, persistent=False)
+    repo.drop(opj('1', '1 f.txt'))  # should be all kosher
+    repo.get(opj('1', '1 f.txt'))
+    ok_archives_caches(repo.path, 1, persistent=True)
+    ok_archives_caches(repo.path, 0, persistent=False)
 
-    ds.repo.drop(opj('1', '1 f.txt'))  # should be all kosher
-    ds.repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
-    ds.repo.get(opj('1', '1 f.txt'))  # that what managed to not work
+    repo.drop(opj('1', '1 f.txt'))  # should be all kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
+    repo.get(opj('1', '1 f.txt'))  # that what managed to not work
 
     # TODO: check if persistent archive is there for the 1.tar.gz
 
     # We should be able to drop everything since available online
     with swallow_outputs():
         clean(dataset=ds)
-    ds.repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
 
     ds.drop(opj('1', '1 f.txt'))  # should be all kosher
     ds.get(opj('1', '1 f.txt'))  # and should be able to get it again
 
     # bug was that dropping didn't work since archive was dropped first
-    ds.repo.call_annex(["drop", "--all"])
+    repo.call_annex(["drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
-    ds.repo.get(key_1tar, key=True)
+    repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
     with assert_raises(CommandError) as e:
-        ds.repo.drop(key_1tar, key=True)
+        repo.drop(key_1tar, key=True)
         assert_equal(e.kwargs['stdout_json'][0]['success'], False)
         assert_result_values_cond(
             e.kwargs['stdout_json'], 'note',
             lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
         )
-    assert exists(opj(ds.repo.path, ds.repo.get_contentlocation(key_1tar)))
+    assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
 @integration
@@ -376,12 +377,12 @@ def test_add_archive_content(path_orig, url, repo_path):
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     with chpwd(repo_path):
         ds = Dataset(repo_path).create(force=True)
-
+        repo = ds.repo
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
-            ds.repo.add_urls([opj(url, '1.tar.gz')],
+            repo.add_urls([opj(url, '1.tar.gz')],
                              options=["--pathdepth", "-1"])
-        ds.repo.commit("added 1.tar.gz")
+        repo.commit("added 1.tar.gz")
 
         add_archive_content('1.tar.gz', strip_leading_dirs=True)
         ok_(not exists('1'))
@@ -407,11 +408,12 @@ def test_add_archive_content_zip(repo_path):
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
     ds = Dataset(opj(path, "ds")).create(force=True)
+    repo = ds.repo
     ds.save("1.tar.gz", message="1.tar.gz")
     abs_tar_gz = opj(path, "ds", "1.tar.gz")
     add_archive_content(abs_tar_gz, dataset=ds)
     ok_file_under_git(opj(path, "ds", "1", "foo"), annexed=True)
-    commit_msg = ds.repo.format_commit("%B")
+    commit_msg = repo.format_commit("%B")
     # The commit message uses relative paths.
     assert_not_in(abs_tar_gz, commit_msg)
     assert_in("1.tar.gz", commit_msg)
@@ -537,15 +539,15 @@ class TestAddArchiveOptions():
         # but that new stuff was added to annex repo.  We know the key since
         # default backend and content remain the same
         key1 = 'MD5E-s5--db87ebcba59a8c9f34b68e713c08a718.dat'
-
+        repo = self.ds.repo
         # previous state of things:
         prev_files = list(find_files('.*', self.ds.path))
-        assert_equal(self.ds.repo.whereis(key1, key=True, output='full'), {})
+        assert_equal(repo.whereis(key1, key=True, output='full'), {})
 
-        commits_prior = list(self.ds.repo.get_branch_commits_('git-annex'))
+        commits_prior = list(repo.get_branch_commits_('git-annex'))
         self.ds.add_archive_content('1.tar',
                                     strip_leading_dirs=True, delete_after=True)
-        commits_after = list(self.ds.repo.get_branch_commits_('git-annex'))
+        commits_after = list(repo.get_branch_commits_('git-annex'))
         # There should be a single commit for all additions +1 to initiate
         # datalad-archives gh-1258
         # If faking dates, there should be another +1 because
@@ -553,9 +555,9 @@ class TestAddArchiveOptions():
         assert_equal(len(commits_after),
                      # We expect one more when faking dates because
                      # annex.alwayscommit isn't set to false.
-                     len(commits_prior) + 2 + self.ds.repo.fake_dates_enabled)
+                     len(commits_prior) + 2 + repo.fake_dates_enabled)
         assert_equal(prev_files, list(find_files('.*', self.ds.path)))
-        w = self.ds.repo.whereis(key1, key=True, output='full')
+        w = repo.whereis(key1, key=True, output='full')
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
 
         # Let's now do the same but also drop content
@@ -563,7 +565,7 @@ class TestAddArchiveOptions():
                                     strip_leading_dirs=True, delete_after=True,
                                     drop_after=True)
         assert_equal(prev_files, list(find_files('.*', self.ds.path)))
-        w = self.ds.repo.whereis(key1, key=True, output='full')
+        w = repo.whereis(key1, key=True, output='full')
         assert_equal(len(w), 1)  # in archive
 
         # there should be no .datalad temporary files hanging around
