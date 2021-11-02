@@ -85,7 +85,7 @@ class Drop(Interface):
         what=Parameter(
             args=("--what",),
             doc="""""",
-            # add 'unwanted'
+            # TODO add 'unwanted'
             constraints=EnsureChoice('filecontent', 'allkeys', 'datasets', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -116,6 +116,17 @@ class Drop(Interface):
             check=None,
             # TODO deal with deprecation
             if_dirty=None):
+
+        # proper spelling of mode switches is critical for implementation
+        # below. double-check, also in Python API usage
+        # TODO consider making a generic helper
+        for label, value in (('what', what), ('reckless', reckless)):
+            try:
+                Drop._params_[label].constraints(value)
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid '{label}' parameter value of: "
+                    f"{repr(value)} [{str(e)}]") from e
 
         # TODO deprecation warning on `check`
         if check is False:
@@ -258,7 +269,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
 
     if paths is not None and paths != [ds.pathobj]:
         # so we have paths constraints that prevent dropping the full dataset
-        if what == 'dataset':
+        if what == 'datasets':
             # there is nothing to do here, but to drop keys, which we must not
             # done
             return
