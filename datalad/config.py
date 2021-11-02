@@ -319,6 +319,18 @@ class ConfigManager(object):
         if source not in ('any', 'local', 'branch', 'branch-local'):
             raise ValueError(
                 'Unknown ConfigManager(source=) setting: {}'.format(source))
+
+        # public dict to store variables that always override any setting
+        # read from a file
+        # `hasattr()` is needed because `datalad.cfg` is generated upon first module
+        # import, hence when this code runs first, there cannot be any config manager
+        # to inherit from
+        self.overrides = datalad.cfg.overrides.copy() if hasattr(datalad, 'cfg') else {}
+        if overrides is not None:
+            self.overrides.update(overrides)
+        self.setup(dataset=dataset, source=source)
+
+    def setup(self, dataset=None, source='any'):
         store = dict(
             # store in a simple dict
             # no subclassing, because we want to be largely read-only, and implement
@@ -350,14 +362,6 @@ class ConfigManager(object):
                 self._repo_pathobj = dataset.repo.pathobj
 
         self._config_cmd = ['git', 'config']
-        # public dict to store variables that always override any setting
-        # read from a file
-        # `hasattr()` is needed because `datalad.cfg` is generated upon first module
-        # import, hence when this code runs first, there cannot be any config manager
-        # to inherit from
-        self.overrides = datalad.cfg.overrides.copy() if hasattr(datalad, 'cfg') else {}
-        if overrides is not None:
-            self.overrides.update(overrides)
         if dataset is None:
             if source in ('branch', 'branch-local'):
                 raise ValueError(

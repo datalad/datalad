@@ -435,7 +435,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
 
 
 @optional_args
-def datasetmethod(f, name=None, dataset_argname='dataset'):
+def datasetmethod(f, name=None, dataset_argname='dataset', bind=True):
     """Decorator to bind functions to Dataset class.
 
     The decorated function is still directly callable and additionally serves
@@ -484,8 +484,13 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
                 kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func(f))
-    return f
+    if True: # bind:
+        setattr(Dataset, name, apply_func(f))
+        return f
+    else:
+        # TODO: naming/logic better...?
+        return apply_func(f)
+
 
 
 # Note: Cannot be defined within constraints.py, since then dataset.py needs to

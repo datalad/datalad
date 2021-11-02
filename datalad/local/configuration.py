@@ -141,10 +141,11 @@ class Configuration(Interface):
         recursion_limit=recursion_limit,
     )
 
-    @staticmethod
-    # @datasetmethod(name='config')
+    # @staticmethod
+    # @datasetmethod(name='config', bind=False)
     @eval_results
     def __call__(
+            self,
             action='dump',
             spec=None,
             scope=None,
@@ -185,12 +186,26 @@ class Configuration(Interface):
                     'Name must contain a section (i.e. "section.name"). '
                     'Invalid: {}'.format(invalid_names))
 
+        # ConfigManager's constructor takes a dataset as an argument:
+        #      def __init__(self, dataset=None, overrides=None, source='any'):
+        # but doesn't bind it inside -- just uses to figure things out and possibly (ab)use its Runner.
+        # So, the only way to instantiate a proper "Mule" (joint ConfigManager + Configuration)
+        # is to pass `dataset` to ConfigManager constructor, which of cause our interface'ing code
+        # does not do ATM.
         ds = None
         if scope != 'global' or recursive:
             ds = require_dataset(
                 dataset,
                 check_installed=True,
                 purpose='configuration')
+            if ds and scope != 'global':
+                import pdb; pdb.set_trace()
+                # map scope ('local', 'dataset', None)  of configuration (excluding global) to source
+                #           {'any', 'local', 'branch', 'branch-local'}
+                # see also https://github.com/datalad/datalad/pull/5969
+                # which maps
+                source = {None: 'any', 'local': 'local', 'dataset': 'branch'}[scope]
+                # self.setup(dataset=ds, source=source)
 
         res_kwargs = dict(
             action='configuration',
@@ -273,6 +288,8 @@ def configuration(action, scope, specs, res_kwargs, ds=None):
     if action == 'dump':
         # dumping is querying for all known keys
         specs = [(n,) for n in sorted(set(cfg_defs.keys()).union(cfg.keys()))]
+        # ??? Yarik is not sure why scope would not mapper while dumping?!
+        # I could have different values in different scopes
         scope = None
 
     for spec in specs:
