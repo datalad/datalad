@@ -375,7 +375,7 @@ def test_safetynet(otherpath, origpath, clonepath):
     # some windows test setup is not very robust, explicitly
     # include the default name "origin" in the test success
     # conditions to make this more robust
-    assert_in(res[0]['message'][1], ['dl-test-remote', 'origin'])
+    assert_in(res[0]['message'][1][0], ['dl-test-remote', 'origin'])
     assert_true(cloneds.is_installed())
 
     # announce dead
