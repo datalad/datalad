@@ -783,6 +783,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         argspec = re.compile(r'^([^=]*)=(.*)$')
         srs = {}
         try:
+            # git-annex might have some changes "staged" to be committed to
+            # git-annex branch.  Before interrogating git-annex's metadata without
+            # going through git annex, we need to possibly commit staged changes.
+            if not self.always_commit:
+                self.call_annex(['info', '--fast'], always_commit=True)
             for line in self.call_git_items_(
                     ['cat-file', 'blob', 'git-annex:remote.log'],
                     read_only=True):
@@ -813,6 +818,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,
                     git_options=None, stdin=None, merge_annex_branches=True,
+                    always_commit=None,
                     **kwargs):
         """Internal helper to run git-annex commands
 
@@ -847,6 +853,8 @@ class AnnexRepo(GitRepo, RepoInterface):
           If False, annex.merge-annex-branches=false config will be set for
           git-annex call.  Useful for operations which are not intended to
           benefit from updating information about remote git-annexes
+        always_commit: bool, optional
+          If specified, will take precedence over self.alwayscommit
         **kwargs:
           Additional arguments are passed on to the WitlessProtocol constructor
 
@@ -879,7 +887,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             cmd += git_options
 
-        if not self.always_commit:
+        if always_commit is None:
+            always_commit = self.always_commit
+        if not always_commit:
             cmd += ['-c', 'annex.alwayscommit=false']
 
         if not merge_annex_branches:
@@ -1147,7 +1157,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         return self._call_annex_records(args, files=files)
 
-    def call_annex(self, args, files=None):
+    def call_annex(self, args, files=None, always_commit=None):
         """Call annex and return standard output.
 
         Parameters
@@ -1158,6 +1168,8 @@ class AnnexRepo(GitRepo, RepoInterface):
           File arguments to pass to `annex`. The advantage of passing these here
           rather than as part of `args` is that the call will be split into
           multiple calls to avoid exceeding the maximum command line length.
+        always_commit: bool, optional
+          If specified, the value will be used instead of self.always_commit
 
         Returns
         -------
@@ -1170,6 +1182,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return self._call_annex(
             args,
             files=files,
+            always_commit=always_commit,
             protocol=StdOutErrCapture)['stdout']
 
     def call_annex_items_(self, args, files=None, sep=None):
