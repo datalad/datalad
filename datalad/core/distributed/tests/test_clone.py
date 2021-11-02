@@ -124,7 +124,6 @@ def test_invalid_args(path, otherpath, alienpath):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir, ds_path):
@@ -143,7 +142,6 @@ def test_clone_crcns(tdir, ds_path):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir):
     tdir = Path(tdir)
@@ -719,7 +717,7 @@ def test_decode_source_spec():
             'localhost/another/path',
             'user@someho.st/mydir',
             'ssh://somewhe.re/else',
-            'git://github.com/datalad/testrepo--basic--r1',
+            'https://github.com/datalad/testrepo--basic--r1',
     ):
         props = decode_source_spec(url)
         dest = props.pop('default_destpath')
@@ -1554,9 +1552,9 @@ def test_fetch_git_special_remote(url_path, url, path):
 def test_nonuniform_adjusted_subdataset(path):
     # https://github.com/datalad/datalad/issues/5107
     topds = Dataset(Path(path) / "top").create()
-    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    subds_url = 'https://github.com/datalad/testrepo--basic--r1'
     topds.clone(
-        source='git://github.com/datalad/testrepo--basic--r1',
+        source='https://github.com/datalad/testrepo--basic--r1',
         path='subds')
     eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
         subds_url)

@@ -492,18 +492,18 @@ def test_GitRepo_files_decorator():
 @with_tempfile
 def test_GitRepo_remote_add(path):
     gr = GitRepo(path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     out = gr.get_remotes()
     assert_in('github', out)
     eq_(len(out), 1)
-    eq_('git://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
+    eq_('https://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
 
 
 @with_tempfile
 def test_GitRepo_remote_remove(path):
 
     gr = GitRepo(path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     out = gr.get_remotes()
     eq_(len(out), 1)
     gr.remove_remote('github')
@@ -515,9 +515,9 @@ def test_GitRepo_remote_remove(path):
 def test_GitRepo_get_remote_url(path):
 
     gr = GitRepo(path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     eq_(gr.get_remote_url('github'),
-        'git://github.com/datalad/testrepo--basic--r1')
+        'https://github.com/datalad/testrepo--basic--r1')
 
 
 @with_tempfile
@@ -1549,7 +1549,8 @@ def test_protocols():
     # which happened with git-annex-standalone 7.20191017+git2-g7b13db551-1~ndall+1
 
     # http is well tested already
-    for proto in 'git', 'https':
+    # 'git' is not longer supported
+    for proto in ('https', ):
         yield _test_protocols, proto
 
 
