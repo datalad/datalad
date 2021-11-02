@@ -81,17 +81,22 @@ class Remove(Interface):
             doc="path/name of the component to be removed",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        what=Parameter(
-            args=("--what",),
+        drop=Parameter(
+            args=("--drop",),
             doc="""""",
+            # we must not offer a 'nothing' which would bypass
+            # the `drop()` call. The implementation completely
+            # relies ob `drop()` for all safety measures.
+            # instead `drop(reckless=kill)` must be used to fast-kill
+            # things
             constraints=EnsureChoice('datasets', 'all')),
         recursive=Parameter(
             args=("--recursive", '-r',),
             doc="""DPERECATED and IGNORED"""),
         jobs=jobs_opt,
+        message=save_message_opt,
         # XXX deprecate!
         save=nosave_opt,
-        message=save_message_opt,
     )
     # inherit some from Drop
     # if_dirty and check as deprecated
@@ -119,7 +124,7 @@ class Remove(Interface):
     def __call__(
             path=None,
             dataset=None,
-            what='all',
+            drop='all',
             reckless=None,
             message=None,
             jobs=None,
@@ -146,7 +151,7 @@ class Remove(Interface):
         for res in Drop.__call__(
                 dataset=dataset,
                 path=path,
-                what=what,
+                what=drop,
                 reckless=reckless,
                 recursive=True,
                 recursion_limit=None,

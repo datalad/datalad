@@ -294,7 +294,7 @@ def test_remove_file_handle_only(path):
     ok_(path_two.exists())
     # remove one handle, should not affect the other
     # what=dataset prevents the dropping of individual keys
-    ds.remove('two', what='dataset', message="custom msg")
+    ds.remove('two', drop='datasets', reckless='availability', message="custom msg")
     eq_(ds.repo.format_commit("%B").rstrip(), "custom msg")
     eq_(rpath_one, (ds.pathobj / 'one').resolve())
     ok_(rpath_one.exists())
