@@ -101,11 +101,23 @@ class BlockingOSWriterThread(ExitingThread):
     """
     def __init__(self,
                  destination: IO,
+                 signal_queue: Optional[Queue] = None
                  ):
 
         super().__init__()
         self.destination = destination
+        self.signal_queue = signal_queue
         self.queue = Queue(1)
+
+    def signal_exit(self):
+        if self.signal_queue is None:
+            return
+        try:
+            self.signal_queue.put(None, block=True, timeout=1)
+        except Full:
+            lgr.debug(
+                f"timeout while trying to signal "
+                f"{(None)}")
 
     def run(self):
 
@@ -116,6 +128,7 @@ class BlockingOSWriterThread(ExitingThread):
             if isinstance(data, tuple):
                 identifier, state, data = data
             if data is None:
+                self.signal_exit()
                 self.destination.close()
                 break
 
@@ -125,9 +138,9 @@ class BlockingOSWriterThread(ExitingThread):
                     written += os.write(
                         self.destination.fileno(),
                         data[written:])
-            except (BrokenPipeError, OSError, ValueError):
+            except (BrokenPipeError, OSError, ValueError) as e:
                 # The destination was most likely closed, indicate EOF.
-                self.queue.put(None)
+                self.signal_exit()
                 break
 
         lgr.log(5, "%s exiting", self)

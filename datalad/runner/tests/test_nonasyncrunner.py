@@ -40,7 +40,10 @@ from .. import (
 )
 from ..nonasyncrunner import run_command
 from ..protocol import WitlessProtocol
-from ..runnerthreads import BlockingOSReaderThread
+from ..runnerthreads import (
+    BlockingOSReaderThread,
+    BlockingOSWriterThread,
+)
 
 
 def test_subprocess_return_code_capture():
@@ -154,6 +157,109 @@ def test_blocking_thread_exit():
     os.write(write_descriptor, b"more data")
     reader_thread.join()
     assert_true(read_queue.empty())
+
+
+def test_blocking_read_exception_catching():
+    (read_descriptor, write_descriptor) = os.pipe()
+    read_file = os.fdopen(read_descriptor, "rb")
+
+    reader_thread = BlockingOSReaderThread(read_file)
+    reader_thread.start()
+    read_queue = reader_thread.queue
+
+    os.write(write_descriptor, b"some data")
+    assert_true(reader_thread.is_alive())
+    data = read_queue.get()
+    eq_(data, b"some data")
+    os.close(write_descriptor)
+    reader_thread.join()
+    data = read_queue.get()
+    eq_(data, None)
+
+
+def test_blocking_read_closing():
+    class FakeFile:
+        def fileno(self):
+            return 33
+
+    reader_thread = BlockingOSReaderThread(FakeFile())
+    reader_thread.start()
+    read_queue = reader_thread.queue
+
+    reader_thread.join()
+    data = read_queue.get()
+    eq_(data, None)
+
+
+def test_blocking_write_exception_catching():
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    signal_queue = queue.Queue()
+    writer_thread = BlockingOSWriterThread(write_file, signal_queue)
+    writer_thread.start()
+    writer_queue = writer_thread.queue
+
+    writer_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    os.close(read_descriptor)
+    os.close(write_descriptor)
+
+    writer_queue.put(b"more data")
+    writer_thread.join()
+    eq_(signal_queue.get(), None)
+
+
+def test_blocking_writer_closing():
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    signal_queue = queue.Queue()
+    writer_thread = BlockingOSWriterThread(write_file, signal_queue)
+    writer_thread.start()
+    writer_queue = writer_thread.queue
+
+    writer_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    writer_queue.put(None)
+    writer_thread.join()
+    eq_(signal_queue.get(), None)
+
+
+def test_blocking_writer_closing_timeout_signal():
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    signal_queue = queue.Queue(1)
+    signal_queue.put("This is data")
+
+    writer_thread = BlockingOSWriterThread(write_file, signal_queue)
+    writer_thread.start()
+    writer_queue = writer_thread.queue
+
+    writer_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    writer_queue.put(None)
+    writer_thread.join()
+    eq_(signal_queue.get(), "This is data")
+
+
+def test_blocking_writer_closing_no_signal():
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    writer_thread = BlockingOSWriterThread(write_file)
+    writer_thread.start()
+    writer_queue = writer_thread.queue
+
+    writer_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    writer_queue.put(None)
+    writer_thread.join()
 
 
 def test_inside_async():

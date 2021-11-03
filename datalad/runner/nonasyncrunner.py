@@ -347,7 +347,9 @@ class ThreadedRunner:
 
             if self.write_stdin:
                 self.active_file_numbers.add(self.process_stdin_fileno)
-                self.stdin_writer_thread = BlockingOSWriterThread(self.process.stdin)
+                # Use the WriterThread source queue to signal file close
+                self.stdin_writer_thread = BlockingOSWriterThread(
+                    self.process.stdin, self.stdin_queue)
                 self.stdin_enqueueing_thread = WriteThread(
                     identifier=self.process_stdin_fileno,
                     source_queue=self.stdin_queue,
