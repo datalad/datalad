@@ -589,7 +589,11 @@ def get_paths_by_ds(refds, dataset_arg, paths, subdsroot_mode='rsync'):
             # and we are either in 'super' mode, or in 'rsync' and found
             # rsync-link syntax to identify the dataset as whole
             # (e.g. 'ds') vs its content (e.g. 'ds/')
-            super_root = get_dataset_root(op.dirname(root))
+            root_dir = op.dirname(root)
+            try:
+                super_root = roots_cache[root_dir]
+            except KeyError:
+                super_root = roots_cache[root_dir] = get_dataset_root(root_dir)
             if super_root:
                 # the dataset identified by the path argument
                 # is contained in a superdataset, and no
