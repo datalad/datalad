@@ -75,7 +75,7 @@ class WitlessRunner(object):
           will return an iterator and can therefore be used in a for-clause.
         stdin : file-like, string, bytes, Queue, or None
           If stdin is a file-like, it will be directly used as stdin for the
-          subprocess. The caller is resonsible for writing to it and closing it.
+          subprocess. The caller is responsible for writing to it and closing it.
           If stdin is a string or bytes, those will be fed to stdin of the
           subprocess. If all data is written, stdin will be closed.
           If stdin is a Queue, all elements (bytes) put into the Queue will
@@ -94,22 +94,20 @@ class WitlessRunner(object):
         timeout:
           None or the seconds after which a timeout callback is
           invoked, if no progress was made in communicating with
-          the sub-process
+          the sub-process, or if waiting for the subprocess exit
+          took more than the specified time. See the protocol and
+          `ThreadedRunner` descriptions for a more detailed discussion
+          on timeouts.
         kwargs :
           Passed to the Protocol class constructor.
 
-        Returns
-        -------
-        Union[dict, Generator]
+        : returns : Union[Any, Generator]
 
-            If the protocol does not have a GeneratorMixIn-mixin, the
-            result will be a dictionary.
-            At minimum there will be keys 'stdout', 'stderr' with
-            unicode strings of the cumulative standard output and error
-            of the process as values.
+            If the protocol is not a subclass of `GeneratorMixIn`, the
+            result of protocol._prepare_result will be returned.
 
-            If the protocol has a GeneratorMixIn-mixin, a Generator will be
-            returned. This allows to use this function in constructs like:
+            If the protocol is a subclass of `GeneratorMixIn`, a Generator
+            will be returned. This allows to use this method in constructs like:
 
                 for protocol_output in runner.run():
                     ...

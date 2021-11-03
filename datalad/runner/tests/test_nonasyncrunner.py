@@ -14,6 +14,7 @@ import queue
 import signal
 import subprocess
 import sys
+from time import sleep
 from typing import (
     List,
     Optional,
@@ -30,15 +31,16 @@ from datalad.tests.utils import (
 )
 from datalad.utils import on_windows
 
-from datalad.runner import (
+from .. import (
     NoCapture,
     Protocol,
     Runner,
     StdOutCapture,
     StdOutErrCapture,
 )
-from datalad.runner.protocol import WitlessProtocol
-from datalad.runner.nonasyncrunner import run_command
+from ..nonasyncrunner import run_command
+from ..protocol import WitlessProtocol
+from ..runnerthreads import BlockingOSReaderThread
 
 
 def test_subprocess_return_code_capture():
@@ -126,35 +128,32 @@ def test_interactive_communication():
     assert_true(result_pool["process_exited_called"], True)
 
 
-# def test_blocking_thread_exit():
-#
-#     (read_descriptor, write_descriptor) = os.pipe()
-#     read_file = os.fdopen(read_descriptor, "rb")
-#     read_queue = queue.Queue()
-#
-#     reader_thread = ReadThread(read_file, read_queue, "test")
-#     reader_thread.start()
-#
-#     os.write(write_descriptor, b"some data")
-#     assert_true(reader_thread.is_alive())
-#     data = read_queue.get()
-#     eq_(data[1], b"some data")
-#
-#     reader_thread.request_exit()
-#
-#     # Check the blocking part
-#     sleep(5)
-#     assert_true(reader_thread.is_alive())
-#
-#     # Check actual exit, we will not get
-#     # "more data" when exit was requested,
-#     # because the thread will not attempt
-#     # a write
-#     os.write(write_descriptor, b"more data")
-#     reader_thread.join()
-#     data = read_queue.get()
-#     eq_(data[1], None)
-#     assert_true(read_queue.empty())
+def test_blocking_thread_exit():
+    (read_descriptor, write_descriptor) = os.pipe()
+    read_file = os.fdopen(read_descriptor, "rb")
+
+    reader_thread = BlockingOSReaderThread(read_file)
+    reader_thread.start()
+    read_queue = reader_thread.queue
+
+    os.write(write_descriptor, b"some data")
+    assert_true(reader_thread.is_alive())
+    data = read_queue.get()
+    eq_(data, b"some data")
+
+    reader_thread.request_exit()
+
+    # Check the blocking part
+    sleep(3)
+    assert_true(reader_thread.is_alive())
+
+    # Check actual exit, we will not get
+    # "more data" when exit was requested,
+    # because the thread will not attempt
+    # a write
+    os.write(write_descriptor, b"more data")
+    reader_thread.join()
+    assert_true(read_queue.empty())
 
 
 def test_inside_async():
@@ -243,7 +242,6 @@ def test_timeout_nothing():
         timeout=1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
-    print(timeout_queue)
     eq_(len(timeout_queue), 1)
 
 

@@ -26,16 +26,13 @@ class GeneratorMixIn:
     """ Protocol mix in that will instruct runner.run to return a generator
 
     When this class is in the parent of a protocol given to runner.run (and
-    some other functions/methods) the run-method will return a generator that
-    will yield stdout and/or stderr output of the sub-process, if `proc_out`
-    and/or `proc_err` are set to not `None` in the protocol class.
+    some other functions/methods) the run-method will return a `Generator`,
+    which yields whatever the protocol callbacks send to the `Generator`,
+    via the `send_result`-method of this class.
 
-    The generator will yield tuples containing a file descriptor and data that
-    was read from the file descriptor: (file_descriptor, data)
+    This allows to use runner.run() in constructs like:
 
-    This allows to use runner.run in a construct like:
-
-        for fd, data in runner.run(...):
+        for result in runner.run(...):
             # do something, for example write to stdin of the subprocess
 
     """
@@ -137,18 +134,16 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         Called if the timeout parameter to WitlessRunner.run()
         is not `None` and a process file descriptor could not
         be read (stdout or stderr) or not be written (stdin)
-        within the specified time in seconds.
+        within the specified time in seconds, or if waiting for
+        a subprocess to exit takes longer than the specified time.
 
         stdin timeouts are only caught when the type of the `stdin`-
         parameter to WitlessRunner.run() is either a `Queue`,
         a `str`, or `bytes`. `Stdout` or `stderr` timeouts
         are only caught of proc_out and proc_err are
-        not None in the protocol class.
-        Even without stdin, stderr, and stdout-timeouts the
-        process runtime can still generate a timeout, e.g.,
-        if the process has to be waited for more than
-        `timeout` seconds. In this case the `fd`-argument
-        will be `None`.
+        not None in the protocol class. Process wait timeouts are
+        always caught if `timeout` is not `None`. In this case the
+        `fd`-argument will be `None`.
 
         fd:
           The file descriptor that timed out or `None` if no
@@ -158,17 +153,15 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
         return:
           If the callback returns `True`, the file descriptor
-          (if any was given) will be removed from the active
-          descriptor set, the associated files will be closed
-          and it will no longer be monitored.
+          (if any was given) will be closed and no longer monitored.
           If the return values is anything else than `True`,
           the file-descriptor will be monitored further
           and additional timeouts might occur indefinitely.
-          If `None` was given, i.e. process runtime-timeout
+          If `None` was given, i.e. a process runtime-timeout
           was detected, and `True` is returned, the process
           will be terminated.
         """
-        pass
+        return False
 
     def _prepare_result(self):
         """Prepares the final result to be returned to the runner

@@ -29,11 +29,10 @@ from typing import (
     Union,
 )
 
-from datalad.runner.protocol import (
+from .protocol import (
     GeneratorMixIn,
     WitlessProtocol,
 )
-
 from .runnerthreads import (
     BlockingOSReaderThread,
     BlockingOSWriterThread,
@@ -41,7 +40,6 @@ from .runnerthreads import (
     ReadThread,
     WriteThread,
 )
-
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 
@@ -120,7 +118,14 @@ class _ResultGenerator(Generator):
 
 
 class ThreadedRunner:
+    """
+    A class the contains a naive implementation for concurrent sub-process
+    execution. It uses `subprocess.Popen` and threads to read from stdout and
+    stderr of the subprocess, and to write to stdin of the subprocess.
 
+    All read data and timeouts are passed to a protocol instance, which can
+    create the final result.
+    """
     # Interval in seconds after which we check that a subprocess
     # is still running.
     process_check_interval = 0.2
@@ -133,6 +138,57 @@ class ThreadedRunner:
                  timeout: Optional[float] = None,
                  **popen_kwargs
                  ):
+        """
+        Parameters
+        ----------
+        cmd : list or str
+            Command to be executed, passed to `subprocess.Popen`. If cmd
+            is a str, `subprocess.Popen will be called with `shell=True`.
+
+        protocol : WitlessProtocol class or subclass which will be
+            instantiated for managing communication with the subprocess.
+
+            If the protocol is a subclass of
+            `datalad.runner.protocol.GeneratorMixIn`, this function will
+            return a `Generator` which yields whatever the protocol callback
+            fed into `GeneratorMixIn.send_result()`.
+
+            If the protocol is not a subclass of
+            `datalad.runner.protocol.GeneratorMixIn`, the function will return
+            the result created by the protocol method `_generate_result`.
+
+        stdin : file-like, string, bytes, Queue, or None
+            If stdin is a file-like, it will be directly used as stdin for the
+            subprocess. The caller is responsible for writing to it and closing
+            it. If stdin is a string or bytes, those will be fed to stdin of the
+            subprocess. If all data is written, stdin will be closed.
+            If stdin is a Queue, all elements (bytes) put into the Queue will
+            be passed to stdin until None is read from the queue. If None is
+            read, stdin of the subprocess is closed.
+
+        protocol_kwargs : dict, optional
+            Passed to the Protocol class constructor.
+
+        timeout : float, optional
+            If a non-`None` timeout is specified, the `timeout`-method of
+            the protocol will be called if:
+
+            - stdin-write, stdout-read, or stderr-read time out. In this case
+              the file descriptor will be given as argument to the
+              timeout-method. If the timeout-method return `True`, the file
+              descriptor will be closed.
+
+            - process.wait() timeout: if waiting for process completion after
+              stdin, stderr, and stdout takes longer than `timeout` seconds,
+              the timeout-method will be called with the argument `None`. If
+              it returns `True`, the process will be terminated.
+
+        popen_kwargs : dict
+            Passed to `subprocess.Popen`, will typically be parameters
+            supported by `subprocess.Popen`. Note that `bufsize`, `stdin`,
+            `stdout`, `stderr`, and `shell` will be overwritten internally.
+        """
+
         self.cmd = cmd
         self.protocol_class = protocol_class
         self.stdin = stdin
@@ -150,55 +206,32 @@ class ThreadedRunner:
         self.process_stdin_fileno = None
         self.process_stdout_fileno = None
         self.process_stderr_fileno = None
+        self.stderr_reader_thread = None
+        self.stderr_enqueueing_thread = None
+        self.stdout_reader_thread = None
+        self.stdout_enqueueing_thread = None
+        self.stdin_writer_thread = None
+        self.stdin_enqueueing_thread = None
         self.process_running = False
         self.fileno_mapping = None
         self.fileno_to_file = None
         self.output_queue = None
         self.active_file_numbers = None
 
-    def run(self):
+    def run(self) -> Union[Any, Generator]:
         """
-        Run a command in a subprocess
-
-        This is a naive implementation that uses sub`process.Popen`
-        and threads to read from sub-proccess' stdout and stderr and
-        put it into a queue from which the main-thread reads.
-        Upon receiving data from the queue, the main thread
-        will delegate data handling to a protocol_class instance
-
-        Parameters
-        ----------
-        cmd : list or str
-            Command to be executed, passed to `subprocess.Popen`. If cmd
-            is a str, `subprocess.Popen will be called with `shell=True`.
-        protocol : WitlessProtocol class or subclass which will be
-            instantiated for managing communication with the subprocess.
-            If the protocol has the GeneratorMixIn-mixin, the run-method
-            will return an iterator and can therefore be used in a for-clause.
-        stdin : file-like, string, bytes, Queue, or None
-            If stdin is a file-like, it will be directly used as stdin for the
-            subprocess. The caller is resonsible for writing to it and closing
-            it. If stdin is a string or bytes, those will be fed to stdin of the
-            subprocess. If all data is written, stdin will be closed.
-            If stdin is a Queue, all elements (bytes) put into the Queue will
-            be passed to stdin until None is read from the queue. If None is
-            read, stdin of the subprocess is closed.
-        protocol_kwargs : dict, optional
-            Passed to the Protocol class constructor.
-        popen_kwargs : Pass to `subprocess.Popen`, will typically be parameters
-            supported by `subprocess.Popen`. Note that `bufsize`, `stdin`,
-            `stdout`, `stderr`, and `shell` will be overwritten by
-            `run_command`.
+        Run the command as specified in __init__.
 
         Returns
         -------
         Any
-            If the protocol does not have a GeneratorMixIn-mixin, the result
-            of protocol._prepare_result will be returned.
+            If the protocol is not a subclass of `GeneratorMixIn`, the
+            result of protocol._prepare_result will be returned.
 
         Generator
-            If the protocol has a GeneratorMixIn-mixin, a Generator will be
-            returned. This allows to use this function in constructs like:
+            If the protocol is a subclass of `GeneratorMixIn`, a Generator
+            will be returned. This allows to use this method in constructs
+            like:
 
                 for protocol_output in runner.run():
                     ...
@@ -218,7 +251,6 @@ class ThreadedRunner:
                # get the return code of the process
                result = gen.return_code
         """
-
         if isinstance(self.stdin, (int, IO, type(None))):
             # indicate that we will not write anything to stdin, that
             # means the user can pass None, or he can pass a
@@ -473,15 +505,22 @@ def run_command(cmd: Union[str, List],
                 stdin: Any,
                 protocol_kwargs: Optional[Dict] = None,
                 timeout: Optional[float] = None,
-                **kwargs) -> Any:
+                **popen_kwargs) -> Union[Any, Generator]:
+    """
+    Run a command in a subprocess
 
+    this function delegates the execution to an instance of
+    `ThreadedRunner`, please see `ThreadedRunner.__init__()` for a
+    documentation of the parameters, and `ThreadedRunner.run()` for a
+    documentation of the return values.
+    """
     runner = ThreadedRunner(
         cmd=cmd,
         protocol_class=protocol,
         stdin=stdin,
         protocol_kwargs=protocol_kwargs,
         timeout=timeout,
-        **kwargs
+        **popen_kwargs,
     )
 
     return runner.run()
