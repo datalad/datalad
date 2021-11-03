@@ -60,9 +60,8 @@ def test_invalid_call(path):
 
         # needs spec or discover
         assert_raises(InsufficientArgumentsError, run_procedure)
-        res = run_procedure('unknown', on_failure='ignore')
-        assert_true(len(res) == 1)
-        assert_in_results(res, status="impossible")
+        # an unknown procedure should cause an error
+        assert_raises(ValueError, run_procedure, 'unknown')
 
 
 @with_tree(tree={'README.md': 'dirty'})

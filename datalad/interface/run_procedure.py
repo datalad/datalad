@@ -387,17 +387,7 @@ class RunProcedure(Interface):
             procedure_file, cmd_name, cmd_tmpl, cmd_help = \
                 next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
-            res = get_status_dict(
-                    action='run_procedure',
-                    # TODO: Default renderer requires a key "path" to exist.
-                    # Doesn't make a lot of sense in this case
-                    path=name,
-                    logger=lgr,
-                    refds=ds.path if ds else None,
-                    status='impossible',
-                    message="Cannot find procedure with name '%s'" % name)
-            yield res
-            return
+            raise ValueError("Cannot find procedure with name '%s'" % name)
 
         ex = _guess_exec(procedure_file)
         # configured template (call-format string) takes precedence:
