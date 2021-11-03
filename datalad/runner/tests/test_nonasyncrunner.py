@@ -54,6 +54,17 @@ from ..runnerthreads import (
 )
 
 
+# Protocol classes used for a set of generator tests later
+class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
+    def timeout(self, fd: Optional[int]) -> bool:
+        return True
+
+
+class GenNothing(GeneratorMixIn, NoCapture):
+    def timeout(self, fd: Optional[int]) -> bool:
+        return False
+
+
 def test_subprocess_return_code_capture():
 
     class KillProtocol(Protocol):
@@ -186,6 +197,9 @@ def test_blocking_read_exception_catching():
 
 
 def test_blocking_read_closing():
+    # Expect that the blocking OS reader thread
+    # exits when reading from a random file
+    # descriptor.
     class FakeFile:
         def fileno(self):
             return 33
@@ -200,6 +214,8 @@ def test_blocking_read_closing():
 
 
 def test_blocking_write_exception_catching():
+    # Expect that the blocking OS writer catches exceptions
+    # and exits gracefully.
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
     signal_queue = queue.Queue()
@@ -220,6 +236,8 @@ def test_blocking_write_exception_catching():
 
 
 def test_blocking_writer_closing():
+    # Expect that the blocking OS writer closes
+    # its file when `None` is sent to it.
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
     signal_queue = queue.Queue()
@@ -237,6 +255,8 @@ def test_blocking_writer_closing():
 
 
 def test_blocking_writer_closing_timeout_signal():
+    # Expect that the blocking OS writer does not
+    # block forever on a full signal queue
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
     signal_queue = queue.Queue(1)
@@ -307,15 +327,18 @@ def test_popen_invocation(src_path, dest_path):
 
 
 def test_timeout():
-
+    # Expect timeout protocol calls on long running process
+    # if the specified timeout is short enough
     class TestProtocol(WitlessProtocol):
+
+        received_timeouts = list()
+
         def __init__(self):
             WitlessProtocol.__init__(self)
-            self.received_timeouts = list()
             self.counter = count()
 
         def timeout(self, fd: Optional[int]):
-            print(self.counter.__next__(), "YYY", fd)
+            TestProtocol.received_timeouts.append((self.counter.__next__(), fd))
 
     result = run_command(
         ['timeout', '3'] if on_windows else ["sleep", "5"],
@@ -323,10 +346,13 @@ def test_timeout():
         protocol=TestProtocol,
         timeout=1
     )
+    assert_true(len(TestProtocol.received_timeouts) > 0)
+    assert_true(all(map(lambda e: e[1] is None, TestProtocol.received_timeouts)))
 
 
 def test_timeout_nothing():
-
+    # Expect timeout protocol calls on long running process
+    # if the specified timeout is short enough
     class TestProtocol(NoCapture):
         def __init__(self,
                      timeout_queue: List):
@@ -360,7 +386,7 @@ def test_timeout_nothing():
 
 
 def test_timeout_all():
-
+    # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
                      timeout_queue: List):
@@ -369,9 +395,8 @@ def test_timeout_all():
             self.counter = count()
 
         def timeout(self, fd: Optional[int]) -> bool:
-            if fd is not None:
-                self.timeout_queue.append((self.counter.__next__(), fd))
-                return True
+            self.timeout_queue.append((self.counter.__next__(), fd))
+            return True
 
     stdin_queue = queue.Queue()
     for i in range(72):
@@ -390,14 +415,15 @@ def test_timeout_all():
         timeout=1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
-    eq_(len(timeout_queue), 3)
+    eq_(len(timeout_queue), 4)
 
 
 def test_exit_0():
-    class NGT(GeneratorMixIn, StdOutErrCapture):
-        pass
-
-    rt = ThreadedRunner(cmd=["sleep", "2"], stdin=None, protocol_class=NGT)
+    # Expect check_process_state to correctly
+    # detect the process state.
+    rt = ThreadedRunner(cmd=["sleep", "2"],
+                        stdin=None,
+                        protocol_class=GenStdoutStderr)
     rt.run()
     while rt.process_running is True:
         rt.check_process_state()
@@ -406,10 +432,12 @@ def test_exit_0():
 
 
 def test_exit_1():
-    class NGT(GeneratorMixIn, NoCapture):
-        pass
-
-    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    # Expect wait_for_process to correctly
+    # wait for the running process
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenNothing,
+                        timeout=.5)
     rt.run()
     while rt.wait_for_process() is True:
        pass
@@ -417,11 +445,13 @@ def test_exit_1():
 
 
 def test_exit_2():
-    class NGT(GeneratorMixIn, StdOutErrCapture):
-        def timeout(self, fd: Optional[int]) -> bool:
-            return True
-
-    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    # Expect wait_for_process to correctly
+    # wait for the running process, and
+    # close file handles
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenStdoutStderr,
+                        timeout=.5)
     rt.run()
     while rt.wait_for_process() is True:
        pass
@@ -429,11 +459,12 @@ def test_exit_2():
 
 
 def test_exit_3():
-    class NGT(GeneratorMixIn, StdOutErrCapture):
-        def timeout(self, fd: Optional[int]) -> bool:
-            return True
-
-    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    # Expect the process to be closed after
+    # the generator exits.
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenStdoutStderr,
+                        timeout=.5)
     for x in rt.run():
         print(x)
     assert_true(rt.process.poll() is not None)
@@ -443,21 +474,19 @@ def test_generator_exit_3():
     # Expect generator to wait for process exit
     # after the result queue is empty in
     # `GeneratorState.process_running`.
-    class NGT(GeneratorMixIn, StdOutErrCapture):
-        def timeout(self, fd: Optional[int]) -> bool:
-            return True
-
     patch_state = [0]
+
     def fake_wait_for_process():
         if patch_state[0] == 0:
-            print("T")
             patch_state[0] = 1
             return True
-        print("S")
         patch_state[0] += 1
         return False
 
-    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenStdoutStderr,
+                        timeout=.5)
     rt.wait_for_process = fake_wait_for_process
     for _ in rt.run():
         pass
@@ -465,23 +494,21 @@ def test_generator_exit_3():
 
 
 def test_exit_4():
-    class NGT(GeneratorMixIn, NoCapture):
-        def timeout(self, fd: Optional[int]) -> bool:
-            print("T", fd)
-            return False
-
-    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenNothing,
+                        timeout=.5)
     for x in rt.run():
         print(x)
     assert_true(rt.process.poll() is not None)
 
 
 def test_process_queue():
-    class NGT(GeneratorMixIn, NoCapture):
-        pass
-
     called = []
-    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenNothing,
+                        timeout=.5)
     rt.output_queue = queue.Queue()
 
     def fake_check():
@@ -494,12 +521,9 @@ def test_process_queue():
 
 
 def test_generator_throw():
-    class NGT(GeneratorMixIn, NoCapture):
-        pass
-
     rt = ThreadedRunner(cmd=["sleep", "4"],
                         stdin=None,
-                        protocol_class=NGT,
+                        protocol_class=GenNothing,
                         timeout=.5)
     gen = rt.run()
     assert_raises(ValueError, gen.throw, ValueError, ValueError("abcdefg"))
