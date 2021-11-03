@@ -79,6 +79,8 @@ from datalad.tests.utils import (
 
 from datalad.core.local.tests.test_run import last_commit_msg
 cat_command = 'cat' if not on_windows else 'type'
+touch_command = "touch " if not on_windows else "type nul > "
+grep_command = 'grep ' if not on_windows else 'findstr '
 
 @slow  # 17.1880s
 @known_failure_windows
@@ -455,8 +457,8 @@ def test_rerun_outofdate_tree(path):
         f.write("abc\ndef")
     ds.save("foo", to_git=True)
     # Create initial run.
-    ds.run('grep def foo > out')
-    eq_('def\n', open(output_file).read())
+    ds.run(f'{grep_command} def foo > out')
+    assert_in('def', open(output_file).read())
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
@@ -484,7 +486,7 @@ def test_rerun_subdir(path):
     ds = Dataset(path).create(force=True)
     subdir = op.join(path, 'subdir')
     with chpwd(subdir):
-        run("touch test.dat")
+        run(touch_command + "test.dat")
     assert_repo_status(ds.path)
 
     # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
@@ -507,7 +509,7 @@ def test_rerun_subdir(path):
 
     # but if we run ds.run -- runs within top of the dataset
     with chpwd(subdir):
-        ds.run("touch test2.dat")
+        ds.run(touch_command + "test2.dat")
     assert_repo_status(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
     rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
@@ -571,7 +573,7 @@ def test_new_or_modified(path):
 def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo")
-    ds.run(["touch", "bar"], message='BAR', sidecar=True)
+    ds.run([touch_command + "bar"], message='BAR', sidecar=True)
     # a run record sidecar file was added with the last commit
     assert(any(d['path'].startswith(op.join(ds.path, '.datalad', 'runinfo'))
                for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
@@ -583,7 +585,7 @@ def test_rerun_script(path):
     ok_exists(script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("touch bar\n", lines)
+        assert_in(touch_command + "bar\n", lines)
         # The commit message is there too.
         assert_in("# BAR\n", lines)
         assert_in("# (record: {})\n".format(bar_hexsha), lines)
@@ -592,7 +594,7 @@ def test_rerun_script(path):
     ds.rerun(since="", script=script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("touch bar\n", lines)
+        assert_in(touch_command + "bar\n", lines)
         # Automatic commit messages aren't included.
         assert_not_in("# echo a >foo\n", lines)
         assert_in("echo a >foo\n", lines)
@@ -600,7 +602,7 @@ def test_rerun_script(path):
     # --script=- writes to stdout.
     with patch("sys.stdout", new_callable=StringIO) as cmout:
         ds.rerun(script="-")
-        assert_in("touch bar",
+        assert_in(touch_command + "bar",
                   cmout.getvalue().splitlines())
 
 
