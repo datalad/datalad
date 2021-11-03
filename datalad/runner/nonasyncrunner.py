@@ -83,8 +83,8 @@ class _ResultGenerator(Generator):
                 runner.protocol.process_exited()
                 self.state = self.GeneratorState.process_exited
             else:
-                # If we have no results in the queue, but still active
-                # reading/writing threads, wait on the threaded runner queue.
+                # If we have no results in the queue, but still monitored
+                # file numbers, wait on the threaded runner queue.
                 while len(self.result_queue) == 0 and runner.active_file_numbers:
                     runner.process_queue()
                 if len(self.result_queue) > 0:
@@ -348,6 +348,7 @@ class ThreadedRunner:
             if self.write_stdin:
                 self.active_file_numbers.add(self.process_stdin_fileno)
                 # Use the WriterThread source queue to signal file close
+                # on write error to us.
                 self.stdin_writer_thread = BlockingOSWriterThread(
                     self.process.stdin, self.stdin_queue)
                 self.stdin_enqueueing_thread = WriteThread(
@@ -405,17 +406,20 @@ class ThreadedRunner:
         """
         data = None
         while True:
-            # We do not need a timeout here. If self.timeout is None,
-            # no timeouts are reported anyway. If self.timeout is not
-            # None, and any enqueuing (stdin) or de-queuing (stdout,
-            # stderr) operation took longer than self.timeout, we should
-            # have a queue entry for that. We still use a .1 second
-            # timeout to check whether the process is still running.
+            # We do not need a user provided timeout here. If
+            # self.timeout is None, no timeouts are reported anyway.
+            # If self.timeout is not None, and any enqueuing (stdin)
+            # or de-queuing (stdout, stderr) operation takes longer than
+            # self.timeout, we will get a queue entry for that.
+            # We still use a "system"-timeout, i.e.
+            # `ThreadedRunner.process_check_interval`, to check whether the
+            # process is still running.
             try:
                 file_number, state, data = self.output_queue.get(
-                    ThreadedRunner.process_check_interval)
+                    timeout=ThreadedRunner.process_check_interval)
             except Empty:
                 self.check_process_state()
+                continue
 
             if state == IOState.ok:
                 break
@@ -425,7 +429,7 @@ class ThreadedRunner:
                 # If the timeout handler returns True, remove
                 # the file number that caused the timeout from
                 # active files and return.
-                if self.protocol.timeout(self.fileno_mapping[file_number]):
+                if self.protocol.timeout(self.fileno_mapping[file_number]) is True:
                     self.active_file_numbers.remove(file_number)
                     return
 
@@ -465,12 +469,13 @@ class ThreadedRunner:
         """
         if self.process_running is False:
             return
-        self.process_running = self.process.poll() is not None
+        self.process_running = self.process.poll() is None
         if self.process_running is False:
             for file_descriptor in (self.process.stdin,
                                     self.process.stdout,
                                     self.process.stderr):
-                file_descriptor.close()
+                if file_descriptor is not None:
+                    file_descriptor.close()
 
     def close_process_stdin_stdout_stderr(self):
         for file_object in (self.process.stdin,
@@ -479,7 +484,7 @@ class ThreadedRunner:
             if file_object is not None:
                 file_object.close()
 
-    def wait_for_process(self):
+    def wait_for_process(self) -> bool:
         """
         Wait for a process to exit. Handle timeout and
         call the process timeout handler, if necessary.

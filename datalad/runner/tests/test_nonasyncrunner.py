@@ -23,6 +23,7 @@ from itertools import count
 
 from datalad.tests.utils import (
     assert_false,
+    assert_raises,
     assert_true,
     eq_,
     known_failure_osx,
@@ -38,8 +39,15 @@ from .. import (
     StdOutCapture,
     StdOutErrCapture,
 )
-from ..nonasyncrunner import run_command
-from ..protocol import WitlessProtocol
+from ..nonasyncrunner import (
+    IOState,
+    ThreadedRunner,
+    run_command,
+)
+from ..protocol import (
+    GeneratorMixIn,
+    WitlessProtocol,
+)
 from ..runnerthreads import (
     BlockingOSReaderThread,
     BlockingOSWriterThread,
@@ -383,3 +391,115 @@ def test_timeout_all():
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
     eq_(len(timeout_queue), 3)
+
+
+def test_exit_0():
+    class NGT(GeneratorMixIn, StdOutErrCapture):
+        pass
+
+    rt = ThreadedRunner(cmd=["sleep", "2"], stdin=None, protocol_class=NGT)
+    rt.run()
+    while rt.process_running is True:
+        rt.check_process_state()
+    assert_true(rt.process_running is False)
+    rt.check_process_state()
+
+
+def test_exit_1():
+    class NGT(GeneratorMixIn, NoCapture):
+        pass
+
+    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt.run()
+    while rt.wait_for_process() is True:
+       pass
+    assert_true(rt.process.poll() is not None)
+
+
+def test_exit_2():
+    class NGT(GeneratorMixIn, StdOutErrCapture):
+        def timeout(self, fd: Optional[int]) -> bool:
+            return True
+
+    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt.run()
+    while rt.wait_for_process() is True:
+       pass
+    assert_true(rt.process.poll() is not None)
+
+
+def test_exit_3():
+    class NGT(GeneratorMixIn, StdOutErrCapture):
+        def timeout(self, fd: Optional[int]) -> bool:
+            return True
+
+    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    for x in rt.run():
+        print(x)
+    assert_true(rt.process.poll() is not None)
+
+
+def test_generator_exit_3():
+    # Expect generator to wait for process exit
+    # after the result queue is empty in
+    # `GeneratorState.process_running`.
+    class NGT(GeneratorMixIn, StdOutErrCapture):
+        def timeout(self, fd: Optional[int]) -> bool:
+            return True
+
+    patch_state = [0]
+    def fake_wait_for_process():
+        if patch_state[0] == 0:
+            print("T")
+            patch_state[0] = 1
+            return True
+        print("S")
+        patch_state[0] += 1
+        return False
+
+    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt.wait_for_process = fake_wait_for_process
+    for _ in rt.run():
+        pass
+    assert_true(rt.process.poll() is None)
+
+
+def test_exit_4():
+    class NGT(GeneratorMixIn, NoCapture):
+        def timeout(self, fd: Optional[int]) -> bool:
+            print("T", fd)
+            return False
+
+    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    for x in rt.run():
+        print(x)
+    assert_true(rt.process.poll() is not None)
+
+
+def test_process_queue():
+    class NGT(GeneratorMixIn, NoCapture):
+        pass
+
+    called = []
+    rt = ThreadedRunner(cmd=["sleep", "4"], stdin=None, protocol_class=NGT, timeout=.5)
+    rt.output_queue = queue.Queue()
+
+    def fake_check():
+        called.append(True)
+        rt.output_queue.put((1000, IOState.ok, b"XXXX"))
+
+    rt.check_process_state = fake_check
+    rt.process_queue()
+    eq_(called, [True])
+
+
+def test_generator_throw():
+    class NGT(GeneratorMixIn, NoCapture):
+        pass
+
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=NGT,
+                        timeout=.5)
+    gen = rt.run()
+    assert_raises(ValueError, gen.throw, ValueError, ValueError("abcdefg"))

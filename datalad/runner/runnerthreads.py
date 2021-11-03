@@ -97,7 +97,8 @@ class BlockingOSWriterThread(ExitingThread):
     the OS write capabilities.
     It expects bytes in the Queue or None.
     Bytes will be written, if None is fetched
-    from the queue, the thread will exit.
+    from the queue, or an error occurs while
+    writing, the thread will exit.
     """
     def __init__(self,
                  destination: IO,
@@ -117,7 +118,7 @@ class BlockingOSWriterThread(ExitingThread):
         except Full:
             lgr.debug(
                 f"timeout while trying to signal "
-                f"{(None)}")
+                f"{None}")
 
     def run(self):
 
