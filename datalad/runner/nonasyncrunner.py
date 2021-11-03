@@ -240,7 +240,7 @@ class ThreadedRunner:
             # indicate that we will not write anything to stdin, that
             # means the user can pass None, or he can pass a
             # file-like and write to it from a different thread.
-            lgr.warning(f"unknown instance class: {type(self.stdin)}, "
+            lgr.warning(f"Unknown instance class: {type(self.stdin)}, "
                         f"assuming file-like input: {self.stdin}")
             # We assume that the caller will write to the given
             # file descriptor.
