@@ -532,22 +532,31 @@ def get_paths_by_ds(refds, dataset_arg, paths, subdsroot_mode='rsync'):
     # step 2: resolve
     # for later comparison, we need to preserve the original value too
     paths = [(resolve_path(p, dataset_arg), str(p)) for p in paths]
+    # OPT: store cache for dataset roots for each directory directly
+    #      listed in paths, or containing the path (if file)
+    roots_cache = {}
     # sort any path argument into the respective subdatasets
     # sort by comparing the resolved Path instances, this puts top-level
     # paths first, leading to their datasets to be injected into the result
     # dict first
     for p, orig_path in sorted(paths, key=lambda x: x[0]):
-        # TODO(OPT)? YOH does not spot any optimization for paths under the same
-        # directory: if not isdir(path) - files would all have the same
-        # "root", and we could avoid doing full `get_dataset_root` check for
-        # those. Moreover, if some path points UNDER that path which isdir, and
-        # we have some other path already with the root above - we can just take
-        # the same. Altogether sounds like a logic duplicated with
-        # discover_dataset_trace_to_targets and even get_tree_roots
-        # of save.
+        # TODO (left from implementing caching OPT):
+        # Logic here sounds duplicated with discover_dataset_trace_to_targets
+        # and even get_tree_roots of save.
         str_p = str(p)
-        # the dataset root containing the path in question
-        root = get_dataset_root(str_p)
+
+        # query get_dataset_root caching for repeated queries within the same
+        # directory
+        if p.is_dir():
+            p_dir = str(p)
+        else:  # symlink, file, whatnot - seems to match logic in get_dataset_root
+            p_dir = str(p.parent)
+
+        try:
+            root = roots_cache[p_dir]
+        except KeyError:
+            root = roots_cache[p_dir] = get_dataset_root(p_dir)
+
         # to become the root of the dataset that contains the path in question
         # in the context of (same basepath) as the reference dataset
         qds_inrefds = None
