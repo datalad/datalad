@@ -447,7 +447,6 @@ def test_rerun_invalid_merge_run_commit(path):
     eq_(len(ds.repo.get_revisions(hexsha_orig + ".." + DEFAULT_BRANCH)), 1)
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
@@ -477,7 +476,6 @@ def test_rerun_ambiguous_revision_file(path):
         len(ds.repo.get_revisions("ambig")))
 
 
-@known_failure_windows
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
@@ -568,7 +566,6 @@ def test_new_or_modified(path):
         {"to_modify", op.join("d", "to_modify")})
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
     ds = Dataset(path).create()
@@ -765,7 +762,6 @@ def test_run_inputs_outputs(src, path):
                         strip=True)
 
 
-@known_failure_windows
 @with_tree({"foo": "foo"})
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).create(annex=False, force=True)
