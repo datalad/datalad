@@ -73,6 +73,7 @@ class BlockingOSReaderThread(ExitingThread):
             try:
                 data = os.read(self.source.fileno(), self.length)
             except (ValueError, OSError):
+                # The source was most likely closed, indicate EOF.
                 data = b""
 
             if data == b"":
@@ -125,7 +126,7 @@ class BlockingOSWriterThread(ExitingThread):
                         self.destination.fileno(),
                         data[written:])
             except (BrokenPipeError, OSError, ValueError):
-                # the destination was most likely closed
+                # The destination was most likely closed, indicate EOF.
                 self.queue.put(None)
                 break
 
@@ -148,13 +149,14 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
                state: IOState,
                data: Union[bytes, None]):
         for queue in self.signal_queues:
-            # Ensure that signal will never block.
+            # Ensure that self.signal() will never block.
             # TODO: separate the timeout and EOF signal paths?
             try:
                 queue.put((self.identifier, state, data), block=True, timeout=1)
             except Full:
-                lgr.debug(f"timeout while trying to signal {(self.identifier, state, data)}")
-                pass
+                lgr.debug(
+                    f"timeout while trying to signal "
+                    f"{(self.identifier, state, data)}")
 
     @abstractmethod
     def read(self,
@@ -210,7 +212,11 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
                 assert state == IOState.ok
                 break
 
-        lgr.log(5, "%s exiting (exit_requested: %s, last data: %s)", self, self.exit_requested, data)
+        lgr.log(
+            5,
+            "%s exiting (exit_requested: %s, last data: %s)",
+            self,
+            self.exit_requested, data)
 
 
 class ReadThread(TransportThread):
