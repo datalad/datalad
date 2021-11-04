@@ -9,6 +9,9 @@
 
 import os.path as op
 
+from datalad.api import remove
+from datalad.distribution.dataset import Dataset
+
 from datalad.tests.utils import (
     assert_false,
     assert_in,
@@ -19,6 +22,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     assert_true,
+    chpwd,
     get_deeply_nested_structure,
     with_tempfile,
 )
@@ -100,7 +104,7 @@ def test_remove(path):
     ds.save(rmdspath, recursive=True)
     res = ds.remove(rmdspath, on_failure='ignore')
     # unique dataset, with unique keys -- must fail
-    assert_in_results(res, status='error', action='drop', path=str(rmdspath))
+    assert_in_results(res, status='error', action='uninstall', path=str(rmdspath))
 
     # go reckless
     assert_in(str(rmdspath),
@@ -140,3 +144,17 @@ def test_remove(path):
     res = ds.remove(reckless='kill')
     assert_in_results(res, action='uninstall', path=ds.path, status='ok')
     assert_false(ds.is_installed())
+
+
+@with_tempfile
+def test_remove_subdataset_nomethod(path):
+    ds = Dataset(path).create()
+    ds.create('subds')
+    with chpwd(path):
+        # fails due to unique state
+        res = remove('subds', on_failure='ignore')
+        assert_in_results(res, action='uninstall', status='error', type='dataset')
+        res = remove('subds', reckless='availability', on_failure='ignore')
+        assert_in_results(res, action='uninstall', status='ok', type='dataset')
+        assert_in_results(res, action='remove', status='ok')
+        assert_in_results(res, action='save', status='ok')

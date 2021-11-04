@@ -27,7 +27,6 @@ from datalad.api import (
     uninstall,
 )
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     assert_in,
     assert_in_results,

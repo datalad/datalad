@@ -446,7 +446,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             result_renderer='disabled')
         if subdatasets:
             yield dict(
-                action='drop',
+                action='uninstall',
                 path=ds.path,
                 type='dataset',
                 status='error',
@@ -458,11 +458,11 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
 
     if what in ('all', 'datasets') \
             and reckless not in ('availability', 'kill') \
-            and paths is None:
+            and (paths is None or paths == [ds.pathobj]):
         unpushed = _detect_unpushed_revs(repo, is_annex)
         if unpushed:
             yield dict(
-                action='drop',
+                action='uninstall',
                 path=ds.path,
                 type='dataset',
                 status='error',
@@ -490,7 +490,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         ]
         if remotes_that_know_this_annex:
             yield dict(
-                action='drop',
+                action='uninstall',
                 path=ds.path,
                 type='dataset',
                 status='error',

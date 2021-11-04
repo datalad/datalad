@@ -257,7 +257,7 @@ def test_uninstall_recursive(path):
         what='all', reckless='availability', on_failure='ignore')
     assert_in_results(
         res,
-        action='drop',
+        action='uninstall',
         path=ds.path,
         type='dataset',
         status='error',
@@ -359,7 +359,7 @@ def test_safetynet(otherpath, origpath, clonepath):
     # - branch is progressed
     # - a new key is only available here
     res = cloneds.drop(what='all', on_failure='ignore')
-    assert_in_results(res, action="drop", status="error")
+    assert_in_results(res, action="uninstall", status="error")
     assert_true(res[0]['message'][0].startswith(
         "to-be-dropped dataset has the following revisions "
         "that are not available at any known sibling"))
@@ -371,7 +371,7 @@ def test_safetynet(otherpath, origpath, clonepath):
     cloneds.push(data='nothing')
 
     res = cloneds.drop(what='all', on_failure='ignore')
-    assert_in_results(res, action="drop", status="error")
+    assert_in_results(res, action="uninstall", status="error")
     assert_true(res[0]['message'][0].startswith(
         "to-be-deleted local annex not declared 'dead'"))
     # some windows test setup is not very robust, explicitly
