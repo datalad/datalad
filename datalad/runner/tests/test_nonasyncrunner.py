@@ -14,12 +14,13 @@ import queue
 import signal
 import subprocess
 import sys
+from itertools import count
 from time import sleep
 from typing import (
     List,
     Optional,
 )
-from itertools import count
+from unittest.mock import patch
 
 from datalad.tests.utils import (
     assert_false,
@@ -199,17 +200,22 @@ def test_blocking_read_exception_catching():
 
 def test_blocking_read_closing():
     # Expect that the blocking OS reader thread
-    # exits when reading from a random file
-    # descriptor.
+    # exits when os.read throws an error.
     class FakeFile:
         def fileno(self):
-            return 33
+            return -1
 
-    reader_thread = BlockingOSReaderThread(FakeFile())
-    reader_thread.start()
+    def fake_read(*args):
+        raise ValueError("test exception")
+
+    with patch("datalad.runner.runnerthreads.os.read") as read:
+        read.side_effect = fake_read
+
+        reader_thread = BlockingOSReaderThread(FakeFile())
+        reader_thread.start()
+        reader_thread.join()
+
     read_queue = reader_thread.queue
-
-    reader_thread.join()
     data = read_queue.get()
     eq_(data, None)
 
