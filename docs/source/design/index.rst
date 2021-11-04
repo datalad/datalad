@@ -21,3 +21,4 @@ subsystems in DataLad.
    exception_handling
    credentials
    url_substitution
+   threaded_runner
