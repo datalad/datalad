@@ -56,9 +56,48 @@ lgr = logging.getLogger('datalad.distributed.drop')
 
 @build_doc
 class Drop(Interface):
-    """DOCUMENT ME
+    """Drop content of individual files or entire (sub)datasets
+
+    This command is the antagonist of 'get'. It can undo the retrieval of file
+    content, and the installation of subdatasets.
+
+    Dropping is a safe-by-default operation. Before dropping any information,
+    the command confirms the continued availability of file-content (see e.g.,
+    configuration 'annex.numcopies'), and the state of all dataset branches
+    from at least one known dataset sibling. Moreover, prior removal of an
+    entire dataset annex, that it is confirmed that it is no longer marked
+    as existing in the network of dataset siblings.
+
+    Importantly, all checks regarding version history availability and local
+    annex availability are performed using the current state of remote
+    siblings as known to the local dataset. This is done for performance
+    reasons and for resilience in case of absent network connectivity. To
+    ensure decision making based on up-to-date information, it is advised to
+    execute a dataset update before dropping dataset components.
     """
     _examples_ = [
+        {'text': "Drop single file content",
+         'code_py': "drop('path/to/file')",
+         'code_cmd': "datalad drop <path/to/file>"},
+        {'text': "Drop all file content in the current dataset",
+         'code_py': "drop('.')",
+         'code_cmd': "datalad drop"},
+        {'text': "Drop all file content in a dataset and all its subdatasets",
+         'code_py': "drop(dataset='.', recursive=True)",
+         'code_cmd': "datalad drop -d <path/to/dataset> -r"},
+        {'text': "Disable check to ensure the configured minimum number of "
+                 "remote sources for dropped data",
+         'code_py': "drop(path='path/to/content', reckless='availability')",
+         'code_cmd': "datalad drop <path/to/content> --reckless availability"},
+        {'text': 'Drop (uninstall) an entire dataset '
+                 '(will fail with subdatasets present)',
+         'code_py': "drop(what='all')",
+         'code_cmd': "datalad drop --what all"},
+        {'text': 'Kill a dataset recklessly with any existing subdatasets too'
+                 '(this will be fast, but will disable any and all safety '
+                 'checks)',
+         'code_py': "drop(what='all', reckless='kill', recursive=True)",
+         'code_cmd': "datalad drop --what all, --reckless kill --recursive"},
     ]
 
     _params_ = dict(
@@ -72,17 +111,41 @@ class Drop(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path of the component to be dropped",
+            doc="path of a dataset or dataset component to be dropped",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         reckless=Parameter(
             args=("--reckless",),
-            doc="""""",
+            doc="""disable individual or all data safety measures that would
+            normally prevent potentially irreversible data-loss.
+            With 'modification', unsaved modifications in a dataset will not be
+            detected. This improves performance at the cost of permitting
+            potential loss of unsaved or untracked dataset components.
+            With 'availability', detection of dataset/branch-states that are
+            only available in the local dataset, and detection of an
+            insufficient number of file-content copies will be disabled.
+            Especially the latter is a potentially expensive check which might
+            involve numerous network transactions.
+            With 'undead', detection whether a to-be-removed local annex is
+            still known to exists in the network of dataset-clones is disabled.
+            This could cause zombie-records of invalid file availability.
+            With 'kill', all safety-checks are disabled.""",
             constraints=EnsureChoice(
                 'modification', 'availability', 'undead', 'kill', None)),
         what=Parameter(
             args=("--what",),
-            doc="""""",
+            doc="""select what type of items shall be dropped.
+            With 'filecontent', only the file content (git-annex keys) of files
+            in a dataset's worktree will be dropped.
+            With 'allkeys', content of any version of any file in any branch
+            (including, but not limited to the worktree) will be dropped. This
+            effectively empties the annex of a local dataset.
+            With 'datasets', only complete datasets will be dropped (implies
+            'allkeys' mode for each such dataset), but no filecontent will be
+            dropped for any files in datasets that are not dropped entirely.
+            With 'all', content for any matching file or dataset will be dropped
+            entirely.
+            """,
             # TODO add 'unwanted'
             constraints=EnsureChoice('filecontent', 'allkeys', 'datasets', 'all')),
         recursive=recursion_flag,
@@ -95,8 +158,7 @@ class Drop(Interface):
             dest='check'),
         if_dirty=Parameter(
             args=("--if-dirty",),
-            doc="""DEPRECATED: use --reckless instead""",
-            constraints=EnsureChoice('fail', 'save-before', 'ignore', None)),
+            doc="""DEPRECATED and IGNORED: use --reckless instead""",),
     )
 
     @staticmethod
@@ -114,6 +176,9 @@ class Drop(Interface):
             check=None,
             # TODO deal with deprecation
             if_dirty=None):
+
+        # TODO if reckless is None, initialize from a potential config setting
+        # left behind by a reckless clone
 
         # proper spelling of mode switches is critical for implementation
         # below. double-check, also in Python API usage

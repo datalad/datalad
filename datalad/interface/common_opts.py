@@ -34,13 +34,13 @@ location_description = Parameter(
 recursion_flag = Parameter(
     args=("-r", "--recursive",),
     action="store_true",
-    doc="""if set, recurse into potential subdataset""")
+    doc="""if set, recurse into potential subdatasets""")
 
 recursion_limit = Parameter(
     args=("-R", "--recursion-limit",),
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
-    doc="""limit recursion into subdataset to the given number of levels""")
+    doc="""limit recursion into subdatasets to the given number of levels""")
 
 shared_access_opt = Parameter(
     args=('--shared-access',),
