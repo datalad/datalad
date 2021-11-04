@@ -17,7 +17,6 @@ import logging
 from os.path import lexists
 import itertools
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc

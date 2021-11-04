@@ -31,16 +31,16 @@ from ..dochelpers import borrowkwargs
 
 from ..ui import ui
 from ..utils import auto_repr
-from ..dochelpers import exc_str
 from ..support.network import get_url_filename
 from ..support.network import get_response_disposition_filename
 from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
 from ..support.status import FileStatus
 from ..support.exceptions import (
-    DownloadError,
     AccessDeniedError,
     AccessFailedError,
+    CapturedException,
+    DownloadError,
     UnhandledRedirectError,
 )
 
@@ -63,7 +63,8 @@ try:
     _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
-    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s", exc_str(e))
+    ce = CapturedException(e)
+    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s", ce)
     _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:
@@ -427,8 +428,8 @@ class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
             auth_info = auth_response.json()
         except ValueError as e:
             raise DownloadError(
-                "Failed to get information from {}: {}"
-                .format(auth_url, exc_str(e)))
+                "Failed to get information from {}"
+                .format(auth_url)) from e
         session.headers['Authorization'] = "Bearer " + auth_info["token"]
 
 
@@ -499,7 +500,8 @@ class HTTPDownloaderSession(DownloaderSession):
                     if pbar:
                         pbar.update(total)
                 except Exception as e:
-                    lgr.warning("Failed to update progressbar: %s" % exc_str(e))
+                    ce = CapturedException(e)
+                    lgr.warning("Failed to update progressbar: %s", ce)
                 # TEMP
                 # see https://github.com/niltonvolpato/python-progressbar/pull/44
                 ui.out.flush()
@@ -594,6 +596,7 @@ class HTTPDownloader(BaseDownloader):
                     headers=headers)
             #except (MaxRetryError, NewConnectionError) as exc:
             except Exception as exc:
+                ce = CapturedException(exc)
                 # happen to run into those with urls pointing to Amazon,
                 # so let's rest and try again
                 if retry >= nretries:
@@ -605,11 +608,10 @@ class HTTPDownloader(BaseDownloader):
 
                     raise AccessFailedError(
                         "Failed to establish a new session %d times. %s"
-                        "Last exception was: %s"
-                        % (nretries, msg_ftp, exc_str(exc)))
+                        % (nretries, msg_ftp)) from exc
                 lgr.warning(
                     "Caught exception %s. Will retry %d out of %d times",
-                    exc_str(exc), retry+1, nretries)
+                    ce, retry + 1, nretries)
                 sleep(2**retry)
 
         check_response_status(response, session=self._session)

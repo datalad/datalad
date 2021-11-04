@@ -27,7 +27,6 @@ from ...tests.utils import (
     with_tempfile,
     with_testsui,
 )
-from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
 from ...support.exceptions import AccessDeniedError
 
@@ -40,7 +39,7 @@ from ...support import path as op
 try:
     import boto
 except Exception as e:
-    raise SkipTest("boto module is not available: %s" % exc_str(e))
+    raise SkipTest("boto module is not available") from e
 
 from .utils import get_test_providers
 from .test_http import check_download_external_url
