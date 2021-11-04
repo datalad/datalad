@@ -178,7 +178,7 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - NOSE_OPTS=( )
+  - NOSE_OPTS=( -v )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
