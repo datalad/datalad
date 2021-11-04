@@ -104,7 +104,7 @@ class Drop(Interface):
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar="DATASET",
-            doc="""specify the dataset to perform the drop on.
+            doc="""specify the dataset to perform drop from.
             If no dataset is given, the current working directory is used
             as operation context""",
             constraints=EnsureDataset() | EnsureNone()),
