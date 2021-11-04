@@ -15,12 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from itertools import chain
 
-from datalad.support.param import Parameter
-from datalad.support.constraints import (
-    EnsureChoice,
-    EnsureNone,
-    EnsureStr,
-)
+from datalad.core.local.status import get_paths_by_ds
 from datalad.distribution.dataset import (
     Dataset,
     EnsureDataset,
@@ -38,20 +33,23 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.results import (
     annexjson2result,
-    success_status_map,
     results_from_annex_noinfo,
+    success_status_map,
 )
-from datalad.interface.utils import (
-    eval_results,
+from datalad.interface.utils import eval_results
+from datalad.runner.exception import CommandError
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
 )
+from datalad.support.exceptions import CapturedException
+from datalad.support.param import Parameter
 from datalad.utils import (
     ensure_list,
     rmtree,
 )
-from datalad.core.local.status import get_paths_by_ds
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CapturedException
-from datalad.runner.exception import CommandError
 
 lgr = logging.getLogger('datalad.distributed.drop')
 

@@ -10,6 +10,7 @@
 import os.path as op
 
 from datalad.tests.utils import (
+    assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -18,7 +19,6 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     assert_true,
-    assert_false,
     get_deeply_nested_structure,
     with_tempfile,
 )

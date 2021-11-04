@@ -10,49 +10,50 @@
 """
 
 import os
+from glob import glob
 from os.path import (
-    join as opj,
-    split as psplit,
     exists,
-    lexists,
     isdir,
 )
-from glob import glob
+from os.path import join as opj
+from os.path import lexists
+from os.path import split as psplit
 
 from datalad.api import (
-    uninstall,
-    drop,
-    remove,
-    install,
     create,
+    drop,
+    install,
+    remove,
+    uninstall,
 )
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
-    ok_,
-    eq_,
-    with_testrepos,
-    assert_raises,
-    assert_status,
     assert_in,
     assert_in_results,
+    assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_result_values_cond,
-    ok_file_under_git,
-    with_tempfile,
-    with_tree,
+    assert_status,
     create_tree,
+    eq_,
+    known_failure_windows,
+    ok_,
+    ok_file_under_git,
     skip_if_no_network,
     use_cassette,
     usecase,
-    known_failure_windows,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
 from datalad.utils import (
-    chpwd,
-    _path_,
     Path,
+    _path_,
+    chpwd,
 )
-from datalad.support.external_versions import external_versions
+
 from ..dataset import Dataset
 
 

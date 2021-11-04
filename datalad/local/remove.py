@@ -14,44 +14,37 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from itertools import chain
+from os.path import lexists
 
-from os.path import (
-    lexists,
+from datalad.core.local.save import Save
+from datalad.core.local.status import get_paths_by_ds
+from datalad.distributed.drop import Drop
+from datalad.distribution.dataset import (
+    datasetmethod,
+    require_dataset,
 )
-from datalad.utils import (
-    ensure_list,
-    rmtree,
+from datalad.distribution.uninstall import dataset_argument
+from datalad.interface.base import (
+    Interface,
+    build_doc,
 )
-from datalad.support.param import Parameter
+from datalad.interface.common_opts import (
+    jobs_opt,
+    nosave_opt,
+    save_message_opt,
+)
+from datalad.interface.utils import eval_results
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.distribution.dataset import (
-    datasetmethod,
-    require_dataset,
+from datalad.support.param import Parameter
+from datalad.utils import (
+    ensure_list,
+    rmtree,
 )
-from datalad.interface.base import Interface
-from datalad.interface.common_opts import (
-    jobs_opt,
-    nosave_opt,
-    save_message_opt,
-)
-from datalad.interface.utils import (
-    eval_results,
-)
-from datalad.interface.base import build_doc
-from datalad.distribution.uninstall import (
-    dataset_argument,
-)
-from datalad.distributed.drop import (
-    Drop,
-)
-from datalad.core.local.status import get_paths_by_ds
-from datalad.core.local.save import Save
-
 
 lgr = logging.getLogger('datalad.distribution.remove')
 

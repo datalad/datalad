@@ -10,12 +10,22 @@
 import os.path as op
 
 from datalad.api import (
+    Dataset,
     clone,
     drop,
-    Dataset,
 )
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.distributed.drop import (
+    _detect_nondead_annex_at_remotes,
+    _detect_unpushed_revs,
+)
+from datalad.support.exceptions import (
+    IncompleteResultsError,
+    NoDatasetFound,
+)
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    OBSCURE_FILENAME,
     assert_in,
     assert_in_results,
     assert_raises,
@@ -24,16 +34,8 @@ from datalad.tests.utils import (
     eq_,
     get_deeply_nested_structure,
     with_tempfile,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
-    OBSCURE_FILENAME,
-)
-from datalad.distributed.drop import (
-    _detect_nondead_annex_at_remotes,
-    _detect_unpushed_revs,
 )
 from datalad.utils import chpwd
-from datalad.support.exceptions import NoDatasetFound
 
 
 @with_tempfile
