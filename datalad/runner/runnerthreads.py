@@ -209,9 +209,9 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
 
             # If the source sends None-data it wants
             # us to exit the thread. Signal this to
-            # the signal queues (which might or might
+            # the downstream queues (which might or might
             # not be contain the output queue),
-            # and exit the thread
+            # and exit the thread.
             if data is None:
                 self.signal(IOState.ok, None)
                 break

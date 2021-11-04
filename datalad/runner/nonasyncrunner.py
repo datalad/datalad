@@ -104,6 +104,8 @@ class _ResultGenerator(Generator):
             else:
                 # TODO: check exception
                 runner.protocol.connection_lost(None)
+                runner.close_process_stdin_stdout_stderr()
+                runner.wait_for_threads()
                 self.state = self.GeneratorState.connection_lost
 
         if self.state == self.GeneratorState.connection_lost:
@@ -387,7 +389,6 @@ class ThreadedRunner:
         # a timeout was specified and is triggered, call the timeout
         # handler in the protocol with `None`, and ---if the handler
         # returns `True`--- terminate the process.
-        self.close_process_stdin_stdout_stderr()
         while self.wait_for_process():
             pass
 
@@ -396,6 +397,7 @@ class ThreadedRunner:
         # TODO: check exception
         self.protocol.connection_lost(None)
         self.close_process_stdin_stdout_stderr()
+        self.wait_for_threads()
         return result
 
     def process_queue(self):
@@ -505,6 +507,17 @@ class ThreadedRunner:
                 self.process.wait()
                 return False
             return True
+
+    def wait_for_threads(self):
+        for thread in (self.stderr_reader_thread,
+                       self.stdout_reader_thread,
+                       self.stdin_writer_thread,
+                       self.stderr_enqueueing_thread,
+                       self.stdout_enqueueing_thread,
+                       self.stdin_enqueueing_thread):
+            if thread is not None:
+                thread.request_exit()
+                thread.join()
 
 
 def run_command(cmd: Union[str, List],
