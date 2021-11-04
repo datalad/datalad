@@ -14,6 +14,7 @@ from datalad.tests.utils import (
 )
 
 from ..runner import WitlessRunner
+from .utils import py2cmd
 
 
 class TestProtocol(GeneratorMixIn, StdOutErrCapture):
@@ -109,7 +110,9 @@ def test_file_number_activity_detection():
 
 def test_exiting_process():
 
-    result = run_command([sys.executable, "-c", "import time\ntime.sleep(3)\nprint('exit')"], protocol=NoCapture, stdin=None)
+    result = run_command(py2cmd("import time\ntime.sleep(3)\nprint('exit')"),
+                         protocol=NoCapture,
+                         stdin=None)
     print(result)
 
 

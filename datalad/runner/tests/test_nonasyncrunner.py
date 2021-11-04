@@ -52,6 +52,7 @@ from ..runnerthreads import (
     BlockingOSReaderThread,
     BlockingOSWriterThread,
 )
+from .utils import py2cmd
 
 
 # Protocol classes used for a set of generator tests later
@@ -372,11 +373,7 @@ def test_timeout_nothing():
 
     timeout_queue = []
     run_command(
-        [
-            "python",
-            "-c",
-            "import time; time.sleep(5)\n"
-        ],
+        py2cmd("import time; time.sleep(5)\n"),
         stdin=stdin_queue,
         protocol=TestProtocol,
         timeout=1,
@@ -405,17 +402,18 @@ def test_timeout_all():
 
     timeout_queue = []
     run_command(
-        [
-            "python",
-            "-c",
-            "import time; time.sleep(5)\n"
-        ],
+        py2cmd("import time; time.sleep(5)\n"),
         stdin=stdin_queue,
         protocol=TestProtocol,
         timeout=1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
-    eq_(len(timeout_queue), 4)
+    print(timeout_queue)
+    # This is not a very nice, but on some systems the
+    # stdin pipe might not be filled with the data that
+    # we wrote, and will therefore not create a timeout,
+    # e.g. on Windows.
+    assert_true(len(timeout_queue) in (3, 4))
 
 
 def test_exit_0():
@@ -488,6 +486,7 @@ def test_generator_exit_3():
                         protocol_class=GenStdoutStderr,
                         timeout=.5)
     rt.wait_for_process = fake_wait_for_process
+    rt.wait_for_threads = lambda: None
     for _ in rt.run():
         pass
     assert_true(rt.process.poll() is None)
