@@ -133,7 +133,7 @@ class Drop(Interface):
             # TODO check for conflict with new reckless parameter
             reckless = 'availability'
 
-        if what == 'all' and reckless == 'kill' and not recursive:
+        if what in ('all', 'datasets') and reckless == 'kill' and not recursive:
             raise ValueError(
                 'A reckless kill is requested by no recursion flag is set. '
                 "With 'kill' no checks for subdatasets will be made, "
@@ -267,16 +267,11 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         )
         return
 
-    if paths is not None and paths != [ds.pathobj]:
+    if paths is not None and paths != [ds.pathobj] and what == 'all':
         # so we have paths constraints that prevent dropping the full dataset
-        if what == 'datasets':
-            # there is nothing to do here, but to drop keys, which we must not
-            # done
-            return
-        elif what == 'all':
-            lgr.debug('Only dropping file content for given paths in %s, '
-                      'allthough instruction was to drop %s', ds, what)
-            what = 'filecontent'
+        lgr.debug('Only dropping file content for given paths in %s, '
+                  'allthough instruction was to drop %s', ds, what)
+        what = 'filecontent'
 
     repo = ds.repo
     is_annex = isinstance(repo, AnnexRepo)
@@ -288,6 +283,14 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         had_fatality = True
         yield res
     if had_fatality:
+        return
+
+    # next check must come AFTER the modification checks above, otherwise
+    # remove() could not rely on the modification detection above
+    if paths is not None and paths != [ds.pathobj] and what == 'datasets':
+        # so we have paths constraints that prevent dropping the full dataset
+        # there is nothing to do here, but to drop keys, which we must not
+        # done
         return
 
     # now conditional/informative checks
@@ -367,10 +370,11 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         )
         return
 
-    if what == 'all' and not reckless == 'kill':
+    if what in ('all', 'datasets') and not reckless == 'kill':
         # we must not have subdatasets anymore
         # if we do, --recursive was forgotton
         subdatasets = ds.subdatasets(
+            path=paths,
             # we only care about the present ones
             fulfilled=True,
             # first-level is enough, if that has none, there will be none
@@ -389,7 +393,9 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
-    if what == 'all' and reckless not in ('availability', 'kill'):
+    if what in ('all', 'datasets') \
+            and reckless not in ('availability', 'kill') \
+            and paths is None:
         unpushed = _detect_unpushed_revs(repo, is_annex)
         if unpushed:
             yield dict(
@@ -408,7 +414,8 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
             # this is fatal
             return
 
-    if is_annex and what == 'all' and reckless not in ('undead', 'kill'):
+    if is_annex and what in ('all', 'datasets') \
+            and reckless not in ('undead', 'kill'):
         # this annex is about to die, test if it is still considered
         # not-dead. if so, complain to avoid generation of zombies
         # (annexed that are floating around, but are actually dead).
@@ -447,7 +454,8 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
                 annex=False,
                 # we only need to inspect a subdataset's state in case
                 # we want to drop it completely
-                eval_subdataset_state='commit' if what in ('all',) else 'no',
+                eval_subdataset_state='commit'
+                if what in ('all', 'datasets') else 'no',
                 # recursion is handled outside this function
                 recursive=False,
                 result_renderer='disabled',

@@ -124,7 +124,7 @@ class Remove(Interface):
     def __call__(
             path=None,
             dataset=None,
-            drop='all',
+            drop='datasets',
             reckless=None,
             message=None,
             jobs=None,
@@ -191,7 +191,7 @@ class Remove(Interface):
                 # dataset, and it still needs to be unregistered
                 # from its parent -> `git rm`
                 if dpath.exists():
-                    GitRepo.call_git(
+                    GitRepo(dpath).call_git(
                         # no need for recursion, we know that even the root
                         # path not longer exists
                         ['rm', '-q'],
@@ -199,7 +199,13 @@ class Remove(Interface):
                     )
                     # this path was already being removed by drop
                     # so it must belong to a dropped dataset
-                    pass
+                    # save won't report about this, let's do it
+                    yield dict(
+                        action='remove',
+                        status='ok',
+                        path=str(delpath),
+                        type='dataset',
+                    )
 
         if not refds.is_installed():
             # we already dropped the whole thing
