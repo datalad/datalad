@@ -427,3 +427,15 @@ def test_call_fmt_from_env_requires_reload(path):
                      f"{sys.executable} {{script}}"}):
         # This will fail if the above environment variable isn't in effect.
         ds.run_procedure("p")
+
+
+@with_tempfile
+def test_run_proc_with_dict(path):
+    # Test whether a result from run_procedure(discover=True) will be accepted
+    ds = Dataset(path).create()
+    g = ds.run_procedure(discover=True, result_renderer='disabled',
+                         return_type='generator')
+    for proc in g:
+        if proc['procedure_name'] == 'cfg_text2git':
+            break
+    ds.run_procedure(spec=proc)
