@@ -39,6 +39,7 @@ from datalad.utils import (
 
 from .. import (
     CommandError,
+    KillOutput,
     Protocol,
     Runner,
     StdOutCapture,
@@ -286,3 +287,13 @@ def test_faulty_poll_detection():
     protocol = Protocol()
     protocol.process = PopenMock()
     assert_raises(CommandError, protocol._prepare_result)
+
+
+def test_kill_output():
+    runner = Runner()
+    res = runner.run(
+        py2cmd('import sys; sys.stdout.write("aaaa\\n"); sys.stderr.write("bbbb\\n")'),
+        protocol=KillOutput
+    )
+    eq_(res['stdout'], '')
+    eq_(res['stderr'], '')

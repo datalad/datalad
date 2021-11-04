@@ -63,8 +63,7 @@ class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
 
 
 class GenNothing(GeneratorMixIn, NoCapture):
-    def timeout(self, fd: Optional[int]) -> bool:
-        return False
+    pass
 
 
 def test_subprocess_return_code_capture():

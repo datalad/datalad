@@ -83,12 +83,6 @@ def test_file_number_activity_detection():
             GeneratorMixIn.__init__(self)
             NoCapture.__init__(self)
 
-        def pipe_data_received(self, fd, data):
-            self.send_result(1)
-
-        def pipe_connection_lost(self, fd: int, exc: Optional[Exception]) -> None:
-            self.send_result(2)
-
         def process_exited(self):
             self.send_result(3)
 
@@ -113,16 +107,4 @@ def test_exiting_process():
     result = run_command(py2cmd("import time\ntime.sleep(3)\nprint('exit')"),
                          protocol=NoCapture,
                          stdin=None)
-    print(result)
-
-
-def generator_mixin_interactive_demo():
-
-    stdin_queue = Queue()
-    for fd, data in run_command([sys.executable, "-i", "-v"], TestProtocol, stdin_queue):
-        if fd == 1:
-            sys.stdout.write(f"{data}\n")
-        else:
-            sys.stderr.write(data)
-            if data == ">>> ":
-                stdin_queue.put((input() + "\n").encode())
+    assert_equal(result["code"], 0)
