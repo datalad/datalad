@@ -339,6 +339,19 @@ class Create(Interface):
             yield res
             return
 
+        # Check if specified cfg_proc(s) can be discovered. If not,
+        # raise an error to prevent creating the dataset.
+        for cfg_proc_ in cfg_proc:
+            for discovered_proc in tbds.run_procedure(
+                    discover=True,
+                    result_renderer='disabled',
+                    return_type='generator'):
+                if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
+                    break
+            else:
+                raise ValueError("Cannot find procedure with name"
+                                 "'%s'" % cfg_proc)
+
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
