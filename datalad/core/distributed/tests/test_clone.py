@@ -307,6 +307,24 @@ def test_clone_into_dataset(source_path, top_path):
     eq_(subds_.pathobj, ds.pathobj / "sub2")  # for paranoid yoh ;)
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
+    # don't do anything to the dataset, when cloning fails (gh-6138)
+    create_tree(ds.path, {'subdir': {'dummy2.txt': 'whatever'}})
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
+    results = ds.clone(source, "subdir",
+                       result_xfm=None,
+                       return_type='list',
+                       on_failure='ignore')
+    assert_in_results(results, status='error')
+    # status unchanged
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    # nothing was committed
+    eq_(hexsha_before, ds.repo.get_hexsha(DEFAULT_BRANCH))
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
