@@ -339,18 +339,22 @@ class Create(Interface):
             yield res
             return
 
-        # Check if specified cfg_proc(s) can be discovered. If not,
-        # raise an error to prevent creating the dataset.
+        # Check if specified cfg_proc(s) can be discovered, storing
+        # the results so they can be used when the time comes to run
+        # the procedure. If a procedure cannot be found, raise an
+        # error to prevent creating the dataset.
+        cfg_proc_specs = []
         for cfg_proc_ in cfg_proc:
             for discovered_proc in tbds.run_procedure(
                     discover=True,
                     result_renderer='disabled',
                     return_type='generator'):
                 if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
+                    cfg_proc_specs.append(discovered_proc)
                     break
             else:
-                raise ValueError("Cannot find procedure with name"
-                                 "'%s'" % cfg_proc)
+                raise ValueError("Cannot find procedure with name "
+                                 "'%s'" % cfg_proc_)
 
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
@@ -424,8 +428,8 @@ class Create(Interface):
             _status=add_to_git,
         )
 
-        for cfg_proc_ in cfg_proc:
-            for r in tbds.run_procedure('cfg_' + cfg_proc_):
+        for cfg_proc_spec in cfg_proc_specs:
+            for r in tbds.run_procedure(cfg_proc_spec):
                 yield r
 
         # the next only makes sense if we saved the created dataset,

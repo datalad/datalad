@@ -280,10 +280,11 @@ class RunProcedure(Interface):
             args=("spec",),
             metavar='NAME [ARGS]',
             nargs=REMAINDER,
-            doc="""Name and possibly additional arguments of the
-            to-be-executed procedure. [CMD: Note, that all options to
-            run-procedure need to be put before NAME, since all ARGS get
-            assigned to NAME CMD]"""),
+            doc="""Name and possibly additional arguments of the to-be-executed
+            procedure. [PY: Can also be a dictionary coming from
+            run-procedure(discover=True).] [CMD: Note, that all options
+            to run-procedure need to be put before NAME, since all
+            ARGS get assigned to NAME CMD]"""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar="PATH",
@@ -376,18 +377,32 @@ class RunProcedure(Interface):
                 yield res
             return
 
-        if not isinstance(spec, (tuple, list)):
-            # maybe coming from config
-            spec = split_cmdline(spec)
-        name = spec[0]
-        args = spec[1:]
 
-        try:
-            # get the first match an run with it
-            procedure_file, cmd_name, cmd_tmpl, cmd_help = \
-                next(_get_procedure_implementation(name, ds=ds))
-        except StopIteration:
-            raise ValueError("Cannot find procedure with name '%s'" % name)
+        if isinstance(spec, dict):
+            # Skip getting procedure implementation if called with a
+            # dictionary (presumably coming from --discover)
+            procedure_file = spec['path']
+            cmd_name = spec['procedure_name']
+            cmd_tmpl = spec['procedure_callfmt']
+            cmd_help = spec['procedure_help']
+
+            name = cmd_name
+            args = []
+
+        else:
+
+            if not isinstance(spec, (tuple, list)):
+                # maybe coming from config
+                spec = split_cmdline(spec)
+            name = spec[0]
+            args = spec[1:]
+
+            try:
+                # get the first match an run with it
+                procedure_file, cmd_name, cmd_tmpl, cmd_help = \
+                    next(_get_procedure_implementation(name, ds=ds))
+            except StopIteration:
+                raise ValueError("Cannot find procedure with name '%s'" % name)
 
         ex = _guess_exec(procedure_file)
         # configured template (call-format string) takes precedence:
