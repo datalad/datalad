@@ -57,22 +57,6 @@ from ..dataset import Dataset
 
 
 @with_tempfile()
-def test_safetynet(path):
-    ds = Dataset(path).create()
-    os.makedirs(opj(ds.path, 'deep', 'down'))
-    for p in (ds.path, opj(ds.path, 'deep'), opj(ds.path, 'deep', 'down')):
-        with chpwd(p):
-            # will never remove PWD, or anything outside the dataset
-            for target in (ds.path, os.curdir, os.pardir, opj(os.pardir, os.pardir)):
-                assert_raises(RuntimeError, uninstall, path=target)
-    sub = ds.create('sub')
-    subsub = sub.create('subsub')
-    for p in (sub.path, subsub.path):
-        with chpwd(p):
-            assert_raises(RuntimeError, uninstall)
-
-
-@with_tempfile()
 def test_uninstall_uninstalled(path):
     # goal oriented error reporting. here:
     # nothing installed, any removal was already a success before it started

@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test drop command"""
 
+import os
 import os.path as op
 
 from datalad.api import (
@@ -432,3 +433,19 @@ def test_kill(path):
     )
     eq_(False, ds.is_installed())
     eq_(False, ds.pathobj.exists())
+
+
+@with_tempfile()
+def test_refuse_to_drop_cwd(path):
+    ds = Dataset(path).create()
+    (ds.pathobj / 'deep' / 'down').mkdir(parents=True)
+    for p in (ds.pathobj, ds.pathobj / 'deep', ds.pathobj / 'deep' / 'down'):
+        with chpwd(str(p)):
+            # will never remove PWD, or anything outside the dataset
+            for target in (ds.pathobj, os.curdir, os.pardir, op.join(os.pardir, os.pardir)):
+                assert_raises(RuntimeError, drop, path=target, what='all')
+    sub = ds.create('sub')
+    subsub = sub.create('subsub')
+    for p in (sub.path, subsub.path):
+        with chpwd(p):
+            assert_raises(RuntimeError, drop, what='all')
