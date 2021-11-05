@@ -13,7 +13,6 @@ from datalad.api import remove
 from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import (
-    assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -22,9 +21,11 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     assert_status,
-    assert_true,
     chpwd,
+    eq_,
     get_deeply_nested_structure,
+    nok_,
+    ok_,
     with_tempfile,
 )
 
@@ -35,7 +36,7 @@ def test_remove(path):
     ds = get_deeply_nested_structure(path)
     gitfile = op.join("subdir", "git_file.txt")
 
-    assert_true((ds.pathobj / gitfile).exists())
+    ok_((ds.pathobj / gitfile).exists())
     res = ds.remove(gitfile, drop='all')
     assert_result_count(res, 3)
     # git file needs no dropping
@@ -62,7 +63,7 @@ def test_remove(path):
         type='dataset',
         status='ok',
     )
-    assert_false((ds.pathobj / gitfile).exists())
+    nok_((ds.pathobj / gitfile).exists())
 
     # now same for an annexed files
     annexedfile = op.join("subdir", "annexed_file.txt")
@@ -71,7 +72,7 @@ def test_remove(path):
     assert_result_count(res, 1)
     assert_in_results(res, status='error', action='drop',
                       path=str(ds.pathobj / annexedfile))
-    assert_true((ds.pathobj / annexedfile).exists())
+    ok_((ds.pathobj / annexedfile).exists())
 
     # now remove the file, but actually not drop the underlying
     # key -- hence no availability loss -- default mode of operation
@@ -90,20 +91,20 @@ def test_remove(path):
     assert_in_results(res, action='remove', status='ok',
                       path=str(ds.pathobj / annexedfile))
     assert_not_in_results(res, action='drop')
-    assert_false((ds.pathobj / annexedfile).exists())
+    nok_((ds.pathobj / annexedfile).exists())
     res = ds.repo.call_annex_records(['whereis', '--key', key, '--json'])
     assert_in_results(res, key=key, success=True)
 
     # now remove entire directory
     res = ds.remove('subdir', on_failure='ignore')
     assert_in_results(res, status='impossible', state='untracked')
-    assert_true((ds.pathobj / 'subdir').exists())
+    ok_((ds.pathobj / 'subdir').exists())
 
     ds.save('subdir')
     res = ds.remove('subdir', on_failure='ignore')
     assert_in_results(res, status='ok', action='remove')
     assert_in_results(res, status='ok', action='save', type='dataset')
-    assert_false((ds.pathobj / 'subdir').exists())
+    nok_((ds.pathobj / 'subdir').exists())
 
     # now remove an entire subdataset
     # prep: make clean
@@ -123,7 +124,7 @@ def test_remove(path):
     assert_status('ok', res)
     assert_in_results(res, action='uninstall', path=str(rmdspath))
     assert_in_results(res, action='remove', path=str(rmdspath))
-    assert_false(rmdspath.exists())
+    nok_(rmdspath.exists())
     # properly unlinked
     assert_not_in(str(rmdspath),
                   ds.subdatasets(path='subds_modified',
@@ -150,7 +151,7 @@ def test_remove(path):
     # and really finally, removing top-level is just a drop
     res = ds.remove(reckless='kill')
     assert_in_results(res, action='uninstall', path=ds.path, status='ok')
-    assert_false(ds.is_installed())
+    nok_(ds.is_installed())
 
 
 @with_tempfile

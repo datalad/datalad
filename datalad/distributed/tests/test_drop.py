@@ -27,14 +27,14 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     OBSCURE_FILENAME,
-    assert_false,
     assert_in,
     assert_in_results,
     assert_raises,
     assert_result_count,
-    assert_true,
     eq_,
     get_deeply_nested_structure,
+    nok_,
+    ok_,
     with_tempfile,
 )
 from datalad.utils import chpwd
@@ -79,13 +79,13 @@ def test_drop_file_content(path, outside_path):
         )
 
     # drop multiple files from different datasets
-    assert_true(ds.repo.file_has_content(axfile_rootds))
+    ok_(ds.repo.file_has_content(axfile_rootds))
     res = ds.drop(
         [axfile_rootds, axfile_subds],
         reckless='availability',
         jobs=2,
         on_failure='ignore')
-    assert_false(ds.repo.file_has_content(axfile_rootds))
+    nok_(ds.repo.file_has_content(axfile_rootds))
     assert_result_count(res, 2)
     for rp in [axfile_rootds, axfile_subds]:
         assert_in_results(
@@ -348,18 +348,18 @@ def test_safetynet(otherpath, origpath, clonepath):
     # to drop
     with chpwd(otherpath):
         assert_raises(NoDatasetFound, drop, clonepath, what='all')
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     # refuse to remove the CWD
     with chpwd(clonepath):
         assert_raises(RuntimeError, drop, what='all')
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     assert_in_results(
         cloneds.drop(what='all', on_failure='ignore'),
         message='cannot drop untracked content, save first',
         status='impossible')
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     # so let's save...
     cloneds.save()
@@ -367,10 +367,10 @@ def test_safetynet(otherpath, origpath, clonepath):
     # - a new key is only available here
     res = cloneds.drop(what='all', on_failure='ignore')
     assert_in_results(res, action="uninstall", status="error")
-    assert_true(res[0]['message'][0].startswith(
+    ok_(res[0]['message'][0].startswith(
         "to-be-dropped dataset has revisions "
         "that are not available at any known sibling"))
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     # so let's push -- git only
     # we cannot use git-push directly, it would not handle
@@ -379,13 +379,13 @@ def test_safetynet(otherpath, origpath, clonepath):
 
     res = cloneds.drop(what='all', on_failure='ignore')
     assert_in_results(res, action="uninstall", status="error")
-    assert_true(res[0]['message'][0].startswith(
+    ok_(res[0]['message'][0].startswith(
         "to-be-deleted local annex not declared 'dead'"))
     # some windows test setup is not very robust, explicitly
     # include the default name "origin" in the test success
     # conditions to make this more robust
     eq_(res[0]['message'][1], [DEFAULT_REMOTE])
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     # announce dead
     cloneds.repo.call_annex(['dead', 'here'])
@@ -393,18 +393,18 @@ def test_safetynet(otherpath, origpath, clonepath):
     assert_in_results(
         cloneds.drop(what='all', on_failure='ignore'),
         status='error')
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     # so let's push that announcement also
     cloneds.push(data='nothing')
 
     res = cloneds.drop(what='all', on_failure='ignore')
     assert_in_results(res, action="drop", status="error")
-    assert_true(res[0]['message'].startswith(
+    ok_(res[0]['message'].startswith(
         "unsafe\nCould only verify the existence of "
         "0 out of 1 necessary"),
         msg=f"Results were {res}")
-    assert_true(cloneds.is_installed())
+    ok_(cloneds.is_installed())
 
     # so let's push all
     cloneds.push()
