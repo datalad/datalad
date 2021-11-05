@@ -13,6 +13,7 @@ import os.path as op
 from datalad.api import (
     Dataset,
     clone,
+    create,
     drop,
 )
 from datalad.distributed.drop import (
@@ -30,7 +31,9 @@ from datalad.tests.utils import (
     assert_in,
     assert_in_results,
     assert_raises,
+    assert_repo_status,
     assert_result_count,
+    assert_status,
     eq_,
     get_deeply_nested_structure,
     nok_,
@@ -455,3 +458,60 @@ def test_refuse_to_drop_cwd(path):
     for p in (sub.path, subsub.path):
         with chpwd(p):
             assert_raises(RuntimeError, drop, what='all')
+
+
+@with_tempfile()
+def test_careless_subdataset_uninstall(path):
+    # nested datasets
+    ds = Dataset(path).create()
+    subds1 = ds.create('deep1')
+    ds.create('deep2')
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
+    assert_repo_status(ds.path)
+    # now we kill the sub without the parent knowing
+    subds1.drop(what='all', reckless='kill', recursive=True)
+    ok_(not subds1.is_installed())
+    # mountpoint exists
+    ok_(subds1.pathobj.exists())
+    assert_repo_status(ds.path)
+    # parent still knows the sub
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
+
+
+@with_tempfile(mkdir=True)
+def test_drop_nocrash_absent_subds(path):
+    parent = Dataset(path).create()
+    parent.create('sub')
+    parent.drop('sub', reckless='availability')
+    assert_repo_status(parent.path)
+    with chpwd(path):
+        assert_status('notneeded', drop('.', recursive=True))
+
+
+@with_tempfile(mkdir=True)
+def test_uninstall_without_super(path):
+    # a parent dataset with a proper subdataset, and another dataset that
+    # is just placed underneath the parent, but not an actual subdataset
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
+    assert_repo_status(parent.path)
+    nosub = create(op.join(parent.path, 'nosub'))
+    assert_repo_status(nosub.path)
+    subreport = parent.subdatasets()
+    assert_result_count(subreport, 1, path=sub.path)
+    assert_result_count(subreport, 0, path=nosub.path)
+    # it should be possible to uninstall the proper subdataset, even without
+    # explicitly calling the uninstall methods of the parent -- things should
+    # be figured out by datalad
+    with chpwd(parent.path):
+        # check False because revisions are not pushed
+        drop(sub.path, reckless='availability')
+    assert not sub.is_installed()
+    # no present subdatasets anymore
+    subreport = parent.subdatasets()
+    assert_result_count(subreport, 1)
+    assert_result_count(subreport, 1, path=sub.path, state='absent')
+    assert_result_count(subreport, 0, path=nosub.path)
+    # but we should fail on an attempt to uninstall the non-subdataset
+    with chpwd(nosub.path):
+        assert_raises(RuntimeError, drop)

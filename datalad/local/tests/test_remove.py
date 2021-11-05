@@ -9,7 +9,10 @@
 
 import os.path as op
 
-from datalad.api import remove
+from datalad.api import (
+    clone,
+    remove,
+)
 from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import (
@@ -22,11 +25,13 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     chpwd,
+    create_tree,
     eq_,
     get_deeply_nested_structure,
     nok_,
     ok_,
     with_tempfile,
+    with_tree,
 )
 
 
@@ -172,3 +177,113 @@ def test_remove_subdataset_nomethod(path):
 def test_remove_uninstalled(path):
     ds = Dataset(path)
     assert_raises(ValueError, ds.remove)
+
+
+@with_tempfile()
+def test_remove_nowhining(path):
+    # when removing a dataset under a dataset (but not a subdataset)
+    # should not provide a meaningless message that something was not right
+    ds = Dataset(path).create()
+    # just install/clone inside of it
+    subds_path = ds.pathobj / 'subds'
+    clone(path=subds_path, source=path)
+    remove(dataset=subds_path)  # should remove just fine
+
+
+@with_tempfile()
+def test_remove_recreation(path):
+    # test recreation is possible and doesn't conflict with in-memory
+    # remainings of the old instances
+    # see issue #1311
+    ds = Dataset(path).create()
+    ds.remove(reckless='availability')
+    ds = Dataset(path).create()
+    assert_repo_status(ds.path)
+    ok_(ds.is_installed())
+
+
+@with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
+def test_remove_more_than_one(path):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    assert_repo_status(path)
+    # ensure #1912 stays resolved
+    ds.remove(['one', 'two'], reckless='availability')
+    assert_repo_status(path)
+
+
+@with_tempfile()
+def test_no_interaction_with_untracked_content(path):
+    # extracted from what was a metadata test originally
+    ds = Dataset(op.join(path, 'origin')).create(force=True)
+    create_tree(ds.path, {'sub': {'subsub': {'dat': 'lots of data'}}})
+    subds = ds.create('sub', force=True)
+    subds.remove(op.join('.datalad', 'config'), if_dirty='ignore')
+    nok_((subds.pathobj / '.datalad' / 'config').exists())
+    # this will only work, if `remove` didn't do anything stupid and
+    # caused all content to be saved
+    subds.create('subsub', force=True)
+
+
+@with_tempfile()
+def test_kill(path):
+    # nested datasets with load
+    ds = Dataset(path).create()
+    (ds.pathobj / 'file.dat').write_text('load')
+    ds.save("file.dat")
+    subds = ds.create('deep1')
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1'])
+    assert_repo_status(ds.path)
+
+    # and we fail to remove for many reasons
+    # - unpushed commits
+    # - a subdataset present
+    # - unique annex key
+    res = ds.remove(on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='error', path=ds.path)
+    eq_(ds.remove(recursive=True,
+                  reckless='availability',
+                  result_xfm='datasets'),
+        [subds, ds])
+    nok_(ds.pathobj.exists())
+
+
+@with_tempfile()
+def test_clean_subds_removal(path):
+    ds = Dataset(path).create()
+    subds1 = ds.create('one')
+    subds2 = ds.create('two')
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['one', 'two'])
+    assert_repo_status(ds.path)
+    # now kill one
+    res = ds.remove('one', reckless='availability', result_xfm=None)
+    # subds1 got uninstalled, and ds got the removal of subds1 saved
+    assert_result_count(res, 1, path=subds1.path, action='uninstall', status='ok')
+    assert_result_count(res, 1, path=subds1.path, action='remove', status='ok')
+    assert_result_count(res, 1, path=ds.path, action='save', status='ok')
+    ok_(not subds1.is_installed())
+    assert_repo_status(ds.path)
+    # two must remain
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['two'])
+    # one is gone
+    nok_(subds1.pathobj.exists())
+    # and now again, but this time remove something that is not installed
+    ds.create('three')
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
+    ds.drop('two', reckless='availability')
+    assert_repo_status(ds.path)
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
+    ok_(not subds2.is_installed())
+    # oderly empty mountpoint is maintained
+    ok_(subds2.pathobj.exists())
+    res = ds.remove('two', reckless='availability')
+    assert_in_results(
+        res,
+        path=str(ds.pathobj / 'two'),
+        action='remove')
+    assert_repo_status(ds.path)
+    # subds2 was already uninstalled, now ds got the removal of subds2 saved
+    nok_(subds2.pathobj.exists())
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
