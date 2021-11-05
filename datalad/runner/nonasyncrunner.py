@@ -29,6 +29,7 @@ from typing import (
     Union,
 )
 
+from .exception import CommandError
 from .protocol import (
     GeneratorMixIn,
     WitlessProtocol,
@@ -69,6 +70,11 @@ class _ResultGenerator(Generator):
         self.return_code = None
         self.state = self.GeneratorState.process_running
 
+    def _check_result(self):
+        if self.runner.exception_on_error is True:
+            if self.return_code != 0:
+                raise CommandError(cmd=self.runner.cmd, code=self.return_code)
+
     def send(self, _):
         runner = self.runner
         if self.state == self.GeneratorState.process_running:
@@ -82,6 +88,7 @@ class _ResultGenerator(Generator):
                 self.return_code = runner.process.poll()
                 runner.protocol.process_exited()
                 self.state = self.GeneratorState.process_exited
+                self._check_result()
             else:
                 # If we have no results in the queue, but still monitored
                 # file numbers, wait on the threaded runner queue.
@@ -97,6 +104,7 @@ class _ResultGenerator(Generator):
                     self.return_code = runner.process.poll()
                     runner.protocol.process_exited()
                     self.state = self.GeneratorState.process_exited
+                    self._check_result()
 
         if self.state == self.GeneratorState.process_exited:
             if len(self.result_queue) > 0:
@@ -138,6 +146,7 @@ class ThreadedRunner:
                  stdin: Any,
                  protocol_kwargs: Optional[Dict] = None,
                  timeout: Optional[float] = None,
+                 exception_on_error: bool = True,
                  **popen_kwargs
                  ):
         """
@@ -187,6 +196,15 @@ class ThreadedRunner:
               the timeout-method will be called with the argument `None`. If
               it returns `True`, the process will be terminated.
 
+        exception_on_error : bool, optional
+            This argument is only interpreted if the protocol is a subclass
+            of `GeneratorMixIn`. If it is `True` (default), a
+            `CommandErrorException` is raised by the generator if the
+            sub process exited with a return code not equal to zero. If the
+            parameter is `False`, no exception is raised. In both cases the
+            return code can be read from the attribute `return_code` of
+            the generator.
+
         popen_kwargs : dict
             Passed to `subprocess.Popen`, will typically be parameters
             supported by `subprocess.Popen`. Note that `bufsize`, `stdin`,
@@ -198,7 +216,9 @@ class ThreadedRunner:
         self.stdin = stdin
         self.protocol_kwargs = protocol_kwargs or {}
         self.timeout = timeout
+        self.exception_on_error = exception_on_error
         self.popen_kwargs = popen_kwargs
+
         self.catch_stdout = self.protocol_class.proc_out is not None
         self.catch_stderr = self.protocol_class.proc_err is not None
         self.generator = self.protocol_class.generator is not None
@@ -527,6 +547,7 @@ def run_command(cmd: Union[str, List],
                 stdin: Any,
                 protocol_kwargs: Optional[Dict] = None,
                 timeout: Optional[float] = None,
+                exception_on_error: bool = True,
                 **popen_kwargs) -> Union[Any, Generator]:
     """
     Run a command in a subprocess
@@ -542,6 +563,7 @@ def run_command(cmd: Union[str, List],
         stdin=stdin,
         protocol_kwargs=protocol_kwargs,
         timeout=timeout,
+        exception_on_error=exception_on_error,
         **popen_kwargs,
     )
 

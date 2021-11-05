@@ -467,7 +467,8 @@ def test_exit_3():
     rt = ThreadedRunner(cmd=["sleep", "4"],
                         stdin=None,
                         protocol_class=GenStdoutStderr,
-                        timeout=.5)
+                        timeout=.5,
+                        exception_on_error=False)
     for x in rt.run():
         print(x)
     assert_true(rt.process.poll() is not None)
@@ -489,7 +490,8 @@ def test_generator_exit_3():
     rt = ThreadedRunner(cmd=["sleep", "4"],
                         stdin=None,
                         protocol_class=GenStdoutStderr,
-                        timeout=.5)
+                        timeout=.5,
+                        exception_on_error=False)
     rt.wait_for_process = fake_wait_for_process
     rt.wait_for_threads = lambda: None
     for _ in rt.run():
@@ -531,3 +533,10 @@ def test_generator_throw():
                         timeout=.5)
     gen = rt.run()
     assert_raises(ValueError, gen.throw, ValueError, ValueError("abcdefg"))
+
+
+def test_exiting_process():
+    result = run_command(py2cmd("import time\ntime.sleep(3)\nprint('exit')"),
+                         protocol=NoCapture,
+                         stdin=None)
+    eq_(result["code"], 0)

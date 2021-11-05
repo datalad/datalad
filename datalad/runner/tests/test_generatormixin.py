@@ -13,6 +13,7 @@ from datalad.tests.utils import (
     assert_raises,
 )
 
+from ..exception import CommandError
 from ..runner import WitlessRunner
 from .utils import py2cmd
 
@@ -102,9 +103,18 @@ def test_file_number_activity_detection():
     assert_raises(StopIteration, result_generator.send, None)
 
 
-def test_exiting_process():
+def test_failing_process():
+    class TestProtocol(GeneratorMixIn, NoCapture):
+        def __init__(self):
+            GeneratorMixIn.__init__(self)
+            NoCapture.__init__(self)
 
-    result = run_command(py2cmd("import time\ntime.sleep(.1)\nprint('exit')"),
-                         protocol=NoCapture,
-                         stdin=None)
-    assert_equal(result["code"], 0)
+    try:
+        for _ in run_command(py2cmd("exit(1)"),
+                             protocol=TestProtocol,
+                             stdin=None):
+            pass
+        assert_equal(1, 2)
+    except CommandError:
+        return
+    assert_equal(2, 3)
