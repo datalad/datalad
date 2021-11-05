@@ -15,17 +15,17 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
-from ...api import (
+from datalad.api import (
     clone,
     download_url,
     Dataset,
 )
-from ...utils import (
+from datalad.utils import (
     chpwd,
     Path,
 )
-from ...downloaders.tests.utils import get_test_providers
-from ...tests.utils import (
+
+from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_false,
     assert_in,
@@ -36,7 +36,7 @@ from ...tests.utils import (
     ok_exists,
     with_tempfile,
 )
-from ...tests.utils import (
+from datalad.tests.utils import (
     DEFAULT_REMOTE,
     assert_in_results,
     assert_not_in,

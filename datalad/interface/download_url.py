@@ -13,26 +13,38 @@ __docformat__ = 'restructuredtext'
 
 import os.path as op
 
-from .base import Interface
-from ..core.local.save import Save
-from ..interface.base import build_doc
-from ..interface.common_opts import nosave_opt
-from ..interface.common_opts import save_message_opt
-from ..interface.results import get_status_dict
-from ..interface.utils import eval_results
-from ..utils import ensure_list_from_str
-from ..utils import Path
-from ..utils import PurePosixPath
-from ..distribution.dataset import Dataset
-from ..distribution.dataset import datasetmethod
-from ..distribution.dataset import EnsureDataset
-from ..distribution.dataset import path_under_rev_dataset
-from ..distribution.dataset import require_dataset
-from ..distribution.dataset import resolve_path
-from ..support.annexrepo import AnnexRepo
-from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureNone
-from ..support.exceptions import (
+from datalad.interface.base import Interface
+from datalad.core.local.save import Save
+from datalad.interface.base import build_doc
+from datalad.interface.common_opts import (
+    nosave_opt,
+    save_message_opt,
+)
+
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import eval_results
+from datalad.utils import (
+    ensure_list_from_str,
+    Path,
+    PurePosixPath,
+)
+
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    EnsureDataset,
+    path_under_rev_dataset,
+    require_dataset,
+    resolve_path,
+)
+from datalad.dochelpers import exc_str
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.param import Parameter
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureNone,
+)
+from datalad.support.exceptions import (
     CapturedException,
     CommandError,
     NoDatasetFound,
@@ -272,6 +284,5 @@ URLs:
                                         path, url, CapturedException(exc))
 
                     if archive:
-                        from datalad.api import add_archive_content
                         for path in annex_paths:
-                            add_archive_content(path, annex=ds_repo, delete=True)
+                            ds.add_archive_content(path, delete=True)

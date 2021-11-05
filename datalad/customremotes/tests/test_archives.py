@@ -17,6 +17,7 @@ import logging
 import glob
 from time import sleep
 
+from datalad.api import Dataset
 from ..archives import (
     ArchiveAnnexCustomRemote,
     link_file_load,
@@ -157,11 +158,10 @@ def test_basic_scenario(d, d2):
     tree={'a.tar.gz': {'d': {fn_in_archive_obscure: '123'}}}
 )
 def test_annex_get_from_subdir(topdir):
-    from datalad.api import add_archive_content
-    annex = AnnexRepo(topdir, backend='MD5E', init=True)
-    annex.add('a.tar.gz')
-    annex.commit()
-    add_archive_content('a.tar.gz', annex=annex, delete=True)
+    ds = Dataset(topdir)
+    ds.create(force=True)
+    ds.save('a.tar.gz')
+    ds.add_archive_content('a.tar.gz', delete=True)
     fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
     with chpwd(op.join(topdir, 'a', 'd')):
@@ -169,11 +169,11 @@ def test_annex_get_from_subdir(topdir):
         runner.run(
             ['git', 'annex', 'drop', '--', fn_in_archive_obscure],
             protocol=KillOutput)  # run git annex drop
-        assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
+        assert_false(ds.repo.file_has_content(fpath))             # and verify if file deleted from directory
         runner.run(
             ['git', 'annex', 'get', '--', fn_in_archive_obscure],
             protocol=KillOutput)   # run git annex get
-        assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
+        assert_true(ds.repo.file_has_content(fpath))              # and verify if file got into directory
 
 
 def test_get_git_environ_adjusted():
