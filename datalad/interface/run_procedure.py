@@ -282,7 +282,7 @@ class RunProcedure(Interface):
             nargs=REMAINDER,
             doc="""Name and possibly additional arguments of the to-be-executed
             procedure. [PY: Can also be a dictionary coming from
-            run-procedure(discover=True).] [CMD: Note, that all options
+            run-procedure(discover=True).][CMD: Note, that all options
             to run-procedure need to be put before NAME, since all
             ARGS get assigned to NAME CMD]"""),
         dataset=Parameter(
