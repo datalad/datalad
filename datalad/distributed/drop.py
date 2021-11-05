@@ -127,8 +127,8 @@ class Drop(Interface):
             insufficient number of file-content copies will be disabled.
             Especially the latter is a potentially expensive check which might
             involve numerous network transactions.
-            With 'undead', detection whether a to-be-removed local annex is
-            still known to exists in the network of dataset-clones is disabled.
+            With 'undead', detection of whether a to-be-removed local annex is
+            still known to exist in the network of dataset-clones is disabled.
             This could cause zombie-records of invalid file availability.
             With 'kill', all safety-checks are disabled.""",
             constraints=EnsureChoice(
