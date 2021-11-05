@@ -359,18 +359,14 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     # now conditional/informative checks
     yield from _pre_drop_checks(ds, repo, paths, what, reckless, is_annex)
 
-    if is_annex and what == 'filecontent' and not reckless == 'kill':
-        # XXX should we only drop filecontent with particular paths
-        # specified? e.g. '.'
-        # MIH: right now I don't think so, because running drop without
-        # should be safe by default in the end
+    if is_annex and what == 'filecontent':
         yield from _drop_files(
             ds,
             repo,
             # give paths or '.' with no constraint
             paths=[str(p.relative_to(ds.pathobj))
                    for p in paths] if paths else '.',
-            force=reckless in ('availability',),
+            force=reckless in ('availability', 'kill'),
             jobs=jobs,
         )
         # end it here for safety, the rest of the function deals with
