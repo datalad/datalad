@@ -361,7 +361,7 @@ def test_safetynet(otherpath, origpath, clonepath):
     res = cloneds.drop(what='all', on_failure='ignore')
     assert_in_results(res, action="uninstall", status="error")
     assert_true(res[0]['message'][0].startswith(
-        "to-be-dropped dataset has the following revisions "
+        "to-be-dropped dataset has revisions "
         "that are not available at any known sibling"))
     assert_true(cloneds.is_installed())
 
