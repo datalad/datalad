@@ -18,6 +18,7 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_not_in,
     assert_not_in_results,
+    assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_status,
@@ -158,3 +159,9 @@ def test_remove_subdataset_nomethod(path):
         assert_in_results(res, action='uninstall', status='ok', type='dataset')
         assert_in_results(res, action='remove', status='ok')
         assert_in_results(res, action='save', status='ok')
+
+
+@with_tempfile()
+def test_remove_uninstalled(path):
+    ds = Dataset(path)
+    assert_raises(ValueError, ds.remove)

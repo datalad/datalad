@@ -58,12 +58,8 @@ from ..dataset import Dataset
 
 @with_tempfile()
 def test_uninstall_uninstalled(path):
-    # goal oriented error reporting. here:
-    # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
-    assert_raises(ValueError, ds.drop)
     assert_raises(ValueError, ds.uninstall)
-    assert_raises(ValueError, ds.remove)
 
 
 @with_tempfile()

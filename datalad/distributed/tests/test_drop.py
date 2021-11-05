@@ -250,7 +250,10 @@ def test_undead_annex_detection(gitpath, origpath, clonepath):
 
 @with_tempfile
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path)
+    assert_raises(ValueError, ds.drop)
+
+    ds = ds.create()
     subds = ds.create('sub')
 
     # fail to uninstall with subdatasets present
