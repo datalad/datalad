@@ -17,7 +17,7 @@ Threads
 
 Datalad often requires the execution of subprocesses. While subprocesses are executed, datalad, i.e. its main thread, should be able to read data from stdout and stderr of the subprocess as well as write data to stdin of the subprocess. This requires a way to efficiently multiplex reading from stdout and stderr of the subprocess as well as writing to stdin of the subprocess.
 
-Since non-blocking IO and waiting on multiple sources (poll or select) differs wastly in terms of capabilities and API on different OSs, we decided to use blocking IO and threads to multiplex reading from different sources.
+Since non-blocking IO and waiting on multiple sources (poll or select) differs vastly in terms of capabilities and API on different OSs, we decided to use blocking IO and threads to multiplex reading from different sources.
 
 Generally we have a number of threads. Each thread can read from either a single queue or a file descriptor. Reading is done blocking. Each thread can put data into multiple queues. This is used to transport data that was read as well as for signaling conditions like closed file descriptors.
 
