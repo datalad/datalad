@@ -397,7 +397,9 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
             )
             # pull any note, and rename recommended parameter to
             # avoid confusion
-            message = r.get('note', '').replace('--force', '--reckless')
+            message = r.get('note', '').replace(
+                '--force',
+                '--reckless availability')
             if message:
                 res['message'] = message
             error_messages = r.get('error-messages')
@@ -786,7 +788,7 @@ def _postproc_annexdrop_result(res, respath_by_status, ds, **kwargs):
             # Just mention reckless itself, do not go into the details
             # of which mode. This is likely changing over time and
             # adjusting this replacement will be forgotten.
-            res["message"] = msg.replace("--force", "--reckless")
+            res["message"] = msg.replace(
+                "--force",
+                "--reckless availability")
     return res
-
-
