@@ -26,8 +26,8 @@ import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
-from datalad.dochelpers import exc_str
 from datalad.support.exceptions import (
+    CapturedException,
     DownloadError,
     AccessDeniedError,
     AccessPermissionExpiredError,
@@ -45,7 +45,9 @@ try:
     from boto.s3.connection import OrdinaryCallingFormat
 except Exception as e:
     if not isinstance(e, ImportError):
-        lgr.warning("boto module failed to import although available: %s" % exc_str(e))
+        lgr.warning(
+            "boto module failed to import although available: %s",
+            CapturedException(e))
     boto = Key = S3ResponseError = OrdinaryCallingFormat = None
 
 
@@ -73,9 +75,9 @@ def _handle_exception(e, bucket_name):
         AccessDeniedError
         if e.error_code == 'AccessDenied'
         else DownloadError)(
-            "Cannot connect to %s S3 bucket. Exception: %s"
-            % (bucket_name, exc_str(e))
-        )
+            "Cannot connect to %s S3 bucket."
+            % (bucket_name)
+        ) from e
 
 
 def _check_S3ResponseError(e):
@@ -96,7 +98,8 @@ def _check_S3ResponseError(e):
         # error_code.  Then we will allow to retry until we get something we know how to
         # handle it more specifically
         if e.error_code == 'ExpiredToken':
-            raise AccessPermissionExpiredError("Used token to access S3 has expired: %s" % exc_str(e))
+            raise AccessPermissionExpiredError(
+                "Used token to access S3 has expired") from e
         elif not e.error_code:
             lgr.log(5, "Empty error_code in %s", e)
         return True
@@ -130,11 +133,12 @@ def get_bucket(conn, bucket_name):
     try:
         return try_multiple_dec_s3(conn.get_bucket)(bucket_name)
     except S3ResponseError as e:
+        ce = CapturedException(e)
         # can initially deny or error to connect to the specific bucket by name,
         # and we would need to list which buckets are available under following
         # credentials:
         lgr.debug("Cannot access bucket %s by name with validation: %s",
-                  bucket_name, exc_str(e))
+                  bucket_name, ce)
         if conn.anon:
             raise AnonymousAccessDeniedError(
                 "Access to the bucket %s did not succeed.  Requesting "
@@ -150,7 +154,7 @@ def get_bucket(conn, bucket_name):
                 return try_multiple_dec_s3(conn.get_bucket)(bucket_name, validate=False)
             except S3ResponseError as e2:
                 lgr.debug("Cannot access bucket %s even without validation: %s",
-                          bucket_name, exc_str(e2))
+                          bucket_name, CapturedException(e2))
                 _handle_exception(e, bucket_name)
 
         try:
@@ -160,7 +164,7 @@ def get_bucket(conn, bucket_name):
             if bucket_name in all_bucket_names:
                 return all_buckets[all_bucket_names.index(bucket_name)]
         except S3ResponseError as e2:
-            lgr.debug("Cannot access all buckets: %s", exc_str(e2))
+            lgr.debug("Cannot access all buckets: %s", CapturedException(e2))
             _handle_exception(e, 'any (originally requested %s)' % bucket_name)
         else:
             _handle_exception(e, bucket_name)

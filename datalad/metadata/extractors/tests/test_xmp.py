@@ -20,8 +20,7 @@ from datalad.tests.utils import (
 try:
     import libxmp
 except Exception as exc:
-    from datalad.dochelpers import exc_str
-    raise SkipTest("libxmp cannot be imported: %s" % exc_str(exc))
+    raise SkipTest("libxmp cannot be imported") from exc
 
 from shutil import copy
 from os.path import (

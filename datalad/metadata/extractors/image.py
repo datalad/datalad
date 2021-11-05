@@ -15,8 +15,7 @@ from datalad.log import log_progress
 
 from PIL import Image
 from datalad.metadata.extractors.base import BaseMetadataExtractor
-from datalad.dochelpers import exc_str
-
+from datalad.support.exceptions import CapturedException
 
 vocabulary = {
     "spatial_resolution(dpi)": {
@@ -78,7 +77,7 @@ class MetadataExtractor(BaseMetadataExtractor):
                 img = Image.open(absfp)
             except Exception as e:
                 lgr.debug("Image metadata extractor failed to load %s: %s",
-                          absfp, exc_str(e))
+                          absfp, CapturedException(e))
                 continue
             meta = {
                 'type': 'dctype:Image',

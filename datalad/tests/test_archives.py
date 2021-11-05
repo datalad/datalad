@@ -25,7 +25,6 @@ from datalad.tests.utils import (
     skip_if,
 )
 
-from datalad.dochelpers import exc_str
 from datalad.support.archives import (
     ArchivesCache,
     compress_files,
@@ -161,7 +160,7 @@ def check_compress_file(ext, annex, path, name):
     try:
         decompress_file(archive, dir_extracted)
     except MissingExternalDependency as exc:
-        raise SkipTest(exc_str(exc))
+        raise SkipTest() from exc
     _filepath = op.join(dir_extracted, _filename)
 
     ok_file_has_content(_filepath, 'content')

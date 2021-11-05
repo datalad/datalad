@@ -22,7 +22,6 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.distribution.update import Update
-from datalad.dochelpers import exc_str
 from datalad.downloaders.credentials import UserPassword
 from datalad.interface.base import (
     Interface,
@@ -56,6 +55,7 @@ from datalad.support.constraints import (
 from datalad.support.exceptions import (
     AccessDeniedError,
     AccessFailedError,
+    CapturedException,
     CommandError,
     DownloadError,
     InsufficientArgumentsError,
@@ -563,6 +563,7 @@ def _configure_remote(
                         store=False):
                     repo.enable_remote(name)
             except (CommandError, DownloadError) as exc:
+                ce = CapturedException(exc)
                 # TODO yield
                 # this is unlikely to ever happen, now done for AnnexRepo
                 # instances only
@@ -574,7 +575,7 @@ def _configure_remote(
                     "Could not enable annex remote %s. This is expected if %s "
                     "is a pure Git remote, or happens if it is not accessible.",
                     name, name)
-                lgr.debug("Exception was: %s", exc_str(exc))
+                lgr.debug("Exception was: %s", ce)
 
             if as_common_datasrc:
                 # we need a fully configured remote here

@@ -29,7 +29,6 @@ from ..utils import (
     ensure_unicode,
     unlink,
 )
-from ..dochelpers import exc_str
 from .credentials import (
     CREDENTIAL_TYPES,
     CompositeCredential,
@@ -38,6 +37,7 @@ from ..support.exceptions import (
     AccessDeniedError,
     AccessPermissionExpiredError,
     AnonymousAccessDeniedError,
+    CapturedException,
     DownloadError,
     IncompleteDownloadError,
     UnaccountedDownloadError,
@@ -167,11 +167,12 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # assume success if no puke etc
                 break
             except AccessDeniedError as e:
+                ce = CapturedException(e)
                 if isinstance(e, AnonymousAccessDeniedError):
                     access_denied = "Anonymous access"
                 else:
                     access_denied = "Access"
-                lgr.debug("%s was denied: %s", access_denied, exc_str(e))
+                lgr.debug("%s was denied: %s", access_denied, ce)
                 supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
@@ -204,7 +205,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                             # enter a new one, we will allow only a single refresh
                             credential_was_refreshed = True
                         else:
-                            self._handle_authentication(url, needs_authentication, e,
+                            self._handle_authentication(url, needs_authentication, e, ce,
                                                         access_denied, msg_types,
                                                         supported_auth_types,
                                                         used_old_session)
@@ -215,12 +216,13 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 continue
 
             except IncompleteDownloadError as e:
+                ce = CapturedException(e)
                 exc_info = sys.exc_info()
                 incomplete_attempt += 1
                 if incomplete_attempt > 5:
                     # give up
                     raise
-                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
+                lgr.debug("Failed to download fully, will try again: %s", ce)
                 # TODO: may be fail earlier than after 20 attempts in such a case?
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
@@ -228,7 +230,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
         return result
 
-    def _handle_authentication(self, url, needs_authentication, e,
+    def _handle_authentication(self, url, needs_authentication, e, ce,
                                access_denied, msg_types, supported_auth_types,
                                used_old_session):
         if needs_authentication:
@@ -247,7 +249,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 if not ui.is_interactive:
                     lgr.error(
                         "Interface is non interactive, so we are "
-                        "reraising: %s" % exc_str(e))
+                        "reraising: %s", ce)
                     raise e
                 self._enter_credentials(
                     url,
@@ -481,11 +483,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         except (AccessDeniedError, IncompleteDownloadError) as e:
             raise
         except Exception as e:
-            e_str = exc_str(e, limit=5)
-            lgr.error("Failed to download {url} into {filepath}: {e_str}".format(
-                **locals()
-            ))
-            raise DownloadError(exc_str(e))  # for now
+            ce = CapturedException(e)
+            lgr.error("Failed to download %s into %s: %s", url, filepath, ce)
+            raise DownloadError(ce) from e # for now
         finally:
             if exists(temp_filepath):
                 # clean up
@@ -566,8 +566,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 try:
                     return msgpack.loads(res, encoding='utf-8')
                 except Exception as exc:
+                    ce = CapturedException(exc)
                     lgr.warning("Failed to unpack loaded from cache for %s: %s",
-                                url, exc_str(exc))
+                                url, ce)
 
         downloader_session = self.get_downloader_session(url, allow_redirects=allow_redirects)
 
@@ -596,9 +597,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         except (AccessDeniedError, IncompleteDownloadError) as e:
             raise
         except Exception as e:
-            e_str = exc_str(e, limit=5)
-            lgr.error("Failed to fetch {url}: {e_str}".format(**locals()))
-            raise DownloadError(exc_str(e, limit=8))  # for now
+            ce = CapturedException(e)
+            lgr.error("Failed to fetch %s: %s", url, ce)
+            raise DownloadError(ce) from e  # for now
 
         if cache:
             # apparently requests' CaseInsensitiveDict is not serialazable
