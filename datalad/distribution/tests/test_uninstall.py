@@ -215,19 +215,6 @@ def test_remove_nowhining(path):
     remove(dataset=subds_path)  # should remove just fine
 
 
-@usecase
-@skip_if_no_network
-@with_tempfile(mkdir=True)
-@use_cassette('test_remove_recursive_2')
-def test_remove_recursive_2(tdir):
-    # fails in some cases https://github.com/datalad/datalad/issues/1573
-    with chpwd(tdir):
-        install('///labs')
-        with chpwd('labs'):
-            install('tarr/face_place')
-        remove(dataset='labs', recursive=True)
-
-
 @with_tempfile(mkdir=True)
 def test_failon_nodrop(path):
     # test to make sure that we do not wipe out data when checks are enabled
