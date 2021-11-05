@@ -281,7 +281,7 @@ URLs:
                                 options=['--relaxed'])
                         except CommandError as exc:
                             lgr.warning("Registering %s with %s failed: %s",
-                                        path, url, exc_str(exc))
+                                        path, url, CapturedException(exc))
 
                     if archive:
                         for path in annex_paths:

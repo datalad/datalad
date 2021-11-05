@@ -51,7 +51,6 @@ from datalad.config import (
     write_config_section,
 )
 
-from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
     Path,
@@ -1009,9 +1008,10 @@ class GitRepo(CoreGitRepo):
                 break
             except CommandError as e:
                 # log here but let caller decide what to do
-                e_str = exc_str(e)
+                ce = CapturedException(e)
+                str_e = str(e)
                 # see https://github.com/datalad/datalad/issues/785
-                if re.search("Request for .*aborted.*Unable to find", str(e),
+                if re.search("Request for .*aborted.*Unable to find", str_e,
                              re.DOTALL) \
                         and trial < ntries - 1:
                     lgr.info(
@@ -1021,8 +1021,8 @@ class GitRepo(CoreGitRepo):
                     continue
                     #(lgr.debug if expect_fail else lgr.error)(e_str)
 
-                if "Clone succeeded, but checkout failed." in str(e):
-                    fix_annex = e
+                if "Clone succeeded, but checkout failed." in str_e:
+                    fix_annex = ce
                     break
 
                 raise
@@ -1039,7 +1039,7 @@ class GitRepo(CoreGitRepo):
                     gr._init()
                 gr.fsck()
             else:
-                lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
+                lgr.warning("Experienced issues while cloning: %s", fix_annex)
         return gr
 
     # Note: __del__ shouldn't be needed anymore as we switched to
@@ -3231,7 +3231,7 @@ class GitRepo(CoreGitRepo):
                 ['diff', '--name-only', '--staged'],
                 expect_stderr=True))
         except CommandError as e:
-            lgr.debug(exc_str(e))
+            lgr.debug(CapturedException(e))
             return []
 
     def _save_post(self, message, status, partial_commit, amend=False,

@@ -90,7 +90,7 @@ from ..support.external_versions import external_versions
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
 from ..support.network import RI
-from ..dochelpers import exc_str, borrowkwargs
+from ..dochelpers import borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import (
     ARCHIVES_TEMP_DIR,
@@ -135,7 +135,7 @@ def skip_if_no_module(module):
     try:
         imp = __import__(module)
     except Exception as exc:
-        raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
+        raise SkipTest("Module %s fails to load" % module) from exc
 
 
 def skip_if_scrapy_without_selector():

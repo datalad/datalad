@@ -37,7 +37,6 @@ from weakref import (
 
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
-    exc_str,
     borrowdoc,
     borrowkwargs
 )
@@ -373,7 +372,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             """We might be too late in the game and either .debug or exc_str
             are no longer bound"""
             try:
-                return lgr.debug(exc_str(e))
+                return lgr.debug(str(e))
             except (AttributeError, NameError):
                 return
 
@@ -1589,11 +1588,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                     yield r
                     return
             except CommandError as e:
+                ce = CapturedException(e)
                 # TODO: RM DIRECT?  left for detection of direct mode submodules
                 if AnnexRepo._is_annex_work_tree_message(e.stderr):
                     raise DirectModeNoLongerSupportedError(
-                        self, exc_str(e)
-                    )
+                        self) from e
                 raise
 
         # Theoretically we could have done for git as well, if it could have
@@ -2074,7 +2073,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 #     raise
                 raise AnnexBatchCommandError(
                     cmd="addurl",
-                    msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
+                    msg="Adding url %s to file %s failed" % (url, file_)) from exc
             assert \
                 (out_json.get('command') == 'addurl'), \
                 "no exception was raised and no 'command' in result out_json=%s" % str(out_json)

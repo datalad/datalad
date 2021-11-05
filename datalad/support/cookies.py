@@ -9,14 +9,14 @@
 """Management of cookies for HTTP sessions"""
 
 import atexit
+import logging
 import shelve
 import appdirs
 import os.path
 
 from .network import get_tld
-from datalad.dochelpers import exc_str
+from datalad.support.exceptions import CapturedException
 
-import logging
 lgr = logging.getLogger('datalad.cookies')
 
 
@@ -58,7 +58,8 @@ class CookiesDB(object):
         try:
             self._cookies_db = shelve.open(filename, writeback=True, protocol=2)
         except Exception as exc:
-            lgr.warning("Failed to open cookies DB %s: %s", filename, exc_str(exc))
+            lgr.warning("Failed to open cookies DB %s: %s",
+                        filename, CapturedException(exc))
 
     def close(self):
         if self._cookies_db is not None:
@@ -72,11 +73,11 @@ class CookiesDB(object):
             try:
                 self._cookies_db.close()
             except Exception as exc:
+                ce = CapturedException(exc)
                 if known_cookies:
                     lgr.warning(
                         "Failed to save possibly updated %d cookies (%s): %s",
-                        len(known_cookies), ', '.join(known_cookies),
-                        exc_str(exc))
+                        len(known_cookies), ', '.join(known_cookies), ce)
             # no cookies - no worries!
             self._cookies_db = None
 
@@ -89,7 +90,7 @@ class CookiesDB(object):
             return self.cookies_db[self._get_provider(url)]
         except Exception as exc:
             lgr.warning("Failed to get a cookie for %s: %s",
-                        url, exc_str(exc))
+                        url, CapturedException(exc))
             return None
 
     def __setitem__(self, url, value):
@@ -97,14 +98,14 @@ class CookiesDB(object):
             self.cookies_db[self._get_provider(url)] = value
         except Exception as exc:
             lgr.warning("Failed to set a cookie for %s: %s",
-                        url, exc_str(exc))
+                        url, CapturedException(exc))
 
     def __contains__(self, url):
         try:
             return self._get_provider(url) in self.cookies_db
         except Exception as exc:
             lgr.warning("Failed to check for having a cookie for %s: %s",
-                        url, exc_str(exc))
+                        url, CapturedException(exc))
             return None
 
 
