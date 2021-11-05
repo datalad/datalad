@@ -344,17 +344,17 @@ class Create(Interface):
         # the procedure. If a procedure cannot be found, raise an
         # error to prevent creating the dataset.
         cfg_proc_specs = []
-        for cfg_proc_ in cfg_proc:
-            for discovered_proc in tbds.run_procedure(
-                    discover=True,
-                    result_renderer='disabled',
-                    return_type='generator'):
-                if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
-                    cfg_proc_specs.append(discovered_proc)
-                    break
-            else:
-                raise ValueError("Cannot find procedure with name "
-                                 "'%s'" % cfg_proc_)
+        if cfg_proc:
+            discovered_procs = tbds.run_procedure(
+                discover=True, result_renderer='disabled')
+            for cfg_proc_ in cfg_proc:
+                for discovered_proc in discovered_procs:
+                    if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
+                        cfg_proc_specs.append(discovered_proc)
+                        break
+                else:
+                    raise ValueError("Cannot find procedure with name "
+                                     "'%s'" % cfg_proc_)
 
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
