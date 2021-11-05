@@ -272,10 +272,10 @@ def test_clean_subds_removal(path):
     # and now again, but this time remove something that is not installed
     ds.create('three')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
-    ds.drop('two', reckless='availability')
+    ds.drop('two', what='all', reckless='availability')
     assert_repo_status(ds.path)
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
-    ok_(not subds2.is_installed())
+    nok_(subds2.is_installed())
     # oderly empty mountpoint is maintained
     ok_(subds2.pathobj.exists())
     res = ds.remove('two', reckless='availability')

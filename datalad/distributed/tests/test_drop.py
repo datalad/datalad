@@ -198,7 +198,7 @@ def test_drop_allkeys(origpath, clonepath):
 
     # and now drop all keys from the clone, one is redundant and can be
     # dropped, the other is not and must fail
-    res = dsclone.drop(what='allkeys', on_failure='ignore')
+    res = dsclone.drop(what='allkeys', jobs=2, on_failure='ignore')
     # confirm one key gone, one left
     eq_(1, dsclone.repo.call_annex_records(['info'])[0]['local annex keys'])
     assert_result_count(res, 1, action='drop', status='error', type='key')
@@ -330,6 +330,11 @@ def test_unpushed_state_detection(origpath, clonepath):
     cloneds.push(to=DEFAULT_REMOTE)
     eq_([], tester(clonerepo))
 
+    # now detach HEAD, should work and not somehow require a branch
+    cloneds.repo.call_git(['reset', '--hard', 'HEAD~1'])
+    # we have this state
+    eq_([], tester(clonerepo))
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile
@@ -346,6 +351,10 @@ def test_safetynet(otherpath, origpath, clonepath):
     (cloneds.pathobj / 'file1').write_text('some text')
     # now we try to drop the entire dataset in a variety of ways
     # to check that it does not happen too quickly
+
+    # cannot use invalid mode switch values
+    assert_raises(ValueError, drop, what='bananas')
+    assert_raises(ValueError, drop, reckless='rubberducky')
 
     # cannot simple run drop somewhere and give a path to a dataset
     # to drop
@@ -505,8 +514,8 @@ def test_uninstall_without_super(path):
     # be figured out by datalad
     with chpwd(parent.path):
         # check False because revisions are not pushed
-        drop(sub.path, reckless='availability')
-    assert not sub.is_installed()
+        drop(sub.path, what='all', reckless='availability')
+    nok_(sub.is_installed())
     # no present subdatasets anymore
     subreport = parent.subdatasets()
     assert_result_count(subreport, 1)
@@ -514,4 +523,13 @@ def test_uninstall_without_super(path):
     assert_result_count(subreport, 0, path=nosub.path)
     # but we should fail on an attempt to uninstall the non-subdataset
     with chpwd(nosub.path):
-        assert_raises(RuntimeError, drop)
+        assert_raises(RuntimeError, drop, what='all')
+
+
+@with_tempfile
+def test_drop_from_git(path):
+    ds = Dataset(path).create(annex=False)
+    (ds.pathobj / 'file').write_text('some')
+    ds.save()
+    assert_status('notneeded', ds.drop('file'))
+    assert_status('notneeded', ds.drop(what='allkeys'))
