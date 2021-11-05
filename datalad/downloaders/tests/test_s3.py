@@ -20,6 +20,7 @@ from ...tests.utils import (
     assert_raises,
     integration,
     skip_if_no_network,
+    skip_if_no_module,
     SkipTest,
     swallow_outputs,
     turtle,
@@ -35,15 +36,10 @@ from ...utils import (
 )
 
 from ...support import path as op
-
-try:
-    import boto
-except Exception as e:
-    raise SkipTest("boto module is not available") from e
-
 from .utils import get_test_providers
 from .test_http import check_download_external_url
 
+skip_if_no_module('boto')
 skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
