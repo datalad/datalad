@@ -367,8 +367,6 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
-@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)

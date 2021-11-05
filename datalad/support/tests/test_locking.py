@@ -36,7 +36,6 @@ from datalad.tests.utils import (
     ok_exists,
     on_osx,
     with_tempfile,
-    known_failure_windows,
 )
 
 
@@ -55,7 +54,6 @@ class Subproc:
             q.put(acquired)
 
 
-@known_failure_windows
 @with_tempfile
 def test_lock_if_check_fails(tempfile):
     # basic test, should never try to lock so filename is not important

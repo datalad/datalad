@@ -171,7 +171,6 @@ def test_repo_cache(path):
     assert_true(isinstance(ds.repo, AnnexRepo))
 
 
-@known_failure_windows  # leaves modified .gitmodules behind
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
     # from scratch

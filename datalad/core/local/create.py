@@ -335,7 +335,7 @@ class Create(Interface):
                 'status': 'error',
                 'message':
                     'will not create a dataset in a non-empty directory, use '
-                    '`force` option to ignore'})
+                    '`--force` option to ignore'})
             yield res
             return
 

@@ -49,7 +49,7 @@ from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
 )
-
+from datalad.downloaders.providers import Provider
 from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
 
@@ -59,13 +59,14 @@ class DownloadURL(Interface):
     """Download content
 
     It allows for a uniform download interface to various supported URL
-    schemes, re-using or asking for authentication details maintained by
-    datalad.
+    schemes (see command help for details), re-using or asking for
+    authentication details maintained by datalad.
     """
 
     _params_ = dict(
         urls=Parameter(
-            doc="URL(s) to be downloaded",
+            doc="""URL(s) to be downloaded. Supported protocols: {}""".format(
+                ", ".join(map(repr, sorted(Provider.DOWNLOADERS)))),
             constraints=EnsureStr(),  # TODO: EnsureURL
             metavar='url',
             nargs='+'),

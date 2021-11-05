@@ -73,6 +73,8 @@ from datalad.tests.utils import (
 )
 
 
+cat_command = 'cat' if not on_windows else 'type'
+
 @with_tempfile(mkdir=True)
 def test_invalid_call(path):
     with chpwd(path):
@@ -335,9 +337,6 @@ def test_run_assume_ready(path):
     assert_not_in_results(res, action="unlock", type="file")
 
 
-# unexpected content of state "modified", likely a more fundamental issue with the
-# testrepo setup
-@known_failure_githubci_win
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -352,14 +351,14 @@ def test_run_explicit(path):
 
     # We need explicit=True to run with dirty repo.
     assert_status("impossible",
-                  ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+                  ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
                          inputs=["test-annex.dat"],
                          on_failure="ignore"))
 
     hexsha_initial = ds.repo.get_hexsha()
     # If we specify test-annex.dat as an input, it will be retrieved before the
     # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
            inputs=["test-annex.dat"], explicit=True)
     ok_(ds.repo.file_has_content("test-annex.dat"))
     # We didn't commit anything because outputs weren't specified.
@@ -374,7 +373,7 @@ def test_run_explicit(path):
     remove(op.join(path, "doubled.dat"))
 
     hexsha_initial = ds.repo.get_hexsha()
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
            inputs=["test-annex.dat"], outputs=["doubled.dat"],
            explicit=True)
     ok_(ds.repo.file_has_content("doubled.dat"))
@@ -389,7 +388,6 @@ def test_run_explicit(path):
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 
-@known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})

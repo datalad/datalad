@@ -764,6 +764,10 @@ class AnnexRepo(GitRepo, RepoInterface):
     def get_special_remotes(self):
         """Get info about all known (not just enabled) special remotes.
 
+        The present implementation is not able to report on special remotes
+        that have only been configured in a private annex repo
+        (annex.private=true).
+
         Returns
         -------
         dict
@@ -782,33 +786,51 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         argspec = re.compile(r'^([^=]*)=(.*)$')
         srs = {}
+
+        # We provide custom implementation to access this metadata since ATM
+        # no git-annex command exposes it on CLI.
+        #
+        # Information will potentially be obtained from remote.log within
+        # git-annex branch, and git-annex's journal, which might exist e.g.
+        # due to alwayscommit=false operations
+        sources = []
         try:
-            for line in self.call_git_items_(
-                    ['cat-file', 'blob', 'git-annex:remote.log'],
-                    read_only=True):
-                # be precise and split by spaces
-                fields = line.split(' ')
-                # special remote UUID
-                sr_id = fields[0]
-                # the rest are config args for enableremote
-                sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
-                if "name" not in sr_info:
-                    name = sr_info.get("sameas-name")
-                    if name is None:
-                        lgr.warning(
-                            "Encountered git-annex remote without a name or "
-                            "sameas-name value: %s",
-                            sr_info)
-                    else:
-                        sr_info["name"] = name
-                srs[sr_id] = sr_info
+            sources.append(
+                list(
+                    self.call_git_items_(
+                        ['cat-file', 'blob', 'git-annex:remote.log'],
+                        read_only=True)
+                )
+            )
         except CommandError as e:
             if 'Not a valid object name git-annex:remote.log' in e.stderr:
-                # no special remotes configures
-                return {}
+                # no special remotes configures - might still be in the journal
+                pass
             else:
                 # some unforeseen error
                 raise e
+
+        journal_path = self.dot_git / "annex" / "journal" / "remote.log"
+        if journal_path.exists():
+            sources.append(journal_path.read_text().splitlines())
+
+        for line in chain(*sources):
+            # be precise and split by spaces
+            fields = line.split(' ')
+            # special remote UUID
+            sr_id = fields[0]
+            # the rest are config args for enableremote
+            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            if "name" not in sr_info:
+                name = sr_info.get("sameas-name")
+                if name is None:
+                    lgr.warning(
+                        "Encountered git-annex remote without a name or "
+                        "sameas-name value: %s",
+                        sr_info)
+                else:
+                    sr_info["name"] = name
+            srs[sr_id] = sr_info
         return srs
 
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,

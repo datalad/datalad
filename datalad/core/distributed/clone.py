@@ -317,14 +317,22 @@ class Clone(Interface):
             return
 
         # perform the actual cloning operation
-        yield from clone_dataset(
-            [source],
-            destination_dataset,
-            reckless,
-            description,
-            result_props,
-            cfg=None if ds is None else ds.config,
-        )
+        clone_failure = False
+        for r in clone_dataset(
+                [source],
+                destination_dataset,
+                reckless,
+                description,
+                result_props,
+                cfg=None if ds is None else ds.config,
+                ):
+            if r['status'] in ['error', 'impossible']:
+                clone_failure = True
+            yield r
+
+        if clone_failure:
+            # do not proceed saving anything if cloning failed
+            return
 
         # TODO handle any 'version' property handling and verification using a
         # dedicated public helper

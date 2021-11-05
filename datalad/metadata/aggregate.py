@@ -27,7 +27,7 @@ from datalad.consts import (
     DATASET_METADATA_FILE,
 )
 from datalad.dochelpers import exc_str
-from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import _minimal_annotate_paths
 from datalad.interface.base import Interface
 from datalad.interface.utils import (
     eval_results,
@@ -75,6 +75,7 @@ from datalad.utils import (
     all_same,
     ensure_list,
 )
+from datalad.core.local.status import get_paths_by_ds
 
 lgr = logging.getLogger('datalad.metadata.aggregate')
 
@@ -925,18 +926,17 @@ class AggregateMetaData(Interface):
 
         to_save = []
         to_aggregate = set()
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                path=path,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
+        paths_by_ds, errors = get_paths_by_ds(
+            require_dataset(dataset),
+            dataset,
+            paths=ensure_list(path),
+            subdsroot_mode='super')
+        for ap in _minimal_annotate_paths(
+                paths_by_ds,
+                errors,
                 action='aggregate_metadata',
-                # uninstalled subdatasets could be queried via aggregated metadata
-                # -> no 'error'
-                unavailable_path_status='',
-                nondataset_path_status='error',
-                return_type='generator',
-                on_failure='ignore'):
+                recursive=recursive,
+                recursion_limit=recursion_limit):
             if ap.get('status', None):
                 # this is done
                 yield ap
