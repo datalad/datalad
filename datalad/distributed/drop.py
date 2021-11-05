@@ -467,11 +467,12 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
                 type='dataset',
                 status='error',
                 message=(
-                    "to-be-dropped dataset has the following revisions that "
+                    "to-be-dropped dataset has revisions that "
                     "are not available at any known sibling. Use "
                     "`datalad push --to ...` to push "
                     "these before dropping the local dataset, "
-                    "or ignore via `--reckless availability`: %s",
+                    "or ignore via `--reckless availability`. "
+                    "Unique revisions: %s",
                     unpushed)
             )
             # this is fatal
