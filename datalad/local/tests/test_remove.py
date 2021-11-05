@@ -78,9 +78,15 @@ def test_remove(path):
     # remember the key
     key = ds.repo.get_file_annexinfo(annexedfile)['key']
     res = ds.remove(annexedfile, drop='datasets',
+                    message="custom msg",
                     on_failure='ignore')
     # removal and dataset save
     assert_result_count(res, 2)
+    eq_(
+        ds.repo.format_commit(
+            "%B",
+            ds.repo.get_corresponding_branch()).rstrip(),
+        "custom msg")
     assert_in_results(res, action='remove', status='ok',
                       path=str(ds.pathobj / annexedfile))
     assert_not_in_results(res, action='drop')

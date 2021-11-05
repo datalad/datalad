@@ -27,6 +27,7 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     OBSCURE_FILENAME,
+    assert_false,
     assert_in,
     assert_in_results,
     assert_raises,
@@ -78,11 +79,13 @@ def test_drop_file_content(path, outside_path):
         )
 
     # drop multiple files from different datasets
+    assert_true(ds.repo.file_has_content(axfile_rootds))
     res = ds.drop(
         [axfile_rootds, axfile_subds],
         reckless='availability',
         jobs=2,
         on_failure='ignore')
+    assert_false(ds.repo.file_has_content(axfile_rootds))
     assert_result_count(res, 2)
     for rp in [axfile_rootds, axfile_subds]:
         assert_in_results(
