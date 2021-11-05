@@ -13,8 +13,7 @@ from datalad.api import create
 from datalad.api import create_test_dataset
 from datalad.api import install
 from datalad.api import ls
-from datalad.api import remove
-from datalad.api import uninstall
+from datalad.api import drop
 
 #
 # Following ones could be absent in older versions
@@ -95,10 +94,11 @@ class supers(SampleSuperDatasetBenchmarks):
 
     def time_uninstall(self):
         for subm in self.ds.repo.get_submodules_():
-            self.ds.uninstall(subm["path"], recursive=True, check=False)
+            self.ds.drop(subm["path"], recursive=True, what='all',
+                         reckless='kill')
 
     def time_remove(self):
-        remove(self.ds.path, recursive=True)
+        drop(self.ds.path, what='all', reckless='kill', recursive=True)
 
     def time_diff(self):
         diff(self.ds.path, revision="HEAD^")

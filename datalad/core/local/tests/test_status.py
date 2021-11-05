@@ -390,7 +390,6 @@ def test_get_paths_by_ds(path, otherdspath):
     )
     # evaluate the test cases
     for inp, pbd_target, error_target in testcases:
-        print('TTT', inp)
         paths_by_ds, errors = get_paths_by_ds(ds, *inp)
         assert_dict_equal(pbd_target, paths_by_ds)
         eq_(error_target, errors)

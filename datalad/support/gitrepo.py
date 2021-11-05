@@ -2967,10 +2967,15 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 modified = _cache[key]
             else:
+                # from Git 2.31.0 onwards ls-files has --deduplicate
+                # by for backward compatibility keep doing deduplication here
                 modified = set(
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self.call_git_items_(
-                        ['ls-files', '-z', '-m'],
+                        # we must also look for deleted files, for the logic
+                        # below to work. Only from Git 2.31.0 would they be
+                        # included with `-m` alone
+                        ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
                         files=[str(p) for p in paths] if paths else None,
                         sep='\0',

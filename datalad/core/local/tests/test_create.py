@@ -95,7 +95,7 @@ def test_create_raises(path, outside_path):
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
-    ds.uninstall(obscure_ds, check=False)
+    ds.drop(obscure_ds, what='all', reckless='kill', recursive=True)
     assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
@@ -138,7 +138,7 @@ def test_create_force_subds(path):
         subds.create(force=True, **raw),
         status="ok")
     # ... even if it is uninstalled.
-    subds.uninstall()
+    subds.drop(what='all', reckless='kill', recursive=True)
     ok_(not subds.is_installed())
     assert_in_results(
         subds.create(force=True, **raw),

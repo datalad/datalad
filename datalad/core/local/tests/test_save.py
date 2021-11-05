@@ -448,7 +448,7 @@ def test_add_subdataset(path, other):
     # now add, it should pick up the source URL
     ds.save('other')
     # and that is why, we can reobtain it from origin
-    ds.uninstall('other')
+    ds.drop('other', what='all', reckless='kill', recursive=True)
     ok_(not other_clone.is_installed())
     ds.get('other')
     ok_(other_clone.is_installed())

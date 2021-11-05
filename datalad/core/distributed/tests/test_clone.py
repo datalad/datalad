@@ -1002,7 +1002,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     eq_(len(sds), 1)
     eq_(sds[0]['gitmodule_datalad-url'], ria_url)
     assert_repo_status(ds.path)
-    ds.uninstall('sub', check=False)
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     assert_repo_status(ds.path)
 
     # .gitmodules still there:
@@ -1622,7 +1622,7 @@ def test_clone_url_mapping(src_path, dest_path):
             with patch.dict(dest.config._merged_store, specs):
                 clone('rambo', dest_path)
         finally:
-            dest.remove(check=False)
+            dest.drop(what='all', reckless='kill', recursive=True)
 
     # check submodule config impact
     dest.create()

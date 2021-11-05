@@ -371,7 +371,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_(exists(opj(ds.path, sname)))
 
     # remove from origin
-    origin.remove(sname)
+    origin.remove(sname, reckless='availability')
     assert_result_count(ds.update(merge=True),
                         1, action='update', status='ok', type='dataset')
     # gone locally, wasn't checked out
@@ -411,9 +411,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_(Dataset(opj(ds.path, sname)).is_installed())
 
     # now remove the now disconnected subdataset for further tests
-    # not using a bound method, not giving a parentds, should
-    # not be needed to get a clean dataset
-    remove(op.join(ds.path, sname), check=False)
+    remove(dataset=op.join(ds.path, sname), check=False)
     assert_repo_status(ds.path)
 
     # new separate subdataset, not within the origin dataset

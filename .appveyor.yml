@@ -41,8 +41,10 @@
 #     will run until the file is removed (or 60 min have passed)
 #
 #   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
-#     environment to debug in a Python 3.8 session (should generally match the
+#     environment to debug in a Python 3.9 session (should generally match the
 #     respective CI run configuration).
+#
+#   - Workers have vim installed for convenient text editing in the command shell
 
 
 # do not make repository clone cheap: interfers with versioneer

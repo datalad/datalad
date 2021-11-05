@@ -1685,10 +1685,10 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     ds.create('subds_unavailable_clean')
     ds.create(opj('subdir', 'subds_unavailable_clean'))
     # uninstall some subdatasets (still clean)
-    ds.uninstall([
+    ds.drop([
         'subds_unavailable_clean',
         opj('subdir', 'subds_unavailable_clean')],
-        check=False)
+        what='all', reckless='kill', recursive=True)
     assert_repo_status(ds.path)
     # make a dirty subdataset
     ds.create('subds_modified')
@@ -1812,7 +1812,7 @@ def get_deeply_nested_structure(path):
     )
     create_tree(
         str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
-        {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
+        {OBSCURE_FILENAME + u'_directory_untracked': {"untracked_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
