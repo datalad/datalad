@@ -13,7 +13,6 @@ from ..consts import (
     CONFIG_HUB_TOKEN_FIELD,
     GITHUB_TOKENS_URL,
 )
-from ..dochelpers import exc_str
 from ..downloaders.credentials import Token
 from ..ui import ui
 from ..utils import (
@@ -22,6 +21,7 @@ from ..utils import (
 )
 from .exceptions import (
     AccessDeniedError,
+    CapturedException,
     MissingExternalDependency,
 )
 from .network import URL
@@ -73,7 +73,7 @@ def _get_tokens_for_login(login, tokens):
         except gh.BadCredentialsException as exc:
             lgr.debug(
                 "Token %s caused %s while trying to check token's use"
-                " login name. Skipping", _token_str(t), exc_str(exc))
+                " login name. Skipping", _token_str(t), CapturedException(exc))
     lgr.debug(
         "Selected %d tokens out of %d for the login %s",
         len(selected_tokens), len(tokens), login
@@ -131,7 +131,7 @@ def _gen_github_ses(github_login):
             yield gh.Github(token), _token_str(token)
         except gh.BadCredentialsException as exc:
             lgr.debug("Failed to obtain Github session for token %s: %s",
-                      _token_str(token), exc_str(exc))
+                      _token_str(token), CapturedException(exc))
 
     # We got here so time to get/store token from credential store
     cred = _get_github_cred(github_login)
@@ -143,7 +143,7 @@ def _gen_github_ses(github_login):
             yield gh.Github(token), _token_str(token)
         except gh.BadCredentialsException as exc:
             lgr.debug("Failed to obtain Github session for token %s: %s",
-                      _token_str(token), exc_str(exc))
+                      _token_str(token), CapturedException(exc))
         # if we are getting here, it means we are asked for more and thus
         # aforementioned one didn't work out :-/
         if ui.is_interactive:
@@ -184,9 +184,8 @@ def _gen_github_entity(
                 yield org, token_str
             except gh.UnknownObjectException as e:
                 # yoh thinks it might be due to insufficient credentials?
-                raise ValueError('unknown organization "{}" [{}]'.format(
-                                 github_organization,
-                                 exc_str(e)))
+                raise ValueError('unknown organization "{}"'.format(
+                                 github_organization)) from e
             except gh.BadCredentialsException as e:
                 lgr.warning(
                     "Having authenticated using a token %s, we failed (%s) to access "
@@ -258,7 +257,7 @@ def _make_github_repos_(
                     raise
                 lgr.warning("Failed to create repository while using token %s: %s%s",
                             token_str,
-                            exc_str(e),
+                            CapturedException(e),
                             (" Hint: %s" % hint) if hint else "")
 
                 if auth_success:
