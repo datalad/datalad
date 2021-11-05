@@ -764,6 +764,10 @@ class AnnexRepo(GitRepo, RepoInterface):
     def get_special_remotes(self):
         """Get info about all known (not just enabled) special remotes.
 
+        The present implementation is not able to report on special remotes
+        that have only been configured in a private annex repo
+        (annex.private=true).
+
         Returns
         -------
         dict
