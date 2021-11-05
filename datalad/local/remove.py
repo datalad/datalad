@@ -116,9 +116,12 @@ class Remove(Interface):
         _params_[p] = Drop._params_[p]
 
     _examples_ = [
-        dict(text="Permanently remove a subdataset from a dataset",
+        dict(text="Permanently remove a subdataset (and all further subdatasets contained in it) from a dataset",
              code_py="remove(dataset='path/to/dataset', path='path/to/subds')",
              code_cmd="datalad remove -d <path/to/dataset> <path/to/subds>"),
+             dict(text="Permanently remove a superdataset (with all subdatasets) from the filesystem",
+             code_py="remove(dataset='path/to/dataset')",
+             code_cmd="datalad remove -d <path/to/dataset>"),
     ]
 
     @staticmethod
