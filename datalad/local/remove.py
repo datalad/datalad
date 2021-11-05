@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from os.path import lexists
+import warnings
 
 from datalad.core.local.save import Save
 from datalad.core.local.status import get_paths_by_ds
@@ -138,10 +139,41 @@ class Remove(Interface):
             recursive=None,
             check=None,
             save=None,
-            if_dirty='save-before'):
+            if_dirty=None):
 
         # deprecate checks
+        if if_dirty is not None:
+            warnings.warn(
+                "The `if_dirty` argument of `datalad remove` is ignored, "
+                "it can be removed for a safe-by-default behavior. For "
+                "other cases consider the `reckless` argument.",
+                DeprecationWarning)
+
+        if save is not None:
+            warnings.warn(
+                "The `save` argument of `datalad remove` is ignored. "
+                "A dataset modification is always saved. Consider "
+                "`save --amend` if post-remove fix-ups are needed.",
+                DeprecationWarning)
+
+        if recursive is not None:
+            warnings.warn(
+                "The `recursive` argument of `datalad remove` is ignored. "
+                "Removal operations are always recursive, and the parameter "
+                "can be stripped from calls for a safe-by-default behavior. ",
+                DeprecationWarning)
+
+        if check is not None:
+            warnings.warn(
+                "The `check` argument of `datalad remove` is deprecated, "
+                "use the `reckless` argument instead.",
+                DeprecationWarning)
+
         if check is False:
+            if reckless is not None:
+                raise ValueError(
+                    'Must not use deprecated `check` argument, and new '
+                    '`reckless` argument together with `datalad remove`.')
             reckless = 'availability'
 
         refds = require_dataset(dataset, check_installed=True,

@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from itertools import chain
+import warnings
 
 from datalad.core.local.status import get_paths_by_ds
 from datalad.distribution.dataset import (
@@ -174,7 +175,6 @@ class Drop(Interface):
             jobs=None,
             # deprecated
             check=None,
-            # TODO deal with deprecation
             if_dirty=None):
 
         # TODO if reckless is None, initialize from a potential config setting
@@ -191,9 +191,23 @@ class Drop(Interface):
                     f"Invalid '{label}' parameter value of: "
                     f"{repr(value)} [{str(e)}]") from e
 
-        # TODO deprecation warning on `check`
+        if check is not None:
+            warnings.warn(
+                "The `check` argument of `datalad drop` is deprecated, "
+                "use the `reckless` argument instead.",
+                DeprecationWarning)
+        if if_dirty is not None:
+            warnings.warn(
+                "The `if_dirty` argument of `datalad drop` is ignored, "
+                "it can be removed for a safe-by-default behavior. For "
+                "other cases consider the `reckless` argument.",
+                DeprecationWarning)
+
         if check is False:
-            # TODO check for conflict with new reckless parameter
+            if reckless is not None:
+                raise ValueError(
+                    'Must not use deprecated `check` argument, and new '
+                    '`reckless` argument together with `datalad drop`.')
             reckless = 'availability'
 
         if what in ('all', 'datasets') and reckless == 'kill' and not recursive:
