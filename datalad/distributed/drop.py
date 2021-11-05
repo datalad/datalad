@@ -198,7 +198,7 @@ class Drop(Interface):
 
         if what in ('all', 'datasets') and reckless == 'kill' and not recursive:
             raise ValueError(
-                'A reckless kill is requested by no recursion flag is set. '
+                'A reckless kill is requested but no recursion flag is set. '
                 "With 'kill' no checks for subdatasets will be made, "
                 'acknowledge by setting the recursive flag')
 
