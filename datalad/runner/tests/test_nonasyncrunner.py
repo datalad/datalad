@@ -13,33 +13,33 @@ import os
 import queue
 import signal
 import subprocess
+import sys
 from time import sleep
 
 from datalad.tests.utils import (
     assert_false,
     assert_true,
     eq_,
-    known_failure_windows,
     known_failure_osx,
+    known_failure_windows,
     with_tempfile,
 )
+from datalad.utils import on_windows
 
-from datalad.cmd import (
+from .. import (
+    Protocol,
+    Runner,
     StdOutCapture,
-    WitlessProtocol,
-    WitlessRunner,
 )
-from datalad.nonasyncrunner import (
+from ..nonasyncrunner import (
     _ReaderThread,
     run_command,
 )
 
-from datalad.utils import on_windows
-
 
 def test_subprocess_return_code_capture():
 
-    class KillProtocol(WitlessProtocol):
+    class KillProtocol(Protocol):
 
         proc_out = True
         proc_err = True
@@ -79,7 +79,7 @@ def test_subprocess_return_code_capture():
 
 def test_interactive_communication():
 
-    class BidirectionalProtocol(WitlessProtocol):
+    class BidirectionalProtocol(Protocol):
 
         proc_out = True
         proc_err = True
@@ -109,7 +109,7 @@ def test_interactive_communication():
                 os.write(self.process.stdin.fileno(), b"exit(0)\n")
 
     result_pool = dict()
-    result = run_command(["python", "-i"],
+    result = run_command([sys.executable, "-i"],
                          BidirectionalProtocol,
                          stdin=subprocess.PIPE,
                          protocol_kwargs={
@@ -152,7 +152,7 @@ def test_thread_exit():
 
 def test_inside_async():
     async def main():
-        runner = WitlessRunner()
+        runner = Runner()
         return runner.run(
             (["cmd.exe", "/c"] if on_windows else []) + ["echo", "abc"],
             StdOutCapture)
@@ -170,9 +170,10 @@ def test_inside_async():
 @with_tempfile
 def test_popen_invocation(src_path, dest_path):
     # https://github.com/ReproNim/testkraken/issues/93
-    from datalad.distribution.dataset import Dataset
-    from datalad.api import clone
     from multiprocessing import Process
+
+    from datalad.api import clone
+    from datalad.distribution.dataset import Dataset
 
     src = Dataset(src_path).create()
     (src.pathobj / "file.dat").write_bytes(b"\000")

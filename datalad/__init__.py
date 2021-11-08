@@ -48,6 +48,7 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
+from datalad.support.exceptions import CapturedException
 from datalad.utils import (
     get_encoding_info,
     get_envvars_info,
@@ -217,14 +218,19 @@ def setup_package():
     # the URL will be available from datalad.test_http_server.url
     from datalad.tests.utils import HTTPPath
     import tempfile
+
     global test_http_server
-    serve_path = tempfile.mkdtemp(
-        dir=cfg.get("datalad.tests.temp.dir"),
-        prefix='httpserve',
-    )
-    test_http_server = HTTPPath(serve_path)
-    test_http_server.start()
-    _TEMP_PATHS_GENERATED.append(serve_path)
+    # Start the server only if not running already
+    # Relevant: we have test_misc.py:test_test which runs datalad.test but
+    # not doing teardown, so the original server might never get stopped
+    if test_http_server is None:
+        serve_path = tempfile.mkdtemp(
+            dir=cfg.get("datalad.tests.temp.dir"),
+            prefix='httpserve',
+        )
+        test_http_server = HTTPPath(serve_path)
+        test_http_server.start()
+        _TEMP_PATHS_GENERATED.append(serve_path)
 
     if cfg.obtain('datalad.tests.setup.testrepos'):
         lgr.debug("Pre-populating testrepos")
@@ -243,8 +249,8 @@ def teardown_package():
         print("Obscure filename: str=%s repr=%r"
                 % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
     except UnicodeEncodeError as exc:
-        from .dochelpers import exc_str
-        print("Obscure filename failed to print: %s" % exc_str(exc))
+        ce = CapturedException(exc)
+        print("Obscure filename failed to print: %s" % ce)
     def print_dict(d):
         return " ".join("%s=%r" % v for v in d.items())
     print("Encodings: %s" % print_dict(get_encoding_info()))
@@ -258,8 +264,12 @@ def teardown_package():
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
 
+    global test_http_server
     if test_http_server:
         test_http_server.stop()
+        test_http_server = None
+    else:
+        lgr.debug("For some reason global http_server was not set/running, thus not stopping")
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):

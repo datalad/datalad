@@ -1,14 +1,5 @@
-.all-contributorsrc
-.appveyor.yml
-.autorc
-.codespell-ignorelines
-.codespell-ignorewords
 .coveragerc
-.gitattributes
-.pre-commit-config.yaml
-.tributors
 CHANGELOG.md
-CITATION.cff
 CONTRIBUTING.md
 CONTRIBUTORS
 COPYING
@@ -42,13 +33,11 @@ datalad/__main__.py
 datalad/_version.py
 datalad/api.py
 datalad/cmd.py
-datalad/cmd_protocols.py
 datalad/config.py
 datalad/consts.py
 datalad/coreapi.py
 datalad/dochelpers.py
 datalad/log.py
-datalad/nonasyncrunner.py
 datalad/utils.py
 datalad/version.py
 datalad.egg-info/PKG-INFO
@@ -262,7 +251,6 @@ datalad/metadata/tests/test_extract_metadata.py
 datalad/metadata/tests/test_search.py
 datalad/metadata/tests/data/audio.mp3
 datalad/metadata/tests/data/exif.jpg
-datalad/metadata/tests/data/nifti1.nii.gz
 datalad/metadata/tests/data/xmp.pdf
 datalad/plugin/__init__.py
 datalad/plugin/add_readme.py
@@ -279,6 +267,17 @@ datalad/resources/procedures/cfg_text2git.py
 datalad/resources/procedures/cfg_yoda.py
 datalad/resources/procedures/tests/__init__.py
 datalad/resources/procedures/tests/test_noannex.py
+datalad/runner/__init__.py
+datalad/runner/coreprotocols.py
+datalad/runner/exception.py
+datalad/runner/gitrunner.py
+datalad/runner/nonasyncrunner.py
+datalad/runner/protocol.py
+datalad/runner/runner.py
+datalad/runner/utils.py
+datalad/runner/tests/__init__.py
+datalad/runner/tests/test_nonasyncrunner.py
+datalad/runner/tests/test_witless_runner.py
 datalad/support/__init__.py
 datalad/support/annexrepo.py
 datalad/support/ansi_colors.py
@@ -353,6 +352,7 @@ datalad/tests/test__main__.py
 datalad/tests/test_api.py
 datalad/tests/test_archives.py
 datalad/tests/test_base.py
+datalad/tests/test_cmd.py
 datalad/tests/test_config.py
 datalad/tests/test_constraints.py
 datalad/tests/test_direct_mode.py
@@ -361,7 +361,6 @@ datalad/tests/test_installed.py
 datalad/tests/test_interface.py
 datalad/tests/test_log.py
 datalad/tests/test_misc.py
-datalad/tests/test_nonasyncrunner.py
 datalad/tests/test_s3.py
 datalad/tests/test_strings.py
 datalad/tests/test_testrepos.py
@@ -370,7 +369,6 @@ datalad/tests/test_utils.py
 datalad/tests/test_utils_cached_dataset.py
 datalad/tests/test_utils_testrepos.py
 datalad/tests/test_version.py
-datalad/tests/test_witless_runner.py
 datalad/tests/utils.py
 datalad/tests/utils_cached_dataset.py
 datalad/tests/utils_testdatasets.py
@@ -416,6 +414,7 @@ docs/source/related.rst
 docs/source/_static/datalad_logo.png
 docs/source/_static/favicon.ico
 docs/source/_templates/autosummary/module.rst
+docs/source/design/credentials.rst
 docs/source/design/dataset_argument.rst
 docs/source/design/drop.rst
 docs/source/design/exception_handling.rst
@@ -423,6 +422,7 @@ docs/source/design/index.rst
 docs/source/design/log_levels.rst
 docs/source/design/miscpatterns.rst
 docs/source/design/python_imports.rst
+docs/source/design/url_substitution.rst
 docs/utils/pygments_ansi_color.py
 tools/Dockerfile.fullmaster
 tools/Singularity
@@ -467,6 +467,7 @@ tools/ci/appveyor_ssh2localhost.sh
 tools/ci/appveyor_ssh_config
 tools/ci/benchmark-travis-pr.sh
 tools/ci/bisect-python.sh
+tools/ci/debians_disable_outdated_ssl_cert
 tools/ci/download-latest-artifact
 tools/ci/gpg-90F7E9EB.pub
 tools/ci/install-annex.sh

@@ -19,3 +19,5 @@ subsystems in DataLad.
    python_imports
    miscpatterns
    exception_handling
+   credentials
+   url_substitution

@@ -16,6 +16,7 @@ import re
 import os
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import default_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
@@ -38,7 +39,6 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     getpwd,
@@ -210,6 +210,8 @@ class Subdatasets(Interface):
             option can be given multiple times. CMD]""",
             constraints=EnsureStr() | EnsureNone()))
 
+    result_renderer = "tailored"
+
     @staticmethod
     @datasetmethod(name='subdatasets')
     @eval_results
@@ -285,6 +287,9 @@ class Subdatasets(Interface):
                     #logger=lgr
                 )
 
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        default_result_renderer(res)
 
 
 # internal helper that needs all switches, simply to avoid going through
