@@ -693,6 +693,8 @@ class HTTPPath(object):
         env = os.environ.copy()
         if self.use_ssl:
             env.pop('https_proxy', None)
+            env['REQUESTS_CA_BUNDLE'] = str(
+                Path(__file__).parent / 'ca' / 'ca_bundle.pem')
         else:
             env.pop('http_proxy', None)
         self._env_patch = patch.dict('os.environ', env, clear=True)
