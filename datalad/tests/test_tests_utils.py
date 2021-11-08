@@ -23,6 +23,7 @@ from glob import glob
 from os.path import exists, join as opj, basename
 
 from urllib.request import urlopen
+from urllib.parse import quote as url_quote
 
 from unittest.mock import patch
 from datalad.utils import (
@@ -397,10 +398,10 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
     # verify first that we could encode file name in this environment
     try:
         filesysencoding = sys.getfilesystemencoding()
-        test_fpath_encoded = str(test_fpath).encode(filesysencoding)
+        test_fpath_encoded = str(test_fpath.as_posix()).encode(filesysencoding)
     except UnicodeEncodeError:  # pragma: no cover
         raise SkipTest("Environment doesn't support unicode filenames")
-    if test_fpath_encoded.decode(filesysencoding) != str(test_fpath):  # pragma: no cover
+    if test_fpath_encoded.decode(filesysencoding) != test_fpath.as_posix():  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
@@ -415,22 +416,29 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
         # @serve_ should remove http_proxy from the os.environ if was present
         if not on_windows:
             assert_false('http_proxy' in os.environ)
-        url = url + test_fpath.parent.as_posix()
-        assert_true(urlopen(url))
-        u = urlopen(url)
+        # get the "dir-view"
+        dirurl = url + test_fpath.parent.as_posix()
+        u = urlopen(dirurl)
         assert_true(u.getcode() == 200)
         html = u.read()
+        # get the actual content
+        file_html = urlopen(
+            url + url_quote(test_fpath.as_posix())).read().decode()
+        # verify we got the right one
+        eq_(file_html, test_fpath_full.read_text())
+
         if bs4 is None:
             return
 
+        # MIH is not sure what this part below is supposed to do
+        # possibly some kind of internal consistency test
         soup = bs4.BeautifulSoup(html, "html.parser")
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
-
-        url = "{}/{}".format(url, href_links[0])
-        u = urlopen(url)
+        parsed_url = f"{dirurl}/{href_links[0]}"
+        u = urlopen(parsed_url)
         html = u.read().decode()
-        assert(test_txt == html)
+        eq_(html, file_html)
 
     test_path_and_url()
 
