@@ -1,3 +1,12 @@
+datalad (0.15.3-1) UNRELEASED; urgency=medium
+
+  * Freshish upstream maintenance release
+  * d/patches
+    - refreshed for code movement
+    - CPed from upstream patches dropped
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 08 Nov 2021 13:32:51 -0500
+
 datalad (0.15.0-2) unstable; urgency=medium
 
   * d/control
