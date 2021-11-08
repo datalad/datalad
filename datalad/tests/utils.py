@@ -21,6 +21,7 @@ import re
 import tempfile
 import platform
 import multiprocessing
+import multiprocessing.queues
 import logging
 import random
 import socket
@@ -681,7 +682,13 @@ class HTTPPath(object):
             args=(hostname, self.path, queue),
             kwargs=dict(use_ssl=self.use_ssl, auth=self.auth))
         self._mproc.start()
-        port = queue.get(timeout=300)
+        try:
+            port = queue.get(timeout=300)
+        except multiprocessing.queues.Empty as e:
+            if self.use_ssl:
+                raise SkipTest('No working SSL support') from e
+            else:
+                raise
         self.url = 'http{}://{}:{}/'.format(
             's' if self.use_ssl else '',
             hostname,
@@ -753,7 +760,6 @@ def serve_path_via_http(tfunc, *targs, use_ssl=False, auth=None):
         If a (username, password) tuple is given, the server access will
         be protected via HTTP basic auth.
     """
-
     @wraps(tfunc)
     @attr('serve_path_via_http')
     def  _wrap_serve_path_via_http(*args, **kwargs):
