@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import base64
 import platform
 import sys
 import os
@@ -22,7 +23,10 @@ except ImportError:  # pragma: no cover
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from urllib.request import urlopen
+from urllib.request import (
+    urlopen,
+    Request,
+)
 from urllib.parse import quote as url_quote
 
 from unittest.mock import patch
@@ -391,7 +395,7 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 
 @with_tempfile(mkdir=True)
-def _test_serve_path_via_http(test_fpath, use_ssl, tmp_dir):  # pragma: no cover
+def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no cover
     tmp_dir = Path(tmp_dir)
     test_fpath = Path(test_fpath)
     # First verify that filesystem layer can encode this filename
@@ -410,20 +414,28 @@ def _test_serve_path_via_http(test_fpath, use_ssl, tmp_dir):  # pragma: no cover
     test_fpath_full.write_text(
         f'some txt and a randint {random.randint(1, 10)}')
 
-    @serve_path_via_http(tmp_dir, use_ssl=use_ssl)
+    @serve_path_via_http(tmp_dir, use_ssl=use_ssl, auth=auth)
     def test_path_and_url(path, url):
+        def _urlopen(url, auth=None):
+            req = Request(url)
+            if auth:
+                req.add_header(
+                    "Authorization",
+                    b"Basic " + base64.standard_b64encode(
+                        '{0}:{1}'.format(*auth).encode('utf-8')))
+            return urlopen(req)
 
         # @serve_ should remove http_proxy from the os.environ if was present
         if not on_windows:
             assert_false('http_proxy' in os.environ)
         # get the "dir-view"
         dirurl = url + test_fpath.parent.as_posix()
-        u = urlopen(dirurl)
+        u = _urlopen(dirurl, auth)
         assert_true(u.getcode() == 200)
         html = u.read()
         # get the actual content
-        file_html = urlopen(
-            url + url_quote(test_fpath.as_posix())).read().decode()
+        file_html = _urlopen(
+            url + url_quote(test_fpath.as_posix()), auth).read().decode()
         # verify we got the right one
         eq_(file_html, test_fpath_full.read_text())
 
@@ -436,7 +448,7 @@ def _test_serve_path_via_http(test_fpath, use_ssl, tmp_dir):  # pragma: no cover
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
         parsed_url = f"{dirurl}/{href_links[0]}"
-        u = urlopen(parsed_url)
+        u = _urlopen(parsed_url, auth)
         html = u.read().decode()
         eq_(html, file_html)
 
@@ -451,13 +463,13 @@ def test_serve_path_via_http():
                        u'Джэйсон',
                        get_most_obscure_supported_name(),
                       ]:
-
-        yield _test_serve_path_via_http, test_fpath, False
-        yield _test_serve_path_via_http, test_fpath, True
+        yield _test_serve_path_via_http, test_fpath, False, None
+        yield _test_serve_path_via_http, test_fpath, True, None
+        yield _test_serve_path_via_http, test_fpath, False, ('ernie', 'bert')
 
     # just with the last one check that we did remove proxy setting
     with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
-        yield _test_serve_path_via_http, test_fpath, False
+        yield _test_serve_path_via_http, test_fpath, False, None
 
 
 @known_failure_githubci_win

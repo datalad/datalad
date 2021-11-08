@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Miscellaneous utilities to assist with testing"""
 
+import base64
 import glob
 import gzip
 import inspect
@@ -580,9 +581,35 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
 
 
 def _multiproc_serve_path_via_http(
-        hostname, path_to_serve_from, queue, use_ssl=False): # pragma: no cover
+        hostname, path_to_serve_from, queue, use_ssl=False, auth=None): # pragma: no cover
+    handler = SilentHTTPHandler
+    if auth:
+        # to-be-expected key for basic auth
+        auth_test = (b'Basic ' + base64.b64encode(
+            bytes('%s:%s' % auth, 'utf-8'))).decode('utf-8')
+
+        # ad-hoc basic-auth handler
+        class BasicAuthHandler(SilentHTTPHandler):
+            def do_HEAD(self, authenticated):
+                if authenticated:
+                    self.send_response(200)
+                else:
+                    self.send_response(401)
+                    self.send_header(
+                        'WWW-Authenticate', 'Basic realm=\"Protected\"')
+                self.send_header('content-type', 'text/html')
+                self.end_headers()
+
+            def do_GET(self):
+                if self.headers.get('Authorization') == auth_test:
+                    super().do_GET()
+                else:
+                    self.do_HEAD(False)
+                    self.wfile.write(bytes('Auth failed', 'utf-8'))
+        handler = BasicAuthHandler
+
     chpwd(path_to_serve_from)
-    httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
+    httpd = HTTPServer((hostname, 0), handler)
     if use_ssl:
         ca_dir = Path(__file__).parent / 'ca'
         ssl_key = ca_dir / 'certificate-key.pem'
@@ -613,14 +640,17 @@ class HTTPPath(object):
     ----------
     path : str
         Directory with content to serve.
-    ssl : bool
+    use_ssl : bool
+    auth : tuple
+        Username, password
     """
-    def __init__(self, path, use_ssl=False):
+    def __init__(self, path, use_ssl=False, auth=None):
         self.path = path
         self.url = None
         self._env_patch = None
         self._mproc = None
         self.use_ssl = use_ssl
+        self.auth = auth
 
     def __enter__(self):
         self.start()
@@ -649,7 +679,7 @@ class HTTPPath(object):
         self._mproc = multiprocessing.Process(
             target=_multiproc_serve_path_via_http,
             args=(hostname, self.path, queue),
-            kwargs=dict(use_ssl=self.use_ssl))
+            kwargs=dict(use_ssl=self.use_ssl, auth=self.auth))
         self._mproc.start()
         port = queue.get(timeout=300)
         self.url = 'http{}://{}:{}/'.format(
@@ -706,8 +736,20 @@ class HTTPPath(object):
 
 
 @optional_args
-def serve_path_via_http(tfunc, *targs, use_ssl=False):
+def serve_path_via_http(tfunc, *targs, use_ssl=False, auth=None):
     """Decorator which serves content of a directory via http url
+
+    Parameters
+    ----------
+    path : str
+        Directory with content to serve.
+    use_ssl : bool
+        Flag whether to set up SSL encryption and return a HTTPS
+        URL. This require a valid certificate setup (which is tested
+        for proper function) or it will cause a SkipTest to be raised.
+    auth : tuple or None
+        If a (username, password) tuple is given, the server access will
+        be protected via HTTP basic auth.
     """
 
     @wraps(tfunc)
@@ -724,7 +766,7 @@ def serve_path_via_http(tfunc, *targs, use_ssl=False):
         else:
             args, path = (), args[0]
 
-        with HTTPPath(path, use_ssl=use_ssl) as url:
+        with HTTPPath(path, use_ssl=use_ssl, auth=auth) as url:
             return tfunc(*(args + (path, url)), **kwargs)
     return  _wrap_serve_path_via_http
 
