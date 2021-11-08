@@ -423,6 +423,9 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
         u = urlopen(url)
         assert_true(u.getcode() == 200)
         html = u.read()
+        if bs4 is None:
+            return
+
         soup = bs4.BeautifulSoup(html, "html.parser")
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
@@ -432,8 +435,6 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
         html = u.read().decode()
         assert(test_txt == html)
 
-    if bs4 is None:  # pragma: no cover
-        raise SkipTest("bs4 is absent")
     test_path_and_url()
 
 
