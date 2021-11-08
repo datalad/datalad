@@ -619,10 +619,10 @@ def _multiproc_serve_path_via_http(
                 'SSL requested, but no key/cert file combination can be '
                 f'located under {ca_dir}')
         # turn on SSL
-        httpd.socket = ssl.wrap_socket (
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(str(ssl_cert), str(ssl_key))
+        httpd.socket = context.wrap_socket (
             httpd.socket,
-            keyfile=str(ssl_key),
-            certfile=str(ssl_cert),
             server_side=True)
     queue.put(httpd.server_port)
     httpd.serve_forever()
