@@ -391,7 +391,7 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 
 @with_tempfile(mkdir=True)
-def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
+def _test_serve_path_via_http(test_fpath, use_ssl, tmp_dir):  # pragma: no cover
     tmp_dir = Path(tmp_dir)
     test_fpath = Path(test_fpath)
     # First verify that filesystem layer can encode this filename
@@ -410,7 +410,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
     test_fpath_full.write_text(
         f'some txt and a randint {random.randint(1, 10)}')
 
-    @serve_path_via_http(tmp_dir)
+    @serve_path_via_http(tmp_dir, use_ssl=use_ssl)
     def test_path_and_url(path, url):
 
         # @serve_ should remove http_proxy from the os.environ if was present
@@ -452,11 +452,12 @@ def test_serve_path_via_http():
                        get_most_obscure_supported_name(),
                       ]:
 
-        yield _test_serve_path_via_http, test_fpath
+        yield _test_serve_path_via_http, test_fpath, False
+        yield _test_serve_path_via_http, test_fpath, True
 
     # just with the last one check that we did remove proxy setting
     with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
-        yield _test_serve_path_via_http, test_fpath
+        yield _test_serve_path_via_http, test_fpath, False
 
 
 @known_failure_githubci_win

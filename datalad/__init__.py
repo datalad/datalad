@@ -122,6 +122,11 @@ def setup_package():
     consts.DATASETS_TOPURL = 'https://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
+    # inform python-requests about our test certificate
+    set_envvar(
+        'REQUESTS_CA_BUNDLE',
+        os.path.join(os.path.dirname(__file__), 'tests', 'ca', 'ca_bundle.pem'))
+
     from datalad.tests.utils import (
         DEFAULT_BRANCH,
         DEFAULT_REMOTE,
