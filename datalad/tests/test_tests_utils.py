@@ -391,34 +391,31 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 @with_tempfile(mkdir=True)
 def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
-
+    tmp_dir = Path(tmp_dir)
+    test_fpath = Path(test_fpath)
     # First verify that filesystem layer can encode this filename
     # verify first that we could encode file name in this environment
     try:
         filesysencoding = sys.getfilesystemencoding()
-        test_fpath_encoded = test_fpath.encode(filesysencoding)
+        test_fpath_encoded = str(test_fpath).encode(filesysencoding)
     except UnicodeEncodeError:  # pragma: no cover
         raise SkipTest("Environment doesn't support unicode filenames")
-    if test_fpath_encoded.decode(filesysencoding) != test_fpath:  # pragma: no cover
+    if test_fpath_encoded.decode(filesysencoding) != str(test_fpath):  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
-    test_fpath_full = str(os.path.join(tmp_dir, test_fpath))
-    test_fpath_dir = str(os.path.dirname(test_fpath_full))
-
-    if not os.path.exists(test_fpath_dir):
-        os.makedirs(test_fpath_dir)
-
-    with open(test_fpath_full, 'w') as f:
-        test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
-        f.write(test_txt)
+    test_fpath_full = tmp_dir / test_fpath
+    test_fpath_full.parent.mkdir(parents=True, exist_ok=True)
+    test_fpath_full.write_text(
+        f'some txt and a randint {random.randint(1, 10)}')
 
     @serve_path_via_http(tmp_dir)
     def test_path_and_url(path, url):
 
         # @serve_ should remove http_proxy from the os.environ if was present
-        assert_false('http_proxy' in os.environ)
-        url = url + os.path.dirname(test_fpath)
+        if not on_windows:
+            assert_false('http_proxy' in os.environ)
+        url = url + test_fpath.parent.as_posix()
         assert_true(urlopen(url))
         u = urlopen(url)
         assert_true(u.getcode() == 200)
@@ -438,12 +435,10 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
     test_path_and_url()
 
 
-# just look at the path specs...
-@known_failure_windows
 def test_serve_path_via_http():
     for test_fpath in ['test1.txt',
-                       'test_dir/test2.txt',
-                       'test_dir/d2/d3/test3.txt',
+                       Path('test_dir', 'test2.txt'),
+                       Path('test_dir', 'd2', 'd3', 'test3.txt'),
                        'file with space test4',
                        u'Джэйсон',
                        get_most_obscure_supported_name(),
