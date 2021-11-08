@@ -6,8 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""
-Protocols used by WitlessRunner
+"""Base class of a protocol to be used with the DataLad runner
 """
 
 import asyncio
@@ -15,11 +14,10 @@ import logging
 import warnings
 from locale import getpreferredencoding
 
-from .support.exceptions import CommandError
+from .exception import CommandError
 from .utils import ensure_unicode
 
-
-lgr = logging.getLogger('datalad.cmd')
+lgr = logging.getLogger('datalad.runner.protocol')
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
@@ -71,7 +69,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         self._log_outputs = False
         if lgr.isEnabledFor(5):
             try:
-                from . import cfg
+                from datalad import cfg
                 self._log_outputs = cfg.getbool('datalad.log', 'outputs', default=False)
             except ImportError:
                 pass
@@ -136,43 +134,3 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     def process_exited(self):
         pass
-
-
-class NoCapture(WitlessProtocol):
-    """WitlessProtocol that captures no subprocess output
-
-    As this is identical with the behavior of the WitlessProtocol base class,
-    this class is merely a more readable convenience alias.
-    """
-    pass
-
-
-class StdOutCapture(WitlessProtocol):
-    """WitlessProtocol that only captures and returns stdout of a subprocess"""
-    proc_out = True
-
-
-class StdErrCapture(WitlessProtocol):
-    """WitlessProtocol that only captures and returns stderr of a subprocess"""
-    proc_err = True
-
-
-class StdOutErrCapture(WitlessProtocol):
-    """WitlessProtocol that captures and returns stdout/stderr of a subprocess
-    """
-    proc_out = True
-    proc_err = True
-
-
-class KillOutput(WitlessProtocol):
-    """WitlessProtocol that swallows stdout/stderr of a subprocess
-    """
-    proc_out = True
-    proc_err = True
-
-    def pipe_data_received(self, fd, data):
-        if lgr.isEnabledFor(5):
-            lgr.log(
-                5,
-                'Discarded %i bytes from %i[%s]',
-                len(data), self.process.pid, self.fd_infos[fd][0])

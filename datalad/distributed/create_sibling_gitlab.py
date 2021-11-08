@@ -40,7 +40,6 @@ from ..distribution.dataset import (
     require_dataset,
     resolve_path,
 )
-from ..dochelpers import exc_str
 
 # bound methods
 from ..distribution.siblings import Siblings
@@ -413,10 +412,13 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
         try:
             site_project = site_api.create_project(project, description)
             # report success
+            message = "sibling repository '%s' created at %s",\
+                      remotename, site_project.get('web_url', None)
             yield dict(
                 res_kwargs,
                 # relay all attributes
                 project_attributes=site_project,
+                message=message,
                 status='ok',
             )
         except Exception as e:

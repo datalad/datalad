@@ -175,7 +175,6 @@ def test_invalid_args(path):
 
 
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_install_datasets_root(tdir):
     with chpwd(tdir):
@@ -443,7 +442,6 @@ def test_install_into_dataset(source, top_path):
 @known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile
 def test_failed_install_multiple(top_path):
     ds = create(top_path)

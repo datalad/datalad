@@ -12,7 +12,6 @@
 
 from os.path import join as opj
 
-from datalad.dochelpers import exc_str
 from datalad.api import (
     create,
     wtf,
@@ -21,7 +20,7 @@ from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
 )
-from datalad.version import __version__
+from datalad import __version__
 
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
@@ -139,7 +138,7 @@ def test_wtf(topdir):
             wtf(dataset=ds.path, clipboard=True)
         except (AttributeError, pyperclip.PyperclipException) as exc:
             # AttributeError could come from pyperclip if no DISPLAY
-            raise SkipTest(exc_str(exc))
+            raise SkipTest(str(exc))
         assert_in("WTF information of length", cmo.out)
         assert_not_in('user.name', cmo.out)
         if not pyperclip_works:

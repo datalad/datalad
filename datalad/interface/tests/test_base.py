@@ -216,6 +216,21 @@ def test_update_docstring_with_parameters_no_kwds():
     assert_in("3", fn.__doc__)
 
 
+def test_update_docstring_with_parameters_single_line_prefix():
+    from datalad.support.param import Parameter
+
+    def fn(pos0, pos1):
+        pass
+
+    update_docstring_with_parameters(
+        fn,
+        dict(pos0=Parameter(doc="pos0 param doc"),
+             pos1=Parameter(doc="pos1 param doc")),
+        prefix="This is a single line.",
+    )
+    assert_in("This is a single line.\n\nParameters\n", fn.__doc__)
+
+
 def check_call_from_parser_pos_arg_underscore(how):
     from datalad.cmdline.helpers import parser_add_common_options
     from datalad.support.param import Parameter

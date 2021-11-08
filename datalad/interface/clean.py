@@ -9,7 +9,6 @@
 
 __docformat__ = 'restructuredtext'
 
-
 import itertools
 from .base import Interface
 from ..utils import (
@@ -40,6 +39,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from logging import getLogger
+
 lgr = getLogger('datalad.api.clean')
 
 # needed API commands
@@ -90,7 +90,7 @@ class Clean(Interface):
             args=("--dry-run",),
             doc="""Report on cleanable locations - not actually cleaning up
             anything.""",
-            action="store_true",),
+            action="store_true", ),
         # TODO: Python only???
         what=Parameter(
             args=("--what",),
@@ -207,7 +207,7 @@ class Clean(Interface):
 
             refds = res.get('refds', None)
             refds = refds if kwargs.get('dataset', None) is not None \
-                or refds == getcwd() else None
+                             or refds == getcwd() else None
             path = res['path'] if refds is None \
                 else str(Path(res['path']).relative_to(refds))
 
@@ -216,8 +216,8 @@ class Clean(Interface):
                 message=(res['message'][0] % res['message'][1:]
                          if isinstance(res['message'], tuple)
                          else res['message'])
-                        if res.get('message', None) else ''
-                )
+                if res.get('message', None) else ''
+            )
             )
 
         else:

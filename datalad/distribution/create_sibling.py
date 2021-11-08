@@ -548,9 +548,9 @@ class CreateSibling(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""limit processing to datasets that have been changed since a given
-            state (by tag, branch, commit, etc). This can be used to create siblings
-            for recently added subdatasets."""),
+            doc="""limit processing to subdatasets that have been changed since
+            a given state (by tag, branch, commit, etc). This can be used to
+            create siblings for recently added subdatasets."""),
     )
 
     @staticmethod
@@ -598,7 +598,8 @@ class CreateSibling(Interface):
         #
         # all checks that are possible before we start parsing the dataset
         #
-
+        if since and not recursive:
+            raise ValueError("The use of 'since' requires 'recursive'")
         # possibly use sshurl to get the name in case if not specified
         if not sshurl:
             if not inherit:
@@ -658,39 +659,46 @@ class CreateSibling(Interface):
             active_branch = ds.repo.get_active_branch()
             since = '%s/%s' % (name, active_branch)
 
-        #
-        # parse the base dataset to find all subdatasets that need processing
-        #
         to_process = []
-        cand_ds = [
-            Dataset(r['path'])
-            for r in diff_dataset(
-                ds,
-                fr=since,
-                to=None,
-                # make explicit, but doesn't matter, no recursion in diff()
-                constant_refs=True,
-                # contrain to the paths of all locally existing subdatasets
-                path=[
-                    sds['path']
-                    for sds in ds.subdatasets(
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        fulfilled=True,
-                        result_renderer=None)
-                ],
-                # save cycles, we are only looking for datasets
-                annex=None,
-                untracked='no',
-                # recursion was done faster by subdatasets()
-                recursive=False,
-                # save cycles, we are only looking for datasets
-                eval_file_type=False,
-            )
-            if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
-        ]
-        # check remotes setup
-        for d in cand_ds if since else ([ds] + cand_ds):
+        if recursive:
+            #
+            # parse the base dataset to find all subdatasets that need processing
+            #
+            cand_ds = [
+                Dataset(r['path'])
+                for r in diff_dataset(
+                    ds,
+                    fr=since,
+                    to=None,
+                    # make explicit, but doesn't matter, no recursion in diff()
+                    constant_refs=True,
+                    # contrain to the paths of all locally existing subdatasets
+                    path=[
+                        sds['path']
+                        for sds in ds.subdatasets(
+                            recursive=recursive,
+                            recursion_limit=recursion_limit,
+                            fulfilled=True,
+                            result_renderer=None)
+                    ],
+                    # save cycles, we are only looking for datasets
+                    annex=None,
+                    untracked='no',
+                    # recursion was done faster by subdatasets()
+                    recursive=False,
+                    # save cycles, we are only looking for datasets
+                    eval_file_type=False,
+                )
+                if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
+            ]
+            if not since:
+                # not only subdatasets
+                cand_ds = [ds] + cand_ds
+        else:
+            # only the current ds
+            cand_ds = [ds]
+        # check remotes setup()
+        for d in cand_ds:
             d_repo = d.repo
             if d_repo is None:
                 continue

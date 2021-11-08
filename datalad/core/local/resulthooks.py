@@ -15,6 +15,8 @@ __docformat__ = 'restructuredtext'
 import logging
 import json
 
+from datalad.support.exceptions import CapturedException
+
 lgr = logging.getLogger('datalad.core.local.resulthooks')
 
 
@@ -58,11 +60,11 @@ def get_jsonhooks_from_config(cfg):
         try:
             match = json.loads(cfg.get(h))
         except Exception as e:
-            from datalad.dochelpers import exc_str
+            ce = CapturedException(e)
             lgr.warning(
                 'Invalid match specification in %s: %s [%s], '
                 'hook will be skipped',
-                h, cfg.get(h), exc_str(e))
+                h, cfg.get(h), ce)
             continue
 
         hooks[hook_name] = dict(
@@ -195,12 +197,12 @@ def run_jsonhook(hook, spec, res, dsarg=None):
     try:
         args = json.loads(args)
     except Exception as e:
-        from datalad.dochelpers import exc_str
+        ce = CapturedException(e)
         lgr.warning(
             'Invalid argument specification for hook %s '
             '(after parameter substitutions): %s [%s], '
             'hook will be skipped',
-            hook, args, exc_str(e))
+            hook, args, ce)
         return
     # only debug level, the hook can issue its own results and communicate
     # through them
