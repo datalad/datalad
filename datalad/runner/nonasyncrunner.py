@@ -73,7 +73,13 @@ class _ResultGenerator(Generator):
     def _check_result(self):
         if self.runner.exception_on_error is True:
             if self.return_code != 0:
-                raise CommandError(cmd=self.runner.cmd, code=self.return_code)
+                protocol = self.runner.protocol
+                stderr = protocol.fd_infos[protocol.stderr_fileno][1]
+                if stderr is not None:
+                    stderr = stderr.decode()
+                raise CommandError(cmd=self.runner.cmd,
+                                   code=self.return_code,
+                                   stderr=stderr)
 
     def send(self, _):
         runner = self.runner
