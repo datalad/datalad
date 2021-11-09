@@ -12,7 +12,6 @@ from unittest.mock import patch
 import os
 import os.path as op
 import sys
-import re
 import logging
 import glob
 from time import sleep
@@ -24,10 +23,6 @@ from ..archives import (
 )
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
-from .test_base import (
-    BASE_INTERACTION_SCENARIOS,
-    check_interaction_scenario,
-)
 from ...tests.utils import (
     abspath,
     assert_equal,
@@ -63,10 +58,6 @@ from ...tests.test_archives import (
     fn_archive_obscure_ext,
     fn_in_archive_obscure,
 )
-from datalad import cfg as dl_cfg
-
-#import line_profiler
-#prof = line_profiler.LineProfiler()
 
 
 # TODO: with_tree ATM for archives creates this nested top directory
