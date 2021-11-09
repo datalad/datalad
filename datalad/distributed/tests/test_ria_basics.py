@@ -659,13 +659,15 @@ def test_push_url(storepath, dspath, blockfile):
 @known_failure_windows
 @with_tempfile
 @with_tempfile
-def test_url_keys(dspath, storepath):
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_url_keys(dspath, storepath, httppath, httpurl):
     ds = Dataset(dspath).create()
     repo = ds.repo
     filename = 'url_no_size.html'
     # URL-type key without size
     repo.call_annex([
-        'addurl', '--relaxed', '--raw', '--file', filename, 'http://example.com',
+        'addurl', '--relaxed', '--raw', '--file', filename, httpurl,
     ])
     ds.save()
     # copy target
@@ -688,7 +690,7 @@ def test_url_keys(dspath, storepath):
     repo.call_annex(['fsck', '-f', 'ria'])
     assert_equal(len(ds.repo.whereis(filename)), 3)
     # mapped key in whereis output
-    assert_in('%%example', repo.call_annex(['whereis', filename]))
+    assert_in('127.0.0.1', repo.call_annex(['whereis', filename]))
 
     repo.call_annex(['move', '-f', 'ria', filename])
     # check that it does not magically reappear, because it actually
