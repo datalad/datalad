@@ -262,7 +262,7 @@ def test_clone_isnot_recursive(path_src, path_nr, path_r):
     # check nothing is unintentionally installed
     subdss = ds.subdatasets(recursive=True)
     assert_result_count(subdss, len(subdss), state='absent')
-    # this also means, subdatasets to be listed as not fulfilled:
+    # this also means, subdatasets to be listed as absent:
     eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
         {'subm 1', '2'})
 

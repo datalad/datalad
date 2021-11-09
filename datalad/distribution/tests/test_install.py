@@ -314,7 +314,7 @@ def test_install_recursive(src, path_nr, path_r):
     for sub in ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(not sub.is_installed(),
             "Unintentionally installed: %s" % (sub,))
-    # this also means, subdatasets to be listed as not fulfilled:
+    # this also means, subdatasets to be listed as absent:
     eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
         {'subm 1', '2'})
 
@@ -345,7 +345,7 @@ def test_install_recursive(src, path_nr, path_r):
         ainfo = subds.repo.get_content_annexinfo(init=None,
                                                  eval_availability=True)
         assert_false(any(st["has_content"] for st in ainfo.values()))
-    # no unfulfilled subdatasets:
+    # no absent subdatasets:
     ok_(top_ds.subdatasets(recursive=True, state='absent') == [])
 
     # check if we can install recursively into a dataset
@@ -355,7 +355,7 @@ def test_install_recursive(src, path_nr, path_r):
     for subsub in subds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subsub.is_installed())
 
-    # check that we get subdataset instances manufactored from notneeded results
+    # check that we get subdataset instances manufactured from notneeded results
     # to install existing subdatasets again
     eq_(subds, ds.install('recursive-in-ds'))
 
@@ -944,4 +944,4 @@ def test_install_recursive_github(path):
         #'git@github.com:datalad/testrepo_gh.git',
     ]):
         ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
-        eq_(len(ds.subdatasets(recursive=True, fulfilled=True)), 2)
+        eq_(len(ds.subdatasets(recursive=True, state='present')), 2)
