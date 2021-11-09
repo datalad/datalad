@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Custom remote to support getting the load from archives present under annex"""
+"""Custom remote to get the load from archives present under annex"""
 
 __docformat__ = 'restructuredtext'
 
@@ -23,7 +23,9 @@ from annexremote import (
     UnsupportedRequest,
 )
 
+from datalad.cmdline.helpers import get_repo_instance
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.archives import ArchivesCache
 from datalad.support.cache import DictCache
 from datalad.support.exceptions import CapturedException
@@ -40,6 +42,7 @@ from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.archive')
 
+
 # ####
 # Preserve from previous version
 # TODO: document intention
@@ -52,7 +55,8 @@ def link_file_load(src, dst, dry_run=False):
     if not op.exists(dst_dir):
         os.makedirs(dst_dir)
     if op.lexists(dst):
-        lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
+        lgr.log(9, "Destination file %(dst)s exists. Removing it first",
+                locals())
         # TODO: how would it interact with git/git-annex
         unlink(dst)
     lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
@@ -76,7 +80,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
      Archives must be under annex'ed themselves.
     """
     CUSTOM_REMOTE_NAME = "archive"
-    SUPPORTED_SCHEMES = (AnnexCustomRemote._get_custom_scheme(CUSTOM_REMOTE_NAME),)
+    SUPPORTED_SCHEMES = (
+        AnnexCustomRemote._get_custom_scheme(CUSTOM_REMOTE_NAME),)
     # Since we support only 1 scheme here
     URL_SCHEME = SUPPORTED_SCHEMES[0]
     URL_PREFIX = URL_SCHEME + ":"
@@ -89,8 +94,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # MIH figure out what the following is all about
         # in particular path==None
-        from ..cmdline.helpers import get_repo_instance
-        from ..support.annexrepo import AnnexRepo
         self.repo = get_repo_instance(class_=AnnexRepo) \
             if not path \
             else AnnexRepo(path, create=False, init=False)
@@ -108,7 +111,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         """Stop communication with annex"""
         self._cache.clean()
 
-    def get_file_url(self, archive_file=None, archive_key=None, file=None, size=None):
+    def get_file_url(self, archive_file=None, archive_key=None, file=None,
+                     size=None):
         """Given archive (file or a key) and a file -- compose URL for access
 
         Examples
@@ -127,7 +131,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         assert(file is not None)
         if archive_file is not None:
             if archive_key is not None:
-                raise ValueError("Provide archive_file or archive_key - not both")
+                raise ValueError(
+                    "Provide archive_file or archive_key - not both")
             archive_key = self.repo.get_file_annexinfo(archive_file)['key']
         assert(archive_key is not None)
         attrs = OrderedDict()  # looking forward for more
@@ -135,15 +140,17 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             attrs['path'] = file.lstrip('/')
         if size is not None:
             attrs['size'] = size
-        return str(URL(scheme=self.URL_SCHEME, path=archive_key, fragment=attrs))
+        return str(URL(scheme=self.URL_SCHEME,
+                       path=archive_key,
+                       fragment=attrs))
 
     @property
     def cache(self):
         return self._cache
 
     def _parse_url(self, url):
-        """Parse url and return archive key, file within archive and additional attributes (such as size)
-        """
+        """Parse url and return archive key, file within archive and
+        additional attributes (such as size)"""
         url = URL(url)
         assert(url.scheme == self.URL_SCHEME)
         fdict = url.fragment_dict
@@ -160,8 +167,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def _gen_akey_afiles(self, key, sorted=False, unique_akeys=True):
         """Given a key, yield akey, afile pairs
 
-        if `sorted`, then first those which have extracted version in local cache
-        will be yielded
+        if `sorted`, then first those which have extracted version in local
+        cache will be yielded
 
         Gets determined based on urls for datalad archives
 
@@ -199,22 +206,24 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         )
 
         # by default get_contentlocation would return empty result for a key
-        # which is not available locally.  But we could still have extracted archive
-        # in the cache.  So we need pretty much get first all possible and then
-        # only remove those which aren't present locally.  So verify_exists was added
+        # which is not available locally.  But we could still have extracted
+        # archive in the cache.  So we need pretty much get first all possible
+        # and then only remove those which aren't present locally.  So
+        # verify_exists was added
         yielded = set()
         akey_afile_paths_ = []
 
-        # utilize cache to check which archives might already be present in the cache
+        # utilize cache to check which archives might already be present in the
+        # cache
         for akey_afile, akey_path in akey_afile_paths:
             if akey_path and self.cache[akey_path].is_extracted:
                 yield akey_afile
                 yielded.add(akey_afile)
             akey_afile_paths_.append((akey_afile, akey_path))
 
-        # replace generators with already collected ones into a list.
-        # The idea that in many cases we don't even need to create a full list
-        # and that initial single yield would be enough, thus we don't need to check
+        # replace generators with already collected ones into a list.  The idea
+        # that in many cases we don't even need to create a full list and that
+        # initial single yield would be enough, thus we don't need to check
         # locations etc for every possible hit
         akey_afile_paths = akey_afile_paths_
 
@@ -225,9 +234,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 yielded.add(akey_afile)
                 yield akey_afile
 
-        # So no archive is present either in the cache or originally under annex
-        # XXX some kind of a heuristic I guess is to use last_url ;-)
-        if self._last_url and self._last_url in urls and (len(urls) == len(akey_afiles)):
+        # So no archive is present either in the cache or originally under
+        # annex XXX some kind of a heuristic I guess is to use last_url ;-)
+        if self._last_url and self._last_url in urls \
+                and (len(urls) == len(akey_afiles)):
             akey_afile, _ = akey_afile_paths[urls.index(self._last_url)]
             yielded.add(akey_afile)
             yield akey_afile
@@ -239,8 +249,9 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def get_contentlocation(self, key, absolute=False, verify_exists=True):
         """Return (relative to top or absolute) path to the file containing the key
 
-        This is a wrapper around AnnexRepo.get_contentlocation which provides caching
-        of the result (we are asking the location for the same archive key often)
+        This is a wrapper around AnnexRepo.get_contentlocation which provides
+        caching of the result (we are asking the location for the same archive
+        key often)
         """
         if key not in self._contentlocations:
             fpath = self.repo.get_contentlocation(key, batch=True)
@@ -271,7 +282,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         size = attrs.get('size', None)
 
         # But reply that present only if archive is present
-        # TODO: this would throw exception if not present, so this statement is kinda bogus
+        # TODO: this would throw exception if not present, so this statement is
+        # kinda bogus
         akey_path = self.get_contentlocation(akey, absolute=True)
         if akey_path:
             # Extract via cache only if size is not yet known
@@ -289,13 +301,13 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             if size is None:
                 return True
             else:
-                # FIXME: providing filename causes annex to not even talk to ask
-                # upon drop :-/
+                # FIXME: providing filename causes annex to not even talk to
+                # ask upon drop :-/
                 return [dict(size=size)]  # , basename(afile))
 
         else:
-            # TODO: theoretically we should first check if key is available from
-            # any remote to know if file is available
+            # TODO: theoretically we should first check if key is available
+            # from any remote to know if file is available
             return False
 
     def checkpresent(self, key):
@@ -303,10 +315,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # we could even store the filename within archive
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
-        # The same content could be available from multiple locations within the same
-        # archive, so let's not ask it twice since here we don't care about "afile"
+        # The same content could be available from multiple locations within
+        # the same archive, so let's not ask it twice since here we don't care
+        # about "afile"
         for akey, _ in self._gen_akey_afiles(key, unique_akeys=True):
-            if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
+            if self.get_contentlocation(akey) \
+                    or self.repo.is_available(akey, batch=True, key=True):
                 return True
         # it is unclear to MIH why this must be UNKNOWN rather than FALSE
         # but this is how I found it
@@ -319,7 +333,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # # otherwise failure (current the only one)
         # akey, afile = self._get_akey_afile(key)
         # if False:
-        #     # TODO: proxy, checking present of local tarball is not sufficient
+        #     # TODO: proxy, checking present of local tarball is not
+        #     # sufficient
         #     #  not exists(self.get_key_path(key)):
         #     self.send("REMOVE-SUCCESS", akey)
         # else:
@@ -328,8 +343,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
     def whereis(self, key):
         return False
-        # although more logical is to report back success, it leads to imho more confusing
-        # duplication. See
+        # although more logical is to report back success, it leads to imho
+        # more confusing duplication. See
         # http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
         # try:
         #     key, file = self._get_akey_afile(key)
@@ -345,7 +360,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # prune the list so we keep only the ones from unique akeys.
         # May be whenever we support extraction directly from the tarballs
         # we should go through all and choose the one easiest to get or smth.
-        for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
+        for akey, afile in self._gen_akey_afiles(
+                key, sorted=True, unique_akeys=True):
             if not akey:
                 lgr.warning("Got an empty archive key %r for key %s. Skipping",
                             akey, key)
@@ -354,7 +370,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             try:
                 with lock_if_check_fails(
                     check=(self.get_contentlocation, (akey,)),
-                    lock_path=(lambda k: op.join(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
+                    lock_path=(
+                        lambda k: op.join(self.repo.path,
+                                          '.git',
+                                          'datalad-archives-%s' % k),
+                        (akey,)),
                     operation="annex-get"
                 ) as (akey_fpath, lock):
                     if lock:
@@ -366,10 +386,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     raise RuntimeError(
                         "We were reported to fetch it alright but now can't "
                         "get its location.  Check logic"
-                )
+                    )
 
                 akey_path = op.join(self.repo.path, akey_fpath)
-                assert op.exists(akey_path), "Key file %s is not present" % akey_path
+                assert op.exists(akey_path), \
+                       "Key file %s is not present" % akey_path
 
                 # Extract that bloody file from the bloody archive
                 # TODO: implement/use caching, for now a simple one
@@ -377,21 +398,26 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 #  https://github.com/wummel/patool/issues/20
                 # so
                 pwd = getpwd()
-                lgr.debug(u"Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
+                lgr.debug(
+                    "Getting file {afile} from {akey_path} "
+                    "while PWD={pwd}".format(**locals()))
                 was_extracted = self.cache[akey_path].is_extracted
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, file)
                 if not was_extracted and self.cache[akey_path].is_extracted:
-                    self.annex.info("%s special remote is using an extraction cache "
-                              "under %s. Remove it with DataLad's 'clean' "
-                              "command to save disk space." %
-                              (ARCHIVES_SPECIAL_REMOTE,
-                               self.cache[akey_path].path)
-                              )
+                    self.annex.info(
+                        "%s special remote is using an extraction cache "
+                        "under %s. Remove it with DataLad's 'clean' "
+                        "command to save disk space." %
+                        (ARCHIVES_SPECIAL_REMOTE,
+                         self.cache[akey_path].path)
+                    )
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug("Failed to fetch {akey} containing {key}: {ce}".format(**locals()))
+                self.annex.debug(
+                    "Failed to fetch {akey} containing {key}: {ce}".format(
+                        **locals()))
                 continue
 
         raise RemoteError(

@@ -43,9 +43,9 @@ class AnnexCustomRemote(SpecialRemote):
             ui.set_specialremote(self)
 
         # OPT: a counter to increment upon successful encounter of the scheme
-        # (ATM only in gen_URLS but later could also be used in other requests).
-        # This would allow to consider schemes in order of decreasing success instead
-        # of arbitrary hardcoded order
+        # (ATM only in gen_URLS but later could also be used in other
+        # requests).  This would allow to consider schemes in order of
+        # decreasing success instead of arbitrary hardcoded order
         self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     @classmethod
@@ -54,10 +54,10 @@ class AnnexCustomRemote(SpecialRemote):
         """
         # prefix which will be used in all URLs supported by this custom remote
         # https://tools.ietf.org/html/rfc2718 dictates "URL Schemes" standard
-        # 2.1.2   suggests that we do use // since all of our URLs will define
-        #         some hierarchical structure.  But actually since we might encode
-        #         additional information (such as size) into the URL, it will not be
-        #         strictly conforming it. Thus we will not use //
+        # 2.1.2 suggests that we do use // since all of our URLs will define
+        # some hierarchical structure.  But actually since we might encode
+        # additional information (such as size) into the URL, it will not be
+        # strictly conforming it. Thus we will not use //
         return "%s+%s" % (URI_PREFIX, prefix)  # if .PREFIX else '')
 
     # Helper methods
@@ -103,15 +103,19 @@ class AnnexCustomRemote(SpecialRemote):
 
 # this function only has anecdotal value and is not used anywhere
 def generate_uuids():
-    """Generate UUIDs for our remotes. Even though quick, for consistency pre-generated and recorded in consts.py"""
+    """Generate UUIDs for our remotes. Even though quick, for
+    consistency pre-generated and recorded in consts.py"""
     import uuid
     return {
-        remote: str(uuid.uuid5(uuid.NAMESPACE_URL, 'http://datalad.org/specialremotes/%s' % remote))
+        remote: str(uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            'http://datalad.org/specialremotes/%s' % remote))
         for remote in {'datalad', 'datalad-archives'}
     }
 
 
-def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]):
+def init_datalad_remote(repo, remote, encryption=None, autoenable=False,
+                        opts=[]):
     """Initialize datalad special remote"""
     from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
     lgr.info("Initiating special remote %s", remote)

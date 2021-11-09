@@ -75,19 +75,22 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
                     return True
-                # TODO:  for CHECKPRESENT-FAILURE we somehow need to figure out that
-                # we can connect to that server but that specific url is N/A,
-                # probably check the connection etc
+                # TODO:  for CHECKPRESENT-FAILURE we somehow need to figure out
+                # that we can connect to that server but that specific url is
+                # N/A, probably check the connection etc
             except TargetFileAbsent as exc:
                 ce = CapturedException(exc)
-                self.annex.debug("Target url %s file seems to be missing: %s" % (url, ce))
+                self.annex.debug(
+                    "Target url %s file seems to be missing: %s" % (url, ce))
                 if not resp:
-                    # if it is already marked as UNKNOWN -- let it stay that way
-                    # but if not -- we might as well say that we can no longer access it
+                    # if it is already marked as UNKNOWN -- let it stay that
+                    # way but if not -- we might as well say that we can no
+                    # longer access it
                     return False
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug("Failed to check status of url %s: %s" % (url, ce))
+                self.annex.debug(
+                    "Failed to check status of url %s: %s" % (url, ce))
         if resp is None:
             raise RemoteError(f'Could not determine presence of key {key}')
         else:
