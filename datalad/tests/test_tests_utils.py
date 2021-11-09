@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import base64
 import platform
 import sys
 import os
@@ -22,7 +23,11 @@ except ImportError:  # pragma: no cover
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from urllib.request import urlopen
+from urllib.request import (
+    urlopen,
+    Request,
+)
+from urllib.parse import quote as url_quote
 
 from unittest.mock import patch
 from datalad.utils import (
@@ -390,69 +395,81 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 
 @with_tempfile(mkdir=True)
-def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
-
+def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no cover
+    tmp_dir = Path(tmp_dir)
+    test_fpath = Path(test_fpath)
     # First verify that filesystem layer can encode this filename
     # verify first that we could encode file name in this environment
     try:
         filesysencoding = sys.getfilesystemencoding()
-        test_fpath_encoded = test_fpath.encode(filesysencoding)
+        test_fpath_encoded = str(test_fpath.as_posix()).encode(filesysencoding)
     except UnicodeEncodeError:  # pragma: no cover
         raise SkipTest("Environment doesn't support unicode filenames")
-    if test_fpath_encoded.decode(filesysencoding) != test_fpath:  # pragma: no cover
+    if test_fpath_encoded.decode(filesysencoding) != test_fpath.as_posix():  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
-    test_fpath_full = str(os.path.join(tmp_dir, test_fpath))
-    test_fpath_dir = str(os.path.dirname(test_fpath_full))
+    test_fpath_full = tmp_dir / test_fpath
+    test_fpath_full.parent.mkdir(parents=True, exist_ok=True)
+    test_fpath_full.write_text(
+        f'some txt and a randint {random.randint(1, 10)}')
 
-    if not os.path.exists(test_fpath_dir):
-        os.makedirs(test_fpath_dir)
-
-    with open(test_fpath_full, 'w') as f:
-        test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
-        f.write(test_txt)
-
-    @serve_path_via_http(tmp_dir)
+    @serve_path_via_http(tmp_dir, use_ssl=use_ssl, auth=auth)
     def test_path_and_url(path, url):
+        def _urlopen(url, auth=None):
+            req = Request(url)
+            if auth:
+                req.add_header(
+                    "Authorization",
+                    b"Basic " + base64.standard_b64encode(
+                        '{0}:{1}'.format(*auth).encode('utf-8')))
+            return urlopen(req)
 
         # @serve_ should remove http_proxy from the os.environ if was present
-        assert_false('http_proxy' in os.environ)
-        url = url + os.path.dirname(test_fpath)
-        assert_true(urlopen(url))
-        u = urlopen(url)
+        if not on_windows:
+            assert_false('http_proxy' in os.environ)
+        # get the "dir-view"
+        dirurl = url + test_fpath.parent.as_posix()
+        u = _urlopen(dirurl, auth)
         assert_true(u.getcode() == 200)
         html = u.read()
+        # get the actual content
+        file_html = _urlopen(
+            url + url_quote(test_fpath.as_posix()), auth).read().decode()
+        # verify we got the right one
+        eq_(file_html, test_fpath_full.read_text())
+
+        if bs4 is None:
+            return
+
+        # MIH is not sure what this part below is supposed to do
+        # possibly some kind of internal consistency test
         soup = bs4.BeautifulSoup(html, "html.parser")
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
-
-        url = "{}/{}".format(url, href_links[0])
-        u = urlopen(url)
+        parsed_url = f"{dirurl}/{href_links[0]}"
+        u = _urlopen(parsed_url, auth)
         html = u.read().decode()
-        assert(test_txt == html)
+        eq_(html, file_html)
 
-    if bs4 is None:  # pragma: no cover
-        raise SkipTest("bs4 is absent")
     test_path_and_url()
 
 
-# just look at the path specs...
-@known_failure_windows
 def test_serve_path_via_http():
     for test_fpath in ['test1.txt',
-                       'test_dir/test2.txt',
-                       'test_dir/d2/d3/test3.txt',
+                       Path('test_dir', 'test2.txt'),
+                       Path('test_dir', 'd2', 'd3', 'test3.txt'),
                        'file with space test4',
                        u'Джэйсон',
                        get_most_obscure_supported_name(),
                       ]:
-
-        yield _test_serve_path_via_http, test_fpath
+        yield _test_serve_path_via_http, test_fpath, False, None
+        yield _test_serve_path_via_http, test_fpath, True, None
+        yield _test_serve_path_via_http, test_fpath, False, ('ernie', 'bert')
 
     # just with the last one check that we did remove proxy setting
     with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
-        yield _test_serve_path_via_http, test_fpath
+        yield _test_serve_path_via_http, test_fpath, False, None
 
 
 @known_failure_githubci_win

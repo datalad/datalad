@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Miscellaneous utilities to assist with testing"""
 
+import base64
 import glob
 import gzip
 import inspect
@@ -20,6 +21,7 @@ import re
 import tempfile
 import platform
 import multiprocessing
+import multiprocessing.queues
 import logging
 import random
 import socket
@@ -30,6 +32,7 @@ import time
 from difflib import unified_diff
 from contextlib import contextmanager
 from unittest.mock import patch
+import ssl
 
 from http.server import (
     HTTPServer,
@@ -578,9 +581,50 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format, *args)
 
 
-def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
+def _multiproc_serve_path_via_http(
+        hostname, path_to_serve_from, queue, use_ssl=False, auth=None): # pragma: no cover
+    handler = SilentHTTPHandler
+    if auth:
+        # to-be-expected key for basic auth
+        auth_test = (b'Basic ' + base64.b64encode(
+            bytes('%s:%s' % auth, 'utf-8'))).decode('utf-8')
+
+        # ad-hoc basic-auth handler
+        class BasicAuthHandler(SilentHTTPHandler):
+            def do_HEAD(self, authenticated):
+                if authenticated:
+                    self.send_response(200)
+                else:
+                    self.send_response(401)
+                    self.send_header(
+                        'WWW-Authenticate', 'Basic realm=\"Protected\"')
+                self.send_header('content-type', 'text/html')
+                self.end_headers()
+
+            def do_GET(self):
+                if self.headers.get('Authorization') == auth_test:
+                    super().do_GET()
+                else:
+                    self.do_HEAD(False)
+                    self.wfile.write(bytes('Auth failed', 'utf-8'))
+        handler = BasicAuthHandler
+
     chpwd(path_to_serve_from)
-    httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
+    httpd = HTTPServer((hostname, 0), handler)
+    if use_ssl:
+        ca_dir = Path(__file__).parent / 'ca'
+        ssl_key = ca_dir / 'certificate-key.pem'
+        ssl_cert = ca_dir / 'certificate-pub.pem'
+        if any(not p.exists for p in (ssl_key, ssl_cert)):
+            raise RuntimeError(
+                'SSL requested, but no key/cert file combination can be '
+                f'located under {ca_dir}')
+        # turn on SSL
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(str(ssl_cert), str(ssl_key))
+        httpd.socket = context.wrap_socket (
+            httpd.socket,
+            server_side=True)
     queue.put(httpd.server_port)
     httpd.serve_forever()
 
@@ -597,12 +641,17 @@ class HTTPPath(object):
     ----------
     path : str
         Directory with content to serve.
+    use_ssl : bool
+    auth : tuple
+        Username, password
     """
-    def __init__(self, path):
+    def __init__(self, path, use_ssl=False, auth=None):
         self.path = path
         self.url = None
         self._env_patch = None
         self._mproc = None
+        self.use_ssl = use_ssl
+        self.auth = auth
 
     def __enter__(self):
         self.start()
@@ -621,23 +670,71 @@ class HTTPPath(object):
         # http://jasonincode.com/customizing-hosts-file-in-docker/
         # so we just force to use 127.0.0.1 while on wheezy
         #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-        hostname = '127.0.0.1'
+        if self.use_ssl:
+            # we cannot use IPs with SSL certificates
+            hostname = 'localhost'
+        else:
+            hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
         self._mproc = multiprocessing.Process(
             target=_multiproc_serve_path_via_http,
-            args=(hostname, self.path, queue))
+            args=(hostname, self.path, queue),
+            kwargs=dict(use_ssl=self.use_ssl, auth=self.auth))
         self._mproc.start()
-        port = queue.get(timeout=300)
-        self.url = 'http://{}:{}/'.format(hostname, port)
+        try:
+            port = queue.get(timeout=300)
+        except multiprocessing.queues.Empty as e:
+            if self.use_ssl:
+                raise SkipTest('No working SSL support') from e
+            else:
+                raise
+        self.url = 'http{}://{}:{}/'.format(
+            's' if self.use_ssl else '',
+            hostname,
+            port)
         lgr.debug("HTTP: serving %s under %s", self.path, self.url)
 
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
-        env.pop('http_proxy', None)
+        if self.use_ssl:
+            env.pop('https_proxy', None)
+            env['REQUESTS_CA_BUNDLE'] = str(
+                Path(__file__).parent / 'ca' / 'ca_bundle.pem')
+        else:
+            env.pop('http_proxy', None)
         self._env_patch = patch.dict('os.environ', env, clear=True)
         self._env_patch.start()
+        if self.use_ssl:
+            # verify that the SSL/cert setup is functional, if not skip the
+            # test
+            # python-requests does its own thing re root CA trust
+            # if this fails, check datalad/tests/ca/prov.sh for ca_bundle
+            try:
+                import requests
+                requests.get(
+                    self.url,
+                    verify=True)
+            # be robust and skip if anything goes wrong, rather than just a
+            # particular SSL issue
+            #except requests.exceptions.SSLError as e:
+            except Exception as e:
+                self.stop()
+                raise SkipTest('No working HTTPS setup') from e
+            # now verify that the stdlib tooling also works
+            # if this fails, check datalad/tests/ca/prov.sh
+            # for info on deploying a datalad-root.crt
+            from urllib.request import urlopen
+            from urllib.error import URLError
+            try:
+                urlopen(self.url)
+            # be robust and skip if anything goes wrong, rather than just a
+            # particular SSL issue
+            #except URLError as e:
+            except Exception as e:
+                self.stop()
+                raise SkipTest('No working HTTPS setup') from e
 
     def stop(self):
         """Stop serving `path`.
@@ -648,10 +745,21 @@ class HTTPPath(object):
 
 
 @optional_args
-def serve_path_via_http(tfunc, *targs):
+def serve_path_via_http(tfunc, *targs, use_ssl=False, auth=None):
     """Decorator which serves content of a directory via http url
-    """
 
+    Parameters
+    ----------
+    path : str
+        Directory with content to serve.
+    use_ssl : bool
+        Flag whether to set up SSL encryption and return a HTTPS
+        URL. This require a valid certificate setup (which is tested
+        for proper function) or it will cause a SkipTest to be raised.
+    auth : tuple or None
+        If a (username, password) tuple is given, the server access will
+        be protected via HTTP basic auth.
+    """
     @wraps(tfunc)
     @attr('serve_path_via_http')
     def  _wrap_serve_path_via_http(*args, **kwargs):
@@ -666,7 +774,7 @@ def serve_path_via_http(tfunc, *targs):
         else:
             args, path = (), args[0]
 
-        with HTTPPath(path) as url:
+        with HTTPPath(path, use_ssl=use_ssl, auth=auth) as url:
             return tfunc(*(args + (path, url)), **kwargs)
     return  _wrap_serve_path_via_http
 
