@@ -416,8 +416,13 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             except Exception as exc:
                 ce = CapturedException(exc)
                 self.annex.debug(
-                    "Failed to fetch {akey} containing {key}: {ce}".format(
-                        **locals()))
+                    "Failed to fetch {akey} containing {key}: {msg}".format(
+                        akey=akey,
+                        key=key,
+                        # we need to get rid of any newlines, or we might
+                        # break the special remote protocol
+                        msg=str(ce).replace('\n', '|')
+                    ))
                 continue
 
         raise RemoteError(
@@ -449,10 +454,14 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             % (naturalsize(akey_size) if akey_size else "unknown")
         )
 
-        self.repo._call_annex(
-            ["get", "--json", "--json-progress", "--key", akey],
-            protocol=AnnexJsonProtocol,
-        )
+        try:
+            self.repo._call_annex(
+                ["get", "--json", "--json-progress", "--key", akey],
+                protocol=AnnexJsonProtocol,
+            )
+        except Exception:
+            self.annex.debug(f'Failed to fetch archive with key {akey}')
+            raise
 
 
 def main():
