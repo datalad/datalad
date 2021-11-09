@@ -14,16 +14,44 @@ __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
 from os import environ
+from pathlib import Path
 from os.path import join as opj, expanduser
-from datalad.support.constraints import EnsureBool
-from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureListOf
-from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureInt,
+    EnsureNone,
+    EnsureChoice,
+    EnsureListOf,
+    EnsureStr,
+)
+
 from datalad.utils import on_windows
 
-dirs = AppDirs("datalad", "datalad.org")
+if on_windows:
+    from datalad.support.knownpaths import (
+        get_path,
+        FOLDERID,
+    )
+
+    class AppDirsSurrogate(object):
+        # we are building a mock AppDirs class
+        user_data_dir = Path(get_path(
+            getattr(FOLDERID, 'LocalAppData'))) / 'datalad'
+        user_cache_dir = Path(get_path(
+            getattr(FOLDERID, 'LocalAppData'))) / 'datalad' / 'Cache'
+        user_config_dir = Path(get_path(
+            getattr(FOLDERID, 'LocalAppData'))) / 'datalad' / 'config'
+        user_state_dir = Path(get_path(
+            getattr(FOLDERID, 'LocalAppData'))) / 'datalad.org' / 'datalad'
+        user_log_dir = Path(get_path(
+            getattr(FOLDERID, 'LocalAppData'))) / 'datalad.org' / 'datalad' / 'Logs'
+        site_config_dir = Path(get_path(
+            getattr(FOLDERID, 'ProgramData'))) / 'datalad.org' / 'datalad'
+        site_data_dir = Path(get_path(
+            getattr(FOLDERID, 'ProgramData'))) / 'datalad.org' / 'datalad'
+    dirs = AppDirsSurrogate
+else:
+    dirs = AppDirs("datalad", "datalad.org")
 
 subst_rule_docs = """\
 A substitution specification is a string with a match and substitution

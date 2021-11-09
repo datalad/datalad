@@ -14,8 +14,10 @@ import shelve
 import appdirs
 import os.path
 
+from pathlib import Path
 from .network import get_tld
 from datalad.support.exceptions import CapturedException
+from datalad.utils import on_windows
 
 lgr = logging.getLogger('datalad.cookies')
 
@@ -46,8 +48,20 @@ class CookiesDB(object):
             filename = self._filename
             cookies_dir = os.path.dirname(filename)
         else:
-            cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
-            filename = os.path.join(cookies_dir, 'cookies')
+            if on_windows:
+                # imports are platform specific and have to happen only once we
+                # are sure we're on Windows
+                from datalad.support.knownpaths import (
+                    get_path,
+                    FOLDERID
+                )
+                # we determine the path to LocalAppData (which varies
+                # depending on Windows OS) with KNOWNPATHS.
+                cookies_dir = get_path(getattr(FOLDERID, "LocalAppData"))
+                cookies_dir = Path(cookies_dir) / 'datalad'
+            else:
+                cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
+            filename = Path(cookies_dir) / 'cookies'
 
         # TODO: guarantee restricted permissions
 
