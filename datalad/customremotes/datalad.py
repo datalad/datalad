@@ -28,9 +28,7 @@ lgr = logging.getLogger('datalad.customremotes.datalad')
 
 
 class DataladAnnexCustomRemote(SpecialRemote):
-    """Special custom remote allowing to obtain files from archives
-
-     Archives should also be under annex control.
+    """git-annex special-remote frontend for DataLad's downloader facility
     """
 
     SUPPORTED_SCHEMES = ('http', 'https', 's3', 'shub')
@@ -63,8 +61,9 @@ class DataladAnnexCustomRemote(SpecialRemote):
                 # for URLs for other schemes if this scheme is good enough
                 self._scheme_hits[scheme] += 1
                 for url in scheme_urls:
+                    nurls += 1
                     yield url
-        self.annex.debug("Got %d URL(s) for key %s", nurls, key)
+        self.annex.debug("Processed %d URL(s) for key %s", nurls, key)
 
     # Protocol implementation
     def initremote(self):
@@ -74,10 +73,7 @@ class DataladAnnexCustomRemote(SpecialRemote):
         pass
 
     def transfer_retrieve(self, key, file):
-        lgr.debug("RETRIEVE key %s into/from %s", key, file)  # was INFO level
-
         urls = []
-
         # TODO: priorities etc depending on previous experience or settings
         for url in self.gen_URLS(key):
             urls.append(url)
@@ -85,7 +81,7 @@ class DataladAnnexCustomRemote(SpecialRemote):
                 downloaded_path = self._providers.download(
                     url, path=file, overwrite=True
                 )
-                lgr.info("Successfully downloaded %s into %s", url, downloaded_path)
+                assert(downloaded_path == file)
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
@@ -110,7 +106,6 @@ class DataladAnnexCustomRemote(SpecialRemote):
             return False
 
     def checkpresent(self, key):
-        lgr.debug("VERIFYING key %s", key)
         resp = None
         for url in self.gen_URLS(key):
             # somewhat duplicate of CHECKURL
