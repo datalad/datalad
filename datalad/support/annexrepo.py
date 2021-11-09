@@ -18,8 +18,8 @@ import logging
 import os
 import re
 import warnings
-
 from itertools import chain
+from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
@@ -27,19 +27,18 @@ from os.path import (
     exists,
     lexists,
     isdir,
-    normpath
+    normpath,
 )
-from multiprocessing import cpu_count
 from weakref import (
     finalize,
-    WeakValueDictionary
+    WeakValueDictionary,
 )
 
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
     exc_str,
     borrowdoc,
-    borrowkwargs
+    borrowkwargs,
 )
 from datalad.ui import ui
 import datalad.utils as ut
@@ -915,12 +914,20 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         try:
             if files:
-                return runner.run_on_filelist_chunks(
-                    cmd,
-                    files,
-                    protocol=protocol,
-                    env=env,
-                    **kwargs)
+                if issubclass(protocol, GeneratorMixIn):
+                    return runner.run_on_filelist_chunks_items_(
+                        cmd,
+                        files,
+                        protocol=protocol,
+                        env=env,
+                        **kwargs)
+                else:
+                    return runner.run_on_filelist_chunks(
+                        cmd,
+                        files,
+                        protocol=protocol,
+                        env=env,
+                        **kwargs)
             else:
                 return runner.run(
                     cmd,
@@ -1195,11 +1202,37 @@ class AnnexRepo(GitRepo, RepoInterface):
         ------
         See `_call_annex()` for information on Exceptions.
         """
-        out = self._call_annex(
-            args,
-            files=files,
-            protocol=StdOutErrCapture)['stdout']
-        yield from (out.split(sep) if sep else out.splitlines())
+        class GeneratorStdOutErrCapture(GeneratorMixIn, StdOutErrCapture):
+            def __init__(self):
+                GeneratorMixIn.__init__(self)
+                StdOutErrCapture.__init__(self)
+
+            def pipe_data_received(self, fd, data):
+                if fd == 1:
+                    self.send_result(("stdout", data.decode(self.encoding)))
+                    return
+                super().pipe_data_received(fd, data)
+
+        current_content = ""
+        for source, content in self._call_annex(
+                                args,
+                                files=files,
+                                protocol=GeneratorStdOutErrCapture):
+
+            if source == "stdout":
+                current_content += content
+                if sep is not None:
+                    lines = current_content.split(sep)
+                    current_content = lines[-1]
+                    del lines[-1]
+                else:
+                    lines = current_content.splitlines()
+                    if current_content.endswith(os.linesep):
+                        current_content = ""
+                    else:
+                        current_content = lines[-1]
+                        del lines[-1]
+                yield from lines
 
     def call_annex_oneline(self, args, files=None):
         """Call annex for a single line of output.

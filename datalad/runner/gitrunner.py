@@ -13,7 +13,10 @@ import logging
 import os
 import os.path as op
 
-from .runner import WitlessRunner
+from .runner import (
+    GeneratorMixIn,
+    WitlessRunner,
+)
 from .utils import (
     borrowdoc,
     generate_file_chunks,
@@ -198,3 +201,30 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
                 for k, v in res.items():
                     results[k] += v
         return results
+
+    def run_on_filelist_chunks_items_(self,
+                                      cmd,
+                                      files,
+                                      protocol=None,
+                                      cwd=None,
+                                      env=None,
+                                      **kwargs):
+        """
+        see run_on_filelist_chunks
+        """
+
+        assert isinstance(cmd, list)
+        assert issubclass(protocol, GeneratorMixIn)
+
+        file_chunks = generate_file_chunks(files, cmd)
+
+        for i, file_chunk in enumerate(file_chunks):
+            # do not pollute with message when there only ever is a single chunk
+            if len(file_chunk) < len(files):
+                lgr.debug('Process file list chunk %i (length %i)',
+                          i, len(file_chunk))
+            return self.run(cmd + ['--'] + file_chunk,
+                            protocol=protocol,
+                            cwd=cwd,
+                            env=env,
+                            **kwargs)

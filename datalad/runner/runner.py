@@ -59,7 +59,14 @@ class WitlessRunner(object):
             env['PWD'] = cwd
         return env
 
-    def run(self, cmd, protocol=None, stdin=None, cwd=None, env=None, timeout=None, **kwargs):
+    def run(self,
+            cmd,
+            protocol=None,
+            stdin=None,
+            cwd=None,
+            env=None,
+            timeout=None,
+            **kwargs):
         """Execute a command and communicate with it.
 
         Parameters
