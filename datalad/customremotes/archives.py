@@ -10,9 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections import Counter
 import os
-from os.path import join as opj
 import os.path as op
 from collections import OrderedDict
 from operator import itemgetter
@@ -23,21 +21,22 @@ import logging
 
 from annexremote import (
     RemoteError,
-    SpecialRemote,
     UnsupportedRequest,
 )
-from ..support.archives import ArchivesCache
-from datalad.support.exceptions import CapturedException
-from ..support.network import URL
-from ..support.locking import lock_if_check_fails
-from ..support.path import exists
-from ..utils import getpwd
-from ..utils import unique
-from ..utils import ensure_bytes
-from ..utils import unlink
-from .base import AnnexCustomRemote
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
-from ..support.cache import DictCache
+from datalad.support.archives import ArchivesCache
+from datalad.support.exceptions import CapturedException
+from datalad.support.network import URL
+from datalad.support.locking import lock_if_check_fails
+from datalad.utils import (
+    getpwd,
+    unique,
+    ensure_bytes,
+    unlink,
+)
+
+from .base import AnnexCustomRemote
+from datalad.support.cache import DictCache
 
 lgr = logging.getLogger('datalad.customremotes.archive')
 
@@ -71,12 +70,11 @@ def link_file_load(src, dst, dry_run=False):
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
 #       into a separate class
-class ArchiveAnnexCustomRemote(SpecialRemote):
+class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     """Special custom remote allowing to obtain files from archives
 
      Archives must be under annex'ed themselves.
     """
-
     CUSTOM_REMOTE_NAME = "archive"
     SUPPORTED_SCHEMES = (AnnexCustomRemote._get_custom_scheme(CUSTOM_REMOTE_NAME),)
     # Since we support only 1 scheme here
@@ -105,12 +103,6 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
         self._last_url = None  # for heuristic to choose among multiple URLs
         self._cache = ArchivesCache(self.path, persistent=persistent_cache)
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
-
-        # OPT: a counter to increment upon successful encounter of the scheme
-        # (ATM only in gen_URLS but later could also be used in other requests).
-        # This would allow to consider schemes in order of decreasing success instead
-        # of arbitrary hardcoded order
-        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     def stop(self, *args):
         """Stop communication with annex"""
@@ -229,7 +221,7 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
         # if not present in the cache -- check which are present
         # locally and choose that one to use, so it would get extracted
         for akey_afile, akey_path in akey_afile_paths:
-            if akey_path and exists(akey_path):
+            if akey_path and op.exists(akey_path):
                 yielded.add(akey_afile)
                 yield akey_afile
 
@@ -257,38 +249,17 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
         else:
             fpath = self._contentlocations[key]
             # but verify that it exists
-            if verify_exists and not op.lexists(opj(self.path, fpath)):
+            if verify_exists and not op.lexists(op.join(self.path, fpath)):
                 # prune from cache
                 del self._contentlocations[key]
                 fpath = ''
 
         if absolute and fpath:
-            return opj(self.path, fpath)
+            return op.join(self.path, fpath)
         else:
             return fpath
 
-    def gen_URLS(self, key):
-        """Yield URL(s) associated with a key, and keep stats on protocols."""
-        nurls = 0
-        for scheme, _ in self._scheme_hits.most_common():
-            scheme_ = scheme + ":"
-            scheme_urls = self.annex.geturls(key, scheme_)
-            if scheme_urls:
-                # note: generator would cease to exist thus not asking
-                # for URLs for other schemes if this scheme is good enough
-                self._scheme_hits[scheme] += 1
-                for url in scheme_urls:
-                    nurls += 1
-                    yield url
-        self.annex.debug("Processed %d URL(s) for key %s", nurls, key)
-
     # Protocol implementation
-    def initremote(self):
-        pass
-
-    def prepare(self):
-        pass
-
     def checkurl(self, url):
         # TODO:  what about those MULTI and list to be returned?
         #  should we return all filenames or keys within archive?
@@ -309,7 +280,7 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
                 efile = self.cache[akey_path].get_extracted_filename(afile)
                 efile = ensure_bytes(efile)
 
-                if exists(efile):
+                if op.exists(efile):
                     size = os.stat(efile).st_size
 
             # so it was a good successful one -- record
@@ -383,7 +354,7 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
             try:
                 with lock_if_check_fails(
                     check=(self.get_contentlocation, (akey,)),
-                    lock_path=(lambda k: opj(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
+                    lock_path=(lambda k: op.join(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
                     operation="annex-get"
                 ) as (akey_fpath, lock):
                     if lock:
@@ -397,8 +368,8 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
                         "get its location.  Check logic"
                 )
 
-                akey_path = opj(self.repo.path, akey_fpath)
-                assert exists(akey_path), "Key file %s is not present" % akey_path
+                akey_path = op.join(self.repo.path, akey_fpath)
+                assert op.exists(akey_path), "Key file %s is not present" % akey_path
 
                 # Extract that bloody file from the bloody archive
                 # TODO: implement/use caching, for now a simple one
@@ -427,9 +398,6 @@ class ArchiveAnnexCustomRemote(SpecialRemote):
             "Failed to fetch any archive containing {key}. "
             "Tried: {akeys_tried}".format(**locals())
         )
-
-    def transfer_store(self, key, local_file):
-        raise UnsupportedRequest('This special remote cannot store content')
 
     def claimurl(self, url):
         scheme = urlparse(url).scheme

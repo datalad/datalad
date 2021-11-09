@@ -10,67 +10,31 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections import Counter
 import logging
 from urllib.parse import urlparse
 
-from annexremote import (
-    RemoteError,
-    SpecialRemote,
-    UnsupportedRequest,
-)
+from annexremote import RemoteError
+
 from datalad.downloaders.providers import Providers
 from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
+from .base import AnnexCustomRemote
+
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
 
-class DataladAnnexCustomRemote(SpecialRemote):
+class DataladAnnexCustomRemote(AnnexCustomRemote):
     """git-annex special-remote frontend for DataLad's downloader facility
     """
 
     SUPPORTED_SCHEMES = ('http', 'https', 's3', 'shub')
 
     def __init__(self, annex, **kwargs):
-        # OPT: a counter to increment upon successful encounter of the scheme
-        # (ATM only in gen_URLS but later could also be used in other requests).
-        # This would allow to consider schemes in order of decreasing success instead
-        # of arbitrary hardcoded order
-        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
-
         super().__init__(annex)
-        # annex requests load by KEY not but URL which it originally asked
-        # about.  So for a key we might get back multiple URLs and as a
-        # heuristic let's use the most recently asked one
 
         self._providers = Providers.from_config_files()
-
-        # TODO self.info = {}, self.configs = {}
-
-    # Helper methods
-    def gen_URLS(self, key):
-        """Yield URL(s) associated with a key, and keep stats on protocols."""
-        nurls = 0
-        for scheme, _ in self._scheme_hits.most_common():
-            scheme_ = scheme + ":"
-            scheme_urls = self.annex.geturls(key, scheme_)
-            if scheme_urls:
-                # note: generator would cease to exist thus not asking
-                # for URLs for other schemes if this scheme is good enough
-                self._scheme_hits[scheme] += 1
-                for url in scheme_urls:
-                    nurls += 1
-                    yield url
-        self.annex.debug("Processed %d URL(s) for key %s", nurls, key)
-
-    # Protocol implementation
-    def initremote(self):
-        pass
-
-    def prepare(self):
-        pass
 
     def transfer_retrieve(self, key, file):
         urls = []
@@ -89,9 +53,6 @@ class DataladAnnexCustomRemote(SpecialRemote):
                                  % (url, key, ce))
         raise RemoteError(
             f"Failed to download from any of {len(urls)} locations")
-
-    def transfer_store(self, key, local_file):
-        raise UnsupportedRequest('This special remote cannot store content')
 
     def checkurl(self, url):
         try:
@@ -137,14 +98,6 @@ class DataladAnnexCustomRemote(SpecialRemote):
             return True
         else:
             return False
-
-    def remove(self, key):
-        raise RemoteError("Removal of content from urls is not possible")
-
-    def whereis(self, key):
-        # All that information is stored in annex itself,
-        # we can't complement anything
-        raise RemoteError()
 
 
 def main():

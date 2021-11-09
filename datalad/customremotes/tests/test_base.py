@@ -29,10 +29,10 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import Path
 
 from ..base import (
-    AnnexCustomRemote,
     ensure_datalad_remote,
     init_datalad_remote,
 )
+from ..archives import ArchiveAnnexCustomRemote
 
 
 # PermissionError: [WinError 32] The process cannot access the file because it is being used by another process:
@@ -45,7 +45,7 @@ def test_get_contentlocation(tdir):
 
     # TODO contentlocation would come with eval_availability=True
     key = repo.get_file_annexinfo('file.dat')['key']
-    cr = AnnexCustomRemote(tdir)
+    cr = ArchiveAnnexCustomRemote(None, path=tdir)
     key_path = cr.get_contentlocation(key, absolute=False)
     assert not isabs(key_path)
     key_path_abs = cr.get_contentlocation(key, absolute=True)

@@ -12,51 +12,41 @@ from __future__ import absolute_import
 
 __docformat__ = 'restructuredtext'
 
-import errno
-import os
-import sys
 
 from collections import Counter
-
-from ..support.path import (
-    join as opj,
-    lexists,
-)
-
-from urllib.parse import urlparse
 
 import logging
 lgr = logging.getLogger('datalad.customremotes')
 
-from ..ui import ui
-from ..support.cache import DictCache
-from datalad.support.exceptions import CapturedException
-from ..cmdline.helpers import get_repo_instance
-from datalad.utils import (
-    getargspec,
+from annexremote import (
+    RemoteError,
+    SpecialRemote,
+    UnsupportedRequest,
 )
 
+from datalad.ui import ui
+
 URI_PREFIX = "dl"
-SUPPORTED_PROTOCOL = 1
-
-DEFAULT_COST = 100
-DEFAULT_AVAILABILITY = "LOCAL"
 
 
-class AnnexCustomRemote(object):
-    def __init__(self, path=None, cost=None, fin=None, fout=None):  # , availability=DEFAULT_AVAILABILITY):
-        """
-        Parameters
-        ----------
-        path : string, optional
-            Path to the repository for which this custom remote is serving.
-            Usually this class is instantiated by a script which runs already
-            within that directory, so the default is to point to current
-            directory, i.e. '.'
-        """
+class AnnexCustomRemote(SpecialRemote):
+    # default properties
+    COST = 100
+    AVAILABILITY = "LOCAL"
+
+    def __init__(self, annex):  # , availability=DEFAULT_AVAILABILITY):
+        super().__init__(annex)
+        # TODO self.info = {}, self.configs = {}
+
         # instruct annex backend UI to use this remote
         if ui.backend == 'annex':
             ui.set_specialremote(self)
+
+        # OPT: a counter to increment upon successful encounter of the scheme
+        # (ATM only in gen_URLS but later could also be used in other requests).
+        # This would allow to consider schemes in order of decreasing success instead
+        # of arbitrary hardcoded order
+        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     @classmethod
     def _get_custom_scheme(cls, prefix):
@@ -70,11 +60,45 @@ class AnnexCustomRemote(object):
         #         strictly conforming it. Thus we will not use //
         return "%s+%s" % (URI_PREFIX, prefix)  # if .PREFIX else '')
 
-    def req_GETCOST(self):
-        self.send("COST", self.cost)
+    # Helper methods
+    def gen_URLS(self, key):
+        """Yield URL(s) associated with a key, and keep stats on protocols."""
+        nurls = 0
+        for scheme, _ in self._scheme_hits.most_common():
+            scheme_ = scheme + ":"
+            scheme_urls = self.annex.geturls(key, scheme_)
+            if scheme_urls:
+                # note: generator would cease to exist thus not asking
+                # for URLs for other schemes if this scheme is good enough
+                self._scheme_hits[scheme] += 1
+                for url in scheme_urls:
+                    nurls += 1
+                    yield url
+        self.annex.debug("Processed %d URL(s) for key %s", nurls, key)
 
-    def req_GETAVAILABILITY(self):
-        self.send("AVAILABILITY", self.AVAILABILITY.upper())
+    # Protocol implementation
+    def initremote(self):
+        pass
+
+    def prepare(self):
+        pass
+
+    def transfer_store(self, key, local_file):
+        raise UnsupportedRequest('This special remote cannot store content')
+
+    def remove(self, key):
+        raise RemoteError("Removal of content from urls is not possible")
+
+    def whereis(self, key):
+        # All that information is stored in annex itself,
+        # we can't complement anything
+        raise RemoteError()
+
+    def getcost(self):
+        return self.COST
+
+    def getavailability(self):
+        return self.AVAILABILITY.lower()
 
 
 # this function only has anecdotal value and is not used anywhere
