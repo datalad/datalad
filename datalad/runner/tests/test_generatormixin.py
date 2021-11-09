@@ -104,7 +104,7 @@ def test_file_number_activity_detection():
 
 def test_exiting_process():
 
-    result = run_command(py2cmd("import time\ntime.sleep(3)\nprint('exit')"),
+    result = run_command(py2cmd("import time\ntime.sleep(.1)\nprint('exit')"),
                          protocol=NoCapture,
                          stdin=None)
     assert_equal(result["code"], 0)

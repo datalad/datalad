@@ -167,9 +167,11 @@ class ThreadedRunner:
             If stdin is a Queue, all elements (bytes) put into the Queue will
             be passed to stdin until None is read from the queue. If None is
             read, stdin of the subprocess is closed.
+            If stdin is None, nothing will be sent to stdin of the subprocess.
+            More precisely, `subprocess.Popen` will be called with `stdin=None`.
 
         protocol_kwargs : dict, optional
-            Passed to the Protocol class constructor.
+            Passed to the protocol class constructor.
 
         timeout : float, optional
             If a non-`None` timeout is specified, the `timeout`-method of

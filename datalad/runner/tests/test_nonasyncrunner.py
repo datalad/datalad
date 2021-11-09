@@ -378,10 +378,10 @@ def test_timeout_nothing():
 
     timeout_queue = []
     run_command(
-        py2cmd("import time; time.sleep(5)\n"),
+        py2cmd("import time; time.sleep(.6)\n"),
         stdin=stdin_queue,
         protocol=TestProtocol,
-        timeout=1,
+        timeout=.1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
     eq_(len(timeout_queue), 1)
@@ -407,10 +407,10 @@ def test_timeout_all():
 
     timeout_queue = []
     run_command(
-        py2cmd("import time; time.sleep(5)\n"),
+        py2cmd("import time; time.sleep(.5)\n"),
         stdin=stdin_queue,
         protocol=TestProtocol,
-        timeout=1,
+        timeout=.1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
     print(timeout_queue)

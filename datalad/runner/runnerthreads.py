@@ -46,14 +46,19 @@ class ExitingThread(threading.Thread):
 
 class BlockingOSReaderThread(ExitingThread):
     """
-    A blocking OS file reader. If it reads
-    anything, it stores its data in a queue.
-    That allows a consumer to block
-    on OS-reads with timeout, independent from
-    the OS read capabilities.
-    It enqueues bytes if something is read. If
-    the file is close, it will enqueue None and
-    exit.
+    A blocking OS file reader. If it reads data, it puts the data into a queue
+    of length one. That allows a consumer to block on OS-reads with timeouts,
+    independent of the read capabilities of the OS.
+
+    It enqueues bytes if something is read. If the file is closed, it will
+    enqueue None and exit.
+
+    "
+        It enqueues bytes if something's read.
+        If source is closed, it ends the thread,
+        not without enqueuing None,
+        so you might see that it is done.
+    "
     """
     def __init__(self,
                  source: IO,
