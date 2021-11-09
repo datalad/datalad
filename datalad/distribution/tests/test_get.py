@@ -244,8 +244,10 @@ def test_get_single_file(path):
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
-    eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    annexprops = ds.repo.get_file_annexinfo('test-annex.dat',
+                                            eval_availability=True)
+    eq_(result[0]['annexkey'], annexprops['key'])
+    ok_(annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)
@@ -365,8 +367,6 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
-@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
@@ -707,3 +707,43 @@ def test_get_relays_command_errors(path):
     assert_result_count(
         ds.get("foo", on_failure="ignore", result_renderer=None),
         1, action="get", type="file", status="error")
+
+
+@with_tempfile()
+def test_missing_path_handling(path):
+    ds = Dataset(path).create()
+    ds.save()
+
+    class Struct:
+        pass
+
+    refds = Struct()
+    refds.pathobj = Path("foo")
+    refds.subdatasets = []
+    refds.path = "foo"
+
+    with \
+            patch("datalad.distribution.get._get_targetpaths") as get_target_path, \
+            patch("datalad.distribution.get.Interface.get_refds_path") as get_refds_path, \
+            patch("datalad.distribution.get.require_dataset") as require_dataset, \
+            patch("datalad.distribution.get._install_targetpath") as _install_targetpath, \
+            patch("datalad.distribution.get.Subdatasets") as subdatasets:
+
+        get_target_path.return_value = [{
+            "status": "error"
+        }]
+        get_refds_path.return_value = None
+        require_dataset.return_value = refds
+        _install_targetpath.return_value = [{
+            "status": "notneeded",
+            "path": "foo",
+            "contains": "xxx"
+        }]
+        subdatasets.return_value = [{
+            "type": "file",
+            "status": "impossible",
+            "path": "foo",
+            "message": "path not contained in any matching subdataset"}]
+
+        # Check for guarded access in error results
+        ds.get("foo")

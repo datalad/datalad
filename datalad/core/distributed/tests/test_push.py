@@ -78,7 +78,7 @@ def test_invalid_call(origin, tdir):
 
     # unavailable subdataset
     dummy_sub = ds.create('sub')
-    dummy_sub.uninstall()
+    dummy_sub.drop(what='all', reckless='kill', recursive=True)
     assert_in('sub', ds.subdatasets(state='absent', result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
     assert_raises(ValueError, ds.push, 'sub')
@@ -525,7 +525,7 @@ def test_ria_push(srcpath, dstpath):
         'ok',
         src.create_sibling_ria(
             "ria+{}".format(get_local_file_url(dstpath, compatibility='git')),
-            "datastore"))
+            "datastore", new_store_ok=True))
     res = src.push(to='datastore')
     assert_in_results(
         res, action='publish', target='datastore', status='ok',
@@ -929,7 +929,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     store_url = 'ria+' + get_local_file_url(storepath)
     with chpwd(orig_super.path):
         run(['datalad', 'create-sibling-ria', '--recursive',
-             '-s', 'store', store_url])
+             '-s', 'store', store_url, '--new-store-ok'])
         run(['datalad', 'push', '--recursive', '--to', 'store'])
 
     # we are using the 'store' sibling's URL, which should be a plain path

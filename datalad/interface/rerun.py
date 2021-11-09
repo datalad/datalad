@@ -20,7 +20,6 @@ import os.path as op
 import re
 import sys
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -289,7 +288,7 @@ def _revrange_as_results(dset, revrange):
         except ValueError as exc:
             # Recast the error so the message includes the revision.
             raise ValueError(
-                "Error on {}'s message: {}".format(rev, exc_str(exc)))
+                "Error on {}'s message".format(rev)) from exc
 
         if info is not None:
             if len(parents) != 1:
@@ -653,9 +652,8 @@ def get_run_info(dset, message):
         runinfo = json.loads(runinfo)
     except Exception as e:
         raise ValueError(
-            'cannot rerun command, command specification is not valid JSON: '
-            '%s' % exc_str(e)
-        )
+            'cannot rerun command, command specification is not valid JSON'
+        ) from e
     if not isinstance(runinfo, (list, dict)):
         # this is a run record ID -> load the beast
         record_dir = dset.config.get(
@@ -708,6 +706,7 @@ def new_or_modified(diff_results):
     """Filter diff result records to those for new or modified files.
     """
     for r in diff_results:
-        if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
+        if r.get('type') in ('file', 'symlink') \
+                and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r

@@ -285,6 +285,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # take out any duplicate source candidates
     # unique() takes out the duplicated at the tail end
     clone_urls = unique(clone_urls, lambda x: x['url'])
+    lgr.debug('Assembled %i clone candidates for %s: %s',
+              len(clone_urls), sm_path, [cand['url'] for cand in clone_urls])
 
     return clone_urls
 
@@ -403,7 +405,8 @@ def _install_necessary_subdatasets(
     # to visit only subdataset on the trajectory to the target path
     subds_trail = ds.subdatasets(contains=path, recursive=True,
                                  on_failure="ignore",
-                                 result_filter=is_ok_dataset)
+                                 result_filter=is_ok_dataset,
+                                 result_renderer='disabled')
     if not subds_trail:
         # there is not a single known subdataset (installed or not)
         # for this path -- job done
@@ -435,12 +438,15 @@ def _install_necessary_subdatasets(
                 else:
                     # report unconditionally to caller
                     yield res
-
+        if sd.pathobj == path:
+            # we've just got the target subdataset, we're done
+            return
         # now check whether the just installed subds brought us any closer to
         # the target path
         subds_trail = sd.subdatasets(contains=path, recursive=False,
                                      on_failure='ignore',
-                                     result_filter=is_ok_dataset)
+                                     result_filter=is_ok_dataset,
+                                     result_renderer='disabled')
         if not subds_trail:
             # no (newly available) subdataset gets us any closer
             return
@@ -953,7 +959,7 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
-                if res['path'] not in content_by_ds:
+                if 'path' not in res or res['path'] not in content_by_ds:
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res

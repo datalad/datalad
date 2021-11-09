@@ -94,7 +94,7 @@ def test_dryrun(path):
     eq_(res[-1]['request_data']['name'], 'bogus-subds')
 
     # ignore unavailable datasets
-    ds.uninstall('subds')
+    ds.drop('subds', what='all', reckless='kill', recursive=True)
     res = ds.create_sibling_gin(
         'bogus', recursive=True, credential='some', dry_run=True)
     eq_(len(res), 1)

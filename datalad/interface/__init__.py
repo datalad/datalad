@@ -26,9 +26,10 @@ _group_dataset = (
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
         ('datalad.core.distributed.push', 'Push', 'push'),
+        # deprecated
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
-        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
-        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
+        ('datalad.distributed.drop', 'Drop'),
+        ('datalad.local.remove', 'Remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
@@ -94,7 +95,6 @@ _group_misc = (
 _group_plumbing = (
     'Plumbing commands',
     [
-        ('datalad.interface.annotate_paths', 'AnnotatePaths', 'annotate-paths'),
         ('datalad.core.distributed.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),

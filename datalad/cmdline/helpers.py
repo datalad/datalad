@@ -22,6 +22,7 @@ import warnings
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
+from datalad import __version__
 from ..cmd import WitlessRunner as Runner
 from ..interface.common_opts import eval_defaults
 from ..log import is_interactive
@@ -33,7 +34,6 @@ from ..utils import (
     unlink,
     get_suggestions_msg,
 )
-from ..version import __version__, __full_version__
 
 from appdirs import AppDirs
 from os.path import join as opj
@@ -409,7 +409,7 @@ def _maybe_get_single_subparser(cmdlineargs, parser, interface_groups,
                 msg="too few arguments, run with --help or visit https://handbook.datalad.org",
                 exit_code=2)
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
-                  __full_version__, parsed_args, unparsed_args)
+                  __version__, parsed_args, unparsed_args)
     except Exception as exc:
         ce = CapturedException(exc)
         lgr.debug("Early parsing failed with %s", ce)

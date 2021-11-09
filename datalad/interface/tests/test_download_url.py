@@ -15,17 +15,17 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
-from ...api import (
+from datalad.api import (
     clone,
     download_url,
     Dataset,
 )
-from ...utils import (
+from datalad.utils import (
     chpwd,
     Path,
 )
-from ...downloaders.tests.utils import get_test_providers
-from ...tests.utils import (
+
+from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_false,
     assert_in,
@@ -36,11 +36,10 @@ from ...tests.utils import (
     ok_exists,
     with_tempfile,
 )
-from ...tests.utils import (
+from datalad.tests.utils import (
     DEFAULT_REMOTE,
     assert_in_results,
     assert_not_in,
-    known_failure_windows,
     serve_path_via_http,
     skip_if_no_network,
     slow,
@@ -83,7 +82,6 @@ def test_download_url_existing_dir_no_slash_exception(path):
                        res)
 
 
-@known_failure_windows
 @assert_cwd_unchanged
 @with_tree(tree=[
     ('file1.txt', 'abc'),

@@ -168,8 +168,10 @@ def cached_dataset(f, url=None, version=None, paths=None):
             clone_ds = Clone()(ds.pathobj, arg[-1])
         else:
             clone_ds = Clone()(url, arg[-1])
+        #save some cycles
+        clone_repo = clone_ds.repo
         if version:
-            clone_ds.repo.checkout(version)
+            clone_repo.checkout(version)
         if paths and AnnexRepo.is_valid_repo(clone_ds.path):
             # just assume ds is annex as well. Otherwise `Clone` wouldn't
             # work correctly - we don't need to test its implementation here
@@ -179,9 +181,22 @@ def cached_dataset(f, url=None, version=None, paths=None):
                 # `paths` and potentially a `version` they refer to. We can't
                 # assume the same (or any) worktree in cache. Hence we need to
                 # translate to keys.
-                keys = clone_ds.repo.get_file_key(paths)
-                ds.repo.get(keys, key=True)
-                clone_ds.repo.fsck(remote=DEFAULT_REMOTE, fast=True)
+                # MIH Despite the variable names used in this function
+                # (pathS, keyS) they ultimately are passed to get(..., key=True)
+                # which means that it can ever only be a single path and a
+                # single key -- this is very confusing.
+                # the key determination could hence be done with
+                # get_file_annexinfo() in a much simpler way, but it seems this
+                # function wants to be ready for more, sigh
+                keys = [
+                    p['key']
+                    for p in clone_repo.get_content_annexinfo(
+                        ensure_list(paths), init=None).values()
+                    if 'key' in p
+                ]
+                if keys:
+                    ds.repo.get(keys, key=True)
+                clone_repo.fsck(remote=DEFAULT_REMOTE, fast=True)
 
             clone_ds.get(paths)
         return f(*(arg[:-1] + (clone_ds,)), **kw)

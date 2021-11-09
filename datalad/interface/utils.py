@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import inspect
 import logging
+import os
 import wrapt
 import sys
 import re
@@ -41,12 +42,12 @@ from datalad.utils import (
     get_wrapped_class,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import IncompleteResultsError
-from datalad import cfg as dlcfg
-from datalad.dochelpers import (
-    exc_str,
-    single_or_plural,
+from datalad.support.exceptions import (
+    CapturedException,
+    IncompleteResultsError,
 )
+from datalad import cfg as dlcfg
+from datalad.dochelpers import single_or_plural
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -61,7 +62,6 @@ from datalad.core.local.resulthooks import (
     match_jsonhook2result,
     run_jsonhook,
 )
-
 
 lgr = logging.getLogger('datalad.interface.utils')
 
@@ -171,7 +171,7 @@ def path_is_under(values, path=None):
         # need to protect against unsupported use of relpath() with
         # abspaths on windows from different drives (gh-3724)
         if path_drive != p_drive:
-        # different drives, enough evidence for "not under"
+            # different drives, enough evidence for "not under"
             continue
         rpath = relpath(p, start=path)
         if rpath == curdir \
@@ -230,7 +230,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
         current_trace = current_trace + [basepath]
     # this edge is not done, we need to try to reach any downstream
     # dataset
-    undiscovered_ds = set(t for t in targetpaths) # if t != basepath)
+    undiscovered_ds = set(t for t in targetpaths)  # if t != basepath)
     # whether anything in this directory matched a targetpath
     filematch = False
     if isdir(basepath):
@@ -258,8 +258,8 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                     downward_targets))
     undiscovered_ds = [t for t in undiscovered_ds
                        if includeds and
-                          path_is_subpath(t, current_trace[-1]) and
-                          t in includeds]
+                       path_is_subpath(t, current_trace[-1]) and
+                       t in includeds]
     if filematch or basepath in targetpaths or undiscovered_ds:
         for i, p in enumerate(current_trace[:-1]):
             # TODO RF prepare proper annotated path dicts
@@ -387,10 +387,10 @@ def eval_results(func):
             # of the command execution
             results = []
             do_custom_result_summary = result_renderer in ('tailored', 'default') \
-                and hasattr(wrapped_class, 'custom_result_summary_renderer')
+                                       and hasattr(wrapped_class, 'custom_result_summary_renderer')
             pass_summary = do_custom_result_summary and \
-                getattr(wrapped_class,
-                        'custom_result_summary_renderer_pass_summary', None)
+                           getattr(wrapped_class,
+                                   'custom_result_summary_renderer_pass_summary', None)
 
             # process main results
             for r in _process_results(
@@ -479,6 +479,7 @@ def eval_results(func):
                     return results[0] if results else None
                 else:
                     return results
+
             lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
             return return_func(generator_func)(*args, **kwargs)
 
@@ -497,7 +498,7 @@ def default_result_renderer(res):
                 # can happen, e.g., on windows with paths from different
                 # drives. just go with the original path in this case
                 pass
-        ui.message('{action}({status}):{path}{type}{msg}'.format(
+        ui.message('{action}({status}):{path}{type}{msg}{err}'.format(
             action=ac.color_word(
                 res.get('action', '<action-unspecified>'),
                 ac.BOLD),
@@ -510,7 +511,12 @@ def default_result_renderer(res):
                 res['message'][0] % res['message'][1:]
                 if isinstance(res['message'], tuple) else res[
                     'message'])
-            if res.get('message', None) else ''))
+            if res.get('message', None) else '',
+            err=ac.color_word(' [{}]'.format(
+                res['error_message'][0] % res['error_message'][1:]
+                if isinstance(res['error_message'], tuple) else res[
+                    'error_message']), ac.RED)
+            if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
 
 
 def render_action_summary(action_summary):
@@ -520,7 +526,6 @@ def render_action_summary(action_summary):
             ', '.join('{}: {}'.format(status, action_summary[act][status])
                       for status in sorted(action_summary[act])))
                     for act in sorted(action_summary))))
-
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
@@ -567,9 +572,9 @@ def _process_results(
     # how many repetitions to show, before suppression kicks in
     render_n_repetitions = \
         dlcfg.obtain('datalad.ui.suppress-similar-results-threshold') \
-        if sys.stdout.isatty() \
-        and dlcfg.obtain('datalad.ui.suppress-similar-results') \
-        else float("inf")
+            if sys.stdout.isatty() \
+               and dlcfg.obtain('datalad.ui.suppress-similar-results') \
+            else float("inf")
 
     for res in results:
         if not res or 'action' not in res:
@@ -617,8 +622,8 @@ def _process_results(
                 except TypeError as exc:
                     raise TypeError(
                         "Failed to render %r with %r from %r: %s"
-                        % (msg, msgargs, res, exc_str(exc))
-                    )
+                        % (msg, msgargs, res, str(exc))
+                    ) from exc
             else:
                 res_lgr(msg)
 
@@ -661,7 +666,7 @@ def _process_results(
                 result_renderer(res, **allkwargs)
             except Exception as e:
                 lgr.warning('Result rendering failed for: %s [%s]',
-                            res, exc_str(e))
+                            res, CapturedException(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
@@ -692,7 +697,7 @@ def keep_result(res, rfilter, **kwargs):
     except ValueError as e:
         # make sure to report the excluded result to massively improve
         # debugging experience
-        lgr.debug('Not reporting result (%s): %s', exc_str(e), res)
+        lgr.debug('Not reporting result (%s): %s', CapturedException(e), res)
         return False
     return True
 

@@ -369,8 +369,8 @@ def test_getpwd_basic():
         assert_false(oschdir.called)
 
 
-@assert_cwd_unchanged(ok_to_chdir=True)
 @with_tempfile(mkdir=True)
+@assert_cwd_unchanged(ok_to_chdir=True)
 def test_getpwd_change_mode(tdir):
     from datalad import utils
     if utils._pwd_mode != 'PWD':

@@ -34,7 +34,6 @@ from datalad.consts import (
     TIMESTAMP_FMT,
     WEB_META_LOG
 )
-from datalad.dochelpers import exc_str
 from datalad.distribution.siblings import (
     _DelayedSuper,
     Siblings,
@@ -355,9 +354,10 @@ def _create_dataset_sibling(
             shell("git -C {} config receive.denyCurrentBranch updateInstead".format(
                 sh_quote(remoteds_path)))
         except CommandError as e:
+            ce = CapturedException(e)
             lgr.error("git config failed at remote location %s.\n"
                       "You will not be able to push to checked out "
-                      "branch. Error: %s", remoteds_path, exc_str(e))
+                      "branch. Error: %s", remoteds_path, ce)
     else:
         lgr.error("Git version >= 2.4 needed to configure remote."
                   " Version detected on server: %s\nSkipping configuration"
@@ -383,8 +383,9 @@ def _create_dataset_sibling(
             CreateSibling.create_postupdate_hook(
                 remoteds_path, shell, ds)
         except CommandError as e:
+            ce = CapturedException(e)
             lgr.error("Failed to add json creation command to post update "
-                      "hook.\nError: %s" % exc_str(e))
+                      "hook.\nError: %s", ce)
 
     return remoteds_path
 
@@ -548,9 +549,9 @@ class CreateSibling(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""limit processing to datasets that have been changed since a given
-            state (by tag, branch, commit, etc). This can be used to create siblings
-            for recently added subdatasets."""),
+            doc="""limit processing to subdatasets that have been changed since
+            a given state (by tag, branch, commit, etc). This can be used to
+            create siblings for recently added subdatasets."""),
     )
 
     @staticmethod
@@ -598,7 +599,8 @@ class CreateSibling(Interface):
         #
         # all checks that are possible before we start parsing the dataset
         #
-
+        if since and not recursive:
+            raise ValueError("The use of 'since' requires 'recursive'")
         # possibly use sshurl to get the name in case if not specified
         if not sshurl:
             if not inherit:
@@ -614,7 +616,8 @@ class CreateSibling(Interface):
             try:
                 sshurl = CreateSibling._get_remote_url(ds, name)
             except Exception as exc:
-                lgr.debug('%s does not know about url for %s: %s', ds, name, exc_str(exc))
+                ce = CapturedException(exc)
+                lgr.debug('%s does not know about url for %s: %s', ds, name, ce)
         elif inherit:
             raise ValueError(
                 "For now, for clarity not allowing specifying a custom sshurl "
@@ -658,39 +661,46 @@ class CreateSibling(Interface):
             active_branch = ds.repo.get_active_branch()
             since = '%s/%s' % (name, active_branch)
 
-        #
-        # parse the base dataset to find all subdatasets that need processing
-        #
         to_process = []
-        cand_ds = [
-            Dataset(r['path'])
-            for r in diff_dataset(
-                ds,
-                fr=since,
-                to=None,
-                # make explicit, but doesn't matter, no recursion in diff()
-                constant_refs=True,
-                # contrain to the paths of all locally existing subdatasets
-                path=[
-                    sds['path']
-                    for sds in ds.subdatasets(
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        state='present',
-                        result_renderer=None)
-                ],
-                # save cycles, we are only looking for datasets
-                annex=None,
-                untracked='no',
-                # recursion was done faster by subdatasets()
-                recursive=False,
-                # save cycles, we are only looking for datasets
-                eval_file_type=False,
-            )
-            if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
-        ]
-        # check remotes setup
-        for d in cand_ds if since else ([ds] + cand_ds):
+        if recursive:
+            #
+            # parse the base dataset to find all subdatasets that need processing
+            #
+            cand_ds = [
+                Dataset(r['path'])
+                for r in diff_dataset(
+                    ds,
+                    fr=since,
+                    to=None,
+                    # make explicit, but doesn't matter, no recursion in diff()
+                    constant_refs=True,
+                    # contrain to the paths of all locally existing subdatasets
+                    path=[
+                        sds['path']
+                        for sds in ds.subdatasets(
+                            recursive=recursive,
+                            recursion_limit=recursion_limit,
+                            state='present',
+                            result_renderer=None)
+                    ],
+                    # save cycles, we are only looking for datasets
+                    annex=None,
+                    untracked='no',
+                    # recursion was done faster by subdatasets()
+                    recursive=False,
+                    # save cycles, we are only looking for datasets
+                    eval_file_type=False,
+                )
+                if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
+            ]
+            if not since:
+                # not only subdatasets
+                cand_ds = [ds] + cand_ds
+        else:
+            # only the current ds
+            cand_ds = [ds]
+        # check remotes setup()
+        for d in cand_ds:
             d_repo = d.repo
             if d_repo is None:
                 continue
@@ -886,11 +896,11 @@ class CreateSibling(Interface):
             )
             shared = out.strip()
         except CommandError as e:
+            ce = CapturedException(e)
             lgr.debug(
                 "Could not figure out remote shared setting of %s for %s due "
                 "to %s",
-                ds, name, exc_str(e)
-            )
+                ds, name, ce)
             # could well be ok if e.g. not shared
             # TODO: more detailed analysis may be?
         return shared
@@ -916,10 +926,11 @@ class CreateSibling(Interface):
             assert out in ('yes', 'no')
             has_active_post_update = out == "yes"
         except CommandError as e:
+            ce = CapturedException(e)
             lgr.debug(
                 "Could not figure out either %s on remote %s has active "
                 "post_update hook due to %s",
-                ds, name, exc_str(e)
+                ds, name, ce
             )
         return has_active_post_update
 
@@ -943,8 +954,9 @@ class CreateSibling(Interface):
         try:
             ssh(cmd)
         except CommandError as e:
+            ce = CapturedException(e)
             lgr.error("Initialization of remote git repository failed at %s."
-                      "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+                      "\nError: %s\nSkipping ...", path, ce)
             return False
 
         if isinstance(dataset.repo, AnnexRepo):
@@ -957,8 +969,9 @@ class CreateSibling(Interface):
                         if description else '')
                 )
             except CommandError as e:
+                ce = CapturedException(e)
                 lgr.error("Initialization of remote git annex repository failed at %s."
-                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+                          "\nError: %s\nSkipping ...", path, ce)
                 return False
         return True
 

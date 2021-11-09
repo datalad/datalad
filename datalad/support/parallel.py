@@ -23,9 +23,9 @@ from queue import Queue, Empty
 from threading import Thread
 
 from . import ansi_colors as colors
-from ..dochelpers import exc_str
 from ..log import log_progress
 from ..utils import path_is_subpath
+from datalad.support.exceptions import CapturedException
 
 import logging
 lgr = logging.getLogger('datalad.parallel')
@@ -432,6 +432,7 @@ class ProducerConsumer:
                     self.shutdown(force=True, exception=self._producer_exception or interrupted_by_exception)
                     break  # if there were no exception to raise
                 except BaseException as exc:
+                    ce = CapturedException(exc)
                     self._interrupted = True
                     if interrupted_by_exception:
                         # so we are here again but now it depends why we are here
@@ -439,14 +440,18 @@ class ProducerConsumer:
                             lgr.warning("Interrupted via Ctrl-C.  Forcing the exit")
                             self.shutdown(force=True, exception=exc)
                         else:
-                            lgr.warning("One more exception was received while trying to finish gracefully: %s", exc_str(exc))
+                            lgr.warning(
+                                "One more exception was received while "
+                                "trying to finish gracefully: %s",
+                                ce)
                             # and we go back into the loop until we finish or there is Ctrl-C
                     else:
                         interrupted_by_exception = exc
-                        lgr.warning("""Received an exception %s.
-Canceling not-yet running jobs and waiting for completion of running.
-You can force earlier forceful exit by Ctrl-C.""",
-                                    exc_str(exc))
+                        lgr.warning(
+                            "Received an exception %s. Canceling not-yet "
+                            "running jobs and waiting for completion of "
+                            "running. You can force earlier forceful exit "
+                            "by Ctrl-C.", ce)
                         self.shutdown(force=False, exception=exc)
 
     def add_to_producer_queue(self, value):

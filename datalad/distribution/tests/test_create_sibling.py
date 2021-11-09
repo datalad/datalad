@@ -869,3 +869,20 @@ def test_preserve_attrs(src, dest):
     assert s.st_mtime == 1234567890
     with open(opj(dest, "src", "foo", "bar")) as fp:
         assert fp.read() == "This is test text."
+
+
+@with_tempfile(mkdir=True)
+def test_only_one_level_without_recursion(path):
+    # this tests for https://github.com/datalad/datalad/issues/5614: accidental
+    # recursion of one level by default
+    path = Path(path)
+    ds_main = Dataset(path / "main").create()
+    ds_main.create('sub1')
+
+    ds_main.create_sibling(
+        name="dummy",
+        sshurl=str(path / "toplevelsibling"))
+    # this should exist
+    ok_((path / 'toplevelsibling').exists())
+    # this shouldn't
+    assert_false(Path(path / 'toplevelsibling' / 'sub1').exists())

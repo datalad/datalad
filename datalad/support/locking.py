@@ -5,12 +5,13 @@ from fasteners import (
 from contextlib import contextmanager
 
 from .path import exists
-from ..dochelpers import exc_str
 from ..utils import (
     ensure_unicode,
     get_open_files,
     unlink,
 )
+from datalad.support.exceptions import CapturedException
+
 
 import logging
 lgr = logging.getLogger('datalad.locking')
@@ -147,7 +148,7 @@ def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_un
             lgr.debug(
                 "Failed to get a list of processes which 'posses' the file %s: %s",
                 lock_path,
-                exc_str(exc)
+                CapturedException(exc)
             )
             return 'Another process is using it (failed to determine one)?'
 

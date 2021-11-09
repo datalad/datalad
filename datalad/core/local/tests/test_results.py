@@ -35,8 +35,8 @@ def test_default_result_renderer():
         (dict(type='funky'),
          ['<action-unspecified>(<status-unspecified>): (funky)']),
         # plain message makes it through
-        (dict(message='funky'),
-         ['<action-unspecified>(<status-unspecified>): [funky]']),
+        (dict(message='funky', error_message='extra-funky'),
+         ['<action-unspecified>(<status-unspecified>): [funky] [extra-funky]']),
     ]
     if on_windows:
         testcases.extend([

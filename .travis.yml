@@ -235,7 +235,8 @@ script:
   # Run tests
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER python -m nose "${NOSE_OPTS[@]}"
+    $NOSE_WRAPPER python -W error::DeprecationWarning:^datalad
+      -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
       --with-cov --cover-package datalad

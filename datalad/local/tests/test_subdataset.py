@@ -289,7 +289,7 @@ def test_state(path):
     assert_result_count(
         ds.subdatasets(), 1, path=sub.path, state='present')
     # uninstall the subdataset
-    ds.uninstall('sub')
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     # normal 'gone' is "absent"
     assert_false(sub.is_installed())
     assert_result_count(
@@ -346,7 +346,7 @@ def test_name_starts_with_hyphen(origpath, path):
         ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
 
     # uninstall
-    ds_clone.uninstall('-clone')
+    ds_clone.drop('-clone', what='all', reckless='kill', recursive=True)
     assert_false(dash_clone.is_installed())
     assert_result_count(
         ds_clone.subdatasets(), 1, path=dash_clone.path, state='absent')

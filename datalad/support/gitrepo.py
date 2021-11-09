@@ -51,7 +51,6 @@ from datalad.config import (
     write_config_section,
 )
 
-from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
     Path,
@@ -1009,9 +1008,10 @@ class GitRepo(CoreGitRepo):
                 break
             except CommandError as e:
                 # log here but let caller decide what to do
-                e_str = exc_str(e)
+                ce = CapturedException(e)
+                str_e = str(e)
                 # see https://github.com/datalad/datalad/issues/785
-                if re.search("Request for .*aborted.*Unable to find", str(e),
+                if re.search("Request for .*aborted.*Unable to find", str_e,
                              re.DOTALL) \
                         and trial < ntries - 1:
                     lgr.info(
@@ -1021,8 +1021,8 @@ class GitRepo(CoreGitRepo):
                     continue
                     #(lgr.debug if expect_fail else lgr.error)(e_str)
 
-                if "Clone succeeded, but checkout failed." in str(e):
-                    fix_annex = e
+                if "Clone succeeded, but checkout failed." in str_e:
+                    fix_annex = ce
                     break
 
                 raise
@@ -1039,7 +1039,7 @@ class GitRepo(CoreGitRepo):
                     gr._init()
                 gr.fsck()
             else:
-                lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
+                lgr.warning("Experienced issues while cloning: %s", fix_annex)
         return gr
 
     # Note: __del__ shouldn't be needed anymore as we switched to
@@ -1474,7 +1474,7 @@ class GitRepo(CoreGitRepo):
         return [
             str(r.relative_to(self.pathobj))
             for r in self.get_content_info(
-                paths=None, ref=None, untracked='no', eval_file_type=False)
+                paths=None, ref=None, untracked='no')
         ]
 
     def format_commit(self, fmt, commitish=None):
@@ -1801,7 +1801,7 @@ class GitRepo(CoreGitRepo):
         return [
             str(p.relative_to(self.pathobj))
             for p in self.get_content_info(
-                paths=None, ref=branch, untracked='no', eval_file_type=False)
+                paths=None, ref=branch, untracked='no')
             ]
 
     def add_remote(self, name, url, options=None):
@@ -2244,12 +2244,8 @@ class GitRepo(CoreGitRepo):
         if bool(stdout.strip()):
             # The quick `git status`-based check can give a different answer
             # than `datalad status` for submodules on an adjusted branch.
-            #
-            # TODO: This is almost a self.status() call. Add an eval_file_type
-            # parameter to self.status() and use it here?
             st = self.diffstatus(fr="HEAD" if self.get_hexsha() else None,
-                                 to=None, untracked="normal",
-                                 eval_file_type=False)
+                                 to=None, untracked="normal")
             return any(r.get("state") != "clean" for r in st.values())
         return False
 
@@ -2344,8 +2340,7 @@ class GitRepo(CoreGitRepo):
         for path, props in self.get_content_info(
                 paths=paths,
                 ref=None,
-                untracked='no',
-                eval_file_type=False).items():
+                untracked='no').items():
             if props.get('type', None) != 'dataset':
                 # make sure this method never talks about non-dataset
                 # content
@@ -2647,7 +2642,7 @@ class GitRepo(CoreGitRepo):
                 f.write('{}\n'.format(attrline))
 
     def get_content_info(self, paths=None, ref=None, untracked='all',
-                         eval_file_type=True):
+                         eval_file_type=None):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2675,11 +2670,9 @@ class GitRepo(CoreGitRepo):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        eval_file_type : bool
-          If True, inspect file type of untracked files, and report annex
-          symlink pointers as type 'file'. This convenience comes with a
-          cost; disable to get faster performance if this information
-          is not needed.
+        eval_file_type :
+          THIS FUNCTIONALITY IS NO LONGER SUPPORTED.
+          Setting this flag has no effect.
 
         Returns
         -------
@@ -2691,13 +2684,6 @@ class GitRepo(CoreGitRepo):
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
-
-            Note that the reported type will not always match the type of
-            content committed to Git, rather it will reflect the nature
-            of the content minus platform/mode-specifics. For example,
-            a symlink to a locked annexed file on Unix will have a type
-            'file', reported, while a symlink to a file in Git or directory
-            will be of type 'symlink'.
 
           `gitshasum`
             SHASUM of the item as tracked by Git, or None, if not
@@ -2711,6 +2697,10 @@ class GitRepo(CoreGitRepo):
           repository)
         """
         lgr.debug('%s.get_content_info(...)', self)
+        if eval_file_type is not None:
+            warnings.warn(
+                "GitRepo.get_content_info(eval_file_type=) no longer supported",
+                DeprecationWarning)
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
@@ -2776,52 +2766,16 @@ class GitRepo(CoreGitRepo):
             raise
         lgr.debug('Done query repo: %s', cmd)
 
-        if not eval_file_type:
-            _get_link_target = None
-        elif ref:
-            def _read_symlink_target_from_catfile(lines):
-                # it is always the second line, all checks done upfront
-                header = lines.readline()
-                if header.rstrip().endswith('missing'):
-                    # something we do not know about, should not happen
-                    # in real use, but guard against to avoid stalling
-                    return ''
-                return lines.readline().rstrip()
-
-            _get_link_target = BatchedCommand(
-                ['git', 'cat-file', '--batch'],
-                path=self.path,
-                output_proc=_read_symlink_target_from_catfile,
-            )
-        else:
-            def try_readlink(path):
-                try:
-                    return os.readlink(path)
-                except OSError:
-                    # readlink will fail if the symlink reported by ls-files is
-                    # not in the working tree (it could be removed or
-                    # unlocked). Fall back to a slower method.
-                    return str(Path(path).resolve())
-
-            _get_link_target = try_readlink
-
-        try:
-            self._get_content_info_line_helper(
-                ref,
-                info,
-                stdout.split('\0'),
-                props_re,
-                _get_link_target)
-        finally:
-            if ref and _get_link_target:
-                # cancel batch process
-                _get_link_target.close()
+        self._get_content_info_line_helper(
+            ref,
+            info,
+            stdout.split('\0'),
+            props_re)
 
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
-    def _get_content_info_line_helper(self, ref, info, lines,
-                                      props_re, get_link_target):
+    def _get_content_info_line_helper(self, ref, info, lines, props_re):
         """Internal helper of get_content_info() to parse Git output"""
         mode_type_map = {
             '100644': 'file',
@@ -2855,20 +2809,6 @@ class GitRepo(CoreGitRepo):
                 inf['gitshasum'] = props.group('sha')
                 inf['type'] = mode_type_map.get(
                     props.group('type'), props.group('type'))
-                if get_link_target and inf['type'] == 'symlink' and \
-                        ((ref is None and '.git/annex/objects' in \
-                          ut.Path(
-                            get_link_target(str(self.pathobj / path))
-                          ).as_posix()) or \
-                         (ref and \
-                          '.git/annex/objects' in get_link_target(
-                              u'{}:{}'.format(
-                                  ref, str(path))))
-                        ):
-                    # report annex symlink pointers as file, their
-                    # symlink-nature is a technicality that is dependent
-                    # on the particular mode annex is in
-                    inf['type'] = 'file'
 
                 if ref and inf['type'] == 'file':
                     inf['bytesize'] = int(props.group('size'))
@@ -2976,14 +2916,21 @@ class GitRepo(CoreGitRepo):
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   eval_submodule_state='full', eval_file_type=True,
+                   eval_submodule_state='full', eval_file_type=None,
                    _cache=None):
         """Like diff(), but reports the status of 'clean' content too.
 
         It supports an additional submodule evaluation state 'global'.
         If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
-        it can."""
+        it can.
+
+        The eval_file_type parameter is ignored.
+        """
+        if eval_file_type is not None:
+            warnings.warn(
+                "GitRepo.diffstatus(eval_file_type=) no longer supported",
+                DeprecationWarning)
 
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
@@ -3012,8 +2959,7 @@ class GitRepo(CoreGitRepo):
                 to_state = _cache[key]
             else:
                 to_state = self.get_content_info(
-                    paths=paths, ref=None, untracked=untracked,
-                    eval_file_type=eval_file_type)
+                    paths=paths, ref=None, untracked=untracked)
                 _cache[key] = to_state
             # we want Git to tell us what it considers modified and avoid
             # reimplementing logic ourselves
@@ -3021,10 +2967,15 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 modified = _cache[key]
             else:
+                # from Git 2.31.0 onwards ls-files has --deduplicate
+                # by for backward compatibility keep doing deduplication here
                 modified = set(
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self.call_git_items_(
-                        ['ls-files', '-z', '-m'],
+                        # we must also look for deleted files, for the logic
+                        # below to work. Only from Git 2.31.0 would they be
+                        # included with `-m` alone
+                        ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
                         files=[str(p) for p in paths] if paths else None,
                         sep='\0',
@@ -3036,8 +2987,7 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 to_state = _cache[key]
             else:
-                to_state = self.get_content_info(
-                    paths=paths, ref=to, eval_file_type=eval_file_type)
+                to_state = self.get_content_info(paths=paths, ref=to)
                 _cache[key] = to_state
             # we do not need worktree modification detection in this case
             modified = None
@@ -3047,8 +2997,7 @@ class GitRepo(CoreGitRepo):
             from_state = _cache[key]
         else:
             if fr:
-                from_state = self.get_content_info(
-                    paths=paths, ref=fr, eval_file_type=eval_file_type)
+                from_state = self.get_content_info(paths=paths, ref=fr)
             else:
                 # no ref means from nothing
                 from_state = {}
@@ -3139,7 +3088,6 @@ class GitRepo(CoreGitRepo):
                 paths=None,
                 untracked=untracked,
                 eval_submodule_state='global',
-                eval_file_type=False,
                 _cache=_cache) if st['state'] == 'clean' else 'modified'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
@@ -3283,7 +3231,7 @@ class GitRepo(CoreGitRepo):
                 ['diff', '--name-only', '--staged'],
                 expect_stderr=True))
         except CommandError as e:
-            lgr.debug(exc_str(e))
+            lgr.debug(CapturedException(e))
             return []
 
     def _save_post(self, message, status, partial_commit, amend=False,

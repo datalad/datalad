@@ -82,7 +82,7 @@ def test_unlock_raises(path, path2, path3):
     assert_in_results(
         ds.unlock(path=path2, on_failure="ignore"),
         status="error",
-        message="path not underneath this dataset")
+        message=("path not underneath the reference dataset %s", ds.path))
 
     chpwd(_cwd)
 

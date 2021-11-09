@@ -15,7 +15,6 @@ from ..path import (
     robust_abspath,
     split_ext,
 )
-from ...dochelpers import exc_str
 from ...utils import (
     chpwd,
     rmtree,
@@ -39,7 +38,7 @@ def test_robust_abspath(tdir):
         except Exception as exc:
             # probably windows or above exception
             raise SkipTest(
-                "Cannot test in current environment: %s" % exc_str(exc))
+                "Cannot test in current environment") from exc
 
         assert_raises(OSError, abspath, curdir)
         eq_(robust_abspath(curdir), tdir)

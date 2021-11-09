@@ -20,7 +20,7 @@ from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
 )
-from datalad.version import __version__
+from datalad import __version__
 
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (

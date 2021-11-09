@@ -15,8 +15,8 @@ from functools import wraps
 from os.path import isabs
 from contextlib import contextmanager
 
-from datalad.dochelpers import exc_str
 from datalad.utils import Path
+from datalad.support.exceptions import CapturedException
 
 lgr = logging.getLogger("datalad.support.vcr")
 
@@ -70,7 +70,7 @@ except Exception as exc:
     if not isinstance(exc, ImportError):
         # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
         lgr.warning("Failed to import vcr, no cassettes will be available: %s",
-                    exc_str(exc, limit=10))
+                    CapturedException(exc))
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
 
     def use_cassette(path, return_body=None, skip_if_no_vcr=False, **kwargs):

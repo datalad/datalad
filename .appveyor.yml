@@ -41,8 +41,10 @@
 #     will run until the file is removed (or 60 min have passed)
 #
 #   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
-#     environment to debug in a Python 3.8 session (should generally match the
+#     environment to debug in a Python 3.9 session (should generally match the
 #     respective CI run configuration).
+#
+#   - Workers have vim installed for convenient text editing in the command shell
 
 
 # do not make repository clone cheap: interfers with versioneer
@@ -69,6 +71,7 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     # Windows core tests
@@ -93,6 +96,7 @@ environment:
       #INSTALL_GITANNEX: git-annex=8.20201129
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Additional test runs
     - ID: WinP39a1
@@ -130,6 +134,7 @@ environment:
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
     - ID: MacP38a2
       # ~35min
       DTS: >
@@ -142,6 +147,7 @@ environment:
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Test alternative Python versions
     - ID: Ubu20P36
@@ -149,6 +155,7 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     - ID: Ubu20P37
@@ -156,6 +163,7 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
 
@@ -243,6 +251,8 @@ install:
   - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
   # Workaround on older/buggy debian/ubuntus having outdated certificate
   - sh: tools/ci/debians_disable_outdated_ssl_cert
+  # Deploy test root CA for internal HTTPS test server
+  - sh: tools/ci/deploy_datalad-rootca
   # deploy the datalad installer, override version via DATALAD_INSTALLER_VERSION
   - cmd:
       IF DEFINED DATALAD_INSTALLER_VERSION (
@@ -290,20 +300,17 @@ test_script:
   - sh: mkdir __testhome__
   - cd __testhome__
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
-  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
-  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+  - cmd: python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - sh:  python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
 
 
 after_test:
-  # move coverage into the project dir to make default handling applicable
-  - cmd: move .coverage ..
-  - sh: mv .coverage ..
-  - cd ..
-  # use windows codecov uploader package
-  - cmd: choco install codecov
-  - cmd: python -m coverage xml
-  - cmd: codecov -f coverage.xml
-  - sh: bash <(curl -sfS https://codecov.io/bash)
+  - python -m coverage xml
+  - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
+  - cmd: .\codecov.exe -f "coverage.xml"
+  - sh: "curl -Os $CODECOV_BINARY"
+  - sh: chmod +x codecov
+  - sh: ./codecov
 
 
 #on_success:

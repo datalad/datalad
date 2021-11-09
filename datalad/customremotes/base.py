@@ -587,9 +587,7 @@ def ensure_datalad_remote(repo, remote=None,
     name = repo.get_special_remotes().get(uuid, {}).get("name")
 
     if not name:
-        from datalad.consts import DATALAD_SPECIAL_REMOTE
-
-        init_datalad_remote(repo, DATALAD_SPECIAL_REMOTE,
+        init_datalad_remote(repo, remote,
                             encryption=encryption, autoenable=autoenable)
     elif repo.is_special_annex_remote(name, check_if_known=False):
         lgr.debug("datalad special remote '%s' is already enabled", name)

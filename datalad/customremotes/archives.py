@@ -114,7 +114,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         if archive_file is not None:
             if archive_key is not None:
                 raise ValueError("Provide archive_file or archive_key - not both")
-            archive_key = self.repo.get_file_key(archive_file)
+            archive_key = self.repo.get_file_annexinfo(archive_file)['key']
         assert(archive_key is not None)
         attrs = OrderedDict()  # looking forward for more
         if file:

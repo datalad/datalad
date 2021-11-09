@@ -396,7 +396,8 @@ class Dataset(object, metaclass=PathBasedFlyweight):
                                            contains=path,
                                            result_filter=res_filter,
                                            on_failure='ignore',
-                                           result_xfm='paths')
+                                           result_xfm='paths',
+                                           result_renderer='disabled')
 
         while path:
             # normalize the path after adding .. so we guaranteed to not

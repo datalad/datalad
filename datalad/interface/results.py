@@ -22,7 +22,6 @@ from os.path import (
     relpath,
 )
 
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     path_is_subpath,
@@ -47,7 +46,7 @@ success_status_map = {
 
 def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
                     refds=None, status=None, message=None, exception=None,
-                    **kwargs):
+                    error_message=None, **kwargs):
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
     # just for not shadowing the builtin `type` in this function
@@ -88,6 +87,8 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
         d['status'] = status
     if message is not None:
         d['message'] = message
+    if error_message is not None:
+        d['error_message'] = error_message
     if exception is not None:
         d['exception'] = exception
         d['exception_traceback'] = \
@@ -238,7 +239,7 @@ def annexjson2result(d, ds, **kwargs):
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
     if d.get('error-messages', None):
-        messages.extend(d['error-messages'])
+        res['error_message'] = '\n'.join(m.strip() for m in d['error-messages'])
     # avoid meaningless standard messages, and collision with actual error
     # messages
     elif 'note' in d:
