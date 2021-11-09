@@ -10,17 +10,22 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import Counter
 import os
 from os.path import join as opj
 import os.path as op
 from collections import OrderedDict
 from operator import itemgetter
 import shutil
+from urllib.parse import urlparse
 
 import logging
-lgr = logging.getLogger('datalad.customremotes.archive')
-lgr.log(5, "Importing datalad.customremotes.archive")
 
+from annexremote import (
+    RemoteError,
+    SpecialRemote,
+    UnsupportedRequest,
+)
 from ..support.archives import ArchivesCache
 from datalad.support.exceptions import CapturedException
 from ..support.network import URL
@@ -31,9 +36,10 @@ from ..utils import unique
 from ..utils import ensure_bytes
 from ..utils import unlink
 from .base import AnnexCustomRemote
-from .main import main as super_main
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from ..support.cache import DictCache
 
+lgr = logging.getLogger('datalad.customremotes.archive')
 
 # ####
 # Preserve from previous version
@@ -65,10 +71,10 @@ def link_file_load(src, dst, dry_run=False):
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
 #       into a separate class
-class ArchiveAnnexCustomRemote(AnnexCustomRemote):
+class ArchiveAnnexCustomRemote(SpecialRemote):
     """Special custom remote allowing to obtain files from archives
 
-     Archives should also be under annex control.
+     Archives must be under annex'ed themselves.
     """
 
     CUSTOM_REMOTE_NAME = "archive"
@@ -80,19 +86,35 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     AVAILABILITY = "local"
     COST = 500
 
-    def __init__(self, persistent_cache=True, **kwargs):
-        super(ArchiveAnnexCustomRemote, self).__init__(**kwargs)
+    def __init__(self, annex, path=None, persistent_cache=True, **kwargs):
+        super().__init__(annex)
+
+        # MIH figure out what the following is all about
+        # in particular path==None
+        from ..support.annexrepo import AnnexRepo
+        from ..cmdline.helpers import get_repo_instance
+        self.repo = get_repo_instance(class_=AnnexRepo) \
+            if not path \
+            else AnnexRepo(path, create=False, init=False)
+
+        self.path = self.repo.path
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
         self._last_url = None  # for heuristic to choose among multiple URLs
         self._cache = ArchivesCache(self.path, persistent=persistent_cache)
+        self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
+
+        # OPT: a counter to increment upon successful encounter of the scheme
+        # (ATM only in gen_URLS but later could also be used in other requests).
+        # This would allow to consider schemes in order of decreasing success instead
+        # of arbitrary hardcoded order
+        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     def stop(self, *args):
         """Stop communication with annex"""
         self._cache.clean()
-        super(ArchiveAnnexCustomRemote, self).stop(*args)
 
     def get_file_url(self, archive_file=None, archive_key=None, file=None, size=None):
         """Given archive (file or a key) and a file -- compose URL for access
@@ -222,27 +244,52 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             if akey_afile not in yielded:
                 yield akey_afile
 
+    def get_contentlocation(self, key, absolute=False, verify_exists=True):
+        """Return (relative to top or absolute) path to the file containing the key
+
+        This is a wrapper around AnnexRepo.get_contentlocation which provides caching
+        of the result (we are asking the location for the same archive key often)
+        """
+        if key not in self._contentlocations:
+            fpath = self.repo.get_contentlocation(key, batch=True)
+            if fpath:  # shouldn't store empty ones
+                self._contentlocations[key] = fpath
+        else:
+            fpath = self._contentlocations[key]
+            # but verify that it exists
+            if verify_exists and not op.lexists(opj(self.path, fpath)):
+                # prune from cache
+                del self._contentlocations[key]
+                fpath = ''
+
+        if absolute and fpath:
+            return opj(self.path, fpath)
+        else:
+            return fpath
+
+    def gen_URLS(self, key):
+        """Yield URL(s) associated with a key, and keep stats on protocols."""
+        nurls = 0
+        for scheme, _ in self._scheme_hits.most_common():
+            scheme_ = scheme + ":"
+            scheme_urls = self.annex.geturls(key, scheme_)
+            if scheme_urls:
+                # note: generator would cease to exist thus not asking
+                # for URLs for other schemes if this scheme is good enough
+                self._scheme_hits[scheme] += 1
+                for url in scheme_urls:
+                    nurls += 1
+                    yield url
+        self.annex.debug("Processed %d URL(s) for key %s", nurls, key)
+
     # Protocol implementation
-    def req_CHECKURL(self, url):
-        """
+    def initremote(self):
+        pass
 
-        Replies
+    def prepare(self):
+        pass
 
-        CHECKURL-CONTENTS Size|UNKNOWN Filename
-            Indicates that the requested url has been verified to exist.
-            The Size is the size in bytes, or use "UNKNOWN" if the size could
-            not be determined.
-            The Filename can be empty (in which case a default is used), or can
-            specify a filename that is suggested to be used for this url.
-        CHECKURL-MULTI Url Size|UNKNOWN Filename ...
-            Indicates that the requested url has been verified to exist, and
-            contains multiple files, which can each be accessed using their own
-            url.
-            Note that since a list is returned, neither the Url nor the Filename
-            can contain spaces.
-        CHECKURL-FAILURE
-            Indicates that the requested url could not be accessed.
-        """
+    def checkurl(self, url):
         # TODO:  what about those MULTI and list to be returned?
         #  should we return all filenames or keys within archive?
         #  might be way too many?
@@ -265,61 +312,37 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 if exists(efile):
                     size = os.stat(efile).st_size
 
-            if size is None:
-                size = 'UNKNOWN'
-
-            # FIXME: providing filename causes annex to not even talk to ask
-            # upon drop :-/
-            self.send("CHECKURL-CONTENTS", size)  # , basename(afile))
-
             # so it was a good successful one -- record
             self._last_url = url
+
+            if size is None:
+                return True
+            else:
+                # FIXME: providing filename causes annex to not even talk to ask
+                # upon drop :-/
+                return [dict(size=size)]  # , basename(afile))
+
         else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
-            self.send("CHECKURL-FAILURE")
+            return False
 
-    def req_CHECKPRESENT(self, key):
-        """Check if copy is available
-
-        TODO: just proxy the call to annex for underlying tarball
-
-        Replies
-
-        CHECKPRESENT-SUCCESS Key
-            Indicates that a key has been positively verified to be present in
-            the remote.
-        CHECKPRESENT-FAILURE Key
-            Indicates that a key has been positively verified to not be present
-            in the remote.
-        CHECKPRESENT-UNKNOWN Key ErrorMsg
-            Indicates that it is not currently possible to verify if the key is
-            present in the remote. (Perhaps the remote cannot be contacted.)
-        """
+    def checkpresent(self, key):
         # TODO: so we need to maintain mapping from urls to keys.  Then
         # we could even store the filename within archive
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
-        lgr.debug("VERIFYING key %s", key)
         # The same content could be available from multiple locations within the same
         # archive, so let's not ask it twice since here we don't care about "afile"
         for akey, _ in self._gen_akey_afiles(key, unique_akeys=True):
             if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
-                self.send("CHECKPRESENT-SUCCESS", key)
-                return
-        self.send("CHECKPRESENT-UNKNOWN", key)
+                return True
+        # it is unclear to MIH why this must be UNKNOWN rather than FALSE
+        # but this is how I found it
+        raise RemoteError()
 
-    def req_REMOVE(self, key):
-        """
-        REMOVE-SUCCESS Key
-            Indicates the key has been removed from the remote. May be returned
-            if the remote didn't have the key at the point removal was requested
-        REMOVE-FAILURE Key ErrorMsg
-            Indicates that the key was unable to be removed from the remote.
-        """
-        self.send("REMOVE-FAILURE", key,
-                  "Removal from file archives is not supported")
-        return
+    def remove(self, key):
+        raise UnsupportedRequest('This special remote cannot remove content')
         # # TODO: proxy query to the underlying tarball under annex that if
         # # tarball was removed (not available at all) -- report success,
         # # otherwise failure (current the only one)
@@ -332,28 +355,18 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         #     self.send("REMOVE-FAILURE", akey,
         #               "Removal from file archives is not supported")
 
-    def req_WHEREIS(self, key):
-        """
-        WHEREIS-SUCCESS String
-            Indicates a location of a key. Typically an url, the string can be anything
-            that it makes sense to display to the user about content stored in the special
-            remote.
-        WHEREIS-FAILURE
-            Indicates that no location is known for a key.
-        """
-        self.send("WHEREIS-FAILURE")
+    def whereis(self, key):
+        return False
         # although more logical is to report back success, it leads to imho more confusing
         # duplication. See
         # http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
-
         # try:
         #     key, file = self._get_akey_afile(key)
         #     self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
         # except ValueError:
         #     self.send("WHEREIS-FAILURE")
 
-    def _transfer(self, cmd, key, path):
-
+    def transfer_retrieve(self, key, file):
         akeys_tried = []
         # the same file could come from multiple files within the same archive
         # So far it doesn't make sense to "try all" of them since if one fails
@@ -396,27 +409,34 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 lgr.debug(u"Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
                 was_extracted = self.cache[akey_path].is_extracted
                 apath = self.cache[akey_path].get_extracted_file(afile)
-                link_file_load(apath, path)
+                link_file_load(apath, file)
                 if not was_extracted and self.cache[akey_path].is_extracted:
-                    self.info("%s special remote is using an extraction cache "
+                    self.annex.info("%s special remote is using an extraction cache "
                               "under %s. Remove it with DataLad's 'clean' "
                               "command to save disk space." %
                               (ARCHIVES_SPECIAL_REMOTE,
                                self.cache[akey_path].path)
                               )
-                self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                # from celery.contrib import rdb
-                # rdb.set_trace()
-                self.debug("Failed to fetch {akey} containing {key}: {ce}".format(**locals()))
+                self.annex.debug("Failed to fetch {akey} containing {key}: {ce}".format(**locals()))
                 continue
 
-        raise RuntimeError(
+        raise RemoteError(
             "Failed to fetch any archive containing {key}. "
             "Tried: {akeys_tried}".format(**locals())
         )
+
+    def transfer_store(self, key, local_file):
+        raise UnsupportedRequest('This special remote cannot store content')
+
+    def claimurl(self, url):
+        scheme = urlparse(url).scheme
+        if scheme in self.SUPPORTED_SCHEMES:
+            return True
+        else:
+            return False
 
     def _annex_get_archive_by_key(self, akey):
         # TODO: make it more stringent?
@@ -428,7 +448,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         from datalad.support.annexrepo import AnnexJsonProtocol
 
         akey_size = self.repo.get_size_from_key(akey)
-        self.info(
+        self.annex.info(
             "To obtain some keys we need to fetch an archive "
             "of size %s"
             % (naturalsize(akey_size) if akey_size else "unknown")
@@ -442,6 +462,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
 def main():
     """cmdline entry point"""
-    super_main(backend="archive")
-
-lgr.log(5, "Done importing datalad.customremotes.archive")
+    from annexremote import Master
+    master = Master()
+    remote = ArchiveAnnexCustomRemote(master)
+    master.LinkRemote(remote)
+    master.Listen()
+    # cleanup
+    remote.stop()
