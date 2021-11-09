@@ -10,20 +10,24 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import Counter
 import logging
-lgr = logging.getLogger('datalad.customremotes.datalad')
+from urllib.parse import urlparse
 
-from .base import AnnexCustomRemote
-
-from ..downloaders.providers import Providers
-from ..support.exceptions import (
+from annexremote import (
+    RemoteError,
+    SpecialRemote,
+    UnsupportedRequest,
+)
+from datalad.downloaders.providers import Providers
+from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
-from .main import main as super_main
+lgr = logging.getLogger('datalad.customremotes.datalad')
 
 
-class DataladAnnexCustomRemote(AnnexCustomRemote):
+class DataladAnnexCustomRemote(SpecialRemote):
     """Special custom remote allowing to obtain files from archives
 
      Archives should also be under annex control.
@@ -31,67 +35,81 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     SUPPORTED_SCHEMES = ('http', 'https', 's3', 'shub')
 
-    AVAILABILITY = "global"
+    def __init__(self, annex, **kwargs):
+        # OPT: a counter to increment upon successful encounter of the scheme
+        # (ATM only in gen_URLS but later could also be used in other requests).
+        # This would allow to consider schemes in order of decreasing success instead
+        # of arbitrary hardcoded order
+        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
-    def __init__(self, **kwargs):
-        super(DataladAnnexCustomRemote, self).__init__(**kwargs)
+        super().__init__(annex)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
         self._providers = Providers.from_config_files()
 
-    #
+        # TODO self.info = {}, self.configs = {}
+
     # Helper methods
+    def gen_URLS(self, key):
+        """Yield URL(s) associated with a key, and keep stats on protocols."""
+        nurls = 0
+        for scheme, _ in self._scheme_hits.most_common():
+            scheme_ = scheme + ":"
+            scheme_urls = self.annex.geturls(key, scheme_)
+            if scheme_urls:
+                # note: generator would cease to exist thus not asking
+                # for URLs for other schemes if this scheme is good enough
+                self._scheme_hits[scheme] += 1
+                for url in scheme_urls:
+                    yield url
+        self.annex.debug("Got %d URL(s) for key %s", nurls, key)
 
     # Protocol implementation
-    def req_CHECKURL(self, url):
-        """
+    def initremote(self):
+        pass
 
-        Replies
+    def prepare(self):
+        pass
 
-        CHECKURL-CONTENTS Size|UNKNOWN Filename
-            Indicates that the requested url has been verified to exist.
-            The Size is the size in bytes, or use "UNKNOWN" if the size could
-            not be determined.
-            The Filename can be empty (in which case a default is used), or can
-            specify a filename that is suggested to be used for this url.
-        CHECKURL-MULTI Url Size|UNKNOWN Filename ...
-            Indicates that the requested url has been verified to exist, and
-            contains multiple files, which can each be accessed using their own
-            url.
-            Note that since a list is returned, neither the Url nor the Filename
-            can contain spaces.
-        CHECKURL-FAILURE
-            Indicates that the requested url could not be accessed.
-        """
+    def transfer_retrieve(self, key, file):
+        lgr.debug("RETRIEVE key %s into/from %s", key, file)  # was INFO level
 
+        urls = []
+
+        # TODO: priorities etc depending on previous experience or settings
+        for url in self.gen_URLS(key):
+            urls.append(url)
+            try:
+                downloaded_path = self._providers.download(
+                    url, path=file, overwrite=True
+                )
+                lgr.info("Successfully downloaded %s into %s", url, downloaded_path)
+                return
+            except Exception as exc:
+                ce = CapturedException(exc)
+                self.annex.debug("Failed to download url %s for key %s: %s"
+                                 % (url, key, ce))
+        raise RemoteError(
+            f"Failed to download from any of {len(urls)} locations")
+
+    def transfer_store(self, key, local_file):
+        raise UnsupportedRequest('This special remote cannot store content')
+
+    def checkurl(self, url):
         try:
             status = self._providers.get_status(url)
-            size = str(status.size) if status.size is not None else 'UNKNOWN'
-            resp = ["CHECKURL-CONTENTS", size] \
-                + ([status.filename] if status.filename else [])
+            props = dict(filename=status.filename, url=url)
+            if status.size is not None:
+                props['size'] = status.size
+            return [props]
         except Exception as exc:
             ce = CapturedException(exc)
-            self.debug("Failed to check url %s: %s" % (url, ce))
-            resp = ["CHECKURL-FAILURE"]
-        self.send(*resp)
+            self.annex.debug("Failed to check url %s: %s" % (url, ce))
+            return False
 
-    def req_CHECKPRESENT(self, key):
-        """Check if copy is available
-
-        Replies
-
-        CHECKPRESENT-SUCCESS Key
-            Indicates that a key has been positively verified to be present in
-            the remote.
-        CHECKPRESENT-FAILURE Key
-            Indicates that a key has been positively verified to not be present
-            in the remote.
-        CHECKPRESENT-UNKNOWN Key ErrorMsg
-            Indicates that it is not currently possible to verify if the key is
-            present in the remote. (Perhaps the remote cannot be contacted.)
-        """
+    def checkpresent(self, key):
         lgr.debug("VERIFYING key %s", key)
         resp = None
         for url in self.gen_URLS(key):
@@ -99,76 +117,45 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             try:
                 status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
-                    resp = "CHECKPRESENT-SUCCESS"
-                    break
+                    return True
                 # TODO:  for CHECKPRESENT-FAILURE we somehow need to figure out that
                 # we can connect to that server but that specific url is N/A,
                 # probably check the connection etc
             except TargetFileAbsent as exc:
                 ce = CapturedException(exc)
-                self.debug("Target url %s file seems to be missing: %s" % (url, ce))
+                self.annex.debug("Target url %s file seems to be missing: %s" % (url, ce))
                 if not resp:
                     # if it is already marked as UNKNOWN -- let it stay that way
                     # but if not -- we might as well say that we can no longer access it
-                    resp = "CHECKPRESENT-FAILURE"
+                    return False
             except Exception as exc:
                 ce = CapturedException(exc)
-                resp = "CHECKPRESENT-UNKNOWN"
-                self.debug("Failed to check status of url %s: %s" % (url, ce))
+                self.annex.debug("Failed to check status of url %s: %s" % (url, ce))
         if resp is None:
-            resp = "CHECKPRESENT-UNKNOWN"
-        self.send(resp, key)
+            raise RemoteError(f'Could not determine presence of key {key}')
+        else:
+            return False
 
-    def req_REMOVE(self, key):
-        """
-        REMOVE-SUCCESS Key
-            Indicates the key has been removed from the remote. May be returned
-            if the remote didn't have the key at the point removal was requested
-        REMOVE-FAILURE Key ErrorMsg
-            Indicates that the key was unable to be removed from the remote.
-        """
-        self.send("REMOVE-FAILURE", key,
-                  "Removal of content from urls is not possible")
+    def claimurl(self, url):
+        scheme = urlparse(url).scheme
+        if scheme in self.SUPPORTED_SCHEMES:
+            return True
+        else:
+            return False
 
-    def req_WHEREIS(self, key):
-        """
-        WHEREIS-SUCCESS String
-            Indicates a location of a key. Typically an url, the string can be anything
-            that it makes sense to display to the user about content stored in the special
-            remote.
-        WHEREIS-FAILURE
-            Indicates that no location is known for a key.
-        """
-        # All that information is stored in annex itself, we can't complement anything
-        self.send("WHEREIS-FAILURE")
+    def remove(self, key):
+        raise RemoteError("Removal of content from urls is not possible")
 
-    def _transfer(self, cmd, key, path):
-
-        # TODO: We might want that one to be a generator so we do not bother requesting
-        # all possible urls at once from annex.
-        urls = []
-
-        # TODO: priorities etc depending on previous experience or settings
-
-        for url in self.gen_URLS(key):
-            urls.append(url)
-            try:
-                downloaded_path = self._providers.download(
-                    url, path=path, overwrite=True
-                )
-                lgr.info("Successfully downloaded %s into %s", url, downloaded_path)
-                self.send('TRANSFER-SUCCESS', cmd, key)
-                return
-            except Exception as exc:
-                ce = CapturedException(exc)
-                self.debug("Failed to download url %s for key %s: %s"
-                           % (url, key, ce))
-
-        raise RuntimeError(
-            "Failed to download from any of %d locations" % len(urls)
-        )
+    def whereis(self, key):
+        # All that information is stored in annex itself,
+        # we can't complement anything
+        raise RemoteError()
 
 
 def main():
     """cmdline entry point"""
-    super_main(backend="datalad")
+    from annexremote import Master
+    master = Master()
+    remote = DataladAnnexCustomRemote(master)
+    master.LinkRemote(remote)
+    master.Listen()
