@@ -202,8 +202,7 @@ def test_script_shims():
     runner = Runner()
     for script in [
         'datalad',
-        'git-annex-remote-datalad-archives',
-        'git-annex-remote-datalad']:
+        'git-annex-remote-datalad-archives']:
         if not on_windows:
             # those must be available for execution, and should not contain
             which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
