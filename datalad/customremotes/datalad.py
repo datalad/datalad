@@ -20,6 +20,7 @@ from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
+
 from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.datalad')

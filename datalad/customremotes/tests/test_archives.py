@@ -8,21 +8,30 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from unittest.mock import patch
+import glob
+import logging
 import os
 import os.path as op
 import sys
-import logging
-import glob
 from time import sleep
+from unittest.mock import patch
 
 from datalad.api import Dataset
-from ..archives import (
-    ArchiveAnnexCustomRemote,
-    link_file_load,
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
 )
-from ...support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
+
 from ...consts import ARCHIVES_SPECIAL_REMOTE
+from ...support.annexrepo import AnnexRepo
+from ...tests.test_archives import (
+    fn_archive_obscure,
+    fn_archive_obscure_ext,
+    fn_in_archive_obscure,
+)
 from ...tests.utils import (
     abspath,
     assert_equal,
@@ -41,22 +50,10 @@ from ...tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.cmd import (
-    GitWitlessRunner,
-    KillOutput,
-    StdOutErrCapture,
-    WitlessRunner,
-)
-from datalad.support.exceptions import CommandError
-from ...utils import (
-    unlink,
-)
-
-
-from ...tests.test_archives import (
-    fn_archive_obscure,
-    fn_archive_obscure_ext,
-    fn_in_archive_obscure,
+from ...utils import unlink
+from ..archives import (
+    ArchiveAnnexCustomRemote,
+    link_file_load,
 )
 
 
@@ -220,8 +217,10 @@ def test_no_rdflib_loaded():
 def check_observe_tqdm(topdir, topurl, outdir):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
-    from datalad.api import add_archive_content
-    from datalad.api import create
+    from datalad.api import (
+        add_archive_content,
+        create,
+    )
     ds = create(outdir)
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):

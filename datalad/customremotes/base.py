@@ -13,9 +13,9 @@ from __future__ import absolute_import
 __docformat__ = 'restructuredtext'
 
 
+import logging
 from collections import Counter
 
-import logging
 lgr = logging.getLogger('datalad.customremotes')
 
 from annexremote import (
@@ -143,8 +143,10 @@ def ensure_datalad_remote(repo, remote=None,
     encryption, autoenable : optional
         Passed to `init_datalad_remote`.
     """
-    from datalad.consts import DATALAD_SPECIAL_REMOTE
-    from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
+    from datalad.consts import (
+        DATALAD_SPECIAL_REMOTE,
+        DATALAD_SPECIAL_REMOTES_UUIDS,
+    )
 
     remote = remote or DATALAD_SPECIAL_REMOTE
 

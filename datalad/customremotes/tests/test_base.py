@@ -12,10 +12,11 @@
 from os.path import isabs
 
 from datalad.api import (
-    clone,
     Dataset,
+    clone,
 )
 from datalad.consts import DATALAD_SPECIAL_REMOTE
+from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
     assert_false,
     assert_in,
@@ -25,14 +26,13 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import Path
 
+from ..archives import ArchiveAnnexCustomRemote
 from ..base import (
     ensure_datalad_remote,
     init_datalad_remote,
 )
-from ..archives import ArchiveAnnexCustomRemote
 
 
 # PermissionError: [WinError 32] The process cannot access the file because it is being used by another process:

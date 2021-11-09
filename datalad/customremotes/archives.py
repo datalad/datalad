@@ -10,33 +10,33 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
 import os
 import os.path as op
+import shutil
 from collections import OrderedDict
 from operator import itemgetter
-import shutil
 from urllib.parse import urlparse
-
-import logging
 
 from annexremote import (
     RemoteError,
     UnsupportedRequest,
 )
+
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
 from datalad.support.archives import ArchivesCache
+from datalad.support.cache import DictCache
 from datalad.support.exceptions import CapturedException
-from datalad.support.network import URL
 from datalad.support.locking import lock_if_check_fails
+from datalad.support.network import URL
 from datalad.utils import (
+    ensure_bytes,
     getpwd,
     unique,
-    ensure_bytes,
     unlink,
 )
 
 from .base import AnnexCustomRemote
-from datalad.support.cache import DictCache
 
 lgr = logging.getLogger('datalad.customremotes.archive')
 
@@ -89,8 +89,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # MIH figure out what the following is all about
         # in particular path==None
-        from ..support.annexrepo import AnnexRepo
         from ..cmdline.helpers import get_repo_instance
+        from ..support.annexrepo import AnnexRepo
         self.repo = get_repo_instance(class_=AnnexRepo) \
             if not path \
             else AnnexRepo(path, create=False, init=False)
@@ -413,6 +413,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # TODO: we need to report user somehow about this happening and
         # progress on the download
         from humanize import naturalsize
+
         from datalad.support.annexrepo import AnnexJsonProtocol
 
         akey_size = self.repo.get_size_from_key(akey)

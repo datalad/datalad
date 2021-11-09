@@ -11,6 +11,10 @@
 import glob
 import os.path as op
 
+from datalad.distribution.dataset import Dataset
+from datalad.downloaders.tests.utils import get_test_providers
+from datalad.support.exceptions import CommandError
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     assert_in,
     assert_raises,
@@ -20,11 +24,6 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.support.external_versions import external_versions
-
-from datalad.support.exceptions import CommandError
-from datalad.downloaders.tests.utils import get_test_providers
-from datalad.distribution.dataset import Dataset
 
 
 @with_tempfile()
