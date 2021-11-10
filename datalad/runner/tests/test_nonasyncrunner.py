@@ -413,7 +413,6 @@ def test_timeout_all():
         timeout=.1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
-    print(timeout_queue)
     # This is not a very nice, but on some systems the
     # stdin pipe might not be filled with the data that
     # we wrote, and will therefore not create a timeout,
@@ -469,8 +468,7 @@ def test_exit_3():
                         protocol_class=GenStdoutStderr,
                         timeout=.5,
                         exception_on_error=False)
-    for x in rt.run():
-        print(x)
+    tuple(rt.run())
     assert_true(rt.process.poll() is not None)
 
 
@@ -504,8 +502,7 @@ def test_exit_4():
                         stdin=None,
                         protocol_class=GenNothing,
                         timeout=.5)
-    for x in rt.run():
-        print(x)
+    tuple(rt.run())
     assert_true(rt.process.poll() is not None)
 
 

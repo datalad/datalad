@@ -29,7 +29,6 @@ def test_generator_mixin_basic():
 
     i = 0
     for fd, data in run_command([sys.executable, "-i", "-"], TestProtocol, stdin_queue):
-        print(f"[{fd}]: {repr(data)}")
         if i > 10:
             stdin_queue.put(b"exit(0)\n")
             stdin_queue.put(None)
@@ -45,7 +44,6 @@ def test_generator_mixin_runner():
     runner = WitlessRunner()
     i = 0
     for fd, data in runner.run(cmd=[sys.executable, "-i", "-"], protocol=TestProtocol, stdin=stdin_queue):
-        print(f"[{fd}]: {repr(data)}")
         if i > 10:
             stdin_queue.put(b"exit(0)\n")
             stdin_queue.put(None)
