@@ -466,10 +466,12 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         f_args = f_argspec.args
 
         # If bound function is used with wrong signature (especially by
-        # explicitly passing a dataset, let's raise a proper exception instead
+        # explicitly passing a dataset), let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) >= len(f_args):
-            non_dataset_args = ['self'] + [a for a in f_args if a != dataset_argname]
+        # In case whenever kwonlyargs are used, 'dataset' would not be listed
+        # among args, so we would account for it (possibly) be there.
+        if len(args) >= len(f_args) + int(bool(f_argspec.kwonlyargs)):
+            non_dataset_args = ["self"] + [a for a in f_args if a != dataset_argname]
             raise TypeError(
                 f"{name}() takes at most {len(f_args)} arguments ({len(args)} given): "
                 f"{non_dataset_args}")
@@ -477,13 +479,22 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
             raise TypeError(
                 f"{name}() got an unexpected keyword argument {dataset_argname}")
         kwargs[dataset_argname] = instance
-        ds_index = f_args.index(dataset_argname)
-        for i in range(0, len(args)):
-            if i < ds_index:
-                kwargs[f_args[i]] = args[i]
-            elif i >= ds_index:
-                kwargs[f_args[i+1]] = args[i]
-        return f(**kwargs)
+        if dataset_argname in f_argspec.kwonlyargs:
+            # * was used to enforce kwargs, so we just would pass things as is
+            pass
+        else:
+            # so it is "old" style, where it is a regular kwargs - we pass everything
+            # via kwargs
+            # TODO: issue a DX oriented warning that we advise to separate out kwargs,
+            # dataset included, with * from positional args?
+            ds_index = f_args.index(dataset_argname)
+            for i in range(0, len(args)):
+                if i < ds_index:
+                    kwargs[f_args[i]] = args[i]
+                elif i >= ds_index:
+                    kwargs[f_args[i+1]] = args[i]
+            args = []
+        return f(*args, **kwargs)
 
     setattr(Dataset, name, apply_func)
     # set the ad-hoc attribute so that @build_doc could also bind built doc
