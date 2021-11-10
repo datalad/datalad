@@ -56,7 +56,7 @@ def duecredit_dataset(dataset):
         with swallow_logs(logging.ERROR) as cml:
             res = dataset.metadata(
                 reporton='datasets',  # Interested only in the dataset record
-                result_renderer=None,  # No need
+                result_renderer='disabled',  # No need
                 return_type='item-or-list'  # Expecting a single record
             )
     except Exception as exc:

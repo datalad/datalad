@@ -705,7 +705,7 @@ def test_get_relays_command_errors(path):
     ds.save()
     ds.drop("foo", check=False)
     assert_result_count(
-        ds.get("foo", on_failure="ignore", result_renderer=None),
+        ds.get("foo", on_failure="ignore", result_renderer='disabled'),
         1, action="get", type="file", status="error")
 
 

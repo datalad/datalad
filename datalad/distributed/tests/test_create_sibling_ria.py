@@ -107,12 +107,12 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     eq_(len(res), 1)
 
     # remotes exist, but only in super
-    siblings = ds.siblings(result_renderer=None)
+    siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in siblings})
-    sub_siblings = subds.siblings(result_renderer=None)
+    sub_siblings = subds.siblings(result_renderer='disabled')
     eq_({'here'}, {s['name'] for s in sub_siblings})
-    sub2_siblings = subds2.siblings(result_renderer=None)
+    sub2_siblings = subds2.siblings(result_renderer='disabled')
     eq_({'here'}, {s['name'] for s in sub2_siblings})
 
     # check bare repo:
@@ -166,14 +166,14 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     assert_result_count(res, 1, path=str(subds2.pathobj), status='ok', action="create-sibling-ria")
 
     # remotes now exist in super and sub
-    siblings = ds.siblings(result_renderer=None)
+    siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in siblings})
-    sub_siblings = subds.siblings(result_renderer=None)
+    sub_siblings = subds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in sub_siblings})
     # but no special remote in plain git subdataset:
-    sub2_siblings = subds2.siblings(result_renderer=None)
+    sub2_siblings = subds2.siblings(result_renderer='disabled')
     eq_({'datastore', 'here'},
         {s['name'] for s in sub2_siblings})
 
@@ -327,7 +327,7 @@ def test_storage_only(base_path, ds_path):
     eq_(len(res), 1)
 
     # the storage sibling uses the main name, not -storage
-    siblings = ds.siblings(result_renderer=None)
+    siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'here'},
         {s['name'] for s in siblings})
 
@@ -353,14 +353,14 @@ def test_no_storage(store1, store2, ds_path):
                                 new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore1', 'here'},
-        {s['name'] for s in ds.siblings(result_renderer=None)})
+        {s['name'] for s in ds.siblings(result_renderer='disabled')})
 
     # deprecated way of disabling storage still works
     res = ds.create_sibling_ria(store2_url, "datastore2",
                                 disable_storage__=True, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore2', 'datastore1', 'here'},
-        {s['name'] for s in ds.siblings(result_renderer=None)})
+        {s['name'] for s in ds.siblings(result_renderer='disabled')})
 
     # smoke test that we can push to it
     res = ds.push(to='datastore1')

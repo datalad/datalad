@@ -50,7 +50,7 @@ def test_runnin_on_empty(path):
     # just wrap with a dataset
     ds = Dataset(path)
     # and run status ... should be good and do nothing
-    eq_([], ds.status(result_renderer=None))
+    eq_([], ds.status(result_renderer='disabled'))
 
 
 @with_tempfile(mkdir=True)
@@ -68,8 +68,8 @@ def test_status_basics(path, linkpath, otherdir):
     # outcome identical between ds= and auto-discovery
     with chpwd(path):
         assert_raises(IncompleteResultsError, status, path=otherdir)
-        stat = status(result_renderer=None)
-    eq_(stat, ds.status(result_renderer=None))
+        stat = status(result_renderer='disabled')
+    eq_(stat, ds.status(result_renderer='disabled'))
     assert_status('ok', stat)
     # we have a bunch of reports (be vague to be robust to future changes
     assert len(stat) > 2
@@ -89,13 +89,13 @@ def test_status_basics(path, linkpath, otherdir):
 def test_status_nods(path, otherpath):
     ds = Dataset(path).create()
     assert_result_count(
-        ds.status(path=otherpath, on_failure='ignore', result_renderer=None),
+        ds.status(path=otherpath, on_failure='ignore', result_renderer='disabled'),
         1,
         status='error',
         message=('path not underneath the reference dataset %s', ds.path))
     otherds = Dataset(otherpath).create()
     assert_result_count(
-        ds.status(path=otherpath, on_failure='ignore', result_renderer=None),
+        ds.status(path=otherpath, on_failure='ignore', result_renderer='disabled'),
         1,
         path=otherds.path,
         status='error',
@@ -122,7 +122,7 @@ def test_status(_path, linkpath):
     # spotcheck that annex status reporting and availability evaluation
     # works
     assert_result_count(
-        ds.status(annex='all', result_renderer=None),
+        ds.status(annex='all', result_renderer='disabled'),
         1,
         path=str(ds.pathobj / 'subdir' / 'annexed_file.txt'),
         key='MD5E-s5--275876e34cf609db118f3d84b799a790.txt',
@@ -134,7 +134,7 @@ def test_status(_path, linkpath):
         'MD5E-s5--275876e34cf609db118f3d84b799a790.txt' /
         'MD5E-s5--275876e34cf609db118f3d84b799a790.txt'))
 
-    plain_recursive = ds.status(recursive=True, result_renderer=None)
+    plain_recursive = ds.status(recursive=True, result_renderer='disabled')
     # check integrity of individual reports
     for res in plain_recursive:
         # anything that is an "intended" symlink should be reported
@@ -147,22 +147,22 @@ def test_status(_path, linkpath):
     # bunch of smoke tests
     # query of '.' is same as no path
     eq_(plain_recursive, ds.status(path='.', recursive=True,
-                                   result_renderer=None))
+                                   result_renderer='disabled'))
     # duplicate paths do not change things
     eq_(plain_recursive, ds.status(path=['.', '.'], recursive=True,
-                                   result_renderer=None))
+                                   result_renderer='disabled'))
     # neither do nested paths
     eq_(plain_recursive,
         ds.status(path=['.', 'subds_modified'], recursive=True,
-                  result_renderer=None))
+                  result_renderer='disabled'))
     # when invoked in a subdir of a dataset it still reports on the full thing
     # just like `git status`, as long as there are no paths specified
     with chpwd(op.join(path, 'directory_untracked')):
-        plain_recursive = status(recursive=True, result_renderer=None)
+        plain_recursive = status(recursive=True, result_renderer='disabled')
     # should be able to take absolute paths and yield the same
     # output
     eq_(plain_recursive, ds.status(path=ds.path, recursive=True,
-                                   result_renderer=None))
+                                   result_renderer='disabled'))
 
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
@@ -178,9 +178,9 @@ def test_status(_path, linkpath):
             # change into the realpath of the dataset and
             # query with an explicit path
             with chpwd(ds.repo.path):
-                res = ds.status(path=op.join('.', rpath), result_renderer=None)
+                res = ds.status(path=op.join('.', rpath), result_renderer='disabled')
         else:
-            res = ds.status(path=p, result_renderer=None)
+            res = ds.status(path=p, result_renderer='disabled')
         assert_result_count(
             res,
             1,
@@ -193,20 +193,20 @@ def test_status(_path, linkpath):
 
     assert_result_count(
         ds.status(
-            recursive=True, result_renderer=None),
+            recursive=True, result_renderer='disabled'),
         1,
         path=apath)
     # limiting recursion will exclude this particular path
     assert_result_count(
         ds.status(
             recursive=True,
-            recursion_limit=1, result_renderer=None),
+            recursion_limit=1, result_renderer='disabled'),
         0,
         path=apath)
     # negative limit is unlimited limit
     eq_(
-        ds.status(recursive=True, recursion_limit=-1, result_renderer=None),
-        ds.status(recursive=True, result_renderer=None)
+        ds.status(recursive=True, recursion_limit=-1, result_renderer='disabled'),
+        ds.status(recursive=True, result_renderer='disabled')
     )
 
     # check integrity of individual reports with a focus on how symlinks
@@ -214,7 +214,7 @@ def test_status(_path, linkpath):
     # this is different from plain git-mode, which reports types as-is
     # from the git record
     for res in ds.status(recursive=True, annex='basic',
-                         result_renderer=None):
+                         result_renderer='disabled'):
         # anything that is an "intended" symlink should be reported
         # as such. In contrast, anything that is a symlink for mere
         # technical reasons (annex using it for something in some mode)
@@ -237,7 +237,7 @@ def test_subds_status(path):
     assert_repo_status(subds.path)
     assert_repo_status(ds.path, modified=['subds'])
     assert_result_count(
-        ds.status(path='subds', result_renderer=None),
+        ds.status(path='subds', result_renderer='disabled'),
         1,
         # must be modified, not added (ds was clean after it was added)
         state='modified',
@@ -248,7 +248,7 @@ def test_subds_status(path):
     # path="." gets treated as "this dataset's content" without requiring a
     # trailing "/"...
     assert_result_count(
-        subds.status(path=".", result_renderer=None),
+        subds.status(path=".", result_renderer='disabled'),
         1,
         type="dataset",
         path=op.join(subds.path, "someotherds"),
@@ -256,7 +256,7 @@ def test_subds_status(path):
 
     # ... and so does path=<path/to/ds>.
     assert_result_count(
-        subds.status(path=subds.path, result_renderer=None),
+        subds.status(path=subds.path, result_renderer='disabled'),
         1,
         type="dataset",
         path=op.join(subds.path, "someotherds"),
@@ -264,7 +264,7 @@ def test_subds_status(path):
 
     assert_result_count(
         subds.status(path=op.join(subds.path, op.pardir, "subds"),
-                     result_renderer=None),
+                     result_renderer='disabled'),
         1,
         type="dataset",
         path=op.join(subds.path, "someotherds"),
@@ -272,7 +272,7 @@ def test_subds_status(path):
 
     assert_result_count(
         subds.status(path=op.join(subds.path, op.curdir),
-                     result_renderer=None),
+                     result_renderer='disabled'),
         1,
         type="dataset",
         path=op.join(subds.path, "someotherds"),
@@ -297,7 +297,7 @@ def test_status_symlinked_dir_within_repo(path):
 
     def call():
         return ds.status(path=[bar_f], annex="availability",
-                         on_failure="ignore", result_renderer=None)
+                         on_failure="ignore", result_renderer='disabled')
 
     if ds.repo.git_annex_version < "8.20200522" or on_windows:
         # TODO: on windows even with a recent annex -- no CommandError is raised, TODO
