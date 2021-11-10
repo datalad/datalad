@@ -29,7 +29,7 @@ from datalad.distribution.install import Install
 from datalad.interface.unlock import Unlock
 
 from datalad.interface.base import Interface
-from datalad.interface.utils import default_result_renderer
+from datalad.interface.utils import generic_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
@@ -288,7 +288,7 @@ class Run(Interface):
             else:
                 raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
         else:
-            default_result_renderer(res)
+            generic_result_renderer(res)
 
 
 def _display_basic(res):

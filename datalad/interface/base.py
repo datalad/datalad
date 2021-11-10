@@ -762,14 +762,16 @@ class Interface(object):
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
-            # allow commands to override the default, unless something other than
-            # default is requested
+            # allow commands to override the default, unless something other
+            # than the default 'tailored' is requested
             kwargs['result_renderer'] = \
-                args.common_output_format if args.common_output_format != 'tailored' \
-                else getattr(cls, 'result_renderer', 'default')
-            if '{' in args.common_output_format:
+                args.common_result_renderer \
+                if args.common_result_renderer != 'tailored' \
+                else getattr(cls, 'result_renderer', 'generic')
+            if '{' in args.common_result_renderer:
                 # stupid hack, could and should become more powerful
-                kwargs['result_renderer'] = DefaultOutputRenderer(args.common_output_format)
+                kwargs['result_renderer'] = DefaultOutputRenderer(
+                    args.common_result_renderer)
 
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure

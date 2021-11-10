@@ -16,7 +16,7 @@ import re
 import os
 
 from datalad.interface.base import Interface
-from datalad.interface.utils import default_result_renderer
+from datalad.interface.utils import generic_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
@@ -289,7 +289,7 @@ class Subdatasets(Interface):
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
-        default_result_renderer(res)
+        generic_result_renderer(res)
 
 
 # internal helper that needs all switches, simply to avoid going through

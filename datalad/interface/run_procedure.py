@@ -470,7 +470,7 @@ class RunProcedure(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        from datalad.interface.utils import default_result_renderer
+        from datalad.interface.utils import generic_result_renderer
 
         if res['status'] != 'ok':
             # logging complained about this already
@@ -478,7 +478,7 @@ class RunProcedure(Interface):
 
         if 'procedure' not in res.get('action', ''):
             # it's not our business
-            default_result_renderer(res)
+            generic_result_renderer(res)
             return
 
         if kwargs.get('discover', None):
@@ -508,4 +508,4 @@ class RunProcedure(Interface):
             ))
 
         else:
-            default_result_renderer(res)
+            generic_result_renderer(res)
