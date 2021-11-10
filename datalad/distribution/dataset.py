@@ -9,6 +9,7 @@
 """Implements class Dataset
 """
 
+import inspect
 import logging
 from functools import wraps
 from os.path import (
@@ -461,27 +462,27 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # This wrapper is NOT returned by the decorator, but only used to bind
         # the function `f` to the Dataset class.
         kwargs = kwargs.copy()
-        from datalad.utils import getargspec
-        orig_pos = getargspec(f).args
+        f_argspec = inspect.getfullargspec(f)
+        f_args = f_argspec.args
 
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) >= len(orig_pos):
+        if len(args) >= len(f_args):
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
-                            " {3}".format(name, len(orig_pos), len(args),
-                                          ['self'] + [a for a in orig_pos
+                            " {3}".format(name, len(f_args), len(args),
+                                          ['self'] + [a for a in f_args
                                                       if a != dataset_argname]))
         if dataset_argname in kwargs:
             raise TypeError("{}() got an unexpected keyword argument {}"
                             "".format(name, dataset_argname))
         kwargs[dataset_argname] = instance
-        ds_index = orig_pos.index(dataset_argname)
+        ds_index = f_args.index(dataset_argname)
         for i in range(0, len(args)):
             if i < ds_index:
-                kwargs[orig_pos[i]] = args[i]
+                kwargs[f_args[i]] = args[i]
             elif i >= ds_index:
-                kwargs[orig_pos[i+1]] = args[i]
+                kwargs[f_args[i+1]] = args[i]
         return f(**kwargs)
 
     setattr(Dataset, name, apply_func)
