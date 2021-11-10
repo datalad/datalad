@@ -34,12 +34,26 @@ from weakref import (
     WeakValueDictionary,
 )
 
+from datalad.cmd import (
+    BatchedCommand,
+    GitWitlessRunner,
+    # KillOutput,
+    SafeDelCloseMixin,
+    StdOutCapture,
+    StdOutErrCapture,
+    WitlessProtocol,
+)
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
     exc_str,
     borrowdoc,
     borrowkwargs,
 )
+from datalad.log import log_progress
+from datalad.runner.protocol import GeneratorMixIn
+from datalad.runner.utils import LineSplitter
+# must not be loads, because this one would log, and we need to log ourselves
+from datalad.support.json_py import json_loads
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
@@ -51,19 +65,6 @@ from datalad.utils import (
     split_cmdline,
     unlink,
 )
-from datalad.log import log_progress
-# must not be loads, because this one would log, and we need to log ourselves
-from datalad.support.json_py import json_loads
-from datalad.cmd import (
-    BatchedCommand,
-    GitWitlessRunner,
-    # KillOutput,
-    SafeDelCloseMixin,
-    StdOutCapture,
-    StdOutErrCapture,
-    WitlessProtocol,
-)
-from datalad.runner.protocol import GeneratorMixIn
 
 # imports from same module:
 from datalad.dataset.repo import RepoInterface
@@ -1213,26 +1214,18 @@ class AnnexRepo(GitRepo, RepoInterface):
                     return
                 super().pipe_data_received(fd, data)
 
-        current_content = ""
+        line_splitter = LineSplitter(separator=sep)
         for source, content in self._call_annex(
                                 args,
                                 files=files,
                                 protocol=GeneratorStdOutErrCapture):
 
             if source == "stdout":
-                current_content += content
-                if sep is not None:
-                    lines = current_content.split(sep)
-                    current_content = lines[-1]
-                    del lines[-1]
-                else:
-                    lines = current_content.splitlines()
-                    if current_content.endswith(os.linesep):
-                        current_content = ""
-                    else:
-                        current_content = lines[-1]
-                        del lines[-1]
-                yield from lines
+                yield from line_splitter.process(content)
+
+        remaining_content = line_splitter.finish_processing()
+        if remaining_content is not None:
+            yield remaining_content + os.linesep
 
     def call_annex_oneline(self, args, files=None):
         """Call annex for a single line of output.
