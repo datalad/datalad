@@ -154,14 +154,14 @@ lgr.debug(
 #
 
 # `getargspec` has been deprecated in Python 3.
-if hasattr(inspect, "getfullargspec"):
-    ArgSpecFake = collections.namedtuple(
-        "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
+ArgSpecFake = collections.namedtuple(
+    "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
-    def getargspec(func):
-        return ArgSpecFake(*inspect.getfullargspec(func)[:4])
-else:
-    getargspec = inspect.getargspec
+
+def getargspec(func):
+    """Minimal compat shim for getargspec deprecated in python 3.
+    """
+    return ArgSpecFake(*inspect.getfullargspec(func)[:4])
 
 
 def any_re_search(regexes, value):
