@@ -164,25 +164,6 @@ else:
     getargspec = inspect.getargspec
 
 
-def get_func_kwargs_doc(func):
-    """ Provides args for a function
-
-    Parameters
-    ----------
-    func: str
-      name of the function from which args are being requested
-
-    Returns
-    -------
-    list
-      of the args that a function takes in
-    """
-    return getargspec(func)[0]
-
-    # TODO: format error message with descriptions of args
-    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
-
-
 def any_re_search(regexes, value):
     """Return if any of regexes (list or str) searches successfully for value"""
     for regex in ensure_tuple_or_list(regexes):
