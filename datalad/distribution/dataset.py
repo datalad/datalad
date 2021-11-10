@@ -469,13 +469,13 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
         if len(args) >= len(f_args):
-            raise TypeError("{0}() takes at most {1} arguments ({2} given):"
-                            " {3}".format(name, len(f_args), len(args),
-                                          ['self'] + [a for a in f_args
-                                                      if a != dataset_argname]))
+            non_dataset_args = ['self'] + [a for a in f_args if a != dataset_argname]
+            raise TypeError(
+                f"{name}() takes at most {len(f_args)} arguments ({len(args)} given): "
+                f"{non_dataset_args}")
         if dataset_argname in kwargs:
-            raise TypeError("{}() got an unexpected keyword argument {}"
-                            "".format(name, dataset_argname))
+            raise TypeError(
+                f"{name}() got an unexpected keyword argument {dataset_argname}")
         kwargs[dataset_argname] = instance
         ds_index = f_args.index(dataset_argname)
         for i in range(0, len(args)):
