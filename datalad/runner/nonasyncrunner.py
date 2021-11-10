@@ -26,6 +26,7 @@ from typing import (
     Union,
 )
 
+from datalad.utils import on_windows
 from .protocol import WitlessProtocol
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
@@ -198,7 +199,18 @@ def run_command(cmd: Union[str, List],
 
     protocol = protocol(**protocol_kwargs)
 
-    process = subprocess.Popen(cmd, **kwargs)
+    try:
+        process = subprocess.Popen(cmd, **kwargs)
+    except OSError as e:
+        if not on_windows and "argument list too long" in str(e).lower():
+            lgr.error(
+                "Caught exception suggesting too large stack size limits. "
+                "Hint: use 'ulimit -s' command to see current limit and "
+                "e.g. 'ulimit -s 8192' to reduce it to avoid this exception. "
+                "See https://github.com/datalad/datalad/issues/6106 for more "
+                "information."
+            )
+        raise
     process_stdin_fileno = process.stdin.fileno() if write_stdin else None
     process_stdout_fileno = process.stdout.fileno() if catch_stdout else None
     process_stderr_fileno = process.stderr.fileno() if catch_stderr else None
