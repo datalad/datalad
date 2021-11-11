@@ -117,10 +117,7 @@ def test_help_np():
     ok_startswith(stdout, 'Usage: datalad')
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
     sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
-    # but order is still not guaranteed (dict somewhere)! TODO
-    # see https://travis-ci.org/datalad/datalad/jobs/80519004
-    # thus testing sets
-    for s in {'Commands for dataset operations',
+    for s in {'Essential commands',
               'Commands for metadata handling',
               'Miscellaneous commands',
               'General information',
