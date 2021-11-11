@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Tests for install-dataset command
+"""Tests for download-url command
 
 """
 
@@ -16,35 +16,32 @@ import os
 from os.path import join as opj
 
 from datalad.api import (
+    Dataset,
     clone,
     download_url,
-    Dataset,
 )
-from datalad.utils import (
-    chpwd,
-    Path,
-)
-
 from datalad.tests.utils import (
+    DEFAULT_REMOTE,
     assert_cwd_unchanged,
     assert_false,
     assert_in,
+    assert_in_results,
     assert_message,
+    assert_not_in,
     assert_result_count,
     create_tree,
     eq_,
     ok_,
     ok_exists,
-    with_tempfile,
-)
-from datalad.tests.utils import (
-    DEFAULT_REMOTE,
-    assert_in_results,
-    assert_not_in,
     serve_path_via_http,
     skip_if_no_network,
     slow,
+    with_tempfile,
     with_tree,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
 )
 
 
