@@ -183,14 +183,14 @@ class Clean(Interface):
         # Don't render things like 'status' for clean-info messages -
         # seems rather meaningless.
 
-        from datalad.interface.utils import default_result_renderer
+        from datalad.interface.utils import generic_result_renderer
         import datalad.support.ansi_colors as ac
         from datalad.utils import Path
         from os import getcwd
 
         if res['action'] == 'clean':
             # default renderer is just fine
-            return default_result_renderer(res)
+            return generic_result_renderer(res)
         elif res['action'] != 'clean [dry-run]':
             # Result didn't come from within `clean`.
             # Should be handled elsewhere.
@@ -222,7 +222,7 @@ class Clean(Interface):
 
         else:
             # Any other status than 'ok' is reported the default way.
-            return default_result_renderer(res)
+            return generic_result_renderer(res)
 
     @staticmethod
     def custom_result_summary_renderer(results):

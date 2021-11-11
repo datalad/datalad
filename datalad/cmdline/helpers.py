@@ -24,7 +24,10 @@ from textwrap import wrap
 
 from datalad import __version__
 from ..cmd import WitlessRunner as Runner
-from ..interface.common_opts import eval_defaults
+from ..interface.common_opts import (
+    eval_defaults,
+    eval_params,
+)
 from ..log import is_interactive
 from datalad.support.exceptions import CapturedException
 from ..ui.utils import get_console_width
@@ -240,25 +243,15 @@ def parser_add_common_options(parser, version=None):
     # and a different default: in Python API we have None as default and do not render
     # the results but return them.  In CLI we default to "default" renderer
     parser.add_argument(
-        '-f', '--output-format', dest='common_output_format',
+        # this should really have --result-renderer for homogeneity with the
+        # Python API, but adding it in addition makes the help output
+        # monsterous
+        '-f', '--output-format', # '--result-renderer',
+        dest='common_result_renderer',
         default='tailored',
         type=ensure_unicode,
-        metavar="{default,json,json_pp,tailored,'<template>'}",
-        help="""select format for returned command results. 'tailored'
-        enables a command-specific rendering style that is typically
-        tailored to human consumption, if there is one for a specific
-        command, or otherwise falls back on the the 'default' output
-        format (this is the standard behavior); 'default' give one line
-        per result reporting action, status, path and an optional message;
-        'json' renders a JSON object with all properties for each result (one per
-        line); 'json_pp' pretty-prints JSON spanning multiple lines;
-        '<template>' reports any value(s) of any result properties in any format
-        indicated by the template (e.g. '{path}'; compare with JSON
-        output for all key-value choices). The template syntax follows the Python
-        "format() language". It is possible to report individual
-        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
-        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the template,
-        like so: '{metadata[music#Genre]}'. [Default: '%(default)s']""")
+        metavar="{generic,json,json_pp,tailored,disabled,'<template>'}",
+        help=eval_params['result_renderer']._doc + " [Default: '%(default)s']")
     parser.add_argument(
         '--report-status', dest='common_report_status',
         choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],

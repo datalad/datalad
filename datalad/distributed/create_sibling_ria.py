@@ -356,7 +356,7 @@ class CreateSiblingRia(Interface):
             # even if we have to fail, let's report all conflicting siblings
             # in subdatasets
             failed = False
-            for r in ds.siblings(result_renderer=None,
+            for r in ds.siblings(result_renderer='disabled',
                                  recursive=recursive,
                                  recursion_limit=recursion_limit):
                 log_progress(
@@ -523,7 +523,7 @@ def _create_sibling_ria(
     # determine layout locations; go for a v1 store-level layout
     repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
 
-    ds_siblings = [r['name'] for r in ds.siblings(result_renderer=None)]
+    ds_siblings = [r['name'] for r in ds.siblings(result_renderer='disabled')]
     # Figure whether we are supposed to skip this very dataset
     if existing == 'skip' and (
             name in ds_siblings or (
@@ -742,7 +742,7 @@ def _create_sibling_ria(
         recursive=False,
         # Note, that this should be None if storage_sibling was not set
         publish_depends=storage_name,
-        result_renderer=None,
+        result_renderer='disabled',
         # Note, that otherwise a subsequent publish will report
         # "notneeded".
         fetch=True

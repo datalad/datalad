@@ -544,7 +544,7 @@ def test_run_remove_keeps_leading_directory(path):
 
     assert_in_results(
         ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
-               result_renderer=None),
+               result_renderer='disabled'),
         action="run.remove", status="ok")
 
     assert_repo_status(ds.path)
@@ -554,7 +554,7 @@ def test_run_remove_keeps_leading_directory(path):
     repo.drop(output_rel, options=["--force"])
     assert_in_results(
         ds.run("cd .> something-else", outputs=[output_rel],
-               result_renderer=None),
+               result_renderer='disabled'),
         action="run.remove", status="ok")
     assert_repo_status(ds.path)
 

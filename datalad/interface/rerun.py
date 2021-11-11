@@ -697,7 +697,7 @@ def diff_revision(dataset, revision="HEAD"):
     diff = dataset.diff(recursive=True,
                         fr=fr, to=revision,
                         result_filter=changed,
-                        return_type='generator', result_renderer=None)
+                        return_type='generator', result_renderer='disabled')
     for r in diff:
         yield r
 

@@ -695,7 +695,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
             # TODO evaluate whether this should be exposed as a switch
             # to run an explicit force-drop prior to calling remove()
             check=False,
-            result_renderer=None, return_type=list)
+            result_renderer='disabled', return_type=list)
         if not objs2add and not refds_path == ds_path:
             # this is not the base dataset, make sure to save removal in the
             # parentds -- not needed when objects get added, as removal itself

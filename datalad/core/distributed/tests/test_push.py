@@ -113,7 +113,7 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
                     where='local')
     else:
         target = GitRepo(path=path, bare=bare, create=True)
-    ds.siblings('add', name=name, url=path, result_renderer=None)
+    ds.siblings('add', name=name, url=path, result_renderer='disabled')
     if annex and not bare and target.is_managed_branch():
         # maximum complication
         # the target repo already has a commit that is unrelated
@@ -594,7 +594,7 @@ def test_gh1763(src, target1, target2):
     target1 = mk_push_target(src, 'target1', target1, bare=False)
     target2 = mk_push_target(src, 'target2', target2, bare=False)
     src.siblings('configure', name='target2', publish_depends='target1',
-                 result_renderer=None)
+                 result_renderer='disabled')
     # a file to annex
     (src.pathobj / 'probe1').write_text('probe1')
     src.save('probe1', to_git=False)
