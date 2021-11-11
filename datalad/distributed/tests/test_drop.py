@@ -24,6 +24,7 @@ from datalad.support.exceptions import (
     IncompleteResultsError,
     NoDatasetFound,
 )
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
@@ -535,3 +536,15 @@ def test_drop_from_git(path):
     ds.save()
     assert_status('notneeded', ds.drop('file'))
     assert_status('notneeded', ds.drop(what='allkeys'))
+
+
+# https://github.com/datalad/datalad/issues/6180
+@with_tempfile
+@with_tempfile
+def test_drop_uninit_annexrepo(origpath, path):
+    Dataset(origpath).create()
+    # just git-clone to bypass `git annex init`
+    GitRepo.clone(origpath, path)
+    ds = Dataset(path)
+    assert_status('ok', ds.drop(what='datasets'))
+    nok_(ds.is_installed())

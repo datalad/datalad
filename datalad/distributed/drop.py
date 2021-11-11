@@ -495,7 +495,8 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         # this annex is about to die, test if it is still considered
         # not-dead. if so, complain to avoid generation of zombies
         # (annexed that are floating around, but are actually dead).
-        remotes_that_know_this_annex = [
+        # if repo.uuid is None, git annex init never ran, and we can skip this
+        remotes_that_know_this_annex = None if repo.uuid is None else [
             r
             for r in _detect_nondead_annex_at_remotes(repo, repo.uuid)
             # filter out "here"
