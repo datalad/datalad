@@ -86,6 +86,11 @@ class ForEach(Interface):
       e.g. in bottom-up order command is executed in super-dataset only after it is executed
       in all subdatasets.
 
+    Additional notes:
+
+    - for execution of `"external"` commands we use the environment used to execute external
+      git and git-annex commands.
+
     *Command format*
 
     || REFLOW >>
@@ -142,15 +147,16 @@ class ForEach(Interface):
             action="store_true",
             doc="""whether to report subdatasets in bottom-up order along
             each branch in the dataset tree, and not top-down."""),
-        # Extra options
+        # Possible extra options to be introduced if use-case/demand comes
         # TODO: --diff  to provide `diff` record so any arbitrary  git reset --hard etc desire could be fulfilled
-        # TODO: should we just introduce --lower-recursion-limit aka --mindepth of find?
+        # TODO: --lower-recursion-limit aka --mindepth of find to replace subdatasets-only.
+        #  or may be recursion_limit could be made more sophisticated to be able to specify range
         subdatasets_only=Parameter(
             args=("-s", "--subdatasets-only"),
             action="store_true",
             doc="""whether to exclude top level dataset.  It is implied if a non-empty
             `contains` is used"""),
-        output_streams=Parameter(  # TODO  could be of use for `run` as well
+        output_streams=Parameter(
             args=("--output-streams", "--o-s"),
             constraints=EnsureChoice('capture', 'pass-through'),
             doc="""whether to capture and return outputs from 'cmd' in the record ('stdout', 'stderr') or
@@ -165,8 +171,6 @@ class ForEach(Interface):
             of those datasets.
             """),
         jobs=jobs_opt,
-        # TODO: might want explicit option to either worry about 'safe_to_consume' setting for parallel
-        # For now - always safe
     )
 
     @staticmethod
@@ -174,6 +178,9 @@ class ForEach(Interface):
     @eval_results
     def __call__(
             cmd,
+            # TODO: uncomment
+            # *,
+            # after https://github.com/datalad/datalad/pull/6176 is merged
             cmd_type="auto",
             dataset=None,
             state='present',
@@ -303,7 +310,6 @@ class ForEach(Interface):
                             status='impossible',
                             message=('command has an unrecognized placeholder: %s', exc))
                         return
-                    # TODO: avoid use of _git_runner? why?
                     out = ds.repo._git_runner.run(
                         cmd_expanded,
                         cwd=ds.path if chpwd == 'ds' else pwd,
