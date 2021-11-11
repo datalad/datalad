@@ -17,17 +17,19 @@ for a specialized purpose.
 As the name suggests, a :term:`DataLad extension` package is a proper Python package.
 Consequently, there is a significant amount of boilerplate code involved in the
 creation of a new Datalad extension. However, this overhead enables a number of
-useful features for extension developers:
+useful features for extension developers. Extensions can
 
-- extensions can provide any number of additional commands that can be grouped into
+- provide any number of additional commands that can be grouped into
   labeled command suites, and are automatically exposed via the standard DataLad commandline
-  and Python API
-- extensions can define `entry_points` for any number of additional metadata extractors
+  and Python API if specified in `datalad.extensions` `entry_points`
+- define `datalad.metadata.extractors` for additional metadata
+  extractors, and `datalad.metadata.indexers` `entry_points` for additional metadata indexers
   that become automatically available to DataLad
-- extensions can define `entry_points` for their test suites, such that the standard `datalad test`
+- define `datalad.tests` `entry_points` for their test suites, such that the standard `datalad test`
   command will automatically run these tests in addition to the tests shipped with Datalad core
-- extensions can ship additional dataset procedures by installing them into a
+- ship additional dataset procedures by installing them into a
   directory ``resources/procedures`` underneath the extension module directory
+- ship additional downloaders listed in `datalad.downloaders` `entry_points`
 
 
 Using an extension
