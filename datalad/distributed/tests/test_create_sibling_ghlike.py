@@ -47,7 +47,7 @@ def test_invalid_call(path):
 
     # conflicting sibling name
     ds.siblings('add', name='gin', url='http://example.com',
-                result_renderer=None)
+                result_renderer='disabled')
     res = ds.create_sibling_gin(
         'bogus', name='gin', credential='some', on_failure='ignore',
         dry_run=True)
@@ -137,7 +137,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
             name='ghlike-sibling',
         )
         # now do it again
-        ds.siblings('remove', name='ghlike-sibling', result_renderer=None)
+        ds.siblings('remove', name='ghlike-sibling', result_renderer='disabled')
         res = testcmd(
             reponame, dataset=ds, api=api, credential=credential,
             on_failure='ignore')

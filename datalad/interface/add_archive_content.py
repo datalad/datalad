@@ -390,7 +390,10 @@ class AddArchiveContent(Interface):
         from datalad.customremotes.archives import ArchiveAnnexCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
         # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
-        annexarchive = ArchiveAnnexCustomRemote(path=annex.path,
+        # OK, let's ignore that the following class is actually a special
+        # remote implementation, and use it only to work with its cache
+        annexarchive = ArchiveAnnexCustomRemote(annex=None,
+                                                path=annex.path,
                                                 persistent_cache=True)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True

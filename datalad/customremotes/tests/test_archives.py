@@ -8,25 +8,29 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from unittest.mock import patch
+import glob
+import logging
 import os
 import os.path as op
 import sys
-import re
-import logging
-import glob
 from time import sleep
+from unittest.mock import patch
 
 from datalad.api import Dataset
-from ..archives import (
-    ArchiveAnnexCustomRemote,
-    link_file_load,
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
 )
-from ...support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
+
 from ...consts import ARCHIVES_SPECIAL_REMOTE
-from .test_base import (
-    BASE_INTERACTION_SCENARIOS,
-    check_interaction_scenario,
+from ...support.annexrepo import AnnexRepo
+from ...tests.test_archives import (
+    fn_archive_obscure,
+    fn_archive_obscure_ext,
+    fn_in_archive_obscure,
 )
 from ...tests.utils import (
     abspath,
@@ -46,27 +50,11 @@ from ...tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.cmd import (
-    GitWitlessRunner,
-    KillOutput,
-    StdOutErrCapture,
-    WitlessRunner,
+from ...utils import unlink
+from ..archives import (
+    ArchiveAnnexCustomRemote,
+    link_file_load,
 )
-from datalad.support.exceptions import CommandError
-from ...utils import (
-    unlink,
-)
-
-
-from ...tests.test_archives import (
-    fn_archive_obscure,
-    fn_archive_obscure_ext,
-    fn_in_archive_obscure,
-)
-from datalad import cfg as dl_cfg
-
-#import line_profiler
-#prof = line_profiler.LineProfiler()
 
 
 # TODO: with_tree ATM for archives creates this nested top directory
@@ -95,7 +83,10 @@ def test_basic_scenario(d, d2):
     annex.commit(msg="Added the load file")
 
     # Operations with archive remote URL
-    annexcr = ArchiveAnnexCustomRemote(path=d)
+    # this is not using this class for its actual purpose
+    # being a special remote implementation
+    # likely all this functionality should be elsewhere
+    annexcr = ArchiveAnnexCustomRemote(annex=None, path=d)
     # few quick tests for get_file_url
 
     eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat"), "dl+archive:xyz#path=a.dat")
@@ -209,45 +200,6 @@ def test_no_rdflib_loaded():
     assert_not_in("rdflib", out['stderr'])
 
 
-@with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
-def test_interactions(tdir):
-    # Just a placeholder since constructor expects a repo
-    repo = AnnexRepo(tdir, create=True, init=True)
-    repo.add('archive.tar.gz')
-    repo.commit('added')
-    for scenario in BASE_INTERACTION_SCENARIOS + [
-        [
-            ('GETCOST', 'COST %d' % ArchiveAnnexCustomRemote.COST),
-        ],
-        [
-            # by default we do not require any fancy init
-            # no urls supported by default
-            ('CLAIMURL http://example.com', 'CLAIMURL-FAILURE'),
-            # we know that is just a single option, url, is expected so full
-            # one would be passed
-            ('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
-        ],
-        # basic interaction failing to fetch content from archive
-        [
-            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
-            ('VALUE dl+archive://somekey2#path', None),
-            ('VALUE dl+archive://somekey3#path', None),
-            ('VALUE',
-             re.compile(
-                 'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to fetch any '
-                 'archive containing somekey. Tried: \[\]')
-             )
-        ],
-        # # incorrect response received from annex -- something isn't right but ... later
-        # [
-        #     ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
-        #     # We reply with UNSUPPORTED-REQUEST in these cases
-        #     ('GETCOST', 'UNSUPPORTED-REQUEST'),
-        # ],
-    ]:
-        check_interaction_scenario(ArchiveAnnexCustomRemote, tdir, scenario)
-
-
 @with_tree(tree=
     {'1.tar.gz':
          {
@@ -265,8 +217,10 @@ def test_interactions(tdir):
 def check_observe_tqdm(topdir, topurl, outdir):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
-    from datalad.api import add_archive_content
-    from datalad.api import create
+    from datalad.api import (
+        add_archive_content,
+        create,
+    )
     ds = create(outdir)
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):

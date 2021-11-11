@@ -295,14 +295,14 @@ def eval_results(func):
     This decorator implements common functionality for result rendering/output,
     error detection/handling, and logging.
 
-    Result rendering/output can be triggered via the
-    `datalad.api.result-renderer` configuration variable, or the
-    `result_renderer` keyword argument of each decorated command. Supported
-    modes are: 'default' (one line per result with action, status, path,
-    and an optional message); 'json' (one object per result, like git-annex),
-    'json_pp' (like 'json', but pretty-printed spanning multiple lines),
-    'tailored' custom output formatting provided by each command
-    class (if any).
+    Result rendering/output configured via the `result_renderer` keyword
+    argument of each decorated command. Supported modes are: 'generic' (a
+    generic renderer producing one line per result with key info like action,
+    status, path, and an optional message); 'json' (a complete JSON line
+    serialization of the full result record), 'json_pp' (like 'json', but
+    pretty-printed spanning multiple lines), 'tailored' custom output
+    formatting provided by each command class (if any), or 'disabled' for
+    no result rendering.
 
     Error detection works by inspecting the `status` item of all result
     dictionaries. Any occurrence of a status other than 'ok' or 'notneeded'
@@ -358,9 +358,6 @@ def eval_results(func):
             # use verbatim, if not a known label
             common_params['result_xfm'])
         result_renderer = common_params['result_renderer']
-        # TODO remove this conditional branch entirely, done outside
-        if not result_renderer:
-            result_renderer = dlcfg.get('datalad.api.result-renderer', None)
         # look for potential override of logging behavior
         result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
 
@@ -386,11 +383,14 @@ def eval_results(func):
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
-            do_custom_result_summary = result_renderer in ('tailored', 'default') \
-                                       and hasattr(wrapped_class, 'custom_result_summary_renderer')
-            pass_summary = do_custom_result_summary and \
-                           getattr(wrapped_class,
-                                   'custom_result_summary_renderer_pass_summary', None)
+            do_custom_result_summary = result_renderer in (
+                'tailored', 'generic', 'default') and hasattr(
+                    wrapped_class,
+                    'custom_result_summary_renderer')
+            pass_summary = do_custom_result_summary \
+                and getattr(wrapped_class,
+                            'custom_result_summary_renderer_pass_summary',
+                            None)
 
             # process main results
             for r in _process_results(
@@ -451,9 +451,11 @@ def eval_results(func):
                 else:
                     summary_args = (results,)
                 wrapped_class.custom_result_summary_renderer(*summary_args)
-            elif result_renderer == 'default' and action_summary and \
-                    sum(sum(s.values()) for s in action_summary.values()) > 1:
-                # give a summary in default mode, when there was more than one
+            elif result_renderer in ('generic', 'default') \
+                    and action_summary \
+                    and sum(sum(s.values())
+                            for s in action_summary.values()) > 1:
+                # give a summary in generic mode, when there was more than one
                 # action performed
                 render_action_summary(action_summary)
 
@@ -488,7 +490,7 @@ def eval_results(func):
     return ret
 
 
-def default_result_renderer(res):
+def generic_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res.get('path', None)
         if path and res.get('refds'):
@@ -517,6 +519,10 @@ def default_result_renderer(res):
                 if isinstance(res['error_message'], tuple) else res[
                     'error_message']), ac.RED)
             if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+
+
+# keep for legacy compatibility
+default_result_renderer = generic_result_renderer
 
 
 def render_action_summary(action_summary):
@@ -561,7 +567,7 @@ def _process_results(
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
 
-    # used to track repeated messages in the default renderer
+    # used to track repeated messages in the generic renderer
     last_result = None
     last_result_ts = None
     # which result dict keys to inspect for changes to discover repetitions
@@ -631,14 +637,14 @@ def _process_results(
         # TODO RF this in a simple callable that gets passed into this function
         if result_renderer is None or result_renderer == 'disabled':
             pass
-        elif result_renderer == 'default':
+        elif result_renderer in ('generic', 'default'):
             trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
             if res.get('status', None) != 'notneeded' \
                     and trimmed_result == last_result:
                 # this is a similar report, suppress if too many, but count it
                 result_repetitions += 1
                 if result_repetitions < render_n_repetitions:
-                    default_result_renderer(res)
+                    generic_result_renderer(res)
                 else:
                     last_result_ts = _display_suppressed_message(
                         result_repetitions, render_n_repetitions, last_result_ts)
@@ -648,7 +654,7 @@ def _process_results(
                 last_result_ts = _display_suppressed_message(
                     result_repetitions, render_n_repetitions, last_result_ts,
                     final=True)
-                default_result_renderer(res)
+                generic_result_renderer(res)
                 result_repetitions = 0
             last_result = trimmed_result
         elif result_renderer in ('json', 'json_pp'):
@@ -658,7 +664,7 @@ def _process_results(
                 sort_keys=True,
                 indent=2 if result_renderer.endswith('_pp') else None,
                 default=str))
-        elif result_renderer in ('tailored', 'default'):
+        elif result_renderer in ('tailored', 'generic', 'default'):
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):

@@ -343,7 +343,7 @@ def _create_dataset_sibling(
         annex_group=annex_group,
         annex_groupwanted=annex_groupwanted,
         inherit=inherit,
-        result_renderer=None,
+        result_renderer='disabled',
     )
 
     # check git version on remote end
@@ -681,7 +681,7 @@ class CreateSibling(Interface):
                             recursive=recursive,
                             recursion_limit=recursion_limit,
                             state='present',
-                            result_renderer=None)
+                            result_renderer='disabled')
                     ],
                     # save cycles, we are only looking for datasets
                     annex=None,

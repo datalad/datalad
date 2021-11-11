@@ -42,7 +42,7 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     eval_results,
 )
 from datalad.support.annexrepo import AnnexRepo
@@ -332,7 +332,7 @@ class Siblings(Interface):
             )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
-            default_result_renderer(res)
+            generic_result_renderer(res)
             return
         path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']

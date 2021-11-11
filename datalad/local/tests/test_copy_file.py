@@ -250,7 +250,7 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
     # nested datasets
     eq_(*[
         sorted(
-            r for r in d.status(result_xfm='relpaths', result_renderer=None)
+            r for r in d.status(result_xfm='relpaths', result_renderer='disabled')
             # filter out subdataset entry in dest_ds
             if r not in ('lvl2', '.gitmodules'))
         for d in (src_ds, dest_ds)
@@ -303,7 +303,7 @@ def test_copy_file_specs_from(srcdir, destdir):
                  (r_srcabs, r_srcdestabs_str)):
         eq_(*[
             sorted(
-                r for r in d.status(result_xfm='relpaths', result_renderer=None))
+                r for r in d.status(result_xfm='relpaths', result_renderer='disabled'))
             for d in (a, b)
         ])
 

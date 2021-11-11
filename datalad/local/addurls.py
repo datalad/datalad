@@ -32,7 +32,7 @@ from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     render_action_summary,
 )
 from datalad.interface.results import annexjson2result, get_status_dict
@@ -1572,7 +1572,7 @@ filename_format='{filenameformat}'"""
         refds = res.get("addurls.refds")
         if refds:
             res = dict(res, refds=refds)
-        default_result_renderer(res)
+        generic_result_renderer(res)
 
     custom_result_summary_renderer_pass_summary = True
 

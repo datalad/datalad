@@ -50,7 +50,6 @@ from datalad.utils import (
     find_files,
     generate_chunks,
     get_dataset_root,
-    get_func_kwargs_doc,
     get_open_files,
     get_path_prefix,
     get_timestamp_suffix,
@@ -120,12 +119,6 @@ from .utils import (
     with_tree,
 )
 from datalad import cfg as dl_cfg
-
-
-def test_get_func_kwargs_doc():
-    def some_func(arg1, kwarg1=None, kwarg2="bu"):
-        return
-    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
 
 
 def test_better_wraps():

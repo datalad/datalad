@@ -13,6 +13,7 @@ subsystems in DataLad.
 .. toctree::
    :maxdepth: 2
 
+   result_records
    dataset_argument
    log_levels
    drop

@@ -200,32 +200,29 @@ def test_incorrect_options():
 
 def test_script_shims():
     runner = Runner()
-    for script in [
-        'datalad',
-        'git-annex-remote-datalad-archives',
-        'git-annex-remote-datalad']:
-        if not on_windows:
-            # those must be available for execution, and should not contain
-            which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
-            # test if there is no easy install shim in there
-            with open(which.rstrip()) as f:
-                content = f.read()
-        else:
-            from distutils.spawn import find_executable
-            content = find_executable(script)
+    script = 'datalad'
+    if not on_windows:
+        # those must be available for execution, and should not contain
+        which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
+        # test if there is no easy install shim in there
+        with open(which.rstrip()) as f:
+            content = f.read()
+    else:
+        from distutils.spawn import find_executable
+        content = find_executable(script)
 
-        # and let's check that it is our script
-        out = runner.run([script, '--version'], protocol=StdOutErrCapture)
-        version = out['stdout'].rstrip()
-        mod, version = version.split(' ', 1)
-        assert_equal(mod, 'datalad')
-        # we can get git and non git .dev version... so for now
-        # relax
-        get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
-        # extract numeric portion
-        assert get_numeric_portion(version), f"Got no numeric portion from {version}"
-        assert_equal(get_numeric_portion(__version__),
-                     get_numeric_portion(version))
+    # and let's check that it is our script
+    out = runner.run([script, '--version'], protocol=StdOutErrCapture)
+    version = out['stdout'].rstrip()
+    mod, version = version.split(' ', 1)
+    assert_equal(mod, 'datalad')
+    # we can get git and non git .dev version... so for now
+    # relax
+    get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
+    # extract numeric portion
+    assert get_numeric_portion(version), f"Got no numeric portion from {version}"
+    assert_equal(get_numeric_portion(__version__),
+                 get_numeric_portion(version))
 
 
 @slow  # 11.2591s

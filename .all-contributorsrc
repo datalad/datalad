@@ -405,6 +405,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/6961185?v=4"
             ]
+        },
+        {
+            "login": "mslw",
+            "name": "Michał Szczepanik",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mslw",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/11985212?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7

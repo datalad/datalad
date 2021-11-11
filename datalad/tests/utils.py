@@ -713,9 +713,12 @@ class HTTPPath(object):
             # if this fails, check datalad/tests/ca/prov.sh for ca_bundle
             try:
                 import requests
-                requests.get(
+                from requests.auth import HTTPBasicAuth
+                r = requests.get(
                     self.url,
-                    verify=True)
+                    verify=True,
+                    auth=HTTPBasicAuth(*self.auth) if self.auth else None)
+                r.raise_for_status()
             # be robust and skip if anything goes wrong, rather than just a
             # particular SSL issue
             #except requests.exceptions.SSLError as e:
@@ -725,10 +728,18 @@ class HTTPPath(object):
             # now verify that the stdlib tooling also works
             # if this fails, check datalad/tests/ca/prov.sh
             # for info on deploying a datalad-root.crt
-            from urllib.request import urlopen
-            from urllib.error import URLError
+            from urllib.request import (
+                urlopen,
+                Request,
+            )
             try:
-                urlopen(self.url)
+                req = Request(self.url)
+                if self.auth:
+                    req.add_header(
+                        "Authorization",
+                        b"Basic " + base64.standard_b64encode(
+                            '{0}:{1}'.format(*self.auth).encode('utf-8')))
+                urlopen(req)
             # be robust and skip if anything goes wrong, rather than just a
             # particular SSL issue
             #except URLError as e:

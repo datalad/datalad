@@ -356,8 +356,23 @@ eval_params = dict(
         given.""",
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
     result_renderer=Parameter(
-        doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
+        doc="""select rendering mode command results.
+        'tailored' enables a command-specific rendering style that is typically
+        tailored to human consumption, if there is one for a specific
+        command, or otherwise falls back on the the 'generic' result renderer;
+        'generic' renders each result in one line  with key info like action,
+        status, path, and an optional message);
+        'json' a complete JSON line serialization of the full result record;
+        'json_pp' like 'json', but pretty-printed spanning multiple lines;
+        'disabled' turns off result rendering entirely;
+        '<template>' reports any value(s) of any result properties in any
+        format indicated by the template (e.g. '{path}', compare with JSON
+        output for all key-value choices). The template syntax follows the
+        Python "format() language". It is possible to report individual
+        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
+        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the
+        template, like so: '{metadata[music#Genre]}'.""",
+        default='tailored'),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an

@@ -165,17 +165,17 @@ def test_diff(path, norepo):
     assert_repo_status(ds.path)
     # reports stupid revision input
     assert_result_count(
-        ds.diff(fr='WTF', on_failure='ignore', result_renderer=None),
+        ds.diff(fr='WTF', on_failure='ignore', result_renderer='disabled'),
         1,
         status='impossible',
         message="Git reference 'WTF' invalid")
     # no diff
-    assert_result_count(_dirty_results(ds.diff(result_renderer=None)), 0)
+    assert_result_count(_dirty_results(ds.diff(result_renderer='disabled')), 0)
     assert_result_count(
-        _dirty_results(ds.diff(fr='HEAD', result_renderer=None)), 0)
+        _dirty_results(ds.diff(fr='HEAD', result_renderer='disabled')), 0)
     # bogus path makes no difference
     assert_result_count(
-        _dirty_results(ds.diff(path='THIS', fr='HEAD', result_renderer=None)),
+        _dirty_results(ds.diff(path='THIS', fr='HEAD', result_renderer='disabled')),
         0)
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
@@ -189,7 +189,7 @@ def test_diff(path, norepo):
         fr_base = "HEAD"
         to = None
 
-    res = _dirty_results(ds.diff(fr=fr_base + '~1', to=to, result_renderer=None))
+    res = _dirty_results(ds.diff(fr=fr_base + '~1', to=to, result_renderer='disabled'))
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, action='diff', path=op.join(ds.path, 'new'), state='added')
@@ -197,59 +197,59 @@ def test_diff(path, norepo):
     with chpwd(ds.path):
         assert_result_count(
             _dirty_results(diff(fr=fr_base + '~1', to=to,
-                                result_renderer=None)),
+                                result_renderer='disabled')),
             1,
             action='diff', path=op.join(ds.path, 'new'), state='added')
     # no diff against HEAD
-    assert_result_count(_dirty_results(ds.diff(result_renderer=None)), 0)
+    assert_result_count(_dirty_results(ds.diff(result_renderer='disabled')), 0)
     # modify known file
     create_tree(ds.path, {'new': 'notempty'})
-    res = _dirty_results(ds.diff(result_renderer=None))
+    res = _dirty_results(ds.diff(result_renderer='disabled'))
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, action='diff', path=op.join(ds.path, 'new'),
         state='modified')
     # but if we give another path, it doesn't show up
-    assert_result_count(ds.diff(path='otherpath', result_renderer=None), 0)
+    assert_result_count(ds.diff(path='otherpath', result_renderer='disabled'), 0)
     # giving the right path must work though
     assert_result_count(
-        ds.diff(path='new', result_renderer=None), 1,
+        ds.diff(path='new', result_renderer='disabled'), 1,
         action='diff', path=op.join(ds.path, 'new'), state='modified')
     # stage changes
     ds.repo.add('.', git=True)
     # no change in diff, staged is not committed
-    assert_result_count(_dirty_results(ds.diff(result_renderer=None)), 1)
+    assert_result_count(_dirty_results(ds.diff(result_renderer='disabled')), 1)
     ds.save()
     assert_repo_status(ds.path)
-    assert_result_count(_dirty_results(ds.diff(result_renderer=None)), 0)
+    assert_result_count(_dirty_results(ds.diff(result_renderer='disabled')), 0)
 
     # untracked stuff
     create_tree(ds.path, {'deep': {'down': 'untracked', 'down2': 'tobeadded'}})
     # a plain diff should report the untracked file
     # but not directly, because the parent dir is already unknown
-    res = _dirty_results(ds.diff(result_renderer=None))
+    res = _dirty_results(ds.diff(result_renderer='disabled'))
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, state='untracked', type='directory',
         path=op.join(ds.path, 'deep'))
     # report of individual files is also possible
     assert_result_count(
-        ds.diff(untracked='all', result_renderer=None), 2, state='untracked',
+        ds.diff(untracked='all', result_renderer='disabled'), 2, state='untracked',
         type='file')
     # an unmatching path will hide this result
-    assert_result_count(ds.diff(path='somewhere', result_renderer=None), 0)
+    assert_result_count(ds.diff(path='somewhere', result_renderer='disabled'), 0)
     # perfect match and anything underneath will do
     assert_result_count(
-        ds.diff(path='deep', result_renderer=None), 1, state='untracked',
+        ds.diff(path='deep', result_renderer='disabled'), 1, state='untracked',
         path=op.join(ds.path, 'deep'),
         type='directory')
     assert_result_count(
-        ds.diff(path='deep', result_renderer=None), 1,
+        ds.diff(path='deep', result_renderer='disabled'), 1,
         state='untracked', path=op.join(ds.path, 'deep'))
     ds.repo.add(op.join('deep', 'down2'), git=True)
     # now the remaining file is the only untracked one
     assert_result_count(
-        ds.diff(result_renderer=None), 1, state='untracked',
+        ds.diff(result_renderer='disabled'), 1, state='untracked',
         path=op.join(ds.path, 'deep', 'down'),
         type='file')
 
@@ -260,12 +260,12 @@ def test_diff_recursive(path):
     sub = ds.create('sub')
     # look at the last change, and confirm a dataset was added
     res = ds.diff(fr=DEFAULT_BRANCH + '~1', to=DEFAULT_BRANCH,
-                  result_renderer=None)
+                  result_renderer='disabled')
     assert_result_count(
         res, 1, action='diff', state='added', path=sub.path, type='dataset')
     # now recursive
     res = ds.diff(recursive=True, fr=DEFAULT_BRANCH + '~1', to=DEFAULT_BRANCH,
-                  result_renderer=None)
+                  result_renderer='disabled')
     # we also get the entire diff of the subdataset from scratch
     assert_status('ok', res)
     ok_(len(res) > 3)
@@ -278,7 +278,7 @@ def test_diff_recursive(path):
     create_tree(
         ds.path,
         {'onefile': 'tobeadded', 'sub': {'twofile': 'tobeadded'}})
-    res = ds.diff(recursive=True, untracked='all', result_renderer=None)
+    res = ds.diff(recursive=True, untracked='all', result_renderer='disabled')
     assert_result_count(_dirty_results(res), 3)
     assert_result_count(
         res, 1,
@@ -300,7 +300,7 @@ def test_diff_recursive(path):
 
     # look at the last change, only one file was added
     res = ds.diff(fr=head_ref + '~1', to=head_ref, annex='basic',
-                  result_renderer=None)
+                  result_renderer='disabled')
     assert_result_count(_dirty_results(res), 1)
     assert_result_count(
         res, 1,
@@ -310,7 +310,7 @@ def test_diff_recursive(path):
     # now the exact same thing with recursion, must not be different from the
     # call above
     res = ds.diff(recursive=True, fr=head_ref + '~1', to=head_ref,
-                  annex='basic', result_renderer=None)
+                  annex='basic', result_renderer='disabled')
     assert_result_count(_dirty_results(res), 1)
     # last change in parent
     assert_result_count(
@@ -323,7 +323,7 @@ def test_diff_recursive(path):
     # one further back brings in the modified subdataset, and the added file
     # within it
     res = ds.diff(recursive=True, fr=head_ref + '~2', to=head_ref,
-                  annex='basic', result_renderer=None)
+                  annex='basic', result_renderer='disabled')
     assert_result_count(_dirty_results(res), 3)
     assert_result_count(
         res, 1,
@@ -357,7 +357,7 @@ def test_path_diff(_path, linkpath):
     if has_symlink_capability():
         assert ds.pathobj != ds.repo.pathobj
 
-    plain_recursive = ds.diff(recursive=True, annex='all', result_renderer=None)
+    plain_recursive = ds.diff(recursive=True, annex='all', result_renderer='disabled')
     # check integrity of individual reports with a focus on how symlinks
     # are reported
     for res in plain_recursive:
@@ -376,26 +376,26 @@ def test_path_diff(_path, linkpath):
     # bunch of smoke tests
     # query of '.' is same as no path
     eq_(plain_recursive, ds.diff(path='.', recursive=True, annex='all',
-                                 result_renderer=None))
+                                 result_renderer='disabled'))
     # duplicate paths do not change things
     eq_(plain_recursive, ds.diff(path=['.', '.'], recursive=True, annex='all',
-                                 result_renderer=None))
+                                 result_renderer='disabled'))
     # neither do nested paths
     if not "2.24.0" <= ds.repo.git_version < "2.25.0":
         # Release 2.24.0 contained a regression that was fixed with 072a231016
         # (2019-12-10).
         eq_(plain_recursive,
             ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all',
-                    result_renderer=None))
+                    result_renderer='disabled'))
     # when invoked in a subdir of a dataset it still reports on the full thing
     # just like `git status`, as long as there are no paths specified
     with chpwd(op.join(path, 'directory_untracked')):
         plain_recursive = diff(recursive=True, annex='all',
-                               result_renderer=None)
+                               result_renderer='disabled')
     # should be able to take absolute paths and yield the same
     # output
     eq_(plain_recursive, ds.diff(path=ds.path, recursive=True, annex='all',
-                                 result_renderer=None))
+                                 result_renderer='disabled'))
 
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
@@ -411,12 +411,12 @@ def test_path_diff(_path, linkpath):
                 res = ds.diff(
                     path=op.join('.', rpath),
                     recursive=True,
-                    annex='all', result_renderer=None)
+                    annex='all', result_renderer='disabled')
         else:
             res = ds.diff(
                 path=p,
                 recursive=True,
-                annex='all', result_renderer=None)
+                annex='all', result_renderer='disabled')
         assert_result_count(
             res,
             1,
@@ -429,20 +429,20 @@ def test_path_diff(_path, linkpath):
 
     assert_result_count(
         ds.diff(
-            recursive=True, result_renderer=None),
+            recursive=True, result_renderer='disabled'),
         1,
         path=apath)
     # limiting recursion will exclude this particular path
     assert_result_count(
         ds.diff(
             recursive=True,
-            recursion_limit=1, result_renderer=None),
+            recursion_limit=1, result_renderer='disabled'),
         0,
         path=apath)
     # negative limit is unlimited limit
     eq_(
-        ds.diff(recursive=True, recursion_limit=-1, result_renderer=None),
-        ds.diff(recursive=True, result_renderer=None)
+        ds.diff(recursive=True, recursion_limit=-1, result_renderer='disabled'),
+        ds.diff(recursive=True, result_renderer='disabled')
     )
 
 
@@ -451,13 +451,13 @@ def test_path_diff(_path, linkpath):
 def test_diff_nods(path, otherpath):
     ds = Dataset(path).create()
     assert_result_count(
-        ds.diff(path=otherpath, on_failure='ignore', result_renderer=None),
+        ds.diff(path=otherpath, on_failure='ignore', result_renderer='disabled'),
         1,
         status='error',
         message='path not underneath this dataset')
     otherds = Dataset(otherpath).create()
     assert_result_count(
-        ds.diff(path=otherpath, on_failure='ignore', result_renderer=None),
+        ds.diff(path=otherpath, on_failure='ignore', result_renderer='disabled'),
         1,
         path=otherds.path,
         status='error',
@@ -473,13 +473,13 @@ def test_diff_rsync_syntax(path):
     ds = Dataset(path).create()
     subds = ds.create('sub')
     subsubds = subds.create(Path('subdir', 'deep'))
-    justtop = ds.diff(fr=PRE_INIT_COMMIT_SHA, path='sub', result_renderer=None)
+    justtop = ds.diff(fr=PRE_INIT_COMMIT_SHA, path='sub', result_renderer='disabled')
     # we only get a single result, the subdataset in question
     assert_result_count(justtop, 1)
     assert_result_count(justtop, 1, type='dataset', path=subds.path)
     # now with "peak inside the dataset" syntax
     inside = ds.diff(fr=PRE_INIT_COMMIT_SHA, path='sub' + os.sep,
-                     result_renderer=None)
+                     result_renderer='disabled')
     # we get both subdatasets, but nothing else inside the nested one
     assert_result_count(inside, 2, type='dataset')
     assert_result_count(inside, 1, type='dataset', path=subds.path)
@@ -490,7 +490,7 @@ def test_diff_rsync_syntax(path):
     # subds, but because the subsubds is still underneath it, nothing changes
     inside_subdir = ds.diff(
         fr=PRE_INIT_COMMIT_SHA, path=op.join('sub', 'subdir'),
-        result_renderer=None)
+        result_renderer='disabled')
     assert_result_count(inside_subdir, 2, type='dataset')
     assert_result_count(inside_subdir, 1, type='dataset', path=subds.path)
     assert_result_count(inside_subdir, 1, type='dataset', path=subsubds.path)
@@ -499,7 +499,7 @@ def test_diff_rsync_syntax(path):
     neq_(inside, inside_subdir)
     # just for completeness, we get more when going full recursive
     rec = ds.diff(fr=PRE_INIT_COMMIT_SHA, recursive=True, path='sub' + os.sep,
-                  result_renderer=None)
+                  result_renderer='disabled')
     assert(len(inside) < len(rec))
 
 
@@ -507,7 +507,7 @@ def test_diff_rsync_syntax(path):
 def test_diff_nonexistent_ref_unicode(path):
     ds = Dataset(path).create()
     assert_result_count(
-        ds.diff(fr="HEAD", to=u"β", on_failure="ignore", result_renderer=None),
+        ds.diff(fr="HEAD", to=u"β", on_failure="ignore", result_renderer='disabled'),
         1,
         path=ds.path,
         status="impossible")
@@ -529,7 +529,7 @@ def test_no_worktree_impact_false_deletions(path):
     # identifical
     ds.repo.call_git(['checkout', 'test'])
     res = ds.diff(fr=DEFAULT_BRANCH + '~1', to=DEFAULT_BRANCH,
-                  result_renderer=None)
+                  result_renderer='disabled')
     # under no circumstances can there be any reports on deleted files
     # because we never deleted anything
     assert_result_count(res, 0, state='deleted')
@@ -551,5 +551,5 @@ def test_diff_fr_none_one_get_content_annexinfo_call(path):
     # get_content_annexinfo() is expensive.  If fr=None, we should
     # only need to call it once.
     with patch.object(AnnexRepo, "get_content_annexinfo") as gca:
-        res = ds.diff(fr=None, to="HEAD", annex="all", result_renderer=None)
+        res = ds.diff(fr=None, to="HEAD", annex="all", result_renderer='disabled')
         eq_(gca.call_count, 1)
