@@ -86,7 +86,7 @@ _group_misc = (
         ('datalad.interface.shell_completion', 'ShellCompletion', 'shell-completion'),
         ('datalad.core.local.run', 'Run', 'run'),
         ('datalad.local.rerun', 'Rerun'),
-        ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
+        ('datalad.local.run_procedure', 'RunProcedure'),
         ('datalad.distributed.export_archive_ora', 'ExportArchiveORA',
          'export-archive-ora')
     ])
