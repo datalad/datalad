@@ -154,33 +154,14 @@ lgr.debug(
 #
 
 # `getargspec` has been deprecated in Python 3.
-if hasattr(inspect, "getfullargspec"):
-    ArgSpecFake = collections.namedtuple(
-        "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
-
-    def getargspec(func):
-        return ArgSpecFake(*inspect.getfullargspec(func)[:4])
-else:
-    getargspec = inspect.getargspec
+ArgSpecFake = collections.namedtuple(
+    "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
-def get_func_kwargs_doc(func):
-    """ Provides args for a function
-
-    Parameters
-    ----------
-    func: str
-      name of the function from which args are being requested
-
-    Returns
-    -------
-    list
-      of the args that a function takes in
+def getargspec(func):
+    """Minimal compat shim for getargspec deprecated in python 3.
     """
-    return getargspec(func)[0]
-
-    # TODO: format error message with descriptions of args
-    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
+    return ArgSpecFake(*inspect.getfullargspec(func)[:4])
 
 
 def any_re_search(regexes, value):
