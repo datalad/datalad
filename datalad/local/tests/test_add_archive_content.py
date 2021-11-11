@@ -13,17 +13,33 @@
 __docformat__ = 'restructuredtext'
 
 import os
+from glob import glob
 from os import unlink
 from os.path import (
     basename,
     exists,
-    join as opj,
+)
+from os.path import join as opj
+from os.path import (
     lexists,
     pardir,
 )
-from glob import glob
 from pathlib import Path
 
+from datalad.api import (
+    Dataset,
+    add_archive_content,
+    clean,
+)
+from datalad.consts import (
+    ARCHIVES_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    NoDatasetFound,
+)
 from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_equal,
@@ -49,13 +65,6 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import (
-    CommandError,
-    NoDatasetFound,
-)
-
 from datalad.utils import (
     chpwd,
     find_files,
@@ -63,16 +72,6 @@ from datalad.utils import (
     on_windows,
     rmtemp,
 )
-from datalad.api import (
-    add_archive_content,
-    clean,
-    Dataset,
-)
-from datalad.consts import (
-    ARCHIVES_SPECIAL_REMOTE,
-    DATALAD_SPECIAL_REMOTES_UUIDS,
-)
-
 
 treeargs = dict(
     tree=(
