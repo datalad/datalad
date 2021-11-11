@@ -14,26 +14,26 @@ jobs:
           # This should evaluate to either `true` or `false`, which runs the
           # command of the same name.
           ${{
-            !contains(github.event.pull_request.labels.*.name, 'major')
+            !contains(github.event.pull_request.labels.*.name, 'semver-major')
           }}
       - name: Check that PR against "maint" branch does not have "minor"
         if: github.event.pull_request.base.label == 'datalad:maint'
         run: |
           ${{
-            !contains(github.event.pull_request.labels.*.name, 'minor')
+            !contains(github.event.pull_request.labels.*.name, 'semver-minor')
           }}
       - name: Check that PR uses one of the standard "auto" labels
         run: |
           # major is included to stay optimistic, and to not forget later
           ${{
-            contains(github.event.pull_request.labels.*.name, 'major')
-            || contains(github.event.pull_request.labels.*.name, 'minor')
-            || contains(github.event.pull_request.labels.*.name, 'patch')
-            || contains(github.event.pull_request.labels.*.name, 'dependencies')
-            || contains(github.event.pull_request.labels.*.name, 'documentation')
-            || contains(github.event.pull_request.labels.*.name, 'internal')
-            || contains(github.event.pull_request.labels.*.name, 'performance')
-            || contains(github.event.pull_request.labels.*.name, 'tests')
+            contains(github.event.pull_request.labels.*.name, 'semver-major')
+            || contains(github.event.pull_request.labels.*.name, 'semver-minor')
+            || contains(github.event.pull_request.labels.*.name, 'semver-patch')
+            || contains(github.event.pull_request.labels.*.name, 'semver-dependencies')
+            || contains(github.event.pull_request.labels.*.name, 'semver-documentation')
+            || contains(github.event.pull_request.labels.*.name, 'semver-internal')
+            || contains(github.event.pull_request.labels.*.name, 'semver-performance')
+            || contains(github.event.pull_request.labels.*.name, 'semver-tests')
           }}
 
 # vim:set sts=2:
