@@ -558,10 +558,10 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
 
 
 def _pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
-    if not is_annex and paths and not reckless == 'kill':
+    if not is_annex and reckless not in ('datasets', 'kill'):
         # we cannot drop content in non-annex repos, issue same
         # 'notneeded' as for git-file in annex repo
-        for p in paths:
+        for p in paths or [ds.path]:
             yield dict(
                 action='drop',
                 path=str(p),

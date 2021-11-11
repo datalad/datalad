@@ -529,6 +529,8 @@ def test_uninstall_without_super(path):
 @with_tempfile
 def test_drop_from_git(path):
     ds = Dataset(path).create(annex=False)
+    res = ds.drop()
+    assert_in_results(res, action='drop', status='notneeded')
     (ds.pathobj / 'file').write_text('some')
     ds.save()
     assert_status('notneeded', ds.drop('file'))
