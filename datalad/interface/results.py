@@ -52,8 +52,9 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
     # just for not shadowing the builtin `type` in this function
     """Helper to create a result dictionary.
 
-    Most arguments match their key in the resulting dict. Only exceptions are
-    listed here.
+    Most arguments match their key in the resulting dict, and their given
+    values are simply assigned to the result record under these keys.  Only
+    exceptions are listed here.
 
     Parameters
     ----------
@@ -61,6 +62,12 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
       If given, the `path` and `type` values are populated with the path of the
       datasets and 'dataset' as the type. Giving additional values for both
       keys will overwrite these pre-populated values.
+    exception : CapturedException
+      Exceptions that occurred while generating a result should be captured
+      by immediately instantiating a CapturedException. This instance can
+      be passed here to yield more comprehensive error reporting, including
+      an auto-generated traceback (added to the result record under an
+      'exception_traceback' key).
 
     Returns
     -------
