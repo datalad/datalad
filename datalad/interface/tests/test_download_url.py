@@ -31,6 +31,7 @@ from datalad.tests.utils import (
     assert_in,
     assert_message,
     assert_result_count,
+    create_tree,
     eq_,
     ok_,
     ok_exists,
@@ -193,6 +194,16 @@ def test_download_url_archive(toppath, topurl, path):
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
                   ds.repo.format_commit("%B"))
+    # we should yield an impossible from add archive content when there is
+    # untracked content (gh-#6170)
+    create_tree(ds.path, {'this': 'dirty'})
+    assert_in_results(
+        ds.download_url([topurl + "archive.tar.gz"], archive=True,
+                        on_failure='ignore'),
+        status='impossible',
+        action='add-archive-content',
+        message='clean dataset required. Use `datalad status` to inspect '
+                'unsaved changes')
 
 
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})

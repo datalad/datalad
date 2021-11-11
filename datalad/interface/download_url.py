@@ -285,4 +285,10 @@ URLs:
 
                     if archive:
                         for path in annex_paths:
-                            ds.add_archive_content(path, delete=True)
+                            yield from ds.add_archive_content(
+                                path,
+                                delete=True,
+                                on_failure='ignore',
+                                return_type='generator',
+                                result_renderer='disabled'
+                            )
