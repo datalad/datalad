@@ -80,7 +80,7 @@ _group_misc = (
         ('datalad.local.export_archive', 'ExportArchive'),
         ('datalad.distributed.export_to_figshare', 'ExportToFigshare'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.clean', 'Clean'),
+        ('datalad.local.clean', 'Clean'),
         ('datalad.local.add_archive_content', 'AddArchiveContent'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         ('datalad.interface.shell_completion', 'ShellCompletion', 'shell-completion'),
