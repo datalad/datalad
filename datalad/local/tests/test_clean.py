@@ -12,30 +12,25 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
-
-from os import makedirs
-from os.path import join as opj
-from ...api import clean
-from ...consts import (
-    ARCHIVES_TEMP_DIR,
+from datalad.api import clean
+from datalad.consts import (
     ANNEX_TEMP_DIR,
     ANNEX_TRANSFER_DIR,
-    SEARCH_INDEX_DOTGITDIR
+    ARCHIVES_TEMP_DIR,
+    SEARCH_INDEX_DOTGITDIR,
 )
-from ...distribution.dataset import Dataset
-from ...support.annexrepo import AnnexRepo
-from ...utils import (
-    chpwd,
-    Path,
-    swallow_outputs
-)
-from ...tests.utils import (
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.tests.utils import (
     assert_equal,
     assert_false,
     assert_status,
-    assert_true,
-    with_tempfile
+    with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
+    swallow_outputs,
 )
 
 
