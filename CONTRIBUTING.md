@@ -666,15 +666,15 @@ The section that `auto` adds to the changelog on a new release consists of the
 titles of all pull requests merged into master since the previous release,
 organized by label.  `auto` recognizes the following PR labels:
 
-- `minor` — for changes corresponding to an increase in the minor version
+- `semver-minor` — for changes corresponding to an increase in the minor version
   component
-- `patch` — for changes corresponding to an increase in the patch/micro version
+- `semver-patch` — for changes corresponding to an increase in the patch/micro version
   component; this is the default label for unlabelled PRs
-- `internal` — for changes only affecting the internal API
-- `documentation` — for changes only affecting the documentation
-- `tests` — for changes to tests
-- `dependencies` — for updates to dependency versions
-- `performance` — for performance improvements
+- `semver-internal` — for changes only affecting the internal API
+- `semver-documentation` — for changes only affecting the documentation
+- `semver-tests` — for changes to tests
+- `semver-dependencies` — for updates to dependency versions
+- `semver-performance` — for performance improvements
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
 [contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

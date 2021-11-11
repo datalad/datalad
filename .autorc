@@ -12,5 +12,15 @@
                 "afterRelease": "python -m build && twine upload dist/*"
             }
         ]
-    ]
+    ],
+  "labels": [
+    { "releaseType": "major", "name": "semver-major" },
+    { "releaseType": "minor", "name": "semver-minor" },
+    { "releaseType": "patch", "name": "semver-patch" },
+    { "releaseType": "dependencies", "name": "semver-dependencies" },
+    { "releaseType": "documentation", "name": "semver-documentation" },
+    { "releaseType": "internal", "name": "semver-internal" },
+    { "releaseType": "performance", "name": "semver-performance" },
+    { "releaseType": "tests", "name": "semver-tests" }
+  ]
 }
