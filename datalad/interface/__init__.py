@@ -82,7 +82,7 @@ _group_misc = (
         ('datalad.interface.test', 'Test'),
         ('datalad.local.clean', 'Clean'),
         ('datalad.local.add_archive_content', 'AddArchiveContent'),
-        ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
+        ('datalad.local.download_url', 'DownloadURL'),
         ('datalad.interface.shell_completion', 'ShellCompletion', 'shell-completion'),
         ('datalad.core.local.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
