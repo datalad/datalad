@@ -14,37 +14,36 @@ __docformat__ = 'restructuredtext'
 
 from os.path import join as opj
 
-
-from datalad.distribution.dataset import Dataset
 from datalad.api import (
     create,
     unlock,
 )
-from datalad.utils import Path
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
     NoDatasetFound,
 )
-from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
-    with_tempfile,
-    assert_false,
-    assert_raises,
-    assert_repo_status,
-    eq_,
-    getpwd,
-    chpwd,
     assert_cwd_unchanged,
-    with_testrepos,
-    with_tree,
-    skip_if_root,
-    slow,
+    assert_false,
     assert_in_results,
     assert_not_in_results,
+    assert_raises,
+    assert_repo_status,
     assert_result_count,
+    chpwd,
+    eq_,
+    getpwd,
     known_failure_githubci_win,
     known_failure_windows,
+    skip_if_root,
+    slow,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
+from datalad.utils import Path
 
 
 @assert_cwd_unchanged
