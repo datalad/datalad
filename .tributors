@@ -182,6 +182,7 @@
     },
     "mslw": {
         "name": "Michał Szczepanik",
-        "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich"
+        "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich",
+        "blog": "https://github.com/mslw"
     }
 }
