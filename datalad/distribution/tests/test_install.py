@@ -132,7 +132,12 @@ def test_invalid_args(path):
     assert_raises(ValueError, install, 'ssh://mars/Zoidberg', source='Zoidberg')
     # make fake dataset
     ds = create(path)
-    assert_raises(IncompleteResultsError, install, '/higherup.', 'Zoidberg', dataset=ds)
+    # explicit 'source' as a kwarg
+    assert_raises(IncompleteResultsError, install, '/higherup.', source='Zoidberg', dataset=ds)
+    # or obscure form for multiple installation "things"
+    assert_raises(IncompleteResultsError, install, ['/higherup.', 'Zoidberg'], dataset=ds)
+    # and if just given without keyword arg for source -- standard Python exception
+    assert_raises(TypeError, install, '/higherup.', 'Zoidberg', dataset=ds)
 
 
 # This test caused a mysterious segvault in gh-1350. I reimplementation of
