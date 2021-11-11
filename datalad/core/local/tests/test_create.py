@@ -531,3 +531,12 @@ def check_create_initopts_form(form, path):
 def test_create_initopts_form():
     yield check_create_initopts_form, "dict"
     yield check_create_initopts_form, "list"
+
+
+@with_tempfile
+def test_bad_cfg_proc(path):
+    ds = Dataset(path)
+    # check if error is raised for incorrect cfg_proc
+    assert_raises(ValueError, ds.create, path=path, cfg_proc='unknown')
+    # verify that no directory got created prior to the error
+    assert not op.isdir(path)
