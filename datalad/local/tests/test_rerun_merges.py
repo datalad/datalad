@@ -15,13 +15,13 @@ import os.path as op
 
 from datalad.distribution.dataset import Dataset
 from datalad.tests.utils import (
-    assert_false,
     DEFAULT_BRANCH,
+    assert_false,
     eq_,
     neq_,
     ok_,
-    slow,
     skip_if_adjusted_branch,
+    slow,
     with_tempfile,
 )
 
