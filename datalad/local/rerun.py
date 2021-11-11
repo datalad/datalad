@@ -46,7 +46,7 @@ from datalad.support.exceptions import CapturedException
 from datalad.support.json_py import load_stream
 from datalad.support.param import Parameter
 
-lgr = logging.getLogger('datalad.interface.rerun')
+lgr = logging.getLogger('datalad.local.rerun')
 
 rerun_assume_ready_opt = copy(assume_ready_opt)
 rerun_assume_ready_opt._doc += """

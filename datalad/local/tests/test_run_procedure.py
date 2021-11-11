@@ -17,14 +17,15 @@ import os.path as op
 import sys
 from unittest.mock import patch
 
+from datalad.api import run_procedure
 from datalad.cmd import (
-    WitlessRunner,
     KillOutput,
+    WitlessRunner,
 )
-from datalad.utils import (
-    chpwd,
-    quote_cmdlinearg,
-    swallow_outputs,
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
 )
 from datalad.tests.utils import (
     OBSCURE_FILENAME,
@@ -43,12 +44,11 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import (
-    CommandError,
-    InsufficientArgumentsError,
+from datalad.utils import (
+    chpwd,
+    quote_cmdlinearg,
+    swallow_outputs,
 )
-from datalad.api import run_procedure
 
 
 @with_tempfile(mkdir=True)
@@ -174,6 +174,7 @@ def test_procedure_discovery(path, super_path):
 
     if not on_windows:  # no symlinks
         import os
+
         # create a procedure which is a broken symlink, but recognizable as a
         # python script:
         os.symlink(op.join(super.path, 'sub', 'not_existent'),
