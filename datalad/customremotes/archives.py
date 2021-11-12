@@ -64,7 +64,12 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except AttributeError as e:
+    except (OSError, AttributeError) as e:
+        # we need to catch OSError too, because Python's own logic
+        # of not providing link() where it is known to be unsupported
+        # (e.g. Windows) will not cover scenarios where a particular
+        # filesystem simply does not implement it on an otherwise
+        # sane platform (e.g. exfat on Linux)
         lgr.warning("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
