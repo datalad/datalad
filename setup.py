@@ -44,7 +44,6 @@ requires = {
         'fasteners>=0.14',
         'patool>=1.7',
         'tqdm',
-        'wrapt',
         'annexremote',
     ],
     'downloaders': [
