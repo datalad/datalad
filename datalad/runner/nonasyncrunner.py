@@ -417,6 +417,7 @@ class ThreadedRunner:
         # a timeout was specified and is triggered, call the timeout
         # handler in the protocol with `None`, and ---if the handler
         # returns `True`--- terminate the process.
+        self.close_process_stdin_stdout_stderr()
         while self.wait_for_process():
             pass
 
