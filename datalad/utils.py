@@ -158,10 +158,28 @@ ArgSpecFake = collections.namedtuple(
     "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
-def getargspec(func):
+def getargspec(func, include_kwonlyargs=False):
     """Minimal compat shim for getargspec deprecated in python 3.
+    `include_kwonlyargs` option was added to centralize getting all args,
+    even the ones which are kwonly (follow the ``*,``).
+    Not advised for use in 3rd party code.
     """
-    return ArgSpecFake(*inspect.getfullargspec(func)[:4])
+    f_argspec = inspect.getfullargspec(func)
+    args4 = f_argspec[:4]
+    if f_argspec.kwonlyargs:
+        if not include_kwonlyargs:
+            raise RuntimeError("TODO: should not be used for %s %s" % (func, func.__code__))
+            # lgr.debug("Requested args for %s which has kwonlyargs: %s", func, f_argspec.kwonlyargs)
+        else:
+            # to assume sorted dict for .values
+            assert list(f_argspec.kwonlydefaults.keys()) == f_argspec.kwonlyargs
+            args4 = [
+                args4[0] + f_argspec.kwonlyargs,
+                args4[1],  # varargs name, i.e for *args
+                args4[2],  # keywords name, i.e. for **kwargs
+                (args4[3] or tuple()) + tuple(f_argspec.kwonlydefaults.values()),
+            ]
+    return ArgSpecFake(*args4)
 
 
 def any_re_search(regexes, value):
