@@ -70,6 +70,13 @@ _PYTHON_CMDS = {
     'eval': eval
 }
 
+# Centralize definition with delayed assignment for 'auto' for each case
+_SAFE_TO_CONSUME_MAP = {
+    'auto': lambda: 1/0,  # must be defined based on bottomup"
+    'all-subds-done': no_subds_in_futures,
+    'superds-done': no_parentds_in_futures,
+    'always': None
+}
 
 @build_doc
 class ForEach(Interface):
@@ -170,6 +177,16 @@ class ForEach(Interface):
             with jobs > 1. Hint: use 'ds' and 'refds' objects' methods to execute commands in the context
             of those datasets.
             """),
+        safe_to_consume=Parameter(
+            args=("--safe-to-consume",),
+            constraints=EnsureChoice(*_SAFE_TO_CONSUME_MAP),
+            doc="""Important only in the case of parallel (jobs greater than 1) execution.
+            'all-subds-done' instructs to not consider superdataset until command finished execution
+            in all subdatasets (it is the value in case of 'auto' if traversal is bottomup).
+            'superds-done' instructs to not process subdatasets until command finished in the super-dataset
+            (it is the value in case of 'auto' in traversal is not bottom up, which is the default). With
+            'always' there is no constraint on either to execute in sub or super dataset.
+        """),
         jobs=jobs_opt,
     )
 
@@ -191,10 +208,19 @@ class ForEach(Interface):
             subdatasets_only=False,
             output_streams='pass-through',
             chpwd='ds',  # as the most common case/scenario
+            safe_to_consume='auto',
             jobs=None
             ):
         if not cmd:
             raise InsufficientArgumentsError("No command given")
+
+        if safe_to_consume not in _SAFE_TO_CONSUME_MAP:
+            raise ValueError(f"safe_to_consume - Unknown value {safe_to_consume!r}. "
+                             f"Known are: {', '.join(_SAFE_TO_CONSUME_MAP)}")
+        if safe_to_consume == 'auto':
+            safe_to_consume_func = no_subds_in_futures if bottomup else no_parentds_in_futures
+        else:
+            safe_to_consume_func = _SAFE_TO_CONSUME_MAP[safe_to_consume]
 
         if cmd_type == 'auto':
             cmd_type = 'eval' if _is_callable(cmd) else 'external'
@@ -361,7 +387,7 @@ class ForEach(Interface):
             consumer=run_cmd,
             # probably not needed
             # It is ok to start with subdatasets since top dataset already exists
-            safe_to_consume=no_subds_in_futures if bottomup else no_parentds_in_futures,
+            safe_to_consume=safe_to_consume_func,
             # or vice versa
             jobs=jobs,
             **pc_kw
