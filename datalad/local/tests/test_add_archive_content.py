@@ -587,15 +587,17 @@ class TestAddArchiveOptions():
                 delete_after=True,
                 drop_after=True)
             assert_repo_status(self.annex.path)
-            commits_after_master = list(self.annex.get_branch_commits_())
-            commits_after = list(self.annex.get_branch_commits_('git-annex'))
-            # There should be a single commit for all additions +1 to
-            # initiate datalad-archives gh-1258.  If faking dates,
-            # there should be another +1 because annex.alwayscommit
-            # isn't set to false.
-            assert_equal(len(commits_after),
-                         len(commits_prior) + 2 + self.annex.fake_dates_enabled)
-            assert_equal(len(commits_after_master), len(commits_prior_master))
+            if not self.annex.is_managed_branch():
+                # whole counting logic here is ignorant of adjusted branches
+                commits_after_master = list(self.annex.get_branch_commits_())
+                commits_after = list(self.annex.get_branch_commits_('git-annex'))
+                # There should be a single commit for all additions +1 to
+                # initiate datalad-archives gh-1258.  If faking dates,
+                # there should be another +1 because annex.alwayscommit
+                # isn't set to false.
+                assert_equal(len(commits_after),
+                             len(commits_prior) + 2 + self.annex.fake_dates_enabled)
+                assert_equal(len(commits_after_master), len(commits_prior_master))
             # there should be no .datalad temporary files hanging around
             self.assert_no_trash_left_behind()
 
