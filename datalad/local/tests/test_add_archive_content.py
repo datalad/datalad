@@ -35,7 +35,6 @@ from datalad.consts import (
     ARCHIVES_SPECIAL_REMOTE,
     DATALAD_SPECIAL_REMOTES_UUIDS,
 )
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
@@ -48,7 +47,6 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_not_in,
     assert_raises,
-    assert_re_in,
     assert_repo_status,
     assert_result_values_cond,
     assert_true,
@@ -61,6 +59,7 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -532,7 +531,8 @@ class TestAddArchiveOptions():
                           str(Path('sub') / '123' / 'file.txt'),
                           annexed=True)
 
-    @known_failure_windows
+    # https://github.com/datalad/datalad/issues/6187
+    @skip_if_adjusted_branch
     def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed
         # but that new stuff was added to annex repo.  We know the key since
