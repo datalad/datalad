@@ -158,27 +158,58 @@ ArgSpecFake = collections.namedtuple(
     "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
-def getargspec(func, include_kwonlyargs=False):
-    """Minimal compat shim for getargspec deprecated in python 3.
+def getargspec(func, *, include_kwonlyargs=False):
+    """Compat shim for getargspec deprecated in python 3.
+
+    The main difference from inspect.getargspec (and inspect.getfullargspec
+    for that matter) is that by using inspect.signature we are providing
+    correct args/defaults for functools.wraps'ed functions.
+
     `include_kwonlyargs` option was added to centralize getting all args,
     even the ones which are kwonly (follow the ``*,``).
-    Not advised for use in 3rd party code.
+
+    For internal use and not advised for use in 3rd party code.
+    Please use inspect.signature directly.
     """
-    f_argspec = inspect.getfullargspec(func)
-    args4 = f_argspec[:4]
-    if f_argspec.kwonlyargs:
+    # We use signature, and not getfullargspec, because only signature properly
+    # "passes" args from a functools.wraps decorated function.
+    # Note: getfullargspec works Ok on wrapt-decorated functions
+    f_sign = inspect.signature(func)
+    # Loop through parameters and compose argspec
+    args4 = [[], None, None, {}]
+    # Collect all kwonlyargs into a dedicated dict - name: default
+    kwonlyargs = {}
+    # shortcuts
+    args, defaults = args4[0], args4[3]
+    P = inspect.Parameter
+
+    for p_name, p in f_sign.parameters.items():
+        if p.kind in (P.POSITIONAL_ONLY, P.POSITIONAL_OR_KEYWORD):
+            assert not kwonlyargs  # yoh: must not come after kwonlyarg
+            args.append(p_name)
+            if p.default is not P.empty:
+                defaults[p_name] = p.default
+        elif p.kind == P.VAR_POSITIONAL:
+            args4[1] = p_name
+        elif p.kind == P.VAR_KEYWORD:
+            args4[2] = p_name
+        elif p.kind == P.KEYWORD_ONLY:
+            assert p.default is not P.empty
+            kwonlyargs[p_name] = p.default
+
+    if kwonlyargs:
         if not include_kwonlyargs:
-            raise RuntimeError("TODO: should not be used for %s %s" % (func, func.__code__))
-            # lgr.debug("Requested args for %s which has kwonlyargs: %s", func, f_argspec.kwonlyargs)
+            raise ValueError(
+                'Function has keyword-only parameters or annotations, either use '
+                'inspect.signature() API which can support them, or provide include_kwonlyargs=True '
+                'to this function'
+            )
         else:
-            # to assume sorted dict for .values
-            assert list(f_argspec.kwonlydefaults.keys()) == f_argspec.kwonlyargs
-            args4 = [
-                args4[0] + f_argspec.kwonlyargs,
-                args4[1],  # varargs name, i.e for *args
-                args4[2],  # keywords name, i.e. for **kwargs
-                (args4[3] or tuple()) + tuple(f_argspec.kwonlydefaults.values()),
-            ]
+            args.extend(list(kwonlyargs))
+            defaults.update(kwonlyargs)
+
+    # harmonize defaults to how original getargspec returned them -- just a tuple
+    args4[3] = None if not defaults else tuple(defaults.values())
     return ArgSpecFake(*args4)
 
 
