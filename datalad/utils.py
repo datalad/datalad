@@ -26,7 +26,6 @@ import gzip
 import stat
 import string
 import warnings
-import wrapt
 
 import os.path as op
 
@@ -1062,20 +1061,12 @@ def saved_generator(gen):
 #
 # Decorators
 #
-def better_wraps(to_be_wrapped):
-    """Decorator to replace `functools.wraps`
 
-    This is based on `wrapt` instead of `functools` and in opposition to `wraps`
-    preserves the correct signature of the decorated function.
-    It is written with the intention to replace the use of `wraps` without any
-    need to rewrite the actual decorators.
-    """
-
-    @wrapt.decorator(adapter=to_be_wrapped)
-    def intermediator(to_be_wrapper, instance, args, kwargs):
-        return to_be_wrapper(*args, **kwargs)
-
-    return intermediator
+# Originally better_wraps was created to provide `wrapt`-based, instead of
+# `functools.wraps` implementation to preserve the correct signature of the
+# decorated function. By using inspect.signature in our getargspec, which
+# works fine on `functools.wraps`ed functions, we mediated this necessity.
+better_wraps = wraps
 
 
 # Borrowed from pandas
