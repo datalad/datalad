@@ -27,14 +27,6 @@ from datalad.utils import (
 )
 
 
-Canonical_Line_Ending = "\n"
-Other_Line_Endings = [
-    "\r\n",
-]
-
-
-_Ordered_Other_Line_Endings = sorted(Other_Line_Endings, key=lambda e: len(e))
-
 
 class LineSplitter:
     """
@@ -48,8 +40,7 @@ class LineSplitter:
         the known line endings, if 'separator' is None. The
         currently known line endings are "\n", and "\r\n".
         """
-        self.separator = separator or Canonical_Line_Ending
-        self.unify_separators = separator is None
+        self.separator = separator
         self.remaining_data = None
 
     def process(self, data: str) -> List[str]:
@@ -62,37 +53,45 @@ class LineSplitter:
         if data == "":
             return []
 
-        # Update remaining data before we convert line endings to
-        # canonical line endings.
+        # Update remaining data before attempting to split lines.
         if self.remaining_data is None:
             self.remaining_data = ""
         self.remaining_data += data
 
-        if self.unify_separators:
-            # If no separator was specified, we want to split on all
-            # known line endings. Convert all known line endings into
-            # the canonical line ending and split on this.
-            for other_line_ending in _Ordered_Other_Line_Endings:
-                self.remaining_data = self.remaining_data.replace(
-                    other_line_ending,
-                    Canonical_Line_Ending)
+        if self.separator is None:
+            # If no separator was specified, use python's built in
+            # line split wisdom to split on any known line ending.
+            lines_with_ends = self.remaining_data.splitlines(keepends=True)
+            detected_lines = self.remaining_data.splitlines()
 
-        # Split lines on line ending
-        detected_lines = self.remaining_data.split(self.separator)
+            # If the last line is identical in lines with ends and
+            # lines without ends, it was unterminated, remove it
+            # from the list of detected lines and keep it for the
+            # next round
+            if lines_with_ends[-1] == detected_lines[-1]:
+                self.remaining_data = detected_lines[-1]
+                del detected_lines[-1]
+            else:
+                self.remaining_data = None
 
-        # If replaced data did not end with the separator, it contains an
-        # unterminated line. We save that for the next round. Otherwise
-        # we mark that we do not have remaining data.
-        if not data.endswith(self.separator):
-            self.remaining_data = detected_lines[-1]
         else:
-            self.remaining_data = None
+            # Split lines on separator. This will create additional
+            # empty lines if `remaining_data` end with the separator.
+            detected_lines = self.remaining_data.split(self.separator)
 
-        # If replaced data ended with the canonical line ending, we
-        # have an extra empty line in detected_lines. If it did not
-        # end with canonical line ending, we have to remove the
-        # unterminated line.
-        del detected_lines[-1]
+            # If replaced data did not end with the separator, it contains an
+            # unterminated line. We save that for the next round. Otherwise
+            # we mark that we do not have remaining data.
+            if not data.endswith(self.separator):
+                self.remaining_data = detected_lines[-1]
+            else:
+                self.remaining_data = None
+
+            # If replaced data ended with the canonical line ending, we
+            # have an extra empty line in detected_lines. If it did not
+            # end with canonical line ending, we have to remove the
+            # unterminated line.
+            del detected_lines[-1]
 
         return detected_lines
 

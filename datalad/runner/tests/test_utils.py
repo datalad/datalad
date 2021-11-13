@@ -15,12 +15,14 @@ def test_line_splitter_basic():
         "\n"
     )
 
-    assert_equal(lines, [
-        "first line",
-        "second line",
-        "third line",
-        ""
-    ])
+    assert_equal(
+        lines,
+        [
+            "first line",
+            "second line",
+            "third line",
+            ""
+        ])
 
     assert_is_none(line_splitter.finish_processing())
 
@@ -78,3 +80,7 @@ def test_line_splitter_corner_cases():
     lines = line_splitter.process("\n")
     assert_equal(lines, [""])
     assert_equal(line_splitter.remaining_data, None)
+
+    line_splitter = LineSplitter()
+    lines = line_splitter.process("  a   \f \r\n")
+    assert_equal(lines, ["  a   ", " "])
