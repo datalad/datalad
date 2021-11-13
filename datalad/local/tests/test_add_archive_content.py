@@ -13,17 +13,32 @@
 __docformat__ = 'restructuredtext'
 
 import os
+from glob import glob
 from os import unlink
 from os.path import (
     basename,
     exists,
-    join as opj,
+)
+from os.path import join as opj
+from os.path import (
     lexists,
     pardir,
 )
-from glob import glob
 from pathlib import Path
 
+from datalad.api import (
+    Dataset,
+    add_archive_content,
+    clean,
+)
+from datalad.consts import (
+    ARCHIVES_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+)
+from datalad.support.exceptions import (
+    CommandError,
+    NoDatasetFound,
+)
 from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_equal,
@@ -32,7 +47,6 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_not_in,
     assert_raises,
-    assert_re_in,
     assert_repo_status,
     assert_result_values_cond,
     assert_true,
@@ -45,17 +59,11 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     swallow_outputs,
     with_tempfile,
     with_tree,
 )
-
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import (
-    CommandError,
-    NoDatasetFound,
-)
-
 from datalad.utils import (
     chpwd,
     find_files,
@@ -63,16 +71,6 @@ from datalad.utils import (
     on_windows,
     rmtemp,
 )
-from datalad.api import (
-    add_archive_content,
-    clean,
-    Dataset,
-)
-from datalad.consts import (
-    ARCHIVES_SPECIAL_REMOTE,
-    DATALAD_SPECIAL_REMOTES_UUIDS,
-)
-
 
 treeargs = dict(
     tree=(
@@ -533,7 +531,8 @@ class TestAddArchiveOptions():
                           str(Path('sub') / '123' / 'file.txt'),
                           annexed=True)
 
-    @known_failure_windows
+    # https://github.com/datalad/datalad/issues/6187
+    @skip_if_adjusted_branch
     def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed
         # but that new stuff was added to annex repo.  We know the key since
@@ -588,15 +587,17 @@ class TestAddArchiveOptions():
                 delete_after=True,
                 drop_after=True)
             assert_repo_status(self.annex.path)
-            commits_after_master = list(self.annex.get_branch_commits_())
-            commits_after = list(self.annex.get_branch_commits_('git-annex'))
-            # There should be a single commit for all additions +1 to
-            # initiate datalad-archives gh-1258.  If faking dates,
-            # there should be another +1 because annex.alwayscommit
-            # isn't set to false.
-            assert_equal(len(commits_after),
-                         len(commits_prior) + 2 + self.annex.fake_dates_enabled)
-            assert_equal(len(commits_after_master), len(commits_prior_master))
+            if not self.annex.is_managed_branch():
+                # whole counting logic here is ignorant of adjusted branches
+                commits_after_master = list(self.annex.get_branch_commits_())
+                commits_after = list(self.annex.get_branch_commits_('git-annex'))
+                # There should be a single commit for all additions +1 to
+                # initiate datalad-archives gh-1258.  If faking dates,
+                # there should be another +1 because annex.alwayscommit
+                # isn't set to false.
+                assert_equal(len(commits_after),
+                             len(commits_prior) + 2 + self.annex.fake_dates_enabled)
+                assert_equal(len(commits_after_master), len(commits_prior_master))
             # there should be no .datalad temporary files hanging around
             self.assert_no_trash_left_behind()
 
