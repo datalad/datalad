@@ -28,7 +28,10 @@ from datalad.utils import (
     PurePosixPath,
 )
 from datalad.support.path import robust_abspath
-
+from datalad.support.exceptions import (
+    format_oneline_tb,
+    CapturedException,
+)
 from datalad.distribution.dataset import Dataset
 
 
@@ -62,12 +65,12 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
       If given, the `path` and `type` values are populated with the path of the
       datasets and 'dataset' as the type. Giving additional values for both
       keys will overwrite these pre-populated values.
-    exception : CapturedException
+    exception : Exception
       Exceptions that occurred while generating a result should be captured
       by immediately instantiating a CapturedException. This instance can
       be passed here to yield more comprehensive error reporting, including
       an auto-generated traceback (added to the result record under an
-      'exception_traceback' key).
+      'exception_traceback' key). Exceptions of other types are also supported.
 
     Returns
     -------
@@ -98,8 +101,11 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
         d['error_message'] = error_message
     if exception is not None:
         d['exception'] = exception
-        d['exception_traceback'] = \
-            exception.format_oneline_tb(limit=None, include_str=False)
+        d['exception_traceback'] = exception.format_oneline_tb(
+            include_str=False) \
+            if isinstance(exception, CapturedException) \
+            else format_oneline_tb(
+                exception, include_str=False)
     if kwargs:
         d.update(kwargs)
     return d
