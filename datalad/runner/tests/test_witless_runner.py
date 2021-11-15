@@ -149,7 +149,7 @@ def test_runner_stdin_no_capture():
     # Ensure that stdin writing alone progresses
     runner = Runner()
     runner.run(
-        [sys.executable, '-c', 'import sys; print(sys.stdin.read()[-10:])'],
+        py2cmd('import sys; print(sys.stdin.read()[-10:])'),
         stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 2 + '\n').encode('utf-8'),
         protocol=None
     )
