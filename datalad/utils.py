@@ -1149,15 +1149,14 @@ def collect_method_callstats(func):
       - .repo is expensive since does all kinds of checks.
       - .config is expensive transitively since it calls .repo each time
 
-
     TODO:
-    - fancy one could look through the stack for the same id(self) to see if
-      that location is already in memo.  That would hint to the cases where object
-      is not passed into underlying functions, causing them to redo the same work
-      over and over again
-    - ATM might flood with all "1 lines" calls which are not that informative.
-      The underlying possibly suboptimal use might be coming from their callers.
-      It might or not relate to the previous TODO
+      - fancy one could look through the stack for the same id(self) to see if
+        that location is already in memo.  That would hint to the cases where object
+        is not passed into underlying functions, causing them to redo the same work
+        over and over again
+      - ATM might flood with all "1 lines" calls which are not that informative.
+        The underlying possibly suboptimal use might be coming from their callers.
+        It might or not relate to the previous TODO
     """
     from collections import defaultdict
     import traceback
