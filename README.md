@@ -15,7 +15,8 @@
 [![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
-[![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
+[![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5624980.svg)](https://doi.org/10.5281/zenodo.5624980)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-37-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
