@@ -30,8 +30,8 @@ from datalad.utils import (
 
 class LineSplitter:
     """
-    An OS independent line splitter. In particular, it splits
-    lines terminated with "\n" properly in Windows.
+    An line splitter that handles 'streamed content' and is based
+    on python's built-in splitlines().
     """
     def __init__(self, separator: Optional[str] = None):
         """
