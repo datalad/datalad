@@ -67,40 +67,8 @@ class CapturedException(object):
         If include_str is True (default), this is prepended with the string
         representation of the exception.
         """
-
-        # Note: No import at module level, since ConfigManager imports
-        # dochelpers -> circular import when creating datalad.cfg instance at
-        # startup.
-        from datalad import cfg
-
-        if include_str:
-            # try exc message else exception type
-            leading = self.message or self.name
-            out = "{} ".format(leading)
-        else:
-            out = ""
-
-        entries = []
-        entries.extend(self.tb.stack)
-        if self.tb.__cause__:
-            entries.extend(self.tb.__cause__.stack)
-        elif self.tb.__context__ and not self.tb.__suppress_context__:
-            entries.extend(self.tb.__context__.stack)
-
-        if limit is None:
-            limit = int(cfg.obtain('datalad.exc.str.tblimit',
-                                   default=len(entries)))
-        if entries:
-            tb_str = "[%s]" % (','.join(
-                "{}:{}:{}".format(
-                    Path(frame_summary.filename).name,
-                    frame_summary.name,
-                    frame_summary.lineno)
-                for frame_summary in entries[-limit:])
-            )
-            out += "{}".format(tb_str)
-
-        return out
+        return format_oneline_tb(
+            self, self.tb, limit=limit, include_str=include_str)
 
     def format_standard(self):
         """Returns python's standard formatted traceback output
@@ -150,6 +118,71 @@ class CapturedException(object):
 
     def __repr__(self):
         return self.format_oneline_tb(limit=None, include_str=True)
+
+
+def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
+    """Format an exception traceback as a one-line summary
+
+    Parameters
+    ----------
+    exc: Exception
+    tb: TracebackException, optional
+      If not given, it is generated from the given exception.
+    limit: int, optional
+      Traceback depth limit. If not given, the config setting
+      'datalad.exc.str.tblimit' will be used, or all entries
+      are reported.
+    include_str: bool
+      If set, is True (default), the return value is prepended with a string
+    representation of the exception.
+
+    Returns
+    -------
+    str
+      Of format [filename:contextname:linenumber, ...].
+    """
+
+    # Note: No import at module level, since ConfigManager imports
+    # dochelpers -> circular import when creating datalad.cfg instance at
+    # startup.
+    from datalad import cfg
+
+    if include_str:
+        # try exc message else exception type
+        leading = exc.message or exc.name
+        out = "{} ".format(leading)
+    else:
+        out = ""
+
+    if tb is None:
+        tb = traceback.TracebackException.from_exception(
+            exc,
+            limit=limit,
+            lookup_lines=True,
+            capture_locals=False,
+        )
+
+    entries = []
+    entries.extend(tb.stack)
+    if tb.__cause__:
+        entries.extend(tb.__cause__.stack)
+    elif tb.__context__ and not tb.__suppress_context__:
+        entries.extend(tb.__context__.stack)
+
+    if limit is None:
+        limit = int(cfg.obtain('datalad.exc.str.tblimit',
+                               default=len(entries)))
+    if entries:
+        tb_str = "[%s]" % (','.join(
+            "{}:{}:{}".format(
+                Path(frame_summary.filename).name,
+                frame_summary.name,
+                frame_summary.lineno)
+            for frame_summary in entries[-limit:])
+        )
+        out += "{}".format(tb_str)
+
+    return out
 
 
 class MissingExternalDependency(RuntimeError):
