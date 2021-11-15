@@ -9,15 +9,26 @@
 import datetime
 import os
 import platform
-import setuptools
 import sys
+from os import (
+    linesep,
+    makedirs,
+)
+from os.path import dirname
+from os.path import join as opj
+from os.path import sep as pathsep
+from os.path import splitext
 
-
+import setuptools
 from genericpath import exists
-from os import linesep, makedirs
-from os.path import dirname, join as opj, sep as pathsep, splitext
-from setuptools import Command, DistutilsOptionError, findall, find_packages, setup
 from packaging.version import Version
+from setuptools import (
+    Command,
+    DistutilsOptionError,
+    find_packages,
+    findall,
+    setup,
+)
 
 from . import formatters as fmt
 
@@ -219,8 +230,8 @@ class BuildConfigInfo(Command):
         if not os.path.exists(opath):
             os.makedirs(opath)
 
-        from datalad.interface.common_cfg import definitions as cfgdefs
         from datalad.dochelpers import _indent
+        from datalad.interface.common_cfg import definitions as cfgdefs
 
         categories = {
             'global': {},
@@ -280,10 +291,11 @@ class BuildSchema(Command):
         self.announce('Generating JSON-LD schema file')
 
     def run(self):
-        from datalad.metadata.definitions import common_defs
-        from datalad.metadata.definitions import version as schema_version
         import json
         import shutil
+
+        from datalad.metadata.definitions import common_defs
+        from datalad.metadata.definitions import version as schema_version
 
         def _mk_fname(label, version):
             return '{}{}{}.json'.format(
