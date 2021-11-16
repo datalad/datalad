@@ -525,6 +525,9 @@ def build_doc(cls, **kwargs):
         add_args=add_args
     )
 
+    if hasattr(cls.__call__, '_dataset_method'):
+        cls.__call__._dataset_method.__doc__ = cls.__call__.__doc__
+
     # return original
     return cls
 

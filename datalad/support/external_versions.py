@@ -176,7 +176,6 @@ class ExternalVersions(object):
         'cmd:7z',
         'requests',
         'scrapy',
-        'wrapt',
     )
 
     def __init__(self):

@@ -15,9 +15,9 @@ __docformat__ = 'restructuredtext'
 import inspect
 import logging
 import os
-import wrapt
 import sys
 import re
+from functools import wraps
 from time import time
 from os import curdir
 from os import pardir
@@ -281,7 +281,7 @@ def get_result_filter(fx):
     return _fx
 
 
-def eval_results(func):
+def eval_results(wrapped):
     """Decorator for return value evaluation of datalad commands.
 
     Note, this decorator is only compatible with commands that return
@@ -322,9 +322,9 @@ def eval_results(func):
       i.e. a datalad command definition
     """
 
-    @wrapt.decorator
-    def eval_func(wrapped, instance, args, kwargs):
-        lgr.log(2, "Entered eval_func for %s", func)
+    @wraps(wrapped)
+    def eval_func(*args, **kwargs):
+        lgr.log(2, "Entered eval_func for %s", wrapped)
         # for result filters
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
@@ -469,9 +469,9 @@ def eval_results(func):
             lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
             return generator_func(*args, **kwargs)
         else:
-            @wrapt.decorator
-            def return_func(wrapped_, instance_, args_, kwargs_):
-                results = wrapped_(*args_, **kwargs_)
+            @wraps(generator_func)
+            def return_func(*args_, **kwargs_):
+                results = generator_func(*args_, **kwargs_)
                 if inspect.isgenerator(results):
                     # unwind generator if there is one, this actually runs
                     # any processing
@@ -483,9 +483,9 @@ def eval_results(func):
                     return results
 
             lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
-            return return_func(generator_func)(*args, **kwargs)
+            return return_func(*args, **kwargs)
 
-    ret = eval_func(func)
+    ret = eval_func
     ret._eval_results = True
     return ret
 
