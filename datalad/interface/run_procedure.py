@@ -216,10 +216,10 @@ class RunProcedure(Interface):
     Directories identified by the configuration settings
 
     - 'datalad.locations.user-procedures' (determined by
-      appdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
+      platformdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
       on GNU/Linux systems)
     - 'datalad.locations.system-procedures' (determined by
-      appdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
+      platformdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
       GNU/Linux systems)
     - 'datalad.locations.dataset-procedures'
 

@@ -11,7 +11,7 @@
 import atexit
 import logging
 import shelve
-import appdirs
+import platformdirs
 import os.path
 
 from .network import get_tld
@@ -46,7 +46,7 @@ class CookiesDB(object):
             filename = self._filename
             cookies_dir = os.path.dirname(filename)
         else:
-            cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
+            cookies_dir = os.path.join(platformdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
             filename = os.path.join(cookies_dir, 'cookies')
 
         # TODO: guarantee restricted permissions
