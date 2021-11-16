@@ -105,6 +105,7 @@ environment:
           datalad.cmdline
           datalad.customremotes
           datalad.distribution
+          datalad.distributed
           datalad.downloaders
           datalad.interface
       # TODO: datalad.metadata (this is completely non-functional on Windows,
@@ -115,7 +116,6 @@ environment:
       # ~50min
       DTS: >
           datalad.local
-          datalad.distributed
           datalad.support
           datalad.tests
           datalad.ui
