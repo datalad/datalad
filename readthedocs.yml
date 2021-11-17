@@ -20,7 +20,7 @@ formats: all
 
 # Optionally declare the Python requirements required to build your docs
 python:
-   install:
-   - requirements: requirements-devel.txt
-   - method: setuptools
-   - path: .
+  install:
+    - path: .
+      method: pip
+    - requirements: requirements-devel.txt
