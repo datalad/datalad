@@ -105,8 +105,10 @@ environment:
           datalad.cmdline
           datalad.customremotes
           datalad.distribution
+          datalad.distributed
           datalad.downloaders
           datalad.interface
+          datalad.tests
       # TODO: datalad.metadata (this is completely non-functional on Windows,
       #       either tests only, or actual code too)
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
@@ -115,9 +117,7 @@ environment:
       # ~50min
       DTS: >
           datalad.local
-          datalad.distributed
           datalad.support
-          datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PY: 39-x64
