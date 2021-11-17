@@ -38,7 +38,7 @@ from ..utils import (
     get_suggestions_msg,
 )
 
-from appdirs import AppDirs
+from platformdirs import AppDirs
 from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")

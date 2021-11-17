@@ -161,7 +161,7 @@ class ExternalVersions(object):
     }
     _INTERESTING = (
         'annexremote',
-        'appdirs',
+        'platformdirs',
         'boto',
         'exifread',
         'git',

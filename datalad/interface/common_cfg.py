@@ -12,7 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from appdirs import AppDirs
+from platformdirs import AppDirs
 from os import environ
 from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool

@@ -34,7 +34,7 @@ from _datalad_build_support.setup import (
 
 requires = {
     'core': [
-        'appdirs',
+        'platformdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
