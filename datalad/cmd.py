@@ -17,6 +17,9 @@ import subprocess
 import sys
 import tempfile
 import warnings
+from datetime import datetime
+from operator import attrgetter
+from weakref import WeakValueDictionary
 
 # start of legacy import block
 # to avoid breakage of code written before datalad.runner
@@ -32,18 +35,19 @@ from datalad.runner.gitrunner import (
     GitRunnerBase,
     GitWitlessRunner,
 )
-from datalad.runner.runner import WitlessRunner
-from datalad.runner.protocol import WitlessProtocol
 from datalad.runner.nonasyncrunner import run_command
+from datalad.runner.protocol import WitlessProtocol
+from datalad.runner.runner import WitlessRunner
 from datalad.support.exceptions import CommandError
-# end of legacy import block
-
 from datalad.utils import (
     auto_repr,
     ensure_unicode,
     try_multiple,
     unlink,
 )
+
+# end of legacy import block
+
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -93,6 +97,10 @@ class BatchedCommand(SafeDelCloseMixin):
     """Container for a process which would allow for persistent communication
     """
 
+    # Collection of active BatchedCommands as a mapping from object IDs to
+    # instances
+    _active_instances = WeakValueDictionary()
+
     def __init__(self, cmd, path=None, output_proc=None):
         if not isinstance(cmd, list):
             cmd = [cmd]
@@ -102,6 +110,49 @@ class BatchedCommand(SafeDelCloseMixin):
         self._process = None
         self._stderr_out = None
         self._stderr_out_fname = None
+        self._active = 0
+        self._active_last = nowdt()
+        self.clean_inactive()
+        self._active_instances[id(self)] = self
+
+    @classmethod
+    def clean_inactive(cls):
+        from . import cfg
+        max_batched = cfg.obtain("datalad.runtime.max-batched")
+        max_inactive_age = cfg.obtain("datalad.runtime.max-inactive-age")
+        if len(cls._active_instances) > max_batched:
+            active_qty = 0
+            inactive = []
+            for c in cls._active_instances.values():
+                if c._active:
+                    active_qty += 1
+                else:
+                    inactive.append(c)
+            inactive.sort(key=attrgetter("_active_last"))
+            to_close = len(cls._active_instances) - max_batched
+            if to_close <= 0:
+                return
+            too_young = 0
+            now = nowdt()
+            for i, c in enumerate(inactive):
+                if (now - c._active_last).total_seconds() <= max_inactive_age:
+                    too_young = len(inactive) - i
+                    break
+                elif c._active:
+                    active_qty += 1
+                else:
+                    c.close()
+                    self._active_instances.pop(id(c), None)
+                    to_close -= 1
+                    if to_close <= 0:
+                        break
+            if to_close > 0:
+                lgr.debug(
+                    "Too many BatchedCommands remaining after cleanup;"
+                    " %d active, %d went inactive recently",
+                    active_qty,
+                    too_young,
+                )
 
     def _initialize(self):
         lgr.debug("Initiating a new process for %s", repr(self))
@@ -121,6 +172,7 @@ class BatchedCommand(SafeDelCloseMixin):
             bufsize=1,
             universal_newlines=True  # **kwargs
         )
+        self._active_last = nowdt()
 
     def _check_process(self, restart=False):
         """Check if the process was terminated and restart if restart
@@ -156,54 +208,67 @@ class BatchedCommand(SafeDelCloseMixin):
         str or list
           Output received from process.  list in case if cmds was a list
         """
-        input_multiple = isinstance(cmds, list)
-        if not input_multiple:
-            cmds = [cmds]
+        self._active += 1
+        try:
+            input_multiple = isinstance(cmds, list)
+            if not input_multiple:
+                cmds = [cmds]
 
-        output = [o for o in self.yield_(cmds)]
-        return output if input_multiple else output[0]
+            output = [o for o in self.yield_(cmds)]
+            return output if input_multiple else output[0]
+        finally:
+            self._active -= 1
 
     def yield_(self, cmds):
         """Same as __call__, but requires `cmds` to be an iterable
 
         and yields results for each item."""
-        for entry in cmds:
-            if not isinstance(entry, str):
-                entry = ' '.join(entry)
-            yield self.proc1(entry)
+        self._active += 1
+        try:
+            for entry in cmds:
+                if not isinstance(entry, str):
+                    entry = ' '.join(entry)
+                self._active_last = nowdt()
+                yield self.proc1(entry)
+        finally:
+            self._active -= 1
 
     def proc1(self, arg):
         """Same as __call__, but only takes a single command argument
 
         and returns a single result.
         """
-        # TODO: add checks -- may be process died off and needs to be reinitiated
-        if not self._process:
-            self._initialize()
+        self._active += 1
+        try:
+            # TODO: add checks -- may be process died off and needs to be reinitiated
+            if not self._process:
+                self._initialize()
 
-        entry = arg + '\n'
-        lgr.log(5, "Sending %r to batched command %s", entry, self)
-        # apparently communicate is just a one time show
-        # stdout, stderr = self._process.communicate(entry)
-        # according to the internet wisdom there is no easy way with subprocess
-        self._check_process(restart=True)
-        process = self._process  # _check_process might have restarted it
-        process.stdin.write(entry)
-        process.stdin.flush()
-        lgr.log(5, "Done sending.")
-        still_alive, stderr = self._check_process(restart=False)
-        # TODO: we might want to handle still_alive, e.g. to allow for
-        #       a number of restarts/resends, but it should be per command
-        #       since for some we cannot just resend the same query. But if
-        #       it is just a "get"er - we could resend it few times
-        # The default output_proc expects a single line output.
-        # TODO: timeouts etc
-        stdout = ensure_unicode(self.output_proc(process.stdout)) \
-            if not process.stdout.closed else None
-        if stderr:
-            lgr.warning("Received output in stderr: %r", stderr)
-        lgr.log(5, "Received output: %r", stdout)
-        return stdout
+            entry = arg + '\n'
+            lgr.log(5, "Sending %r to batched command %s", entry, self)
+            # apparently communicate is just a one time show
+            # stdout, stderr = self._process.communicate(entry)
+            # according to the internet wisdom there is no easy way with subprocess
+            self._check_process(restart=True)
+            process = self._process  # _check_process might have restarted it
+            process.stdin.write(entry)
+            process.stdin.flush()
+            lgr.log(5, "Done sending.")
+            still_alive, stderr = self._check_process(restart=False)
+            # TODO: we might want to handle still_alive, e.g. to allow for
+            #       a number of restarts/resends, but it should be per command
+            #       since for some we cannot just resend the same query. But if
+            #       it is just a "get"er - we could resend it few times
+            # The default output_proc expects a single line output.
+            # TODO: timeouts etc
+            stdout = ensure_unicode(self.output_proc(process.stdout)) \
+                if not process.stdout.closed else None
+            if stderr:
+                lgr.warning("Received output in stderr: %r", stderr)
+            lgr.log(5, "Received output: %r", stdout)
+            return stdout
+        finally:
+            self._active -= 1
 
     def close(self, return_stderr=False):
         """Close communication and wait for process to terminate
@@ -281,3 +346,7 @@ class BatchedCommand(SafeDelCloseMixin):
             unlink(self._stderr_out_fname)
             self._stderr_out_fname = None
         return ret
+
+
+def nowdt():
+    return datetime.now().astimezone()
