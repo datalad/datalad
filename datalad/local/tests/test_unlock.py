@@ -128,11 +128,9 @@ def test_unlock(origpath, clonepath):
 
     testfile.write_text("change content")
 
-    repo.add('test-annex.dat')
-    # TODO: RF: make 'lock' a command as well
-    # re-lock to further on have a consistent situation with V5:
-    repo.call_annex(['lock'], files=['test-annex.dat'])
-    repo.commit("edit 'test-annex.dat' via unlock and lock it again")
+    ds.save(
+        'test-annex.dat',
+        message="edit 'test-annex.dat' via unlock and lock it again")
 
     if not managed_branch:
         # after commit, file is locked again:
@@ -150,11 +148,9 @@ def test_unlock(origpath, clonepath):
 
     testfile.write_text("change content again")
 
-    repo.add('test-annex.dat')
-    # TODO: RF: make 'lock' a command as well
-    # re-lock to further on have a consistent situation with V5:
-    repo.call_annex(['lock'], files=['test-annex.dat'])
-    repo.commit("edit 'test-annex.dat' via unlock and lock it again")
+    ds.save(
+        'test-annex.dat',
+        message="edit 'test-annex.dat' via unlock and lock it again")
 
     # TODO:
     # BOOOM: test-annex.dat writeable in V6!
