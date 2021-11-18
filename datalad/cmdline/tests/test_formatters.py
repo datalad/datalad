@@ -16,15 +16,11 @@ from datalad.tests.utils import (
     assert_in,
     assert_not_in,
     SkipTest,
+    skip_if_no_module
 )
-try:
-    import formatters as fmt
-except ImportError:  # pragma: no cover
-    # must be running from installed version where formatters is not present
-    # These tests can be ran only with formatters, which is outside of the
-    # datalad module space in the root of the sourcebase
-    if not exists('formatters.py'):
-        raise SkipTest
+
+skip_if_no_module('formatters')
+import formatters as fmt
 
 from ..main import setup_parser
 
