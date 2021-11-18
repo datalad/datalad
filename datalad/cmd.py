@@ -113,6 +113,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self._active = 0
         self._active_last = _now()
         self.clean_inactive()
+        assert id(self) not in self._active_instances
         self._active_instances[id(self)] = self
 
     @classmethod
