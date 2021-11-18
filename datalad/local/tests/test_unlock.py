@@ -12,39 +12,34 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import join as opj
-
-
-from datalad.distribution.dataset import Dataset
 from datalad.api import (
+    clone,
     create,
     unlock,
 )
-from datalad.utils import Path
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
     NoDatasetFound,
 )
-from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
-    with_tempfile,
-    assert_false,
-    assert_raises,
-    assert_repo_status,
-    eq_,
-    getpwd,
-    chpwd,
     assert_cwd_unchanged,
-    with_testrepos,
-    with_tree,
-    skip_if_root,
-    slow,
+    assert_false,
     assert_in_results,
     assert_not_in_results,
+    assert_raises,
+    assert_repo_status,
     assert_result_count,
-    known_failure_githubci_win,
-    known_failure_windows,
+    chpwd,
+    eq_,
+    getpwd,
+    skip_if_root,
+    slow,
+    with_tempfile,
+    with_tree,
 )
+from datalad.utils import Path
 
 
 @assert_cwd_unchanged
@@ -91,16 +86,23 @@ def test_unlock_raises(path, path2, path3):
 #       Therefore don't know what to test for yet.
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789027#step:8:134
 @slow  # 12sec on Yarik's laptop
-@known_failure_windows
 @skip_if_root
-@with_testrepos('.*annex.*', flavors=['clone'])
-def test_unlock(path):
+@with_tempfile
+@with_tempfile
+def test_unlock(origpath, clonepath):
+    origds = Dataset(origpath).create()
+    (origds.pathobj / 'test-annex.dat').write_text('some text')
+    origds.save()
 
-    ds = Dataset(path)
+    ds = clone(origpath, clonepath)
+    repo = ds.repo
+    testfile = ds.pathobj / 'test-annex.dat'
 
-    # file is currently locked:
-    # TODO: use get_annexed_files instead of hardcoded filename
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    managed_branch = repo.is_managed_branch()
+    if not managed_branch:
+        # file is currently locked:
+        # TODO: use get_annexed_files instead of hardcoded filename
+        assert_raises(IOError, open, testfile, "w")
 
     # Note: In V6+ we can unlock even if the file's content isn't present, but
     # doing so when unlock() is called with no paths isn't consistent with the
@@ -114,44 +116,41 @@ def test_unlock(path):
     # cannot unlock without content (annex get wasn't called)
     assert_in_results(
         ds.unlock(path="test-annex.dat", on_failure="ignore"),
-        path=opj(path, "test-annex.dat"),
+        path=str(testfile),
         status="impossible")
 
-    ds.repo.get('test-annex.dat')
+    repo.get('test-annex.dat')
     result = ds.unlock()
-    assert_result_count(result, 1)
-    assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
+    if not managed_branch:
+        # with managed repos `unlock` is not talking
+        assert_result_count(result, 1)
+        assert_in_results(result, path=str(testfile), status='ok')
 
-    with open(opj(path, 'test-annex.dat'), "w") as f:
-        f.write("change content")
+    testfile.write_text("change content")
 
-    ds.repo.add('test-annex.dat')
-    # TODO: RF: make 'lock' a command as well
-    # re-lock to further on have a consistent situation with V5:
-    ds.repo.call_annex(['lock'], files=['test-annex.dat'])
-    ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
+    ds.save(
+        'test-annex.dat',
+        message="edit 'test-annex.dat' via unlock and lock it again")
 
-    # after commit, file is locked again:
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    if not managed_branch:
+        # after commit, file is locked again:
+        assert_raises(IOError, open, testfile, "w")
 
     # content was changed:
-    with open(opj(path, 'test-annex.dat'), "r") as f:
-        eq_("change content", f.read())
+    eq_("change content", testfile.read_text())
 
     # unlock again, this time more specific:
     result = ds.unlock(path='test-annex.dat')
-    assert_result_count(result, 1)
+    if not managed_branch:
+        # with managed repos `unlock` is not talking
+        assert_result_count(result, 1)
+        assert_in_results(result, path=str(testfile), status='ok')
 
-    assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
+    testfile.write_text("change content again")
 
-    with open(opj(path, 'test-annex.dat'), "w") as f:
-        f.write("change content again")
-
-    ds.repo.add('test-annex.dat')
-    # TODO: RF: make 'lock' a command as well
-    # re-lock to further on have a consistent situation with V5:
-    ds.repo.call_annex(['lock'], files=['test-annex.dat'])
-    ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
+    ds.save(
+        'test-annex.dat',
+        message="edit 'test-annex.dat' via unlock and lock it again")
 
     # TODO:
     # BOOOM: test-annex.dat writeable in V6!
@@ -159,15 +158,14 @@ def test_unlock(path):
     # and locked it again?
     # Also: After opening the file is empty.
 
-    # after commit, file is locked again:
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    if not managed_branch:
+        # after commit, file is locked again:
+        assert_raises(IOError, open, testfile, "w")
 
     # content was changed:
-    with open(opj(path, 'test-annex.dat'), "r") as f:
-        eq_("change content again", f.read())
+    eq_("change content again", testfile.read_text())
 
 
-@known_failure_githubci_win
 @with_tree(tree={"dir": {"a": "a", "b": "b"}})
 def test_unlock_directory(path):
     ds = Dataset(path).create(force=True)
