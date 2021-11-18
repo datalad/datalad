@@ -111,7 +111,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self._stderr_out = None
         self._stderr_out_fname = None
         self._active = 0
-        self._active_last = nowdt()
+        self._active_last = _now()
         self.clean_inactive()
         self._active_instances[id(self)] = self
 
@@ -133,7 +133,7 @@ class BatchedCommand(SafeDelCloseMixin):
             if to_close <= 0:
                 return
             too_young = 0
-            now = nowdt()
+            now = _now()
             for i, c in enumerate(inactive):
                 if (now - c._active_last).total_seconds() <= max_inactive_age:
                     too_young = len(inactive) - i
@@ -172,7 +172,7 @@ class BatchedCommand(SafeDelCloseMixin):
             bufsize=1,
             universal_newlines=True  # **kwargs
         )
-        self._active_last = nowdt()
+        self._active_last = _now()
 
     def _check_process(self, restart=False):
         """Check if the process was terminated and restart if restart
@@ -228,7 +228,7 @@ class BatchedCommand(SafeDelCloseMixin):
             for entry in cmds:
                 if not isinstance(entry, str):
                     entry = ' '.join(entry)
-                self._active_last = nowdt()
+                self._active_last = _now()
                 yield self.proc1(entry)
         finally:
             self._active -= 1
@@ -348,5 +348,5 @@ class BatchedCommand(SafeDelCloseMixin):
         return ret
 
 
-def nowdt():
+def _now():
     return datetime.now().astimezone()
