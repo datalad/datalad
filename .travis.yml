@@ -89,6 +89,8 @@ matrix:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
     - DATALAD_LOG_VMEM=1
+    - DATALAD_RUNTIME_MAX__BATCHED=2
+    - DATALAD_RUNTIME_MAX__INACTIVE__AGE=10
   - python: 3.6
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
