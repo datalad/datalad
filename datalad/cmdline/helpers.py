@@ -276,6 +276,12 @@ def parser_add_common_options(parser, version=None):
         code. A failure is any result with status 'impossible' or 'error'.
         [Default: '%(default)s']""")
     parser.add_argument(
+        '--library-mode', dest='common_library_mode', action='store_true',
+        help="""Enable operation as a utility library (rather than a front-end
+        application). This may improve performance, because convenience
+        functionality will be disabled, and will alter the error reporting to
+        be better suited for internal use.""")
+    parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
         command line options before the subcommand label. Options taking

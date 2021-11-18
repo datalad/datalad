@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     assert_re_in,
     eq_,
     in_,
+    ok_,
     ok_startswith,
     on_windows,
     slow,
@@ -386,3 +387,16 @@ def test_commanderror_jsonmsgs(src, exp):
             protocol=StdOutErrCapture)
     if ds.repo.git_annex_version >= "8.20201129":
         in_('use `git-annex export`', cme.exception.stderr)
+
+
+def test_librarymode():
+    was_mode = datalad.__runtime_mode
+    try:
+        # clean --dry-run is just a no-op command that is cheap
+        # to execute. It has no particular role here, other than
+        # to make the code pass the location where library mode
+        # should be turned on via the cmdline API
+        run_main(['--library-mode', 'clean', '--dry-run'])
+        ok_(datalad.in_librarymode())
+    finally:
+        datalad.__runtime_mode = was_mode
