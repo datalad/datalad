@@ -143,7 +143,7 @@ class BatchedCommand(SafeDelCloseMixin):
                     active_qty += 1
                 else:
                     c.close()
-                    self._active_instances.pop(id(c), None)
+                    cls._active_instances.pop(id(c), None)
                     to_close -= 1
                     if to_close <= 0:
                         break
