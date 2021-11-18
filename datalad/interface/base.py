@@ -30,6 +30,7 @@ import warnings
 
 from ..ui import ui
 
+import datalad
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import (
@@ -484,6 +485,9 @@ def build_doc(cls, **kwargs):
     cls: Interface
       class defining a datalad command
     """
+    if datalad.in_librarymode():
+        lgr.debug("Not assembling DataLad API docs in libary-mode")
+        return cls
 
     # Note, that this is a class decorator, which is executed only once when the
     # class is imported. It builds the docstring for the class' __call__ method

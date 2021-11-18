@@ -48,5 +48,6 @@ order to inherit the mode of the parent process.
 Library-mode implications
 =========================
 
-Once the mode distinction has actual behavioral consequences, such consequences
-should be summarized here.
+No Python API docs
+  Generation of comprehensive doc-strings for all API commands is skipped. This
+  speeds up ``import datalad.api`` by about 30%.
