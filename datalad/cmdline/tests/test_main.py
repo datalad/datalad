@@ -70,21 +70,28 @@ def run_main(args, exit_code=0, expect_stderr=False):
     stdout, stderr  strings
        Output produced
     """
-    with patch('sys.stderr', new_callable=StringIO) as cmerr:
-        with patch('sys.stdout', new_callable=StringIO) as cmout:
-            with assert_raises(SystemExit) as cm:
-                main(["datalad"] + list(args))
-            assert_equal(cm.exception.code, exit_code)
-            stdout = cmout.getvalue()
-            stderr = cmerr.getvalue()
-            if expect_stderr is False:
-                assert_equal(stderr, "")
-            elif expect_stderr is True:
-                # do nothing -- just return
-                pass
-            else:
-                # must be a string
-                assert_equal(stderr, expect_stderr)
+    was_mode = datalad.__api
+    try:
+        with patch('sys.stderr', new_callable=StringIO) as cmerr:
+            with patch('sys.stdout', new_callable=StringIO) as cmout:
+                with assert_raises(SystemExit) as cm:
+                    main(["datalad"] + list(args))
+                eq_('cmdline', datalad.get_apimode())
+                assert_equal(cm.exception.code, exit_code)
+                stdout = cmout.getvalue()
+                stderr = cmerr.getvalue()
+                if expect_stderr is False:
+                    assert_equal(stderr, "")
+                elif expect_stderr is True:
+                    # do nothing -- just return
+                    pass
+                else:
+                    # must be a string
+                    assert_equal(stderr, expect_stderr)
+    finally:
+        # restore what we had
+        datalad.__api = was_mode
+
     return stdout, stderr
 
 

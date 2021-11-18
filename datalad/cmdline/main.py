@@ -151,6 +151,8 @@ def setup_parser(
 
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
+    # record that we came in via the cmdline
+    datalad.__api = 'cmdline'
     args = args or sys.argv
     if on_msys_tainted_paths:
         # Possibly present DataLadRIs were stripped of a leading /

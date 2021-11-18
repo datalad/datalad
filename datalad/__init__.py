@@ -23,6 +23,28 @@ import atexit
 import os
 
 
+# this is not to be modified. for querying use get_apimode()
+__api = 'python'
+
+
+def get_apimode():
+    """Returns the API mode label for the current session.
+
+    The API mode label indicates whether DataLad is running in "normal"
+    mode in a Python session, or whether it is used via the command line
+    interface.
+
+    This function is a utility for optimizing behavior and messaging to the
+    particular API (Python vs command line) in use in a given process.
+
+    Returns
+    {'python', 'cmdline'}
+      The API mode is 'python' by default, unless the main command line
+      entrypoint set it to 'cmdline'.
+    """
+    return __api
+
+
 # For reproducible demos/tests
 _seed = os.environ.get('DATALAD_SEED', None)
 if _seed is not None:
