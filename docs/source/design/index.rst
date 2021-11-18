@@ -23,3 +23,4 @@ subsystems in DataLad.
    exception_handling
    credentials
    url_substitution
+   standard_parameters
