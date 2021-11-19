@@ -24,3 +24,4 @@ subsystems in DataLad.
    credentials
    url_substitution
    batched_command
+   standard_parameters
