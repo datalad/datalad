@@ -21,6 +21,7 @@ from datalad.api import (
     clone,
     create,
     remove,
+    siblings,
 )
 from datalad.utils import (
     chpwd,
@@ -169,7 +170,8 @@ def test_clone_datasets_root(tdir):
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-def test_clone_simple_local(src, path):
+@with_tempfile(mkdir=True)
+def test_clone_simple_local(src, path, path2):
     origin = Dataset(path)
 
     # now install it somewhere else
@@ -209,6 +211,13 @@ def test_clone_simple_local(src, path):
     if isinstance(origin.repo, AnnexRepo):
         eq_(uuid_before, ds.repo.uuid)
 
+    # install it with a custom sibling name
+    res = clone(src, path2, origin='custom',
+                result_xfm=None, return_type='list')
+    assert_status('ok', res)
+    assert_in('custom',
+              [s['name'] for s in siblings(dataset=path2,
+                                           result_renderer='disabled')])
 
 
 # AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []

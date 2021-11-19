@@ -20,6 +20,7 @@ from datalad.interface.common_opts import (
     location_description,
     jobs_opt,
     reckless_opt,
+    origin_opt,
 )
 from datalad.interface.results import (
     get_status_dict,
@@ -161,6 +162,7 @@ class Install(Interface):
         recursion_limit=recursion_limit,
         reckless=reckless_opt,
         jobs=jobs_opt,
+        origin=origin_opt,
     )
 
     @staticmethod
@@ -175,7 +177,8 @@ class Install(Interface):
             recursive=False,
             recursion_limit=None,
             reckless=None,
-            jobs="auto"):
+            jobs="auto",
+            origin=None):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
@@ -361,7 +364,8 @@ class Install(Interface):
             result_xfm=None,
             return_type='generator',
             result_filter=None,
-            on_failure='ignore')
+            on_failure='ignore',
+            origin=origin)
         # helper
         as_ds = YieldDatasets()
         destination_dataset = None

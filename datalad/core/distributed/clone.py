@@ -22,6 +22,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
+    origin_opt,
 )
 from datalad.log import log_progress
 from datalad.support.gitrepo import (
@@ -223,6 +224,7 @@ class Clone(Interface):
             similar to :command:`git clone`"""),
         description=location_description,
         reckless=reckless_opt,
+        origin=origin_opt,
     )
 
     @staticmethod
@@ -232,6 +234,7 @@ class Clone(Interface):
             source,
             path=None,
             dataset=None,
+            origin=None,
             description=None,
             reckless=None):
         # did we explicitly get a dataset to install into?
@@ -321,6 +324,7 @@ class Clone(Interface):
         for r in clone_dataset(
                 [source],
                 destination_dataset,
+                origin,
                 reckless,
                 description,
                 result_props,
@@ -456,6 +460,7 @@ def _map_urls(cfg, urls):
 def clone_dataset(
         srcs,
         destds,
+        origin=None,
         reckless=None,
         description=None,
         result_props=None,
@@ -472,6 +477,8 @@ def clone_dataset(
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
+    origin : str
+      Sibling name to use for clone source. Is passed as --origin to git clone.
     reckless : {None, 'auto', 'ephemeral', 'shared-...'}, optional
       Mode switch to put cloned dataset into unsafe/throw-away configurations, i.e.
       sacrifice data safety for performance or resource footprint. When None
@@ -591,6 +598,8 @@ def clone_dataset(
 
         if cand.get('version', None):
             clone_opts['branch'] = cand['version']
+        if origin is not None:
+            clone_opts['origin'] = origin
         try:
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
             # doesn't make it happen seamlessly

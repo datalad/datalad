@@ -289,6 +289,14 @@ reporton_opt = Parameter(
     doc="""choose on what type result to report on: 'datasets',
     'files', 'all' (both datasets and files), or 'none' (no report).""",
     constraints=EnsureChoice('all', 'datasets', 'files', 'none'))
+
+origin_opt = Parameter(
+    args=("-o", "--origin",),
+    metavar='ORIGIN',
+    doc="""Sibling name for the source location the dataset is cloned
+    from. Defaults to 'origin', or the Git (version >2.30) configuration
+    value of clone.defaultRemoteName""",
+    constraints=EnsureStr() | EnsureNone())
 # define parameters to be used by eval_results to tune behavior
 # Note: This is done outside eval_results in order to be available when building
 # docstrings for the decorated functions
