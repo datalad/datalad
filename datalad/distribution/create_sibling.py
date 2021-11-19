@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from distutils.version import LooseVersion
 import logging
 import os
 from os.path import (
@@ -19,8 +20,6 @@ from os.path import (
     normpath,
     relpath,
 )
-
-from packaging.version import Version
 
 from datalad import ssh_manager
 
@@ -350,7 +349,7 @@ def _create_dataset_sibling(
 
     # check git version on remote end
     lgr.info("Adjusting remote git configuration")
-    if shell.get_git_version() and Version(shell.get_git_version()) >= Version("2.4"):
+    if shell.get_git_version() and shell.get_git_version() >= LooseVersion("2.4"):
         # allow for pushing to checked out branch
         try:
             shell("git -C {} config receive.denyCurrentBranch updateInstead".format(
