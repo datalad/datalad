@@ -163,8 +163,9 @@ class CreateSiblingRia(Interface):
             for creation of the repository sibling in the RIA store.""",
             constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
-            args=('-s', '--name',),
+            args=('-s', '--sibling-name', '--name'),
             metavar='NAME',
+            dest='name',
             doc="""Name of the sibling.
             With `recursive`, the same name will be used to label all
             the subdatasets' siblings.""",

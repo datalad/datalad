@@ -89,7 +89,7 @@ def test_update_simple(origin, src_path, dst_path):
     # deprecation message doesn't ruin things
     assert_status('notneeded', source.update(fetch_all=True))
     # but error if unknown sibling is given
-    assert_status('impossible', source.update(sibling='funky', on_failure='ignore'))
+    assert_status('impossible', source.update(name='funky', on_failure='ignore'))
 
     # get a clone to update later on:
     dest = install(dst_path, source=src_path, recursive=True)
@@ -263,7 +263,7 @@ def test_update_fetch_all(path):
 
     # merge a certain remote:
     assert_result_count(
-        ds.update(sibling='sibling_1', merge=True),
+        ds.update(name='sibling_1', merge=True),
         1, action='update', status='ok', type='dataset')
 
     # changes from sibling_2 still not present:

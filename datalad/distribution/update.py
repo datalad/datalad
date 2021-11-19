@@ -129,14 +129,20 @@ class Update(Interface):
             operation.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        sibling=Parameter(
-            args=("-s", "--sibling",),
+        name=Parameter(
+            args=("-s", "--sibling-name",),
             doc="""name of the sibling to update from. When unspecified,
             updates from all siblings are fetched. If there is more than one
             sibling and changes will be brought into the working tree (as
             requested via [CMD: --merge, --how, or --how-subds CMD][PY:
             `merge`, `how`, or `how_subds` PY]), a sibling will be chosen based
             on the configured remote for the current branch.""",
+            constraints=EnsureStr() | EnsureNone()),
+        sibling=Parameter(
+            args=("--sibling",),
+            doc="""DEPRECATED, will be removed in a future release.
+            Please use  the renamed parameter [CMD: -s/--sibling-name CMD][PY:
+            name PY] instead""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -215,6 +221,7 @@ class Update(Interface):
     def __call__(
             path=None,
             sibling=None,
+            name=None,
             merge=False,
             how=None,
             how_subds=None,
@@ -226,6 +233,13 @@ class Update(Interface):
             reobtain_data=False):
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
+        if sibling is not None:
+            import warnings
+            warnings.warn("The --sibling parameter has been renamed to -s/"
+                          "--sibling-name.",
+                          DeprecationWarning)
+        else:
+            sibling = name
         if path and not recursive:
             lgr.warning('path constraints for subdataset updates ignored, '
                         'because `recursive` option was not given')

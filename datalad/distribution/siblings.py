@@ -140,7 +140,7 @@ class Siblings(Interface):
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         name=Parameter(
-            args=('-s', '--name',),
+            args=('-s', '--sibling-name',),
             metavar='NAME',
             doc="""name of the sibling. For addition with path "URLs" and
             sibling removal this option is mandatory, otherwise the hostname

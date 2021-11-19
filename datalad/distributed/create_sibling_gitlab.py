@@ -111,7 +111,7 @@ class CreateSiblingGitlab(Interface):
         Name of the default GitLab site (see --site)
     "datalad.gitlab-SITENAME-siblingname"
         Name of the sibling configured for the local dataset that points
-        to the GitLab instance SITENAME (see --name)
+        to the GitLab instance SITENAME (see --sibling-name)
     "datalad.gitlab-SITENAME-layout"
         Project layout used at the GitLab instance SITENAME (see --layout)
     "datalad.gitlab-SITENAME-access"
@@ -165,7 +165,7 @@ class CreateSiblingGitlab(Interface):
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         name=Parameter(
-            args=('-s', '--name',),
+            args=('-s', '--sibling-name',),
             metavar='NAME',
             doc="""name to represent the GitLab sibling remote in the local
             dataset installation. If not specified a name is looked up in the

@@ -452,7 +452,7 @@ class CreateSibling(Interface):
                 URL and path on the server.""",
             constraints=EnsureStr()),
         name=Parameter(
-            args=('-s', '--name',),
+            args=('-s', '--sibling-name',),
             metavar='NAME',
             doc="""sibling name to create for this publication target.
                 If `recursive` is set, the same name will be used to label all
