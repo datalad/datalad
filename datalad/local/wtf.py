@@ -14,7 +14,6 @@ import logging
 import os
 import os.path as op
 from functools import partial
-from itertools import chain
 from collections import OrderedDict
 
 
@@ -26,13 +25,13 @@ from datalad.utils import (
     unlink,
     Path,
 )
-from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InvalidGitRepositoryError,
 )
-from datalad.version import __version__, __full_version__
+from datalad import __version__
 
 lgr = logging.getLogger('datalad.local.wtf')
 
@@ -61,7 +60,6 @@ def get_max_path_length(top_path=None, maxl=1000):
         top_path = getpwd()
     import random
     from datalad import lgr
-    from datalad.dochelpers import exc_str
     from datalad.support import path
     prefix = path.join(top_path, "dl%d" % random.randint(1 ,100000))
     # some smart folks could implement binary search for this
@@ -73,9 +71,10 @@ def get_max_path_length(top_path=None, maxl=1000):
             with open(filename, 'w') as f:
                 max_path_length = path_length
         except Exception as exc:
+            ce = CapturedException(exc)
             lgr.debug(
                 "Failed to create sample file for length %d. Last succeeded was %s. Exception: %s",
-                path_length, max_path_length, exc_str(exc))
+                path_length, max_path_length, ce)
             break
         unlink(filename)
     return max_path_length
@@ -85,7 +84,6 @@ def _describe_datalad():
 
     return {
         'version': ensure_unicode(__version__),
-        'full_version': ensure_unicode(__full_version__),
     }
 
 
@@ -100,9 +98,10 @@ def _describe_annex():
         out = runner.run(
             ['git', 'annex', 'version'], protocol=StdOutErrCapture)
     except CommandError as e:
+        ce = CapturedException(e)
         return dict(
             version='not available',
-            message=exc_str(e),
+            message=ce.format_short(),
         )
     info = {}
     for line in out['stdout'].split(os.linesep):
@@ -124,7 +123,8 @@ def _describe_system():
     try:
         dist = get_linux_distribution()
     except Exception as exc:
-        lgr.warning("Failed to get distribution information: %s", exc_str(exc))
+        ce = CapturedException(exc)
+        lgr.warning("Failed to get distribution information: %s", ce)
         dist = tuple()
 
     return {
@@ -185,7 +185,8 @@ def _describe_extensions():
             mod = import_module(e.module_name, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
         except Exception as e:
-            info['load_error'] = exc_str(e)
+            ce = CapturedException(e)
+            info['load_error'] = ce.format_short()
             continue
         info['entrypoints'] = entry_points = {}
         for ep in ext[1]:
@@ -199,7 +200,8 @@ def _describe_extensions():
                 import_module(ep[0], package='datalad')
                 ep_info['load_error'] = None
             except Exception as e:
-                ep_info['load_error'] = exc_str(e)
+                ce = CapturedException(e)
+                ep_info['load_error'] = ce.format_short()
                 continue
     return infos
 
@@ -220,7 +222,8 @@ def _describe_metadata_elements(group):
             e.load()
             info['load_error'] = None
         except Exception as e:
-            info['load_error'] = exc_str(e)
+            ce = CapturedException(e)
+            info['load_error'] = ce.format_short()
             continue
     return infos
 
@@ -241,6 +244,11 @@ def _describe_dataset(ds, sensitive):
             'repo': ds.repo.__class__.__name__ if ds.repo else None,
             'id': ds.id,
         }
+        # describe available branches and their states
+        branches = [
+            '%s@%s' % (b, next(ds.repo.get_branch_commits_(branch=b))[:7])
+            for b in ds.repo.get_branches()]
+        infos['branches'] = branches
         if not sensitive:
             infos['metadata'] = _HIDDEN
         elif ds.id:
@@ -257,7 +265,8 @@ def _describe_dataset(ds, sensitive):
                 infos['metadata'] = None
         return infos
     except InvalidGitRepositoryError as e:
-        return {"invalid": exc_str(e)}
+        ce = CapturedException(e)
+        return {"invalid": ce.message}
 
 
 def _describe_location(res):
@@ -380,7 +389,7 @@ class WTF(Interface):
 
         ds = None
         try:
-            ds = require_dataset(dataset, check_installed=False, purpose='reporting')
+            ds = require_dataset(dataset, check_installed=False, purpose='report')
         except NoDatasetFound:
             # failure is already logged
             pass

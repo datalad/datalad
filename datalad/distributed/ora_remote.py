@@ -188,6 +188,12 @@ class LocalIO(IOBase):
         )
 
     def get_from_archive(self, archive, src, dst, progress_cb):
+        # Upfront check to avoid cryptic error output
+        # https://github.com/datalad/datalad/issues/4336
+        if not self.exists(archive):
+            raise RIARemoteError("archive {arc} does not exist."
+                                 "".format(arc=archive))
+
         # this requires python 3.5
         with open(dst, 'wb') as target_file:
             subprocess.run([
@@ -205,7 +211,12 @@ class LocalIO(IOBase):
         src.rename(dst)
 
     def remove(self, path):
-        path.unlink()
+        try:
+            path.unlink()
+        except PermissionError as e:
+            raise RIARemoteError(str(e) + os.linesep +
+                                 "Note: Write permissions for a key's parent"
+                                 "directory are also required to drop content.")
 
     def remove_dir(self, path):
         path.rmdir()
@@ -486,7 +497,13 @@ class SSHRemoteIO(IOBase):
         self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
 
     def remove(self, path):
-        self._run('rm {}'.format(sh_quote(str(path))))
+        try:
+            self._run('rm {}'.format(sh_quote(str(path))))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(
+                str(e) + os.linesep +
+                "Note: Write permissions for a key's parent"
+                "directory are also required to drop content.")
 
     def remove_dir(self, path):
         self._run('rmdir {}'.format(sh_quote(str(path))))
@@ -619,13 +636,12 @@ class HTTPRemoteIO(object):
     # NOTE: For now read-only. Not sure yet whether an IO class is the right
     # approach.
 
-    def __init__(self, ria_url, dsid, buffer_size=DEFAULT_BUFFER_SIZE):
-        assert ria_url.startswith("ria+http")
-        self.base_url = ria_url[4:]
-        if self.base_url[-1] == '/':
-            self.base_url = self.base_url[:-1]
+    def __init__(self, url, buffer_size=DEFAULT_BUFFER_SIZE):
+        if not url.startswith("http"):
+            raise RIARemoteError("Expected HTTP URL, but got {}".format(url))
 
-        self.base_url += "/" + dsid[:3] + '/' + dsid[3:]
+        self.store_url = url.rstrip('/')
+
         # make sure default is used when None was passed, too.
         self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
@@ -633,17 +649,32 @@ class HTTPRemoteIO(object):
         # Note, that we need the path with hash dirs, since we don't have access
         # to annexremote.dirhash from within IO classes
 
-        url = self.base_url + "/annex/objects/" + str(key_path)
-        response = requests.head(url)
-        return response.status_code == 200
+        return self.exists(key_path)
 
     def get(self, key_path, filename, progress_cb):
         # Note, that we need the path with hash dirs, since we don't have access
         # to annexremote.dirhash from within IO classes
 
-        url = self.base_url + "/annex/objects/" + str(key_path)
+        url = self.store_url + str(key_path)
         from datalad.support.network import download_url
         download_url(url, filename, overwrite=True)
+
+    def exists(self, path):
+        # use same signature as in SSH and Local IO, although validity is
+        # limited in case of HTTP.
+        url = self.store_url + path.as_posix()
+        try:
+            response = requests.head(url, allow_redirects=True)
+        except Exception as e:
+            raise RIARemoteError(str(e))
+
+        return response.status_code == 200
+
+    def read_file(self, file_path):
+
+        from datalad.support.network import download_url
+        content = download_url(self.store_url + file_path.as_posix())
+        return content
 
 
 def handle_errors(func):
@@ -663,31 +694,46 @@ def handle_errors(func):
             return func(self, *args, **kwargs)
         except Exception as e:
             if self.remote_log_enabled:
-                from datetime import datetime
-                from traceback import format_exc
-                exc_str = format_exc()
-                entry = "{time}: Error:\n{exc_str}\n" \
-                        "".format(time=datetime.now(),
-                                  exc_str=exc_str)
-                # ensure base path is platform path
-                log_target = Path(self.store_base_path) / 'error_logs' / \
-                    "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                               uuid=self.uuid)
-                self.io.write_file(log_target, entry, mode='a')
+                try:
+                    from datetime import datetime
+                    from traceback import format_exc
+                    exc_str = format_exc()
+                    entry = "{time}: Error:\n{exc_str}\n" \
+                            "".format(time=datetime.now(),
+                                      exc_str=exc_str)
+                    # ensure base path is platform path
+                    log_target = Path(self.store_base_path) / 'error_logs' / \
+                        "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                                   uuid=self.uuid)
+                    self.io.write_file(log_target, entry, mode='a')
+                except Exception:
+                    # If logging of the exception does fail itself, there's
+                    # nothing we can do about it. Hence, don't log and report
+                    # the original issue only.
+                    # TODO: With a logger that doesn't sabotage the
+                    #  communication with git-annex, we should be abe to use
+                    #  CapturedException here, in order to get an informative
+                    #  traceback in a debug message.
+                    pass
 
             try:
                 # We're done using io, so let it perform any needed cleanup. At
                 # the moment, this is only relevant for SSHRemoteIO, in which
                 # case it cleans up the SSH socket and prevents a hang with
                 # git-annex 8.20201103 and later.
-                self.io.close()
-            except AttributeError:
-                pass
-            else:
-                # Note: It is documented as safe to unregister a function even
-                # if it hasn't been registered.
                 from atexit import unregister
-                unregister(self.io.close)
+                if self._io:
+                    self._io.close()
+                    unregister(self._io.close)
+                if self._push_io:
+                    self._push_io.close()
+                    unregister(self._push_io.close)
+            except AttributeError:
+                # seems like things are already being cleaned up -> a good
+                pass
+            except Exception:
+                # anything else: Not a problem. We are about to exit anyway
+                pass
 
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
@@ -1030,12 +1076,7 @@ class RIARemote(SpecialRemote):
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
 
-        if not isinstance(self.io, HTTPRemoteIO):
-            self.get_store()
-
-        # else:
-        # TODO: consistency with SSH and FILE behavior? In those cases we make
-        #       sure the store exists from within initremote
+        self.get_store()
 
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
@@ -1092,9 +1133,18 @@ class RIARemote(SpecialRemote):
             if self._local_io():
                 self._io = LocalIO()
             elif self.ria_store_url.startswith("ria+http"):
-                self._io = HTTPRemoteIO(self.ria_store_url,
-                                        self.archive_id,
-                                        self.buffer_size)
+                # TODO: That construction of "http(s)://host/" should probably
+                #       be moved, so that we get that when we determine
+                #       self.storage_host. In other words: Get the parsed URL
+                #       instead and let HTTPRemoteIO + SSHRemoteIO deal with it
+                #       uniformly. Also: Don't forget about a possible port.
+
+                url_parts = self.ria_store_url[4:].split('/')
+                # we expect parts: ("http(s):", "", host:port, path)
+                self._io = HTTPRemoteIO(
+                    url_parts[0] + "//" + url_parts[2],
+                    self.buffer_size
+                )
             elif self.storage_host:
                 self._io = SSHRemoteIO(self.storage_host, self.buffer_size)
                 from atexit import register
@@ -1167,8 +1217,7 @@ class RIARemote(SpecialRemote):
         self.uuid = self.annex.getuuid()
         self._verify_config(gitdir)
 
-        if not isinstance(self.io, HTTPRemoteIO):
-            self.get_store()
+        self.get_store()
 
         # report active special remote configuration/status
         self.info = {
@@ -1185,6 +1234,9 @@ class RIARemote(SpecialRemote):
     @handle_errors
     def transfer_store(self, key, filename):
         self._ensure_writeable()
+
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
@@ -1223,12 +1275,8 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def transfer_retrieve(self, key, filename):
-
-        if isinstance(self.io, HTTPRemoteIO):
-            self.io.get(PurePosixPath(self.annex.dirhash(key)) / key / key,
-                        filename,
-                        self.annex.progress)
-            return
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
@@ -1248,10 +1296,8 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def checkpresent(self, key):
-
-        if isinstance(self.io, HTTPRemoteIO):
-            return self.io.checkpresent(
-                PurePosixPath(self.annex.dirhash(key)) / key / key)
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
@@ -1267,6 +1313,9 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def remove(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
+
         self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
@@ -1293,15 +1342,17 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def whereis(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         if isinstance(self.io, HTTPRemoteIO):
             # display the URL for a request
             # TODO: method of HTTPRemoteIO
-            return self.ria_store_url[4:] + "/annex/objects" + \
-                   self.annex.dirhash(key) + "/" + key + "/" + key
+            return self.ria_store_url[4:] + "/annex/objects/" + \
+                   self.annex.dirhash(key) + key + "/" + key
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
-        return str(key_path) if self._local_io() \
+        return str(dsobj_dir / key_path) if self._local_io() \
             else '{}: {}:{}'.format(
                 self.storage_host,
                 self.remote_git_dir,
@@ -1339,6 +1390,35 @@ class RIARemote(SpecialRemote):
             self._last_keypath[1]
 
     # TODO: implement method 'error'
+
+
+def _sanitize_key(key):
+    """Returns a sanitized key that is a suitable directory/file name
+
+    Documentation from the analog implementation in git-annex
+    Annex/Locations.hs
+
+    Converts a key into a filename fragment without any directory.
+
+    Escape "/" in the key name, to keep a flat tree of files and avoid
+    issues with keys containing "/../" or ending with "/" etc.
+
+    "/" is escaped to "%" because it's short and rarely used, and resembles
+        a slash
+    "%" is escaped to "&s", and "&" to "&a"; this ensures that the mapping
+        is one to one.
+    ":" is escaped to "&c", because it seemed like a good idea at the time.
+
+    Changing what this function escapes and how is not a good idea, as it
+    can cause existing objects to get lost.
+    """
+    esc = {
+        '/': '%',
+        '%': '&s',
+        '&': '&a',
+        ':': '&c',
+    }
+    return ''.join(esc.get(c, c) for c in key)
 
 
 def main():

@@ -171,7 +171,6 @@ def test_repo_cache(path):
     assert_true(isinstance(ds.repo, AnnexRepo))
 
 
-@known_failure_windows  # leaves modified .gitmodules behind
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
     # from scratch
@@ -458,7 +457,7 @@ def test_property_reevaluation(repo1):
     assert_is_not_none(ds.id)
     first_id = ds.id
 
-    ds.remove()
+    ds.drop(what='all', reckless='kill', recursive=True)
     # repo is gone, and config is again reevaluated to only provide user/system
     # level config:
     assert_false(lexists(ds.path))

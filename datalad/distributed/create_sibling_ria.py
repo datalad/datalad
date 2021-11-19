@@ -12,8 +12,8 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import subprocess
 
+from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit
@@ -41,6 +41,8 @@ from datalad.distribution.dataset import (
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
+    RIARemoteError,
+    RemoteCommandFailedError,
     SSHRemoteIO,
 )
 from datalad.utils import (
@@ -229,6 +231,12 @@ class CreateSiblingRia(Interface):
             repository be forcefully re-initialized, and the sibling
             (re-)configured ('reconfigure'), or the command be instructed to
             fail ('error').""", ),
+        new_store_ok=Parameter(
+            args=("--new-store-ok",),
+            action='store_true',
+            doc="""When set, a new store will be created, if necessary. Otherwise, a sibling
+            will only be created if the url points to an existing RIA store.""",
+        ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         trust_level=Parameter(
@@ -260,6 +268,7 @@ class CreateSiblingRia(Interface):
                  group=None,
                  storage_sibling=True,
                  existing='error',
+                 new_store_ok=False,
                  trust_level=None,
                  recursive=False,
                  recursion_limit=None,
@@ -283,7 +292,7 @@ class CreateSiblingRia(Interface):
             )
 
         ds = require_dataset(
-            dataset, check_installed=True, purpose='create sibling RIA')
+            dataset, check_installed=True, purpose='create RIA sibling(s)')
         res_kwargs = dict(
             ds=ds,
             action="create-sibling-ria",
@@ -347,7 +356,7 @@ class CreateSiblingRia(Interface):
             # even if we have to fail, let's report all conflicting siblings
             # in subdatasets
             failed = False
-            for r in ds.siblings(result_renderer=None,
+            for r in ds.siblings(result_renderer='disabled',
                                  recursive=recursive,
                                  recursion_limit=recursion_limit):
                 log_progress(
@@ -394,7 +403,29 @@ class CreateSiblingRia(Interface):
         #       - more generally consider store creation a dedicated command or
         #         option
 
-        create_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
+        io = SSHRemoteIO(ssh_host) if ssh_host else LocalIO()
+        try:
+            # determine the existence of a store by trying to read its layout.
+            # Because this raises a FileNotFound error if non-existent, we need
+            # to catch it
+            io.read_file(Path(base_path) / 'ria-layout-version')
+        except (FileNotFoundError, RIARemoteError, RemoteCommandFailedError) as e:
+            if not new_store_ok:
+                # we're instructed to only act in case of an existing RIA store
+                res = get_status_dict(
+                    status='error',
+                    message="No store found at '{}'. Forgot "
+                            "--new-store-ok ?".format(
+                        Path(base_path), **res_kwargs),
+                    )
+                yield res
+                return
+
+        log_progress(
+            lgr.info, 'create-sibling-ria',
+            'Creating a new RIA store at %s', Path(base_path),
+        )
+        create_store(io,
                      Path(base_path),
                      '1')
 
@@ -492,7 +523,7 @@ def _create_sibling_ria(
     # determine layout locations; go for a v1 store-level layout
     repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
 
-    ds_siblings = [r['name'] for r in ds.siblings(result_renderer=None)]
+    ds_siblings = [r['name'] for r in ds.siblings(result_renderer='disabled')]
     # Figure whether we are supposed to skip this very dataset
     if existing == 'skip' and (
             name in ds_siblings or (
@@ -679,8 +710,10 @@ def _create_sibling_ria(
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
         if group:
-            # TODO; do we need a cwd here?
-            subprocess.run(chgrp_cmd, cwd=ds.path)
+            # No CWD needed here, since `chgrp` is expected to be found via PATH
+            # and the path it's operating on is absolute (repo_path). No
+            # repository operation involved.
+            Runner().run(chgrp_cmd)
         # finally update server
         if post_update_hook:
             # Conditional on post_update_hook, since one w/o the other doesn't
@@ -709,7 +742,7 @@ def _create_sibling_ria(
         recursive=False,
         # Note, that this should be None if storage_sibling was not set
         publish_depends=storage_name,
-        result_renderer=None,
+        result_renderer='disabled',
         # Note, that otherwise a subsequent publish will report
         # "notneeded".
         fetch=True

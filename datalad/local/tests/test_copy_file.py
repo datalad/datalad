@@ -162,7 +162,9 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
     dest_ds = Dataset(workdir / 'dest').create()
     # no special remotes
     eq_(dest_ds.repo.get_special_remotes(), {})
-    copy_file([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
+    # must call with a dataset to get change saved, in order for drop
+    # below to work properly without getting in reckless mode
+    dest_ds.copy_file([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
     # we have an special remote in the destination dataset now
     assert_in_results(
         dest_ds.repo.get_special_remotes().values(),
@@ -174,7 +176,9 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
 
     # now replace file in dest with a different content at the same path
-    copy_file([src_ds.pathobj / 'myfile2.txt', dest_ds.pathobj / 'myfile1.txt'])
+    # must call with a dataset to get change saved, in order for drop
+    dest_ds.copy_file([src_ds.pathobj / 'myfile2.txt',
+                       dest_ds.pathobj / 'myfile1.txt'])
     dest_ds.drop('myfile1.txt')
     dest_ds.repo.get('myfile1.txt', remote='datalad')
     # no gets the "same path" but yields different content
@@ -246,7 +250,7 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
     # nested datasets
     eq_(*[
         sorted(
-            r for r in d.status(result_xfm='relpaths', result_renderer=None)
+            r for r in d.status(result_xfm='relpaths', result_renderer='disabled')
             # filter out subdataset entry in dest_ds
             if r not in ('lvl2', '.gitmodules'))
         for d in (src_ds, dest_ds)
@@ -299,7 +303,7 @@ def test_copy_file_specs_from(srcdir, destdir):
                  (r_srcabs, r_srcdestabs_str)):
         eq_(*[
             sorted(
-                r for r in d.status(result_xfm='relpaths', result_renderer=None))
+                r for r in d.status(result_xfm='relpaths', result_renderer='disabled'))
             for d in (a, b)
         ])
 

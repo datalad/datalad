@@ -72,7 +72,6 @@ from datalad.tests.utils import (
     skip_ssh,
     slow,
     swallow_logs,
-    use_cassette,
     with_sameas_remote,
     with_tempfile,
     with_testrepos,
@@ -124,7 +123,6 @@ def test_invalid_args(path, otherpath, alienpath):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir, ds_path):
@@ -143,7 +141,6 @@ def test_clone_crcns(tdir, ds_path):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir):
     tdir = Path(tdir)
@@ -275,7 +272,9 @@ def test_clone_into_dataset(source_path, top_path):
     source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
-
+    # Note, we test against the produced history in DEFAULT_BRANCH, not what it
+    # turns into in an adjusted branch!
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
@@ -289,6 +288,13 @@ def test_clone_into_dataset(source_path, top_path):
     sds = ds.subdatasets("sub")
     assert_result_count(sds, 1, action='subdataset')
     eq_(sds[0]['gitmodule_datalad-url'], source.path)
+    # Clone produced one commit including the addition to .gitmodule:
+    commits = list(ds.repo.get_branch_commits_(
+        branch=DEFAULT_BRANCH,
+        stop=hexsha_before
+    ))
+    assert_not_in(hexsha_before, commits)
+    eq_(len(commits), 1)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -299,6 +305,24 @@ def test_clone_into_dataset(source_path, top_path):
                       result_xfm='datasets', return_type='item-or-list')
     eq_(subds_.pathobj, ds.pathobj / "sub2")  # for paranoid yoh ;)
     assert_repo_status(ds.path, untracked=['dummy.txt'])
+
+    # don't do anything to the dataset, when cloning fails (gh-6138)
+    create_tree(ds.path, {'subdir': {'dummy2.txt': 'whatever'}})
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
+    results = ds.clone(source, "subdir",
+                       result_xfm=None,
+                       return_type='list',
+                       on_failure='ignore')
+    assert_in_results(results, status='error')
+    # status unchanged
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    # nothing was committed
+    eq_(hexsha_before, ds.repo.get_hexsha(DEFAULT_BRANCH))
 
 
 @with_tempfile(mkdir=True)
@@ -528,24 +552,41 @@ def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
 
 
 def test_installationpath_from_url():
-    cases = (
+    # cases for all OSes
+    cases = [
         'http://example.com/lastbit',
         'http://example.com/lastbit.git',
         'http://lastbit:8000',
-    ) + (
+        # SSH
+        'hostname:lastbit',
+        'hostname:lastbit/',
+        'hostname:subd/lastbit',
+        'hostname:/full/path/lastbit',
+        'hostname:lastbit/.git',
+        'hostname:lastbit/.git/',
+        'hostname:/full/path/lastbit/.git',
+        'full.hostname.com:lastbit/.git',
+        'user@full.hostname.com:lastbit/.git',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit/',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit/.git',
+    ]
+    # OS specific cases
+    cases += [
         'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit',
         'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit\\',
         'Temp\\lastbit',
         'Temp\\lastbit\\',
         'lastbit.git',
         'lastbit.git\\',
-    ) if on_windows else (
+    ] if on_windows else [
         'lastbit',
         'lastbit/',
         '/lastbit',
         'lastbit.git',
         'lastbit.git/',
-    )
+    ]
+
     for p in cases:
         eq_(_get_installationpath_from_url(p), 'lastbit')
     # we need to deal with quoted urls
@@ -629,8 +670,7 @@ def test_cfg_originorigin(path):
     with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*Async run:\n cwd=.*\n"
-                              r" cmd=\[('git',.*'annex'|'git-annex'), 'init'",
+        cml.assert_logged(msg=r"[^[]*Run \[('git',.*'annex'|'git-annex'), 'init'",
                           match=False,
                           level='DEBUG')
     assert_result_count(
@@ -694,7 +734,7 @@ def test_decode_source_spec():
             'localhost/another/path',
             'user@someho.st/mydir',
             'ssh://somewhe.re/else',
-            'git://github.com/datalad/testrepo--basic--r1',
+            'https://github.com/datalad/testrepo--basic--r1',
     ):
         props = decode_source_spec(url)
         dest = props.pop('default_destpath')
@@ -805,7 +845,7 @@ def test_ria_http(lcl, storepath, url):
     # now advance the source dataset
     (ds.pathobj / 'newfile.txt').write_text('new')
     ds.save()
-    ds.publish(to='store')
+    ds.push(to='store')
     Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
     # re-clone as before
     riaclone2 = clone(
@@ -961,7 +1001,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     eq_(len(sds), 1)
     eq_(sds[0]['gitmodule_datalad-url'], ria_url)
     assert_repo_status(ds.path)
-    ds.uninstall('sub', check=False)
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     assert_repo_status(ds.path)
 
     # .gitmodules still there:
@@ -1041,7 +1081,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
     url2 = "ria+{}".format(get_local_file_url(str(storepath2)))
     for d in (ds, subds, subgit):
         create_ds_in_store(io, storepath2, d.id, '2', '1')
-        d.create_sibling_ria(url2, "anotherstore")
+        d.create_sibling_ria(url2, "anotherstore", new_store_ok=True)
         d.push('.', to='anotherstore', data='nothing')
         store2_loc, _, _ = get_layout_locations(1, storepath2, d.id)
         Runner(cwd=str(store2_loc)).run(['git', 'update-server-info'])
@@ -1059,7 +1099,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
         # TODO: create-sibling-ria required for config! => adapt to RF'd
         #       creation (missed on rebase?)
         create_ds_in_store(io, storepath, d.id, '2', '1')
-        d.create_sibling_ria(upl_url, "store")
+        d.create_sibling_ria(upl_url, "store", new_store_ok=True)
 
         if d is not subgit:
             # Now, simulate the problem by reconfiguring the special remote to
@@ -1094,7 +1134,6 @@ def test_ria_postclonecfg():
         raise SkipTest("Can't create symlinks")
 
     from datalad.utils import make_tempfile
-    from datalad.tests.utils import HTTPPath
 
     with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store, \
             make_tempfile(mkdir=True) as store2:
@@ -1115,6 +1154,62 @@ def test_ria_postclonecfg():
         # test cloning via ria+ssh://
         yield skip_ssh(_test_ria_postclonecfg), \
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+
+
+@known_failure_windows
+@skip_ssh
+@with_tree(tree={'somefile.txt': 'some content'})
+@with_tempfile
+@with_tempfile
+def test_no_ria_postclonecfg(dspath, storepath, clonepath):
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    clonepath = Path(clonepath)
+
+    # Test that particular configuration(s) do NOT lead to a reconfiguration
+    # upon clone. (See gh-5628)
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+    ds = Dataset(dspath).create(force=True)
+    ds.save()
+    assert_repo_status(ds.path)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+    file_url = "ria+{}".format(get_local_file_url(str(storepath)))
+    ssh_url = "ria+ssh://datalad-test:{}".format(storepath.as_posix())
+    ds.create_sibling_ria(file_url, "teststore",
+                          push_url=ssh_url, alias="testds",
+                          new_store_ok=True)
+    ds.push('.', to='teststore')
+
+    # Now clone via SSH. Should not reconfigure although `url` doesn't match the
+    # URL we cloned from. However, `push-url` does.
+    riaclone = clone('{}#{}'.format(ssh_url, ds.id), clonepath)
+
+    # ORA remote is enabled (since URL still valid) but not reconfigured:
+    untouched_remote = riaclone.siblings(name='teststore-storage',
+                                         return_type='item-or-list')
+    assert_not_is_instance(untouched_remote, list)
+    ora_cfg = riaclone.repo.get_special_remotes()[
+        untouched_remote['annex-uuid']]
+    ok_(ora_cfg['url'] == file_url)
+    ok_(ora_cfg['push-url'] == ssh_url)
+
+    # publication dependency was still set (and it's the only one that was set):
+    eq_(riaclone.config.get(f"remote.{DEFAULT_REMOTE}.datalad-publish-depends",
+                            get_all=True),
+        "teststore-storage")
+
+    # we can still get the content
+    ds.get("somefile.txt")
 
 
 # fatal: Could not read from remote repository.
@@ -1151,7 +1246,7 @@ def test_ria_postclone_noannex(dspath, storepath, clonepath):
     create_store(io, storepath, '1')
     lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
     create_ds_in_store(io, storepath, ds.id, '2', '1')
-    ds.create_sibling_ria(lcl_url, "store")
+    ds.create_sibling_ria(lcl_url, "store", new_store_ok=True)
     ds.push('.', to='store')
 
 
@@ -1278,8 +1373,8 @@ def test_ephemeral(origin_path, bare_path,
                       where="local")
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
-    clone1.publish(to=DEFAULT_REMOTE,
-                   transfer_data='none' if can_symlink else 'auto')
+    clone1.push(to=DEFAULT_REMOTE,
+                   data='nothing' if can_symlink else 'auto')
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
         eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())
@@ -1474,9 +1569,9 @@ def test_fetch_git_special_remote(url_path, url, path):
 def test_nonuniform_adjusted_subdataset(path):
     # https://github.com/datalad/datalad/issues/5107
     topds = Dataset(Path(path) / "top").create()
-    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    subds_url = 'https://github.com/datalad/testrepo--basic--r1'
     topds.clone(
-        source='git://github.com/datalad/testrepo--basic--r1',
+        source='https://github.com/datalad/testrepo--basic--r1',
         path='subds')
     eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
         subds_url)
@@ -1521,3 +1616,85 @@ def test_clone_git_clone_opts(path):
     eq_(set(x["refname"] for x in repo_b.for_each_ref_(fields="refname")),
         {f"refs/heads/{DEFAULT_BRANCH}",
          f"refs/remotes/{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"})
+
+
+@with_tempfile
+@with_tempfile
+def test_clone_url_mapping(src_path, dest_path):
+    src = create(src_path)
+    dest = Dataset(dest_path)
+    # check that the impossible doesn't work
+    assert_raises(IncompleteResultsError, clone, 'rambo', dest_path)
+    # rather than adding test URL mapping here, consider
+    # test_url_mapping_specs(), it is cheaper there
+
+    # anticipate windows test paths and escape them
+    escaped_subst = (r',rambo,%s' % src_path).replace('\\', '\\\\')
+    for specs in (
+            # we can clone with a simple substitution
+            {'datalad.clone.url-substitute.mike': escaped_subst},
+            # a prior match to a dysfunctional URL doesn't impact success
+            {
+                'datalad.clone.url-substitute.no': ',rambo,picknick',
+                'datalad.clone.url-substitute.mike': escaped_subst,
+            }):
+        try:
+            with patch.dict(dest.config._merged_store, specs):
+                clone('rambo', dest_path)
+        finally:
+            dest.drop(what='all', reckless='kill', recursive=True)
+
+    # check submodule config impact
+    dest.create()
+    with patch.dict(dest.config._merged_store,
+                    {'datalad.clone.url-substitute.mike': escaped_subst}):
+        dest.clone('rambo', 'subds')
+    submod_rec = dest.repo.get_submodules()[0]
+    # we record the original-original URL
+    eq_(submod_rec['gitmodule_datalad-url'], 'rambo')
+    # and put the effective one as the primary URL
+    eq_(submod_rec['gitmodule_url'], src_path)
+
+
+_nomatch_map = {
+    'datalad.clone.url-substitute.nomatch': (
+        ',nomatch,NULL',
+    )
+}
+_windows_map = {
+    'datalad.clone.url-substitute.win': (
+        r',C:\\Users\\datalad\\from,D:\\to',
+    )
+}
+
+
+def test_url_mapping_specs():
+    from datalad.core.distributed.clone import _map_urls
+    cfg = ConfigManager()
+    for m, i, o in (
+            # path redirect on windows
+            (_windows_map,
+             r'C:\Users\datalad\from',
+             r'D:\to'),
+            # test standard github mapping, no pathc needed
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1',
+             'https://github.com/datalad/testrepo_gh-sub__1'),
+            # and on deep subdataset too
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1/d/sub_-  1',
+             'https://github.com/datalad/testrepo_gh-sub__1-d-sub_-_1'),
+            # test that the presence of another mapping spec doesn't ruin
+            # the outcome
+            (_nomatch_map,
+             'https://github.com/datalad/testrepo_gh/sub _1',
+             'https://github.com/datalad/testrepo_gh-sub__1'),
+            # verify OSF mapping, but see
+            # https://github.com/datalad/datalad/issues/5769 for future
+            # implications
+            ({},
+             'https://osf.io/q8xnk/',
+             'osf://q8xnk'),
+            ):
+        with patch.dict(cfg._merged_store, m):
+            eq_(_map_urls(cfg, [i]), [o])

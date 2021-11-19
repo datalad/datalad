@@ -12,7 +12,6 @@
 import os
 from os import chmod
 import stat
-import re
 import sys
 
 from os.path import join as opj, exists, basename
@@ -21,7 +20,7 @@ from ..dataset import Dataset
 from datalad.api import (
     create_sibling,
     install,
-    publish,
+    push,
 )
 from datalad.cmd import (
     WitlessRunner as Runner,
@@ -52,7 +51,6 @@ from datalad.tests.utils import (
     known_failure_windows,
     ok_,
     ok_endswith,
-    ok_exists,
     ok_file_has_content,
     ok_file_under_git,
     skip_if_on_windows,
@@ -283,7 +281,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             assert_publish_with_ui(target_path)
 
         # now, push should work:
-        publish(dataset=source, to="local_target")
+        push(dataset=source, to="local_target")
 
         # and we should be able to 'reconfigure'
         def process_digests_mtimes(digests, mtimes):
@@ -394,7 +392,7 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             assert_not_in("local_target", repo.get_remotes())
 
         # now, push should work:
-        publish(dataset=source, to=remote_name)
+        push(dataset=source, to=remote_name)
 
         # verify that we can create-sibling which was created later and possibly
         # first published in super-dataset as an empty directory
@@ -404,10 +402,10 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
         # already
         with chpwd(source.path):
             # as we discussed in gh-1495 we use the last-published state of the base
-            # dataset as the indicator for modification detection with since=''
+            # dataset as the indicator for modification detection with since='^'
             # hence we must not publish the base dataset on its own without recursion,
             # if we want to have this mechanism do its job
-            #publish(to=remote_name)  # no recursion
+            #push(to=remote_name)  # no recursion
             assert_create_sshwebserver(
                 name=remote_name,
                 sshurl=sshurl,
@@ -420,7 +418,7 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             assert_postupdate_hooks(target_path_, installed=have_webui(), flat=flat)
         # so it was created on remote correctly and wasn't just skipped
         assert(Dataset(_path_(target_path_, ('prefix-' if flat else '') + sub3_name)).is_installed())
-        publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
+        push(dataset=source, to=remote_name, recursive=True, since='^') # just a smoke test
 
 
 @slow  # 28 + 19sec on travis
@@ -548,7 +546,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
             raise SkipTest("Known failure")
         raise
     assert_in_results(res, action="create_sibling", sibling_name=sibname)
-    published = ds.publish(to=sibname, transfer_data='all')
+    published = ds.push(to=sibname, data='anything')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     if have_webui():
         # verify that hook runs and there is nothing in stderr
@@ -577,14 +575,14 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
         ds.create_sibling(url, existing='replace', ui=have_webui())
     interactive_create_sibling()
 
-    published2 = ds.publish(to=sibname, transfer_data='all')
+    published2 = ds.push(to=sibname, data='anything')
     assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 
     # and one more test since in above test it would not puke ATM but just
     # not even try to copy since it assumes that file is already there
     create_tree(ds.path, {'sub2.dat': 'more data'})
     ds.save('sub2.dat')
-    published3 = ds.publish(to=sibname, transfer_data='none')  # we publish just git
+    published3 = ds.push(to=sibname, data='nothing')  # we publish just git
     assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
 
     if not have_webui():
@@ -595,7 +593,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     from glob import glob
     from datalad.consts import WEB_META_LOG
     logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
-    published4 = ds.publish(to=sibname, transfer_data='all')
+    published4 = ds.push(to=sibname, data='anything')
     assert_result_count(published4, 1, path=opj(ds.path, 'sub2.dat'))
     logs_post = glob(_path_(dst_path, WEB_META_LOG, '*'))
     eq_(len(logs_post), len(logs_prior) + 1)
@@ -707,6 +705,10 @@ def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
 @slow  # 49 sec
 def test_target_ssh_inherit():
     skip_if_on_windows()  # create_sibling incompatible with win servers
+    try:
+        from datalad_deprecated.publish import Publish
+    except ImportError:
+        raise SkipTest('Test requires `publish()` from datalad-deprecated')
     # TODO: was waiting for resolution on
     #   https://github.com/datalad/datalad/issues/1274
     # which is now closed but this one is failing ATM, thus leaving as TODO
@@ -837,7 +839,7 @@ def test_non_master_branch(src_path, target_path):
     ds_a.create_sibling(
         name="sib", recursive=True,
         sshurl="ssh://datalad-test" + str(target_path / "b"))
-    ds_a.publish(to="sib", transfer_data="all")
+    ds_a.push(to="sib", data="anything")
 
     ds_b = Dataset(target_path / "b")
 
@@ -867,3 +869,20 @@ def test_preserve_attrs(src, dest):
     assert s.st_mtime == 1234567890
     with open(opj(dest, "src", "foo", "bar")) as fp:
         assert fp.read() == "This is test text."
+
+
+@with_tempfile(mkdir=True)
+def test_only_one_level_without_recursion(path):
+    # this tests for https://github.com/datalad/datalad/issues/5614: accidental
+    # recursion of one level by default
+    path = Path(path)
+    ds_main = Dataset(path / "main").create()
+    ds_main.create('sub1')
+
+    ds_main.create_sibling(
+        name="dummy",
+        sshurl=str(path / "toplevelsibling"))
+    # this should exist
+    ok_((path / 'toplevelsibling').exists())
+    # this shouldn't
+    assert_false(Path(path / 'toplevelsibling' / 'sub1').exists())

@@ -23,7 +23,6 @@ from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
 )
-from datalad.dochelpers import exc_str
 
 import re
 import os
@@ -518,7 +517,7 @@ class ConfigManager(object):
                 raise ValueError(
                     "value '{}' of existing configuration for '{}' cannot be "
                     "converted to the desired type '{}' ({})".format(
-                        _value, var, valtype, exc_str(e)))
+                        _value, var, valtype, e)) from e
 
         # now we need to try to obtain something from the user
         from datalad.ui import ui
@@ -572,7 +571,7 @@ class ConfigManager(object):
         except Exception as e:
             raise ValueError(
                 "cannot convert user input `{}` to desired type ({})".format(
-                    _value, exc_str(e)))
+                    _value, e)) from e
             # XXX we could consider "looping" until we have a value of proper
             # type in case of a user typo...
 
@@ -800,8 +799,8 @@ class ConfigManager(object):
             lockfile = self._repo_dot_git / 'config.dataladlock'
         else:
             # follow pattern in downloaders for lockfile location
-            lockfile = Path(self.obtain('datalad.locations.cache')) \
-                / 'locks' / 'gitconfig.lck'
+            lockfile = Path(self.obtain('datalad.locations.locks')) \
+                       / 'gitconfig.lck'
 
         with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)

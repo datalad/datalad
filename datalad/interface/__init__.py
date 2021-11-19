@@ -25,27 +25,33 @@ _group_dataset = (
         ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
-        ('datalad.distribution.publish', 'Publish'),
         ('datalad.core.distributed.push', 'Push', 'push'),
+        # deprecated
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
-        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
-        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
+        ('datalad.distributed.drop', 'Drop'),
+        ('datalad.local.remove', 'Remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
         ('datalad.distribution.create_sibling',
          'CreateSibling',
          'create-sibling'),
-        ('datalad.distribution.create_sibling_github',
+        ('datalad.distributed.create_sibling_github',
          'CreateSiblingGithub',
          'create-sibling-github'),
         ('datalad.distributed.create_sibling_gitlab',
          'CreateSiblingGitlab',
          'create-sibling-gitlab'),
+        ('datalad.distributed.create_sibling_gogs',
+         'CreateSiblingGogs'),
+        ('datalad.distributed.create_sibling_gin',
+         'CreateSiblingGin'),
+        ('datalad.distributed.create_sibling_gitea',
+         'CreateSiblingGitea'),
         ('datalad.distributed.create_sibling_ria',
          'CreateSiblingRia',
          'create-sibling-ria'),
-        ('datalad.interface.unlock', 'Unlock', 'unlock'),
+        ('datalad.local.unlock', 'Unlock'),
         ('datalad.core.local.save', 'Save', 'save'),
         ('datalad.local.copy_file', 'CopyFile', 'copy-file'),
     ])
@@ -74,9 +80,8 @@ _group_misc = (
         ('datalad.local.export_archive', 'ExportArchive'),
         ('datalad.distributed.export_to_figshare', 'ExportToFigshare'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.clean', 'Clean'),
-        ('datalad.interface.add_archive_content', 'AddArchiveContent',
-         'add-archive-content'),
+        ('datalad.local.clean', 'Clean'),
+        ('datalad.local.add_archive_content', 'AddArchiveContent'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         ('datalad.interface.shell_completion', 'ShellCompletion', 'shell-completion'),
         ('datalad.core.local.run', 'Run', 'run'),
@@ -89,7 +94,6 @@ _group_misc = (
 _group_plumbing = (
     'Plumbing commands',
     [
-        ('datalad.interface.annotate_paths', 'AnnotatePaths', 'annotate-paths'),
         ('datalad.core.distributed.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
@@ -105,6 +109,7 @@ _group_plumbing = (
 _known_extension_commands = {
     'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
+    'datalad-deprecated': ('ls',),
     'datalad-neuroimaging': ('bids2scidata',)
 }
 

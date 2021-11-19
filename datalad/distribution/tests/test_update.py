@@ -79,6 +79,10 @@ def test_update_simple(origin, src_path, dst_path):
     # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote(DEFAULT_REMOTE)
+    # also forget the declared absolute location of the submodules, and turn them
+    # relative to this/a clone
+    for sub in source.subdatasets(result_xfm=lambda x: x['gitmodule_name']):
+        source.subdatasets(path=sub, set_property=[('url', './{}'.format(sub))])
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())
@@ -119,8 +123,10 @@ def test_update_simple(origin, src_path, dst_path):
     assert_in("update.txt",
               dest.repo.get_files(dest.repo.get_active_branch()))
     # it's known to annex, but has no content yet:
-    dest.repo.get_file_key("update.txt")  # raises if unknown
-    eq_([False], dest.repo.file_has_content(["update.txt"]))
+    annexprops = dest.repo.get_file_annexinfo("update.txt",
+                                              eval_availability=True)
+    annexprops['key']  # blows if unknown
+    eq_(False, annexprops['has_content'])
 
     # check subdataset path constraints, baseline (parent + 2 subds)
     assert_result_count(dest.update(recursive=True),
@@ -190,7 +196,7 @@ def test_update_simple(origin, src_path, dst_path):
         dest.update(merge=True, recursive=True), 2,
         action='update', status='ok', type='dataset')
     # and now we can get new file
-    dest.get('2/load.dat')
+    dest.get(opj('2', 'load.dat'))
     ok_file_has_content(opj(dest.path, '2', 'load.dat'), 'heavy')
 
 
@@ -269,8 +275,10 @@ def test_update_fetch_all(path):
     assert_in("first.txt",
               ds.repo.get_files(ds.repo.get_active_branch()))
     # it's known to annex, but has no content yet:
-    ds.repo.get_file_key("first.txt")  # raises if unknown
-    eq_([False], ds.repo.file_has_content(["first.txt"]))
+    annexprops = ds.repo.get_file_annexinfo(
+        "first.txt", eval_availability=True)
+    annexprops['key']  # blows if unknown
+    eq_(False, annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)
@@ -363,7 +371,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_(exists(opj(ds.path, sname)))
 
     # remove from origin
-    origin.remove(sname)
+    origin.remove(sname, reckless='availability')
     assert_result_count(ds.update(merge=True),
                         1, action='update', status='ok', type='dataset')
     # gone locally, wasn't checked out
@@ -403,9 +411,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_(Dataset(opj(ds.path, sname)).is_installed())
 
     # now remove the now disconnected subdataset for further tests
-    # not using a bound method, not giving a parentds, should
-    # not be needed to get a clean dataset
-    remove(op.join(ds.path, sname), check=False)
+    remove(dataset=op.join(ds.path, sname), check=False)
     assert_repo_status(ds.path)
 
     # new separate subdataset, not within the origin dataset
@@ -474,8 +480,10 @@ def test_multiway_merge(path):
     r2 = GitRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
     ds.siblings(action='add', name='r1', url=r1.path)
     ds.siblings(action='add', name='r2', url=r2.path)
-    assert_status('ok', ds.publish(to='r1'))
-    assert_status('ok', ds.publish(to='r2'))
+    assert_status('ok', ds.push(to='r1'))
+    # push unlike publish reports on r2 not being an annex remote with a
+    # 'notneeded'
+    assert_status(('ok', 'notneeded'), ds.push(to='r2'))
     # just a fetch should be no issue
     assert_status('ok', ds.update())
     # ATM we do not support multi-way merges
@@ -1069,3 +1077,34 @@ def test_process_how_args():
     # ... unless --how-subds is explicitly specified.
     eq_(_process_how_args(merge=False, how="merge", how_subds="fetch"),
         ("merge", None))
+
+
+@with_tempfile(mkdir=True)
+def test_update_fetch_failure(path):
+    path = Path(path)
+
+    ds_a = Dataset(path / "ds_a").create()
+    s1 = ds_a.create("s1")
+    ds_a.create("s2")
+
+    ds_b = install(source=ds_a.path, path=str(path / "ds-b"), recursive=True)
+
+    # Rename s1 to make fetch fail.
+    s1.pathobj.rename(s1.pathobj.parent / "s3")
+
+    res = ds_b.update(recursive=True, on_failure="ignore")
+    assert_in_results(
+        res,
+        status="error",
+        path=str(ds_b.pathobj / "s1"),
+        action="update")
+    assert_in_results(
+        res,
+        status="ok",
+        path=str(ds_b.pathobj / "s2"),
+        action="update")
+    assert_in_results(
+        res,
+        status="ok",
+        path=ds_b.path,
+        action="update")

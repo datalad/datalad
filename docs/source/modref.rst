@@ -28,14 +28,16 @@ Dataset operations
    api.create_sibling
    api.create_sibling_github
    api.create_sibling_gitlab
+   api.create_sibling_gogs
+   api.create_sibling_gitea
+   api.create_sibling_gin
    api.drop
    api.get
    api.install
-   api.publish
+   api.push
    api.remove
    api.save
    api.update
-   api.uninstall
    api.unlock
 
 Metadata handling
@@ -70,14 +72,12 @@ Plumbing commands
 .. autosummary::
    :toctree: generated
 
-   api.annotate_paths
    api.clean
    api.clone
    api.copy_file
    api.create_test_dataset
    api.diff
    api.download_url
-   api.push
    api.sshrun
    api.siblings
    api.subdatasets
@@ -114,7 +114,6 @@ Support functionality
    support.gitrepo
    support.annexrepo
    support.archives
-   customremotes.main
    customremotes.base
    customremotes.archives
 

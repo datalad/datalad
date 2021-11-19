@@ -37,7 +37,7 @@ def mbasename(s):
     base = basename(s)
     if base.endswith('.py'):
         base = base[:-3]
-    if base in set(['base', '__init__']):
+    if base in set(['base', '__init__', 'utils']):
         base = basename(dirname(s)) + '.' + base
     return base
 
@@ -209,6 +209,11 @@ class ProgressHandler(logging.Handler):
         super(self.__class__, self).__init__()
         self._other_handler = other_handler
         self.pbars = {}
+
+    def close(self):
+        if self._other_handler:
+            self._other_handler.close()
+        super().close()
 
     def emit(self, record):
         from datalad.ui import ui

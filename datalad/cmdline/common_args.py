@@ -46,13 +46,6 @@ log_level = (
               % ', '.join(_log_level_names))
 )
 
-pbs_runner = (
-    'pbs-runner', ('--pbs-runner',),
-    dict(choices=['condor'],
-         default=None,
-         help="""execute command by scheduling it via available PBS.  For settings, config file will be consulted""")
-)
-
 change_path = (
     'change-path', ('-C',),
     dict(action='append',

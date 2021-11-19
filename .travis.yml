@@ -23,7 +23,7 @@ env:
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow or network"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
-    - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
+    - DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"
@@ -161,14 +161,6 @@ matrix:
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
-#  - if: type = cron
-#    python: 3.6
-#    # test whether known v6 failures still fail
-#    env:
-#    - DATALAD_REPO_VERSION=6
-#    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-#    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-#    - DATALAD_TESTS_SSH=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -176,13 +168,6 @@ matrix:
     python: 3.6
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
-#  # test whether known v6 failures still fail
-#  - if: type = cron
-#    env:
-#    - DATALAD_REPO_VERSION=6
-#    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-#    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-#    - DATALAD_TESTS_SSH=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -207,6 +192,7 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - tools/ci/prep-travis-forssh.sh
+  - tools/ci/debians_disable_outdated_ssl_cert
   # Install various basic depedencies
   - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   # needed for tests of patool compression fall-back solution
@@ -222,8 +208,8 @@ before_install:
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   # Install git-annex
-  - wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
-  - eval python3 datalad_installer.py --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+  - pip install datalad-installer
+  - eval datalad-installer --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
   - source new.env && cat new.env >> ~/.bashrc
   - pip install --upgrade pip
 
@@ -249,7 +235,8 @@ script:
   # Run tests
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER `which nosetests` "${NOSE_OPTS[@]}"
+    $NOSE_WRAPPER python -W error::DeprecationWarning:^datalad
+      -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
       --with-cov --cover-package datalad
@@ -258,10 +245,12 @@ script:
   - cd ..
 
 after_success:
-  # submit only what we have covered in the PRs
+  # cron jobs test more and then PRs will be falling behind since they would not
+  # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
+  - cd __testhome__;
+  - python -m coverage combine -a /tmp/.coverage-entrypoints-*;
+  - python -m coverage report;
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
-      cd __testhome__;
-      coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi
 

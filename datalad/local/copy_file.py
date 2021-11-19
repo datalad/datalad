@@ -16,7 +16,6 @@ import os.path as op
 from shutil import copyfile
 import sys
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -31,6 +30,7 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CapturedException
 from datalad.utils import (
     ensure_list,
     get_dataset_root,
@@ -193,7 +193,7 @@ class CopyFile(Interface):
         ds = None
         if dataset:
             ds = require_dataset(dataset, check_installed=True,
-                                 purpose='copying into')
+                                 purpose='copy into')
 
         if target_dir:
             target_dir = resolve_path(target_dir, dataset)
@@ -331,9 +331,9 @@ def _cleanup_cache(repo_cache):
             try:
                 tmp.rmdir()
             except OSError as e:
+                ce = CapturedException(e)
                 lgr.warning(
-                    'Failed to clean up temporary directory: %s',
-                    exc_str(e))
+                    'Failed to clean up temporary directory: %s', ce)
         done.add(repo.pathobj)
 
 

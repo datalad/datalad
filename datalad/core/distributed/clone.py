@@ -44,23 +44,28 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureKeyChoice,
 )
-from datalad.support.exceptions import DownloadError
+from datalad.support.exceptions import (
+    CapturedException,
+    DownloadError,
+)
 from datalad.support.param import Parameter
+from datalad.support.strings import get_replacement_dict
 from datalad.support.network import (
-    get_local_file_url,
-    download_url,
-    is_url,
-    URL,
-    RI,
     DataLadRI,
     PathRI,
+    RI,
+    SSHRI,
+    URL,
+    download_url,
+    get_local_file_url,
+    is_url,
 )
 from datalad.dochelpers import (
-    exc_str,
     single_or_plural,
 )
 from datalad.utils import (
     ensure_bool,
+    ensure_list,
     knows_annex,
     make_tempfile,
     Path,
@@ -120,6 +125,26 @@ class Clone(Interface):
     an installed dataset, regardless of whether it was newly installed ('ok'
     result), or found already installed from the specified source ('notneeded'
     result).<< PYTHON ||
+
+    URL mapping configuration
+
+    'clone' supports the transformation of URLs via (multi-part) substitution
+    specifications. A substitution specification is defined as a configuration
+    setting 'datalad.clone.url-substition.<seriesID>' with a string containing
+    a match and substitution expression, each following Python's regular
+    expression syntax. Both expressions are concatenated to a single string
+    with an arbitrary delimiter character. The delimiter is defined by
+    prefixing the string with the delimiter. Prefix and delimiter are stripped
+    from the expressions (Example: ",^http://(.*)$,https://\\1").  This setting
+    can be defined multiple times, using the same '<seriesID>'.  Substitutions
+    in a series will be applied incrementally, in order of their definition.
+    The first substitution in such a series must match, otherwise no further
+    substitutions in a series will be considered. However, following the first
+    match all further substitutions in a series are processed, regardless
+    whether intermediate expressions match or not. Substitution series themselves
+    have no particular order, each matching series will result in a candidate
+    clone URL. Consequently, the initial match specification in a series should
+    be as precise as possible to prevent inflation of candidate URLs.
 
     .. seealso::
 
@@ -227,7 +252,7 @@ class Clone(Interface):
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
         ds = require_dataset(
-            dataset, check_installed=True, purpose='cloning') \
+            dataset, check_installed=True, purpose='clone') \
             if dataset is not None else dataset
         refds_path = ds.path if ds else None
 
@@ -282,12 +307,15 @@ class Clone(Interface):
             # we are running on -- we don't care if the path actually
             # exists at this point, but we want to abort early if the path
             # spec is determined to be useless
-            path.exists()
+            # we can do strict=False since we are 3.6+
+            path.resolve(strict=False)
         except OSError as e:
+            ce = CapturedException(e)
             yield get_status_dict(
                 status='error',
                 path=path,
-                message=('cannot handle target path: %s', exc_str(e)),
+                message=('cannot handle target path: %s', ce),
+                exception=ce,
                 **result_props)
             return
 
@@ -303,15 +331,23 @@ class Clone(Interface):
             return
 
         # perform the actual cloning operation
-        yield from clone_dataset(
-            [source],
-            destination_dataset,
-            reckless,
-            description,
-            result_props,
-            cfg=None if ds is None else ds.config,
-            clone_opts=git_clone_opts
-        )
+        clone_failure = False
+        for r in clone_dataset(
+                [source],
+                destination_dataset,
+                reckless,
+                description,
+                result_props,
+                cfg=None if ds is None else ds.config,
+                clone_opts=git_clone_opts,
+                ):
+            if r['status'] in ['error', 'impossible']:
+                clone_failure = True
+            yield r
+
+        if clone_failure:
+            # do not proceed saving anything if cloning failed
+            return
 
         # TODO handle any 'version' property handling and verification using a
         # dedicated public helper
@@ -319,18 +355,117 @@ class Clone(Interface):
         if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
+            actually_saved_subds = False
             for r in ds.save(
                     path,
+                    # Note, that here we know we don't save anything but a new
+                    # subdataset. Hence, don't go with default commit message,
+                    # but be more specific.
+                    message="[DATALAD] Added subdataset",
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
                     on_failure='ignore'):
+                actually_saved_subds = actually_saved_subds or (
+                        r['action'] == 'save' and
+                        r['type'] == 'dataset' and
+                        r['refds'] == ds.path and
+                        r['status'] == 'ok')
                 yield r
 
             # Modify .gitmodules to contain originally given url. This is
-            # particularly relevant for postclone routines on a later `get` for
-            # that subdataset. See gh-5256.
-            ds.subdatasets(path, set_property=[("datalad-url", source)])
+            # particularly relevant for postclone routines on a later `get`
+            # for that subdataset. See gh-5256.
+            if actually_saved_subds:
+                # New subdataset actually saved. Amend the modification
+                # of .gitmodules. Note, that we didn't allow to deviate
+                # from git default behavior WRT a submodule's name vs
+                # its path when we made this a new subdataset.
+                subds_name = path.relative_to(ds.pathobj)
+                ds.repo.call_git(
+                    ['config',
+                     '--file',
+                     '.gitmodules',
+                     '--replace-all',
+                     'submodule.{}.{}'.format(subds_name,
+                                              "datalad-url"),
+                     source]
+                )
+                yield from ds.save('.gitmodules',
+                                   amend=True, to_git=True)
+            else:
+                # We didn't really commit. Just call `subdatasets`
+                # in that case to have the modification included in the
+                # post-clone state (whatever that may be).
+                ds.subdatasets(path, set_property=[("datalad-url", source)])
+
+
+def _get_url_mappings(cfg):
+    cfg_prefix = 'datalad.clone.url-substitute.'
+    # figure out which keys we should be looking for
+    # in the active config
+    subst_keys = set(k for k in cfg.keys() if k.startswith(cfg_prefix))
+    # and in the common config specs
+    from datalad.interface.common_cfg import definitions
+    subst_keys.update(k for k in definitions if k.startswith(cfg_prefix))
+    # TODO a potential sorting of substitution series could be implemented
+    # here
+    return [
+        # decode the rule specifications
+        get_replacement_dict(
+            # one or more could come out
+            ensure_list(
+                cfg.get(
+                    k,
+                    # make sure to pull the default from the common config
+                    default=cfg.obtain(k),
+                    # we specifically support declaration of multiple
+                    # settings to build replacement chains
+                    get_all=True)))
+        for k in subst_keys
+    ]
+
+
+def _map_urls(cfg, urls):
+    mapping_specs = _get_url_mappings(cfg)
+    if not mapping_specs:
+        return urls
+
+    mapped = []
+    # we process the candidate in order to maintain any prioritization
+    # encoded in it (e.g. _get_flexible_source_candidates_for_submodule)
+    # if we have a matching mapping replace the URL in its position
+    for u in urls:
+        # we only permit a single match
+        # TODO we likely want to RF this to pick the longest match
+        mapping_applied = False
+        # try one mapping set at a time
+        for mapping_spec in mapping_specs:
+            # process all substitution patterns in the specification
+            # always operate on strings (could be a Path instance too)
+            mu = str(u)
+            matched = False
+            for match_ex, subst_ex in mapping_spec.items():
+                if not matched:
+                    matched = re.match(match_ex, mu) is not None
+                if not matched:
+                    break
+                # try to map, would return unchanged, if there is no match
+                mu = re.sub(match_ex, subst_ex, mu)
+            if mu != u:
+                lgr.debug("URL substitution: '%s' -> '%s'", u, mu)
+                mapped.append(mu)
+                # we could consider breaking after the for effective mapping
+                # specification. however, that would mean any generic
+                # definition of a broadly matching substitution would derail
+                # the entroe system. moreover, suddently order would matter
+                # substantially
+                mapping_applied = True
+        if not mapping_applied:
+            # none of the mappings matches, go with the original URL
+            # (really original, not the stringified one)
+            mapped.append(u)
+    return mapped
 
 
 def clone_dataset(
@@ -397,6 +532,11 @@ def clone_dataset(
 
     dest_path = destds.pathobj
 
+    # check for configured URL mappings, either in the given config manager
+    # or in the one of the destination dataset, which is typically not existent
+    # yet and the process config manager is then used effectively
+    srcs = _map_urls(cfg or destds.config, srcs)
+
     # decode all source candidate specifications
     candidate_sources = [decode_source_spec(s, cfg=cfg) for s in srcs]
 
@@ -423,7 +563,8 @@ def clone_dataset(
                 # this is needed to match it to any potentially incoming local
                 # source path in the 'notneeded' test below
                 track_path = str(Path(track_url))
-            except Exception:
+            except Exception as e:
+                CapturedException(e)
                 # this should never happen, because Path() will let any non-path stringification
                 # pass through unmodified, but we do not want any potential crash due to
                 # pathlib behavior changes
@@ -482,11 +623,12 @@ def clone_dataset(
                 create=True)
 
         except CommandError as e:
+            ce = CapturedException(e)
             e_stderr = e.stderr
 
             error_msgs[cand['giturl']] = e
             lgr.debug("Failed to clone from URL: %s (%s)",
-                      cand['giturl'], exc_str(e))
+                      cand['giturl'], ce)
             if dest_path.exists():
                 lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                           dest_path)
@@ -536,7 +678,7 @@ def clone_dataset(
                 error_msg = "Failed to clone from any candidate source URL. " \
                             "Encountered errors per each url were:\n- %s"
                 error_args = '\n- '.join(
-                    '{}\n  {}'.format(url, exc_str(exc))
+                    '{}\n  {}'.format(url, exc.to_str())
                     for url, exc in error_msgs.items()
                 )
         else:
@@ -595,9 +737,11 @@ def clone_dataset(
             postclone_checkout_commit(dest_repo, checkout_gitsha,
                                       remote=remote)
         except Exception as e:
+            ce = CapturedException(e)
             yield get_status_dict(
                 status='error',
-                message=str(e),
+                message=str(ce),
+                exception=ce,
                 **result_props,
             )
 
@@ -656,7 +800,8 @@ def postclone_checkout_commit(repo, target_commit, remote="origin"):
     if not repo.commit_exists(target_commit):
         try:
             repo.fetch(remote=remote, refspec=target_commit)
-        except CommandError:
+        except CommandError as e:
+            CapturedException(e)
             pass
         # instead of inspecting the fetch results for possible ways
         # with which it could failed to produced the desired result
@@ -772,8 +917,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
                         store_url,
                         '/' if not store_url.endswith('/') else ''))
             except DownloadError as e:
-                lgr.debug("Failed to get config file from source:\n%s",
-                          exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Failed to get config file from source:\n%s", ce)
         elif scheme == 'ssh':
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
@@ -784,8 +929,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
             try:
                 config_content = op.read_file(cfg_path)
             except RIARemoteError as e:
-                lgr.debug("Failed to get config file from source: %s",
-                          exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Failed to get config file from source: %s", ce)
 
         elif scheme == 'file':
             # TODO: switch the following to proper command abstraction:
@@ -794,8 +939,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
             try:
                 config_content = op.read_file(cfg_path)
             except (RIARemoteError, OSError) as e:
-                lgr.debug("Failed to get config file from source: %s",
-                          exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Failed to get config file from source: %s", ce)
         else:
             lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
                       "FILE scheme URLs.", scheme, props['source'])
@@ -817,9 +962,10 @@ def postclonecfg_ria(ds, props, remote="origin"):
                     )
                     uuid = result['stdout'].strip()
                 except CommandError as e:
+                    ce = CapturedException(e)
                     # doesn't contain what we are looking for
                     lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", remote, exc_str(e))
+                              "'%s' (%s)", remote, ce)
 
         return uuid
 
@@ -852,14 +998,27 @@ def postclonecfg_ria(ds, props, remote="origin"):
     srs = repo.get_special_remotes() \
         if hasattr(repo, 'get_special_remotes') else dict()
 
-    if (not ora_remotes and any(
-            r.get('externaltype') == 'ora' for r in srs.values())) or \
-            all(not srs[r['annex-uuid']]['url'].startswith(ria_store_url)
-                for r in ora_remotes):
+    has_only_disabled_ora = \
+        not ora_remotes and \
+        any(r.get('externaltype') == 'ora' for r in srs.values())
+
+    def match_in_urls(special_remote_cfg, url_to_match):
+        # Figure whether either `url` or `push-url` in an ORA remote's config
+        # match a given URL (to a RIA store).
+        return special_remote_cfg['url'].startswith(url_to_match) or \
+               (special_remote_cfg['push-url'].startswith(url_to_match)
+                if 'push-url' in special_remote_cfg else False)
+
+    no_enabled_ora_matches_url = \
+        all(not match_in_urls(srs[r['annex-uuid']], ria_store_url)
+            for r in ora_remotes)
+
+    if has_only_disabled_ora or no_enabled_ora_matches_url:
+
         # No ORA remote autoenabled, but configuration known about at least one,
         # or enabled ORA remotes seem to not match clone URL.
-        # Let's check the remote's config for datalad.ora-remote.uuid as stored by
-        # create-sibling-ria and enable try enabling that one.
+        # Let's check the remote's config for datalad.ora-remote.uuid as stored
+        # by create-sibling-ria and try enabling that one.
         lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
                   "up in source config ...")
 
@@ -891,8 +1050,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
                                    if s.get('annex-externaltype', None) ==
                                    'ora']
                 except CommandError as e:
-                    lgr.debug("Failed to reconfigure ORA special remote: %s",
-                              exc_str(e))
+                    ce = CapturedException(e)
+                    lgr.debug("Failed to reconfigure ORA special remote: %s", ce)
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
                           remote, org_uuid)
@@ -1027,7 +1186,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
                         pass
                     elif origin_git_path.name != '.git':
                         origin_git_path /= '.git'
-                except ValueError:
+                except ValueError as e:
+                    CapturedException(e)
                     # Note, that accessing localpath on a non-local RI throws
                     # ValueError rather than resulting in an AttributeError.
                     # TODO: Warning level okay or is info level sufficient?
@@ -1066,7 +1226,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
         sr_autoenable = config.get('autoenable', False)
         try:
             sr_autoenable = ensure_bool(sr_autoenable)
-        except ValueError:
+        except ValueError as e:
+            CapturedException(e)
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
                 'dataset %s as bool.'
@@ -1081,8 +1242,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
             try:
                 repo.fetch(remote=sr_name)
             except CommandError as exc:
+                ce = CapturedException(exc)
                 lgr.warning("Failed to fetch type=git special remote %s: %s",
-                            sr_name, exc_str(exc))
+                            sr_name, exc)
 
         # determine whether there is a registered remote with matching UUID
         if uuid:
@@ -1226,7 +1388,7 @@ def _get_installationpath_from_url(url):
     from a URL, analog to what `git clone` does.
     """
     ri = RI(url)
-    if isinstance(ri, (URL, DataLadRI)):  # decode only if URL
+    if isinstance(ri, (URL, DataLadRI, SSHRI)):  # decode only if URL
         path = ri.path.rstrip('/')
         path = urlunquote(path) if path else ri.hostname
         if '/' in path:

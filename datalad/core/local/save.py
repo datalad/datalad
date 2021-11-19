@@ -217,7 +217,7 @@ class Save(Interface):
         #   This avoids complex annotation loops and hierarchy tracking.
         # - any modification upwards from the root dataset
 
-        ds = require_dataset(dataset, check_installed=True, purpose='saving')
+        ds = require_dataset(dataset, check_installed=True, purpose='save')
 
         # use status() to do all discovery and annotation of paths
         paths_by_ds = {}

@@ -61,12 +61,6 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.core.local.create')
 
 
-# Used for handling the no_annex -> annex option transition
-# remove when done
-class _NoAnnexDefault(object):
-    pass
-
-
 @build_doc
 class Create(Interface):
     """Create a new dataset from scratch.
@@ -167,11 +161,6 @@ class Create(Interface):
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
         description=location_description,
-        no_annex=Parameter(
-            # hide this from the cmdline parser, replaced by `annex`
-            args=tuple(),
-            doc="""this option is deprecated, use `annex` instead""",
-            action='store_true'),
         annex=Parameter(
             args=("--no-annex",),
             dest='annex',
@@ -207,24 +196,10 @@ class Create(Interface):
             force=False,
             description=None,
             dataset=None,
-            no_annex=_NoAnnexDefault,
             annex=True,
             fake_dates=False,
             cfg_proc=None
     ):
-        # TODO: The current release of datalad-metalad (v0.2.1) still uses
-        # no_annex in its tests. Remove this compatibility kludge once a
-        # release is made, which will include 16a170e (2020-09-08).
-        if no_annex is not _NoAnnexDefault:
-            # the two mirror options do not agree and the deprecated one is
-            # not at default value
-            warnings.warn("datalad-create's `no_annex` option is deprecated "
-                          "and will be removed in a future release, "
-                          "use the reversed-sign `annex` option instead.",
-                          DeprecationWarning)
-            # honor the old option for now
-            annex = not no_annex
-
         # we only perform negative tests below
         no_annex = not annex
 
@@ -280,7 +255,7 @@ class Create(Interface):
         if refds_path and refds_path != str(path):
             refds = require_dataset(
                 refds_path, check_installed=True,
-                purpose='creating a subdataset')
+                purpose='create a subdataset')
 
             path_inrefds = path_under_rev_dataset(refds, path)
             if path_inrefds is None:
@@ -360,9 +335,26 @@ class Create(Interface):
                 'status': 'error',
                 'message':
                     'will not create a dataset in a non-empty directory, use '
-                    '`force` option to ignore'})
+                    '`--force` option to ignore'})
             yield res
             return
+
+        # Check if specified cfg_proc(s) can be discovered, storing
+        # the results so they can be used when the time comes to run
+        # the procedure. If a procedure cannot be found, raise an
+        # error to prevent creating the dataset.
+        cfg_proc_specs = []
+        if cfg_proc:
+            discovered_procs = tbds.run_procedure(
+                discover=True, result_renderer='disabled')
+            for cfg_proc_ in cfg_proc:
+                for discovered_proc in discovered_procs:
+                    if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
+                        cfg_proc_specs.append(discovered_proc)
+                        break
+                else:
+                    raise ValueError("Cannot find procedure with name "
+                                     "'%s'" % cfg_proc_)
 
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
@@ -436,8 +428,8 @@ class Create(Interface):
             _status=add_to_git,
         )
 
-        for cfg_proc_ in cfg_proc:
-            for r in tbds.run_procedure('cfg_' + cfg_proc_):
+        for cfg_proc_spec in cfg_proc_specs:
+            for r in tbds.run_procedure(cfg_proc_spec):
                 yield r
 
         # the next only makes sense if we saved the created dataset,

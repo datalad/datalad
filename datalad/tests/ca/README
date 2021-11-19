@@ -1,0 +1,33 @@
+# Provenance info for the complete root CA/cert setup in this directory
+
+password=OoTh9oM9
+
+# make CA authority, needs password for ca-key.pem
+openssl genrsa -aes256 -out ca-key.pem 2048
+
+# make root certificate, needs password for ca-key.pem
+openssl req -x509 -new -subj "/C=XX/CN=datalad-ci" -nodes -extensions v3_ca -key ca-key.pem -days 3650 -out ca-root.pem -sha512
+
+# deploy certificate on Debian
+sudo mkdir -p /usr/local/share/ca-certificates/
+sudo cp ca-root.pem /usr/local/share/ca-certificates/datalad-root.crt
+sudo update-ca-certificates
+
+# generate a private key for certificates
+openssl genrsa -out certificate-key.pem 2048
+
+# generate certificate signing request for a specific machine
+openssl req -new -subj "/C=XX/CN=localhost" -key certificate-key.pem -out certificate.csr -sha512 -batch
+
+# generate 10 year certificate, needs password for ca-key.pem
+openssl x509 -req -in certificate.csr -CA ca-root.pem -CAkey ca-key.pem -CAcreateserial -out certificate-pub.pem -days 3650 -sha512
+
+# whenever root CA and public certificate cannot be provisioned separately,
+# they could be combined
+cat ca-root.pem certificate-pub.pem > ca_bundle.pem
+
+# check if certificate is considered valid
+openssl verify -trusted ca_bundle.pem certificate-pub.pem
+
+# potentially 
+#export REQUESTS_CA_BUNDLE=/path/to/ca_bundle.pem

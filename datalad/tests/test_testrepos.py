@@ -40,7 +40,7 @@ def test_having_annex(path):
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):
     ok_('github.com' in url)
-    ok_(url.startswith('git://github.com/datalad/testrepo--'))
+    ok_(url.startswith('https://github.com/datalad/testrepo--'))
 
 @with_testrepos
 @with_tempfile

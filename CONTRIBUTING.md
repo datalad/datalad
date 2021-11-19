@@ -134,7 +134,7 @@ since we use it to provide backports of recent fixed external modules we depend 
 
 ```sh
 apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python3-scrapy python3-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
+apt-get install -y -q patool python3-scrapy python3-{argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
 ```
 
 and additionally, for development we suggest to use tox and new
@@ -200,7 +200,6 @@ INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
 ...
 INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor bhanuprasad14 in .all-contributorsrc
 WARNING:tributors:allcontrib does not support updating from orcids.
 WARNING:tributors:allcontrib does not support updating from email.
 ```
@@ -550,7 +549,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 - *DATALAD_DATASETS_TOPURL*:
   Used to point to an alternative location for `///` dataset. If running
-  tests preferred to be set to http://datasets-tests.datalad.org
+  tests preferred to be set to https://datasets-tests.datalad.org
 - *DATALAD_LOG_LEVEL*:
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_LOG_NAME*:
@@ -569,8 +568,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_LOG_VMEM*:
   Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
 - *DATALAD_EXC_STR_TBLIMIT*: 
-  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
-  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+  This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables
@@ -652,27 +650,31 @@ Refer datalad/config.py for information on how to add these environment variable
 - `update-changelog`: uses above `linkissues-changelog` and updates .rst changelog
 - `release-pypi`: ensures no `dist/` exists yet, creates a wheel and a source distribution and uploads to pypi.
 
-## Changelog section
+## Releasing with GitHub Actions, auto, and pull requests
 
-For the upcoming release use this template
+New releases of datalad are created via a GitHub Actions workflow built
+around [`auto`](https://github.com/intuit/auto).  Whenever a pull request is
+merged into `maint` that has the "`release`" label, `auto` updates the
+changelog based on the pull requests since the last release, commits the
+results, tags the new commit with the next version number, and creates a GitHub
+release for the tag.  This in turn triggers a job for building an sdist & wheel
+for the project and uploading them to PyPI.
 
-```markdown
-## 0.16.0 (??? ??, 2021) -- will be better than ever
+### Labelling pull requests
 
-bet we will fix some bugs and make a world even a better place.
+The section that `auto` adds to the changelog on a new release consists of the
+titles of all pull requests merged into master since the previous release,
+organized by label.  `auto` recognizes the following PR labels:
 
-### Major refactoring and deprecations
-
-- hopefully none
-
-### Fixes
-
-?
-
-### Enhancements and new features
-
-?
-```
+- `semver-minor` — for changes corresponding to an increase in the minor version
+  component
+- `semver-patch` — for changes corresponding to an increase in the patch/micro version
+  component; this is the default label for unlabelled PRs
+- `semver-internal` — for changes only affecting the internal API
+- `semver-documentation` — for changes only affecting the documentation
+- `semver-tests` — for changes to tests
+- `semver-dependencies` — for updates to dependency versions
+- `semver-performance` — for performance improvements
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
 [contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

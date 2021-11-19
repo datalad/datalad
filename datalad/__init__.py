@@ -48,6 +48,7 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
+from datalad.support.exceptions import CapturedException
 from datalad.utils import (
     get_encoding_info,
     get_envvars_info,
@@ -63,8 +64,6 @@ from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
-
-from .version import __version__
 
 
 def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
@@ -103,6 +102,8 @@ test_http_server = None
 def setup_package():
     import os
     from datalad.utils import on_osx
+    from datalad.tests import _TEMP_PATHS_GENERATED
+
     if on_osx:
         # enforce honoring TMPDIR (see gh-5307)
         import tempfile
@@ -118,7 +119,7 @@ def setup_package():
         os.environ[v] = val
 
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
-    consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    consts.DATASETS_TOPURL = 'https://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
     from datalad.tests.utils import (
@@ -136,7 +137,6 @@ def setup_package():
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile
-        from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
             pass
@@ -149,6 +149,8 @@ def setup_package():
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[datalad "log"]
+	exc = 1
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
@@ -216,14 +218,19 @@ def setup_package():
     # the URL will be available from datalad.test_http_server.url
     from datalad.tests.utils import HTTPPath
     import tempfile
+
     global test_http_server
-    serve_path = tempfile.mkdtemp(
-        dir=cfg.get("datalad.tests.temp.dir"),
-        prefix='httpserve',
-    )
-    test_http_server = HTTPPath(serve_path)
-    test_http_server.start()
-    _TEMP_PATHS_GENERATED.append(serve_path)
+    # Start the server only if not running already
+    # Relevant: we have test_misc.py:test_test which runs datalad.test but
+    # not doing teardown, so the original server might never get stopped
+    if test_http_server is None:
+        serve_path = tempfile.mkdtemp(
+            dir=cfg.get("datalad.tests.temp.dir"),
+            prefix='httpserve',
+        )
+        test_http_server = HTTPPath(serve_path)
+        test_http_server.start()
+        _TEMP_PATHS_GENERATED.append(serve_path)
 
     if cfg.obtain('datalad.tests.setup.testrepos'):
         lgr.debug("Pre-populating testrepos")
@@ -242,8 +249,8 @@ def teardown_package():
         print("Obscure filename: str=%s repr=%r"
                 % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
     except UnicodeEncodeError as exc:
-        from .dochelpers import exc_str
-        print("Obscure filename failed to print: %s" % exc_str(exc))
+        ce = CapturedException(exc)
+        print("Obscure filename failed to print: %s" % ce)
     def print_dict(d):
         return " ".join("%s=%r" % v for v in d.items())
     print("Encodings: %s" % print_dict(get_encoding_info()))
@@ -257,8 +264,12 @@ def teardown_package():
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
 
+    global test_http_server
     if test_http_server:
         test_http_server.stop()
+        test_http_server = None
+    else:
+        lgr.debug("For some reason global http_server was not set/running, thus not stopping")
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):
@@ -293,5 +304,20 @@ def teardown_package():
     from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
+
+if str(__version__) == '0' or __version__.startswith('0+'):
+    lgr.warning(
+        "DataLad was not installed 'properly' so its version is an uninformative %r.\n"
+        "It can happen e.g. if datalad was installed via\n"
+        "  pip install https://github.com/.../archive/{commitish}.zip\n"
+        "instead of\n"
+        "  pip install git+https://github.com/...@{commitish} .\n"
+        "We advise to re-install datalad or downstream projects might not operate correctly.",
+        __version__
+    )
 
 lgr.log(5, "Done importing main __init__")

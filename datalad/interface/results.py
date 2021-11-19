@@ -22,14 +22,17 @@ from os.path import (
     relpath,
 )
 
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     path_is_subpath,
     PurePosixPath,
 )
+from datalad.support.exceptions import CommandError
 from datalad.support.path import robust_abspath
-
+from datalad.support.exceptions import (
+    format_oneline_tb,
+    CapturedException,
+)
 from datalad.distribution.dataset import Dataset
 
 
@@ -47,14 +50,15 @@ success_status_map = {
 
 def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
                     refds=None, status=None, message=None, exception=None,
-                    **kwargs):
+                    error_message=None, **kwargs):
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
     # just for not shadowing the builtin `type` in this function
     """Helper to create a result dictionary.
 
-    Most arguments match their key in the resulting dict. Only exceptions are
-    listed here.
+    Most arguments match their key in the resulting dict, and their given
+    values are simply assigned to the result record under these keys.  Only
+    exceptions are listed here.
 
     Parameters
     ----------
@@ -62,6 +66,12 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
       If given, the `path` and `type` values are populated with the path of the
       datasets and 'dataset' as the type. Giving additional values for both
       keys will overwrite these pre-populated values.
+    exception : Exception
+      Exceptions that occurred while generating a result should be captured
+      by immediately instantiating a CapturedException. This instance can
+      be passed here to yield more comprehensive error reporting, including
+      an auto-generated traceback (added to the result record under an
+      'exception_traceback' key). Exceptions of other types are also supported.
 
     Returns
     -------
@@ -88,8 +98,17 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
         d['status'] = status
     if message is not None:
         d['message'] = message
+    if error_message is not None:
+        d['error_message'] = error_message
     if exception is not None:
-        d['exception_traceback'] = exc_str(exception, limit=1000, include_str=False)
+        d['exception'] = exception
+        d['exception_traceback'] = exception.format_oneline_tb(
+            include_str=False) \
+            if isinstance(exception, CapturedException) \
+            else format_oneline_tb(
+                exception, include_str=False)
+        if isinstance(exception, CommandError):
+            d['exit_code'] = exception.code
     if kwargs:
         d.update(kwargs)
     return d
@@ -236,7 +255,7 @@ def annexjson2result(d, ds, **kwargs):
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
     if d.get('error-messages', None):
-        messages.extend(d['error-messages'])
+        res['error_message'] = '\n'.join(m.strip() for m in d['error-messages'])
     # avoid meaningless standard messages, and collision with actual error
     # messages
     elif 'note' in d:

@@ -11,7 +11,6 @@
 """
 
 import re
-import time
 import os
 import os.path as op
 
@@ -36,12 +35,7 @@ from os.path import (
 )
 
 import posixpath
-import threading
 from functools import wraps
-from weakref import (
-    finalize,
-    WeakValueDictionary
-)
 import warnings
 
 from datalad.log import log_progress
@@ -56,12 +50,10 @@ from datalad.cmd import (
     StdOutErrCapture,
 )
 from datalad.config import (
-    ConfigManager,
     parse_gitconfig_dump,
     write_config_section,
 )
 
-from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
     Path,
@@ -80,13 +72,12 @@ from datalad.utils import (
 # imports from same module:
 from .external_versions import external_versions
 from .exceptions import (
+    CapturedException,
     CommandError,
     FileNotInRepositoryError,
-    GitIgnoreError,
     InvalidGitReferenceError,
     InvalidGitRepositoryError,
     NoSuchPathError,
-    PathKnownToRepositoryError,
 )
 from .network import (
     RI,
@@ -109,6 +100,7 @@ _pardirsep = pardir + sep
 lgr = logging.getLogger('datalad.gitrepo')
 
 
+# outside the repo base classes only used in ConfigManager
 def to_options(split_single_char_options=True, **kwargs):
     """Transform keyword arguments into a list of cmdline options
 
@@ -1021,9 +1013,10 @@ class GitRepo(CoreGitRepo):
                 break
             except CommandError as e:
                 # log here but let caller decide what to do
-                e_str = exc_str(e)
+                ce = CapturedException(e)
+                str_e = str(e)
                 # see https://github.com/datalad/datalad/issues/785
-                if re.search("Request for .*aborted.*Unable to find", str(e),
+                if re.search("Request for .*aborted.*Unable to find", str_e,
                              re.DOTALL) \
                         and trial < ntries - 1:
                     lgr.info(
@@ -1033,8 +1026,8 @@ class GitRepo(CoreGitRepo):
                     continue
                     #(lgr.debug if expect_fail else lgr.error)(e_str)
 
-                if "Clone succeeded, but checkout failed." in str(e):
-                    fix_annex = e
+                if "Clone succeeded, but checkout failed." in str_e:
+                    fix_annex = ce
                     break
 
                 raise
@@ -1051,7 +1044,7 @@ class GitRepo(CoreGitRepo):
                     gr._init()
                 gr.fsck()
             else:
-                lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
+                lgr.warning("Experienced issues while cloning: %s", fix_annex)
         return gr
 
     # Note: __del__ shouldn't be needed anymore as we switched to
@@ -1486,7 +1479,7 @@ class GitRepo(CoreGitRepo):
         return [
             str(r.relative_to(self.pathobj))
             for r in self.get_content_info(
-                paths=None, ref=None, untracked='no', eval_file_type=False)
+                paths=None, ref=None, untracked='no')
         ]
 
     def format_commit(self, fmt, commitish=None):
@@ -1813,7 +1806,7 @@ class GitRepo(CoreGitRepo):
         return [
             str(p.relative_to(self.pathobj))
             for p in self.get_content_info(
-                paths=None, ref=branch, untracked='no', eval_file_type=False)
+                paths=None, ref=branch, untracked='no')
             ]
 
     def add_remote(self, name, url, options=None):
@@ -1839,7 +1832,7 @@ class GitRepo(CoreGitRepo):
         try:
             self.call_git(['remote', 'remove', name])
         except CommandError as e:
-            if 'fatal: No such remote' in e.stderr:
+            if 'No such remote' in e.stderr:
                 raise RemoteNotAvailableError(name,
                                               cmd="git remote remove",
                                               msg="No such remote",
@@ -2256,12 +2249,8 @@ class GitRepo(CoreGitRepo):
         if bool(stdout.strip()):
             # The quick `git status`-based check can give a different answer
             # than `datalad status` for submodules on an adjusted branch.
-            #
-            # TODO: This is almost a self.status() call. Add an eval_file_type
-            # parameter to self.status() and use it here?
             st = self.diffstatus(fr="HEAD" if self.get_hexsha() else None,
-                                 to=None, untracked="normal",
-                                 eval_file_type=False)
+                                 to=None, untracked="normal")
             return any(r.get("state") != "clean" for r in st.values())
         return False
 
@@ -2356,8 +2345,7 @@ class GitRepo(CoreGitRepo):
         for path, props in self.get_content_info(
                 paths=paths,
                 ref=None,
-                untracked='no',
-                eval_file_type=False).items():
+                untracked='no').items():
             if props.get('type', None) != 'dataset':
                 # make sure this method never talks about non-dataset
                 # content
@@ -2386,207 +2374,6 @@ class GitRepo(CoreGitRepo):
         if sorted_:
             xs = sorted(xs, key=lambda x: x["path"])
         return list(xs)
-
-    def add_submodule(self, path, name=None, url=None, branch=None):
-        """Add a new submodule to the repository.
-
-        This will alter the index as well as the .gitmodules file, but will not
-        create a new commit.  If the submodule already exists, no matter if the
-        configuration differs from the one provided, the existing submodule
-        is considered as already added and no further action is performed.
-
-        NOTE: This method does not work with submodules that use git-annex adjusted
-              branches. Use Repo.save() instead.
-
-        Parameters
-        ----------
-        path : str
-          repository-relative path at which the submodule should be located, and
-          which will be created as required during the repository initialization.
-        name : str or None
-          name/identifier for the submodule. If `None`, the `path` will be used
-          as name.
-        url : str or None
-          git-clone compatible URL. If `None`, the repository is assumed to
-          exist, and the url of the first remote is taken instead. This is
-          useful if you want to make an existing repository a submodule of
-          another one.
-        branch : str or None
-          name of branch to be checked out in the submodule. The given branch
-          must exist in the remote repository, and will be checked out locally
-          as a tracking branch. If `None`, remote HEAD will be checked out.
-        """
-        warnings.warn(
-            'GitRepo.add_submodule() is deprecated and will be removed in '
-            'a future release. Use the Dataset method save() instead.',
-            DeprecationWarning
-        )
-
-        if name is None:
-            name = Path(path).as_posix()
-        cmd = ['submodule', 'add', '--name', name]
-        if branch is not None:
-            cmd += ['-b', branch]
-        if url is None:
-            # repo must already exist locally
-            subm = repo_from_path(op.join(self.path, path))
-            # check that it has a commit, and refuse
-            # to operate on it otherwise, or we would get a bastard
-            # submodule that cripples git operations
-            if not subm.get_hexsha():
-                raise InvalidGitRepositoryError(
-                    'cannot add subdataset {} with no commits'.format(subm))
-            # make an attempt to configure a submodule source URL based on the
-            # discovered remote configuration
-            remote, branch = subm.get_tracking_branch()
-            url = subm.get_remote_url(remote) if remote else None
-
-        if url is None:
-            # had no luck with a remote URL
-            if not isabs(path):
-                # need to recode into a relative path "URL" in POSIX
-                # style, even on windows
-                url = posixpath.join(curdir, posix_relpath(path))
-            else:
-                url = path
-        cmd += [url, Path(path).as_posix()]
-        self.call_git(cmd)
-        # record dataset ID if possible for comprehesive metadata on
-        # dataset components within the dataset itself
-        subm_id = GitRepo(op.join(self.path, path)).config.get(
-            'datalad.dataset.id', None)
-        if subm_id:
-            self.call_git(
-                ['config', '--file', '.gitmodules', '--replace-all',
-                 'submodule.{}.datalad-id'.format(name), subm_id])
-        # ensure supported setup
-        _fixup_submodule_dotgit_setup(self, path)
-        # TODO: return value
-
-    def deinit_submodule(self, path, **kwargs):
-        """Deinit a submodule
-
-        Parameters
-        ----------
-        path: str
-            path to the submodule; relative to `self.path`
-        kwargs:
-            see `__init__`
-        """
-        warnings.warn(
-            'GitRepo.deinit_submodule() is deprecated and will be removed in '
-            'a future release. Use call_git() instead.',
-            DeprecationWarning
-        )
-
-        self.call_git(['submodule', 'deinit'] + to_options(**kwargs),
-                      files=[path])
-        # TODO: return value
-
-    def update_submodule(self, path, mode='checkout', init=False):
-        """Update a registered submodule.
-
-        This will make the submodule match what the superproject expects by
-        cloning missing submodules and updating the working tree of the
-        submodules. The "updating" can be done in several ways depending
-        on the value of submodule.<name>.update configuration variable, or
-        the `mode` argument.
-
-        Parameters
-        ----------
-        path : str
-          Identifies which submodule to operate on by it's repository-relative
-          path.
-        mode : {checkout, rebase, merge}
-          Update procedure to perform. 'checkout': the commit recorded in the
-          superproject will be checked out in the submodule on a detached HEAD;
-          'rebase': the current branch of the submodule will be rebased onto
-          the commit recorded in the superproject; 'merge': the commit recorded
-          in the superproject will be merged into the current branch in the
-          submodule.
-        init : bool
-          If True, initialize all submodules for which "git submodule init" has
-          not been called so far before updating.
-          Primarily provided for internal purposes and should not be used directly
-          since would result in not so annex-friendly .git symlinks/references
-          instead of full featured .git/ directories in the submodules
-        """
-        warnings.warn(
-            'GitRepo.update_submodule() is deprecated and will be removed in '
-            'a future release. Use the dataset method update() instead.',
-            DeprecationWarning
-        )
-        if GitRepo.is_valid_repo(self.pathobj / path):
-            subrepo = GitRepo(self.pathobj / path, create=False)
-            subbranch = subrepo.get_active_branch() if subrepo else None
-            try:
-                subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
-            except ValueError:
-                if subrepo.commit_exists("HEAD"):
-                    # Not what we thought it was. Reraise.
-                    raise
-                else:
-                    raise ValueError(
-                        "Cannot add submodule that has an unborn branch "
-                        "checked out: {}"
-                        .format(subrepo.path))
-
-        else:
-            subrepo = None
-            subbranch = None
-            subbranch_hexsha = None
-
-        cmd = ['submodule', 'update', '--%s' % mode]
-        if init:
-            cmd.append('--init')
-            subgitpath = opj(self.path, path, '.git')
-            if not exists(subgitpath):
-                # TODO:  wouldn't with --init we get all those symlink'ed .git/?
-                # At least let's warn
-                lgr.warning(
-                    "Do not use update_submodule with init=True to avoid git creating "
-                    "symlinked .git/ directories in submodules"
-                )
-            #  yoh: I thought I saw one recently but thought it was some kind of
-            #  an artifact from running submodule update --init manually at
-            #  some point, but looking at this code now I worry that it was not
-        self.call_git(cmd, files=[path])
-
-        if not init:
-            return
-
-        # track branch originally cloned, only if we had a valid repo at the start
-        updated_subbranch = subrepo.get_active_branch() if subrepo else None
-        if subbranch and not updated_subbranch:
-            # got into 'detached' mode
-            # trace if current state is a predecessor of the branch_hexsha
-            lgr.debug(
-                "Detected detached HEAD after updating submodule %s which was "
-                "in %s branch before", self.path, subbranch)
-            detached_hexsha = subrepo.get_hexsha()
-            if subrepo.get_merge_base(
-                    [subbranch_hexsha, detached_hexsha]) == detached_hexsha:
-                # TODO: config option?
-                # in all likely event it is of the same branch since
-                # it is an ancestor -- so we could update that original branch
-                # to point to the state desired by the submodule, and update
-                # HEAD to point to that location
-                lgr.info(
-                    "Submodule HEAD got detached. Resetting branch %s to point "
-                    "to %s. Original location was %s",
-                    subbranch, detached_hexsha[:8], subbranch_hexsha[:8]
-                )
-                branch_ref = 'refs/heads/%s' % subbranch
-                subrepo.update_ref(branch_ref, detached_hexsha)
-                assert(subrepo.get_hexsha(subbranch) == detached_hexsha)
-                subrepo.update_ref('HEAD', branch_ref, symbolic=True)
-                assert(subrepo.get_active_branch() == subbranch)
-            else:
-                lgr.warning(
-                    "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
-                    subrepo.path, subbranch, detached_hexsha[:8]
-                )
-        # TODO: return value
 
     def update_ref(self, ref, value, oldvalue=None, symbolic=False):
         """Update the object name stored in a ref "safely".
@@ -2829,7 +2616,14 @@ class GitRepo(CoreGitRepo):
         attrdir = op.dirname(git_attributes_file)
         if not op.exists(attrdir):
             os.makedirs(attrdir)
-        with open(git_attributes_file, mode) as f:
+
+        with open(git_attributes_file, mode + '+') as f:
+            # for append, fix existing files that do not end with \n
+            if mode == 'a' and f.tell():
+                f.seek(max(0, f.tell() - len(os.linesep)))
+                if not f.read().endswith('\n'):
+                    f.write('\n')
+
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(
@@ -2850,10 +2644,10 @@ class GitRepo(CoreGitRepo):
                         attrline += ' -{}'.format(a)
                     else:
                         attrline += ' {}={}'.format(a, val)
-                f.write('\n{}'.format(attrline))
+                f.write('{}\n'.format(attrline))
 
     def get_content_info(self, paths=None, ref=None, untracked='all',
-                         eval_file_type=True):
+                         eval_file_type=None):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2865,11 +2659,11 @@ class GitRepo(CoreGitRepo):
 
         Parameters
         ----------
-        paths : list(pathlib.PurePath)
+        paths : list(pathlib.PurePath) or None
           Specific paths, relative to the resolved repository root, to query
           info for. Paths must be normed to match the reporting done by Git,
           i.e. no parent dir components (ala "some/../this").
-          If none are given, info is reported for all content.
+          If `None`, info is reported for all content.
         ref : gitref or None
           If given, content information is retrieved for this Git reference
           (via ls-tree), otherwise content information is produced for the
@@ -2881,11 +2675,9 @@ class GitRepo(CoreGitRepo):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        eval_file_type : bool
-          If True, inspect file type of untracked files, and report annex
-          symlink pointers as type 'file'. This convenience comes with a
-          cost; disable to get faster performance if this information
-          is not needed.
+        eval_file_type :
+          THIS FUNCTIONALITY IS NO LONGER SUPPORTED.
+          Setting this flag has no effect.
 
         Returns
         -------
@@ -2897,13 +2689,6 @@ class GitRepo(CoreGitRepo):
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
-
-            Note that the reported type will not always match the type of
-            content committed to Git, rather it will reflect the nature
-            of the content minus platform/mode-specifics. For example,
-            a symlink to a locked annexed file on Unix will have a type
-            'file', reported, while a symlink to a file in Git or directory
-            will be of type 'symlink'.
 
           `gitshasum`
             SHASUM of the item as tracked by Git, or None, if not
@@ -2917,6 +2702,10 @@ class GitRepo(CoreGitRepo):
           repository)
         """
         lgr.debug('%s.get_content_info(...)', self)
+        if eval_file_type is not None:
+            warnings.warn(
+                "GitRepo.get_content_info(eval_file_type=) no longer supported",
+                DeprecationWarning)
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
@@ -2926,6 +2715,8 @@ class GitRepo(CoreGitRepo):
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
             paths = [ut.PurePosixPath(p) for p in paths]
+        elif paths is not None:
+            return info
 
         path_strs = list(map(str, paths)) if paths else None
         if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
@@ -2980,52 +2771,16 @@ class GitRepo(CoreGitRepo):
             raise
         lgr.debug('Done query repo: %s', cmd)
 
-        if not eval_file_type:
-            _get_link_target = None
-        elif ref:
-            def _read_symlink_target_from_catfile(lines):
-                # it is always the second line, all checks done upfront
-                header = lines.readline()
-                if header.rstrip().endswith('missing'):
-                    # something we do not know about, should not happen
-                    # in real use, but guard against to avoid stalling
-                    return ''
-                return lines.readline().rstrip()
-
-            _get_link_target = BatchedCommand(
-                ['git', 'cat-file', '--batch'],
-                path=self.path,
-                output_proc=_read_symlink_target_from_catfile,
-            )
-        else:
-            def try_readlink(path):
-                try:
-                    return os.readlink(path)
-                except OSError:
-                    # readlink will fail if the symlink reported by ls-files is
-                    # not in the working tree (it could be removed or
-                    # unlocked). Fall back to a slower method.
-                    return str(Path(path).resolve())
-
-            _get_link_target = try_readlink
-
-        try:
-            self._get_content_info_line_helper(
-                ref,
-                info,
-                stdout.split('\0'),
-                props_re,
-                _get_link_target)
-        finally:
-            if ref and _get_link_target:
-                # cancel batch process
-                _get_link_target.close()
+        self._get_content_info_line_helper(
+            ref,
+            info,
+            stdout.split('\0'),
+            props_re)
 
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
-    def _get_content_info_line_helper(self, ref, info, lines,
-                                      props_re, get_link_target):
+    def _get_content_info_line_helper(self, ref, info, lines, props_re):
         """Internal helper of get_content_info() to parse Git output"""
         mode_type_map = {
             '100644': 'file',
@@ -3059,20 +2814,6 @@ class GitRepo(CoreGitRepo):
                 inf['gitshasum'] = props.group('sha')
                 inf['type'] = mode_type_map.get(
                     props.group('type'), props.group('type'))
-                if get_link_target and inf['type'] == 'symlink' and \
-                        ((ref is None and '.git/annex/objects' in \
-                          ut.Path(
-                            get_link_target(str(self.pathobj / path))
-                          ).as_posix()) or \
-                         (ref and \
-                          '.git/annex/objects' in get_link_target(
-                              u'{}:{}'.format(
-                                  ref, str(path))))
-                        ):
-                    # report annex symlink pointers as file, their
-                    # symlink-nature is a technicality that is dependent
-                    # on the particular mode annex is in
-                    inf['type'] = 'file'
 
                 if ref and inf['type'] == 'file':
                     inf['bytesize'] = int(props.group('size'))
@@ -3180,14 +2921,21 @@ class GitRepo(CoreGitRepo):
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   eval_submodule_state='full', eval_file_type=True,
+                   eval_submodule_state='full', eval_file_type=None,
                    _cache=None):
         """Like diff(), but reports the status of 'clean' content too.
 
         It supports an additional submodule evaluation state 'global'.
         If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
-        it can."""
+        it can.
+
+        The eval_file_type parameter is ignored.
+        """
+        if eval_file_type is not None:
+            warnings.warn(
+                "GitRepo.diffstatus(eval_file_type=) no longer supported",
+                DeprecationWarning)
 
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
@@ -3216,8 +2964,7 @@ class GitRepo(CoreGitRepo):
                 to_state = _cache[key]
             else:
                 to_state = self.get_content_info(
-                    paths=paths, ref=None, untracked=untracked,
-                    eval_file_type=eval_file_type)
+                    paths=paths, ref=None, untracked=untracked)
                 _cache[key] = to_state
             # we want Git to tell us what it considers modified and avoid
             # reimplementing logic ourselves
@@ -3225,10 +2972,15 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 modified = _cache[key]
             else:
+                # from Git 2.31.0 onwards ls-files has --deduplicate
+                # by for backward compatibility keep doing deduplication here
                 modified = set(
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self.call_git_items_(
-                        ['ls-files', '-z', '-m'],
+                        # we must also look for deleted files, for the logic
+                        # below to work. Only from Git 2.31.0 would they be
+                        # included with `-m` alone
+                        ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
                         files=[str(p) for p in paths] if paths else None,
                         sep='\0',
@@ -3240,8 +2992,7 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 to_state = _cache[key]
             else:
-                to_state = self.get_content_info(
-                    paths=paths, ref=to, eval_file_type=eval_file_type)
+                to_state = self.get_content_info(paths=paths, ref=to)
                 _cache[key] = to_state
             # we do not need worktree modification detection in this case
             modified = None
@@ -3251,8 +3002,7 @@ class GitRepo(CoreGitRepo):
             from_state = _cache[key]
         else:
             if fr:
-                from_state = self.get_content_info(
-                    paths=paths, ref=fr, eval_file_type=eval_file_type)
+                from_state = self.get_content_info(paths=paths, ref=fr)
             else:
                 # no ref means from nothing
                 from_state = {}
@@ -3343,7 +3093,6 @@ class GitRepo(CoreGitRepo):
                 paths=None,
                 untracked=untracked,
                 eval_submodule_state='global',
-                eval_file_type=False,
                 _cache=_cache) if st['state'] == 'clean' else 'modified'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
@@ -3487,7 +3236,7 @@ class GitRepo(CoreGitRepo):
                 ['diff', '--name-only', '--staged'],
                 expect_stderr=True))
         except CommandError as e:
-            lgr.debug(exc_str(e))
+            lgr.debug(CapturedException(e))
             return []
 
     def _save_post(self, message, status, partial_commit, amend=False,
@@ -3737,6 +3486,11 @@ class GitRepo(CoreGitRepo):
         Parameters
         ----------
         paths : list(Path)
+
+        Yields
+        ------
+        dict
+          Result records
         """
         from datalad.interface.results import get_status_dict
 
@@ -3811,11 +3565,9 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-# TODO
-# remove submodule: nope, this is just deinit_submodule + remove
-# status?
 
-
+# used in in the get command and GitRepo.add_submodule(), the
+# latter is not used outside the tests
 def _fixup_submodule_dotgit_setup(ds, relativepath):
     """Implementation of our current of .git in a subdataset
 
@@ -3851,3 +3603,27 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
                opj(subds_dotgit, dot_git_entry))
     assert not listdir(src_dotgit)
     rmdir(src_dotgit)
+
+
+# try retro-fitting GitRepo with deprecated functionality
+# must be done last in this file
+try:
+    from datalad_deprecated.gitrepo import DeprecatedGitRepoMethods
+    for symbol in dir(DeprecatedGitRepoMethods):
+        if symbol.startswith('__'):
+            # ignore Python internals
+            continue
+        if hasattr(GitRepo, symbol):
+            lgr.debug(
+                'Not retro-fitted GitRepo with deprecated %s, '
+                'name-space conflict', symbol)
+            # do not override existing symbols
+            continue
+        # assign deprecated symbol to GitRepo
+        setattr(GitRepo, symbol, getattr(DeprecatedGitRepoMethods, symbol))
+        lgr.debug('Retro-fitted GitRepo with deprecated %s', symbol)
+except ImportError as e:
+    ce = CapturedException(e)
+    lgr.debug(
+        'Not retro-fitting GitRepo with deprecated symbols, '
+        'datalad-deprecated package not found')

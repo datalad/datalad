@@ -10,23 +10,15 @@
 """Test export_to_figshare"""
 
 from datalad.api import export_archive
-from datalad.utils import chpwd
-from datalad.utils import md5sum
 from datalad.support import path as op
 
 from datalad.tests.utils import with_tree, eq_
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import assert_true, assert_not_equal, assert_raises, \
-    assert_false, assert_equal
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
 
 from datalad.support.gitrepo import GitRepo
 from datalad.api import Dataset
 
 from ..export_to_figshare import (
     _get_default_title,
-    _enter_title,
 )
 
 

@@ -13,11 +13,11 @@ import logging
 import os
 import time
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.exceptions import (
+    CapturedException,
     InvalidGitRepositoryError,
     MissingExternalDependency,
 )
@@ -93,7 +93,9 @@ class CheckDates(Interface):
             to_render = {k: v for k, v in res.items()
                          if k not in ["status", "message", "logger"]}
         if to_render:
-            ui.message(json.dumps(to_render, sort_keys=True, indent=2))
+            ui.message(json.dumps(to_render, sort_keys=True, indent=2,
+                                  default=str)
+                       )
 
     _params_ = dict(
         paths=Parameter(
@@ -155,9 +157,11 @@ class CheckDates(Interface):
             ref_ts = _parse_date(reference_date)
         except ValueError as exc:
             lgr.error("Could not parse '%s' as a date", reference_date)
+            ce = CapturedException(exc)
             yield get_status_dict("check_dates",
                                   status="error",
-                                  message=exc_str(exc))
+                                  message=str(ce),
+                                  exception=ce)
             return
 
         lgr.info("Searching for dates %s than %s",

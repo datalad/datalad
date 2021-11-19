@@ -34,6 +34,7 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
+from datalad.support.exceptions import CapturedException
 from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
@@ -41,9 +42,6 @@ from datalad.distribution.dataset import (
     resolve_path,
 )
 from datalad.log import log_progress
-from datalad.dochelpers import (
-    exc_str,
-)
 
 lgr = logging.getLogger('datalad.customremotes.export_archive_ora')
 
@@ -94,7 +92,7 @@ class ExportArchiveORA(Interface):
             dataset=None):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
-            dataset, check_installed=True, purpose='ORA archive export')
+            dataset, check_installed=True, purpose='export to ORA archive')
         ds_repo = ds.repo
 
         annex_objs = ds_repo.dot_git / 'annex' / 'objects'
@@ -188,11 +186,13 @@ class ExportArchiveORA(Interface):
                 status='ok',
                 **res_kwargs)
         except Exception as e:
+            ce = CapturedException(e)
             yield get_status_dict(
                 path=str(archive),
                 type='file',
                 status='error',
-                message=('7z failed: %s', exc_str(e)),
+                message=('7z failed: %s', ce),
+                exception=ce,
                 **res_kwargs)
             return
         finally:

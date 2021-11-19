@@ -204,7 +204,7 @@ def diff_dataset(
         raise ValueError('Unknown reporting order: {}'.format(reporting_order))
 
     ds = require_dataset(
-        dataset, check_installed=True, purpose='difference reporting')
+        dataset, check_installed=True, purpose='report difference')
 
     # we cannot really perform any sorting of paths into subdatasets
     # or rejecting paths based on the state of the filesystem, as
@@ -307,12 +307,13 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             for p, goinside in origpaths.items()
             if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
         )
+    paths_arg = list(paths) if paths else None
     try:
         lgr.debug("Diff %s from '%s' to '%s'", ds, fr, to)
         diff_state = repo.diffstatus(
             fr,
             to,
-            paths=None if not paths else [p for p in paths],
+            paths=paths_arg,
             untracked=untracked,
             eval_file_type=eval_file_type,
             eval_submodule_state='full' if to is None else 'commit',
@@ -328,7 +329,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
         # this will amend `diff_state`
         repo.get_content_annexinfo(
-            paths=paths.keys() if paths is not None else paths,
+            paths=paths_arg,
             init=diff_state,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=to)
@@ -336,7 +337,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         # a get_content_annexinfo on that state doesn't get us anything new
         if fr and fr != to:
             repo.get_content_annexinfo(
-                paths=paths.keys() if paths is not None else paths,
+                paths=paths_arg,
                 init=diff_state,
                 eval_availability=annexinfo in ('availability', 'all'),
                 ref=fr,

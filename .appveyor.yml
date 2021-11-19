@@ -41,12 +41,14 @@
 #     will run until the file is removed (or 60 min have passed)
 #
 #   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
-#     environment to debug in a Python 3.8 session (should generally match the
+#     environment to debug in a Python 3.9 session (should generally match the
 #     respective CI run configuration).
+#
+#   - Workers have vim installed for convenient text editing in the command shell
 
 
-# make repository clone cheap
-shallow_clone: true
+# do not make repository clone cheap: interfers with versioneer
+shallow_clone: false
 
 
 environment:
@@ -69,20 +71,24 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     # Windows core tests
     - ID: WinP39core
       # ~35 min
-      DTS: datalad.core
+      DTS: datalad.core datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 39-x64
-      INSTALL_GITANNEX: git-annex -m datalad/packages
+      # TODO: use datalad/git-annex (github release packages) but
+      # it would need setup of a GITHUB_TOKEN to access.
+      # This one is set in master but kept without change in maint for now
+      # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
     - ID: MacP38core
       # ~25min
-      DTS: datalad.core
+      DTS: datalad.core datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       # does not give a functional installation
@@ -90,32 +96,28 @@ environment:
       #INSTALL_GITANNEX: git-annex=8.20201129
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Additional test runs
     - ID: WinP39a1
-      # ~30min
+      # ~45min
       DTS: >
           datalad.cmdline
           datalad.customremotes
           datalad.distribution
+          datalad.distributed
+          datalad.downloaders
+          datalad.interface
+          datalad.tests
+      # TODO: datalad.metadata (this is completely non-functional on Windows,
+      #       either tests only, or actual code too)
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PY: 39-x64
     - ID: WinP39a2
-      # TODO: datalad.metadata (this is completely non-functional on Windows,
-      #       either tests only, or actual code too)
-      # ~20min
-      DTS: >
-          datalad.downloaders
-          datalad.interface
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 39-x64
-    - ID: WinP39a3
-      # ~18min
+      # ~50min
       DTS: >
           datalad.local
-          datalad.distributed
           datalad.support
-          datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PY: 39-x64
@@ -126,20 +128,14 @@ environment:
           datalad.cmdline
           datalad.customremotes
           datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-    - ID: MacP38a2
-      # ~25min
-      DTS: >
           datalad.downloaders
           datalad.interface
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-    - ID: MacP38a3
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+    - ID: MacP38a2
       # ~35min
       DTS: >
           datalad.local
@@ -151,6 +147,7 @@ environment:
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Test alternative Python versions
     - ID: Ubu20P36
@@ -158,19 +155,28 @@ environment:
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     - ID: Ubu20P37
       PY: 3.7
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
 
 matrix:
   allow_failures:
     - KNOWN2FAIL: 1
+
+
+# do not run the CI if only documentation changes were made
+# documentation builds are tested elsewhere and cheaper
+skip_commits:
+  files:
+    - docs/
 
 
 # tests need specific hostnames to be available
@@ -243,6 +249,10 @@ install:
   # use of python/pip executables below
   - sh: "[ \"x$PY\" != x ] && . ${HOME}/venv${PY}/bin/activate || virtualenv -p 3 ${HOME}/dlvenv && . ${HOME}/dlvenv/bin/activate; ln -s \"$VIRTUAL_ENV\" \"${HOME}/VENV\""
   - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
+  # Workaround on older/buggy debian/ubuntus having outdated certificate
+  - sh: tools/ci/debians_disable_outdated_ssl_cert
+  # Deploy test root CA for internal HTTPS test server
+  - sh: tools/ci/deploy_datalad-rootca
   # deploy the datalad installer, override version via DATALAD_INSTALLER_VERSION
   - cmd:
       IF DEFINED DATALAD_INSTALLER_VERSION (
@@ -252,7 +262,7 @@ install:
       )
   - sh: python -m pip install datalad-installer${DATALAD_INSTALLER_VERSION:-}
   # Missing system software
-  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
+  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
   - cmd: IF DEFINED INSTALL_GITANNEX datalad-installer --sudo ok %INSTALL_GITANNEX%
@@ -266,8 +276,10 @@ install:
 
 
 build_script:
-  - python -m pip install ".[tests]"
-  - python -m pip install ".[devel-utils]"
+  #- python -m pip install ".[tests]"
+  #- python -m pip install ".[devel-utils]"
+  # make comprehensive approach used by travis setup
+  - pip install -r requirements-devel.txt
 
 
 #after_build:
@@ -288,20 +300,17 @@ test_script:
   - sh: mkdir __testhome__
   - cd __testhome__
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
-  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
-  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+  - cmd: python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - sh:  python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
 
 
 after_test:
-  # move coverage into the project dir to make default handling applicable
-  - cmd: move .coverage ..
-  - sh: mv .coverage ..
-  - cd ..
-  # use windows codecov uploader package
-  - cmd: choco install codecov
-  - cmd: python -m coverage xml
-  - cmd: codecov -f coverage.xml
-  - sh: bash <(curl -sfS https://codecov.io/bash)
+  - python -m coverage xml
+  - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
+  - cmd: .\codecov.exe -f "coverage.xml"
+  - sh: "curl -Os $CODECOV_BINARY"
+  - sh: chmod +x codecov
+  - sh: ./codecov
 
 
 #on_success:

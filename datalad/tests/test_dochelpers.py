@@ -15,7 +15,6 @@ from ..dochelpers import (
     single_or_plural,
     borrowdoc,
     borrowkwargs,
-    exc_str,
 )
 
 from datalad.tests.utils import (
@@ -143,39 +142,3 @@ def test_borrow_kwargs():
     assert_true('Some postamble' in B.met1.__doc__)
     assert_true('B.met_nodockwargs' in B.met_nodockwargs.__doc__)
     assert_true('boguse' in B.met_excludes.__doc__)
-
-
-def test_exc_str():
-    try:
-        raise Exception("my bad")
-    except Exception as e:
-        estr = exc_str(e)
-        estr_tb_only = exc_str(e, include_str=False)
-    assert_re_in("my bad \[test_dochelpers.py:test_exc_str:...\]", estr)
-    assert_re_in("^\[.*\]", estr_tb_only)  # only traceback
-
-    def f():
-        def f2():
-            raise Exception("my bad again")
-        f2()
-    try:
-        f()
-    except Exception as e:
-        # default one:
-        estr2 = exc_str(e, 2)
-        estr1 = exc_str(e, 1)
-        # and we can control it via environ by default
-        with patch.dict('os.environ', {'DATALAD_EXC_STR_TBLIMIT': '3'}):
-            estr3 = exc_str(e)
-        with patch.dict('os.environ', {}, clear=True):
-            estr_ = exc_str()
-
-    assert_re_in("my bad again \[test_dochelpers.py:test_exc_str:...,test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr3)
-    assert_re_in("my bad again \[test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr2)
-    assert_re_in("my bad again \[test_dochelpers.py:f2:...\]", estr1)
-    assert_equal(estr_, estr1)
-
-    try:
-        raise NotImplementedError
-    except Exception as e:
-        assert_re_in("NotImplementedError\(\) \[test_dochelpers.py:test_exc_str:...\]", exc_str(e))

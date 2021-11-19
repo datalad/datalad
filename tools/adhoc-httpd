@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+# Helper to launch an ad-hoc http server, with or without SSL enabled,
+# and with or without required basic authentication
+#
+# usage: adhoc-httpd <path-to-serve> [<ssl|nossl> [<user> <password>]]
+# examples:
+#   % adhoc-httpd .
+#   % adhoc-httpd /tmp ssl
+#   % adhoc-httpd /tmp nossl myuser yourpassword
+
+from pathlib import Path
+import sys
+
+from datalad.tests.utils import serve_path_via_http
+
+path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
+if not path.exists():
+    raise ValueError(f'Path {path} does not exist')
+
+ssl = 'nossl'
+use_ssl = False
+if len(sys.argv) > 2:
+    ssl = sys.argv[2]
+    if ssl not in ('ssl', 'nossl'):
+        raise ValueError('SSL argument must be "ssl" or "nossl"')
+    use_ssl = ssl == 'ssl'
+auth = None
+if len(sys.argv) > 3:
+    if len(sys.argv) != 5:
+        raise ValueError(
+            'Usage to enable authentication: '
+            'adhoc-httpd <path-to-serve> <ssl|nossl <user> <password>')
+    auth = tuple(sys.argv[3:])
+
+
+@serve_path_via_http(path, use_ssl=use_ssl, auth=auth)
+def runner(path, url):
+    print(f'Serving {path} at {url} [{ssl}] (required authentication {auth})')
+    input("Hit Return to stop serving")
+
+
+runner()

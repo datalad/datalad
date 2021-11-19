@@ -39,8 +39,9 @@ def test_ephemeral(ds_path, store_path, clone_path):
     ds.save()
 
     # put into store:
-    ds.create_sibling_ria("ria+{}".format(store.as_uri()), "riastore")
-    ds.publish(to="riastore", transfer_data="all")
+    ds.create_sibling_ria("ria+{}".format(store.as_uri()), "riastore",
+                          new_store_ok=True)
+    ds.push(to="riastore", data="anything")
 
     # now, get an ephemeral clone from the RIA store:
     eph_clone = clone('ria+{}#{}'.format(store.as_uri(), ds.id), clone_path,
@@ -71,7 +72,7 @@ def test_ephemeral(ds_path, store_path, clone_path):
         assert_result_count(res, 1, success=True, file=file_testsub.as_posix())
 
         # push back git history
-        eph_clone.publish(to=DEFAULT_REMOTE, transfer_data="none")
+        eph_clone.push(to=DEFAULT_REMOTE, data="nothing")
 
         # get an update in origin
         ds.update(merge=True, reobtain_data=True)

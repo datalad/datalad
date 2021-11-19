@@ -25,7 +25,6 @@ import sys
 
 from unittest.mock import patch
 
-from datalad import __version__
 from datalad.utils import (
     chpwd,
     ensure_unicode,
@@ -73,6 +72,8 @@ from datalad.tests.utils import (
     with_tree,
 )
 
+
+cat_command = 'cat' if not on_windows else 'type'
 
 @with_tempfile(mkdir=True)
 def test_invalid_call(path):
@@ -336,9 +337,6 @@ def test_run_assume_ready(path):
     assert_not_in_results(res, action="unlock", type="file")
 
 
-# unexpected content of state "modified", likely a more fundamental issue with the
-# testrepo setup
-@known_failure_githubci_win
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -353,14 +351,14 @@ def test_run_explicit(path):
 
     # We need explicit=True to run with dirty repo.
     assert_status("impossible",
-                  ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+                  ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
                          inputs=["test-annex.dat"],
                          on_failure="ignore"))
 
     hexsha_initial = ds.repo.get_hexsha()
     # If we specify test-annex.dat as an input, it will be retrieved before the
     # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
            inputs=["test-annex.dat"], explicit=True)
     ok_(ds.repo.file_has_content("test-annex.dat"))
     # We didn't commit anything because outputs weren't specified.
@@ -375,7 +373,7 @@ def test_run_explicit(path):
     remove(op.join(path, "doubled.dat"))
 
     hexsha_initial = ds.repo.get_hexsha()
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
            inputs=["test-annex.dat"], outputs=["doubled.dat"],
            explicit=True)
     ok_(ds.repo.file_has_content("doubled.dat"))
@@ -390,7 +388,6 @@ def test_run_explicit(path):
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 
-@known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
@@ -547,7 +544,7 @@ def test_run_remove_keeps_leading_directory(path):
 
     assert_in_results(
         ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
-               result_renderer=None),
+               result_renderer='disabled'),
         action="run.remove", status="ok")
 
     assert_repo_status(ds.path)
@@ -557,7 +554,7 @@ def test_run_remove_keeps_leading_directory(path):
     repo.drop(output_rel, options=["--force"])
     assert_in_results(
         ds.run("cd .> something-else", outputs=[output_rel],
-               result_renderer=None),
+               result_renderer='disabled'),
         action="run.remove", status="ok")
     assert_repo_status(ds.path)
 
@@ -678,7 +675,7 @@ def test_dry_run(path):
             cmo.out)
 
     # However, a dry run will not do the install/reglob procedure.
-    ds.uninstall("sub", check=False)
+    ds.drop("sub", what='all', reckless='kill', recursive=True)
     with swallow_outputs() as cmo:
         ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
         assert_in("sub/b*", cmo.out)

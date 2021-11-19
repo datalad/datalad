@@ -14,7 +14,6 @@ from datalad.tests.utils import (
     create_tree,
     with_tempfile,
     eq_,
-    known_failure_githubci_win,
     known_failure_windows,
 )
 

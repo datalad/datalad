@@ -16,11 +16,11 @@ from datalad.tests.utils import (
     swallow_outputs,
 )
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
 )
 
 
-def test_default_result_renderer():
+def test_generic_result_renderer():
     # a bunch of bad cases of results
     testcases = [
         # an empty result will surface
@@ -35,8 +35,8 @@ def test_default_result_renderer():
         (dict(type='funky'),
          ['<action-unspecified>(<status-unspecified>): (funky)']),
         # plain message makes it through
-        (dict(message='funky'),
-         ['<action-unspecified>(<status-unspecified>): [funky]']),
+        (dict(message='funky', error_message='extra-funky'),
+         ['<action-unspecified>(<status-unspecified>): [funky] [extra-funky]']),
     ]
     if on_windows:
         testcases.extend([
@@ -51,6 +51,6 @@ def test_default_result_renderer():
         ])
     for result, contenttests in testcases:
         with swallow_outputs() as cmo:
-            default_result_renderer(result)
+            generic_result_renderer(result)
             for ctest in contenttests:
                 assert_in(ctest, cmo.out)

@@ -12,8 +12,6 @@ import logging
 from os import linesep
 
 from datalad import __version__
-from datalad.dochelpers import exc_str
-from datalad.version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
 from datalad.support.exceptions import (
     CommandError,
@@ -54,6 +52,11 @@ def test_external_versions_basic():
     assert_equal(ev[our_module], __version__)
     # and it could be compared
     assert_greater_equal(ev[our_module], __version__)
+    # We got some odd failure in this test not long are after switching to versionner
+    # https://github.com/datalad/datalad/issues/5785.  Verify that we do get expected
+    # data types
+    our_version = ev[our_module].version
+    assert isinstance(our_version, (str, list)), f"Got {our_version!r} of type {type(our_version)}"
     assert_greater(ev[our_module], '0.1')
     assert_equal(list(ev.keys()), [our_module])
     assert_true(our_module in ev)
@@ -109,7 +112,7 @@ def _test_external(ev, modname):
     except ImportError:
         raise SkipTest("External %s not present" % modname)
     except Exception as e:
-        raise SkipTest("External %s fails to import: %s" % (modname, exc_str(e)))
+        raise SkipTest("External %s fails to import" % modname) from e
     assert (ev[modname] is not ev.UNKNOWN)
     assert_greater(ev[modname], '0.0.1')
     assert_greater('1000000.0', ev[modname])  # unlikely in our lifetimes

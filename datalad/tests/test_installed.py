@@ -9,6 +9,8 @@
 """Test invocation of datalad utilities "as is installed"
 """
 
+import os
+
 from unittest.mock import patch
 from datalad.tests.utils import (
     ok_startswith,
@@ -41,4 +43,6 @@ def check_run_and_get_output(cmd):
 def test_run_datalad_help():
     out, err = check_run_and_get_output("datalad --help")
     ok_startswith(out, "Usage: ")
-    eq_(err, "")
+    # There could be a warning from coverage that no data was collected, should be benign
+    lines = [l for l in err.split(os.linesep) if ('no-data-collected' not in l) and l]
+    eq_(lines, [])

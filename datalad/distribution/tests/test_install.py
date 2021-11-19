@@ -175,7 +175,6 @@ def test_invalid_args(path):
 
 
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_install_datasets_root(tdir):
     with chpwd(tdir):
@@ -197,8 +196,6 @@ def test_install_datasets_root(tdir):
         assert_in("already exists and not empty", str(cme.exception))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:360
-@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -239,8 +236,6 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:298
-@known_failure_windows
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -396,8 +391,6 @@ def test_install_recursive_with_data(src, path):
             ok_(all_have_content(subds.repo))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
-@known_failure_windows
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -440,10 +433,8 @@ def test_install_into_dataset(source, top_path):
 
 
 @slow   # 15sec on Yarik's laptop
-@known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
@@ -468,8 +459,6 @@ def test_failed_install_multiple(top_path):
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:318
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_install_known_subdataset(src, path):
@@ -620,7 +609,6 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@skip_if_on_windows  # Due to "another process error"
 def test_install_recursive_repeat(src, path):
     top_src = Dataset(src).create(force=True)
     sub1_src = top_src.create('sub 1', force=True)
@@ -872,7 +860,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1.create_sibling('ssh://datalad-test%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
 
         # print("Creating clone2")
-        clone1.publish(to=clone2_)
+        clone1.push(to=clone2_)
         clone2 = Dataset(clone2_)
         # print("Initiating subdataset")
         clone2.create('subds1')
@@ -902,7 +890,7 @@ def check_datasets_datalad_org(suffix, tdir):
         ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
         1,
         status='ok')
-    assert_status('ok', ds.remove())
+    assert_status('ok', ds.drop(what='all', reckless='kill', recursive=True))
 
 
 def test_datasets_datalad_org():
@@ -943,3 +931,41 @@ def test_install_branch(path):
     repo_sub = Dataset(ds_b.pathobj / "sub").repo
     eq_(repo_sub.get_corresponding_branch() or repo_sub.get_active_branch(),
         DEFAULT_BRANCH)
+
+
+def _create_test_install_recursive_github(path):  # pragma: no cover
+    # to be ran once to populate a hierarchy of test datasets on github
+    # Making it a full round-trip would require github credentials on CI etc
+    ds = create(opj(path, "testrepo  gh"))
+    # making them with spaces and - to ensure that we consistently use the mapping
+    # for create and for get/clone/install
+    ds.create("sub _1")
+    ds.create("sub _1/d/sub_-  1")
+    import datalad.distribution.create_sibling_github  # to bind API
+    ds.create_sibling_github(
+        "testrepo  gh",
+        github_organization='datalad',
+        recursive=True,
+        # yarik forgot to push first, "replace" is not working in non-interactive IIRC
+        # existing='reconfigure'
+    )
+    return ds.push(recursive=True, to='github')
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_install_recursive_github(path):
+    # test recursive installation of a hierarchy of datasets created on github
+    # using datalad create-sibling-github.  Following invocation was used to poplate it
+    #
+    # out = _create_test_install_recursive_github(path)
+
+    # "testrepo  gh" was mapped by our sanitization in create_sibling_github to testrepo_gh, thus
+    for i, url in enumerate([
+        'https://github.com/datalad/testrepo_gh',
+        # optionally made available to please paranoids, but with all takes too long (22sec)
+        #'https://github.com/datalad/testrepo_gh.git',
+        #'git@github.com:datalad/testrepo_gh.git',
+    ]):
+        ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
+        eq_(len(ds.subdatasets(recursive=True, fulfilled=True)), 2)

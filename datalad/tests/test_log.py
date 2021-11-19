@@ -32,6 +32,7 @@ from datalad.support import ansi_colors as colors
 from datalad.tests.utils import (
     assert_equal,
     assert_in,
+    assert_no_open_files,
     assert_not_in,
     assert_re_in,
     known_failure_githubci_win,
@@ -68,12 +69,12 @@ def test_logging_to_a_file(dst):
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
     # (...)? is added to swallow possible traceback logs
-    regex = "\[ERROR\]"
+    regex = "\\[ERROR\\]"
     if EnsureBool()(dl_cfg.get('datalad.log.timestamp', False)):
-        regex = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} " + regex
+        regex = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3} " + regex
     if EnsureBool()(dl_cfg.get('datalad.log.vmem', False)):
-        regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
-    regex += "(\s+\S+\s*)? " + msg
+        regex += ' RSS/VMS: \\S+/\\S+( \\S+)?\\s*'
+    regex += "(\\s+\\S+\\s*)? " + msg
     assert_re_in(regex, line, match=True)
 
     # Python's logger is ok (although not documented as supported) to accept
@@ -86,6 +87,7 @@ def test_logging_to_a_file(dst):
     # Close all handlers so windows is happy -- apparently not closed fast enough
     for handler in lgr.handlers:
         handler.close()
+    assert_no_open_files(dst)
 
 
 @with_tempfile

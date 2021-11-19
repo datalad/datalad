@@ -8,6 +8,7 @@
 import argparse
 import datetime
 import re
+from textwrap import wrap
 
 
 class ManPageFormatter(argparse.HelpFormatter):
@@ -195,7 +196,9 @@ class RSTManPageFormatter(ManPageFormatter):
                                    parser._mutually_exclusive_groups, '')
 
         usage = usage.replace('%s ' % self._prog, '')
-        usage = 'Synopsis\n--------\n::\n\n  %s %s\n' \
+        usage = '\n'.join(wrap(
+            usage, break_on_hyphens=False, subsequent_indent=6*' '))
+        usage = 'Synopsis\n--------\n::\n\n  %s %s\n\n' \
                 % (self._markup(self._prog), usage)
         return usage
 

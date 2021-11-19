@@ -20,7 +20,6 @@ import os.path as op
 import re
 import sys
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -35,6 +34,7 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.param import Parameter
 from datalad.support.json_py import load_stream
+from datalad.support.exceptions import CapturedException
 
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -202,7 +202,7 @@ class Rerun(Interface):
 
         ds = require_dataset(
             dataset, check_installed=True,
-            purpose='rerunning a command')
+            purpose='rerun a command')
         ds_repo = ds.repo
 
         lgr.debug('rerunning command output underneath %s', ds)
@@ -288,7 +288,7 @@ def _revrange_as_results(dset, revrange):
         except ValueError as exc:
             # Recast the error so the message includes the revision.
             raise ValueError(
-                "Error on {}'s message: {}".format(rev, exc_str(exc)))
+                "Error on {}'s message".format(rev)) from exc
 
         if info is not None:
             if len(parents) != 1:
@@ -313,7 +313,9 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     try:
         results = _revrange_as_results(dset, revrange)
     except ValueError as exc:
-        yield get_status_dict("run", status="error", message=exc_str(exc))
+        ce = CapturedException(exc)
+        yield get_status_dict("run", status="error", message=str(ce),
+                              exception=ce)
         return
 
     ds_repo = dset.repo
@@ -650,9 +652,8 @@ def get_run_info(dset, message):
         runinfo = json.loads(runinfo)
     except Exception as e:
         raise ValueError(
-            'cannot rerun command, command specification is not valid JSON: '
-            '%s' % exc_str(e)
-        )
+            'cannot rerun command, command specification is not valid JSON'
+        ) from e
     if not isinstance(runinfo, (list, dict)):
         # this is a run record ID -> load the beast
         record_dir = dset.config.get(
@@ -696,7 +697,7 @@ def diff_revision(dataset, revision="HEAD"):
     diff = dataset.diff(recursive=True,
                         fr=fr, to=revision,
                         result_filter=changed,
-                        return_type='generator', result_renderer=None)
+                        return_type='generator', result_renderer='disabled')
     for r in diff:
         yield r
 
@@ -705,6 +706,7 @@ def new_or_modified(diff_results):
     """Filter diff result records to those for new or modified files.
     """
     for r in diff_results:
-        if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
+        if r.get('type') in ('file', 'symlink') \
+                and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r

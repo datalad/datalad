@@ -27,7 +27,7 @@ jobs:
           update_lookup: github
 
           # Skip these users (example)
-          skip_users: manbat
+          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987
 
           # INFO, DEBUG, ERROR, WARNING, etc.
           log_level: DEBUG
@@ -68,13 +68,15 @@ jobs:
           else
              export OPEN_PULL_REQUEST=1
              printf "Changes\n"
-             git commit -a -m "Automated deployment to update contributors $(date '+%Y-%m-%d')"
+             git commit -a -m "Automated deployment to update contributors $(date '+%Y-%m-%d')
+
+          [skip ci]"
              git push origin "${BRANCH_FROM}"
           fi
           echo "OPEN_PULL_REQUEST=${OPEN_PULL_REQUEST}" >> $GITHUB_ENV
           echo "PULL_REQUEST_FROM_BRANCH=${BRANCH_FROM}" >> $GITHUB_ENV
           echo "PULL_REQUEST_TITLE=[tributors] ${BRANCH_FROM}" >> $GITHUB_ENV
-          echo "PULL_REQUEST_BODY=Tributors update automated pull request." >> $GITHUB_ENV
+          echo "PULL_REQUEST_BODY='Tributors update automated pull request.\n\n[skip ci]'" >> $GITHUB_ENV
 
       - name: Open Pull Request
         uses: vsoch/pull-request-action@1.0.17

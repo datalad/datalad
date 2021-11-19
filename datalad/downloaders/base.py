@@ -29,7 +29,6 @@ from ..utils import (
     ensure_unicode,
     unlink,
 )
-from ..dochelpers import exc_str
 from .credentials import (
     CREDENTIAL_TYPES,
     CompositeCredential,
@@ -38,6 +37,7 @@ from ..support.exceptions import (
     AccessDeniedError,
     AccessPermissionExpiredError,
     AnonymousAccessDeniedError,
+    CapturedException,
     DownloadError,
     IncompleteDownloadError,
     UnaccountedDownloadError,
@@ -45,6 +45,7 @@ from ..support.exceptions import (
 from ..support.locking import (
     InterProcessLock,
     try_lock,
+    try_lock_informatively,
 )
 
 from ..support.network import RI
@@ -114,10 +115,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
         self._lock = InterProcessLock(
-            op.join(
-                cfg.obtain('datalad.locations.cache'),
-                'locks',
-                'downloader-auth.lck'))
+            op.join(cfg.obtain('datalad.locations.locks'),
+                    'downloader-auth.lck')
+        )
 
     def access(self, method, url, allow_old_session=True, **kwargs):
         """Generic decorator to manage access to the URL via some method
@@ -156,12 +156,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
             supported_auth_types = []
             used_old_session = False
             try:
-                lgr.debug("Acquiring a currently %s lock to establish download session. "
-                          "If stalls - check which process holds %s",
-                          "existing" if self._lock.exists() else "absent",
-                          self._lock.path)
-                with self._lock:
-                    # Locking since it might desire to ask for credentials
+                # Try to lock since it might desire to ask for credentials, but still allow to time out at 5 minutes
+                # while providing informative message on what other process might be holding it.
+                with try_lock_informatively(self._lock, purpose="establish download session", proceed_unlocked=False):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -170,11 +167,12 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # assume success if no puke etc
                 break
             except AccessDeniedError as e:
+                ce = CapturedException(e)
                 if isinstance(e, AnonymousAccessDeniedError):
-                    access_denied = "Anonymous"
+                    access_denied = "Anonymous access"
                 else:
-                    access_denied = "Authenticated"
-                lgr.debug("%s access was denied: %s", access_denied, exc_str(e))
+                    access_denied = "Access"
+                lgr.debug("%s was denied: %s", access_denied, ce)
                 supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
@@ -207,7 +205,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                             # enter a new one, we will allow only a single refresh
                             credential_was_refreshed = True
                         else:
-                            self._handle_authentication(url, needs_authentication, e,
+                            self._handle_authentication(url, needs_authentication, e, ce,
                                                         access_denied, msg_types,
                                                         supported_auth_types,
                                                         used_old_session)
@@ -218,12 +216,13 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 continue
 
             except IncompleteDownloadError as e:
+                ce = CapturedException(e)
                 exc_info = sys.exc_info()
                 incomplete_attempt += 1
                 if incomplete_attempt > 5:
                     # give up
                     raise
-                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
+                lgr.debug("Failed to download fully, will try again: %s", ce)
                 # TODO: may be fail earlier than after 20 attempts in such a case?
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
@@ -231,7 +230,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
         return result
 
-    def _handle_authentication(self, url, needs_authentication, e,
+    def _handle_authentication(self, url, needs_authentication, e, ce,
                                access_denied, msg_types, supported_auth_types,
                                used_old_session):
         if needs_authentication:
@@ -250,7 +249,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 if not ui.is_interactive:
                     lgr.error(
                         "Interface is non interactive, so we are "
-                        "reraising: %s" % exc_str(e))
+                        "reraising: %s", ce)
                     raise e
                 self._enter_credentials(
                     url,
@@ -305,8 +304,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         DownloadError
           If no known credentials type or user refuses to update
         """
-        title = "{msg} access to {url} has failed.".format(
-            msg=denied_msg, url=url)
+        title = f"{denied_msg} to {url} has failed."
 
         if new_provider:
             # No credential was known, we need to create an
@@ -440,9 +438,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         else:
             filepath = downloader_session.filename
 
-        existed = exists(filepath)
+        existed = op.lexists(filepath)
         if existed and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
+            raise DownloadError("Path %s already exists" % filepath)
 
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
@@ -485,11 +483,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         except (AccessDeniedError, IncompleteDownloadError) as e:
             raise
         except Exception as e:
-            e_str = exc_str(e, limit=5)
-            lgr.error("Failed to download {url} into {filepath}: {e_str}".format(
-                **locals()
-            ))
-            raise DownloadError(exc_str(e))  # for now
+            ce = CapturedException(e)
+            lgr.error("Failed to download %s into %s: %s", url, filepath, ce)
+            raise DownloadError(ce) from e # for now
         finally:
             if exists(temp_filepath):
                 # clean up
@@ -570,8 +566,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 try:
                     return msgpack.loads(res, encoding='utf-8')
                 except Exception as exc:
+                    ce = CapturedException(exc)
                     lgr.warning("Failed to unpack loaded from cache for %s: %s",
-                                url, exc_str(exc))
+                                url, ce)
 
         downloader_session = self.get_downloader_session(url, allow_redirects=allow_redirects)
 
@@ -600,9 +597,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         except (AccessDeniedError, IncompleteDownloadError) as e:
             raise
         except Exception as e:
-            e_str = exc_str(e, limit=5)
-            lgr.error("Failed to fetch {url}: {e_str}".format(**locals()))
-            raise DownloadError(exc_str(e, limit=8))  # for now
+            ce = CapturedException(e)
+            lgr.error("Failed to fetch %s: %s", url, ce)
+            raise DownloadError(ce) from e  # for now
 
         if cache:
             # apparently requests' CaseInsensitiveDict is not serialazable

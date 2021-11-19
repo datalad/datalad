@@ -104,20 +104,20 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     # own location default remote for current branch
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
-        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath)])
+        [dict(cost=650, name=DEFAULT_REMOTE, url=ds_subpath)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
-        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-         dict(cost=600, name=DEFAULT_REMOTE, url=sshurl)])
+        [dict(cost=600, name=DEFAULT_REMOTE, url=sshurl),
+         dict(cost=650, name=DEFAULT_REMOTE, url=ds_subpath)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
-        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-         dict(cost=600, name=DEFAULT_REMOTE, url=httpurl)])
+        [dict(cost=600, name=DEFAULT_REMOTE, url=httpurl),
+         dict(cost=650, name=DEFAULT_REMOTE, url=ds_subpath)])
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+            dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -126,7 +126,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
                    result_renderer='disabled')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+            dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -134,7 +134,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+                dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='youredead', from_config=True),
         ])
     # we can alter the cost by given the name a two-digit prefix
@@ -144,7 +144,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 dict(cost=400, name='bang', url='youredead', from_config=True),
-                dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+                dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -152,7 +152,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+                dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
                      from_config=True),
         ])
@@ -172,6 +172,17 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         [i['url']
          for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
     )
+
+    # check #5839: two source configs with the same name should raise an error
+    clone3.config.add(
+        f"datalad.get.subdataset-source-candidate-{DEFAULT_REMOTE}",
+        "should-not-work"
+    )
+    clone3.config.add(
+        f"datalad.get.subdataset-source-candidate-{DEFAULT_REMOTE}",
+        "should-really-not-work"
+    )
+    assert_raises(ValueError, clone3.get, 'sub')
 
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
@@ -233,8 +244,10 @@ def test_get_single_file(path):
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
-    eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    annexprops = ds.repo.get_file_annexinfo('test-annex.dat',
+                                            eval_availability=True)
+    eq_(result[0]['annexkey'], annexprops['key'])
+    ok_(annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)
@@ -354,8 +367,6 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
-@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
@@ -694,5 +705,45 @@ def test_get_relays_command_errors(path):
     ds.save()
     ds.drop("foo", check=False)
     assert_result_count(
-        ds.get("foo", on_failure="ignore", result_renderer=None),
+        ds.get("foo", on_failure="ignore", result_renderer='disabled'),
         1, action="get", type="file", status="error")
+
+
+@with_tempfile()
+def test_missing_path_handling(path):
+    ds = Dataset(path).create()
+    ds.save()
+
+    class Struct:
+        pass
+
+    refds = Struct()
+    refds.pathobj = Path("foo")
+    refds.subdatasets = []
+    refds.path = "foo"
+
+    with \
+            patch("datalad.distribution.get._get_targetpaths") as get_target_path, \
+            patch("datalad.distribution.get.Interface.get_refds_path") as get_refds_path, \
+            patch("datalad.distribution.get.require_dataset") as require_dataset, \
+            patch("datalad.distribution.get._install_targetpath") as _install_targetpath, \
+            patch("datalad.distribution.get.Subdatasets") as subdatasets:
+
+        get_target_path.return_value = [{
+            "status": "error"
+        }]
+        get_refds_path.return_value = None
+        require_dataset.return_value = refds
+        _install_targetpath.return_value = [{
+            "status": "notneeded",
+            "path": "foo",
+            "contains": "xxx"
+        }]
+        subdatasets.return_value = [{
+            "type": "file",
+            "status": "impossible",
+            "path": "foo",
+            "message": "path not contained in any matching subdataset"}]
+
+        # Check for guarded access in error results
+        ds.get("foo")

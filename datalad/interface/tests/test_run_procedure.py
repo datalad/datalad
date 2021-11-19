@@ -40,7 +40,6 @@ from datalad.tests.utils import (
     ok_file_has_content,
     on_windows,
     patch_config,
-    skip_if,
     with_tempfile,
     with_tree,
 )
@@ -50,7 +49,6 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
 from datalad.api import run_procedure
-from datalad import cfg as dl_cfg
 
 
 @with_tempfile(mkdir=True)
@@ -62,12 +60,10 @@ def test_invalid_call(path):
 
         # needs spec or discover
         assert_raises(InsufficientArgumentsError, run_procedure)
-        res = run_procedure('unknown', on_failure='ignore')
-        assert_true(len(res) == 1)
-        assert_in_results(res, status="impossible")
+        # an unknown procedure should cause an error
+        assert_raises(ValueError, run_procedure, 'unknown')
 
 
-@known_failure_windows  #FIXME
 @with_tree(tree={'README.md': 'dirty'})
 def test_dirty(path):
     ds = Dataset(path).create(force=True)
@@ -80,7 +76,6 @@ def test_dirty(path):
     assert_repo_status(ds.path)
 
 
-@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -212,7 +207,6 @@ def _check_procedure_properties(ps):
         len(ps))
 
 
-@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -289,7 +283,6 @@ def test_configs(path):
     assert_in_results(r, message="This is a help message", status='ok')
 
 
-@known_failure_windows
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -434,3 +427,15 @@ def test_call_fmt_from_env_requires_reload(path):
                      f"{sys.executable} {{script}}"}):
         # This will fail if the above environment variable isn't in effect.
         ds.run_procedure("p")
+
+
+@with_tempfile
+def test_run_proc_with_dict(path):
+    # Test whether a result from run_procedure(discover=True) will be accepted
+    ds = Dataset(path).create()
+    g = ds.run_procedure(discover=True, result_renderer='disabled',
+                         return_type='generator')
+    for proc in g:
+        if proc['procedure_name'] == 'cfg_text2git':
+            break
+    ds.run_procedure(spec=proc)

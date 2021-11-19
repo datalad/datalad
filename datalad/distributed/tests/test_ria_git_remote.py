@@ -125,15 +125,15 @@ def _test_bare_git_version_1(host, dspath, store):
     assert_result_count(fsck_res,
                         1,
                         status='error',
-                        message='** Based on the location log, one.txt\n'
-                                '** was expected to be present, '
-                                'but its content is missing.')
+                        error_message='** Based on the location log, one.txt\n'
+                                      '** was expected to be present, '
+                                      'but its content is missing.')
     assert_result_count(fsck_res,
                         1,
                         status='error',
-                        message='** Based on the location log, subdir/two\n'
-                                '** was expected to be present, '
-                                'but its content is missing.')
+                        error_message='** Based on the location log, subdir/two\n'
+                                      '** was expected to be present, '
+                                      'but its content is missing.')
     eq_(len(ds.repo.whereis('one.txt')), 1)
     # and the other way around: upload via ora-remote and have it available via
     # git-remote:
@@ -226,9 +226,9 @@ def _test_bare_git_version_2(host, dspath, store):
     assert_result_count(fsck_res,
                         1,
                         status='error',
-                        message='** Based on the location log, one.txt\n'
-                                '** was expected to be present, '
-                                'but its content is missing.')
+                        error_message='** Based on the location log, one.txt\n'
+                                      '** was expected to be present, '
+                                      'but its content is missing.')
     assert_result_count(fsck_res, 1, status='ok')
     eq_(len(fsck_res), 2)
     eq_(len(ds.repo.whereis('one.txt')), 1)

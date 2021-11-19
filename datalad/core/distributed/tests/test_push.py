@@ -50,6 +50,7 @@ from datalad.utils import (
     Path,
     chpwd,
     path_startswith,
+    swallow_outputs,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -77,7 +78,7 @@ def test_invalid_call(origin, tdir):
 
     # unavailable subdataset
     dummy_sub = ds.create('sub')
-    dummy_sub.uninstall()
+    dummy_sub.drop(what='all', reckless='kill', recursive=True)
     assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
     assert_raises(ValueError, ds.push, 'sub')
@@ -112,7 +113,7 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
                     where='local')
     else:
         target = GitRepo(path=path, bare=bare, create=True)
-    ds.siblings('add', name=name, url=path, result_renderer=None)
+    ds.siblings('add', name=name, url=path, result_renderer='disabled')
     if annex and not bare and target.is_managed_branch():
         # maximum complication
         # the target repo already has a commit that is unrelated
@@ -120,7 +121,10 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
         # commit for the managed branch.
         # the only sane approach is to let git-annex establish a shared
         # history
-        ds.repo.call_annex(['sync'])
+        if AnnexRepo.git_annex_version > "8.20210631":
+            ds.repo.call_annex(['sync', '--allow-unrelated-histories'])
+        else:
+            ds.repo.call_annex(['sync'])
         ds.repo.call_annex(['sync', '--cleanup'])
     return target
 
@@ -521,7 +525,7 @@ def test_ria_push(srcpath, dstpath):
         'ok',
         src.create_sibling_ria(
             "ria+{}".format(get_local_file_url(dstpath, compatibility='git')),
-            "datastore"))
+            "datastore", new_store_ok=True))
     res = src.push(to='datastore')
     assert_in_results(
         res, action='publish', target='datastore', status='ok',
@@ -590,7 +594,7 @@ def test_gh1763(src, target1, target2):
     target1 = mk_push_target(src, 'target1', target1, bare=False)
     target2 = mk_push_target(src, 'target2', target2, bare=False)
     src.siblings('configure', name='target2', publish_depends='target1',
-                 result_renderer=None)
+                 result_renderer='disabled')
     # a file to annex
     (src.pathobj / 'probe1').write_text('probe1')
     src.save('probe1', to_git=False)
@@ -925,7 +929,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     store_url = 'ria+' + get_local_file_url(storepath)
     with chpwd(orig_super.path):
         run(['datalad', 'create-sibling-ria', '--recursive',
-             '-s', 'store', store_url])
+             '-s', 'store', store_url, '--new-store-ok'])
         run(['datalad', 'push', '--recursive', '--to', 'store'])
 
     # we are using the 'store' sibling's URL, which should be a plain path
@@ -966,3 +970,25 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     assert_not_in_results(
         clone_super.status(recursive=True),
         state='modified')
+
+
+@with_tempfile
+def test_push_custom_summary(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create()
+
+    sib = mk_push_target(ds, "sib", str(path / "sib"), bare=False, annex=False)
+    (sib.pathobj / "f1").write_text("f1")
+    sib.save()
+
+    (ds.pathobj / "f2").write_text("f2")
+    ds.save()
+
+    # These options are true by default and our tests usually run with a
+    # temporary home, but set them to be sure.
+    ds.config.set("advice.pushUpdateRejected", "true", where="local")
+    ds.config.set("advice.pushFetchFirst", "true", where="local")
+    with swallow_outputs() as cmo:
+        ds.push(to="sib", result_renderer="default", on_failure="ignore")
+        assert_in("Hints:", cmo.out)
+        assert_in("action summary:", cmo.out)

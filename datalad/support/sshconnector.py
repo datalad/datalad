@@ -33,10 +33,10 @@ from datalad.utils import quote_cmdlinearg as sh_quote
 # from datalad.support.network import RI, is_ssh
 
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     ConnectionOpenFailedError,
 )
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
     Path,
@@ -281,7 +281,7 @@ class BaseSSHConnection(object):
                 )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
-                      exc_str(e))
+                      CapturedException(e))
         self._remote_props[key] = annex_install_dir
         return annex_install_dir
 
@@ -300,7 +300,7 @@ class BaseSSHConnection(object):
                 version = out.split('\n')[0].split(':')[1].strip()
             except CommandError as e:
                 lgr.debug('Failed to determine remote git-annex version: %s',
-                          exc_str(e))
+                          CapturedException(e))
                 version = None
         self._remote_props[key] = version
         return version
@@ -314,7 +314,7 @@ class BaseSSHConnection(object):
             git_version = self('git version')[0].split()[2]
         except CommandError as e:
             lgr.debug('Failed to determine Git version: %s',
-                      exc_str(e))
+                      CapturedException(e))
         self._remote_props[key] = git_version
         return git_version
 
@@ -711,7 +711,7 @@ class MultiplexSSHManager(BaseSSHManager):
                 "Failed to (re)set permissions on the %s. "
                 "Most likely future communications would be impaired or fail. "
                 "Original exception: %s",
-                self._socket_dir, exc_str(exc)
+                self._socket_dir, CapturedException(exc)
             )
 
         try:
@@ -724,7 +724,7 @@ class MultiplexSSHManager(BaseSSHManager):
                 "Failed to list %s for existing sockets. "
                 "Most likely future communications would be impaired or fail. "
                 "Original exception: %s",
-                self._socket_dir, exc_str(exc)
+                self._socket_dir, CapturedException(exc)
             )
 
         lgr.log(5,
@@ -800,8 +800,9 @@ class MultiplexSSHManager(BaseSSHManager):
                     try:
                         f()
                     except Exception as exc:
+                        ce = CapturedException(exc)
                         lgr.debug("Failed to close a connection: "
-                                  "%s", exc_str(exc))
+                                  "%s", ce.message)
             self._connections = dict()
 
 

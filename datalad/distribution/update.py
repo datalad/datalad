@@ -17,7 +17,6 @@ import logging
 from os.path import lexists
 import itertools
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -32,7 +31,10 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import (
     recursion_flag,
@@ -80,8 +82,8 @@ def _process_how_args(merge, how, how_subds):
     return how, how_subds
 
 
-_how_constraints = EnsureNone() | EnsureChoice(
-    "fetch", "merge", "ff-only", "reset", "checkout")
+_how_constraints = EnsureChoice(
+    "fetch", "merge", "ff-only", "reset", "checkout", None)
 
 
 @build_doc
@@ -159,7 +161,6 @@ class Update(Interface):
             how="ff-only" PY]."""),
         how=Parameter(
             args=("--how",),
-            metavar="ACTION",
             nargs="?",
             constraints=_how_constraints,
             doc="""how to update the dataset. The default ("fetch") simply
@@ -176,7 +177,6 @@ class Update(Interface):
             `how_subds` PY]."""),
         how_subds=Parameter(
             args=("--how-subds",),
-            metavar="ACTION",
             nargs="?",
             constraints=_how_constraints,
             doc="""Override the behavior of [CMD: --how CMD][PY: `how` PY] in
@@ -235,7 +235,7 @@ class Update(Interface):
         # Unbind `merge` to ensure that downstream code doesn't look at it.
         del merge
 
-        refds = require_dataset(dataset, check_installed=True, purpose='updating')
+        refds = require_dataset(dataset, check_installed=True, purpose='update')
 
         save_paths = []
         update_failures = set()
@@ -307,12 +307,24 @@ class Update(Interface):
                 # test against user-provided value!
                 remote=None if sibling is None else sibling_,
                 all_=sibling is None,
-                # required to not trip over submodules that
-                # were removed in the origin clone
-                recurse_submodules="no",
-                prune=True)  # prune to not accumulate a mess over time
+                git_options=[
+                    # required to not trip over submodules that were removed in
+                    # the origin clone
+                    "--no-recurse-submodules",
+                    # prune to not accumulate a mess over time
+                    "--prune"]
+            )
             if not (follow_parent_lazy and repo.commit_exists(revision)):
-                repo.fetch(**fetch_kwargs)
+                try:
+                    repo.fetch(**fetch_kwargs)
+                except CommandError as exc:
+                    ce = CapturedException(exc)
+                    yield get_status_dict(status="error",
+                                          message=("Fetch failed: %s", ce),
+                                          exception=ce,
+                                          **res,)
+                    continue
+
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
             repo = ds.repo
@@ -325,12 +337,15 @@ class Update(Interface):
                         repo.fetch(remote=sibling_, refspec=revision,
                                    git_options=["--recurse-submodules=no"])
                     except CommandError as exc:
+                        ce = CapturedException(exc)
                         yield dict(
                             res,
                             status="impossible",
                             message=(
                                 "Attempt to fetch %s from %s failed: %s",
-                                revision, sibling_, exc_str(exc)))
+                                revision, sibling_, ce),
+                            exception=ce
+                        )
                         continue
                 else:
                     yield dict(res,
@@ -511,7 +526,8 @@ def _try_command(record, fn, *args, **kwargs):
     try:
         fn(*args, **kwargs)
     except CommandError as exc:
-        return dict(record, status="error", message=exc_str(exc))
+        ce = CapturedException(exc)
+        return dict(record, status="error", message=str(ce))
     else:
         return dict(record, status="ok")
 

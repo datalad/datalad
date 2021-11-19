@@ -44,8 +44,8 @@ def _generate_extension_api():
     from importlib import import_module
     from pkg_resources import iter_entry_points
     from .interface.base import get_api_name
+    from datalad.support.exceptions import CapturedException
 
-    from datalad.dochelpers import exc_str
     import logging
     lgr = logging.getLogger('datalad.api')
 
@@ -59,7 +59,8 @@ def _generate_extension_api():
                 'Loaded entrypoint %s from datalad.extensions',
                 entry_point.name)
         except Exception as e:
-            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, exc_str(e))
+            ce = CapturedException(e)
+            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, ce)
             continue
 
         for intfspec in interfaces:

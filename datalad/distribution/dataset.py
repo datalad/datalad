@@ -10,6 +10,7 @@
 """
 
 import logging
+from functools import wraps
 from os.path import (
     curdir,
     exists,
@@ -18,7 +19,6 @@ from os.path import (
     pardir,
 )
 from weakref import WeakValueDictionary
-import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
@@ -51,7 +51,6 @@ from datalad.utils import (
     Path,
     PurePath,
     ensure_list,
-    quote_cmdlinearg,
 )
 
 
@@ -181,33 +180,14 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             return self.pathobj == other.pathobj
 
     def __getattr__(self, attr):
-        # Assure that we are not just missing some late binding
-        # @datasetmethod . We will use interface definitions.
-        # The gotcha could be the mismatch between explicit name
-        # provided to @datasetmethod and what is defined in interfaces
-        meth = None
+        # Assure that we are not just missing some late binding @datasetmethod .
         if not attr.startswith('_'):  # do not even consider those
-            from datalad.interface.base import (
-                get_interface_groups, get_api_name, load_interface
-            )
-            groups = get_interface_groups()
-            for group, _, interfaces in groups:
-                for intfspec in interfaces:
-                    # lgr.log(5, "Considering interface %s", intfspec)
-                    name = get_api_name(intfspec)
-                    if attr == name:
-                        meth_ = load_interface(intfspec)
-                        if meth_:
-                            lgr.debug("Found matching interface %s for %s",
-                                      intfspec, name)
-                            if meth:
-                                lgr.debug(
-                                    "New match %s possibly overloaded previous one %s",
-                                    meth_, meth
-                                )
-                            meth = meth_
-            if not meth:
-                lgr.debug("Found no match among known interfaces for %r", attr)
+            lgr.debug("Importing datalad.api to possibly discover possibly not yet bound method %r", attr)
+            # load entire datalad.api which will also bind datasetmethods
+            # from extensions.
+            import datalad.api
+            # which would bind all known interfaces as well.
+            # Although adds overhead, good for UX
         return super(Dataset, self).__getattribute__(attr)
 
     def close(self):
@@ -405,7 +385,6 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         -------
         Dataset or None
         """
-        from datalad.coreapi import subdatasets
         path = self.path
         sds_path = path if topmost else None
 
@@ -417,7 +396,8 @@ class Dataset(object, metaclass=PathBasedFlyweight):
                                            contains=path,
                                            result_filter=res_filter,
                                            on_failure='ignore',
-                                           result_xfm='paths')
+                                           result_xfm='paths',
+                                           result_renderer='disabled')
 
         while path:
             # normalize the path after adding .. so we guaranteed to not
@@ -467,11 +447,12 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 
     The decorator has no effect on the actual function decorated with it.
     """
+
     if not name:
         name = f.__name__
 
-    @wrapt.decorator
-    def apply_func(wrapped, instance, args, kwargs):
+    @wraps(f)
+    def apply_func(instance, *args, **kwargs):
         # Wrapper function to assign arguments of the bound function to
         # original function.
         #
@@ -479,7 +460,6 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # ----
         # This wrapper is NOT returned by the decorator, but only used to bind
         # the function `f` to the Dataset class.
-
         kwargs = kwargs.copy()
         from datalad.utils import getargspec
         orig_pos = getargspec(f).args
@@ -504,7 +484,12 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
                 kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func(f))
+    setattr(Dataset, name, apply_func)
+    # set the ad-hoc attribute so that @build_doc could also bind built doc
+    # to the dataset method
+    if getattr(f, '_dataset_method', None):
+        raise RuntimeError(f"_dataset_method of {f} is already set to {f._dataset_method}")
+    setattr(f, '_dataset_method', apply_func)
     return f
 
 
@@ -569,15 +554,19 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetFound(
-                "No dataset found at '{}'.  Specify a dataset to work with "
+                "No dataset found at '{}'{}.  Specify a dataset to work with "
                 "by providing its path via the `dataset` option, "
                 "or change the current working directory to be in a "
-                "dataset.".format(getpwd()))
+                "dataset.".format(
+                    getpwd(),
+                    " for the purpose {!r}".format(purpose) if purpose else ''
+                )
+            )
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
     lgr.debug(u"Resolved dataset%s: %s",
-              u' for {}'.format(purpose) if purpose else '',
+              u' to {}'.format(purpose) if purpose else '',
               dataset.path)
 
     if check_installed and not dataset.is_installed():

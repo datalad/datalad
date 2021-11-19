@@ -11,6 +11,8 @@
 
 """
 
+from functools import wraps
+import inspect
 import os
 import os.path as op
 import shutil
@@ -49,8 +51,8 @@ from datalad.utils import (
     file_basename,
     find_files,
     generate_chunks,
+    getargspec,
     get_dataset_root,
-    get_func_kwargs_doc,
     get_open_files,
     get_path_prefix,
     get_timestamp_suffix,
@@ -102,7 +104,6 @@ from .utils import (
     eq_,
     has_symlink_capability,
     known_failure,
-    known_failure_v6,
     nok_,
     OBSCURE_FILENAME,
     ok_,
@@ -123,16 +124,7 @@ from .utils import (
 from datalad import cfg as dl_cfg
 
 
-def test_get_func_kwargs_doc():
-    def some_func(arg1, kwarg1=None, kwarg2="bu"):
-        return
-    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
-
-
 def test_better_wraps():
-    from functools import wraps
-    from datalad.utils import getargspec
-
     def wraps_decorator(func):
         @wraps(func)
         def  _wrap_wraps_decorator(*args, **kwargs):
@@ -156,9 +148,67 @@ def test_better_wraps():
         return "function2"
 
     eq_("function1", function1(1, 2, 3))
-    eq_(getargspec(function1)[0], [])
+    # getargspec shim now can handle @wraps'ed functions just fine
+    eq_(getargspec(function1)[0], ['a', 'b', 'c'])
     eq_("function2", function2(1, 2, 3))
     eq_(getargspec(function2)[0], ['a', 'b', 'c'])
+
+
+def test_getargspec():
+
+    def eq_argspec(f, expected, has_kwonlyargs=False):
+        """A helper to centralize testing of getargspec on original and wrapped function
+
+        has_kwonlyargs is to instruct if function has kwonly args so we do not try to compare
+        to inspect.get*spec functions, which would barf ValueError if attempted to run on a
+        function with kwonlys. And also we pass it as include_kwonlyargs to our getargspec
+        """
+        # so we know that our expected is correct
+        if not has_kwonlyargs:
+            # if False - we test function with kwonlys - inspect.getargspec would barf
+            eq_(inspect.getargspec(f), expected)
+            # and getfullargspec[:4] wouldn't provide a full picture
+            eq_(inspect.getfullargspec(f)[:4], expected)
+        else:
+            assert_raises(ValueError, inspect.getargspec, f)
+            inspect.getfullargspec(f)  # doesn't barf
+        eq_(getargspec(f, include_kwonlyargs=has_kwonlyargs), expected)
+
+        # and lets try on a wrapped one -- only ours can do the right thing
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                return f(*args, **kwargs)
+            return wrapper
+        fw = decorator(f)
+        if has_kwonlyargs:
+            # We barf ValueError similarly to inspect.getargspec, unless explicitly requested
+            # to include kwonlyargs
+            assert_raises(ValueError, getargspec, fw)
+        eq_(getargspec(fw, include_kwonlyargs=has_kwonlyargs), expected)
+
+    def f0():
+        pass
+
+    yield eq_argspec, f0, ([], None, None, None)
+
+    def f1(a1, kw1=None, kw0=1):
+        pass
+
+    yield eq_argspec, f1, (['a1', 'kw1', 'kw0'], None, None, (None, 1))
+
+    # Having *a already makes keyword args to be kwonlyargs, in that
+    # inspect.get*spec would barf
+    def f1_args(a1, *a, kw1=None, kw0=1, **kw):
+        pass
+
+    yield eq_argspec, f1_args, (['a1', 'kw1', 'kw0'], 'a', 'kw', (None, 1)), True
+
+    def f1_star(a1, *, kw1=None, kw0=1):
+        pass
+
+    assert_raises(ValueError, getargspec, f1_star)
+    yield eq_argspec, f1_star, (['a1', 'kw1', 'kw0'], None, None, (None, 1)), True
 
 
 @with_tempfile(mkdir=True)
@@ -370,8 +420,8 @@ def test_getpwd_basic():
         assert_false(oschdir.called)
 
 
-@assert_cwd_unchanged(ok_to_chdir=True)
 @with_tempfile(mkdir=True)
+@assert_cwd_unchanged(ok_to_chdir=True)
 def test_getpwd_change_mode(tdir):
     from datalad import utils
     if utils._pwd_mode != 'PWD':
@@ -987,32 +1037,6 @@ def test_known_failure():
         assert_raises(AssertionError, failing)
 
 
-def test_known_failure_v6():
-
-    @known_failure_v6
-    def failing():
-        raise AssertionError("Failed")
-
-    v6 = dl_cfg.obtain("datalad.repo.version") == 6
-    skip = dl_cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = dl_cfg.obtain("datalad.tests.knownfailures.probe")
-
-    if v6:
-        if skip:
-            # skipping takes precedence over probing
-            failing()
-        elif probe:
-            # if we probe a known failure it's okay to fail:
-            failing()
-        else:
-            # not skipping and not probing results in the original failure:
-            assert_raises(AssertionError, failing)
-
-    else:
-        # behaves as if it wasn't decorated at all, no matter what
-        assert_raises(AssertionError, failing)
-
-
 from datalad.utils import read_csv_lines
 
 
@@ -1239,12 +1263,16 @@ def test_create_tree(path):
             # right away an obscure case where we have both 1 and 1.gz
                 ('1', content*2),
                 ('1.gz', content*3),
+                ('1.xz', content*4),
+                ('1.lzma', content*5),
             ]
         )),
     ]))
     ok_file_has_content(op.join(path, '1'), content)
     ok_file_has_content(op.join(path, 'sd', '1'), content*2)
     ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+    ok_file_has_content(op.join(path, 'sd', '1.xz'), content*4, decompress=True)
+    ok_file_has_content(op.join(path, 'sd', '1.lzma'), content*5, decompress=True)
 
 
 def test_never_fail():

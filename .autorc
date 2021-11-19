@@ -1,0 +1,26 @@
+{
+    "onlyPublishWithReleaseLabel": true,
+    "baseBranch": "maint",
+    "author": "DataLad Bot <bot@datalad.org>",
+    "noVersionPrefix": true,
+    "plugins": [
+        "git-tag",
+        [
+            "exec",
+            {
+                "afterChangelog": "make update-changelog && git add docs/source/changelog.rst && git commit -m '[skip ci] Update RST changelog'",
+                "afterRelease": "python -m build && twine upload dist/*"
+            }
+        ]
+    ],
+  "labels": [
+    { "releaseType": "major", "name": "semver-major" },
+    { "releaseType": "minor", "name": "semver-minor" },
+    { "releaseType": "patch", "name": "semver-patch" },
+    { "releaseType": "dependencies", "name": "semver-dependencies" },
+    { "releaseType": "documentation", "name": "semver-documentation" },
+    { "releaseType": "internal", "name": "semver-internal" },
+    { "releaseType": "performance", "name": "semver-performance" },
+    { "releaseType": "tests", "name": "semver-tests" }
+  ]
+}

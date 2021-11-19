@@ -115,16 +115,16 @@ API principles
 You can use DataLad's ``install`` command to download datasets. The command accepts
 URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
 to obtain a first dataset is downloading the default :term:`superdataset` from
-http://datasets.datalad.org/ using a shortcut.
+https://datasets.datalad.org/ using a shortcut.
 
 Downloading DataLad's default superdataset
 --------------------------------------------
 
-http://datasets.datalad.org provides a super-dataset consisting of datasets
+https://datasets.datalad.org provides a super-dataset consisting of datasets
 from various portals and sites.  Many of them were crawled, and periodically
 updated, using `datalad-crawler <https://github.com/datalad/datalad-crawler>`__
 extension.  The argument ``///`` can be used
-as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
+as a shortcut that points to the superdataset located at https://datasets.datalad.org/. 
 Here are three common examples in command line notation:
 
 ``datalad install ///``
@@ -162,31 +162,6 @@ Finally, DataLad supports SSH login style resource identifiers, such as ``me@loc
 
 ``datalad install me@localhost:/path``
 
-`--dataset` argument
---------------------
-
-All commands which operate with/on datasets (practically all commands) have a
-``dataset`` argument (``-d`` or ``--dataset`` for the command line API) which takes a
-path to the dataset that the command should operate on. If a dataset is
-identified this way then any relative path that is provided as an argument to
-the command will be interpreted as being relative to the topmost directory of that
-dataset.  If no dataset argument is provided, relative paths are considered to be
-relative to the current directory.
-
-There are also some useful pre-defined "shortcut" values for dataset arguments:
-
-``///``
-   refers to the "default" dataset located under `$HOME/datalad/`.
-   So running ``datalad install -d/// crcns`` will install the ``crcns`` subdataset
-   under ``$HOME/datalad/crcns``.  This is the same as running
-   ``datalad install $HOME/datalad/crcns``.
-``^``
-   topmost superdataset containing the dataset the current directory is part of.
-   For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
-   to search metadata of the entire superdataset you are under (in this case
-   ``///``), run ``datalad search -d^ [something to search]``.
-``^.``
-   the dataset the current directory is part of.
 
 Commands `install` vs `get`
 ---------------------------
@@ -213,7 +188,7 @@ might differ;
 In how both commands operate on provided paths, it could be said that ``install
 == get -n``, and ``install -g == get``.  But ``install`` also has ability to
 install new datasets from remote locations given their URLs (e.g.,
-``http://datasets.datalad.org/`` for our super-dataset) and SSH targets (e.g.,
+``https://datasets.datalad.org/`` for our super-dataset) and SSH targets (e.g.,
 ``[login@]host:path``) if they are provided as the argument to its call or
 explicitly as ``--source`` option.  If ``datalad install --source URL
 DESTINATION`` (command line example) is used, then dataset from URL gets

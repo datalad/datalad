@@ -61,9 +61,10 @@
         "blog": "https://github.com/nicholsn"
     },
     "adelavega": {
-        "name": "adelavega",
+        "name": "Alejandro de la Vega",
         "blog": "https://github.com/adelavega",
-        "bio": "Postdoc in the Psychoinformatics Lab"
+        "email": "delavega@utexas.edu",
+        "bio": "Research Scientist @ UT Austin. "
     },
     "kskyten": {
         "name": "kskyten",
@@ -139,10 +140,6 @@
         "name": "yetanothertestuser",
         "blog": "https://github.com/yetanothertestuser"
     },
-    "bhanuprasad14": {
-        "name": "bhanuprasad14",
-        "blog": "https://github.com/bhanuprasad14"
-    },
     "christian-monch": {
         "name": "Christian Mönch",
         "email": "christian.moench@web.de",
@@ -158,11 +155,34 @@
     "mattcieslak": {
         "name": "Matt Cieslak",
         "bio": "Senior Scientist at UPenn Brain & Behavior Lab. Diffusion imaging enthusiast.",
-        "blog": "https://github.com/mattcieslak"
+        "blog": "https://github.com/mattcieslak",
+        "email": "mattcieslak@gmail.com"
     },
     "ypid": {
         "name": "Robin Schneider",
         "bio": "Working on Free Software as in Freedom.                   EDE1 371D 1B87 D28D A5E8  0515 86FD 980B BF1A 40F8",
         "blog": "https://me.ypid.de/"
+    },
+    "AKSoo": {
+        "name": "Sin Kim",
+        "blog": "https://orcid.org/0000-0003-4652-3758"
+    },
+    "DisasterMo": {
+        "name": "Michael Burgardt",
+        "email": "michael.burgardt@gmail.com",
+        "blog": "https://github.com/DisasterMo"
+    },
+    "Remi-Gau": {
+        "name": "Remi Gau",
+        "email": "remi.gau@tuebingen.mpg.de",
+        "bio": "Neuroimaging (high-res & laminar fMRI) and multisensory.\r\n\r\nToo much matlab and presentation and not enough R and python",
+        "blog": "https://remi-gau.github.io/",
+        "orcid": "0000-0002-1535-9767",
+        "affiliation": "Université catholique de Louvain"
+    },
+    "mslw": {
+        "name": "Michał Szczepanik",
+        "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich",
+        "blog": "https://github.com/mslw"
     }
 }

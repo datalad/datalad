@@ -68,7 +68,7 @@ metadata.  And, if you have a table or records that contain data
 sources and metadata, you can use :ref:`datalad addurls <man_datalad-addurls>`
 to quickly populate a dataset with files and associated
 git-annex metadata. (`///labs/openneurolab/metasearch
-<http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
+<https://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
 an example of such a dataset.)
 
 
@@ -122,9 +122,9 @@ Automating "non-distribution" of sensitive files
 In the `ReproIn <http://reproin.repronim.org>`_ framework for automated
 conversion of BIDS dataset and in some manually prepared datasets
 (such as
-`///labs/gobbini/famface/data <http://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
+`///labs/gobbini/famface/data <https://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
 and
-`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
+`///labs/haxby/raiders <https://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
 we annotated materials that must not be publicly shared with a git-annex
 metadata field ``distribution-restrictions``.  We used the following of values to
 describe why any particular file (content) should not be redistributed:
@@ -135,7 +135,7 @@ describe why any particular file (content) should not be redistributed:
   permissions to share (e.g., movie video files)
 
 Having annotated files this way, we could instruct git-annex
-to :ref:`publish <man_datalad-publish>` all but those restricted files to our
+to publish all but those restricted files to our
 server: ``git annex wanted datalad-public "not metadata=distribution-restrictions=*"``.
 
 .. warning::
@@ -337,7 +337,7 @@ available locally) can be aggregated into a local superdataset with all its
 metadata. In that superdataset, a DataLad user is then able to query
 information on any content of any subdataset, regardless of their actual
 availability. This principle also allows any user to install the superdataset
-from http://datasets.datalad.org and perform *local and offline* queries about
+from https://datasets.datalad.org and perform *local and offline* queries about
 any dataset available online from this server.
 
 Besides full access to all aggregated metadata by path (via the :ref:`metadata

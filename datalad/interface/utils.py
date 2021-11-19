@@ -14,9 +14,10 @@ __docformat__ = 'restructuredtext'
 
 import inspect
 import logging
-import wrapt
+import os
 import sys
 import re
+from functools import wraps
 from time import time
 from os import curdir
 from os import pardir
@@ -41,12 +42,12 @@ from datalad.utils import (
     get_wrapped_class,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import IncompleteResultsError
-from datalad import cfg as dlcfg
-from datalad.dochelpers import (
-    exc_str,
-    single_or_plural,
+from datalad.support.exceptions import (
+    CapturedException,
+    IncompleteResultsError,
 )
+from datalad import cfg as dlcfg
+from datalad.dochelpers import single_or_plural
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -61,7 +62,6 @@ from datalad.core.local.resulthooks import (
     match_jsonhook2result,
     run_jsonhook,
 )
-
 
 lgr = logging.getLogger('datalad.interface.utils')
 
@@ -171,7 +171,7 @@ def path_is_under(values, path=None):
         # need to protect against unsupported use of relpath() with
         # abspaths on windows from different drives (gh-3724)
         if path_drive != p_drive:
-        # different drives, enough evidence for "not under"
+            # different drives, enough evidence for "not under"
             continue
         rpath = relpath(p, start=path)
         if rpath == curdir \
@@ -230,7 +230,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
         current_trace = current_trace + [basepath]
     # this edge is not done, we need to try to reach any downstream
     # dataset
-    undiscovered_ds = set(t for t in targetpaths) # if t != basepath)
+    undiscovered_ds = set(t for t in targetpaths)  # if t != basepath)
     # whether anything in this directory matched a targetpath
     filematch = False
     if isdir(basepath):
@@ -258,8 +258,8 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                     downward_targets))
     undiscovered_ds = [t for t in undiscovered_ds
                        if includeds and
-                          path_is_subpath(t, current_trace[-1]) and
-                          t in includeds]
+                       path_is_subpath(t, current_trace[-1]) and
+                       t in includeds]
     if filematch or basepath in targetpaths or undiscovered_ds:
         for i, p in enumerate(current_trace[:-1]):
             # TODO RF prepare proper annotated path dicts
@@ -281,7 +281,7 @@ def get_result_filter(fx):
     return _fx
 
 
-def eval_results(func):
+def eval_results(wrapped):
     """Decorator for return value evaluation of datalad commands.
 
     Note, this decorator is only compatible with commands that return
@@ -295,14 +295,14 @@ def eval_results(func):
     This decorator implements common functionality for result rendering/output,
     error detection/handling, and logging.
 
-    Result rendering/output can be triggered via the
-    `datalad.api.result-renderer` configuration variable, or the
-    `result_renderer` keyword argument of each decorated command. Supported
-    modes are: 'default' (one line per result with action, status, path,
-    and an optional message); 'json' (one object per result, like git-annex),
-    'json_pp' (like 'json', but pretty-printed spanning multiple lines),
-    'tailored' custom output formatting provided by each command
-    class (if any).
+    Result rendering/output configured via the `result_renderer` keyword
+    argument of each decorated command. Supported modes are: 'generic' (a
+    generic renderer producing one line per result with key info like action,
+    status, path, and an optional message); 'json' (a complete JSON line
+    serialization of the full result record), 'json_pp' (like 'json', but
+    pretty-printed spanning multiple lines), 'tailored' custom output
+    formatting provided by each command class (if any), or 'disabled' for
+    no result rendering.
 
     Error detection works by inspecting the `status` item of all result
     dictionaries. Any occurrence of a status other than 'ok' or 'notneeded'
@@ -322,9 +322,9 @@ def eval_results(func):
       i.e. a datalad command definition
     """
 
-    @wrapt.decorator
-    def eval_func(wrapped, instance, args, kwargs):
-        lgr.log(2, "Entered eval_func for %s", func)
+    @wraps(wrapped)
+    def eval_func(*args, **kwargs):
+        lgr.log(2, "Entered eval_func for %s", wrapped)
         # for result filters
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
@@ -358,11 +358,8 @@ def eval_results(func):
             # use verbatim, if not a known label
             common_params['result_xfm'])
         result_renderer = common_params['result_renderer']
-        # TODO remove this conditional branch entirely, done outside
-        if not result_renderer:
-            result_renderer = dlcfg.get('datalad.api.result-renderer', None)
         # look for potential override of logging behavior
-        result_log_level = dlcfg.get('datalad.log.result-level', None)
+        result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
 
         # query cfg for defaults
         # .is_installed and .config can be costly, so ensure we do
@@ -386,8 +383,14 @@ def eval_results(func):
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
-            do_custom_result_summary = result_renderer in ('tailored', 'default') \
-                and hasattr(wrapped_class, 'custom_result_summary_renderer')
+            do_custom_result_summary = result_renderer in (
+                'tailored', 'generic', 'default') and hasattr(
+                    wrapped_class,
+                    'custom_result_summary_renderer')
+            pass_summary = do_custom_result_summary \
+                and getattr(wrapped_class,
+                            'custom_result_summary_renderer_pass_summary',
+                            None)
 
             # process main results
             for r in _process_results(
@@ -443,17 +446,18 @@ def eval_results(func):
             # result summary before a potential exception
             # custom first
             if do_custom_result_summary:
-                wrapped_class.custom_result_summary_renderer(results)
-            elif result_renderer == 'default' and action_summary and \
-                    sum(sum(s.values()) for s in action_summary.values()) > 1:
-                # give a summary in default mode, when there was more than one
+                if pass_summary:
+                    summary_args = (results, action_summary)
+                else:
+                    summary_args = (results,)
+                wrapped_class.custom_result_summary_renderer(*summary_args)
+            elif result_renderer in ('generic', 'default') \
+                    and action_summary \
+                    and sum(sum(s.values())
+                            for s in action_summary.values()) > 1:
+                # give a summary in generic mode, when there was more than one
                 # action performed
-                ui.message("action summary:\n  {}".format(
-                    '\n  '.join('{} ({})'.format(
-                        act,
-                        ', '.join('{}: {}'.format(status, action_summary[act][status])
-                                  for status in sorted(action_summary[act])))
-                                for act in sorted(action_summary))))
+                render_action_summary(action_summary)
 
             if incomplete_results:
                 raise IncompleteResultsError(
@@ -465,32 +469,28 @@ def eval_results(func):
             lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
             return generator_func(*args, **kwargs)
         else:
-            @wrapt.decorator
-            def return_func(wrapped_, instance_, args_, kwargs_):
-                results = wrapped_(*args_, **kwargs_)
+            @wraps(generator_func)
+            def return_func(*args_, **kwargs_):
+                results = generator_func(*args_, **kwargs_)
                 if inspect.isgenerator(results):
                     # unwind generator if there is one, this actually runs
                     # any processing
                     results = list(results)
-                # render summaries
-                if not result_xfm and result_renderer in ('tailored', 'default'):
-                    # cannot render transformed results
-                    if hasattr(wrapped_class, 'custom_result_summary_renderer'):
-                        wrapped_class.custom_result_summary_renderer(results)
                 if return_type == 'item-or-list' and \
                         len(results) < 2:
                     return results[0] if results else None
                 else:
                     return results
-            lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
-            return return_func(generator_func)(*args, **kwargs)
 
-    ret = eval_func(func)
+            lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
+            return return_func(*args, **kwargs)
+
+    ret = eval_func
     ret._eval_results = True
     return ret
 
 
-def default_result_renderer(res):
+def generic_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res.get('path', None)
         if path and res.get('refds'):
@@ -500,7 +500,7 @@ def default_result_renderer(res):
                 # can happen, e.g., on windows with paths from different
                 # drives. just go with the original path in this case
                 pass
-        ui.message('{action}({status}):{path}{type}{msg}'.format(
+        ui.message('{action}({status}):{path}{type}{msg}{err}'.format(
             action=ac.color_word(
                 res.get('action', '<action-unspecified>'),
                 ac.BOLD),
@@ -513,7 +513,25 @@ def default_result_renderer(res):
                 res['message'][0] % res['message'][1:]
                 if isinstance(res['message'], tuple) else res[
                     'message'])
-            if res.get('message', None) else ''))
+            if res.get('message', None) else '',
+            err=ac.color_word(' [{}]'.format(
+                res['error_message'][0] % res['error_message'][1:]
+                if isinstance(res['error_message'], tuple) else res[
+                    'error_message']), ac.RED)
+            if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+
+
+# keep for legacy compatibility
+default_result_renderer = generic_result_renderer
+
+
+def render_action_summary(action_summary):
+    ui.message("action summary:\n  {}".format(
+        '\n  '.join('{} ({})'.format(
+            act,
+            ', '.join('{}: {}'.format(status, action_summary[act][status])
+                      for status in sorted(action_summary[act])))
+                    for act in sorted(action_summary))))
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
@@ -526,7 +544,7 @@ def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
         # CPU load than the actual processing
         # arbitrarily go for a 2Hz update frequency -- it "feels" good
         if last_ts is None or final or (ts - last_ts > 0.5):
-            ui.message('  [{} similar {} been suppressed]'
+            ui.message('  [{} similar {} been suppressed; disable with datalad.ui.suppress-similar-results=off]'
                        .format(n_suppressed,
                                single_or_plural("message has",
                                                 "messages have",
@@ -549,7 +567,7 @@ def _process_results(
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
 
-    # used to track repeated messages in the default renderer
+    # used to track repeated messages in the generic renderer
     last_result = None
     last_result_ts = None
     # which result dict keys to inspect for changes to discover repetitions
@@ -558,7 +576,11 @@ def _process_results(
     # counter for detected repetitions
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
-    render_n_repetitions = 10 if sys.stdout.isatty() else float("inf")
+    render_n_repetitions = \
+        dlcfg.obtain('datalad.ui.suppress-similar-results-threshold') \
+            if sys.stdout.isatty() \
+               and dlcfg.obtain('datalad.ui.suppress-similar-results') \
+            else float("inf")
 
     for res in results:
         if not res or 'action' not in res:
@@ -584,7 +606,7 @@ def _process_results(
                 res_lgr = getattr(
                     res_lgr,
                     default_logchannels[res['status']]
-                    if result_log_level is None
+                    if result_log_level == 'match-status'
                     else result_log_level)
             msg = res['message']
             msgargs = None
@@ -606,8 +628,8 @@ def _process_results(
                 except TypeError as exc:
                     raise TypeError(
                         "Failed to render %r with %r from %r: %s"
-                        % (msg, msgargs, res, exc_str(exc))
-                    )
+                        % (msg, msgargs, res, str(exc))
+                    ) from exc
             else:
                 res_lgr(msg)
 
@@ -615,14 +637,14 @@ def _process_results(
         # TODO RF this in a simple callable that gets passed into this function
         if result_renderer is None or result_renderer == 'disabled':
             pass
-        elif result_renderer == 'default':
+        elif result_renderer in ('generic', 'default'):
             trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
             if res.get('status', None) != 'notneeded' \
                     and trimmed_result == last_result:
                 # this is a similar report, suppress if too many, but count it
                 result_repetitions += 1
                 if result_repetitions < render_n_repetitions:
-                    default_result_renderer(res)
+                    generic_result_renderer(res)
                 else:
                     last_result_ts = _display_suppressed_message(
                         result_repetitions, render_n_repetitions, last_result_ts)
@@ -632,7 +654,7 @@ def _process_results(
                 last_result_ts = _display_suppressed_message(
                     result_repetitions, render_n_repetitions, last_result_ts,
                     final=True)
-                default_result_renderer(res)
+                generic_result_renderer(res)
                 result_repetitions = 0
             last_result = trimmed_result
         elif result_renderer in ('json', 'json_pp'):
@@ -642,7 +664,7 @@ def _process_results(
                 sort_keys=True,
                 indent=2 if result_renderer.endswith('_pp') else None,
                 default=str))
-        elif result_renderer in ('tailored', 'default'):
+        elif result_renderer in ('tailored', 'generic', 'default'):
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
@@ -650,7 +672,7 @@ def _process_results(
                 result_renderer(res, **allkwargs)
             except Exception as e:
                 lgr.warning('Result rendering failed for: %s [%s]',
-                            res, exc_str(e))
+                            res, CapturedException(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
@@ -681,7 +703,7 @@ def keep_result(res, rfilter, **kwargs):
     except ValueError as e:
         # make sure to report the excluded result to massively improve
         # debugging experience
-        lgr.debug('Not reporting result (%s): %s', exc_str(e), res)
+        lgr.debug('Not reporting result (%s): %s', CapturedException(e), res)
         return False
     return True
 

@@ -23,11 +23,11 @@ from datalad.api import (
 )
 from datalad.utils import (
     chpwd,
-    on_windows,
     Path,
     PurePosixPath,
 )
 from datalad.tests.utils import (
+    assert_true,
     assert_false,
     assert_in,
     assert_not_in,
@@ -286,12 +286,10 @@ def test_get_subdatasets(origpath, path):
 def test_state(path):
     ds = Dataset.create(path)
     sub = ds.create('sub')
-    res = ds.subdatasets()
-    assert_result_count(res, 1, path=sub.path)
-    # by default we are not reporting any state info
-    assert_not_in('state', res[0])
+    assert_result_count(
+        ds.subdatasets(), 1, path=sub.path, state='present')
     # uninstall the subdataset
-    ds.uninstall('sub')
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     # normal 'gone' is "absent"
     assert_false(sub.is_installed())
     assert_result_count(
@@ -324,6 +322,39 @@ def test_parent_on_unborn_branch(path):
     subrepo = GitRepo(opj(path, "sub"), create=True)
     subrepo.commit(msg="c", options=["--allow-empty"])
 
-    ds.repo.add_submodule(path="sub")
+    ds.repo.save(path="sub")
     eq_(ds.subdatasets(result_xfm='relpaths'),
         ["sub"])
+
+
+@with_tempfile
+@with_tempfile
+def test_name_starts_with_hyphen(origpath, path):
+    ds = Dataset.create(origpath)
+    # create
+    dash_sub = ds.create('-sub')
+    assert_true(dash_sub.is_installed())
+    assert_result_count(
+        ds.subdatasets(), 1, path=dash_sub.path, state='present')
+
+    # clone
+    ds_clone = Dataset.create(path)
+    dash_clone = clone(source=dash_sub.path, path=os.path.join(path, '-clone'))
+    ds_clone.save(recursive=True)
+    assert_true(dash_clone.is_installed())
+    assert_result_count(
+        ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
+
+    # uninstall
+    ds_clone.drop('-clone', what='all', reckless='kill', recursive=True)
+    assert_false(dash_clone.is_installed())
+    assert_result_count(
+        ds_clone.subdatasets(), 1, path=dash_clone.path, state='absent')
+
+    # get
+    ds_clone.get('-clone')
+    assert_true(dash_clone.is_installed())
+    assert_result_count(
+        ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
+
+    assert_repo_status(ds.path)

@@ -32,14 +32,16 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    CapturedException,
+    InsufficientArgumentsError,
+)
 from datalad.support.param import Parameter
 from datalad.support.network import (
     RI,
     PathRI,
 )
 from datalad.utils import ensure_list
-from datalad.dochelpers import exc_str
 
 from datalad.distribution.dataset import (
     datasetmethod,
@@ -213,7 +215,7 @@ class Install(Interface):
         ds = None
         if dataset is not None:
             ds = require_dataset(dataset, check_installed=True,
-                                 purpose='installation')
+                                 purpose='install')
             common_kwargs['dataset'] = dataset
         # pre-compute for results below
         refds_path = Interface.get_refds_path(ds)
@@ -333,8 +335,9 @@ class Install(Interface):
             try:
                 path_ri = RI(path)
             except Exception as e:
+                ce = CapturedException(e)
                 raise ValueError(
-                    "invalid path argument {}: ({})".format(path, exc_str(e)))
+                    "invalid path argument {}: ({})".format(path, ce))
             try:
                 # Wouldn't work for SSHRI ATM, see TODO within SSHRI
                 # yoh: path should be a local path, and mapping note within

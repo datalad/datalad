@@ -71,7 +71,7 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create(force=False, **raw),
         status='error',
-        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
+        message='will not create a dataset in a non-empty directory, use `--force` option to ignore')
     # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
@@ -95,7 +95,7 @@ def test_create_raises(path, outside_path):
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
-    ds.uninstall(obscure_ds, check=False)
+    ds.drop(obscure_ds, what='all', reckless='kill', recursive=True)
     assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
@@ -138,7 +138,7 @@ def test_create_force_subds(path):
         subds.create(force=True, **raw),
         status="ok")
     # ... even if it is uninstalled.
-    subds.uninstall()
+    subds.drop(what='all', reckless='kill', recursive=True)
     ok_(not subds.is_installed())
     assert_in_results(
         subds.create(force=True, **raw),
@@ -356,7 +356,7 @@ def test_nested_create(path):
     assert_in_results(
         ds.create(lvl2relpath, **raw),
         status='error',
-        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
+        message='will not create a dataset in a non-empty directory, use `--force` option to ignore')
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
     ds.create(lvl2relpath, force=True)
@@ -531,3 +531,12 @@ def check_create_initopts_form(form, path):
 def test_create_initopts_form():
     yield check_create_initopts_form, "dict"
     yield check_create_initopts_form, "list"
+
+
+@with_tempfile
+def test_bad_cfg_proc(path):
+    ds = Dataset(path)
+    # check if error is raised for incorrect cfg_proc
+    assert_raises(ValueError, ds.create, path=path, cfg_proc='unknown')
+    # verify that no directory got created prior to the error
+    assert not op.isdir(path)

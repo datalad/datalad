@@ -21,6 +21,7 @@ from requests.utils import parse_dict_header
 import io
 from time import sleep
 
+from .. import __version__
 from ..utils import (
     ensure_list_from_str,
     ensure_dict_from_str,
@@ -30,16 +31,16 @@ from ..dochelpers import borrowkwargs
 
 from ..ui import ui
 from ..utils import auto_repr
-from ..dochelpers import exc_str
 from ..support.network import get_url_filename
 from ..support.network import get_response_disposition_filename
 from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
 from ..support.status import FileStatus
 from ..support.exceptions import (
-    DownloadError,
     AccessDeniedError,
     AccessFailedError,
+    CapturedException,
+    DownloadError,
     UnhandledRedirectError,
 )
 
@@ -50,12 +51,20 @@ from logging import getLogger
 from ..log import LoggerHelper
 lgr = getLogger('datalad.http')
 
+# Following https://meta.wikimedia.org/wiki/User-Agent_policy to provide
+# extended and informative User-Agent string
+DEFAULT_USER_AGENT = \
+    f'DataLad/{__version__} ' \
+    '(https://datalad.org; team@datalad.org) ' \
+    f'python-requests/{requests.__version__}'
+
 try:
     import requests_ftp
     _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
-    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s", exc_str(e))
+    ce = CapturedException(e)
+    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s", ce)
     _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:
@@ -79,10 +88,16 @@ __docformat__ = 'restructuredtext'
 def process_www_authenticate(v):
     if not v:
         return []
+    # TODO: provide proper parsing/handling of this custom format and wider support:
+    #   <type> realm=<realm>[, charset="UTF-8"]
+    # More notes: https://github.com/datalad/datalad/issues/5846#issuecomment-890221053
+    # The most complete solution is from 2018 on https://stackoverflow.com/a/52462292/1265472
+    # relying on parsing it using pyparsing.
     supported_type = v.split(' ')[0].lower()
     our_type = {
         'basic': 'http_basic_auth',
         'digest': 'http_digest_auth',
+        # TODO: bearer_token_anon ?
     }.get(supported_type)
     return [our_type] if our_type else []
 
@@ -338,6 +353,18 @@ class HTTPAuthAuthenticator(HTTPRequestsAuthenticator):
         session.auth = authenticator
         response = session.post(post_url, data={},
                                 auth=authenticator)
+        auth_request = response.headers.get('www-authenticate')
+        if response.status_code == 401 and auth_request:
+            if auth_request.lower().split(' ', 1)[0] == 'basic':
+                if response.url != post_url:
+                    # was instructed to authenticate elsewhere
+                    # TODO: do we need to loop may be??
+                    response2 = session.get(response.url, auth=authenticator)
+                    return response2
+            else:
+                lgr.warning(
+                    f"{self} received response with www-authenticate={auth_request!r} "
+                    "which is not Basic, and thus it cannot handle ATM.")
         return response
 
 
@@ -388,6 +415,9 @@ class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
                 .format(status, url))
 
         lgr.debug("Requesting authorization token for %s", url)
+        # TODO: it is not RFC 2068 Section 2 format, but a custom
+        # <type> realm=<realm>[, charset="UTF-8"]
+        # see TODO/harmonize with  process_www_authenticate
         auth_parts = parse_dict_header(response.headers["www-authenticate"])
         auth_url = ("{}?service={}&scope={}"
                     .format(auth_parts["Bearer realm"],
@@ -398,8 +428,8 @@ class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
             auth_info = auth_response.json()
         except ValueError as e:
             raise DownloadError(
-                "Failed to get information from {}: {}"
-                .format(auth_url, exc_str(e)))
+                "Failed to get information from {}"
+                .format(auth_url)) from e
         session.headers['Authorization'] = "Bearer " + auth_info["token"]
 
 
@@ -470,7 +500,8 @@ class HTTPDownloaderSession(DownloaderSession):
                     if pbar:
                         pbar.update(total)
                 except Exception as e:
-                    lgr.warning("Failed to update progressbar: %s" % exc_str(e))
+                    ce = CapturedException(e)
+                    lgr.warning("Failed to update progressbar: %s", ce)
                 # TEMP
                 # see https://github.com/niltonvolpato/python-progressbar/pull/44
                 ui.out.flush()
@@ -488,9 +519,20 @@ class HTTPDownloader(BaseDownloader):
     """
 
     @borrowkwargs(BaseDownloader)
-    def __init__(self, headers={}, **kwargs):
+    def __init__(self, headers=None, **kwargs):
+        """
+
+        Parameters
+        ----------
+        headers: dict, optional
+          Header fields to be provided to the session. Unless User-Agent provided, a custom
+          one, available in `DEFAULT_USER_AGENT` constant of this module will be used.
+        """
         super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
+        headers = headers.copy() if headers else {}
+        if 'user-agent' not in map(str.lower, headers):
+            headers['User-Agent'] = DEFAULT_USER_AGENT
         self._headers = headers
 
     def _establish_session(self, url, allow_old=True):
@@ -526,6 +568,7 @@ class HTTPDownloader(BaseDownloader):
 
         lgr.debug("http session: Creating brand new session")
         self._session = requests.Session()
+        self._session.headers.update(self._headers)
         if self.authenticator:
             self.authenticator.authenticate(url, self.credential, self._session)
 
@@ -543,6 +586,7 @@ class HTTPDownloader(BaseDownloader):
             headers = {}
         if 'Accept-Encoding' not in headers:
             headers['Accept-Encoding'] = ''
+
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1
         for retry in range(1, nretries+1):
@@ -552,6 +596,7 @@ class HTTPDownloader(BaseDownloader):
                     headers=headers)
             #except (MaxRetryError, NewConnectionError) as exc:
             except Exception as exc:
+                ce = CapturedException(exc)
                 # happen to run into those with urls pointing to Amazon,
                 # so let's rest and try again
                 if retry >= nretries:
@@ -563,11 +608,10 @@ class HTTPDownloader(BaseDownloader):
 
                     raise AccessFailedError(
                         "Failed to establish a new session %d times. %s"
-                        "Last exception was: %s"
-                        % (nretries, msg_ftp, exc_str(exc)))
+                        % (nretries, msg_ftp)) from exc
                 lgr.warning(
                     "Caught exception %s. Will retry %d out of %d times",
-                    exc_str(exc), retry+1, nretries)
+                    ce, retry + 1, nretries)
                 sleep(2**retry)
 
         check_response_status(response, session=self._session)

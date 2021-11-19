@@ -14,7 +14,6 @@ import os.path as op
 from datalad.utils import (
     ensure_list,
     Path,
-    on_windows,
     rmtree,
 )
 from datalad.tests.utils import (
@@ -449,7 +448,7 @@ def test_add_subdataset(path, other):
     # now add, it should pick up the source URL
     ds.save('other')
     # and that is why, we can reobtain it from origin
-    ds.uninstall('other')
+    ds.drop('other', what='all', reckless='kill', recursive=True)
     ok_(not other_clone.is_installed())
     ds.get('other')
     ok_(other_clone.is_installed())
@@ -877,7 +876,7 @@ def test_save_amend(dspath):
     file_in_sub = dspath / 'subds' / 'file_in_sub'
 
     # test on a hierarchy including a plain git repo:
-    ds = Dataset(dspath).create(force=True, no_annex=True)
+    ds = Dataset(dspath).create(force=True, annex=False)
     subds = ds.create('subds', force=True)
     ds.save(recursive=True)
     assert_repo_status(ds.repo)

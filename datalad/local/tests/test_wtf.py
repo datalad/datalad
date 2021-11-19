@@ -12,7 +12,6 @@
 
 from os.path import join as opj
 
-from datalad.dochelpers import exc_str
 from datalad.api import (
     create,
     wtf,
@@ -21,7 +20,7 @@ from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
 )
-from datalad.version import __version__
+from datalad import __version__
 
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
@@ -36,6 +35,7 @@ from datalad.tests.utils import (
     SkipTest,
     swallow_outputs,
     with_tree,
+    DEFAULT_BRANCH
 )
 
 
@@ -62,6 +62,9 @@ def test_wtf(topdir):
         assert_in('## dataset', cmo.out)
         assert_in(u'path: {}'.format(ds.path),
                   ensure_unicode(cmo.out))
+        assert_in('branches', cmo.out)
+        assert_in(DEFAULT_BRANCH+'@', cmo.out)
+        assert_in('git-annex@', cmo.out)
 
     # and if we run with all sensitive
     for sensitive in ('some', True):
@@ -135,7 +138,7 @@ def test_wtf(topdir):
             wtf(dataset=ds.path, clipboard=True)
         except (AttributeError, pyperclip.PyperclipException) as exc:
             # AttributeError could come from pyperclip if no DISPLAY
-            raise SkipTest(exc_str(exc))
+            raise SkipTest(str(exc))
         assert_in("WTF information of length", cmo.out)
         assert_not_in('user.name', cmo.out)
         if not pyperclip_works:

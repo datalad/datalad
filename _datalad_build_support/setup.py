@@ -32,19 +32,20 @@ def _path_rel2file(*p):
 
 
 def get_version(name):
-    """Load version from version.py without entailing any imports
+    """Determine version via importlib_metadata
 
     Parameters
     ----------
     name: str
       Name of the folder (package) where from to read version.py
     """
-    # This might entail lots of imports which might not yet be available
-    # so let's do ad-hoc parsing of the version.py
-    with open(_path_rel2file(name, 'version.py')) as f:
-        version_lines = list(filter(lambda x: x.startswith('__version__'), f))
-    assert (len(version_lines) == 1)
-    return version_lines[0].split('=')[1].strip(" '\"\t\n")
+    # delay import so we do not require it for a simple setup stage
+    try:
+        from importlib.metadata import version as importlib_version
+    except ImportError:
+        # TODO - remove whenever python >= 3.8
+        from importlib_metadata import version as importlib_version
+    return importlib_version(name)
 
 
 class BuildManPage(Command):
@@ -430,8 +431,6 @@ def datalad_setup(name, **kwargs):
         kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
     if kwargs.get('long_description') is None:
         kwargs.update(get_long_description_from_README())
-    if kwargs.get('version') is None:
-        kwargs['version'] = get_version(name)
 
     cmdclass = kwargs.get('cmdclass', {})
     # Check if command needs some module specific handling

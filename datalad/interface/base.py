@@ -29,7 +29,6 @@ from collections import (
 import warnings
 
 from ..ui import ui
-from ..dochelpers import exc_str
 
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
@@ -39,6 +38,7 @@ from datalad.support.constraints import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.support.exceptions import CapturedException
 
 
 default_logchannels = {
@@ -144,8 +144,9 @@ def load_interface(spec):
     try:
         mod = import_module(spec[0], package='datalad')
     except Exception as e:
+        ce = CapturedException(e)
         lgr.error("Internal error, cannot import interface '%s': %s",
-                  spec[0], exc_str(e))
+                  spec[0], ce)
         intf = None
     else:
         intf = getattr(mod, spec[1])
@@ -349,6 +350,8 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     doc = prefix if prefix else u''
     if len(args) > 1:
         if len(doc):
+            if not doc.endswith('\n'):
+                doc += '\n'
             doc += '\n'
         doc += "Parameters\n----------\n"
         for i, arg in enumerate(args):
@@ -522,6 +525,9 @@ def build_doc(cls, **kwargs):
         add_args=add_args
     )
 
+    if hasattr(cls.__call__, '_dataset_method'):
+        cls.__call__._dataset_method.__doc__ = cls.__call__.__doc__
+
     # return original
     return cls
 
@@ -662,7 +668,7 @@ class Interface(object):
             has_default = defaults_idx >= 0
             if cmd_args:
                 if cmd_args[0][0] in prefix_chars:
-                    # TODO: All the Paramteter(args=...) values in this code
+                    # TODO: All the Parameter(args=...) values in this code
                     # base use hyphens, so there is no point in the below
                     # conversion. If it looks like no extensions rely on this
                     # behavior either, this could be dropped.
@@ -741,7 +747,7 @@ class Interface(object):
             # common options
             # XXX define or better get from elsewhere
             common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
-                           'help', 'log_level', 'logger', 'pbs_runner',
+                           'help', 'log_level', 'logger',
                            'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
@@ -759,14 +765,16 @@ class Interface(object):
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
-            # allow commands to override the default, unless something other than
-            # default is requested
+            # allow commands to override the default, unless something other
+            # than the default 'tailored' is requested
             kwargs['result_renderer'] = \
-                args.common_output_format if args.common_output_format != 'tailored' \
-                else getattr(cls, 'result_renderer', 'default')
-            if '{' in args.common_output_format:
+                args.common_result_renderer \
+                if args.common_result_renderer != 'tailored' \
+                else getattr(cls, 'result_renderer', 'generic')
+            if '{' in args.common_result_renderer:
                 # stupid hack, could and should become more powerful
-                kwargs['result_renderer'] = DefaultOutputRenderer(args.common_output_format)
+                kwargs['result_renderer'] = DefaultOutputRenderer(
+                    args.common_result_renderer)
 
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
@@ -783,7 +791,8 @@ class Interface(object):
                 ret = list(ret)
             return ret
         except KeyboardInterrupt as exc:
-            ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
+            ui.error("\nInterrupted by user while doing magic: %s"
+                     % CapturedException(exc))
             if cls._interrupted_exit_code is not None:
                 sys.exit(cls._interrupted_exit_code)
             else:
@@ -827,7 +836,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     """Generate a kwargs dict from a call signature and *args, **kwargs
 
     Basically resolving the argnames for all positional arguments, and
-    resolvin the defaults for all kwargs that are not given in a kwargs
+    resolving the defaults for all kwargs that are not given in a kwargs
     dict
     """
     from datalad.utils import getargspec

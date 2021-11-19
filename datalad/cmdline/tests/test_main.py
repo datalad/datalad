@@ -10,16 +10,15 @@
 
 import os
 import re
-import sys
 from io import StringIO
 from unittest.mock import patch
 
 import datalad
 from ..main import (
-    main,
-    fail_with_short_help,
     _fix_datalad_ri,
+    main,
 )
+from ..helpers import fail_with_short_help
 from datalad import __version__
 from datalad.cmd import (
     WitlessRunner as Runner,
@@ -29,7 +28,10 @@ from datalad.ui.utils import (
     get_console_width,
     get_terminal_size,
 )
-from datalad.api import create
+from datalad.api import (
+    create,
+    Dataset,
+)
 from datalad.utils import (
     chpwd,
     Path,
@@ -48,6 +50,7 @@ from datalad.tests.utils import (
     slow,
     with_tempfile,
 )
+from datalad.support.exceptions import CommandError
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -197,42 +200,29 @@ def test_incorrect_options():
 
 def test_script_shims():
     runner = Runner()
-    # The EASY-INSTALL checks below aren't valid for editable installs. Use the
-    # existence of setup.py as an indication that install is _probably_
-    # editable. The file should always exist for editable installs, but it can
-    # also exist for non-editable installs when the tests are being executed
-    # from the top of the source tree.
-    setup_exists = (Path(datalad.__file__).parent.parent / "setup.py").exists()
-    for script in [
-        'datalad',
-        'git-annex-remote-datalad-archives',
-        'git-annex-remote-datalad']:
-        if not on_windows:
-            # those must be available for execution, and should not contain
-            which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
-            # test if there is no easy install shim in there
-            with open(which.rstrip()) as f:
-                content = f.read()
-        else:
-            from distutils.spawn import find_executable
-            content = find_executable(script)
+    script = 'datalad'
+    if not on_windows:
+        # those must be available for execution, and should not contain
+        which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
+        # test if there is no easy install shim in there
+        with open(which.rstrip()) as f:
+            content = f.read()
+    else:
+        from distutils.spawn import find_executable
+        content = find_executable(script)
 
-        if not setup_exists:
-            assert_not_in('EASY', content) # NOTHING easy should be there
-            assert_not_in('pkg_resources', content)
-
-        # and let's check that it is our script
-        out = runner.run([script, '--version'], protocol=StdOutErrCapture)
-        version = out['stdout'].rstrip()
-        mod, version = version.split(' ', 1)
-        assert_equal(mod, 'datalad')
-        # we can get git and non git .dev version... so for now
-        # relax
-        get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
-        # extract numeric portion
-        assert get_numeric_portion(version) # that my lambda is correctish
-        assert_equal(get_numeric_portion(__version__),
-                     get_numeric_portion(version))
+    # and let's check that it is our script
+    out = runner.run([script, '--version'], protocol=StdOutErrCapture)
+    version = out['stdout'].rstrip()
+    mod, version = version.split(' ', 1)
+    assert_equal(mod, 'datalad')
+    # we can get git and non git .dev version... so for now
+    # relax
+    get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
+    # extract numeric portion
+    assert get_numeric_portion(version), f"Got no numeric portion from {version}"
+    assert_equal(get_numeric_portion(__version__),
+                 get_numeric_portion(version))
 
 
 @slow  # 11.2591s
@@ -300,7 +290,7 @@ def test_fail_with_short_help():
             known=["mother", "mutter", "father", "son"],
             provided="muther",
             hint="You can become one",
-            exit_code=0,  # no one forbids
+            exit_code=0,  # nobody forbids
             what="parent",
             out=out)
     assert_equal(cme.exception.code, 0)
@@ -322,3 +312,73 @@ def test_fix_datalad_ri():
     assert_equal(_fix_datalad_ri('///a'), '///a')
     assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
     assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+def test_fail_with_short_help():
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(exit_code=3, out=out)
+    assert_equal(cme.exception.code, 3)
+    assert_equal(out.getvalue(), "")
+
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(msg="Failed badly", out=out)
+    assert_equal(cme.exception.code, 1)
+    assert_equal(out.getvalue(), "error: Failed badly\n")
+
+    # Suggestions, hint, etc
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(
+            msg="Failed badly",
+            known=["mother", "mutter", "father", "son"],
+            provided="muther",
+            hint="You can become one",
+            exit_code=0,  # nobody forbids
+            what="parent",
+            out=out)
+    assert_equal(cme.exception.code, 0)
+    assert_equal(out.getvalue(),
+                 "error: Failed badly\n"
+                 "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
+                 "Did you mean any of these?\n"
+                 "        mutter\n"
+                 "        mother\n"
+                 "        father\n"
+                 "Hint: You can become one\n")
+
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+def test_commanderror_jsonmsgs(src, exp):
+    ds = Dataset(src).create()
+    (ds.pathobj / '123').write_text('123')
+    ds.save()
+    ds.repo.call_annex([
+        'initremote', 'expdir', 'type=directory',
+        'directory={}'.format(exp),
+        'encryption=none',
+        'exporttree=yes'
+    ])
+    #ds.repo.call_annex(['export', '--to=expdir', 'HEAD'])
+    # this must fail, because `push` cannot handle an export.
+    # when https://github.com/datalad/datalad/issues/3127 is implemented
+    # this test must be adjusted
+    with assert_raises(CommandError) as cme:
+        Runner(cwd=ds.path).run(
+            ['datalad', 'push', '--to', 'expdir'],
+            protocol=StdOutErrCapture)
+    if ds.repo.git_annex_version >= "8.20201129":
+        in_('use `git-annex export`', cme.exception.stderr)
