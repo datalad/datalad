@@ -72,7 +72,6 @@ from datalad.tests.utils import (
     skip_ssh,
     slow,
     swallow_logs,
-    use_cassette,
     with_sameas_remote,
     with_tempfile,
     with_testrepos,
@@ -1599,6 +1598,27 @@ def test_clone_recorded_subds_reset(path):
 
 
 @with_tempfile
+def test_clone_git_clone_opts(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a", annex=False)
+
+    repo_a = ds_a.repo
+    repo_a.commit(msg="c1", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
+    repo_a.commit(msg="c2", options=["--allow-empty"])
+    repo_a.tag("atag")
+
+    ds_b = clone(ds_a.path, path / "ds_b",
+                 git_clone_opts=[f"--branch={DEFAULT_BRANCH}",
+                                 "--single-branch", "--no-tags"])
+    repo_b = ds_b.repo
+    eq_(repo_b.get_active_branch(), DEFAULT_BRANCH)
+    eq_(set(x["refname"] for x in repo_b.for_each_ref_(fields="refname")),
+        {f"refs/heads/{DEFAULT_BRANCH}",
+         f"refs/remotes/{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"})
+
+
+@with_tempfile
 @with_tempfile
 def test_clone_url_mapping(src_path, dest_path):
     src = create(src_path)
@@ -1607,7 +1627,7 @@ def test_clone_url_mapping(src_path, dest_path):
     assert_raises(IncompleteResultsError, clone, 'rambo', dest_path)
     # rather than adding test URL mapping here, consider
     # test_url_mapping_specs(), it is cheaper there
-  
+
     # anticipate windows test paths and escape them
     escaped_subst = (r',rambo,%s' % src_path).replace('\\', '\\\\')
     for specs in (

@@ -909,6 +909,30 @@ def test_relpath_semantics(path):
         eq_(sub.path, op.join(super.path, 'sub'))
 
 
+@with_tempfile
+def test_install_branch(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a")
+    ds_a.create("sub")
+
+    repo_a = ds_a.repo
+    repo_a.commit(msg="c1", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
+    repo_a.commit(msg="c2", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH)
+
+    ds_b = install(source=ds_a.path, path=str(path / "ds_b"),
+                   branch=DEFAULT_BRANCH + "-other", recursive=True)
+
+    repo_b = ds_b.repo
+    eq_(repo_b.get_corresponding_branch() or repo_b.get_active_branch(),
+        DEFAULT_BRANCH + "-other")
+
+    repo_sub = Dataset(ds_b.pathobj / "sub").repo
+    eq_(repo_sub.get_corresponding_branch() or repo_sub.get_active_branch(),
+        DEFAULT_BRANCH)
+
+
 def _create_test_install_recursive_github(path):  # pragma: no cover
     # to be ran once to populate a hierarchy of test datasets on github
     # Making it a full round-trip would require github credentials on CI etc
