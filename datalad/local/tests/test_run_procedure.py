@@ -39,7 +39,6 @@ from datalad.tests.utils import (
     eq_,
     known_failure_windows,
     ok_file_has_content,
-    on_windows,
     patch_config,
     with_tempfile,
     with_tree,
@@ -172,7 +171,7 @@ def test_procedure_discovery(path, super_path):
     assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                        'datalad_test_proc.py'))
 
-    if not on_windows:  # no symlinks
+    if not ds.repo.is_managed_branch():  # no symlinks
         import os
 
         # create a procedure which is a broken symlink, but recognizable as a
@@ -396,13 +395,17 @@ print(sys.argv)
 def test_name_with_underscore(path):
     ds = Dataset(path).create(force=True)
 
-    # Procedure name with underscore can't be reached directly with a DATALAD_
-    # environment variable.
-    with patch.dict("os.environ",
-                    {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
-                     '%s {script}' % sys.executable}):
-        with assert_raises(ValueError):
-            ds.run_procedure(spec=["print_args"])
+    # we are using the presence of a managed branch as a proxy indicator
+    # for a crippled FS, were we cannot trust the executable bit
+    # which is our only indicator in the absence of a file extension
+    if not ds.repo.is_managed_branch():
+        # Procedure name with underscore can't be reached directly with a DATALAD_
+        # environment variable.
+        with patch.dict("os.environ",
+                        {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
+                         '%s {script}' % sys.executable}):
+            with assert_raises(ValueError):
+                ds.run_procedure(spec=["print_args"])
 
     # But it can be set via DATALAD_CONFIG_OVERRIDES_JSON.
     with patch.dict("os.environ",

@@ -169,8 +169,6 @@ def _get_procedure_implementation(name='*', ds=None):
 
 
 def _guess_exec(script_file):
-
-    state = None
     try:
         is_exec = os.stat(script_file).st_mode & stat.S_IEXEC
     except OSError as e:
@@ -182,12 +180,11 @@ def _guess_exec(script_file):
         else:
             raise e
 
-    # TODO check for exec permission and rely on interpreter
-    if is_exec and not os.path.isdir(script_file):
-        return {'type': u'executable',
-                'template': u'{script} {ds} {args}',
-                'state': 'executable'}
-    elif script_file.endswith('.sh'):
+    # on some FS the executable bit might not be all that reliable
+    # but a procedure might nevertheless be supported.
+    # go by extension with "known" interpreters first, and only then
+    # try to execute something that looks executable
+    if script_file.endswith('.sh'):
         return {'type': u'bash_script',
                 'template': u'bash {script} {ds} {args}',
                 'state': 'executable'}
@@ -195,6 +192,10 @@ def _guess_exec(script_file):
         ex = quote_cmdlinearg(sys.executable)
         return {'type': u'python_script',
                 'template': u'%s {script} {ds} {args}' % ex,
+                'state': 'executable'}
+    elif is_exec and not os.path.isdir(script_file):
+        return {'type': u'executable',
+                'template': u'{script} {ds} {args}',
                 'state': 'executable'}
     else:
         return {'type': None, 'template': None, 'state': None}
