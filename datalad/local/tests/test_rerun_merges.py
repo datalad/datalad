@@ -121,6 +121,8 @@ def test_rerun_fastforwardable_mutator(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_left_right_runs(path):
     ds = Dataset(path).create()
@@ -174,6 +176,8 @@ def test_rerun_left_right_runs(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_run_left_mutator_right(path):
     ds = Dataset(path).create()
@@ -203,6 +207,8 @@ def test_rerun_run_left_mutator_right(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_nonrun_left_run_right(path):
     ds = Dataset(path).create()
@@ -261,6 +267,7 @@ def test_rerun_nonrun_left_run_right(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_run_left_nonrun_right(path):
@@ -313,6 +320,7 @@ def test_rerun_run_left_nonrun_right(path):
 
 
 # @slow  # ~5sec on Yarik's laptop
+# test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_mutator_left_nonrun_right(path):
@@ -346,6 +354,7 @@ def test_rerun_mutator_left_nonrun_right(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_mutator_stem_nonrun_merges(path):
@@ -408,6 +417,8 @@ def test_rerun_mutator_stem_nonrun_merges(path):
 
 
 # @slow  # ~4.5sec
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_exclude_side(path):
     ds = Dataset(path).create()
@@ -439,6 +450,8 @@ def test_rerun_exclude_side(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_run_left_nonrun_right(path):
     ds = Dataset(path).create()
@@ -486,6 +499,8 @@ def test_rerun_unrelated_run_left_nonrun_right(path):
 
 
 # @slow  # ~3.5sec on Yarik's laptop
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_mutator_left_nonrun_right(path):
     ds = Dataset(path).create()
@@ -567,6 +582,8 @@ def test_rerun_unrelated_nonrun_left_run_right(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_nonrun_left_mutator_right(path):
     ds = Dataset(path).create()
@@ -608,6 +625,7 @@ def test_rerun_unrelated_nonrun_left_mutator_right(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_multifork(path):
@@ -687,6 +705,7 @@ def test_rerun_multifork(path):
 
 
 @slow
+# test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_octopus(path):
