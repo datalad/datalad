@@ -111,7 +111,7 @@ def get_cmd_summaries(descriptions, groups, width=79):
     group is preceded by an entry describing the group.
     """
     cmd_summary = []
-    for grp in sorted(groups, key=lambda x: x[1]):
+    for grp in sorted(groups, key=lambda x: x[0]):
         grp_descr = grp[1]
         grp_cmds = descriptions[grp[0]]
 
