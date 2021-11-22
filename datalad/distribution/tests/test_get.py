@@ -771,12 +771,13 @@ def test_source_candidate_subdataset(store1, store2, intermediate,
     ds.create("sub2", force=True)
     ds.save(recursive=True)
     ria_url_1 = "ria+" + get_local_file_url(store1, compatibility='git')
-    ds.create_sibling_ria(ria_url_1, "firststore", recursive=True)
+    ds.create_sibling_ria(ria_url_1, "firststore", recursive=True,
+                          new_store_ok=True)
     ds.push(".", to="firststore", recursive=True)
     superds = Dataset(super).create()
     superds.clone(source=ria_url_1 + "#" + ds.id, path="intermediate")
     ria_url_2 = "ria+" + get_local_file_url(store2, compatibility='git')
-    superds.create_sibling_ria(ria_url_2, "secondstore")
+    superds.create_sibling_ria(ria_url_2, "secondstore", new_store_ok=True)
     superds.push(".", to="secondstore")
 
     cloneds = install(clone, source=ria_url_2 + "#" + superds.id)
