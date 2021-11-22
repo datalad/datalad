@@ -1345,13 +1345,14 @@ class RIARemote(SpecialRemote):
         # we need a file-system compatible name for the key
         key = _sanitize_key(key)
 
+        dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         if isinstance(self.io, HTTPRemoteIO):
             # display the URL for a request
             # TODO: method of HTTPRemoteIO
-            return self.ria_store_url[4:] + "/annex/objects/" + \
-                   self.annex.dirhash(key) + key + "/" + key
+            # in case of a HTTP remote (unchecked for others), storage_host
+            # is not just a host, but a full URL without a path
+            return f'{self.storage_host}{dsobj_dir}/{key_path}'
 
-        dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         return str(dsobj_dir / key_path) if self._local_io() \
             else '{}: {}:{}'.format(
                 self.storage_host,
