@@ -26,7 +26,6 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     eq_,
-    skip_if_no_network,
     with_tempfile,
 )
 
@@ -100,7 +99,8 @@ def test_dryrun(path):
     eq_(len(res), 1)
 
 
-def check4real(testcmd, testdir, credential, api, delete_endpoint):
+def check4real(testcmd, testdir, credential, api, delete_endpoint,
+            access_protocol='https', moretests=None):
     token_var = f'DATALAD_CREDENTIAL_{credential.upper()}_TOKEN'
     if token_var not in os.environ:
         raise SkipTest(f'No {credential} access token available')
@@ -123,6 +123,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
             api=api,
             credential=credential,
             name='ghlike-sibling',
+            access_protocol=access_protocol,
         )
         assert_in_results(
             res,
@@ -140,6 +141,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
         ds.siblings('remove', name='ghlike-sibling', result_renderer='disabled')
         res = testcmd(
             reponame, dataset=ds, api=api, credential=credential,
+            access_protocol=access_protocol,
             on_failure='ignore')
         assert_result_count(res, 1)
         assert_in_results(
@@ -151,6 +153,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
         # existing=skip must not "fix" this:
         # https://github.com/datalad/datalad/issues/5941
         res = testcmd(reponame, dataset=ds, api=api, existing='skip',
+                      access_protocol=access_protocol,
                       credential=credential, on_failure='ignore')
         assert_result_count(res, 1)
         assert_in_results(
@@ -160,6 +163,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
         )
         # but existing=reconfigure does
         res = testcmd(reponame, dataset=ds, api=api, existing='reconfigure',
+                      access_protocol=access_protocol,
                       credential=credential)
         assert_result_count(res, 2)
         assert_in_results(
@@ -172,6 +176,8 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
             action='configure-sibling',
             status='ok',
         )
+        if moretests:
+            moretests(ds)
     finally:
         token = os.environ[token_var]
         requests.delete(
