@@ -78,7 +78,7 @@ environment:
     - ID: WinP39core
       # ~35 min
       DTS: datalad.core datalad.runner
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       # Python version specification is non-standard on windows
       PY: 39-x64
       # TODO: use datalad/git-annex (github release packages) but
@@ -111,7 +111,7 @@ environment:
           datalad.tests
       # TODO: datalad.metadata (this is completely non-functional on Windows,
       #       either tests only, or actual code too)
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
     - ID: WinP39a2
       # ~50min
@@ -119,7 +119,7 @@ environment:
           datalad.local
           datalad.support
           datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
 
     - ID: MacP38a1
