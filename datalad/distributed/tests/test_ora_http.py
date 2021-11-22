@@ -10,6 +10,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_repo_status,
     assert_result_count,
+    assert_status,
     known_failure_windows,
     serve_path_via_http,
     skip_if_adjusted_branch,
@@ -116,9 +117,11 @@ def test_read_access(store_path, store_url, ds_path):
     ds.repo.init_remote('ora-remote', options=init_opts)
     ds.repo.fsck(remote='ora-remote', fast=True)
     store_uuid = ds.siblings(name='ora-remote',
-                             return_type='item-or-list')['annex-uuid']
+                             return_type='item-or-list',
+                             result_renderer='disabled')['annex-uuid']
     here_uuid = ds.siblings(name='here',
-                            return_type='item-or-list')['annex-uuid']
+                            return_type='item-or-list',
+                            result_renderer='disabled')['annex-uuid']
 
     # nothing in store yet:
     for f in files:
@@ -144,4 +147,9 @@ def test_read_access(store_path, store_url, ds_path):
     assert_equal(len(res), 2)
     assert_result_count(res, 2, status='ok', type='file', action='get',
                         message="from ora-remote...")
+
+    # try whether the reported access URL is correct
+    one_url = ds.repo.whereis('one.txt', output='full'
+        )[store_uuid]['urls'].pop()
+    assert_status('ok', ds.download_url(urls=[one_url], path=str(ds.pathobj / 'dummy')))
 
