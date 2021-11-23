@@ -39,7 +39,6 @@ from datalad.tests.utils import (
     skip_wo_symlink_capability,
     swallow_outputs,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 
@@ -64,10 +63,10 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'dir2': {'testindir3': 'someother3'}})
 
 
-@with_testrepos('.*git.*', flavors=['clone'])
+@with_tempfile()
 def test_save(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(annex=False)
 
     with open(op.join(path, "new_file.tst"), "w") as f:
         f.write("something")
