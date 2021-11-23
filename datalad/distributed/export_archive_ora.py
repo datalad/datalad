@@ -19,6 +19,7 @@ import subprocess
 from argparse import REMAINDER
 
 from datalad.utils import (
+    ensure_list,
     rmtree,
 )
 from datalad.interface.base import (
@@ -31,6 +32,7 @@ from datalad.interface.results import (
 from datalad.interface.utils import eval_results
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
@@ -75,12 +77,41 @@ class ExportArchiveORA(Interface):
             doc="""if an existing directory, an 'archive.7z' is placed into
             it, otherwise this is the path to the target archive""",
             constraints=EnsureStr() | EnsureNone()),
+        remote=Parameter(
+            args=("--for",),
+            dest="remote",
+            metavar='LABEL',
+            doc="""name of the target sibling, wanted/preferred settings
+            will be used to filter the files added to the archives""",
+            constraints=EnsureStr() | EnsureNone()),
+        annex_wanted=Parameter(
+            args=("--annex-wanted",),
+            metavar="FILTERS",
+            doc="""git-annex-preferred-content expression for
+            git-annex find to filter files. Should start with
+            'or' or 'and' when used in combination with `--for`"""),
+        froms=Parameter(
+            args=("--from",),
+            dest="froms",
+            metavar="FROM",
+            nargs="+",
+            doc="""one or multiple tree-ish from which to select files"""),
         opts=Parameter(
             args=("opts",),
             nargs=REMAINDER,
             metavar="...",
             doc="""list of options for 7z to replace the default '-mx0' to
             generate an uncompressed archive"""),
+        missing_content=Parameter(
+            args=("--missing-content",),
+            doc="""By default, any discovered file with missing content will
+            result in an error and the export is aborted. Setting this to
+            'continue' will issue warnings instead of failing on error. The
+            value 'ignore' will only inform about problem at the 'debug' log
+            level. The latter two can be helpful when generating a TAR archive
+            from a dataset where some file content is not available
+            locally.""",
+            constraints=EnsureChoice("error", "continue", "ignore")),
     )
 
     @staticmethod
@@ -89,7 +120,11 @@ class ExportArchiveORA(Interface):
     def __call__(
             target,
             opts=None,
-            dataset=None):
+            dataset=None,
+            remote=None,
+            annex_wanted=None,
+            froms=None,
+            missing_content='error',):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
             dataset, check_installed=True, purpose='export to ORA archive')
@@ -102,6 +137,8 @@ class ExportArchiveORA(Interface):
             archive = archive / 'archive.7z'
         else:
             archive.parent.mkdir(exist_ok=True, parents=True)
+
+        froms = ensure_list(froms)
 
         if not opts:
             # uncompressed by default
@@ -133,10 +170,35 @@ class ExportArchiveORA(Interface):
             )
             return
 
-        keypaths = [
-            k for k in annex_objs.glob(op.join('**', '*'))
-            if k.is_file()
-        ]
+        def expr_to_opts(expr):
+            opts = []
+            expr = expr.replace('(', ' ( ').replace(')', ' ) ')
+            for sub_expr in expr.split(' '):
+                if len(sub_expr):
+                    if sub_expr in '()':
+                        opts.append(f"-{sub_expr}")
+                    else:
+                        opts.append(f"--{sub_expr}")
+            return opts
+
+        find_filters = []
+        if remote:
+            find_filters = ['-('] + expr_to_opts(ds_repo.get_preferred_content('wanted', remote)) + ['-)']
+        if annex_wanted:
+            find_filters.extend(expr_to_opts(annex_wanted))
+        # git-annex find results need to be uniqued with set, as git-annex find
+        # will return duplicates if multiple symlinks point to the same key.
+        if froms:
+            keypaths = set([
+                annex_objs.joinpath(k) for treeish in froms for k in ds_repo.call_annex_items_([
+                'find', *find_filters, f"--branch={treeish}",
+                "--format=${hashdirmixed}${key}/${key}\\n"])
+                ])
+        else:
+            keypaths = set(annex_objs.joinpath(k) for k in ds_repo.call_annex_items_([
+                'find', *find_filters,
+                "--format=${hashdirmixed}${key}/${key}\\n"
+            ]))
 
         log_progress(
             lgr.info,
@@ -146,6 +208,11 @@ class ExportArchiveORA(Interface):
             label='ORA archive export',
             unit=' Keys',
         )
+
+        if missing_content == 'continue':
+            missing_file_lgr_func = lgr.warning
+        elif missing_content == 'ignore':
+            missing_file_lgr_func = lgr.debug
 
         link_fx = os.link
         for keypath in keypaths:
@@ -161,10 +228,16 @@ class ExportArchiveORA(Interface):
             keydir.mkdir(parents=True, exist_ok=True)
             try:
                 link_fx(str(keypath), str(keydir / key))
+            except FileNotFoundError as e:
+                if missing_content == 'error':
+                    raise IOError('Key %s has no content available' % keypath)
+                missing_file_lgr_func(
+                    'Key %s has no content available',
+                    str(keypath))
             except OSError:
                 lgr.warning(
                     'No hard links supported at %s, will copy files instead',
-                    str(keydir))
+                    str(keypath))
                 # no hard links supported
                 # switch function after first error
                 link_fx = shutil.copyfile
