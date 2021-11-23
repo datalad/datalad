@@ -1577,8 +1577,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         ))
 
     def add_(self, files, git=None, backend=None, options=None, jobs=None,
-            git_options=None, annex_options=None, update=False):
+             git_options=None, annex_options=None, update=False):
         """Like `add`, but returns a generator"""
+        warnings.warn(
+            "AnnexRepo.add() and AnnexRepo.add_() were deprecated with "
+            "DataLad 0.16. They will be removed in a subsequent release. "
+            "Use AnnexRepo.save() or AnnexRepo.call_annex(['add',...]) "
+            "instead.", DeprecationWarning)
         if update and not git:
             raise InsufficientArgumentsError("option 'update' requires 'git', too")
 

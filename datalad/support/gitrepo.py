@@ -1208,6 +1208,11 @@ class GitRepo(CoreGitRepo):
 
     def add_(self, files, git=True, git_options=None, update=False):
         """Like `add`, but returns a generator"""
+        warnings.warn(
+            "GitRepo.add() and GitRepo.add_() were deprecated with "
+            "DataLad 0.16. They will be removed in a subsequent release. "
+            "Use GitRepo.save() or GitRepo.call_git(['add',...]) instead.",
+            DeprecationWarning)
         # TODO: git_options is used as options for the git-add here,
         # instead of options to the git executable => rename for consistency
 
