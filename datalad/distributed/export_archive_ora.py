@@ -19,6 +19,7 @@ import subprocess
 from argparse import REMAINDER
 
 from datalad.utils import (
+    ensure_list,
     rmtree,
 )
 from datalad.interface.base import (
@@ -137,8 +138,7 @@ class ExportArchiveORA(Interface):
         else:
             archive.parent.mkdir(exist_ok=True, parents=True)
 
-        if isinstance(froms, str):
-            froms = [froms]
+        froms = ensure_list(froms)
 
         if not opts:
             # uncompressed by default
