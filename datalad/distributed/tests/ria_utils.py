@@ -32,6 +32,14 @@ example_payload = {
 }
 
 
+example_payload2 = {
+    'three.txt': 'content3',
+    'subdir': {
+        'four': 'content4',
+    },
+}
+
+
 def get_all_files(path):
     return sorted([
         Path(p).relative_to(path)
@@ -70,7 +78,10 @@ def setup_archive_remote(repo, archive_path):
 
 
 def populate_dataset(ds):
-    create_tree(ds.path, example_payload)
+    # create 2 commits
+    for pl in [example_payload, example_payload2]:
+        create_tree(ds.path, pl)
+        ds.save()
 
 
 def check_not_generatorfunction(func):
