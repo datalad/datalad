@@ -13,12 +13,17 @@ import logging
 
 from datalad.distributed.create_sibling_ghlike import _create_sibling
 from datalad.distributed.create_sibling_gogs import _GOGS
-from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import (
+    datasetmethod,
+    Dataset,
+)
 from datalad.interface.base import (
     Interface,
     build_doc,
 )
 from datalad.interface.utils import eval_results
+from datalad.support.annexrepo import AnnexRepo
+
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gin')
 
@@ -118,16 +123,31 @@ class CreateSiblingGin(Interface):
             private=False,
             dry_run=False):
 
-        yield from _create_sibling(
-            platform=_GIN(api, credential, require_token=not dry_run),
-            reponame=reponame,
-            dataset=dataset,
-            recursive=recursive,
-            recursion_limit=recursion_limit,
-            name=name,
-            existing=existing,
-            access_protocol=access_protocol,
-            publish_depends=publish_depends,
-            private=private,
-            dry_run=dry_run,
-        )
+        for res in _create_sibling(
+                platform=_GIN(api, credential, require_token=not dry_run),
+                reponame=reponame,
+                dataset=dataset,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                name=name,
+                existing=existing,
+                access_protocol=access_protocol,
+                publish_depends=publish_depends,
+                private=private,
+                dry_run=dry_run):
+            if res.get('action') == 'configure-sibling' \
+                    and res.get('annex-ignore') in ('true', True):
+                # when we see that git-annex had disabled access to GIN
+                # we will revert it for any dataset with an annex.
+                # git-annex's conclusion might solely be based on the
+                # fact that it tested prior the first push (failed to
+                # obtain a git-annex branch with a UUID) and concluded
+                # that there can never be an annex.
+                # however, we know for sure that GIN can do it, so we
+                # force this to enable correct subsequent data transfer
+                ds = Dataset(res['path'])
+                if isinstance(ds.repo, AnnexRepo):
+                    ds.config.set(f'remote.{name}.annex-ignore', 'false',
+                                  where='local')
+                    res['annex-ignore'] = 'false'
+            yield res
