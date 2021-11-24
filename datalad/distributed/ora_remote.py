@@ -213,9 +213,9 @@ class LocalIO(IOBase):
         try:
             path.unlink()
         except PermissionError as e:
-            raise RIARemoteError(str(e) + os.linesep +
-                                 "Note: Write permissions for a key's parent"
-                                 "directory are also required to drop content.")
+            raise RIARemoteError(
+                "Write permissions for a key's parent directory are "
+                "also required to drop content.") from e
 
     def remove_dir(self, path):
         path.rmdir()
@@ -471,7 +471,7 @@ class SSHRemoteIO(IOBase):
         try:
             size = self._get_download_size_from_key(key)
         except RemoteError as e:
-            raise RemoteError("src: {}".format(str(src)) + str(e))
+            raise RemoteError(f"src: {src}") from e
 
         if size is None:
             # rely on SCP for now
@@ -500,9 +500,8 @@ class SSHRemoteIO(IOBase):
             self._run('rm {}'.format(sh_quote(str(path))))
         except RemoteCommandFailedError as e:
             raise RIARemoteError(
-                str(e) + os.linesep +
-                "Note: Write permissions for a key's parent"
-                "directory are also required to drop content.")
+                "Write permissions for a key's parent"
+                "directory are also required to drop content.") from e
 
     def remove_dir(self, path):
         self._run('rmdir {}'.format(sh_quote(str(path))))
@@ -574,8 +573,8 @@ class SSHRemoteIO(IOBase):
         cmd = "cat  {}".format(sh_quote(str(file_path)))
         try:
             out = self._run(cmd, no_output=False, check=True)
-        except RemoteCommandFailedError:
-            raise RIARemoteError("Could not read {}".format(str(file_path)))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(f"Could not read {file_path}") from e
 
         return out
 
@@ -596,8 +595,8 @@ class SSHRemoteIO(IOBase):
             sh_quote(str(file_path)))
         try:
             self._run(cmd, check=True)
-        except RemoteCommandFailedError:
-            raise RIARemoteError("Could not write to {}".format(str(file_path)))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(f"Could not write to {file_path}") from e
 
     def get_7z(self):
         # TODO: To not rely on availability in PATH we might want to use `which`
@@ -665,7 +664,7 @@ class HTTPRemoteIO(object):
         try:
             response = requests.head(url, allow_redirects=True)
         except Exception as e:
-            raise RIARemoteError(str(e))
+            raise RIARemoteError from e
 
         return response.status_code == 200
 
@@ -735,7 +734,7 @@ def handle_errors(func):
                 pass
 
             if not isinstance(e, RIARemoteError):
-                raise RIARemoteError(str(e))
+                raise RIARemoteError from e
             else:
                 raise e
 
@@ -873,7 +872,7 @@ class RIARemote(SpecialRemote):
                 self._get_version_config(object_tree_version_file)
             if self.remote_object_tree_version not in self.known_versions_objt:
                 raise UnknownLayoutVersion
-        except (RemoteError, FileNotFoundError):
+        except (RemoteError, FileNotFoundError) as e:
             # Exception class depends on whether self.io is local or SSH.
             # assume file doesn't exist
             # TODO: Is there a possibility RemoteError has a different reason
@@ -881,9 +880,9 @@ class RIARemote(SpecialRemote):
             #       Don't think so ATM. -> Reconsider with new execution layer.
             if not self.io.exists(object_tree_version_file.parent):
                 # unify exception
-                raise FileNotFoundError
+                raise e
             else:
-                raise NoLayoutVersion
+                raise NoLayoutVersion from e
 
     def _load_cfg(self, gitdir, name):
         # Whether or not to force writing to the remote. Currently used to
@@ -1286,7 +1285,8 @@ class RIARemote(SpecialRemote):
                 self.io.get_from_archive(archive_path, key_path, filename,
                                          self.annex.progress)
             except Exception as e2:
-                raise RIARemoteError('Failed to key: {}'
+                # TODO properly report the causes
+                raise RIARemoteError('Failed to obtain key: {}'
                                      ''.format([str(e1), str(e2)]))
 
     @handle_errors
