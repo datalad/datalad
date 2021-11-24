@@ -185,6 +185,26 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
     return out
 
 
+def format_exception_with_cause(e):
+    """Helper to recursively format an exception with all underlying causes
+
+    For each exception in the chain either the str() of it is taken, or the
+    class name of the exception, with the aim to generate a simple and
+    comprehensible description that can be used in user-facing messages.
+    It is explicitly not aiming to provide a detailed/comprehensive source
+    of information for in-depth debugging.
+
+    '-caused by-' is used a separator between exceptions to be human-readable
+    while being recognizably different from potential exception payload
+    messages.
+    """
+    s = str(e) or e.__class__.__name__
+    exc_cause = getattr(e, '__cause__', None)
+    if exc_cause:
+        s += f' -caused by- {format_exception_with_cause(exc_cause)}'
+    return s
+
+
 class MissingExternalDependency(RuntimeError):
     """External dependency is missing error"""
 

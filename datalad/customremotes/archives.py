@@ -18,10 +18,7 @@ from collections import OrderedDict
 from operator import itemgetter
 from urllib.parse import urlparse
 
-from annexremote import (
-    RemoteError,
-    UnsupportedRequest,
-)
+from annexremote import UnsupportedRequest
 
 from datalad.cmdline.helpers import get_repo_instance
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
@@ -38,6 +35,7 @@ from datalad.utils import (
     unlink,
 )
 
+from datalad.customremotes import RemoteError
 from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -329,7 +327,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 return True
         # it is unclear to MIH why this must be UNKNOWN rather than FALSE
         # but this is how I found it
-        raise RemoteError()
+        raise RemoteError('Key not present')
 
     def remove(self, key):
         raise UnsupportedRequest('This special remote cannot remove content')
@@ -410,17 +408,18 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, file)
                 if not was_extracted and self.cache[akey_path].is_extracted:
-                    self.annex.info(
+                    self.message(
                         "%s special remote is using an extraction cache "
                         "under %s. Remove it with DataLad's 'clean' "
                         "command to save disk space." %
                         (ARCHIVES_SPECIAL_REMOTE,
-                         self.cache[akey_path].path)
+                         self.cache[akey_path].path),
+                        type='info',
                     )
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug(
+                self.message(
                     "Failed to fetch {akey} containing {key}: {msg}".format(
                         akey=akey,
                         key=key,
@@ -453,10 +452,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         from datalad.support.annexrepo import AnnexJsonProtocol
 
         akey_size = self.repo.get_size_from_key(akey)
-        self.annex.info(
+        self.message(
             "To obtain some keys we need to fetch an archive "
             "of size %s"
-            % (naturalsize(akey_size) if akey_size else "unknown")
+            % (naturalsize(akey_size) if akey_size else "unknown"),
+            type='info',
         )
 
         try:
@@ -465,7 +465,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 protocol=AnnexJsonProtocol,
             )
         except Exception:
-            self.annex.debug(f'Failed to fetch archive with key {akey}')
+            self.message(f'Failed to fetch archive with key {akey}')
             raise
 
 

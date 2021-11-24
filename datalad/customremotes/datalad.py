@@ -13,15 +13,15 @@ __docformat__ = 'restructuredtext'
 import logging
 from urllib.parse import urlparse
 
-from annexremote import RemoteError
-
 from datalad.downloaders.providers import Providers
 from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
+from datalad.utils import unique
 
-from .base import AnnexCustomRemote
+from datalad.customremotes import RemoteError
+from datalad.customremotes.base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
@@ -39,6 +39,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     def transfer_retrieve(self, key, file):
         urls = []
+        error_causes = []
         # TODO: priorities etc depending on previous experience or settings
         for url in self.gen_URLS(key):
             urls.append(url)
@@ -50,10 +51,17 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug("Failed to download url %s for key %s: %s"
-                                 % (url, key, ce))
-        raise RemoteError(
-            f"Failed to download from any of {len(urls)} locations")
+                cause = getattr(exc, '__cause__', None)
+                debug_msg = f"Failed to download {url} for key {key}: {ce}"
+                if cause:
+                    debug_msg += f' [{cause}]'
+                self.message(debug_msg)
+                error_causes.append(cause)
+
+        error_msg = f"Failed to download from any of {len(urls)} locations"
+        if error_causes:
+            error_msg += f' {unique(error_causes)}'
+        raise RemoteError(error_msg)
 
     def checkurl(self, url):
         try:
@@ -64,7 +72,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             return [props]
         except Exception as exc:
             ce = CapturedException(exc)
-            self.annex.debug("Failed to check url %s: %s" % (url, ce))
+            self.message("Failed to check url %s: %s" % (url, ce))
             return False
 
     def checkpresent(self, key):
@@ -80,7 +88,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 # N/A, probably check the connection etc
             except TargetFileAbsent as exc:
                 ce = CapturedException(exc)
-                self.annex.debug(
+                self.message(
                     "Target url %s file seems to be missing: %s" % (url, ce))
                 if not resp:
                     # if it is already marked as UNKNOWN -- let it stay that
@@ -89,7 +97,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                     return False
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug(
+                self.message(
                     "Failed to check status of url %s: %s" % (url, ce))
         if resp is None:
             raise RemoteError(f'Could not determine presence of key {key}')

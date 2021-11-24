@@ -1,7 +1,3 @@
-from annexremote import SpecialRemote
-from annexremote import RemoteError
-from annexremote import ProtocolError
-
 import os
 from pathlib import (
     Path,
@@ -13,6 +9,11 @@ from shlex import quote as sh_quote
 import subprocess
 import logging
 from functools import wraps
+
+from datalad.customremotes import (
+    RemoteError,
+    SpecialRemote,
+)
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
@@ -78,9 +79,7 @@ class RemoteCommandFailedError(Exception):
 
 
 class RIARemoteError(RemoteError):
-
-    def __init__(self, msg):
-        super().__init__(msg.replace('\n', '\\n'))
+    pass
 
 
 class IOBase(object):
@@ -214,9 +213,9 @@ class LocalIO(IOBase):
         try:
             path.unlink()
         except PermissionError as e:
-            raise RIARemoteError(str(e) + os.linesep +
-                                 "Note: Write permissions for a key's parent"
-                                 "directory are also required to drop content.")
+            raise RIARemoteError(
+                "Write permissions for a key's parent directory are "
+                "also required to drop content.") from e
 
     def remove_dir(self, path):
         path.rmdir()
@@ -472,7 +471,7 @@ class SSHRemoteIO(IOBase):
         try:
             size = self._get_download_size_from_key(key)
         except RemoteError as e:
-            raise RemoteError("src: {}".format(str(src)) + str(e))
+            raise RemoteError(f"src: {src}") from e
 
         if size is None:
             # rely on SCP for now
@@ -501,9 +500,8 @@ class SSHRemoteIO(IOBase):
             self._run('rm {}'.format(sh_quote(str(path))))
         except RemoteCommandFailedError as e:
             raise RIARemoteError(
-                str(e) + os.linesep +
-                "Note: Write permissions for a key's parent"
-                "directory are also required to drop content.")
+                "Write permissions for a key's parent"
+                "directory are also required to drop content.") from e
 
     def remove_dir(self, path):
         self._run('rmdir {}'.format(sh_quote(str(path))))
@@ -575,8 +573,8 @@ class SSHRemoteIO(IOBase):
         cmd = "cat  {}".format(sh_quote(str(file_path)))
         try:
             out = self._run(cmd, no_output=False, check=True)
-        except RemoteCommandFailedError:
-            raise RIARemoteError("Could not read {}".format(str(file_path)))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(f"Could not read {file_path}") from e
 
         return out
 
@@ -597,8 +595,8 @@ class SSHRemoteIO(IOBase):
             sh_quote(str(file_path)))
         try:
             self._run(cmd, check=True)
-        except RemoteCommandFailedError:
-            raise RIARemoteError("Could not write to {}".format(str(file_path)))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(f"Could not write to {file_path}") from e
 
     def get_7z(self):
         # TODO: To not rely on availability in PATH we might want to use `which`
@@ -666,7 +664,7 @@ class HTTPRemoteIO(object):
         try:
             response = requests.head(url, allow_redirects=True)
         except Exception as e:
-            raise RIARemoteError(str(e))
+            raise RIARemoteError from e
 
         return response.status_code == 200
 
@@ -736,7 +734,7 @@ def handle_errors(func):
                 pass
 
             if not isinstance(e, RIARemoteError):
-                raise RIARemoteError(str(e))
+                raise RIARemoteError from e
             else:
                 raise e
 
@@ -874,7 +872,7 @@ class RIARemote(SpecialRemote):
                 self._get_version_config(object_tree_version_file)
             if self.remote_object_tree_version not in self.known_versions_objt:
                 raise UnknownLayoutVersion
-        except (RemoteError, FileNotFoundError):
+        except (RemoteError, FileNotFoundError) as e:
             # Exception class depends on whether self.io is local or SSH.
             # assume file doesn't exist
             # TODO: Is there a possibility RemoteError has a different reason
@@ -882,9 +880,9 @@ class RIARemote(SpecialRemote):
             #       Don't think so ATM. -> Reconsider with new execution layer.
             if not self.io.exists(object_tree_version_file.parent):
                 # unify exception
-                raise FileNotFoundError
+                raise e
             else:
-                raise NoLayoutVersion
+                raise NoLayoutVersion from e
 
     def _load_cfg(self, gitdir, name):
         # Whether or not to force writing to the remote. Currently used to
@@ -953,7 +951,8 @@ class RIARemote(SpecialRemote):
                              " Use 'git annex enableremote {} "
                              "url=<RIA-URL-TO-STORE>' to store a ria+<scheme>:"
                              "//... URL in the special remote's config."
-                             "".format(name))
+                             "".format(name),
+                             type='info')
 
         if not self.store_base_path:
             raise RIARemoteError(
@@ -997,7 +996,8 @@ class RIARemote(SpecialRemote):
 
         file_content = self.io.read_file(path).strip().split('|')
         if not (1 <= len(file_content) <= 2):
-            self.message("invalid version file {}".format(path))
+            self.message("invalid version file {}".format(path),
+                         type='info')
             return None
 
         remote_version = file_content[0]
@@ -1097,27 +1097,13 @@ class RIARemote(SpecialRemote):
         #       + just isinstance(LocalIO)?
         return not self.storage_host
 
-    def debug(self, msg):
-        # Annex prints just the message, so prepend with
-        # a "DEBUG" on our own.
-        self.annex.debug("ORA-DEBUG: " + msg)
-
-    def message(self, msg):
-        try:
-            self.annex.info(msg)
-        except ProtocolError:
-            # INFO not supported by annex version.
-            # If we can't have an actual info message, at least have a
-            # debug message.
-            self.debug(msg)
-
     def _set_read_only(self, msg):
 
         if not self.force_write:
             self.read_only = True
-            self.message(msg)
+            self.message(msg, type='info')
         else:
-            self.message("Was instructed to force write")
+            self.message("Was instructed to force write", type='info')
 
     def _ensure_writeable(self):
         if self.read_only:
@@ -1169,7 +1155,7 @@ class RIARemote(SpecialRemote):
 
         if not self._push_io:
             if self.ria_store_pushurl:
-                self.debug("switching ORA to push-url")
+                self.message("switching ORA to push-url")
                 # Not-implemented-push-HTTP is ruled out already when reading
                 # push-url, so either local or SSH:
                 if not self.storage_host_push:
@@ -1291,7 +1277,8 @@ class RIARemote(SpecialRemote):
                 self.io.get_from_archive(archive_path, key_path, filename,
                                          self.annex.progress)
             except Exception as e2:
-                raise RIARemoteError('Failed to key: {}'
+                # TODO properly report the causes
+                raise RIARemoteError('Failed to obtain key: {}'
                                      ''.format([str(e1), str(e2)]))
 
     @handle_errors
