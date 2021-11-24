@@ -50,8 +50,8 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug("Failed to download url %s for key %s: %s"
-                                 % (url, key, ce))
+                self.message("Failed to download url %s for key %s: %s"
+                             % (url, key, ce))
         raise RemoteError(
             f"Failed to download from any of {len(urls)} locations")
 
@@ -64,7 +64,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             return [props]
         except Exception as exc:
             ce = CapturedException(exc)
-            self.annex.debug("Failed to check url %s: %s" % (url, ce))
+            self.message("Failed to check url %s: %s" % (url, ce))
             return False
 
     def checkpresent(self, key):
@@ -80,7 +80,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 # N/A, probably check the connection etc
             except TargetFileAbsent as exc:
                 ce = CapturedException(exc)
-                self.annex.debug(
+                self.message(
                     "Target url %s file seems to be missing: %s" % (url, ce))
                 if not resp:
                     # if it is already marked as UNKNOWN -- let it stay that
@@ -89,7 +89,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                     return False
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug(
+                self.message(
                     "Failed to check status of url %s: %s" % (url, ce))
         if resp is None:
             raise RemoteError(f'Could not determine presence of key {key}')

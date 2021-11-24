@@ -1,6 +1,7 @@
-from annexremote import SpecialRemote
-from annexremote import RemoteError
-from annexremote import ProtocolError
+from annexremote import (
+    ProtocolError,
+    RemoteError,
+)
 
 import os
 from pathlib import (
@@ -13,6 +14,8 @@ from shlex import quote as sh_quote
 import subprocess
 import logging
 from functools import wraps
+
+from datalad.customremotes import SpecialRemote
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
@@ -953,7 +956,8 @@ class RIARemote(SpecialRemote):
                              " Use 'git annex enableremote {} "
                              "url=<RIA-URL-TO-STORE>' to store a ria+<scheme>:"
                              "//... URL in the special remote's config."
-                             "".format(name))
+                             "".format(name),
+                             type='info')
 
         if not self.store_base_path:
             raise RIARemoteError(
@@ -997,7 +1001,8 @@ class RIARemote(SpecialRemote):
 
         file_content = self.io.read_file(path).strip().split('|')
         if not (1 <= len(file_content) <= 2):
-            self.message("invalid version file {}".format(path))
+            self.message("invalid version file {}".format(path),
+                         type='info')
             return None
 
         remote_version = file_content[0]
@@ -1097,27 +1102,21 @@ class RIARemote(SpecialRemote):
         #       + just isinstance(LocalIO)?
         return not self.storage_host
 
+    # XXX this is pretty much obsolete, we should use self.message()
+    # which does debug messaging by default. however, I don't know if
+    # these prefixes are used for anything
     def debug(self, msg):
         # Annex prints just the message, so prepend with
         # a "DEBUG" on our own.
         self.annex.debug("ORA-DEBUG: " + msg)
 
-    def message(self, msg):
-        try:
-            self.annex.info(msg)
-        except ProtocolError:
-            # INFO not supported by annex version.
-            # If we can't have an actual info message, at least have a
-            # debug message.
-            self.debug(msg)
-
     def _set_read_only(self, msg):
 
         if not self.force_write:
             self.read_only = True
-            self.message(msg)
+            self.message(msg, type='info')
         else:
-            self.message("Was instructed to force write")
+            self.message("Was instructed to force write", type='info')
 
     def _ensure_writeable(self):
         if self.read_only:
