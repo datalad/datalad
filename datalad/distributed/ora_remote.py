@@ -1097,14 +1097,6 @@ class RIARemote(SpecialRemote):
         #       + just isinstance(LocalIO)?
         return not self.storage_host
 
-    # XXX this is pretty much obsolete, we should use self.message()
-    # which does debug messaging by default. however, I don't know if
-    # these prefixes are used for anything
-    def debug(self, msg):
-        # Annex prints just the message, so prepend with
-        # a "DEBUG" on our own.
-        self.annex.debug("ORA-DEBUG: " + msg)
-
     def _set_read_only(self, msg):
 
         if not self.force_write:
@@ -1163,7 +1155,7 @@ class RIARemote(SpecialRemote):
 
         if not self._push_io:
             if self.ria_store_pushurl:
-                self.debug("switching ORA to push-url")
+                self.message("switching ORA to push-url")
                 # Not-implemented-push-HTTP is ruled out already when reading
                 # push-url, so either local or SSH:
                 if not self.storage_host_push:
