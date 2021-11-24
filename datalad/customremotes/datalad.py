@@ -18,6 +18,7 @@ from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
+from datalad.utils import unique
 
 from datalad.customremotes import RemoteError
 from datalad.customremotes.base import AnnexCustomRemote
@@ -38,6 +39,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     def transfer_retrieve(self, key, file):
         urls = []
+        error_causes = []
         # TODO: priorities etc depending on previous experience or settings
         for url in self.gen_URLS(key):
             urls.append(url)
@@ -49,10 +51,17 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.message("Failed to download url %s for key %s: %s"
-                             % (url, key, ce))
-        raise RemoteError(
-            f"Failed to download from any of {len(urls)} locations")
+                cause = getattr(exc, '__cause__', None)
+                debug_msg = f"Failed to download {url} for key {key}: {ce}"
+                if cause:
+                    debug_msg += f' [{cause}]'
+                self.message(debug_msg)
+                error_causes.append(cause)
+
+        error_msg = f"Failed to download from any of {len(urls)} locations"
+        if error_causes:
+            error_msg += f' {unique(error_causes)}'
+        raise RemoteError(error_msg)
 
     def checkurl(self, url):
         try:
