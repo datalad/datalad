@@ -9,6 +9,7 @@
 """Test WitlessRunner
 """
 
+import logging
 import os
 import signal
 import sys
@@ -30,9 +31,12 @@ from datalad.tests.utils import (
     integration,
     ok_,
     ok_file_has_content,
+    skip_if_on_windows,
+    swallow_logs,
     with_tempfile,
 )
 from datalad.utils import (
+    CMD_MAX_ARG,
     Path,
     on_windows,
 )
@@ -294,3 +298,14 @@ def test_faulty_poll_detection():
     protocol = Protocol()
     protocol.process = PopenMock()
     assert_raises(CommandError, protocol._prepare_result)
+
+
+@skip_if_on_windows  # no "hint" on windows since no ulimit command there
+def test_too_long():
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        with assert_raises(OSError):  # we still raise an exception if we exceed too much
+            Runner().run(
+                [sys.executable, '-c', 'import sys; print(len(sys.argv))'] + [str(i) for i in range(CMD_MAX_ARG)],
+                protocol=StdOutCapture
+            )
+        cml.assert_logged('.*use.*ulimit.*')
