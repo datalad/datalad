@@ -168,8 +168,6 @@ def main(args=None):
     # parse cmd args
     lgr.debug("Parsing known args among %s", repr(args))
     cmdlineargs, unparsed_args = parser.parse_known_args(args[1:])
-    if cmdlineargs.common_library_mode:
-        datalad.enable_librarymode()
     has_func = hasattr(cmdlineargs, 'func') and cmdlineargs.func is not None
     if unparsed_args:
         if has_func and cmdlineargs.func.__self__.__name__ != 'Export':
@@ -192,6 +190,8 @@ def main(args=None):
 
     # enable overrides
     datalad.cfg.reload(force=True)
+    if 'datalad.runtime.librarymode' in datalad.cfg:
+        datalad.enable_librarymode()
 
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt

@@ -22,16 +22,22 @@ DataLad continues to behave like a stand-alone application by default.
 
 For internal use, Python and command-line APIs provide dedicated mode switches.
 
-The command line entry point offers a ``--library-mode`` switch that enables
-the mode very early in the process runtime, and for the complete lifetime of the
-process. Similarly, the Python API offers a function ``enable_libarymode()``
-that should be called immediately after importing the ``datalad`` package
-for maximum impact.
+Library mode can be enabled by setting the boolean configuration setting
+``datalad.runtime.librarymode`` **before the start of the DataLad process**.
+From the command line, this can be done with the option
+``-c datalad.runtime.librarymode=yes``, or any other means for setting
+configuration. In an already running Python process, library mode can be
+enabled by calling ``datalad.enable_libarymode()``. This should be done
+immediately after importing the ``datalad`` package for maximum impact.
 
 .. code-block:: python
 
    >>> import datalad
    >>> datalad.enable_libarymode()
+
+In a Python session, library mode **cannot** be enabled reliably by just setting
+the configuration flag **after** the ``datalad`` package was already imported.
+The ``enable_librarymode()`` function must be used.
 
 Moreover, with ``datalad.in_librarymode()`` a query utility is provided that
 can be used throughout the code base for adjusting behavior according to the
@@ -40,9 +46,9 @@ usage scenario.
 Switching back and forth between modes during the runtime of a process is not
 supported.
 
-Care must be taken to configure child-processes of the main DataLad
-process/session appropriately, for example internal Dataset procedure calls, in
-order to inherit the mode of the parent process.
+A library mode setting is exported into the environment of the Python process.
+By default, it will be inherited by all child-processes, such as dataset
+procedure executions.
 
 
 Library-mode implications

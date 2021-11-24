@@ -396,7 +396,9 @@ def test_librarymode():
         # to execute. It has no particular role here, other than
         # to make the code pass the location where library mode
         # should be turned on via the cmdline API
-        run_main(['--library-mode', 'clean', '--dry-run'])
+        run_main(['-c', 'datalad.runtime.librarymode=yes', 'clean', '--dry-run'])
         ok_(datalad.in_librarymode())
     finally:
+        # restore pre-test behavior
         datalad.__runtime_mode = was_mode
+        datalad.cfg.overrides.pop('datalad.runtime.librarymode')

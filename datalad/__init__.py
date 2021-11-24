@@ -25,10 +25,6 @@ import os
 
 # this is not to be modified. for querying use get_apimode()
 __api = 'python'
-# this is not to be modified. see enable/in_librarymode()
-# by default, we are in application-mode, simply because most of
-# datalad was originally implemented with this scenario assumption
-__runtime_mode = 'application'
 
 
 def get_apimode():
@@ -83,6 +79,8 @@ def enable_librarymode():
     """
     global __runtime_mode
     __runtime_mode = 'library'
+    # export into the environment for child processes to inherit
+    os.environ['DATALAD_RUNTIME_LIBRARYMODE'] = '1'
 
 
 # For reproducible demos/tests
@@ -112,6 +110,13 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 # must come after config manager
+# this is not to be modified. see enable/in_librarymode()
+# by default, we are in application-mode, simply because most of
+# datalad was originally implemented with this scenario assumption
+__runtime_mode = 'library' \
+    if cfg.getbool('datalad.runtime', 'librarymode', False) \
+    else 'application'
+
 from .log import lgr
 from datalad.support.exceptions import CapturedException
 from datalad.utils import (
