@@ -19,7 +19,7 @@
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5624980.svg)](https://doi.org/10.5281/zenodo.5624980)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-37-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-38-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -191,6 +191,7 @@ project (NIH 1P41EB019936-01A1).
   <tr>
     <td align="center"><a href="https://remi-gau.github.io/"><img src="https://avatars.githubusercontent.com/u/6961185?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Remi Gau</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=Remi-Gau" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/mslw"><img src="https://avatars.githubusercontent.com/u/11985212?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Michał Szczepanik</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mslw" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/bpinsard"><img src="https://avatars.githubusercontent.com/u/1155388?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Basile</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bpinsard" title="Code">💻</a></td>
   </tr>
 </table>
 
