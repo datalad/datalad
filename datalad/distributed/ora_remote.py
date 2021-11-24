@@ -1,8 +1,3 @@
-from annexremote import (
-    ProtocolError,
-    RemoteError,
-)
-
 import os
 from pathlib import (
     Path,
@@ -15,7 +10,10 @@ import subprocess
 import logging
 from functools import wraps
 
-from datalad.customremotes import SpecialRemote
+from datalad.customremotes import (
+    RemoteError,
+    SpecialRemote,
+)
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
@@ -81,9 +79,7 @@ class RemoteCommandFailedError(Exception):
 
 
 class RIARemoteError(RemoteError):
-
-    def __init__(self, msg):
-        super().__init__(msg.replace('\n', '\\n'))
+    pass
 
 
 class IOBase(object):

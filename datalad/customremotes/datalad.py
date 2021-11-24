@@ -13,15 +13,14 @@ __docformat__ = 'restructuredtext'
 import logging
 from urllib.parse import urlparse
 
-from annexremote import RemoteError
-
 from datalad.downloaders.providers import Providers
 from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
 
-from .base import AnnexCustomRemote
+from datalad.customremotes import RemoteError
+from datalad.customremotes.base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.datalad')
 

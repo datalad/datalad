@@ -18,10 +18,7 @@ from collections import OrderedDict
 from operator import itemgetter
 from urllib.parse import urlparse
 
-from annexremote import (
-    RemoteError,
-    UnsupportedRequest,
-)
+from annexremote import UnsupportedRequest
 
 from datalad.cmdline.helpers import get_repo_instance
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
@@ -38,6 +35,7 @@ from datalad.utils import (
     unlink,
 )
 
+from datalad.customremotes import RemoteError
 from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -329,7 +327,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 return True
         # it is unclear to MIH why this must be UNKNOWN rather than FALSE
         # but this is how I found it
-        raise RemoteError()
+        raise RemoteError('Key not present')
 
     def remove(self, key):
         raise UnsupportedRequest('This special remote cannot remove content')

@@ -12,12 +12,22 @@
 
 __docformat__ = 'restructuredtext'
 
-__all__ = ['SpecialRemote']
+__all__ = ['RemoteError, SpecialRemote']
 
 from annexremote import (
     ProtocolError,
     SpecialRemote as _SpecialRemote,
+    RemoteError as _RemoteError,
 )
+
+
+class RemoteError(_RemoteError):
+    # technically the message is optional, but any such case is immediately a
+    # UX issue ("reason unknown"), hence let's not allow for it
+    def __init__(self, msg):
+        # prevent multiline messages, they would be swallowed
+        # or kill the protocol
+        super().__init__(msg.replace('\n', '\\n'))
 
 
 class SpecialRemote(_SpecialRemote):
