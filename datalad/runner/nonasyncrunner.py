@@ -477,18 +477,9 @@ class ThreadedRunner:
     def should_continue(self) -> bool:
         # Continue with queue processing if there is still a process or
         # monitored files, or if there are still elements in the output queue.
-        live_threads = [
-                thread.is_alive()
-                for thread in (
-                    self.stdin_enqueueing_thread,
-                    self.stdout_enqueueing_thread,
-                    self.stderr_enqueueing_thread,
-                    self.process_waiting_thread,
-                ) if thread is not None]
         return (
             len(self.active_file_numbers) > 0
-            or self.output_queue.empty() is False
-            or any(live_threads))
+            or not self.output_queue.empty())
 
     def process_queue(self):
         """
@@ -511,11 +502,6 @@ class ThreadedRunner:
                     timeout=ThreadedRunner.timeout_resolution)
                 break
             except Empty:
-                # Check should continue regularly, because we might
-                # have entered with an empty set and running threads
-                # that were just about to exit.
-                if not self.should_continue():
-                    return
                 self.process_timeouts()
                 continue
 
