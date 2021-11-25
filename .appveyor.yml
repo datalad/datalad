@@ -220,6 +220,11 @@ init:
   # Identity setup
   - git config --global user.email "test@appveyor.land"
   - git config --global user.name "Appveyor Almighty"
+  # globally setting filter.annex.process (needs git-annex 8.20211117) to reduce git-add runtime
+  # https://git-annex.branchable.com/bugs/Windows__58___substantial_per-file_cost_for___96__add__96__/
+  - cmd: git config --system filter.annex.process "git-annex filter-process"
+  # might also bring a slight speed-up on Mac, but Ubuntu git-annex is currently too old
+  #- sh: sudo git config --system filter.annex.process "git-annex filter-process"
   # Scratch space
   - cmd: md C:\DLTMP
   # we place the "unix" one into the user's HOME to avoid git-annex issues on MacOSX
