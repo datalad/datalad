@@ -511,6 +511,11 @@ class ThreadedRunner:
                     timeout=ThreadedRunner.timeout_resolution)
                 break
             except Empty:
+                # Check should continue regularly, because we might
+                # have entered with an empty set and running threads
+                # that were just about to exit.
+                if not self.should_continue():
+                    return
                 self.process_timeouts()
                 continue
 
