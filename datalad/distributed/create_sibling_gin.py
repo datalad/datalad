@@ -70,6 +70,8 @@ class CreateSiblingGin(Interface):
     In order to be able to use this command, a personal access token has to be
     generated on the platform (Account->Your Settings->Applications->Generate
     New Token).
+
+    .. versionadded:: 0.16
     """
 
     _examples_ = [

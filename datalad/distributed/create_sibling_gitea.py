@@ -93,6 +93,8 @@ class CreateSiblingGitea(Interface):
 
     In order to be able to use this command, a personal access token has to be
     generated on the platform (Account->Settings->Applications->Generate Token).
+
+    .. versionadded:: 0.16
     """
 
     _params_ = _Gitea.create_sibling_params
