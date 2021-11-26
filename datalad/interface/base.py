@@ -221,6 +221,11 @@ def alter_interface_docs_for_api(docs):
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE)
+    # select only the python alternative from argument specifications
+    docs = re.sub(
+        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
+        lambda match: f'``{match.group(1)}``',
+        docs)
     docs = re.sub(
         r'\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
         lambda match: match.group(1),
@@ -301,6 +306,11 @@ def alter_interface_docs_for_cmdline(docs):
     docs = re.sub(
         r'`\S*`',
         lambda match: match.group(0).strip('`').upper(),
+        docs)
+    # select only the cmdline alternative from argument specifications
+    docs = re.sub(
+        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
+        lambda match: f'``{match.group(2)}``',
         docs)
     # clean up sphinx API refs
     docs = re.sub(
