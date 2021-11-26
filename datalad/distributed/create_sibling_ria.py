@@ -416,8 +416,8 @@ class CreateSiblingRia(Interface):
                     status='error',
                     message="No store found at '{}'. Forgot "
                             "--new-store-ok ?".format(
-                        Path(base_path), **res_kwargs),
-                    )
+                        Path(base_path)),
+                    **res_kwargs)
                 yield res
                 return
 
