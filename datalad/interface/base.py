@@ -221,6 +221,11 @@ def alter_interface_docs_for_api(docs):
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE)
+    # select only the python alternative from argument specifications
+    docs = re.sub(
+        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
+        lambda match: f'``{match.group(1)}``',
+        docs)
     docs = re.sub(
         r'\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
         lambda match: match.group(1),
@@ -240,8 +245,8 @@ def alter_interface_docs_for_api(docs):
             '\\1 (http://handbook.datalad.org/symbols)',
             docs)
     docs = re.sub(
-        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(1)),
+        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
@@ -299,14 +304,23 @@ def alter_interface_docs_for_cmdline(docs):
     # capitalize variables and remove backticks to uniformize with
     # argparse output
     docs = re.sub(
-        r'`\S*`',
-        lambda match: match.group(0).strip('`').upper(),
+        r'([^`]+)`([a-zA-Z0-9_]+)`([^`]+)',
+        lambda match: f'{match.group(1)}{match.group(2).upper()}{match.group(3)}',
+        docs)
+    # select only the cmdline alternative from argument specifications
+    docs = re.sub(
+        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
+        lambda match: f'``{match.group(2)}``',
         docs)
     # clean up sphinx API refs
     docs = re.sub(
         r'\~datalad\.api\.\S*',
         lambda match: "`{0}`".format(match.group(0)[13:]),
         docs)
+    # dedicated support for version markup
+    docs = docs.replace('.. versionadded::', 'New in version')
+    docs = docs.replace('.. versionchanged::', 'Changed in version')
+    docs = docs.replace('.. deprecated::', 'Deprecated in version')
     # Remove RST paragraph markup
     docs = re.sub(
         r'^.. \S+::',
@@ -314,8 +328,8 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(1)),
+        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
