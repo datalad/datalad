@@ -245,8 +245,8 @@ def alter_interface_docs_for_api(docs):
             '\\1 (http://handbook.datalad.org/symbols)',
             docs)
     docs = re.sub(
-        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(1)),
+        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
@@ -324,8 +324,8 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(1)),
+        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
