@@ -13,8 +13,8 @@ Docstrings
    implementation.
 
 Docstrings in DataLad source code are used and consumed in many ways. Besides
-serving as documentation directly in the sources, the are also transformed
-rendered in various ways.
+serving as documentation directly in the sources, they are also transformed
+and rendered in various ways.
 
 - Command line ``--help`` output
 - Python's ``help()`` or IPython's ``?``
