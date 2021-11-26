@@ -562,3 +562,11 @@ def test_exiting_process():
                          protocol=NoCapture,
                          stdin=None)
     eq_(result["code"], 0)
+
+
+def test_deadlock_detection():
+    runner = ThreadedRunner("something", StdOutErrCapture, None)
+    with patch("datalad.runner.nonasyncrunner.lgr") as logger:
+        runner.process_queue()
+    eq_(logger.method_calls[0][0], "warning")
+    eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): deadlock detected")

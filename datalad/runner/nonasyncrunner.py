@@ -240,6 +240,7 @@ class ThreadedRunner:
 
         self.last_touched = dict()
         self.active_file_numbers = set()
+        self.deadlock_check_interval = 10
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -502,6 +503,14 @@ class ThreadedRunner:
                     timeout=ThreadedRunner.timeout_resolution)
                 break
             except Empty:
+                # Check for deadlock situation every 1000 ms
+                if self.deadlock_check_interval == 0:
+                    self.deadlock_check_interval = 11
+                    if not self.should_continue():
+                        lgr.warning(
+                            "ThreadedRunner.process_queue(): deadlock detected")
+                        return
+                self.deadlock_check_interval -= 1
                 self.process_timeouts()
                 continue
 
