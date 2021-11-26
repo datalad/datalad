@@ -317,6 +317,10 @@ def alter_interface_docs_for_cmdline(docs):
         r'\~datalad\.api\.\S*',
         lambda match: "`{0}`".format(match.group(0)[13:]),
         docs)
+    # dedicated support for version markup
+    docs = docs.replace('.. versionadded::', 'New in version')
+    docs = docs.replace('.. versionchanged::', 'Changed in version')
+    docs = docs.replace('.. deprecated::', 'Deprecated in version')
     # Remove RST paragraph markup
     docs = re.sub(
         r'^.. \S+::',
