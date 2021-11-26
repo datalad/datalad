@@ -108,6 +108,8 @@ class Remove(Interface):
             doc="""DEPRECATED and IGNORED; use `save --amend` instead"""),
         recursive=Parameter(
             args=("--recursive", '-r',),
+            action='store_const',
+            const=None,
             doc="""DEPRECATED and IGNORED: removal is always a recursive
             operation"""),
     )
@@ -123,6 +125,9 @@ class Remove(Interface):
              dict(text="Permanently remove a superdataset (with all subdatasets) from the filesystem",
              code_py="remove(dataset='path/to/dataset')",
              code_cmd="datalad remove -d <path/to/dataset>"),
+             dict(text="DANGER-ZONE: Fast wipe-out a dataset and all its subdataset, bypassing all safety checks",
+             code_py="remove(dataset='path/to/dataset', reckless='kill')",
+             code_cmd="datalad remove -d <path/to/dataset> --reckless kill"),
     ]
 
     @staticmethod
