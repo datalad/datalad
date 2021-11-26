@@ -304,8 +304,8 @@ def alter_interface_docs_for_cmdline(docs):
     # capitalize variables and remove backticks to uniformize with
     # argparse output
     docs = re.sub(
-        r'`\S*`',
-        lambda match: match.group(0).strip('`').upper(),
+        r'([^`]+)`([a-zA-Z0-9_]+)`([^`]+)',
+        lambda match: f'{match.group(1)}{match.group(2).upper()}{match.group(3)}',
         docs)
     # select only the cmdline alternative from argument specifications
     docs = re.sub(
