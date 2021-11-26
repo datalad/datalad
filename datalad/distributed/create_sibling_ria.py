@@ -150,11 +150,11 @@ class CreateSiblingRia(Interface):
             args=("url",),
             metavar="ria+<ssh|file|http(s)>://<host>[/path]",
             doc="""URL identifying the target RIA store and access protocol. If
-            [CMD: --push-url CMD][PY: push_url PY] is given in addition, this is
+            ``push_url||--push-url`` is given in addition, this is
             used for read access only. Otherwise it will be used for write
             access too and to create the repository sibling in the RIA store.
             Note, that HTTP(S) currently is valid for consumption only thus
-            requiring to provide [CMD: --push-url CMD][PY: push_url PY].
+            requiring to provide ``push_url||--push-url``.
             """,
             constraints=EnsureStr() | EnsureNone()),
         push_url=Parameter(

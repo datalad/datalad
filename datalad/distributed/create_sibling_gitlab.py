@@ -201,7 +201,7 @@ class CreateSiblingGitlab(Interface):
             args=("--dryrun",),
             action="store_true",
             doc="""Deprecated. Use the renamed
-            [CMD: --dry-run CMD][PY: `dry_run` PY] parameter""")
+            ``dry_run||--dry-run`` parameter""")
     )
 
     @staticmethod
