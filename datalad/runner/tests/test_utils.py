@@ -27,6 +27,16 @@ def test_line_splitter_basic():
     assert_is_none(line_splitter.finish_processing())
 
 
+def test_line_splitter_unterminated():
+    # Expect two lines split at "x", after the second process-call
+    line_splitter = LineSplitter("x")
+    lines = line_splitter.process("first line")
+    assert_equal(lines, [])
+    lines = line_splitter.process("xsecond linex")
+    assert_equal(lines, ["first line", "second line"])
+    assert_is_none(line_splitter.finish_processing())
+
+
 def test_line_splitter_separator():
     line_splitter = LineSplitter("X")
     lines = line_splitter.process(
