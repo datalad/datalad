@@ -20,7 +20,10 @@ from typing import (
     List,
     Optional,
 )
-from unittest.mock import patch
+from unittest.mock import (
+    patch,
+    MagicMock,
+)
 
 from datalad.tests.utils import (
     assert_false,
@@ -564,9 +567,25 @@ def test_exiting_process():
     eq_(result["code"], 0)
 
 
-def test_deadlock_detection():
+def test_stalling_detection_1():
     runner = ThreadedRunner("something", StdOutErrCapture, None)
+    runner.stdout_enqueueing_thread = None
+    runner.stderr_enqueueing_thread = None
+    runner.process_waiting_thread = None
     with patch("datalad.runner.nonasyncrunner.lgr") as logger:
         runner.process_queue()
     eq_(logger.method_calls[0][0], "warning")
-    eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): deadlock detected")
+    eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
+
+
+def test_stalling_detection_2():
+    thread_mock = MagicMock()
+    thread_mock.is_alive.return_value = False
+    runner = ThreadedRunner("something", StdOutErrCapture, None)
+    runner.stdout_enqueueing_thread = thread_mock
+    runner.stderr_enqueueing_thread = thread_mock
+    runner.process_waiting_thread = thread_mock
+    with patch("datalad.runner.nonasyncrunner.lgr") as logger:
+        runner.process_queue()
+    eq_(logger.method_calls[0][0], "warning")
+    eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
