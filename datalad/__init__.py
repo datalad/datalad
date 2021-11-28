@@ -165,6 +165,7 @@ def setup_package():
         with open(cfg_file, 'w') as f:
             f.write(gitconfig)
         set_envvar('GIT_CONFIG_GLOBAL', cfg_file)
+        _TEMP_PATHS_GENERATED.append(cfg_dir)
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
