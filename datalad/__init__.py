@@ -138,7 +138,7 @@ def setup_package():
 	exc = 1
 """
     from datalad.support.external_versions import external_versions
-    if not on_osx or external_versions['cmd:git'] < "2.32":
+    if external_versions['cmd:git'] < "2.32":
         # To overcome pybuild overriding HOME but us possibly wanting our
         # own HOME where we pre-setup git for testing (name, email)
         if 'GIT_HOME' in os.environ:
