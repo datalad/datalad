@@ -14,6 +14,7 @@ from datalad.customremotes import (
     RemoteError,
     SpecialRemote,
 )
+from datalad.support.annexrepo import AnnexRepo
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
@@ -702,7 +703,7 @@ def handle_errors(func):
                     # ensure base path is platform path
                     log_target = Path(self.store_base_path) / 'error_logs' / \
                         "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                   uuid=self.uuid)
+                                                   uuid=self._repo.uuid)
                     self.io.write_file(log_target, entry, mode='a')
                 except Exception:
                     # If logging of the exception does fail itself, there's
@@ -765,6 +766,8 @@ class RIARemote(SpecialRemote):
                                        "Optional."
             self.configs['archive-id'] = "Dataset ID. Should be set " \
                                          "automatically by datalad"
+        # the local repo
+        self._repo = None
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
@@ -776,7 +779,6 @@ class RIARemote(SpecialRemote):
         # by default we can read and write
         self.read_only = False
         self.force_write = None
-        self.uuid = None
         self.ignore_remote_config = None
         self.remote_log_enabled = None
         self.remote_dataset_tree_version = None
@@ -1200,7 +1202,7 @@ class RIARemote(SpecialRemote):
     def prepare(self):
 
         gitdir = self.annex.getgitdir()
-        self.uuid = self.annex.getuuid()
+        self._repo = AnnexRepo(gitdir)
         self._verify_config(gitdir)
 
         self.get_store()
@@ -1238,17 +1240,12 @@ class RIARemote(SpecialRemote):
         # transfer is still in progress and furthermore not interfere with
         # administrative tasks in annex/objects.
         # In addition include uuid, to not interfere with parallel uploads from
-        # different remotes.
+        # different clones.
         transfer_dir = \
-            self.remote_git_dir / "ora-remote-{}".format(self.uuid) / "transfer"
+            self.remote_git_dir / "ora-remote-{}".format(self._repo.uuid) / "transfer"
         self.push_io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 
-        if self.push_io.exists(tmp_path):
-            # Just in case - some parallel job could already be writing to it at
-            # least tell the conclusion, not just some obscure permission error
-            raise RIARemoteError('{}: upload already in progress'
-                                 ''.format(filename))
         try:
             self.push_io.put(filename, tmp_path, self.annex.progress)
             # copy done, atomic rename to actual target
