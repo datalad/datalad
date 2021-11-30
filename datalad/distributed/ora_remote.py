@@ -30,6 +30,7 @@ DEFAULT_BUFFER_SIZE = 65536
 # - make archive check optional
 
 
+# only use by _get_datalad_id
 def _get_gitcfg(gitdir, key, cfgargs=None, regex=False):
     cmd = [
         'git',
@@ -54,6 +55,8 @@ def _get_gitcfg(gitdir, key, cfgargs=None, regex=False):
         return None
 
 
+# cannot be replaced until https://github.com/datalad/datalad/issues/6264
+# is fixed
 def _get_datalad_id(gitdir):
     """Attempt to determine a DataLad dataset ID for a given repo
 
@@ -889,18 +892,18 @@ class RIARemote(SpecialRemote):
     def _load_cfg(self, gitdir, name):
         # Whether or not to force writing to the remote. Currently used to
         # overrule write protection due to layout version mismatch.
-        self.force_write = _get_gitcfg(
-            gitdir, 'annex.ora-remote.{}.force-write'.format(name))
+        self.force_write = self._repo.config.get(
+            f'annex.ora-remote.{name}.force-write')
 
         # whether to ignore config flags set at the remote end
         self.ignore_remote_config = \
-            _get_gitcfg(gitdir,
-                        'annex.ora-remote.{}.ignore-remote-config'.format(name))
+            self._repo.config.get(
+                f'annex.ora-remote.{name}.ignore-remote-config')
 
         # buffer size for reading files over HTTP and SSH
-        self.buffer_size = _get_gitcfg(gitdir,
-                                       "remote.{}.ora-buffer-size"
-                                       "".format(name))
+        self.buffer_size = self._repo.config.get(
+            f"remote.{name}.ora-buffer-size")
+
         if self.buffer_size:
             self.buffer_size = int(self.buffer_size)
 
@@ -916,15 +919,9 @@ class RIARemote(SpecialRemote):
         # get store url(s):
         self.ria_store_url = self.annex.getconfig('url')
         self.ria_store_pushurl = self.annex.getconfig('push-url')
-        # Support URL rewrite without talking to a DataLad ConfigManager,
-        # because of additional import cost otherwise. Remember that this is a
-        # special remote not a "real" datalad process.
-        url_cfgs = dict()
-        url_cfgs_raw = _get_gitcfg(gitdir, "^url.*", regex=True)
-        if url_cfgs_raw:
-            for line in url_cfgs_raw.splitlines():
-                k, v = line.split()
-                url_cfgs[k] = v
+        # get URL rewriting config
+        url_cfgs = {k: v for k, v in self._repo.config.items()
+                    if k.startswith('url.')}
 
         if self.ria_store_url:
             self.storage_host, self.store_base_path, self.ria_store_url = \
@@ -933,18 +930,18 @@ class RIARemote(SpecialRemote):
         else:
             # for now still accept the configs, if no ria-URL is known, but
             # issue deprecation warning:
-            host = _get_gitcfg(gitdir,
-                               'annex.ora-remote.{}.ssh-host'.format(name)) or \
-                   self.annex.getconfig('ssh-host')
+            host = self._repo.config.get(
+                f'annex.ora-remote.{name}.ssh-host') or \
+                self.annex.getconfig('ssh-host')
             # Note: Special value '0' is replaced by None only after checking
             # the repository's annex config. This is to uniformly handle '0' and
             # None later on, but let a user's config '0' overrule what's
             # stored by git-annex.
             self.storage_host = None if host == '0' else host
 
-            path = _get_gitcfg(gitdir,
-                               'annex.ora-remote.{}.base-path'.format(name)) or \
-                   self.annex.getconfig('base-path')
+            path = self._repo.config.get(
+                f'annex.ora-remote.{name}.base-path') or \
+                self.annex.getconfig('base-path')
             self.store_base_path = path.strip() if path else path
 
             if path or host:
@@ -1071,6 +1068,9 @@ class RIARemote(SpecialRemote):
     def initremote(self):
         # which repo are we talking about
         gitdir = self.annex.getgitdir()
+        # this will work, even when this is not a bare repo
+        # but it is not capable of reading out dataset/branch config
+        self._repo = AnnexRepo(gitdir)
         self._verify_config(gitdir, fail_noid=False)
         if not self.archive_id:
             self.archive_id = _get_datalad_id(gitdir)
