@@ -98,7 +98,7 @@ class GlobbedPaths(object):
         misses = {}
         with chpwd(self.pwd):
             for pattern in self._patterns:
-                full_hits = glob.glob(pattern)
+                full_hits = glob.glob(pattern, recursive=True)
                 if full_hits:
                     hits[pattern] = sorted(map(normalize_hit, full_hits))
                 else:
@@ -107,7 +107,7 @@ class GlobbedPaths(object):
                     # a sub-pattern hit, that may mean we have an uninstalled
                     # subdataset.
                     for sub_pattern in self._get_sub_patterns(pattern):
-                        sub_hits = glob.glob(sub_pattern)
+                        sub_hits = glob.glob(sub_pattern, recursive=True)
                         if sub_hits:
                             partial_hits[pattern] = sorted(
                                 map(normalize_hit, sub_hits))
