@@ -570,7 +570,6 @@ class TestAddArchiveOptions():
         # there should be no .datalad temporary files hanging around
         self.assert_no_trash_left_behind()
 
-    @known_failure_windows
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
         mv_out = self.annex.call_git(
