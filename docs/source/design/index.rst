@@ -25,4 +25,5 @@ subsystems in DataLad.
    url_substitution
    batched_command
    standard_parameters
+   pos_vs_kw_parameters
    docstrings
