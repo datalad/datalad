@@ -1020,6 +1020,10 @@ class RIARemote(SpecialRemote):
         """
         # make sure the base path is a platform path when doing local IO
         # the incoming Path object is a PurePosixPath
+        # XXX this else branch is wrong: Incoming is PurePosixPath
+        # but it is subsequently assumed to be a platform path, by
+        # get_layout_locations() etc. Hence it must be converted
+        # to match the *remote* platform, not the local client
         store_base_path = Path(self.store_base_path) \
             if self._local_io else self.store_base_path
 
