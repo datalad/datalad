@@ -33,13 +33,15 @@ from urllib.request import (
     urlopen,
 )
 
+import pytest
+from _pytest.outcomes import Skipped
+
 from datalad import cfg as dl_cfg
 from datalad.support import path as op
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
     OBSCURE_FILENAMES,
     OBSCURE_PREFIX,
-    SkipTest,
     assert_cwd_unchanged,
     assert_dict_equal,
     assert_false,
@@ -190,7 +192,7 @@ def test_get_resolved_values():
         @with_testrepos(flavors=['network'])
         def magical():
             raise AssertionError("Must not be ran")
-        assert_raises(SkipTest, magical)
+        assert_raises(Skipped, magical)
 
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
@@ -241,7 +243,7 @@ def test_get_most_obscure_supported_name():
 def test_keeptemp_via_env_variable():
 
     if dl_cfg.get('datalad.tests.temp.keep'):  # pragma: no cover
-        raise SkipTest("We have env variable set to preserve tempfiles")
+        pytest.skip("We have env variable set to preserve tempfiles")
 
     files = []
 
@@ -408,9 +410,9 @@ def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no
         filesysencoding = sys.getfilesystemencoding()
         test_fpath_encoded = str(test_fpath.as_posix()).encode(filesysencoding)
     except UnicodeEncodeError:  # pragma: no cover
-        raise SkipTest("Environment doesn't support unicode filenames")
+        pytest.skip("Environment doesn't support unicode filenames")
     if test_fpath_encoded.decode(filesysencoding) != test_fpath.as_posix():  # pragma: no cover
-        raise SkipTest("Can't convert back/forth using %s encoding"
+        pytest.skip("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
     test_fpath_full = tmp_dir / test_fpath
@@ -531,12 +533,12 @@ def test_skip_if_no_network():
             return a1
         ok_(hasattr(somefunc, "network"))
         with patch_config({'datalad.tests.nonetwork': '1'}):
-            assert_raises(SkipTest, somefunc, 1)
+            assert_raises(Skipped, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
         # and now if used as a function, not a decorator
         with patch_config({'datalad.tests.nonetwork': '1'}):
-            assert_raises(SkipTest, skip_if_no_network)
+            assert_raises(Skipped, skip_if_no_network)
         with patch.dict('os.environ', {}):
             eq_(skip_if_no_network(), None)
 
@@ -546,7 +548,7 @@ def test_skip_if_no_module():
     def testish():
         skip_if_no_module("nonexistingforsuremodule")
         raise ValueError
-    assert_raises(SkipTest, testish)
+    assert_raises(Skipped, testish)
 
     def testish2():
         skip_if_no_module("datalad")
@@ -556,7 +558,7 @@ def test_skip_if_no_module():
 
 def test_skip_if():
 
-    with assert_raises(SkipTest):
+    with assert_raises(Skipped):
         @skip_if(True)
         def f():  # pragma: no cover
             raise AssertionError("must have not been ran")
@@ -600,7 +602,7 @@ def test_assert_dict_equal():
     try:
         import numpy as np
     except:  # pragma: no cover
-        raise SkipTest("need numpy for this tiny one")
+        pytest.skip("need numpy for this tiny one")
     # one is scalar another one array
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
@@ -650,7 +652,7 @@ def test_setup():
 
 def test_skip_ssh():
     with patch_config({'datalad.tests.ssh': False}):
-        with assert_raises(SkipTest):
+        with assert_raises(Skipped):
             skip_ssh(lambda: False)()
 
 
