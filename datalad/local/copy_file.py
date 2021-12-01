@@ -166,6 +166,7 @@ class CopyFile(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             recursive=False,
             target_dir=None,

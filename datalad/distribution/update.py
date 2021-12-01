@@ -214,6 +214,7 @@ class Update(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             sibling=None,
             merge=False,
             how=None,

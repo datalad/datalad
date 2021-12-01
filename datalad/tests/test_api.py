@@ -42,12 +42,8 @@ def _test_consistent_order_of_args(intf, spec_posargs):
         raise SkipTest("no positional args") # print intf, "skipped"
 #    else:
 #        print intf, spec_posargs
-    if intf.__name__ == 'Save':
-        # it makes sense there to have most common argument first
-        # -- the message. But we don't enforce it on cmdline so it is
-        # optional
-        spec_posargs.add('message')
-    elif intf.__name__ in (
+    # TODO*: all those ideally are RFed to follow the CLI-matching args-kwargs separation with *
+    if intf.__name__ in (
             'AddReadme',
             'Addurls',
             # Clone gained a git_clone_opts REMAINDER option. This is

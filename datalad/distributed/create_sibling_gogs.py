@@ -75,6 +75,7 @@ class CreateSiblingGogs(Interface):
     @eval_results
     def __call__(
             reponame,
+            *,
             # possibly retrieve a default from config
             api=None,
             dataset=None,

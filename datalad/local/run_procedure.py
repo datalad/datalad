@@ -327,6 +327,7 @@ class RunProcedure(Interface):
     @eval_results
     def __call__(
             spec=None,
+            *,
             dataset=None,
             discover=False,
             help_proc=False):

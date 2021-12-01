@@ -557,7 +557,9 @@ class CreateSibling(Interface):
     @staticmethod
     @datasetmethod(name='create_sibling')
     @eval_results
-    def __call__(sshurl, name=None, target_dir=None,
+    def __call__(sshurl,
+                 *,
+                 name=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None,
                  recursive=False,

@@ -104,7 +104,8 @@ class Clean(Interface):
     @staticmethod
     @datasetmethod(name='clean')
     @eval_results
-    def __call__(dataset=None, what=None, dry_run=False,
+    def __call__(*,
+                 dataset=None, what=None, dry_run=False,
                  recursive=False, recursion_limit=None):
 
         ds = require_dataset(dataset,

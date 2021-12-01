@@ -244,6 +244,7 @@ class Clone(Interface):
     def __call__(
             source,
             path=None,
+            *,
             dataset=None,
             description=None,
             reckless=None,

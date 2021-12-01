@@ -206,6 +206,7 @@ class Siblings(Interface):
     @eval_results
     def __call__(
             action='query',
+            *,
             dataset=None,
             name=None,
             url=None,

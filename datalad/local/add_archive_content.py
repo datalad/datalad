@@ -222,6 +222,7 @@ class AddArchiveContent(Interface):
     @eval_results
     def __call__(
             archive,
+            *,
             dataset=None,
             annex=None,
             add_archive_leading_dir=False,

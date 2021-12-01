@@ -247,6 +247,7 @@ class ExportToFigshare(Interface):
     @staticmethod
     @datasetmethod(name='export_to_figshare')
     @eval_results
+    # TODO*: yet another former plugin with dataset first -- do we need that???
     def __call__(dataset, filename=None, missing_content='error', no_annex=False,
                  # TODO: support working with projects and articles within them
                  # project_id=None,

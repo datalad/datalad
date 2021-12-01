@@ -879,6 +879,7 @@ class Metadata(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             get_aggregates=False,
             reporton='all',

@@ -268,6 +268,7 @@ class Run(Interface):
     @eval_results
     def __call__(
             cmd=None,
+            *,
             dataset=None,
             inputs=None,
             outputs=None,

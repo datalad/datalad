@@ -152,6 +152,7 @@ class Remove(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             drop='datasets',
             reckless=None,

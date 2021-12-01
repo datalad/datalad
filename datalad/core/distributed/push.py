@@ -182,6 +182,7 @@ class Push(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             to=None,
             since=None,

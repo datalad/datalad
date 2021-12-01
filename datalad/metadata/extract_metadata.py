@@ -70,6 +70,7 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
+    # TODO*: types is option and files (path!) is posarg -- harmonize
     def __call__(types, files=None, dataset=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",

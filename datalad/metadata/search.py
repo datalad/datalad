@@ -1307,6 +1307,7 @@ class Search(Interface):
     @datasetmethod(name='search')
     @eval_results
     def __call__(query=None,
+                 *,
                  dataset=None,
                  force_reindex=False,
                  max_nresults=None,

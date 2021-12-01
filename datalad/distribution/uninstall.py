@@ -84,6 +84,7 @@ class Uninstall(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             recursive=False,
             check=True,
