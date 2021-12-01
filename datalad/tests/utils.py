@@ -44,9 +44,10 @@ from os.path import (
 from os.path import join as opj
 from os.path import relpath
 from os.path import split as pathsplit
+from unittest import SkipTest
 from unittest.mock import patch
 
-from nose import SkipTest
+import pytest
 from nose.plugins.attrib import attr
 from nose.tools import (
     assert_equal,
@@ -133,10 +134,7 @@ lgr = logging.getLogger("datalad.tests.utils")
 
 
 def skip_if_no_module(module):
-    try:
-        imp = __import__(module)
-    except Exception as exc:
-        raise SkipTest("Module %s fails to load" % module) from exc
+    pytest.importorskip(module, reason=f"Module {module} fails to load")
 
 
 def skip_if_scrapy_without_selector():
@@ -145,8 +143,7 @@ def skip_if_scrapy_without_selector():
         import scrapy
         from scrapy.selector import Selector
     except ImportError:
-        from nose import SkipTest
-        raise SkipTest(
+        pytest.skip(
             "scrapy misses Selector (too old? version: %s)"
             % getattr(scrapy, '__version__'))
 
@@ -159,9 +156,9 @@ def skip_if_url_is_not_available(url, regex=None):
     try:
         content = providers.fetch(url)
         if regex and re.search(regex, content):
-            raise SkipTest("%s matched %r -- skipping the test" % (url, regex))
+            pytest.skip("%s matched %r -- skipping the test" % (url, regex))
     except DownloadError:
-        raise SkipTest("%s failed to download" % url)
+        pytest.skip("%s failed to download" % url)
 
 
 def check_not_generatorfunction(func):
@@ -180,7 +177,7 @@ def skip_if_no_network(func=None):
 
     def check_and_raise():
         if dl_cfg.get('datalad.tests.nonetwork'):
-            raise SkipTest("Skipping since no network settings")
+            pytest.skip("Skipping since no network settings")
 
     if func:
         @wraps(func)
@@ -201,7 +198,7 @@ def skip_if_on_windows(func=None):
 
     def check_and_raise():
         if on_windows:
-            raise SkipTest("Skipping on Windows")
+            pytest.skip("Skipping on Windows")
 
     if func:
         @wraps(func)
@@ -224,7 +221,7 @@ def skip_if_root(func=None):
 
     def check_and_raise():
         if hasattr(os, "geteuid") and os.geteuid() == 0:
-            raise SkipTest("Skipping: test assumptions fail under root")
+            pytest.skip("Skipping: test assumptions fail under root")
 
     if func:
         @wraps(func)
@@ -261,7 +258,7 @@ def skip_if(func, cond=True, msg=None, method='raise'):
     def  _wrap_skip_if(*args, **kwargs):
         if cond:
             if method == 'raise':
-                raise SkipTest(msg if msg else "condition was True")
+                pytest.skip(msg if msg else "condition was True")
             elif method == 'pass':
                 print(msg if msg else "condition was True")
                 return
@@ -281,7 +278,7 @@ def skip_ssh(func):
     def  _wrap_skip_ssh(*args, **kwargs):
         test_ssh = dl_cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
-            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
+            pytest.skip("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return  _wrap_skip_ssh
 
@@ -303,7 +300,7 @@ def skip_nomultiplex_ssh(func):
     @skip_ssh
     def  _wrap_skip_nomultiplex_ssh(*args, **kwargs):
         if SSHManager is not MultiplexSSHManager:
-            raise SkipTest("SSH without multiplexing is used")
+            pytest.skip("SSH without multiplexing is used")
         return func(*args, **kwargs)
     return  _wrap_skip_nomultiplex_ssh
 
@@ -712,7 +709,7 @@ class HTTPPath(object):
             port = queue.get(timeout=300)
         except multiprocessing.queues.Empty as e:
             if self.use_ssl:
-                raise SkipTest('No working SSL support') from e
+                pytest.skip('No working SSL support')
             else:
                 raise
         self.url = 'http{}://{}:{}/'.format(
@@ -750,7 +747,7 @@ class HTTPPath(object):
             #except requests.exceptions.SSLError as e:
             except Exception as e:
                 self.stop()
-                raise SkipTest('No working HTTPS setup') from e
+                pytest.skip('No working HTTPS setup')
             # now verify that the stdlib tooling also works
             # if this fails, check datalad/tests/ca/prov.sh
             # for info on deploying a datalad-root.crt
@@ -771,7 +768,7 @@ class HTTPPath(object):
             #except URLError as e:
             except Exception as e:
                 self.stop()
-                raise SkipTest('No working HTTPS setup') from e
+                pytest.skip('No working HTTPS setup')
 
     def stop(self):
         """Stop serving `path`.
@@ -834,12 +831,12 @@ def with_memory_keyring(t):
 def without_http_proxy(tfunc):
     """Decorator to remove http*_proxy env variables for the duration of the test
     """
-    
+
     @wraps(tfunc)
     @attr('without_http_proxy')
     def  _wrap_without_http_proxy(*args, **kwargs):
         if on_windows:
-            raise SkipTest('Unclear why this is not working on windows')
+            pytest.skip('Unclear why this is not working on windows')
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
@@ -1162,7 +1159,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
         # addurls with our generated file:// URLs doesn't work on appveyor
         # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
         #if 'APPVEYOR' in os.environ:
-        #    raise SkipTest("Testrepo setup is broken on AppVeyor")
+        #    pytest.skip("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1174,7 +1171,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             assert(testrepos_uris)
         else:
             if not testrepos_uris:
-                raise SkipTest("No non-networked repos to test on")
+                pytest.skip("No non-networked repos to test on")
 
         fake_dates = dl_cfg.get("datalad.fake-dates")
         ntested = 0
@@ -1226,7 +1223,7 @@ def with_sameas_remote(func, autoenabled=False):
         # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
         if external_versions['cmd:system-ssh'] < '7.4' and \
            '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
-            raise SkipTest("Test known to hang")
+            pytest.skip("Test known to hang")
 
         sr_path, repo_path = args[-2:]
         fn_args = args[:-2]
@@ -1757,7 +1754,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     #if 'APPVEYOR' in os.environ:
     #    # issue only happens on appveyor, Python itself implodes
     #    # cannot be reproduced on a real windows box
-    #    raise SkipTest(
+    #    pytest.skip(
     #        'get_convoluted_situation() causes appveyor to crash, '
     #        'reason unknown')
     repo = repocls(path, create=True)
@@ -2002,7 +1999,7 @@ def skip_wo_symlink_capability(func):
     @attr('skip_wo_symlink_capability')
     def  _wrap_skip_wo_symlink_capability(*args, **kwargs):
         if not has_symlink_capability():
-            raise SkipTest("no symlink capabilities")
+            pytest.skip("no symlink capabilities")
         return func(*args, **kwargs)
     return  _wrap_skip_wo_symlink_capability
 
@@ -2025,7 +2022,7 @@ def skip_if_adjusted_branch(func):
             _TESTS_ADJUSTED_TMPDIR = _check()
 
         if _TESTS_ADJUSTED_TMPDIR:
-            raise SkipTest("Test incompatible with adjusted branch default")
+            pytest.skip("Test incompatible with adjusted branch default")
         return func(*args, **kwargs)
     return _wrap_skip_if_adjusted_branch
 
@@ -2040,6 +2037,8 @@ def get_ssh_port(host):
     Note that if `host` does not match a host in ssh_config, the default value
     of 22 is returned.
 
+    Skips test if port cannot be found.
+
     Parameters
     ----------
     host : str
@@ -2047,10 +2046,6 @@ def get_ssh_port(host):
     Returns
     -------
     port (int)
-
-    Raises
-    ------
-    SkipTest if port cannot be found.
     """
     out = ''
     runner = WitlessRunner()
@@ -2071,7 +2066,7 @@ def get_ssh_port(host):
             break
 
     if port is None:
-        raise SkipTest("port for {} could not be determined: {}"
+        pytest.skip("port for {} could not be determined: {}"
                        .format(host, err))
     return port
 
