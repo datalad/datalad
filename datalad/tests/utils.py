@@ -48,31 +48,6 @@ from unittest import SkipTest
 from unittest.mock import patch
 
 import pytest
-from nose.tools import (
-    assert_equal,
-    assert_false,
-    assert_greater,
-    assert_greater_equal,
-)
-from nose.tools import assert_in
-from nose.tools import assert_in as in_
-from nose.tools import (
-    assert_is,
-    assert_is_instance,
-    assert_is_none,
-    assert_is_not,
-    assert_is_not_none,
-    assert_not_equal,
-    assert_not_in,
-    assert_not_is_instance,
-    assert_raises,
-    assert_set_equal,
-    assert_true,
-    eq_,
-    make_decorator,
-    ok_,
-    raises,
-)
 
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
@@ -127,6 +102,100 @@ else:
 
 def attr(name):
     return getattr(pytest.mark, name)
+
+def assert_equal(first, second, msg=None):
+    if msg is None:
+        assert first == second
+    else:
+        assert first == second, msg
+
+def assert_false(expr, msg=None):
+    if msg is None:
+        assert not expr
+    else:
+        assert not expr, msg
+
+def assert_greater(first, second, msg=None):
+    if msg is None:
+        assert first > second
+    else:
+        assert first > second, msg
+
+def assert_greater_equal(first, second, msg=None):
+    if msg is None:
+        assert first >= second
+    else:
+        assert first >= second, msg
+
+def assert_in(first, second, msg=None):
+    if msg is None:
+        assert first in second
+    else:
+        assert first in second, msg
+
+in_ = assert_in
+
+def assert_is(first, second, msg=None):
+    if msg is None:
+        assert first is second
+    else:
+        assert first is second, msg
+
+def assert_is_instance(first, second, msg=None):
+    if msg is None:
+        assert isinstance(first, second)
+    else:
+        assert isinstance(first, second), msg
+
+def assert_is_none(expr, msg=None):
+    if msg is None:
+        assert expr is None
+    else:
+        assert expr is None, msg
+
+def assert_is_not(first, second, msg=None):
+    if msg is None:
+        assert first is not second
+    else:
+        assert first is not second, msg
+
+def assert_is_not_none(expr, msg=None):
+    if msg is None:
+        assert expr is not None
+    else:
+        assert expr is not None, msg
+
+def assert_not_equal(first, second, msg=None):
+    if msg is None:
+        assert first != second
+    else:
+        assert first != second, msg
+
+def assert_not_in(first, second, msg=None):
+    if msg is None:
+        assert first not in second
+    else:
+        assert first not in second, msg
+
+def assert_not_is_instance(first, second, msg=None):
+    if msg is None:
+        assert not isinstance(first, second)
+    else:
+        assert not isinstance(first, second), msg
+
+assert_raises = pytest.raises
+
+assert_set_equal = assert_equal
+
+def assert_true(expr, msg=None):
+    if msg is None:
+        assert expr
+    else:
+        assert expr, msg
+
+eq_ = assert_equal
+
+ok_ = assert_true
 
 # additional shortcuts
 neq_ = assert_not_equal
