@@ -130,29 +130,42 @@ def setup_package():
                "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
                .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
-    # To overcome pybuild overriding HOME but us possibly wanting our
-    # own HOME where we pre-setup git for testing (name, email)
-    if 'GIT_HOME' in os.environ:
-        set_envvar('HOME', os.environ['GIT_HOME'])
-    else:
-        # we setup our own new HOME, the BEST and HUGE one
-        from datalad.utils import make_tempfile
-        # TODO: split into a function + context manager
-        with make_tempfile(mkdir=True) as new_home:
-            pass
-        for v, val in get_home_envvars(new_home).items():
-            set_envvar(v, val)
-        if not os.path.exists(new_home):
-            os.makedirs(new_home)
-        with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
-            f.write("""\
+    gitconfig = """\
 [user]
 	name = DataLad Tester
 	email = test@example.com
 [datalad "log"]
 	exc = 1
-""")
-        _TEMP_PATHS_GENERATED.append(new_home)
+"""
+    from datalad.support.external_versions import external_versions
+    if not on_osx or external_versions['cmd:git'] < "2.32":
+        # To overcome pybuild overriding HOME but us possibly wanting our
+        # own HOME where we pre-setup git for testing (name, email)
+        if 'GIT_HOME' in os.environ:
+            set_envvar('HOME', os.environ['GIT_HOME'])
+        else:
+            # we setup our own new HOME, the BEST and HUGE one
+            from datalad.utils import make_tempfile
+            # TODO: split into a function + context manager
+            with make_tempfile(mkdir=True) as new_home:
+                pass
+            for v, val in get_home_envvars(new_home).items():
+                set_envvar(v, val)
+            if not os.path.exists(new_home):
+                os.makedirs(new_home)
+            with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
+                f.write(gitconfig)
+            _TEMP_PATHS_GENERATED.append(new_home)
+    else:
+        from datalad.utils import make_tempfile
+        with make_tempfile(mkdir=True) as cfg_dir:
+            pass
+        os.makedirs(cfg_dir, exist_ok=True)
+        cfg_file = os.path.join(cfg_dir, '.gitconfig')
+        with open(cfg_file, 'w') as f:
+            f.write(gitconfig)
+        set_envvar('GIT_CONFIG_GLOBAL', cfg_file)
+        _TEMP_PATHS_GENERATED.append(cfg_dir)
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153

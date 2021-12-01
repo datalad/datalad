@@ -73,8 +73,17 @@ def test_no_empty_http_proxy():
 def test_git_config_warning(path):
     if 'GIT_AUTHOR_NAME' in os.environ:
         raise SkipTest("Found existing explicit identity config")
+
+    # Note: An easier way to test this, would be to just set GIT_CONFIG_GLOBAL
+    # to point somewhere else. However, this is not supported by git before
+    # 2.32. Hence, stick with changed HOME in this test, but be sure to unset a
+    # possible GIT_CONFIG_GLOBAL in addition.
+
+    patched_env = os.environ.copy()
+    patched_env.pop('GIT_CONFIG_GLOBAL', None)
+    patched_env.update(get_home_envvars(path))
     with chpwd(path), \
-            patch.dict('os.environ', get_home_envvars(path)), \
+            patch.dict('os.environ', patched_env, clear=True), \
             swallow_logs(new_level=30) as cml:
         # no configs in that empty HOME
         from datalad.api import Dataset
