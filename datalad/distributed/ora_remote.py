@@ -1180,7 +1180,7 @@ class RIARemote(SpecialRemote):
                     self.io.close()
 
                 # XXX now also READ IO is done with the write IO
-                # this explicitely ignores the remote config
+                # this explicitly ignores the remote config
                 # that distinguishes READ from WRITE with different
                 # methods
                 self._io = self._push_io
