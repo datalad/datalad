@@ -174,7 +174,17 @@ class Run(Interface):
              code_cmd="""\
              datalad run -m 'run my script' -i 'data/*' \\
              -i 'datafile.txt' -o 'output_dir/*' -o \\
-             'outfile.txt' 'code/script.sh'""")
+             'outfile.txt' 'code/script.sh'"""),
+        dict(text="Use ** to match any file at any directory depth recursively. "
+                  "Single * does not check files within matched directories.",
+             code_py="""\
+             run(cmd='code/script.sh',
+                 message='run my script',
+                 inputs=['data/**/*.dat'],
+                 outputs=['output_dir/**'])""",
+             code_cmd="""\
+             datalad run -m 'run my script' -i 'data/**/*.dat' \\
+             -o 'output_dir/**' 'code/script.sh'""")
     ]
 
     result_renderer = "tailored"
