@@ -172,6 +172,12 @@ def setup_package():
         return new_home, cfg_file
 
     if external_versions['cmd:git'] < "2.32":
+        if (on_osx or on_windows) and \
+                not cfg.obtain("datalad.tests.force-fake-home", default=False):
+            raise RuntimeError("Refuse to execute datalad tests with git<2.32, "
+                               "see config datalad.tests.force-fake-home for "
+                               "details.")
+
         # To overcome pybuild overriding HOME but us possibly wanting our
         # own HOME where we pre-setup git for testing (name, email)
         if 'GIT_HOME' in os.environ:

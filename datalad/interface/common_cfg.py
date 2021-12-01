@@ -12,7 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
-from os import environ
+from os import (
+    environ,
+    linesep
+)
 from os.path import expanduser
 from os.path import join as opj
 
@@ -196,6 +199,18 @@ definitions = {
         'ui': ('yesno', {
                'title': 'Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set'}),
         'type': EnsureBool(),
+    },
+    'datalad.tests.force-fake-home': {
+        'ui': ('yesno', {
+               'title': 'Force running tests on OSX and window with manipulated HOME or USERPROFILE respectively.',
+               'text': "This is potentially dangerous and only applies on OSX and Windows if the git version used by datalad is older than 2.32."
+                       "By default, tests are not executed under these circumstances, since the legacy setup for the test environment can have unintended side-effects:{nl}"
+                       "1. On Windows, subprocesses launched by the tests (incl. indirectly started ones), may end up reading from and writing to wrong locations, as any subprocess will fail to retrieve correct standard locations for configs, caches, etc. This issue is discussed in gh-6160 and gh-6260."
+                       "See also: https://github.com/datalad/datalad/issues/6160 and https://github.com/datalad/datalad/pull/6260 for more details.{nl}"
+                       "2. OSX, most notably the system-level osxkeychain git-credential helper, which will lead to hanging git commands if it fails to find the keychain in its expected location under $HOME/Library/Keychain."
+                       "Do you want to run tests nevertheless?".format(nl=linesep)}),
+        'type': EnsureBool(),
+        'default': False
     },
     'datalad.tests.dataladremote': {
         'ui': ('yesno', {
