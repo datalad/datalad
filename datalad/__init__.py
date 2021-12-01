@@ -18,7 +18,6 @@ documentation with `help`.
 if not __debug__:
     raise RuntimeError('DataLad cannot run in "optimized" mode, i.e. python -O')
 
-
 # For reproducible demos/tests
 import os
 _seed = os.environ.get('DATALAD_SEED', None)
@@ -101,11 +100,12 @@ test_http_server = None
 
 def setup_package():
     import os
+    from pathlib import Path
     from datalad.utils import (
         on_osx,
-        on_windows,
     )
     from datalad.tests import _TEMP_PATHS_GENERATED
+    from datalad.utils import make_tempfile
 
     if on_osx:
         # enforce honoring TMPDIR (see gh-5307)
@@ -133,13 +133,27 @@ def setup_package():
                "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
                .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
-    gitconfig = """\
+    def prep_tmphome():
+        gitconfig = """\
 [user]
 	name = DataLad Tester
 	email = test@example.com
 [datalad "log"]
 	exc = 1
 """
+        # TODO: split into a function + context manager
+        with make_tempfile(mkdir=True) as new_home:
+            pass
+        # register for clean-up on exit
+        _TEMP_PATHS_GENERATED.append(new_home)
+
+        # populate default config
+        new_home = Path(new_home)
+        new_home.mkdir(parents=True, exist_ok=True)
+        cfg_file = new_home / '.gitconfig'
+        cfg_file.write_text(gitconfig)
+        return new_home, cfg_file
+
     from datalad.support.external_versions import external_versions
     if external_versions['cmd:git'] < "2.32":
         # To overcome pybuild overriding HOME but us possibly wanting our
@@ -148,27 +162,12 @@ def setup_package():
             set_envvar('HOME', os.environ['GIT_HOME'])
         else:
             # we setup our own new HOME, the BEST and HUGE one
-            from datalad.utils import make_tempfile
-            # TODO: split into a function + context manager
-            with make_tempfile(mkdir=True) as new_home:
-                pass
+            new_home, _ = prep_tmphome()
             for v, val in get_home_envvars(new_home).items():
                 set_envvar(v, val)
-            if not os.path.exists(new_home):
-                os.makedirs(new_home)
-            with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
-                f.write(gitconfig)
-            _TEMP_PATHS_GENERATED.append(new_home)
     else:
-        from datalad.utils import make_tempfile
-        with make_tempfile(mkdir=True) as cfg_dir:
-            pass
-        os.makedirs(cfg_dir, exist_ok=True)
-        cfg_file = os.path.join(cfg_dir, '.gitconfig')
-        with open(cfg_file, 'w') as f:
-            f.write(gitconfig)
-        set_envvar('GIT_CONFIG_GLOBAL', cfg_file)
-        _TEMP_PATHS_GENERATED.append(cfg_dir)
+        _, cfg_file = prep_tmphome()
+        set_envvar('GIT_CONFIG_GLOBAL', str(cfg_file))
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
@@ -294,7 +293,7 @@ def teardown_package():
         msg = "Nothing to remove"
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
-        rmtemp(path, ignore_errors=True)
+        rmtemp(str(path), ignore_errors=True)
 
     # restore all the env variables
     for v, val in _test_states['env'].items():

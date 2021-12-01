@@ -236,10 +236,10 @@ def get_home_envvars(new_home):
 
     Parameters
     ----------
-    new_home: str
+    new_home: str or Path
       New home path, in native to OS "schema"
     """
-    environ = os.environ
+    new_home = str(new_home)
     out = {'HOME': new_home}
     if on_windows:
         # requires special handling, since it has a number of relevant variables
