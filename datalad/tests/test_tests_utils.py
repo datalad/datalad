@@ -125,7 +125,7 @@ def test_nested_with_tempfile_basic(f1=None, f2=None):
 @with_tempfile(suffix='.cfg.old')
 @with_testrepos(flavors=local_testrepo_flavors, count=1)
 def check_nested_with_tempfile_parametrized_surrounded(
-        param, f0, tree, f1, f2, repo):
+        param, f0=None, tree=None, f1=None, f2=None, repo=None):
     eq_(param, "param1")
     ok_(f0.endswith('big'), msg="got %s" % f0)
     ok_(os.path.basename(f0).startswith('TEST'), msg="got %s" % f0)
@@ -137,7 +137,7 @@ def check_nested_with_tempfile_parametrized_surrounded(
 
 
 def test_nested_with_tempfile_parametrized_surrounded():
-    yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+    check_nested_with_tempfile_parametrized_surrounded("param1")
 
 
 @with_tempfile(content="testtest")
@@ -323,7 +323,8 @@ def test_ok_generator():
     assert_raises(AssertionError, ok_generator, func(1))
 
 
-def _test_assert_Xwd_unchanged(func):
+@pytest.mark.parametrize("func", [os.chdir, chpwd])
+def test_assert_Xwd_unchanged(func):
     orig_cwd = os.getcwd()
     orig_pwd = getpwd()
 
@@ -339,12 +340,8 @@ def _test_assert_Xwd_unchanged(func):
     eq_(orig_pwd, getpwd(),
         "assert_cwd_unchanged didn't return us back to pwd %s" % orig_pwd)
 
-def test_assert_Xwd_unchanged():
-    yield _test_assert_Xwd_unchanged, os.chdir
-    yield _test_assert_Xwd_unchanged, chpwd
-
-
-def _test_assert_Xwd_unchanged_ok_chdir(func):
+@pytest.mark.parametrize("func", [os.chdir, chpwd])
+def test_assert_Xwd_unchanged_ok_chdir(func):
     # Test that we are not masking out other "more important" exceptions
 
     orig_cwd = os.getcwd()
@@ -362,11 +359,6 @@ def _test_assert_Xwd_unchanged_ok_chdir(func):
         eq_(orig_pwd, getpwd(),
             "assert_cwd_unchanged didn't return us back to cwd %s" % orig_pwd)
         assert_not_in("Mitigating and changing back", cml.out)
-
-
-def test_assert_Xwd_unchanged_ok_chdir():
-    yield _test_assert_Xwd_unchanged_ok_chdir, os.chdir
-    yield _test_assert_Xwd_unchanged_ok_chdir, chpwd
 
 
 def test_assert_cwd_unchanged_not_masking_exceptions():
@@ -461,21 +453,27 @@ def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no
     test_path_and_url()
 
 
-def test_serve_path_via_http():
-    for test_fpath in ['test1.txt',
-                       Path('test_dir', 'test2.txt'),
-                       Path('test_dir', 'd2', 'd3', 'test3.txt'),
-                       'file with space test4',
-                       u'Джэйсон',
-                       get_most_obscure_supported_name(),
-                      ]:
-        yield _test_serve_path_via_http, test_fpath, False, None
-        yield _test_serve_path_via_http, test_fpath, True, None
-        yield _test_serve_path_via_http, test_fpath, False, ('ernie', 'bert')
+@pytest.mark.parametrize("test_fpath", [
+    'test1.txt',
+    Path('test_dir', 'test2.txt'),
+    Path('test_dir', 'd2', 'd3', 'test3.txt'),
+    'file with space test4',
+    u'Джэйсон',
+    get_most_obscure_supported_name(),
+])
+@pytest.mark.parametrize("use_ssl,auth", [
+    (False, None),
+    (True, None),
+    (False, ('ernie', 'bert')),
+])
+def test_serve_path_via_http(test_fpath, use_ssl, auth):
+    _test_serve_path_via_http(test_fpath, use_ssl, auth)
 
+
+def test_serve_path_via_http_local_proxy():
     # just with the last one check that we did remove proxy setting
     with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
-        yield _test_serve_path_via_http, test_fpath, False, None
+        _test_serve_path_via_http(get_most_obscure_supported_name(), False, None)
 
 
 @known_failure_githubci_win
