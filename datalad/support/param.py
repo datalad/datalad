@@ -27,7 +27,12 @@ class Parameter(object):
     # Known keyword arguments which we want to allow to pass over into
     # argparser.add_argument . Mentioned explicitly, since otherwise
     # are not verified while working in Python-only API
-    _KNOWN_ARGS = getargspec(argparse.Action.__init__)[0] + ['action']
+    # include_kwonlyargs=True is future-proofing since ATM in 3.9 there is no
+    # *, in Action.__init__ but could be added later, and semantically it
+    # makes sense to include those among _KNOWN_ARGS
+    _KNOWN_ARGS = getargspec(
+        argparse.Action.__init__, include_kwonlyargs=True
+    ).args + ['action']
 
     def __init__(self, constraints=None, doc=None, args=None, **kwargs):
         """Add constraints (validator) specifications and a docstring for

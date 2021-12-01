@@ -36,7 +36,7 @@ def test_basic_setup():
 
 def _test_consistent_order_of_args(intf, spec_posargs):
     f = getattr(intf, '__call__')
-    args, varargs, varkw, defaults = getargspec(f)
+    args, varargs, varkw, defaults = getargspec(f, include_kwonlyargs=True)
     # now verify that those spec_posargs are first among args
     if not spec_posargs:
         raise SkipTest("no positional args") # print intf, "skipped"
