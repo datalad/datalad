@@ -9,7 +9,7 @@
 '''Unit tests for Python API functionality.'''
 
 import re
-from datalad.utils import getargspec
+from datalad.utils import get_sig_param_names
 
 from datalad.tests.utils import assert_true, assert_false
 from datalad.tests.utils import SkipTest
@@ -36,7 +36,7 @@ def test_basic_setup():
 
 def _test_consistent_order_of_args(intf, spec_posargs):
     f = getattr(intf, '__call__')
-    args, varargs, varkw, defaults = getargspec(f, include_kwonlyargs=True)
+    args, = get_sig_param_names(f, ['pos_any'])
     # now verify that those spec_posargs are first among args
     if not spec_posargs:
         raise SkipTest("no positional args") # print intf, "skipped"

@@ -46,6 +46,7 @@ from datalad.utils import (
     getpwd,
     optional_args,
     get_dataset_root,
+    get_sig_param_names,
     # TODO remove after a while, when external consumers have adjusted
     # to use get_dataset_root()
     get_dataset_root as rev_get_dataset_root,
@@ -466,18 +467,8 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # due to use of functools.wraps and inability of of getarspec to get
         # those, we use .signature.
         # More information in de-wrapt PR https://github.com/datalad/datalad/pull/6190
-        f_sign = inspect.signature(f)
-        P = inspect.Parameter
-        f_args = [
-            p_name
-            for p_name, p in f_sign.parameters.items()
-            if p.kind in (P.POSITIONAL_ONLY, P.POSITIONAL_OR_KEYWORD)
-        ]
-        f_kwonlyargs = {
-            p_name: p
-            for p_name, p in f_sign.parameters.items()
-            if p.kind == P.KEYWORD_ONLY
-        }
+        from datalad.utils import get_sig_param_names
+        f_args, f_kwonlyargs = get_sig_param_names(f, ['pos_any', 'kw_only'])
 
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset), let's raise a proper exception instead
