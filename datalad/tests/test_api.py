@@ -42,18 +42,13 @@ def _test_consistent_order_of_args(intf, spec_posargs):
     if intf.__name__ in (
             'AddReadme',
             'Addurls',
-            # Clone gained a git_clone_opts REMAINDER option. This is
-            # positional on the command line, but positioning it at the front
-            # of the signature could break existing python callers.
-            'Clone',
             'ExportArchive',
             'ExportToFigshare',
             'ExtractMetadata'):
-        if intf.__name__ not in ['Clone', 'ExtractMetadata']:
+        if intf.__name__ not in ['ExtractMetadata']:
             # ex-plugins had 'dataset' as the first positional argument
             # and ExtractMetadata has 'types' as the first positional arg
             eq_(args[0], 'dataset')
-        eq_(spec_posargs, spec_posargs)
         return
 
     # if we had used * to instruct to have keyword only args, then all
