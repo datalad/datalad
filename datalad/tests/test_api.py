@@ -68,6 +68,12 @@ def _test_consistent_order_of_args(intf, spec_posargs):
     else:
         # and if no kw_only -- only those which are known to be positional
         eq_(set(args[:len(spec_posargs)]), spec_posargs)
+        if spec_posargs:
+            # and really -- we should not even get here if there are some spec_posargs --
+            # new interfaces should use * to separate pos args from kwargs per our now
+            # accepted design doc:
+            # http://docs.datalad.org/en/latest/design/pos_vs_kw_parameters.html
+            assert False
 
 
 def test_consistent_order_of_args():

@@ -76,7 +76,9 @@ class SSHRun(Interface):
     )
 
     @staticmethod
-    def __call__(login, cmd, port=None, ipv4=False, ipv6=False, options=None,
+    def __call__(login, cmd,
+                 *,
+                 port=None, ipv4=False, ipv6=False, options=None,
                  no_stdin=False):
         lgr.debug("sshrun invoked: login=%r, cmd=%r, port=%r, options=%r, "
                   "ipv4=%r, ipv6=%r, no_stdin=%r",

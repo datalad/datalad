@@ -153,7 +153,7 @@ class CreateTestDataset(Interface):
     )
 
     @staticmethod
-    def __call__(path=None, spec=None, seed=None):
+    def __call__(path=None, *, spec=None, seed=None):
         levels = _parse_spec(spec)
 
         if seed is not None:

@@ -56,7 +56,7 @@ class Test(Interface):
     )
 
     @staticmethod
-    def __call__(module=None, verbose=False, nocapture=False, pdb=False, stop=False):
+    def __call__(module=None, *, verbose=False, nocapture=False, pdb=False, stop=False):
         if not module:
             from pkg_resources import iter_entry_points
             module = ['datalad']
