@@ -39,7 +39,6 @@ from datalad.customremotes.ria_utils import (
 #       different layouts via those requests is up to the server side, which we
 #       don't test here.
 
-@known_failure_windows  # see gh-4469
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile

@@ -247,6 +247,7 @@ def get_home_envvars(new_home):
         # since python 3.8: https://bugs.python.org/issue36264
         out['USERPROFILE'] = new_home
         out['HOMEDRIVE'], out['HOMEPATH'] = splitdrive(new_home)
+
     return {v: val for v, val in out.items() if v in os.environ}
 
 
