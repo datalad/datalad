@@ -8,11 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import base64
-import platform
-import sys
-import os
-import random
 import logging
+import os
+import platform
+import random
+import sys
 
 try:
     # optional direct dependency we might want to kick out
@@ -21,21 +21,25 @@ except ImportError:  # pragma: no cover
     bs4 = None
 
 from glob import glob
-from os.path import exists, join as opj, basename
-
-from urllib.request import (
-    urlopen,
-    Request,
+from os.path import (
+    basename,
+    exists,
 )
-from urllib.parse import quote as url_quote
-
+from os.path import join as opj
 from unittest.mock import patch
-from datalad.utils import (
-    chpwd,
-    getpwd,
-    Path,
+from urllib.parse import quote as url_quote
+from urllib.request import (
+    Request,
+    urlopen,
 )
+
+from datalad import cfg as dl_cfg
+from datalad.support import path as op
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
+    OBSCURE_FILENAMES,
+    OBSCURE_PREFIX,
+    SkipTest,
     assert_cwd_unchanged,
     assert_dict_equal,
     assert_false,
@@ -52,8 +56,6 @@ from datalad.tests.utils import (
     known_failure_windows,
     local_testrepo_flavors,
     nok_startswith,
-    OBSCURE_FILENAMES,
-    OBSCURE_PREFIX,
     ok_,
     ok_broken_symlink,
     ok_file_has_content,
@@ -73,18 +75,20 @@ from datalad.tests.utils import (
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
-    SkipTest,
     skip_wo_symlink_capability,
     swallow_logs,
     with_tempfile,
-    with_testrepos, with_tree,
+    with_testrepos,
     with_testsui,
+    with_tree,
     without_http_proxy,
 )
+from datalad.utils import (
+    Path,
+    chpwd,
+    getpwd,
+)
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support import path as op
-from datalad import cfg as dl_cfg
 #
 # Test with_tempfile, especially nested invocations
 #
