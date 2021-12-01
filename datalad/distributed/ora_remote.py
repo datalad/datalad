@@ -1101,6 +1101,8 @@ class RIARemote(SpecialRemote):
 
         # TODO: Isn't that wrong with HTTP anyway?
         #       + just isinstance(LocalIO)?
+        # XXX isinstance(LocalIO) would not work, this method is used
+        # before LocalIO is instantiated
         return not self.storage_host
 
     def _set_read_only(self, msg):
@@ -1177,6 +1179,10 @@ class RIARemote(SpecialRemote):
                     unregister(self.io.close)
                     self.io.close()
 
+                # XXX now also READ IO is done with the write IO
+                # this explicitely ignores the remote config
+                # that distinguishes READ from WRITE with different
+                # methods
                 self._io = self._push_io
                 if hasattr(self.io, 'close'):
                     register(self.io.close)
