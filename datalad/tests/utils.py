@@ -48,7 +48,6 @@ from unittest import SkipTest
 from unittest.mock import patch
 
 import pytest
-from nose.plugins.attrib import attr
 from nose.tools import (
     assert_equal,
     assert_false,
@@ -125,6 +124,9 @@ if external_versions["cmd:git"] >= "2.30.0":
     DEFAULT_REMOTE = "dl-test-remote"  # Set by setup_package().
 else:
     DEFAULT_REMOTE = "origin"
+
+def attr(name):
+    return getattr(pytest.mark, name)
 
 # additional shortcuts
 neq_ = assert_not_equal
@@ -2127,8 +2129,6 @@ def set_annex_version(version):
 #
 # To be explicit, and not "loose" some tests due to typos, decided to make
 # explicit decorators for common types
-
-from nose.plugins.attrib import attr
 
 
 def integration(f):
