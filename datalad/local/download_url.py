@@ -69,6 +69,7 @@ class DownloadURL(Interface):
                 ", ".join(map(repr, sorted(Provider.DOWNLOADERS)))),
             constraints=EnsureStr(),  # TODO: EnsureURL
             metavar='url',
+            args=('urls',),
             nargs='+'),
         dataset=Parameter(
             args=("-d", "--dataset"),

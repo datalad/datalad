@@ -259,7 +259,7 @@ class CreateSiblingRia(Interface):
     @datasetmethod(name='create_sibling_ria')
     @eval_results
     def __call__(url,
-                 name=None,
+                 name,
                  *,  # note that `name` is required but not posarg in CLI
                  dataset=None,
                  storage_name=None,

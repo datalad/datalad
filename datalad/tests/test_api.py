@@ -36,12 +36,8 @@ def test_basic_setup():
 
 def _test_consistent_order_of_args(intf, spec_posargs):
     f = getattr(intf, '__call__')
-    args, = get_sig_param_names(f, ['pos_any'])
+    args, kw_only = get_sig_param_names(f, ['pos_any', 'kw_only'])
     # now verify that those spec_posargs are first among args
-    if not spec_posargs:
-        raise SkipTest("no positional args") # print intf, "skipped"
-#    else:
-#        print intf, spec_posargs
     # TODO*: all those ideally are RFed to follow the CLI-matching args-kwargs separation with *
     if intf.__name__ in (
             'AddReadme',
@@ -60,7 +56,18 @@ def _test_consistent_order_of_args(intf, spec_posargs):
         eq_(spec_posargs, spec_posargs)
         return
 
-    eq_(set(args[:len(spec_posargs)]), spec_posargs)
+    # if we had used * to instruct to have keyword only args, then all
+    # args should actually be matched entirely
+    if kw_only:
+        # "special cases/exclusions"
+        if intf.__name__ == 'CreateSiblingRia':
+            # -s|--name is a mandatory option (for uniformity), so allowed to be used as posarg #2
+            eq_(set(args), spec_posargs.union({'name'}))
+        else:
+            eq_(set(args), spec_posargs)
+    else:
+        # and if no kw_only -- only those which are known to be positional
+        eq_(set(args[:len(spec_posargs)]), spec_posargs)
 
 
 def test_consistent_order_of_args():
