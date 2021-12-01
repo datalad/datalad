@@ -12,51 +12,53 @@ import base64
 import glob
 import gzip
 import inspect
+import logging
 import lzma
-import shutil
-import stat
-from json import dumps
-import os
-import re
-import tempfile
-import platform
 import multiprocessing
 import multiprocessing.queues
-import logging
+import os
+import platform
 import random
+import re
+import shutil
 import socket
-import textwrap
-import warnings
-from fnmatch import fnmatch
-import time
-from difflib import unified_diff
-from contextlib import contextmanager
-from unittest.mock import patch
 import ssl
-
+import stat
+import tempfile
+import textwrap
+import time
+import warnings
+from contextlib import contextmanager
+from difflib import unified_diff
+from fnmatch import fnmatch
+from functools import wraps
 from http.server import (
     HTTPServer,
     SimpleHTTPRequestHandler,
 )
-
-from functools import wraps
+from json import dumps
 from os.path import (
     curdir,
     exists,
-    join as opj,
-    relpath,
-    split as pathsplit,
 )
+from os.path import join as opj
+from os.path import relpath
+from os.path import split as pathsplit
+from unittest.mock import patch
 
+from nose import SkipTest
 from nose.plugins.attrib import attr
 from nose.tools import (
     assert_equal,
     assert_false,
     assert_greater,
     assert_greater_equal,
-    assert_in as in_,
-    assert_in,
+)
+from nose.tools import assert_in
+from nose.tools import assert_in as in_
+from nose.tools import (
     assert_is,
+    assert_is_instance,
     assert_is_none,
     assert_is_not,
     assert_is_not_none,
@@ -64,6 +66,7 @@ from nose.tools import (
     assert_not_in,
     assert_not_is_instance,
     assert_raises,
+    assert_set_equal,
     assert_true,
     eq_,
     make_decorator,
@@ -71,33 +74,8 @@ from nose.tools import (
     raises,
 )
 
-from nose.tools import assert_set_equal
-from nose.tools import assert_is_instance
-from nose import SkipTest
-
-from datalad import cfg as dl_cfg
 import datalad.utils as ut
-# TODO this must go
-from ..utils import *
-from datalad.utils import (
-    Path,
-    ensure_unicode,
-)
-
-from .. import utils
-from ..support.exceptions import (
-    CommandError,
-    CommandNotAvailableError,
-)
-from ..support.external_versions import external_versions
-from ..support.vcr_ import *
-from ..support.keyring_ import MemoryKeyring
-from ..support.network import RI
-from ..dochelpers import borrowkwargs
-from ..consts import (
-    ARCHIVES_TEMP_DIR,
-)
-from . import _TEMP_PATHS_GENERATED
+from datalad import cfg as dl_cfg
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
@@ -105,7 +83,26 @@ from datalad.cmd import (
     WitlessRunner,
 )
 from datalad.core.local.repo import repo_from_path
+from datalad.utils import (
+    Path,
+    ensure_unicode,
+)
 
+from .. import utils
+from ..cmdline.helpers import get_repo_instance
+from ..consts import ARCHIVES_TEMP_DIR
+from ..dochelpers import borrowkwargs
+from ..support.exceptions import (
+    CommandError,
+    CommandNotAvailableError,
+)
+from ..support.external_versions import external_versions
+from ..support.keyring_ import MemoryKeyring
+from ..support.network import RI
+from ..support.vcr_ import *
+# TODO this must go
+from ..utils import *
+from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -156,8 +153,8 @@ def skip_if_scrapy_without_selector():
 
 def skip_if_url_is_not_available(url, regex=None):
     # verify that dataset is available
-    from datalad.downloaders.providers import Providers
     from datalad.downloaders.base import DownloadError
+    from datalad.downloaders.providers import Providers
     providers = Providers.from_config_files()
     try:
         content = providers.fetch(url)
@@ -296,7 +293,10 @@ def skip_nomultiplex_ssh(func):
     """
 
     check_not_generatorfunction(func)
-    from ..support.sshconnector import MultiplexSSHManager, SSHManager
+    from ..support.sshconnector import (
+        MultiplexSSHManager,
+        SSHManager,
+    )
 
     @wraps(func)
     @attr('skip_nomultiplex_ssh')
@@ -312,10 +312,18 @@ def skip_nomultiplex_ssh(func):
 #
 
 import os
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
+
 from datalad.distribution.dataset import Dataset
-from ..utils import chpwd, getpwd
+from datalad.support.annexrepo import (
+    AnnexRepo,
+    FileNotInAnnexError,
+)
+from datalad.support.gitrepo import GitRepo
+
+from ..utils import (
+    chpwd,
+    getpwd,
+)
 
 
 def ok_clean_git(path, annex=None, index_modified=[], untracked=[]):
@@ -747,8 +755,8 @@ class HTTPPath(object):
             # if this fails, check datalad/tests/ca/prov.sh
             # for info on deploying a datalad-root.crt
             from urllib.request import (
-                urlopen,
                 Request,
+                urlopen,
             )
             try:
                 req = Request(self.url)
@@ -1056,8 +1064,13 @@ def _get_testrepos_uris(regex, flavors):
     # we should instantiate those whenever test repos actually asked for
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
-        from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
-            SubmoduleDataset, NestedDataset, InnerSubmodule
+        from .utils_testrepos import (
+            BasicAnnexTestRepo,
+            BasicGitTestRepo,
+            InnerSubmodule,
+            NestedDataset,
+            SubmoduleDataset,
+        )
 
         _basic_annex_test_repo = BasicAnnexTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
@@ -1643,8 +1656,8 @@ def assert_no_errors_logged(func, skip_re=None):
 
 def get_mtimes_and_digests(target_path):
     """Return digests (md5) and mtimes for all the files under target_path"""
-    from datalad.utils import find_files
     from datalad.support.digests import Digester
+    from datalad.utils import find_files
     digester = Digester(['md5'])
 
     # bother only with existing ones for this test, i.e. skip annexed files without content
