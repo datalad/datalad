@@ -9,22 +9,27 @@
 
 import os
 import tempfile
+from abc import (
+    ABCMeta,
+    abstractmethod,
+)
+from os.path import exists
+from os.path import join as opj
 
-from abc import ABCMeta, abstractmethod
-from os.path import join as opj, exists
-
-from ..support.gitrepo import GitRepo
-from ..support.annexrepo import AnnexRepo
-from ..support.network import get_local_file_url
-from ..support.external_versions import external_versions
-from ..utils import swallow_outputs
-from ..utils import swallow_logs
+from datalad import cfg as dl_cfg
+from datalad.customremotes.base import init_datalad_remote
 
 from .. import __version__
+from ..support.annexrepo import AnnexRepo
+from ..support.external_versions import external_versions
+from ..support.gitrepo import GitRepo
+from ..support.network import get_local_file_url
+from ..utils import (
+    swallow_logs,
+    swallow_outputs,
+)
 from . import _TEMP_PATHS_GENERATED
 from .utils import get_tempfile_kwargs
-from datalad.customremotes.base import init_datalad_remote
-from datalad import cfg as dl_cfg
 
 # eventually become a URL to a local file served via http
 # that can be used for http/url-based testing
@@ -99,7 +104,7 @@ class BasicAnnexTestRepo(TestRepo):
         global remote_file_url
         if not remote_file_url:
             # we need a local file, that is server via a URL
-            from datalad import test_http_server
+            from datalad.conftest import test_http_server
             remote_file_name = 'testrepo-annex.dat'
             with open(opj(test_http_server.path, remote_file_name), "w") as f:
                 f.write("content to be annex-addurl'd")

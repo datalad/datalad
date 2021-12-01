@@ -109,6 +109,7 @@ from .config import ConfigManager
 
 cfg = ConfigManager()
 
+
 # must come after config manager
 # this is not to be modified. see enable/in_librarymode()
 # by default, we are in application-mode, simply because most of
@@ -117,7 +118,10 @@ __runtime_mode = 'library' \
     if cfg.getbool('datalad.runtime', 'librarymode', False) \
     else 'application'
 
-from datalad.utils import getpwd
+from datalad.utils import (
+    get_encoding_info,
+    getpwd,
+)
 
 from .log import lgr
 
