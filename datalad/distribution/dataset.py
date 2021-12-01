@@ -462,15 +462,29 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # This wrapper is NOT returned by the decorator, but only used to bind
         # the function `f` to the Dataset class.
         kwargs = kwargs.copy()
-        f_argspec = inspect.getfullargspec(f)
-        f_args = f_argspec.args
+
+        # due to use of functools.wraps and inability of of getarspec to get
+        # those, we use .signature.
+        # More information in de-wrapt PR https://github.com/datalad/datalad/pull/6190
+        f_sign = inspect.signature(f)
+        P = inspect.Parameter
+        f_args = [
+            p_name
+            for p_name, p in f_sign.parameters.items()
+            if p.kind in (P.POSITIONAL_ONLY, P.POSITIONAL_OR_KEYWORD)
+        ]
+        f_kwonlyargs = {
+            p_name: p
+            for p_name, p in f_sign.parameters.items()
+            if p.kind == P.KEYWORD_ONLY
+        }
 
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset), let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
         # In case whenever kwonlyargs are used, 'dataset' would not be listed
         # among args, so we would account for it (possibly) be there.
-        if len(args) >= len(f_args) + int(bool(f_argspec.kwonlyargs)):
+        if len(args) >= len(f_args) + int(bool(f_kwonlyargs)):
             non_dataset_args = ["self"] + [a for a in f_args if a != dataset_argname]
             raise TypeError(
                 f"{name}() takes at most {len(f_args)} arguments ({len(args)} given): "
@@ -479,7 +493,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
             raise TypeError(
                 f"{name}() got an unexpected keyword argument {dataset_argname}")
         kwargs[dataset_argname] = instance
-        if dataset_argname in f_argspec.kwonlyargs:
+        if dataset_argname in f_kwonlyargs:
             # * was used to enforce kwargs, so we just would pass things as is
             pass
         else:
