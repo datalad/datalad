@@ -41,7 +41,6 @@ def _test_consistent_order_of_args(intf, spec_posargs):
     # TODO*: all those ideally are RFed to follow the CLI-matching args-kwargs separation with *
     if intf.__name__ in (
             'AddReadme',
-            'Addurls',
             'ExportArchive',
             'ExportToFigshare',
             'ExtractMetadata'):
