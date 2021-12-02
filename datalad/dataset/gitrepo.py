@@ -20,6 +20,7 @@ lifetime of a singleton.
 __all__ = ['GitRepo']
 
 import logging
+import os
 from os import environ
 from os.path import lexists
 import re
@@ -39,6 +40,8 @@ from datalad.dataset.repo import (
     RepoInterface,
     path_based_str_repr,
 )
+from datalad.runner.protocol import GeneratorMixIn
+from datalad.runner.utils import LineSplitter
 from datalad.support.exceptions import (
     CommandError,
     GitIgnoreError,
@@ -106,6 +109,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self._git_runner = GitWitlessRunner(cwd=self.pathobj)
 
         self.__fake_dates_enabled = None
+
+        self._line_splitter = None
 
         # Finally, register a finalizer (instead of having a __del__ method).
         # This will be called by garbage collection as well as "atexit". By
@@ -321,7 +326,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                 read_only=read_only)
         return out
 
-    def call_git_items_(self, args, files=None, expect_stderr=False, sep=None,
+    def call_git_items_(self,
+                        args,
+                        files=None,
+                        expect_stderr=False,
+                        sep=None,
                         read_only=False):
         """Call git, splitting output on `sep`.
 
@@ -340,9 +349,77 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._call_git(args, files, expect_stderr=expect_stderr,
-                                read_only=read_only)
-        yield from (out.split(sep) if sep else out.splitlines())
+        class GeneratorStdOutErrCapture(GeneratorMixIn, StdOutErrCapture):
+            def __init__(self):
+                GeneratorMixIn.__init__(self)
+                StdOutErrCapture.__init__(self)
+
+            def pipe_data_received(self, fd, data):
+                if fd == 1:
+                    self.send_result(("stdout", data.decode(self.encoding)))
+                    return
+                super().pipe_data_received(fd, data)
+
+        runner = self._git_runner
+        stderr_log_level = {True: 5, False: 11}[expect_stderr]
+
+        cmd = self._git_cmd_prefix + args
+
+        if not read_only and self._fake_dates_enabled:
+            env = self.add_fake_dates_to_env(runner.env)
+        else:
+            env = None
+
+        if not read_only:
+            self._write_lock.acquire()
+
+        if files:
+            # only call the wrapper if needed (adds distraction logs
+            # otherwise, and also maintains the possibility to connect
+            # stdin in the future)
+            generator = runner.run_on_filelist_chunks_items_(
+                cmd,
+                files,
+                protocol=GeneratorStdOutErrCapture,
+                env=env)
+        else:
+            generator = runner.run(
+                cmd,
+                protocol=GeneratorStdOutErrCapture,
+                env=env)
+        protocol = self._git_runner.threaded_runner.protocol
+
+        self._line_splitter = LineSplitter(sep)
+        try:
+            for source, content in generator:
+                if source == "stdout":
+                    yield from self._line_splitter.process(content)
+
+            remaining_content = self._line_splitter.finish_processing()
+            if remaining_content is not None:
+                yield remaining_content
+
+        except CommandError as e:
+            e.stderr = protocol.fd_infos[protocol.stderr_fileno][1].decode(protocol.encoding)
+            ignored = re.search(GitIgnoreError.pattern, e.stderr)
+            if ignored:
+                raise GitIgnoreError(cmd=e.cmd,
+                                     msg=e.stderr,
+                                     code=e.code,
+                                     stdout=e.stdout,
+                                     stderr=e.stderr,
+                                     paths=ignored.groups()[0].splitlines())
+            lgr.log(11, str(e))
+            raise
+        finally:
+            if not read_only:
+                self._write_lock.release()
+
+        stderr = protocol.fd_infos[protocol.stderr_fileno][1]
+        if stderr:
+            for line in stderr.decode(protocol.encoding).splitlines():
+                lgr.log(stderr_log_level,
+                        "stderr| " + line.rstrip('\n'))
 
     def call_git_oneline(self, args, files=None, expect_stderr=False, read_only=False):
         """Call git for a single line of output.

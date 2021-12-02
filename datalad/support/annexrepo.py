@@ -1246,7 +1246,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         remaining_content = line_splitter.finish_processing()
         if remaining_content is not None:
-            yield remaining_content + os.linesep
+            yield remaining_content
 
     def call_annex_oneline(self, args, files=None):
         """Call annex for a single line of output.

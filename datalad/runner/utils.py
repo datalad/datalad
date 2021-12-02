@@ -80,7 +80,7 @@ class LineSplitter:
             detected_lines = self.remaining_data.split(self.separator)
 
             # If replaced data did not end with the separator, it contains an
-            # unterminated line. We save that for the next round. Otherwise
+            # unterminated line. We save that for the next round. Otherwise,
             # we mark that we do not have remaining data.
             if not data.endswith(self.separator):
                 self.remaining_data = detected_lines[-1]
