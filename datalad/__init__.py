@@ -16,18 +16,20 @@ documentation with `help`.
 """
 
 if not __debug__:
-    raise RuntimeError('DataLad cannot run in "optimized" mode, i.e. python -O')
+    raise RuntimeError(
+        'DataLad cannot run in "optimized" mode, i.e. python -O')
+
+import atexit
+import os
 
 
 # For reproducible demos/tests
-import os
 _seed = os.environ.get('DATALAD_SEED', None)
 if _seed is not None:
     import random
     _seed = int(_seed)
     random.seed(_seed)
 
-import atexit
 # Colorama (for Windows terminal colors) must be imported before we use/bind
 # any sys.stdout
 try:
@@ -47,6 +49,7 @@ except ImportError as e:
 from .config import ConfigManager
 cfg = ConfigManager()
 
+# must come after config manager
 from .log import lgr
 from datalad.support.exceptions import CapturedException
 from datalad.utils import (
@@ -99,20 +102,38 @@ _test_states = {
 # handle to an HTTP server instance that is used as part of the tests
 test_http_server = None
 
+
 def setup_package():
-    import os
-    from datalad.utils import (
-        on_osx,
-        on_windows,
+    from io import StringIO as OrigStringIO
+    from nose.ext import dtcompat
+    from nose.plugins import (
+        capture,
+        multiprocess,
+        plugintest,
     )
+    import os
+    from pathlib import Path
+    import tempfile
+
+    from datalad import consts
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.external_versions import external_versions
     from datalad.tests import _TEMP_PATHS_GENERATED
+    from datalad.tests.utils import (
+        DEFAULT_BRANCH,
+        DEFAULT_REMOTE,
+        HTTPPath,
+    )
+    from datalad.ui import ui
+    from datalad.utils import (
+        make_tempfile,
+        on_osx,
+    )
 
     if on_osx:
         # enforce honoring TMPDIR (see gh-5307)
-        import tempfile
         tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
-
-    from datalad import consts
 
     _test_states['env'] = {}
 
@@ -125,22 +146,31 @@ def setup_package():
     consts.DATASETS_TOPURL = 'https://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
-    from datalad.tests.utils import (
-        DEFAULT_BRANCH,
-        DEFAULT_REMOTE,
-    )
     set_envvar("GIT_CONFIG_PARAMETERS",
                "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
                .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
-    gitconfig = """\
+    def prep_tmphome():
+        gitconfig = """\
 [user]
 	name = DataLad Tester
 	email = test@example.com
 [datalad "log"]
 	exc = 1
 """
-    from datalad.support.external_versions import external_versions
+        # TODO: split into a function + context manager
+        with make_tempfile(mkdir=True) as new_home:
+            pass
+        # register for clean-up on exit
+        _TEMP_PATHS_GENERATED.append(new_home)
+
+        # populate default config
+        new_home = Path(new_home)
+        new_home.mkdir(parents=True, exist_ok=True)
+        cfg_file = new_home / '.gitconfig'
+        cfg_file.write_text(gitconfig)
+        return new_home, cfg_file
+
     if external_versions['cmd:git'] < "2.32":
         # To overcome pybuild overriding HOME but us possibly wanting our
         # own HOME where we pre-setup git for testing (name, email)
@@ -148,33 +178,17 @@ def setup_package():
             set_envvar('HOME', os.environ['GIT_HOME'])
         else:
             # we setup our own new HOME, the BEST and HUGE one
-            from datalad.utils import make_tempfile
-            # TODO: split into a function + context manager
-            with make_tempfile(mkdir=True) as new_home:
-                pass
+            new_home, _ = prep_tmphome()
             for v, val in get_home_envvars(new_home).items():
                 set_envvar(v, val)
-            if not os.path.exists(new_home):
-                os.makedirs(new_home)
-            with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
-                f.write(gitconfig)
-            _TEMP_PATHS_GENERATED.append(new_home)
     else:
-        from datalad.utils import make_tempfile
-        with make_tempfile(mkdir=True) as cfg_dir:
-            pass
-        os.makedirs(cfg_dir, exist_ok=True)
-        cfg_file = os.path.join(cfg_dir, '.gitconfig')
-        with open(cfg_file, 'w') as f:
-            f.write(gitconfig)
-        set_envvar('GIT_CONFIG_GLOBAL', cfg_file)
-        _TEMP_PATHS_GENERATED.append(cfg_dir)
+        _, cfg_file = prep_tmphome()
+        set_envvar('GIT_CONFIG_GLOBAL', str(cfg_file))
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
 
-    from datalad.interface.common_cfg import compute_cfg_defaults
     compute_cfg_defaults()
     # datalad.locations.sockets has likely changed. Discard any cached values.
     ssh_manager._socket_dir = None
@@ -191,7 +205,6 @@ def setup_package():
     # During tests we allow for "insecure" access to local file:// and
     # http://localhost URLs since all of them either generated as tests
     # fixtures or cloned from trusted sources
-    from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = True
 
     DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
@@ -208,21 +221,16 @@ def setup_package():
         _test_states['loglevel'] = None
 
     # Set to non-interactive UI
-    from datalad.ui import ui
     _test_states['ui_backend'] = ui.backend
     # obtain() since that one consults for the default value
     ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
     # Monkey patch nose so it does not ERROR out whenever code asks for fileno
     # of the output. See https://github.com/nose-devs/nose/issues/6
-    from io import StringIO as OrigStringIO
-
     class StringIO(OrigStringIO):
         fileno = lambda self: 1
         encoding = None
 
-    from nose.ext import dtcompat
-    from nose.plugins import capture, multiprocess, plugintest
     dtcompat.StringIO = StringIO
     capture.StringIO = StringIO
     multiprocess.StringIO = StringIO
@@ -232,9 +240,6 @@ def setup_package():
     # file:// URLs in the tests, have a standard HTTP server
     # that serves an 'httpserve' directory in the test HOME
     # the URL will be available from datalad.test_http_server.url
-    from datalad.tests.utils import HTTPPath
-    import tempfile
-
     global test_http_server
     # Start the server only if not running already
     # Relevant: we have test_misc.py:test_test which runs datalad.test but
@@ -256,10 +261,19 @@ def setup_package():
 
 def teardown_package():
     import os
-    from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
+    from datalad import consts
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.cookies import cookies_db
+    from datalad.support.external_versions import external_versions as ev
+    from datalad.tests import _TEMP_PATHS_GENERATED
+    from datalad.tests.utils import (
+        rmtemp,
+        OBSCURE_FILENAME,
+    )
+    from datalad.ui import ui
 
     lgr.debug("Printing versioning information collected so far")
-    from datalad.support.external_versions import external_versions as ev
     print(ev.dumps(query=True))
     try:
         print("Obscure filename: str=%s repr=%r"
@@ -274,8 +288,6 @@ def teardown_package():
 
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
-    from datalad.ui import ui
-    from datalad import consts
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
@@ -287,14 +299,13 @@ def teardown_package():
     else:
         lgr.debug("For some reason global http_server was not set/running, thus not stopping")
 
-    from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):
         msg = "Removing %d dirs/files: %s" % (len(_TEMP_PATHS_GENERATED), ', '.join(_TEMP_PATHS_GENERATED))
     else:
         msg = "Nothing to remove"
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
-        rmtemp(path, ignore_errors=True)
+        rmtemp(str(path), ignore_errors=True)
 
     # restore all the env variables
     for v, val in _test_states['env'].items():
@@ -309,15 +320,12 @@ def teardown_package():
     # either way.
     cfg.reload(force=True)
 
-    from datalad.interface.common_cfg import compute_cfg_defaults
     compute_cfg_defaults()
     ssh_manager._socket_dir = None
 
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
-    from datalad.support.cookies import cookies_db
     cookies_db.close()
-    from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
 
