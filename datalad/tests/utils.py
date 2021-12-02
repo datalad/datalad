@@ -105,6 +105,8 @@ from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
+from datalad.core.local.repo import repo_from_path
+
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -376,30 +378,23 @@ def _prep_file_under_git(path, filename):
 
     Helper to be used by few functions
     """
+    path = Path(path)
     if filename is None:
         # path provides the path and the name
-        path, filename = pathsplit(path)
-    try:
-        # if succeeds when must not (not `annexed`) -- fail
-        repo = get_repo_instance(path, class_=AnnexRepo)
-        annex = True
-    except RuntimeError as e:
-        # TODO: make a dedicated Exception
-        if "No annex repository found in" in str(e):
-            repo = get_repo_instance(path, class_=GitRepo)
-            annex = False
-        else:
-            raise
+        filename = Path(path.name)
+        path = path.parent
+    else:
+        filename = Path(filename)
 
-    # path to the file within the repository
-    # repo.path is a "realpath" so to get relpath working correctly
-    # we need to realpath our path as well
-    # do absolute() in addition to always get an absolute path
-    # even with non-existing paths on windows
-    path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
-    file_repo_dir = relpath(path, repo.path)
-    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
-    return annex, file_repo_path, filename, path, repo
+    ds = Dataset(utils.get_dataset_root(path))
+
+    return isinstance(ds.repo, AnnexRepo), \
+        str(path.absolute().relative_to(ds.path) / filename) \
+        if not filename.is_absolute() \
+        else str(filename.relative_to(ds.pathobj)), \
+        filename, \
+        str(path), \
+        ds.repo
 
 
 #
