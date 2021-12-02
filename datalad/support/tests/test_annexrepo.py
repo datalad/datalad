@@ -29,6 +29,7 @@ from os.path import (
     pardir,
     exists,
 )
+from queue import Queue
 from shutil import copyfile
 
 from urllib.parse import urljoin
@@ -131,6 +132,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import (
     AnnexRepo,
     AnnexJsonProtocol,
+    GeneratorAnnexJsonProtocol,
 )
 
 
@@ -2570,3 +2572,28 @@ def test_done_deprecation():
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
         _ = AnnexJsonProtocol()
         warn_mock.assert_not_called()
+
+
+def test_generator_annex_json_protocol():
+
+    runner = Runner()
+    stdin_queue = Queue()
+
+    def json_object(count: int):
+        json_template = '{{"id": "some-id", "count": {count}}}'
+        return json_template.format(count=count).encode()
+
+    count = 123
+    stdin_queue.put(json_object(count=count))
+    for result in runner.run(cmd="cat", protocol=GeneratorAnnexJsonProtocol, stdin=stdin_queue):
+        assert_equal(
+            result,
+            {
+                "id": "some-id",
+                "count": count,
+            }
+        )
+        if count == 133:
+            break
+        count += 1
+        stdin_queue.put(json_object(count=count))

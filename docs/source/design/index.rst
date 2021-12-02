@@ -23,6 +23,7 @@ subsystems in DataLad.
    exception_handling
    credentials
    url_substitution
+   threaded_runner
    batched_command
    standard_parameters
    pos_vs_kw_parameters

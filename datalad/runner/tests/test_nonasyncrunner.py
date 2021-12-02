@@ -14,10 +14,20 @@ import queue
 import signal
 import subprocess
 import sys
+from itertools import count
 from time import sleep
+from typing import (
+    List,
+    Optional,
+)
+from unittest.mock import (
+    patch,
+    MagicMock,
+)
 
 from datalad.tests.utils import (
     assert_false,
+    assert_raises,
     assert_true,
     eq_,
     known_failure_osx,
@@ -27,14 +37,53 @@ from datalad.tests.utils import (
 from datalad.utils import on_windows
 
 from .. import (
+    NoCapture,
     Protocol,
     Runner,
     StdOutCapture,
+    StdOutErrCapture,
 )
 from ..nonasyncrunner import (
-    _ReaderThread,
+    IOState,
+    ThreadedRunner,
     run_command,
 )
+from ..protocol import (
+    GeneratorMixIn,
+)
+from ..runnerthreads import (
+    ReadThread,
+    WriteThread,
+)
+from .utils import py2cmd
+
+
+# Protocol classes used for a set of generator tests later
+class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
+    def __init__(self,
+                 done_future=None,
+                 encoding=None):
+
+        StdOutErrCapture.__init__(
+            self,
+            done_future=done_future,
+            encoding=encoding)
+        GeneratorMixIn.__init__(self)
+
+    def timeout(self, fd: Optional[int]) -> bool:
+        return True
+
+
+class GenNothing(GeneratorMixIn, NoCapture):
+    def __init__(self,
+                 done_future=None,
+                 encoding=None):
+
+        NoCapture.__init__(
+            self,
+            done_future=done_future,
+            encoding=encoding)
+        GeneratorMixIn.__init__(self)
 
 
 def test_subprocess_return_code_capture():
@@ -68,7 +117,8 @@ def test_subprocess_return_code_capture():
                          {
                              "signal_to_send": signal_to_send,
                              "result_pool": result_pool
-                         })
+                         },
+                         exception_on_error=False)
     if not on_windows:
         # this one specifically tests the SIGINT case, which is not supported
         # on windows
@@ -122,32 +172,200 @@ def test_interactive_communication():
     assert_true(result_pool["process_exited_called"], True)
 
 
-def test_thread_exit():
+def test_blocking_thread_exit():
+    read_queue = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     read_file = os.fdopen(read_descriptor, "rb")
-    read_queue = queue.Queue()
-
-    reader_thread = _ReaderThread(read_file, read_queue, "test")
-    reader_thread.start()
+    read_thread = ReadThread(
+        identifier="test thread",
+        user_info=read_descriptor,
+        source=read_file,
+        destination_queue=read_queue,
+        signal_queues=[]
+    )
+    read_thread.start()
 
     os.write(write_descriptor, b"some data")
-    assert_true(reader_thread.is_alive())
-    data = read_queue.get()
-    eq_(data[1], b"some data")
+    assert_true(read_thread.is_alive())
+    identifier, state, data = read_queue.get()
+    eq_(data, b"some data")
 
-    reader_thread.request_exit()
+    read_thread.request_exit()
 
     # Check the blocking part
-    sleep(5)
-    assert_true(reader_thread.is_alive())
+    sleep(.3)
+    assert_true(read_thread.is_alive())
 
-    # Check actual exit
+    # Check actual exit, we will not get
+    # "more data" when exit was requested,
+    # because the thread will not attempt
+    # a write
     os.write(write_descriptor, b"more data")
-    reader_thread.join()
-    data = read_queue.get()
-    eq_(data[1], b"more data")
+    read_thread.join()
+    print(read_queue.queue)
     assert_true(read_queue.empty())
+
+
+def test_blocking_read_exception_catching():
+    read_queue = queue.Queue()
+
+    (read_descriptor, write_descriptor) = os.pipe()
+    read_file = os.fdopen(read_descriptor, "rb")
+    read_thread = ReadThread(
+        identifier="test thread",
+        user_info=read_descriptor,
+        source=read_file,
+        destination_queue=read_queue,
+        signal_queues=[read_queue]
+    )
+    read_thread.start()
+
+    os.write(write_descriptor, b"some data")
+    assert_true(read_thread.is_alive())
+    identifier, state, data = read_queue.get()
+    eq_(data, b"some data")
+    os.close(write_descriptor)
+    read_thread.join()
+    identifier, state, data = read_queue.get()
+    eq_(data, None)
+
+
+def test_blocking_read_closing():
+    # Expect that a reader thread exits when os.read throws an error.
+    class FakeFile:
+        def fileno(self):
+            return -1
+
+        def close(self):
+            pass
+
+    def fake_read(*args):
+        raise ValueError("test exception")
+
+    read_queue = queue.Queue()
+    with patch("datalad.runner.runnerthreads.os.read") as read:
+        read.side_effect = fake_read
+
+        read_thread = ReadThread(
+            identifier="test thread",
+            user_info=None,
+            source=FakeFile(),
+            destination_queue=None,
+            signal_queues=[read_queue])
+
+        read_thread.start()
+        read_thread.join()
+
+    identifier, state, data = read_queue.get()
+    eq_(data, None)
+
+
+def test_blocking_write_exception_catching():
+    # Expect that a blocking writer catches exceptions and exits gracefully.
+
+    write_queue = queue.Queue()
+    signal_queue = queue.Queue()
+
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    write_thread = WriteThread(
+        identifier="test thread",
+        user_info=write_descriptor,
+        source_queue=write_queue,
+        destination=write_file,
+        signal_queues=[signal_queue]
+    )
+    write_thread.start()
+
+    write_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    os.close(read_descriptor)
+    os.close(write_descriptor)
+
+    write_queue.put(b"more data")
+    write_thread.join()
+    eq_(signal_queue.get(), (write_descriptor, IOState.ok, None))
+
+
+def test_blocking_writer_closing():
+    # Expect that a blocking writer closes its file when `None` is sent to it.
+    write_queue = queue.Queue()
+    signal_queue = queue.Queue()
+
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    write_thread = WriteThread(
+        identifier="test thread",
+        user_info=write_descriptor,
+        source_queue=write_queue,
+        destination=write_file,
+        signal_queues=[signal_queue]
+    )
+    write_thread.start()
+
+    write_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    write_queue.put(None)
+    write_thread.join()
+    eq_(signal_queue.get(), (write_descriptor, IOState.ok, None))
+
+
+def test_blocking_writer_closing_timeout_signal():
+    # Expect that writer or reader do not block forever on a full signal queue
+
+    write_queue = queue.Queue()
+    signal_queue = queue.Queue(1)
+    signal_queue.put("This is data")
+
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    write_thread = WriteThread(
+        identifier="test thread",
+        user_info=write_descriptor,
+        source_queue=write_queue,
+        destination=write_file,
+        signal_queues=[signal_queue]
+    )
+    write_thread.start()
+
+    write_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    write_queue.put(None)
+    write_thread.join()
+    eq_(signal_queue.get(), "This is data")
+
+
+def test_blocking_writer_closing_no_signal():
+    # Expect that writer or reader do not block forever on a full signal queue
+
+    write_queue = queue.Queue()
+    signal_queue = queue.Queue(1)
+    signal_queue.put("This is data")
+
+    (read_descriptor, write_descriptor) = os.pipe()
+    write_file = os.fdopen(write_descriptor, "rb")
+    write_thread = WriteThread(
+        identifier="test thread",
+        user_info=write_descriptor,
+        source_queue=write_queue,
+        destination=write_file,
+        signal_queues=[signal_queue]
+    )
+    write_thread.start()
+
+    write_queue.put(b"some data")
+    data = os.read(read_descriptor, 1024)
+    eq_(data, b"some data")
+
+    write_queue.put(None)
+    write_thread.join()
 
 
 def test_inside_async():
@@ -184,3 +402,190 @@ def test_popen_invocation(src_path, dest_path):
     fetching_data.start()
     fetching_data.join(5.0)
     assert_false(fetching_data.is_alive(), "Child is stuck!")
+
+
+def test_timeout():
+    # Expect timeout protocol calls on long running process
+    # if the specified timeout is short enough
+    class TestProtocol(StdOutErrCapture):
+
+        received_timeouts = list()
+
+        def __init__(self):
+            StdOutErrCapture.__init__(self)
+            self.counter = count()
+
+        def timeout(self, fd: Optional[int]):
+            TestProtocol.received_timeouts.append((self.counter.__next__(), fd))
+
+    run_command(
+        ['timeout', '1'] if on_windows else ["sleep", "1"],
+        stdin=None,
+        protocol=TestProtocol,
+        timeout=.1
+    )
+    assert_true(len(TestProtocol.received_timeouts) > 0)
+    assert_true(all(map(lambda e: e[1] in (1, 2, None), TestProtocol.received_timeouts)))
+
+
+def test_timeout_nothing():
+    # Expect timeout protocol calls for the process on long running processes,
+    # if the specified timeout is short enough.
+    class TestProtocol(NoCapture):
+        def __init__(self,
+                     timeout_queue: List):
+            NoCapture.__init__(self)
+            self.timeout_queue = timeout_queue
+            self.counter = count()
+
+        def timeout(self, fd: Optional[int]) -> bool:
+            self.timeout_queue.append(fd)
+            return False
+
+    stdin_queue = queue.Queue()
+    for i in range(12):
+        stdin_queue.put(b"\x00" * 1024)
+    stdin_queue.put(None)
+
+    timeout_queue = []
+    run_command(
+        py2cmd("import time; time.sleep(.4)\n"),
+        stdin=stdin_queue,
+        protocol=TestProtocol,
+        timeout=.1,
+        protocol_kwargs=dict(timeout_queue=timeout_queue)
+    )
+    # Ensure that we have only process timeouts and at least one
+    assert_true(all(map(lambda e: e is None, timeout_queue)))
+    assert_true(len(timeout_queue) > 0)
+
+
+def test_timeout_stdout_stderr():
+    # Expect timeouts on stdin, stdout, stderr, and the process
+    class TestProtocol(StdOutErrCapture):
+        def __init__(self,
+                     timeout_queue: List):
+            StdOutErrCapture.__init__(self)
+            self.timeout_queue = timeout_queue
+            self.counter = count()
+
+        def timeout(self, fd: Optional[int]) -> bool:
+            self.timeout_queue.append((self.counter.__next__(), fd))
+            return False
+
+    stdin_queue = queue.Queue()
+    for i in range(12):
+        stdin_queue.put(b"\x00" * 1024)
+    stdin_queue.put(None)
+
+    timeout_queue = []
+    run_command(
+        py2cmd("import time;time.sleep(.5)\n"),
+        stdin=stdin_queue,
+        protocol=TestProtocol,
+        timeout=.1,
+        protocol_kwargs=dict(timeout_queue=timeout_queue)
+    )
+
+    # Expect at least one timeout for stdout and stderr.
+    # there might be more.
+    sources = (1, 2)
+    assert_true(len(timeout_queue) >= len(sources))
+    for source in sources:
+        assert_true(any(filter(lambda t: t[1] == source, timeout_queue)))
+
+
+def test_timeout_process():
+    # Expect timeouts on stdin, stdout, stderr, and the process
+    class TestProtocol(StdOutErrCapture):
+        def __init__(self,
+                     timeout_queue: List):
+            StdOutErrCapture.__init__(self)
+            self.timeout_queue = timeout_queue
+            self.counter = count()
+
+        def timeout(self, fd: Optional[int]) -> bool:
+            self.timeout_queue.append((self.counter.__next__(), fd))
+            return False
+
+    stdin_queue = queue.Queue()
+    for i in range(12):
+        stdin_queue.put(b"\x00" * 1024)
+    stdin_queue.put(None)
+
+    timeout_queue = []
+    run_command(
+        py2cmd("import time;time.sleep(.5)\n"),
+        stdin=stdin_queue,
+        protocol=TestProtocol,
+        timeout=.1,
+        protocol_kwargs=dict(timeout_queue=timeout_queue)
+    )
+
+    # Expect at least one timeout for stdout and stderr.
+    # there might be more.
+    sources = (1, 2)
+    assert_true(len(timeout_queue) >= len(sources))
+    for source in sources:
+        assert_true(any(filter(lambda t: t[1] == source, timeout_queue)))
+
+
+def test_exit_3():
+    # Expect the process to be closed after
+    # the generator exits.
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenStdoutStderr,
+                        timeout=.5,
+                        exception_on_error=False)
+    tuple(rt.run())
+    assert_true(rt.process.poll() is not None)
+
+
+def test_exit_4():
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenNothing,
+                        timeout=.5)
+    tuple(rt.run())
+    assert_true(rt.process.poll() is not None)
+
+
+def test_generator_throw():
+    rt = ThreadedRunner(cmd=["sleep", "4"],
+                        stdin=None,
+                        protocol_class=GenNothing,
+                        timeout=.5)
+    gen = rt.run()
+    assert_raises(ValueError, gen.throw, ValueError, ValueError("abcdefg"))
+
+
+def test_exiting_process():
+    result = run_command(py2cmd("import time\ntime.sleep(3)\nprint('exit')"),
+                         protocol=NoCapture,
+                         stdin=None)
+    eq_(result["code"], 0)
+
+
+def test_stalling_detection_1():
+    runner = ThreadedRunner("something", StdOutErrCapture, None)
+    runner.stdout_enqueueing_thread = None
+    runner.stderr_enqueueing_thread = None
+    runner.process_waiting_thread = None
+    with patch("datalad.runner.nonasyncrunner.lgr") as logger:
+        runner.process_queue()
+    eq_(logger.method_calls[0][0], "warning")
+    eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
+
+
+def test_stalling_detection_2():
+    thread_mock = MagicMock()
+    thread_mock.is_alive.return_value = False
+    runner = ThreadedRunner("something", StdOutErrCapture, None)
+    runner.stdout_enqueueing_thread = thread_mock
+    runner.stderr_enqueueing_thread = thread_mock
+    runner.process_waiting_thread = thread_mock
+    with patch("datalad.runner.nonasyncrunner.lgr") as logger:
+        runner.process_queue()
+    eq_(logger.method_calls[0][0], "warning")
+    eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")

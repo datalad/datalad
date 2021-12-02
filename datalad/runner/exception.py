@@ -10,6 +10,11 @@
 """
 
 import logging
+from typing import (
+    Dict,
+    List,
+)
+
 
 lgr = logging.getLogger('datalad.runner.exception')
 
@@ -76,7 +81,7 @@ class CommandError(RuntimeError):
         return self.to_str()
 
 
-def _format_json_error_messages(recs):
+def _format_json_error_messages(recs: List[Dict]):
     # there could be many, condense
     msgs = {}
     for r in recs:

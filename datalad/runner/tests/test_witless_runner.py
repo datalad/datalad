@@ -43,20 +43,13 @@ from datalad.utils import (
 
 from .. import (
     CommandError,
+    KillOutput,
     Protocol,
     Runner,
     StdOutCapture,
     StdOutErrCapture,
 )
-
-
-def py2cmd(code):
-    """Helper to invoke some Python code through a cmdline invocation of
-    the Python interpreter.
-
-    This should be more portable in some cases.
-    """
-    return [sys.executable, '-c', code]
+from .utils import py2cmd
 
 
 @assert_cwd_unchanged
@@ -161,7 +154,7 @@ def test_runner_stdin_no_capture():
     runner = Runner()
     runner.run(
         py2cmd('import sys; print(sys.stdin.read()[-10:])'),
-        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 10000).encode('utf-8'),
+        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 2 + '\n').encode('utf-8'),
         protocol=None
     )
 
@@ -298,6 +291,15 @@ def test_faulty_poll_detection():
     protocol = Protocol()
     protocol.process = PopenMock()
     assert_raises(CommandError, protocol._prepare_result)
+
+
+def test_kill_output():
+    runner = Runner()
+    res = runner.run(
+        py2cmd('import sys; sys.stdout.write("aaaa\\n"); sys.stderr.write("bbbb\\n")'),
+        protocol=KillOutput)
+    eq_(res['stdout'], '')
+    eq_(res['stderr'], '')
 
 
 @skip_if_on_windows  # no "hint" on windows since no ulimit command there
