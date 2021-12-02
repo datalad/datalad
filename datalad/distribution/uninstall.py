@@ -34,6 +34,7 @@ from datalad.interface.utils import (
     eval_results,
     handle_dirty_dataset,
 )
+from datalad.interface.results import get_status_dict
 from datalad.interface.base import build_doc
 from datalad.utils import (
     ensure_list,
@@ -134,7 +135,7 @@ class Uninstall(Interface):
             "Calling "
             "drop(dataset=%r, path=%r, recursive=%r, what='all', reckless=%r)",
             dataset, path, recursive, reckless)
-        yield from drop(
+        for res in drop(
             path=path,
             dataset=dataset,
             recursive=recursive,
@@ -143,5 +144,13 @@ class Uninstall(Interface):
             return_type='generator',
             result_renderer='disabled',
             # we need to delegate the decision making to this uninstall shim
-            on_failure='ignore')
+            on_failure='ignore'):
+            if res['status'] == 'error':
+                msg, *rest = res["message"]
+                if isinstance(msg, str) and "--reckless availability" in msg:
+                    # Avoid confusing datalad-uninstall callers with the new
+                    # drop parametrization while uninstall still exists.
+                    msg = msg.replace("--reckless availability", "--nocheck")
+                    res["message"] = (msg, *rest)
+            yield res
         return
