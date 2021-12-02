@@ -48,7 +48,7 @@ from datalad.support.exceptions import (
 )
 from datalad import cfg as dlcfg
 from datalad.dochelpers import single_or_plural
-
+from datalad.support.network import URL
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
 
@@ -365,9 +365,15 @@ def eval_results(wrapped):
         # .is_installed and .config can be costly, so ensure we do
         # it only once. See https://github.com/datalad/datalad/issues/3575
         dataset_arg = allkwargs.get('dataset', None)
-        from datalad.distribution.dataset import Dataset
-        ds = dataset_arg if isinstance(dataset_arg, Dataset) \
-            else Dataset(dataset_arg) if dataset_arg else None
+        ds = None
+        if dataset_arg is not None:
+            from datalad.distribution.dataset import Dataset
+            ds = dataset_arg  \
+                if isinstance(dataset_arg, Dataset) \
+                else Dataset(dataset_arg) \
+                if URL(dataset_arg).is_local() \
+                else None
+
         # look for hooks
         hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 
