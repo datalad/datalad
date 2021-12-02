@@ -202,7 +202,7 @@ definitions = {
     },
     'datalad.tests.force-fake-home': {
         'ui': ('yesno', {
-               'title': 'Force running tests on OSX and window with manipulated HOME or USERPROFILE respectively.',
+               'title': 'Force running tests on OSX and window with manipulated HOME or USERPROFILE respectively',
                'text': "This is potentially dangerous and only applies on OSX and Windows if the git version used by datalad is older than 2.32."
                        "By default, tests are not executed under these circumstances, since the legacy setup for the test environment can have unintended side-effects:{nl}"
                        "1. On Windows, sub-processes launched by the tests fail to use the desired, isolated locations for configs, caches, etc."
