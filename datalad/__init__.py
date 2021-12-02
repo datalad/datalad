@@ -129,6 +129,7 @@ def setup_package():
     from datalad.utils import (
         make_tempfile,
         on_osx,
+        on_windows
     )
 
     if on_osx:
