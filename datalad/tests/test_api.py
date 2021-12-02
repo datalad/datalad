@@ -38,16 +38,8 @@ def _test_consistent_order_of_args(intf, spec_posargs):
     f = getattr(intf, '__call__')
     args, kw_only = get_sig_param_names(f, ['pos_any', 'kw_only'])
     # now verify that those spec_posargs are first among args
-    # TODO*: all those ideally are RFed to follow the CLI-matching args-kwargs separation with *
-    if intf.__name__ in (
-            'AddReadme',
-            'ExportArchive',
-            'ExportToFigshare',
-            'ExtractMetadata'):
-        if intf.__name__ not in ['ExtractMetadata']:
-            # ex-plugins had 'dataset' as the first positional argument
-            # and ExtractMetadata has 'types' as the first positional arg
-            eq_(args[0], 'dataset')
+    # TODO*: The last odd one left from "plugins" era. Decided to leave alone
+    if intf.__name__ in ('ExtractMetadata',):
         return
 
     # if we had used * to instruct to have keyword only args, then all

@@ -71,8 +71,11 @@ class ExportArchive(Interface):
     @staticmethod
     @datasetmethod(name='export_archive')
     @eval_results
-    # TODO*: harmonize - move dataset after posarg filename and add *,
-    def __call__(dataset, filename=None, archivetype='tar', compression='gz',
+    def __call__(filename=None,
+                 *,
+                 dataset=None,
+                 archivetype='tar',
+                 compression='gz',
                  missing_content='error'):
         import os
         import tarfile

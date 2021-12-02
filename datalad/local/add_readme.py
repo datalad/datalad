@@ -60,8 +60,10 @@ class AddReadme(Interface):
     @staticmethod
     @datasetmethod(name='add_readme')
     @eval_results
-    # TODO*: harmonize for adding *,
-    def __call__(dataset, filename='README.md', existing='skip'):
+    def __call__(filename='README.md',
+                 *,
+                 dataset=None,
+                 existing='skip'):
         from os.path import lexists
         from os.path import join as opj
         from io import open

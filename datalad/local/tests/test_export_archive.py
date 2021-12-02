@@ -46,7 +46,8 @@ _dataset_template = {
 @with_tree(_dataset_template)
 def test_failure(path):
     # non-existing dataset
-    assert_raises(ValueError, export_archive, Dataset('nowhere'))
+    with assert_raises(ValueError):
+        export_archive(dataset=Dataset('nowhere'))
 
 
 @with_tree(_dataset_template)
