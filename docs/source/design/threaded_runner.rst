@@ -35,7 +35,7 @@ The ``stdin``-thread reads data from a queue and writes it to the ``stdin``-file
 
 The ``stdout``- and ``stderr``-threads read from the respective file descriptor and enqueue data into their output queue, unless the data has zero length (which indicates a closed descriptor). On a zero-length read they exit and enqueue ``None`` into their signal queues.
 
-All queues are infinite. Nevertheless signaling is performed with a timeout of one 100 milli seconds in order to ensure that threads can exit.
+All queues are infinite. Nevertheless signaling is performed with a timeout of one 100 milliseconds in order to ensure that threads can exit.
 
 
 Process Waiting Thread
