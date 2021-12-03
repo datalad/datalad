@@ -205,7 +205,12 @@ lgr = logging.getLogger("datalad.tests.utils")
 
 
 def skip_if_no_module(module):
-    pytest.importorskip(module, reason=f"Module {module} fails to load")
+    # Using pytest.importorskip here won't always work, as some imports (e.g.,
+    # libxmp) can fail with exceptions other than ImportError
+    try:
+        imp = __import__(module)
+    except Exception as exc:
+        pytest.skip("Module %s fails to load" % module)
 
 
 def skip_if_scrapy_without_selector():
