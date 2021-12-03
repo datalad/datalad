@@ -482,11 +482,7 @@ class RunProcedure(Interface):
         from datalad.interface.utils import generic_result_renderer
         from datalad.ui import ui
 
-        if res['status'] != 'ok':
-            # logging complained about this already
-            return
-
-        if 'procedure' not in res.get('action', ''):
+        if res['status'] != 'ok' or 'procedure' not in res.get('action', ''):
             # it's not our business
             generic_result_renderer(res)
             return
