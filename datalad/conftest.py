@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import ExitStack
 
 import pytest
@@ -23,7 +24,6 @@ test_http_server = None
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_package():
-    import os
     import tempfile
     from pathlib import Path
 
@@ -49,9 +49,7 @@ def setup_package():
         # enforce honoring TMPDIR (see gh-5307)
         tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
 
-    with ExitStack() as stack:
-        m = stack.enter_context(pytest.MonkeyPatch().context())
-
+    with pytest.MonkeyPatch().context() as m:
         m.setattr(consts, "DATASETS_TOPURL", 'https://datasets-tests.datalad.org/')
         m.setenv('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
@@ -123,15 +121,6 @@ def setup_package():
             if ev in os.environ and not (os.environ[ev]):
                 lgr.debug("Removing %s from the environment since it is empty", ev)
                 os.environ.pop(ev)
-
-        DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
-        if DATALAD_LOG_LEVEL is None:
-            # very very silent.  Tests introspecting logs should use
-            # swallow_logs(new_level=...)
-            stack.enter_context(pytest.LogCaptureFixture().at_level(100, lgr.name))
-
-            # And we should also set it within environ so underlying commands also stay silent
-            m.setenv('DATALAD_LOG_LEVEL', '100')
 
         # Prevent interactive credential entry (note "true" is the command to run)
         # See also the core.askPass setting above
@@ -211,5 +200,12 @@ def setup_package():
 
 
 @pytest.fixture(autouse=True)
-def capture_logs(caplog):
-    caplog.set_level(logging.INFO, logger="datalad")
+def capture_logs(caplog, monkeypatch):
+    DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
+    if DATALAD_LOG_LEVEL is None:
+        # very very silent.  Tests introspecting logs should use
+        # swallow_logs(new_level=...)
+        caplog.set_level(100, lgr.name)
+        # And we should also set it within environ so underlying commands also
+        # stay silent
+        monkeypatch.setenv('DATALAD_LOG_LEVEL', '100')
