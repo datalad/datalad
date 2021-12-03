@@ -157,6 +157,8 @@ ArgSpecFake = collections.namedtuple(
     "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
+# adding cache here somehow does break it -- even 'datalad wtf' does not run
+# @lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
 def getargspec(func, *, include_kwonlyargs=False):
     """Compat shim for getargspec deprecated in python 3.
 
@@ -223,7 +225,8 @@ _SIG_KIND_SELECTORS = {
 _SIG_KIND_SELECTORS['any'] = set().union(*_SIG_KIND_SELECTORS.values())
 
 
-def get_sig_param_names(f, kinds: list) -> tuple:
+@lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
+def get_sig_param_names(f, kinds: tuple) -> tuple:
     """A helper to selectively return parameters from inspect.signature.
 
     inspect.signature is the ultimate way for introspecting callables.  But
@@ -238,7 +241,7 @@ def get_sig_param_names(f, kinds: list) -> tuple:
     Parameters
     ----------
     f: callable
-    kinds: list with values from {'pos_any', 'pos_only', 'kw_any', 'kw_only', 'any'}
+    kinds: tuple with values from {'pos_any', 'pos_only', 'kw_any', 'kw_only', 'any'}
       Is a list of what kinds of args to return in result (tuple). Each element
       should be one of: 'any_pos' - positional or keyword which could be used
       positionally. 'kw_only' - keyword only (cannot be used positionally) arguments,

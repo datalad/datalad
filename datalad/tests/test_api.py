@@ -36,7 +36,7 @@ def test_basic_setup():
 
 def _test_consistent_order_of_args(intf, spec_posargs):
     f = getattr(intf, '__call__')
-    args, kw_only = get_sig_param_names(f, ['pos_any', 'kw_only'])
+    args, kw_only = get_sig_param_names(f, ('pos_any', 'kw_only'))
     # now verify that those spec_posargs are first among args
     # TODO*: The last odd one left from "plugins" era. Decided to leave alone
     if intf.__name__ in ('ExtractMetadata',):

@@ -468,7 +468,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # those, we use .signature.
         # More information in de-wrapt PR https://github.com/datalad/datalad/pull/6190
         from datalad.utils import get_sig_param_names
-        f_args, f_kwonlyargs = get_sig_param_names(f, ['pos_any', 'kw_only'])
+        f_args, f_kwonlyargs = get_sig_param_names(f, ('pos_any', 'kw_only'))
 
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset), let's raise a proper exception instead
