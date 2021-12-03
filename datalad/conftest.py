@@ -1,3 +1,4 @@
+import logging
 from contextlib import ExitStack
 
 import pytest
@@ -207,3 +208,8 @@ def setup_package():
     ssh_manager._socket_dir = None
 
     cookies_db.close()
+
+
+@pytest.fixture(autouse=True)
+def capture_logs(caplog):
+    caplog.set_level(logging.INFO, logger="datalad")
