@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
+import datalad
 from datalad.coreapi import *
 
 
@@ -35,7 +36,8 @@ def _command_summary():
     return "\n".join(get_cmd_summaries(grp_short_descriptions, groups))
 
 
-__doc__ += "\n\n{}".format(_command_summary())
+if not datalad.in_librarymode():
+    __doc__ += "\n\n{}".format(_command_summary())
 
 
 def _generate_extension_api():

@@ -23,6 +23,66 @@ import atexit
 import os
 
 
+# this is not to be modified. for querying use get_apimode()
+__api = 'python'
+
+
+def get_apimode():
+    """Returns the API mode label for the current session.
+
+    The API mode label indicates whether DataLad is running in "normal"
+    mode in a Python session, or whether it is used via the command line
+    interface.
+
+    This function is a utility for optimizing behavior and messaging to the
+    particular API (Python vs command line) in use in a given process.
+
+    Returns
+    {'python', 'cmdline'}
+      The API mode is 'python' by default, unless the main command line
+      entrypoint set it to 'cmdline'.
+    """
+    return __api
+
+
+def in_librarymode():
+    """Returns whether DataLad is requested to run in "library mode"
+
+    In this mode DataLad aims to behave without the assumption that it is
+    itself the front-end of a process and in full control over messaging
+    and parameters.
+
+    Returns
+    -------
+    bool
+    """
+    return __runtime_mode == 'library'
+
+
+def enable_librarymode():
+    """Request DataLad to operate in library mode.
+
+    This function should be executed immediately after importing the `datalad`
+    package, when DataLad is not used as an application, or in interactive
+    scenarios, but as a utility library inside other applications. Enabling
+    this mode will turn off some convenience feature that are irrelevant in
+    such use cases (with performance benefits), and alters it messaging
+    behavior to better interoperate with 3rd-party front-ends.
+
+    Library mode can only be enabled once. Switching it on and off within
+    the runtime of a process is not supported.
+
+    Example::
+
+        >>> import datalad
+        >>> datalad.enable_librarymode()
+    """
+    global __runtime_mode
+    __runtime_mode = 'library'
+    # export into the environment for child processes to inherit
+    os.environ['DATALAD_RUNTIME_LIBRARYMODE'] = '1'
+
+
 # For reproducible demos/tests
 _seed = os.environ.get('DATALAD_SEED', None)
 if _seed is not None:
@@ -50,6 +110,13 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 # must come after config manager
+# this is not to be modified. see enable/in_librarymode()
+# by default, we are in application-mode, simply because most of
+# datalad was originally implemented with this scenario assumption
+__runtime_mode = 'library' \
+    if cfg.getbool('datalad.runtime', 'librarymode', False) \
+    else 'application'
+
 from .log import lgr
 from datalad.support.exceptions import CapturedException
 from datalad.utils import (
