@@ -60,6 +60,7 @@ requires = {
         'httpretty>=0.9.4',  # Introduced py 3.6 support
         'nose>=1.3.4',
         'pytest~=6.0',
+        'pytest-cov~=3.0',
         'vcrpy',
     ],
     'metadata': [
@@ -92,7 +93,6 @@ requires.update({
     'devel-utils': [
         'asv',        # benchmarks
         'gprof2dot',  # rendering cProfile output as a graph image
-        'nose-timer',
         'psutil',
         'coverage',
         # disable for now, as it pulls in ipython 6, which is PY3 only
