@@ -120,6 +120,7 @@ __runtime_mode = 'library' \
 
 from datalad.utils import (
     get_encoding_info,
+    get_envvars_info,
     getpwd,
 )
 
