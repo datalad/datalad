@@ -8,21 +8,24 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """"""
 
+import importlib.util
 from io import StringIO as SIO
+from pathlib import Path
+
+import pytest
+
 from datalad.tests.utils import (
-    ok_,
-    ok_startswith,
+    SkipTest,
     assert_in,
     assert_not_in,
-    SkipTest,
+    ok_,
+    ok_startswith,
 )
 
-import importlib.util
-from pathlib import Path
 file_path = \
     Path(__file__).parents[3] / '_datalad_build_support' / 'formatters.py'
 if not file_path.exists():
-    raise SkipTest(f'Cannot find {file_path}')
+    pytestmark = pytest.mark.skip(reason=f"Module 'formatters' failed to load: {e}")
 spec = importlib.util.spec_from_file_location('formatters', file_path)
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)
