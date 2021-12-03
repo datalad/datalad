@@ -247,6 +247,7 @@ script:
       -m "$PYTEST_SELECTION_OP($PYTEST_SELECTION) and not(turtle)"
       --doctest-modules
       --cov=datalad
+      --log-cli-level=INFO
       -k test_tests_utils
       --pyargs
       $TESTS_TO_PERFORM
