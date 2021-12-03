@@ -33,7 +33,10 @@ from datalad.interface.utils import generic_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import save_message_opt
+from datalad.interface.common_opts import (
+    save_message_opt,
+    jobs_opt
+)
 
 from datalad.config import anything2bool
 
@@ -261,6 +264,7 @@ class Run(Interface):
             uninstalled dataset will be left unexpanded because no subdatasets
             will be installed for a dry run.""",
             constraints=EnsureChoice(None, "basic", "command")),
+        jobs=jobs_opt
     )
 
     @staticmethod
@@ -276,7 +280,8 @@ class Run(Interface):
             explicit=False,
             message=None,
             sidecar=None,
-            dry_run=None):
+            dry_run=None,
+            jobs=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
@@ -284,7 +289,8 @@ class Run(Interface):
                              explicit=explicit,
                              message=message,
                              sidecar=sidecar,
-                             dry_run=dry_run):
+                             dry_run=dry_run,
+                             jobs=jobs):
             yield r
 
     @staticmethod
@@ -414,7 +420,7 @@ def _install_and_reglob(dset_path, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset_path, inputs, extra_inputs=None):
+def prepare_inputs(dset_path, inputs, extra_inputs=None, jobs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -448,7 +454,7 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None):
                     message=("Input did not match existing file: %s",
                              miss))
         yield from get(dataset=dset_path, path=gp.expand_strict(),
-                       on_failure="ignore")
+                       on_failure="ignore", jobs=jobs)
 
 
 def _unlock_or_remove(dset_path, paths):
@@ -593,7 +599,7 @@ def _execute_command(command, pwd, expected_exit=None):
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
-                dry_run=False,
+                dry_run=False, jobs=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -686,7 +692,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     [] if assume_ready in ["inputs", "both"] else inputs,
                     # Ignore --assume-ready for extra_inputs. It's an unexposed
                     # implementation detail that lets wrappers sneak in inputs.
-                    extra_inputs):
+                    extra_inputs=extra_inputs,
+                    jobs=jobs):
                 yield res
 
             if assume_ready not in ["outputs", "both"]:
@@ -822,5 +829,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     path=outputs_to_save,
                     recursive=True,
                     message=msg,
+                    jobs=jobs,
                     return_type='generator'):
                 yield r
