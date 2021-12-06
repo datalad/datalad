@@ -266,6 +266,10 @@ class Run(Interface):
             constraints=EnsureChoice(None, "basic", "command")),
         jobs=jobs_opt
     )
+    _params_['jobs']._doc += """\
+        NOTE: This option can only parallelize input retrieval (get) and output
+        recording (save). DataLad does NOT parallelize your scripts for you.
+    """
 
     @staticmethod
     @datasetmethod(name='run')
