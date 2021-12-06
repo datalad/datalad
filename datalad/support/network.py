@@ -696,7 +696,7 @@ class URL(RI):
 
     @property
     def localpath(self):
-        if not self.is_local():
+        if self.scheme != 'file':
             raise ValueError(
                 "Non 'file://' URL cannot be resolved to a local path")
         hostname = self.hostname
@@ -704,9 +704,6 @@ class URL(RI):
                 or hostname.startswith('127.')):
             raise ValueError("file:// URL does not point to 'localhost'")
         return self.path
-
-    def is_local(self):
-        return self.scheme == 'file'
 
 
 class PathRI(RI):
