@@ -24,6 +24,7 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from locale import getpreferredencoding
 from os import environ
 from os.path import lexists
@@ -63,6 +64,46 @@ from datalad.utils import (
 lgr = logging.getLogger('datalad.dataset.gitrepo')
 
 preferred_encoding = getpreferredencoding(do_setlocale=False)
+
+
+@contextmanager
+def lock_if_required(read_only,
+                     write_lock):
+    if not read_only:
+        write_lock.acquire()
+    try:
+        yield write_lock
+    finally:
+        if not read_only:
+            write_lock.release()
+
+
+@contextmanager
+def git_ignore_check(expect_fail,
+                     stdout_buffer,
+                     stderr_buffer):
+    try:
+        yield None
+    except CommandError as e:
+        e.stdout = "".join(stdout_buffer) if stdout_buffer else ""
+        e.stderr = "".join(stderr_buffer) if stderr_buffer else ""
+        ignore_exception = _get_git_ignore_exception(e)
+        if ignore_exception:
+            raise ignore_exception
+        lgr.log(5 if expect_fail else 11, str(e))
+        raise
+
+
+def _get_git_ignore_exception(exception):
+    ignored = re.search(GitIgnoreError.pattern, exception.stderr)
+    if ignored:
+        return GitIgnoreError(cmd=exception.cmd,
+                              msg=exception.stderr,
+                              code=exception.code,
+                              stdout=exception.stdout,
+                              stderr=exception.stderr,
+                              paths=ignored.groups()[0].splitlines())
+    return None
 
 
 @path_based_str_repr
@@ -319,17 +360,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if remaining_content is not None:
                 yield file_no, remaining_content
 
-    def _get_ignore_exception(self, exception):
-        ignored = re.search(GitIgnoreError.pattern, exception.stderr)
-        if ignored:
-            return GitIgnoreError(cmd=exception.cmd,
-                                  msg=exception.stderr,
-                                  code=exception.code,
-                                  stdout=exception.stdout,
-                                  stderr=exception.stderr,
-                                  paths=ignored.groups()[0].splitlines())
-        return None
-
     def _call_git(self,
                   args,
                   files=None,
@@ -355,29 +385,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             STDERR_FILENO: [],
         }
 
-        try:
-            if not read_only:
-                self._write_lock.acquire()
+        with lock_if_required(read_only, self._write_lock), \
+             git_ignore_check(expect_fail, output[STDOUT_FILENO], output[STDERR_FILENO]):
 
-            for file_no, line in self._generator_call_git(
-                                                  args,
-                                                  files=files,
-                                                  env=env):
+            for file_no, line in self._generator_call_git(args,
+                                                          files=files,
+                                                          env=env):
                 output[file_no].append(line)
-
-        except CommandError as e:
-            e.stdout = "".join(output[STDOUT_FILENO])
-            e.stderr = "".join(output[STDERR_FILENO])
-            ignore_exception = self._get_ignore_exception(e)
-            if ignore_exception:
-                raise ignore_exception
-
-            lgr.log(5 if expect_fail else 11, str(e))
-            raise
-
-        finally:
-            if not read_only:
-                self._write_lock.release()
 
         for line in output[STDERR_FILENO]:
             lgr.log(stderr_log_level,
@@ -461,9 +475,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 env if env else self._git_runner.env)
 
         stderr_lines = []
-        try:
-            if not read_only:
-                self._write_lock.acquire()
+
+        with lock_if_required(read_only, self._write_lock), \
+             git_ignore_check(expect_fail, None, stderr_lines):
 
             for file_no, line in self._generator_call_git(
                                                     args,
@@ -474,19 +488,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     yield line.rstrip("\n")
                 else:
                     stderr_lines.append(line)
-
-        except CommandError as e:
-            e.stderr = "".join(stderr_lines)
-            ignore_exception = self._get_ignore_exception(e)
-            if ignore_exception:
-                raise ignore_exception
-
-            lgr.log(5 if expect_fail else 11, str(e))
-            raise
-
-        finally:
-            if not read_only:
-                self._write_lock.release()
 
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
         for line in stderr_lines:
