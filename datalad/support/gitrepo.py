@@ -419,13 +419,13 @@ class GitProgress(WitlessProtocol):
             )
         super().process_exited()
 
-    def pipe_data_received(self, fd, bytes):
+    def pipe_data_received(self, fd, byts):
         # progress reports only come from stderr
         if fd != 2:
             # let the base class decide what to do with it
-            super().pipe_data_received(fd, bytes)
+            super().pipe_data_received(fd, byts)
             return
-        for line in bytes.splitlines(keepends=True):
+        for line in byts.splitlines(keepends=True):
             # put any unprocessed content back in front
             line = self._unprocessed + line if self._unprocessed else line
             self._unprocessed = None
