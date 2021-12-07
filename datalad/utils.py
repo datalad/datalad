@@ -1501,6 +1501,18 @@ def disable_logger(logger=None):
         [h.removeFilter(filter_) for h in logger.handlers]
 
 
+@contextmanager
+def lock_if_required(lock_required, lock):
+    """ Acquired and released the provided lock if indicated by a flag"""
+    if lock_required:
+        lock.acquire()
+    try:
+        yield lock
+    finally:
+        if lock_required:
+            lock.release()
+
+
 #
 # Additional handlers
 #

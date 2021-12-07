@@ -13,7 +13,7 @@ import logging
 
 from .coreprotocols import NoCapture
 from .exception import CommandError
-from .nonasyncrunner import run_command
+from .nonasyncrunner import ThreadedRunner
 from .protocol import GeneratorMixIn
 
 
@@ -26,7 +26,7 @@ class WitlessRunner(object):
     It aims to be as simple as possible, providing only essential
     functionality.
     """
-    __slots__ = ['cwd', 'env']
+    __slots__ = ['cwd', 'env', 'threaded_runner']
 
     def __init__(self, cwd=None, env=None):
         """
@@ -44,6 +44,9 @@ class WitlessRunner(object):
         self.env = env
         # stringify to support Path instances on PY35
         self.cwd = str(cwd) if cwd is not None else None
+
+        self.threaded_runner = None
+
 
     def _get_adjusted_env(self, env=None, cwd=None, copy=True):
         """Return an adjusted copy of an execution environment
@@ -117,7 +120,9 @@ class WitlessRunner(object):
         kwargs :
           Passed to the Protocol class constructor.
 
-        : returns : Union[Any, Generator]
+        Returns
+        -------
+          Union[Any, Generator]
 
             If the protocol is not a subclass of `GeneratorMixIn`, the
             result of protocol._prepare_result will be returned.
@@ -164,16 +169,19 @@ class WitlessRunner(object):
         )
 
         lgr.debug('Run %r (cwd=%s)', cmd, cwd)
-        results_or_iterator = run_command(
-            cmd,
-            protocol,
-            stdin,
+
+        self.threaded_runner = ThreadedRunner(
+            cmd=cmd,
+            protocol_class=protocol,
+            stdin=stdin,
             protocol_kwargs=kwargs,
-            cwd=cwd,
-            env=env,
             timeout=timeout,
-            exception_on_error=exception_on_error
+            exception_on_error=exception_on_error,
+            cwd=cwd,
+            env=env
         )
+
+        results_or_iterator = self.threaded_runner.run()
 
         if issubclass(protocol, GeneratorMixIn):
             return results_or_iterator
