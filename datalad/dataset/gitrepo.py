@@ -67,15 +67,15 @@ preferred_encoding = getpreferredencoding(do_setlocale=False)
 
 
 @contextmanager
-def lock_if_required(read_only,
-                     write_lock):
-    if not read_only:
-        write_lock.acquire()
+def lock_if_required(lock_required, lock):
+    """Acquire/ and release the provided lock if indicated by a flag"""
+    if lock_required:
+        lock.acquire()
     try:
-        yield write_lock
+        yield lock
     finally:
-        if not read_only:
-            write_lock.release()
+        if lock_required:
+            lock.release()
 
 
 @contextmanager
