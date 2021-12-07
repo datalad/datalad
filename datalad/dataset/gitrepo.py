@@ -20,7 +20,6 @@ lifetime of a singleton.
 __all__ = ['GitRepo']
 
 import logging
-import os
 import re
 import threading
 import time
@@ -57,6 +56,7 @@ from datalad.support.exceptions import (
 )
 from datalad.utils import (
     ensure_list,
+    lock_if_required,
     Path,
 )
 
@@ -64,18 +64,6 @@ from datalad.utils import (
 lgr = logging.getLogger('datalad.dataset.gitrepo')
 
 preferred_encoding = getpreferredencoding(do_setlocale=False)
-
-
-@contextmanager
-def lock_if_required(lock_required, lock):
-    """Acquire/ and release the provided lock if indicated by a flag"""
-    if lock_required:
-        lock.acquire()
-    try:
-        yield lock
-    finally:
-        if lock_required:
-            lock.release()
 
 
 @contextmanager
@@ -377,7 +365,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
 
-        if not read_only and self._fake_dates_enabled:
+        read_write = not read_only
+        if read_write and self._fake_dates_enabled:
             env = self.add_fake_dates_to_env(env if env else runner.env)
 
         output = {
@@ -385,7 +374,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             STDERR_FILENO: [],
         }
 
-        with lock_if_required(read_only, self._write_lock), \
+        with lock_if_required(read_write, self._write_lock), \
              git_ignore_check(expect_fail, output[STDOUT_FILENO], output[STDERR_FILENO]):
 
             for file_no, line in self._generator_call_git(args,
@@ -470,13 +459,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         CommandError if the call exits with a non-zero status.
         """
 
-        if not read_only and self._fake_dates_enabled:
+        read_write = not read_only
+        if read_write and self._fake_dates_enabled:
             env = self.add_fake_dates_to_env(
                 env if env else self._git_runner.env)
 
         stderr_lines = []
 
-        with lock_if_required(read_only, self._write_lock), \
+        with lock_if_required(read_write, self._write_lock), \
              git_ignore_check(expect_fail, None, stderr_lines):
 
             for file_no, line in self._generator_call_git(
