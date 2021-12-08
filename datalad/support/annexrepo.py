@@ -53,6 +53,7 @@ from datalad.runner.protocol import GeneratorMixIn
 from datalad.runner.utils import LineSplitter
 # must not be loads, because this one would log, and we need to log ourselves
 from datalad.support.json_py import json_loads
+from datalad.support.exceptions import CapturedException
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (

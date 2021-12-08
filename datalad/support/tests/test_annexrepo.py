@@ -2597,3 +2597,14 @@ def test_generator_annex_json_protocol():
             break
         count += 1
         stdin_queue.put(json_object(count=count))
+
+
+def test_captured_exception():
+    class RaiseMock:
+        def add_(self, *args, **kwargs):
+            raise CommandError("RaiseMock.add_")
+
+    with patch("datalad.support.annexrepo.super") as repl_super:
+        repl_super.return_value = RaiseMock()
+        gen = AnnexRepo.add_(object(), [])
+        assert_raises(CommandError, gen.send, None)
