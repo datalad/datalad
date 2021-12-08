@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -28,6 +28,7 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
     RemoteNotAvailableError,
 )
+from datalad.support.network import get_local_file_url
 from datalad.tests.utils import (
     ok_,
     eq_,
@@ -76,8 +77,6 @@ def _make_dataset_hierarchy(path):
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
-# AssertionError since does get extra record {'cost': 400, 'name': 'bang', 'url': 'youredead', 'from_config': True},
-@known_failure_githubci_win
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -747,3 +746,40 @@ def test_missing_path_handling(path):
 
         # Check for guarded access in error results
         ds.get("foo")
+
+
+@known_failure_windows  # create-sibling-ria + ORA not fit for windows
+@with_tempfile
+@with_tempfile
+@with_tree(tree={'sub1': {'file1.txt': 'content 1'},
+                 'sub2': {'file2.txt': 'content 2'}})
+@with_tempfile
+@with_tempfile
+def test_source_candidate_subdataset(store1, store2, intermediate,
+                                     super, clone):
+
+    # This tests the scenario of gh-6159.
+    # However, the actual point is to test that `get` does not overwrite a
+    # source candidate config in subdatasets, if they already have such a
+    # config. This could come from any postclone_cfg routine, but the only one
+    # actually doing this ATM is postclone_cfg_ria.
+
+    ds = Dataset(intermediate).create(force=True)
+    ds.create("sub1", force=True)
+    ds.create("sub2", force=True)
+    ds.save(recursive=True)
+    ria_url_1 = "ria+" + get_local_file_url(store1, compatibility='git')
+    ds.create_sibling_ria(ria_url_1, "firststore", recursive=True,
+                          new_store_ok=True)
+    ds.push(".", to="firststore", recursive=True)
+    superds = Dataset(super).create()
+    superds.clone(source=ria_url_1 + "#" + ds.id, path="intermediate")
+    ria_url_2 = "ria+" + get_local_file_url(store2, compatibility='git')
+    superds.create_sibling_ria(ria_url_2, "secondstore", new_store_ok=True)
+    superds.push(".", to="secondstore")
+
+    cloneds = install(clone, source=ria_url_2 + "#" + superds.id)
+
+    # This would fail if source candidates weren't right, since cloneds only
+    # knows the second store so far (which doesn't have the subdatasets).
+    cloneds.get("intermediate", recursive=True)

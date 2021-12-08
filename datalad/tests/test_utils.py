@@ -1,6 +1,6 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -11,6 +11,8 @@
 
 """
 
+from functools import wraps
+import inspect
 import os
 import os.path as op
 import shutil
@@ -49,6 +51,7 @@ from datalad.utils import (
     file_basename,
     find_files,
     generate_chunks,
+    getargspec,
     get_dataset_root,
     get_open_files,
     get_path_prefix,
@@ -122,9 +125,6 @@ from datalad import cfg as dl_cfg
 
 
 def test_better_wraps():
-    from functools import wraps
-    from datalad.utils import getargspec
-
     def wraps_decorator(func):
         @wraps(func)
         def  _wrap_wraps_decorator(*args, **kwargs):
@@ -148,9 +148,67 @@ def test_better_wraps():
         return "function2"
 
     eq_("function1", function1(1, 2, 3))
-    eq_(getargspec(function1)[0], [])
+    # getargspec shim now can handle @wraps'ed functions just fine
+    eq_(getargspec(function1)[0], ['a', 'b', 'c'])
     eq_("function2", function2(1, 2, 3))
     eq_(getargspec(function2)[0], ['a', 'b', 'c'])
+
+
+def test_getargspec():
+
+    def eq_argspec(f, expected, has_kwonlyargs=False):
+        """A helper to centralize testing of getargspec on original and wrapped function
+
+        has_kwonlyargs is to instruct if function has kwonly args so we do not try to compare
+        to inspect.get*spec functions, which would barf ValueError if attempted to run on a
+        function with kwonlys. And also we pass it as include_kwonlyargs to our getargspec
+        """
+        # so we know that our expected is correct
+        if not has_kwonlyargs:
+            # if False - we test function with kwonlys - inspect.getargspec would barf
+            eq_(inspect.getargspec(f), expected)
+            # and getfullargspec[:4] wouldn't provide a full picture
+            eq_(inspect.getfullargspec(f)[:4], expected)
+        else:
+            assert_raises(ValueError, inspect.getargspec, f)
+            inspect.getfullargspec(f)  # doesn't barf
+        eq_(getargspec(f, include_kwonlyargs=has_kwonlyargs), expected)
+
+        # and lets try on a wrapped one -- only ours can do the right thing
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):  # pragma: no cover
+                return f(*args, **kwargs)
+            return wrapper
+        fw = decorator(f)
+        if has_kwonlyargs:
+            # We barf ValueError similarly to inspect.getargspec, unless explicitly requested
+            # to include kwonlyargs
+            assert_raises(ValueError, getargspec, fw)
+        eq_(getargspec(fw, include_kwonlyargs=has_kwonlyargs), expected)
+
+    def f0():  # pragma: no cover
+        pass
+
+    yield eq_argspec, f0, ([], None, None, None)
+
+    def f1(a1, kw1=None, kw0=1):  # pragma: no cover
+        pass
+
+    yield eq_argspec, f1, (['a1', 'kw1', 'kw0'], None, None, (None, 1))
+
+    # Having *a already makes keyword args to be kwonlyargs, in that
+    # inspect.get*spec would barf
+    def f1_args(a1, *a, kw1=None, kw0=1, **kw):  # pragma: no cover
+        pass
+
+    yield eq_argspec, f1_args, (['a1', 'kw1', 'kw0'], 'a', 'kw', (None, 1)), True
+
+    def f1_star(a1, *, kw1=None, kw0=1):  # pragma: no cover
+        pass
+
+    assert_raises(ValueError, getargspec, f1_star)
+    yield eq_argspec, f1_star, (['a1', 'kw1', 'kw0'], None, None, (None, 1)), True
 
 
 @with_tempfile(mkdir=True)
@@ -661,7 +719,7 @@ def test_all_same():
         yield 'a'
         yield 'a'
         yield 'b'
-        raise ValueError("Should not get here since on b should return")
+        raise ValueError("Should not get here since on b should return")  # pragma: no cover
 
     ok_(not all_same(never_get_to_not_needed()))
 

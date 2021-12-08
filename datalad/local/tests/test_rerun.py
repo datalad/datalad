@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -14,70 +14,63 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from os import (
-    remove,
-)
-
-from io import StringIO
 import sys
+from io import StringIO
+from os import remove
 from unittest.mock import patch
 
-from datalad.utils import (
-    chpwd,
-    on_windows,
-    Path,
-)
-
-from datalad.distribution.dataset import Dataset
-from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import (
-    CommandError,
-    IncompleteResultsError,
-)
 from datalad.api import (
     install,
     run,
 )
-from datalad.core.local.run import (
-    run_command,
-)
-from datalad.interface.rerun import (
-    get_run_info,
+from datalad.core.local.run import run_command
+from datalad.core.local.tests.test_run import last_commit_msg
+from datalad.distribution.dataset import Dataset
+from datalad.local.rerun import (
     diff_revision,
+    get_run_info,
     new_or_modified,
 )
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+)
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
-    assert_raises,
-    assert_false,
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    SkipTest,
     assert_dict_equal,
+    assert_false,
+    assert_in,
     assert_in_results,
+    assert_not_in,
+    assert_not_in_results,
+    assert_raises,
     assert_repo_status,
-    with_tempfile,
-    with_tree,
+    assert_result_count,
+    assert_status,
+    create_tree,
+    eq_,
+    known_failure_windows,
+    neq_,
     ok_,
     ok_exists,
     ok_file_has_content,
     ok_file_under_git,
-    create_tree,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
-    eq_,
-    neq_,
-    assert_status,
-    assert_result_count,
-    assert_in,
-    assert_not_in,
-    assert_not_in_results,
+    skip_if_adjusted_branch,
+    slow,
     swallow_logs,
     swallow_outputs,
-    known_failure_windows,
-    known_failure_githubci_win,
-    slow,
-    skip_if_adjusted_branch,
-    SkipTest,
+    with_tempfile,
+    with_tree,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
+    on_windows,
 )
 
-from datalad.core.local.tests.test_run import last_commit_msg
 cat_command = 'cat' if not on_windows else 'type'
 touch_command = "touch " if not on_windows else "type nul > "
 grep_command = 'grep ' if not on_windows else 'findstr '

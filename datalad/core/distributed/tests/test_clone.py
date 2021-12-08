@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -72,10 +72,8 @@ from datalad.tests.utils import (
     skip_ssh,
     slow,
     swallow_logs,
-    use_cassette,
     with_sameas_remote,
     with_tempfile,
-    with_testrepos,
     with_tree,
     SkipTest,
 )
@@ -167,9 +165,8 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
-@with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-def test_clone_simple_local(src, path):
+def check_clone_simple_local(src, path):
     origin = Dataset(path)
 
     # now install it somewhere else
@@ -185,14 +182,20 @@ def test_clone_simple_local(src, path):
         ok_(not isinstance(ds.repo, AnnexRepo))
         ok_(GitRepo.is_valid_repo(ds.path))
         eq_(set(ds.repo.get_indexed_files()),
-            {'test.dat', 'INFO.txt'})
+            {'test.dat', 'INFO.txt', '.noannex',
+             str(Path('.datalad', 'config'))})
         assert_repo_status(path, annex=False)
     else:
         # must be an annex
         ok_(isinstance(ds.repo, AnnexRepo))
         ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
         eq_(set(ds.repo.get_indexed_files()),
-            {'test.dat', 'INFO.txt', 'test-annex.dat'})
+            {'test.dat',
+             'INFO.txt',
+             'test-annex.dat',
+             str(Path('.datalad', 'config')),
+             str(Path('.datalad', '.gitattributes')),
+             '.gitattributes'})
         assert_repo_status(path, annex=True)
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
@@ -210,12 +213,29 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_clone_simple_local(src, url):
+    srcobj = Path(src)
+    gitds = Dataset(srcobj / 'git').create(annex=False)
+    annexds = Dataset(srcobj/ 'annex').create(annex=True)
+    (annexds.pathobj / "test-annex.dat").write_text('annexed content')
+    annexds.save()
+    for ds in (gitds, annexds):
+        (ds.pathobj / 'test.dat').write_text('content')
+        (ds.pathobj / 'INFO.txt').write_text('content2')
+        ds.save(to_git=True)
+        ds.repo.call_git(["update-server-info"])
+    check_clone_simple_local(gitds.path)
+    check_clone_simple_local(gitds.pathobj)
+    check_clone_simple_local(f'{url}git')
+    check_clone_simple_local(annexds.path)
+    check_clone_simple_local(annexds.pathobj)
+    check_clone_simple_local(f'{url}annex')
 
-# AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
-@known_failure_githubci_win
-@with_testrepos(flavors=['local-url', 'network', 'local'])
+
 @with_tempfile
-def test_clone_dataset_from_just_source(url, path):
+def check_clone_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = clone(url, result_xfm='datasets', return_type='item-or-list')
 
@@ -224,6 +244,18 @@ def test_clone_dataset_from_just_source(url, path):
     ok_(GitRepo.is_valid_repo(ds.path))
     assert_repo_status(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
+
+
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_clone_dataset_from_just_source(src, url):
+    ds = Dataset(src).create()
+    (ds.pathobj / 'INFO.txt').write_text('content')
+    ds.save()
+    ds.repo.call_git(["update-server-info"])
+    check_clone_dataset_from_just_source(ds.path)
+    check_clone_dataset_from_just_source(ds.pathobj)
+    check_clone_dataset_from_just_source(url)
 
 
 # test fails randomly, likely a bug in one of the employed test helpers
@@ -1599,6 +1631,27 @@ def test_clone_recorded_subds_reset(path):
 
 
 @with_tempfile
+def test_clone_git_clone_opts(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a", annex=False)
+
+    repo_a = ds_a.repo
+    repo_a.commit(msg="c1", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
+    repo_a.commit(msg="c2", options=["--allow-empty"])
+    repo_a.tag("atag")
+
+    ds_b = clone(ds_a.path, path / "ds_b",
+                 git_clone_opts=[f"--branch={DEFAULT_BRANCH}",
+                                 "--single-branch", "--no-tags"])
+    repo_b = ds_b.repo
+    eq_(repo_b.get_active_branch(), DEFAULT_BRANCH)
+    eq_(set(x["refname"] for x in repo_b.for_each_ref_(fields="refname")),
+        {f"refs/heads/{DEFAULT_BRANCH}",
+         f"refs/remotes/{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"})
+
+
+@with_tempfile
 @with_tempfile
 def test_clone_url_mapping(src_path, dest_path):
     src = create(src_path)
@@ -1607,7 +1660,7 @@ def test_clone_url_mapping(src_path, dest_path):
     assert_raises(IncompleteResultsError, clone, 'rambo', dest_path)
     # rather than adding test URL mapping here, consider
     # test_url_mapping_specs(), it is cheaper there
-  
+
     # anticipate windows test paths and escape them
     escaped_subst = (r',rambo,%s' % src_path).replace('\\', '\\\\')
     for specs in (

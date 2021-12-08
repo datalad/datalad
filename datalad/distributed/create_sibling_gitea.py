@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -93,6 +93,8 @@ class CreateSiblingGitea(Interface):
 
     In order to be able to use this command, a personal access token has to be
     generated on the platform (Account->Settings->Applications->Generate Token).
+
+    .. versionadded:: 0.16
     """
 
     _params_ = _Gitea.create_sibling_params

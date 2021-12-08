@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,7 +26,6 @@ import gzip
 import stat
 import string
 import warnings
-import wrapt
 
 import os.path as op
 
@@ -158,10 +157,59 @@ ArgSpecFake = collections.namedtuple(
     "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
-def getargspec(func):
-    """Minimal compat shim for getargspec deprecated in python 3.
+def getargspec(func, *, include_kwonlyargs=False):
+    """Compat shim for getargspec deprecated in python 3.
+
+    The main difference from inspect.getargspec (and inspect.getfullargspec
+    for that matter) is that by using inspect.signature we are providing
+    correct args/defaults for functools.wraps'ed functions.
+
+    `include_kwonlyargs` option was added to centralize getting all args,
+    even the ones which are kwonly (follow the ``*,``).
+
+    For internal use and not advised for use in 3rd party code.
+    Please use inspect.signature directly.
     """
-    return ArgSpecFake(*inspect.getfullargspec(func)[:4])
+    # We use signature, and not getfullargspec, because only signature properly
+    # "passes" args from a functools.wraps decorated function.
+    # Note: getfullargspec works Ok on wrapt-decorated functions
+    f_sign = inspect.signature(func)
+    # Loop through parameters and compose argspec
+    args4 = [[], None, None, {}]
+    # Collect all kwonlyargs into a dedicated dict - name: default
+    kwonlyargs = {}
+    # shortcuts
+    args, defaults = args4[0], args4[3]
+    P = inspect.Parameter
+
+    for p_name, p in f_sign.parameters.items():
+        if p.kind in (P.POSITIONAL_ONLY, P.POSITIONAL_OR_KEYWORD):
+            assert not kwonlyargs  # yoh: must not come after kwonlyarg
+            args.append(p_name)
+            if p.default is not P.empty:
+                defaults[p_name] = p.default
+        elif p.kind == P.VAR_POSITIONAL:
+            args4[1] = p_name
+        elif p.kind == P.VAR_KEYWORD:
+            args4[2] = p_name
+        elif p.kind == P.KEYWORD_ONLY:
+            assert p.default is not P.empty
+            kwonlyargs[p_name] = p.default
+
+    if kwonlyargs:
+        if not include_kwonlyargs:
+            raise ValueError(
+                'Function has keyword-only parameters or annotations, either use '
+                'inspect.signature() API which can support them, or provide include_kwonlyargs=True '
+                'to this function'
+            )
+        else:
+            args.extend(list(kwonlyargs))
+            defaults.update(kwonlyargs)
+
+    # harmonize defaults to how original getargspec returned them -- just a tuple
+    args4[3] = None if not defaults else tuple(defaults.values())
+    return ArgSpecFake(*args4)
 
 
 def any_re_search(regexes, value):
@@ -188,10 +236,10 @@ def get_home_envvars(new_home):
 
     Parameters
     ----------
-    new_home: str
+    new_home: str or Path
       New home path, in native to OS "schema"
     """
-    environ = os.environ
+    new_home = str(new_home)
     out = {'HOME': new_home}
     if on_windows:
         # requires special handling, since it has a number of relevant variables
@@ -199,6 +247,7 @@ def get_home_envvars(new_home):
         # since python 3.8: https://bugs.python.org/issue36264
         out['USERPROFILE'] = new_home
         out['HOMEDRIVE'], out['HOMEPATH'] = splitdrive(new_home)
+
     return {v: val for v, val in out.items() if v in os.environ}
 
 
@@ -1013,20 +1062,12 @@ def saved_generator(gen):
 #
 # Decorators
 #
-def better_wraps(to_be_wrapped):
-    """Decorator to replace `functools.wraps`
 
-    This is based on `wrapt` instead of `functools` and in opposition to `wraps`
-    preserves the correct signature of the decorated function.
-    It is written with the intention to replace the use of `wraps` without any
-    need to rewrite the actual decorators.
-    """
-
-    @wrapt.decorator(adapter=to_be_wrapped)
-    def intermediator(to_be_wrapper, instance, args, kwargs):
-        return to_be_wrapper(*args, **kwargs)
-
-    return intermediator
+# Originally better_wraps was created to provide `wrapt`-based, instead of
+# `functools.wraps` implementation to preserve the correct signature of the
+# decorated function. By using inspect.signature in our getargspec, which
+# works fine on `functools.wraps`ed functions, we mediated this necessity.
+better_wraps = wraps
 
 
 # Borrowed from pandas
@@ -1109,15 +1150,14 @@ def collect_method_callstats(func):
       - .repo is expensive since does all kinds of checks.
       - .config is expensive transitively since it calls .repo each time
 
-
     TODO:
-    - fancy one could look through the stack for the same id(self) to see if
-      that location is already in memo.  That would hint to the cases where object
-      is not passed into underlying functions, causing them to redo the same work
-      over and over again
-    - ATM might flood with all "1 lines" calls which are not that informative.
-      The underlying possibly suboptimal use might be coming from their callers.
-      It might or not relate to the previous TODO
+      - fancy one could look through the stack for the same id(self) to see if
+        that location is already in memo.  That would hint to the cases where object
+        is not passed into underlying functions, causing them to redo the same work
+        over and over again
+      - ATM might flood with all "1 lines" calls which are not that informative.
+        The underlying possibly suboptimal use might be coming from their callers.
+        It might or not relate to the previous TODO
     """
     from collections import defaultdict
     import traceback
@@ -1459,6 +1499,18 @@ def disable_logger(logger=None):
         yield logger
     finally:
         [h.removeFilter(filter_) for h in logger.handlers]
+
+
+@contextmanager
+def lock_if_required(lock_required, lock):
+    """ Acquired and released the provided lock if indicated by a flag"""
+    if lock_required:
+        lock.acquire()
+    try:
+        yield lock
+    finally:
+        if lock_required:
+            lock.release()
 
 
 #

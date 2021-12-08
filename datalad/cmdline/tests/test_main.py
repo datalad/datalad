@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     assert_re_in,
     eq_,
     in_,
+    ok_,
     ok_startswith,
     on_windows,
     slow,
@@ -70,21 +71,28 @@ def run_main(args, exit_code=0, expect_stderr=False):
     stdout, stderr  strings
        Output produced
     """
-    with patch('sys.stderr', new_callable=StringIO) as cmerr:
-        with patch('sys.stdout', new_callable=StringIO) as cmout:
-            with assert_raises(SystemExit) as cm:
-                main(["datalad"] + list(args))
-            assert_equal(cm.exception.code, exit_code)
-            stdout = cmout.getvalue()
-            stderr = cmerr.getvalue()
-            if expect_stderr is False:
-                assert_equal(stderr, "")
-            elif expect_stderr is True:
-                # do nothing -- just return
-                pass
-            else:
-                # must be a string
-                assert_equal(stderr, expect_stderr)
+    was_mode = datalad.__api
+    try:
+        with patch('sys.stderr', new_callable=StringIO) as cmerr:
+            with patch('sys.stdout', new_callable=StringIO) as cmout:
+                with assert_raises(SystemExit) as cm:
+                    main(["datalad"] + list(args))
+                eq_('cmdline', datalad.get_apimode())
+                assert_equal(cm.exception.code, exit_code)
+                stdout = cmout.getvalue()
+                stderr = cmerr.getvalue()
+                if expect_stderr is False:
+                    assert_equal(stderr, "")
+                elif expect_stderr is True:
+                    # do nothing -- just return
+                    pass
+                else:
+                    # must be a string
+                    assert_equal(stderr, expect_stderr)
+    finally:
+        # restore what we had
+        datalad.__api = was_mode
+
     return stdout, stderr
 
 
@@ -117,10 +125,7 @@ def test_help_np():
     ok_startswith(stdout, 'Usage: datalad')
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
     sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
-    # but order is still not guaranteed (dict somewhere)! TODO
-    # see https://travis-ci.org/datalad/datalad/jobs/80519004
-    # thus testing sets
-    for s in {'Commands for dataset operations',
+    for s in {'Essential commands',
               'Commands for metadata handling',
               'Miscellaneous commands',
               'General information',
@@ -382,3 +387,18 @@ def test_commanderror_jsonmsgs(src, exp):
             protocol=StdOutErrCapture)
     if ds.repo.git_annex_version >= "8.20201129":
         in_('use `git-annex export`', cme.exception.stderr)
+
+
+def test_librarymode():
+    was_mode = datalad.__runtime_mode
+    try:
+        # clean --dry-run is just a no-op command that is cheap
+        # to execute. It has no particular role here, other than
+        # to make the code pass the location where library mode
+        # should be turned on via the cmdline API
+        run_main(['-c', 'datalad.runtime.librarymode=yes', 'clean', '--dry-run'])
+        ok_(datalad.in_librarymode())
+    finally:
+        # restore pre-test behavior
+        datalad.__runtime_mode = was_mode
+        datalad.cfg.overrides.pop('datalad.runtime.librarymode')

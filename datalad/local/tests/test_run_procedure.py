@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -17,14 +17,15 @@ import os.path as op
 import sys
 from unittest.mock import patch
 
+from datalad.api import run_procedure
 from datalad.cmd import (
-    WitlessRunner,
     KillOutput,
+    WitlessRunner,
 )
-from datalad.utils import (
-    chpwd,
-    quote_cmdlinearg,
-    swallow_outputs,
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
 )
 from datalad.tests.utils import (
     OBSCURE_FILENAME,
@@ -38,17 +39,15 @@ from datalad.tests.utils import (
     eq_,
     known_failure_windows,
     ok_file_has_content,
-    on_windows,
     patch_config,
     with_tempfile,
     with_tree,
 )
-from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import (
-    CommandError,
-    InsufficientArgumentsError,
+from datalad.utils import (
+    chpwd,
+    quote_cmdlinearg,
+    swallow_outputs,
 )
-from datalad.api import run_procedure
 
 
 @with_tempfile(mkdir=True)
@@ -97,7 +96,7 @@ def test_procedure_discovery(path, super_path):
         # ^ Change directory so that we don't fail with an
         # InvalidGitRepositoryError if the test is executed from a git
         # worktree.
-        ps = run_procedure(discover=True)
+        ps = run_procedure(discover=True, result_renderer='disabled')
         # there are a few procedures coming with datalad, needs to find them
         assert_true(len(ps) > 2)
         # we get essential properties
@@ -114,14 +113,14 @@ def test_procedure_discovery(path, super_path):
     top_dir_procedure_path = op.join(ds.path, 'cfg_yoda.sh')
 
     # run discovery on the dataset:
-    ps = ds.run_procedure(discover=True)
+    ps = ds.run_procedure(discover=True, result_renderer='disabled')
     # it should not be found magically by default
     assert_not_in_results(ps, path=code_dir_procedure_path)
     assert_not_in_results(ps, path=top_dir_procedure_path)
 
     with patch_config({'datalad.locations.extra-procedures': op.join(ds.path, 'code')}):
         # run discovery on the dataset:
-        ps = ds.run_procedure(discover=True)
+        ps = ds.run_procedure(discover=True, result_renderer='disabled')
         # still needs to find procedures coming with datalad
         assert_true(len(ps) > 3)
         # and procedure under the path we specified
@@ -131,7 +130,7 @@ def test_procedure_discovery(path, super_path):
     # multiple extra locations
     with patch_config({'datalad.locations.extra-procedures': [op.join(ds.path, 'code'), ds.path]}):
         # run discovery on the dataset:
-        ps = ds.run_procedure(discover=True)
+        ps = ds.run_procedure(discover=True, result_renderer='disabled')
         # still needs to find procedures coming with datalad
         assert_true(len(ps) > 4)
         # and procedure under the path we specified
@@ -146,7 +145,7 @@ def test_procedure_discovery(path, super_path):
     ds.save(op.join('.datalad', 'config'))
 
     # run discovery on the dataset:
-    ps = ds.run_procedure(discover=True)
+    ps = ds.run_procedure(discover=True, result_renderer='disabled')
 
     # still needs to find procedures coming with datalad
     assert_true(len(ps) > 2)
@@ -164,7 +163,7 @@ def test_procedure_discovery(path, super_path):
     super = Dataset(super_path).create()
     super.install('sub', source=ds.path)
 
-    ps = super.run_procedure(discover=True)
+    ps = super.run_procedure(discover=True, result_renderer='disabled')
     # still needs to find procedures coming with datalad
     assert_true(len(ps) > 2)
     _check_procedure_properties(ps)
@@ -172,8 +171,9 @@ def test_procedure_discovery(path, super_path):
     assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                        'datalad_test_proc.py'))
 
-    if not on_windows:  # no symlinks
+    if not ds.repo.is_managed_branch():  # no symlinks
         import os
+
         # create a procedure which is a broken symlink, but recognizable as a
         # python script:
         os.symlink(op.join(super.path, 'sub', 'not_existent'),
@@ -183,7 +183,7 @@ def test_procedure_discovery(path, super_path):
         os.symlink(op.join(super.path, 'sub', 'not_existent'),
                    op.join(super.path, 'sub', 'code', 'unknwon_broken_link'))
 
-        ps = super.run_procedure(discover=True)
+        ps = super.run_procedure(discover=True, result_renderer='disabled')
         # still needs to find procedures coming with datalad and the dataset
         # procedure registered before
         assert_true(len(ps) > 3)
@@ -395,13 +395,17 @@ print(sys.argv)
 def test_name_with_underscore(path):
     ds = Dataset(path).create(force=True)
 
-    # Procedure name with underscore can't be reached directly with a DATALAD_
-    # environment variable.
-    with patch.dict("os.environ",
-                    {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
-                     '%s {script}' % sys.executable}):
-        with assert_raises(ValueError):
-            ds.run_procedure(spec=["print_args"])
+    # we are using the presence of a managed branch as a proxy indicator
+    # for a crippled FS, were we cannot trust the executable bit
+    # which is our only indicator in the absence of a file extension
+    if not ds.repo.is_managed_branch():
+        # Procedure name with underscore can't be reached directly with a DATALAD_
+        # environment variable.
+        with patch.dict("os.environ",
+                        {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
+                         '%s {script}' % sys.executable}):
+            with assert_raises(ValueError):
+                ds.run_procedure(spec=["print_args"])
 
     # But it can be set via DATALAD_CONFIG_OVERRIDES_JSON.
     with patch.dict("os.environ",

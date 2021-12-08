@@ -20,9 +20,9 @@ lgr = logging.getLogger('datalad.customremotes')
 
 from annexremote import (
     RemoteError,
-    SpecialRemote,
     UnsupportedRequest,
 )
+from datalad.customremotes import SpecialRemote
 
 from datalad.ui import ui
 

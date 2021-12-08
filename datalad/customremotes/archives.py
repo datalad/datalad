@@ -16,15 +16,13 @@ import os.path as op
 import shutil
 from collections import OrderedDict
 from operator import itemgetter
+from pathlib import Path
 from urllib.parse import urlparse
 
-from annexremote import (
-    RemoteError,
-    UnsupportedRequest,
-)
+from annexremote import UnsupportedRequest
 
-from datalad.cmdline.helpers import get_repo_instance
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.archives import ArchivesCache
 from datalad.support.cache import DictCache
@@ -34,10 +32,12 @@ from datalad.support.network import URL
 from datalad.utils import (
     ensure_bytes,
     getpwd,
+    get_dataset_root,
     unique,
     unlink,
 )
 
+from datalad.customremotes import RemoteError
 from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -64,7 +64,12 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except AttributeError as e:
+    except (OSError, AttributeError) as e:
+        # we need to catch OSError too, because Python's own logic
+        # of not providing link() where it is known to be unsupported
+        # (e.g. Windows) will not cover scenarios where a particular
+        # filesystem simply does not implement it on an otherwise
+        # sane platform (e.g. exfat on Linux)
         lgr.warning("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
@@ -94,7 +99,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # MIH figure out what the following is all about
         # in particular path==None
-        self.repo = get_repo_instance(class_=AnnexRepo) \
+        self.repo = Dataset(get_dataset_root(Path.cwd())).repo \
             if not path \
             else AnnexRepo(path, create=False, init=False)
 
@@ -324,7 +329,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 return True
         # it is unclear to MIH why this must be UNKNOWN rather than FALSE
         # but this is how I found it
-        raise RemoteError()
+        raise RemoteError('Key not present')
 
     def remove(self, key):
         raise UnsupportedRequest('This special remote cannot remove content')
@@ -405,17 +410,18 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, file)
                 if not was_extracted and self.cache[akey_path].is_extracted:
-                    self.annex.info(
+                    self.message(
                         "%s special remote is using an extraction cache "
                         "under %s. Remove it with DataLad's 'clean' "
                         "command to save disk space." %
                         (ARCHIVES_SPECIAL_REMOTE,
-                         self.cache[akey_path].path)
+                         self.cache[akey_path].path),
+                        type='info',
                     )
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                self.annex.debug(
+                self.message(
                     "Failed to fetch {akey} containing {key}: {msg}".format(
                         akey=akey,
                         key=key,
@@ -448,10 +454,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         from datalad.support.annexrepo import AnnexJsonProtocol
 
         akey_size = self.repo.get_size_from_key(akey)
-        self.annex.info(
+        self.message(
             "To obtain some keys we need to fetch an archive "
             "of size %s"
-            % (naturalsize(akey_size) if akey_size else "unknown")
+            % (naturalsize(akey_size) if akey_size else "unknown"),
+            type='info',
         )
 
         try:
@@ -460,7 +467,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 protocol=AnnexJsonProtocol,
             )
         except Exception:
-            self.annex.debug(f'Failed to fetch archive with key {akey}')
+            self.message(f'Failed to fetch archive with key {akey}')
             raise
 
 

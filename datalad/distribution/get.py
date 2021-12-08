@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -369,13 +369,15 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         for rec in cand_cfg:
             # check whether any of this configuration originated from the
             # superdataset. if so, inherit the config in the new subdataset
-            # clone. if not, keep things clean in order to be able to move with
-            # any outside configuration change
+            # clone unless that config is already specified in the new
+            # subdataset which can happen during postclone_cfg routines.
+            # if not, keep things clean in order to be able to move with any
+            # outside configuration change
             for c in ('datalad.get.subdataset-source-candidate-{}{}'.format(
                           rec['cost'], rec['name']),
                       'datalad.get.subdataset-source-candidate-{}'.format(
                           rec['name'])):
-                if c in super_cfg.keys():
+                if c in super_cfg.keys() and c not in subds.config.keys():
                     subds.config.set(c, super_cfg.get(c), where='local',
                                      reload=False)
                     need_reload = True

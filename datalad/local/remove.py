@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -72,6 +72,23 @@ class Remove(Interface):
     subdatasets are located under a to-be-removed path, they will be
     uninstalled entirely, and all their content dropped. If any subdataset
     can not be uninstalled safely, the remove operation will fail and halt.
+
+    .. versionchanged:: 0.16
+       More in-depth and comprehensive safety-checks are now performed by
+       default.
+       The ``if_dirty||--if-dirty`` argument is ignored, will be removed in
+       a future release, and can be removed for a safe-by-default behavior. For
+       other cases consider the ``reckless||--reckless`` argument.
+       The ``save||--save`` argument is ignored and will be removed in a future
+       release, a dataset modification is now always saved. Consider save's
+       ``amend||--amend`` argument for post-remove fix-ups.
+       The ``recursive||--recursive`` argument is ignored, and will be removed
+       in a future release. Removal operations are always recursive, and the
+       parameter can be stripped from calls for a safe-by-default behavior.
+
+    .. deprecated:: 0.16
+       The ``check||--check`` argument will be removed in a future release.
+       It needs to be replaced with ``reckless||--reckless``.
     """
     _params_ = dict(
         dataset=Parameter(
@@ -108,6 +125,8 @@ class Remove(Interface):
             doc="""DEPRECATED and IGNORED; use `save --amend` instead"""),
         recursive=Parameter(
             args=("--recursive", '-r',),
+            action='store_const',
+            const=None,
             doc="""DEPRECATED and IGNORED: removal is always a recursive
             operation"""),
     )
@@ -123,6 +142,9 @@ class Remove(Interface):
              dict(text="Permanently remove a superdataset (with all subdatasets) from the filesystem",
              code_py="remove(dataset='path/to/dataset')",
              code_cmd="datalad remove -d <path/to/dataset>"),
+             dict(text="DANGER-ZONE: Fast wipe-out a dataset and all its subdataset, bypassing all safety checks",
+             code_py="remove(dataset='path/to/dataset', reckless='kill')",
+             code_cmd="datalad remove -d <path/to/dataset> --reckless kill"),
     ]
 
     @staticmethod

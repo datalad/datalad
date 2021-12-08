@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -246,7 +246,7 @@ def test_gitrepo_call_git_methods(path):
     eq_(list(gr.call_git_items_(["ls-files", "-z"], sep="\0", read_only=True)),
         # Note: The custom separator has trailing empty item, but this is an
         # arbitrary command with unknown output it isn't safe to trim it.
-        ["bar", "foo.txt", ""])
+        ["bar", "foo.txt"])
 
     with assert_raises(AssertionError):
         gr.call_git_oneline(["ls-files"], read_only=True)

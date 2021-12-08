@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -39,6 +39,7 @@ from datalad.support.exceptions import (
     IncompleteResultsError,
 )
 from datalad.api import (
+    clone,
     run,
 )
 from datalad.core.local.run import (
@@ -58,7 +59,6 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
-    known_failure_githubci_win,
     known_failure_windows,
     neq_,
     OBSCURE_FILENAME,
@@ -68,12 +68,12 @@ from datalad.tests.utils import (
     swallow_logs,
     swallow_outputs,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 
 
 cat_command = 'cat' if not on_windows else 'type'
+
 
 @with_tempfile(mkdir=True)
 def test_invalid_call(path):
@@ -337,9 +337,13 @@ def test_run_assume_ready(path):
     assert_not_in_results(res, action="unlock", type="file")
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_run_explicit(path):
-    ds = Dataset(path)
+@with_tempfile()
+@with_tempfile()
+def test_run_explicit(origpath, path):
+    origds = Dataset(origpath).create()
+    (origds.pathobj / "test-annex.dat").write_text('content')
+    origds.save()
+    ds = clone(origpath, path)
 
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
@@ -350,16 +354,18 @@ def test_run_explicit(path):
         ofh.write(", more")
 
     # We need explicit=True to run with dirty repo.
-    assert_status("impossible",
-                  ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
-                         inputs=["test-annex.dat"],
-                         on_failure="ignore"))
+    assert_status(
+        "impossible",
+        ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
+               inputs=["test-annex.dat"],
+               on_failure="ignore"))
 
     hexsha_initial = ds.repo.get_hexsha()
     # If we specify test-annex.dat as an input, it will be retrieved before the
     # run.
     ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
-           inputs=["test-annex.dat"], explicit=True)
+           inputs=["test-annex.dat"], explicit=True,
+           result_renderer='disabled')
     ok_(ds.repo.file_has_content("test-annex.dat"))
     # We didn't commit anything because outputs weren't specified.
     assert_false(ds.repo.file_has_content("doubled.dat"))
@@ -368,23 +374,25 @@ def test_run_explicit(path):
     # If an input doesn't exist, we just show the standard warning.
     with assert_raises(IncompleteResultsError):
         ds.run("ls", inputs=["not-there"], explicit=True,
-               on_failure="stop")
+               on_failure="stop", result_renderer='disabled')
 
     remove(op.join(path, "doubled.dat"))
 
     hexsha_initial = ds.repo.get_hexsha()
     ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
            inputs=["test-annex.dat"], outputs=["doubled.dat"],
-           explicit=True)
+           explicit=True, result_renderer='disabled')
     ok_(ds.repo.file_has_content("doubled.dat"))
-    assert_repo_status(ds.path, modified=["dirt_modified"], untracked=['dirt_untracked'])
+    assert_repo_status(ds.path, modified=["dirt_modified"],
+                       untracked=['dirt_untracked'])
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
     # Saving explicit outputs works from subdirectories.
     subdir = op.join(path, "subdir")
     mkdir(subdir)
     with chpwd(subdir):
-        run("echo insubdir >foo", explicit=True, outputs=["foo"])
+        run("echo insubdir >foo", explicit=True, outputs=["foo"],
+            result_renderer='disabled')
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 

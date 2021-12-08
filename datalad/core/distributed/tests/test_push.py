@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -511,7 +511,6 @@ def test_force_checkdatapresent(srcpath, dstpath):
                       message='Slated for transport, but no content present')
 
 
-@skip_if_on_windows  # https://github.com/datalad/datalad/issues/4278
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
 def test_ria_push(srcpath, dstpath):

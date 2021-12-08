@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -17,6 +17,9 @@ import os.path as op
 import logging
 from collections import (
     OrderedDict,
+)
+from collections.abc import (
+    Mapping,
 )
 from os import linesep
 from os.path import (
@@ -929,9 +932,10 @@ class GitRepo(CoreGitRepo):
         ----------
         url : str
         path : str
-        clone_options : dict
-          Key/value pairs of arbitrary options that will be passed on to the
-          underlying call to `git-clone`.
+        clone_options : dict or list
+          Arbitrary options that will be passed on to the underlying call to
+          `git-clone`. This may be a list of plain options or key-value pairs
+          that will be converted to a list of plain options with `to_options`.
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
@@ -985,19 +989,20 @@ class GitRepo(CoreGitRepo):
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
 
-        cmd_base = cls._git_cmd_prefix + ['clone', '--progress']
+        cmd = cls._git_cmd_prefix + ['clone', '--progress']
+        if clone_options:
+            if isinstance(clone_options, Mapping):
+                clone_options = to_options(**clone_options)
+            cmd.extend(clone_options)
+        cmd.extend([url, path])
+
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
-                res = GitWitlessRunner().run(
-                        cmd_base + [url, path] \
-                        + (to_options(**clone_options)
-                           if clone_options else []),
-                        protocol=GitProgress,
-                )
+                res = GitWitlessRunner().run(cmd, protocol=GitProgress)
                 # fish out non-critical warnings by git-clone
                 # (empty repo clone, etc.), all other content is logged
                 # by the progress helper to 'debug'

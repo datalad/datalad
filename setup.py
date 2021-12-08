@@ -34,7 +34,7 @@ from _datalad_build_support.setup import (
 
 requires = {
     'core': [
-        'appdirs',
+        'platformdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
@@ -44,7 +44,6 @@ requires = {
         'fasteners>=0.14',
         'patool>=1.7',
         'tqdm',
-        'wrapt',
         'annexremote',
     ],
     'downloaders': [
@@ -94,7 +93,7 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx>=1.7.8, !=4.0.0',
+        'sphinx>=2, !=4.0.0',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [

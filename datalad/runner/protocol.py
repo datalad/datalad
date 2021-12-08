@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,12 +12,37 @@
 import asyncio
 import logging
 import warnings
+from collections import deque
 from locale import getpreferredencoding
+from typing import Optional
 
 from .exception import CommandError
 from .utils import ensure_unicode
 
 lgr = logging.getLogger('datalad.runner.protocol')
+
+
+class GeneratorMixIn:
+    """ Protocol mix in that will instruct runner.run to return a generator
+
+    When this class is in the parent of a protocol given to runner.run (and
+    some other functions/methods) the run-method will return a `Generator`,
+    which yields whatever the protocol callbacks send to the `Generator`,
+    via the `send_result`-method of this class.
+
+    This allows to use runner.run() in constructs like:
+
+        for result in runner.run(...):
+            # do something, for example write to stdin of the subprocess
+
+    """
+    generator = True
+
+    def __init__(self):
+        self.result_queue = deque()
+
+    def send_result(self, result):
+        self.result_queue.append(result)
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
@@ -36,6 +61,8 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     proc_out = None
     proc_err = None
+
+    generator = None
 
     def __init__(self, done_future=None, encoding=None):
         """
@@ -97,10 +124,44 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     def pipe_data_received(self, fd, data):
         self._log(fd, data)
-        # store received output if stream was to be captured
+        # Store received output if stream was to be captured.
         fd_name, buffer = self.fd_infos[fd]
         if buffer is not None:
             buffer.extend(data)
+
+    def timeout(self, fd: Optional[int]) -> bool:
+        """
+        Called if the timeout parameter to WitlessRunner.run()
+        is not `None` and a process file descriptor could not
+        be read (stdout or stderr) or not be written (stdin)
+        within the specified time in seconds, or if waiting for
+        a subprocess to exit takes longer than the specified time.
+
+        stdin timeouts are only caught when the type of the `stdin`-
+        parameter to WitlessRunner.run() is either a `Queue`,
+        a `str`, or `bytes`. `Stdout` or `stderr` timeouts
+        are only caught of proc_out and proc_err are
+        not None in the protocol class. Process wait timeouts are
+        always caught if `timeout` is not `None`. In this case the
+        `fd`-argument will be `None`.
+
+        fd:
+          The file descriptor that timed out or `None` if no
+          progress was made at all, i.e. no stdin element was
+          enqueued and no output was read from either stdout
+          or stderr.
+
+        return:
+          If the callback returns `True`, the file descriptor
+          (if any was given) will be closed and no longer monitored.
+          If the return values is anything else than `True`,
+          the file-descriptor will be monitored further
+          and additional timeouts might occur indefinitely.
+          If `None` was given, i.e. a process runtime-timeout
+          was detected, and `True` is returned, the process
+          will be terminated.
+        """
+        return False
 
     def _prepare_result(self):
         """Prepares the final result to be returned to the runner

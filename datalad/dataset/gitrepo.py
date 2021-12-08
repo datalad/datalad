@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -20,15 +20,18 @@ lifetime of a singleton.
 __all__ = ['GitRepo']
 
 import logging
-from os import environ
-from os.path import lexists
 import re
 import threading
 import time
+from contextlib import contextmanager
+from locale import getpreferredencoding
+from os import environ
+from os.path import lexists
 from weakref import (
     finalize,
     WeakValueDictionary
 )
+
 from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
@@ -39,6 +42,12 @@ from datalad.dataset.repo import (
     RepoInterface,
     path_based_str_repr,
 )
+from datalad.runner.nonasyncrunner import (
+    STDERR_FILENO,
+    STDOUT_FILENO,
+)
+from datalad.runner.protocol import GeneratorMixIn
+from datalad.runner.utils import LineSplitter
 from datalad.support.exceptions import (
     CommandError,
     GitIgnoreError,
@@ -47,11 +56,42 @@ from datalad.support.exceptions import (
 )
 from datalad.utils import (
     ensure_list,
+    lock_if_required,
     Path,
 )
 
 
 lgr = logging.getLogger('datalad.dataset.gitrepo')
+
+preferred_encoding = getpreferredencoding(do_setlocale=False)
+
+
+@contextmanager
+def git_ignore_check(expect_fail,
+                     stdout_buffer,
+                     stderr_buffer):
+    try:
+        yield None
+    except CommandError as e:
+        e.stdout = "".join(stdout_buffer) if stdout_buffer else ""
+        e.stderr = "".join(stderr_buffer) if stderr_buffer else ""
+        ignore_exception = _get_git_ignore_exception(e)
+        if ignore_exception:
+            raise ignore_exception
+        lgr.log(5 if expect_fail else 11, str(e))
+        raise
+
+
+def _get_git_ignore_exception(exception):
+    ignored = re.search(GitIgnoreError.pattern, exception.stderr)
+    if ignored:
+        return GitIgnoreError(cmd=exception.cmd,
+                              msg=exception.stderr,
+                              code=exception.code,
+                              stdout=exception.stdout,
+                              stderr=exception.stderr,
+                              paths=ignored.groups()[0].splitlines())
+    return None
 
 
 @path_based_str_repr
@@ -106,6 +146,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self._git_runner = GitWitlessRunner(cwd=self.pathobj)
 
         self.__fake_dates_enabled = None
+
+        self._line_splitter = None
 
         # Finally, register a finalizer (instead of having a __del__ method).
         # This will be called by garbage collection as well as "atexit". By
@@ -224,8 +266,95 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         return env
 
-    def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
-                  env=None, read_only=False):
+    def _generator_call_git(self,
+                            args,
+                            files=None,
+                            env=None,
+                            sep=None):
+        """
+        Call git, yield stdout and stderr lines when available. Output lines
+        are split at line ends or `sep` if `sep` is not None.
+
+        Parameters
+        ----------
+        sep : str, optional
+          Use `sep` as line separator. Does not create an empty last line if
+          the input ends on sep.
+
+        All other parameters match those described for `call_git`.
+
+        Returns
+        -------
+        Generator that yields tuples of `(file_no, line)`, where `file_no` is
+        either:
+
+         - `datalad.runner.nonasyncrunner.STDOUT_FILENO` for stdout, or
+         - `datalad.runner.nonasyncrunner.STDERR_FILENO` for stderr,
+
+        and `line` is the next result line, split on `sep`, or on standard line
+        ends.
+
+        Raises
+        ------
+        CommandError if the call exits with a non-zero status.
+        """
+
+        class GeneratorStdOutErrCapture(GeneratorMixIn, StdOutErrCapture):
+            """
+            Generator-runner protocol that yields stdout and captures stderr
+            in the provided stderr_buffer.
+            """
+            def __init__(self):
+                GeneratorMixIn.__init__(self)
+                StdOutErrCapture.__init__(self)
+
+            def pipe_data_received(self, fd, data):
+                if fd in (1, 2):
+                    self.send_result((fd, data.decode(self.encoding)))
+                else:
+                    StdOutErrCapture.pipe_data_received(self, fd, data)
+
+        cmd = self._git_cmd_prefix + args
+
+        if files:
+            # only call the wrapper if needed (adds distraction logs
+            # otherwise, and also maintains the possibility to connect
+            # stdin in the future)
+            generator = self._git_runner.run_on_filelist_chunks_items_(
+                cmd,
+                files,
+                protocol=GeneratorStdOutErrCapture,
+                env=env)
+        else:
+            generator = self._git_runner.run(
+                cmd,
+                protocol=GeneratorStdOutErrCapture,
+                env=env)
+
+        line_splitter = {
+            STDOUT_FILENO: LineSplitter(sep),
+            STDERR_FILENO: LineSplitter(sep)
+        }
+
+        for file_no, content in generator:
+            if file_no in (STDOUT_FILENO, STDERR_FILENO):
+                for line in line_splitter[file_no].process(content):
+                    yield file_no, line + "\n"
+            else:
+                raise ValueError(f"unknown file number: {file_no}")
+
+        for file_no in (STDOUT_FILENO, STDERR_FILENO):
+            remaining_content = line_splitter[file_no].finish_processing()
+            if remaining_content is not None:
+                yield file_no, remaining_content
+
+    def _call_git(self,
+                  args,
+                  files=None,
+                  expect_stderr=False,
+                  expect_fail=False,
+                  env=None,
+                  read_only=False):
         """Allows for calling arbitrary commands.
 
         Internal helper to the call_git*() methods.
@@ -236,50 +365,29 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
 
-        cmd = self._git_cmd_prefix + args
-
-        if not read_only and self._fake_dates_enabled:
+        read_write = not read_only
+        if read_write and self._fake_dates_enabled:
             env = self.add_fake_dates_to_env(env if env else runner.env)
 
-        protocol = StdOutErrCapture
-        out = err = None
-        try:
-            if not read_only:
-                self._write_lock.acquire()
-            if files:
-                # only call the wrapper if needed (adds distraction logs
-                # otherwise, and also maintains the possibility to connect
-                # stdin in the future)
-                res = runner.run_on_filelist_chunks(
-                    cmd,
-                    files,
-                    protocol=protocol,
-                    env=env)
-            else:
-                res = runner.run(
-                    cmd,
-                    protocol=protocol,
-                    env=env)
-        except CommandError as e:
-            ignored = re.search(GitIgnoreError.pattern, e.stderr)
-            if ignored:
-                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
-                                     code=e.code, stdout=e.stdout,
-                                     stderr=e.stderr,
-                                     paths=ignored.groups()[0].splitlines())
-            lgr.log(5 if expect_fail else 11, str(e))
-            raise
-        finally:
-            if not read_only:
-                self._write_lock.release()
+        output = {
+            STDOUT_FILENO: [],
+            STDERR_FILENO: [],
+        }
 
-        out = res['stdout']
-        err = res['stderr']
-        if err:
-            for line in err.splitlines():
-                lgr.log(stderr_log_level,
-                        "stderr| " + line.rstrip('\n'))
-        return out, err
+        with lock_if_required(read_write, self._write_lock), \
+             git_ignore_check(expect_fail, output[STDOUT_FILENO], output[STDERR_FILENO]):
+
+            for file_no, line in self._generator_call_git(args,
+                                                          files=files,
+                                                          env=env):
+                output[file_no].append(line)
+
+        for line in output[STDERR_FILENO]:
+            lgr.log(stderr_log_level,
+                    "stderr| " + line.rstrip("\n"))
+        return (
+            "".join(output[STDOUT_FILENO]),
+            "".join(output[STDERR_FILENO]))
 
     def call_git(self, args, files=None,
                  expect_stderr=False, expect_fail=False, read_only=False):
@@ -315,34 +423,65 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._call_git(args, files,
-                                expect_stderr=expect_stderr,
-                                expect_fail=expect_fail,
-                                read_only=read_only)
-        return out
+        return "\n".join(
+            self.call_git_items_(args,
+                                 files,
+                                 expect_stderr=expect_stderr,
+                                 expect_fail=expect_fail,
+                                 read_only=read_only))
 
-    def call_git_items_(self, args, files=None, expect_stderr=False, sep=None,
-                        read_only=False):
-        """Call git, splitting output on `sep`.
+    def call_git_items_(self,
+                        args,
+                        files=None,
+                        expect_stderr=False,
+                        expect_fail=False,
+                        env=None,
+                        read_only=False,
+                        sep=None):
+        """
+        Call git, yield output lines when available. Output lines are split
+        at line ends or `sep` if `sep` is not None.
 
         Parameters
         ----------
         sep : str, optional
-          Split the output by `str.split(sep)` rather than `str.splitlines`.
+          Use sep as line separator. Does not create an empty last line if
+          the input ends on sep.
 
         All other parameters match those described for `call_git`.
 
         Returns
         -------
-        Generator that yields output items.
+        Generator that yields stdout items.
 
         Raises
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._call_git(args, files, expect_stderr=expect_stderr,
-                                read_only=read_only)
-        yield from (out.split(sep) if sep else out.splitlines())
+
+        read_write = not read_only
+        if read_write and self._fake_dates_enabled:
+            env = self.add_fake_dates_to_env(
+                env if env else self._git_runner.env)
+
+        stderr_lines = []
+
+        with lock_if_required(read_write, self._write_lock), \
+             git_ignore_check(expect_fail, None, stderr_lines):
+
+            for file_no, line in self._generator_call_git(
+                                                    args,
+                                                    files=files,
+                                                    env=env,
+                                                    sep=sep):
+                if file_no == STDOUT_FILENO:
+                    yield line.rstrip("\n")
+                else:
+                    stderr_lines.append(line)
+
+        stderr_log_level = {True: 5, False: 11}[expect_stderr]
+        for line in stderr_lines:
+            lgr.log(stderr_log_level, "stderr| " + line.strip("\n"))
 
     def call_git_oneline(self, args, files=None, expect_stderr=False, read_only=False):
         """Call git for a single line of output.

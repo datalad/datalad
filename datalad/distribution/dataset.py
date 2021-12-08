@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -10,6 +10,7 @@
 """
 
 import logging
+from functools import wraps
 from os.path import (
     curdir,
     exists,
@@ -18,7 +19,6 @@ from os.path import (
     pardir,
 )
 from weakref import WeakValueDictionary
-import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
@@ -447,11 +447,12 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 
     The decorator has no effect on the actual function decorated with it.
     """
+
     if not name:
         name = f.__name__
 
-    @wrapt.decorator
-    def apply_func(wrapped, instance, args, kwargs):
+    @wraps(f)
+    def apply_func(instance, *args, **kwargs):
         # Wrapper function to assign arguments of the bound function to
         # original function.
         #
@@ -459,7 +460,6 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # ----
         # This wrapper is NOT returned by the decorator, but only used to bind
         # the function `f` to the Dataset class.
-
         kwargs = kwargs.copy()
         from datalad.utils import getargspec
         orig_pos = getargspec(f).args
@@ -484,7 +484,12 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
                 kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func(f))
+    setattr(Dataset, name, apply_func)
+    # set the ad-hoc attribute so that @build_doc could also bind built doc
+    # to the dataset method
+    if getattr(f, '_dataset_method', None):
+        raise RuntimeError(f"_dataset_method of {f} is already set to {f._dataset_method}")
+    setattr(f, '_dataset_method', apply_func)
     return f
 
 

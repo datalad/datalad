@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -67,7 +67,6 @@ def _test_initremote_basic(url, io, store, ds_path, link):
     link = Path(link)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     init_opts = common_init_opts + ['url={}'.format(url)]
 
@@ -213,7 +212,6 @@ def _test_initremote_alias(host, ds_path, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     if host:
         url = "ria+ssh://{host}{path}".format(host=host,
@@ -259,7 +257,6 @@ def _test_initremote_rewrite(host, ds_path, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     url = "mystore:"
@@ -313,7 +310,6 @@ def _test_remote_layout(host, dspath, store, archiv_store):
     archiv_store = Path(archiv_store)
     ds = Dataset(dspath).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -345,7 +341,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         get_layout_locations(1, store, ds.id)
     store_objects = get_all_files(dsobj_dir)
     local_objects = get_all_files(ds.pathobj / '.git' / 'annex' / 'objects')
-    assert_equal(len(store_objects), 2)
+    assert_equal(len(store_objects), 4)
 
     if not ds.repo.is_managed_branch():
         # with managed branches the local repo uses hashdirlower instead
@@ -376,6 +372,16 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         # now fsck the new remote to get the new special remote indexed
         ds.repo.fsck(remote='archive', fast=True)
         assert_equal(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
+        # test creating an archive with filters on files
+        ds.export_archive_ora(archive_dir / 'archive2.7z', annex_wanted='(include=*.txt)')
+        # test with wanted expression of a specific remote
+        ds.repo.set_preferred_content("wanted", "include=subdir/*", remote="store")
+        ds.export_archive_ora(archive_dir / 'archive3.7z', remote="store")
+        # test with the current sha
+        ds.export_archive_ora(
+            archive_dir / 'archive4.7z',
+            froms=ds.repo.get_revisions()[1],
+            )
 
 
 @slow  # 12sec + ? on travis
@@ -395,7 +401,6 @@ def _test_version_check(host, dspath, store):
 
     ds = Dataset(dspath).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -493,7 +498,6 @@ def _test_gitannex(host, store, dspath):
     ds = Dataset(dspath).create()
 
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -611,7 +615,6 @@ def test_push_url(storepath, dspath, blockfile):
 
     ds = Dataset(dspath).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
