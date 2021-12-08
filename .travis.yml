@@ -244,7 +244,7 @@ script:
     PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
-      -m "$PYTEST_SELECTION_OP($PYTEST_SELECTION) and not(turtle)"
+      -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
       --cov=datalad
       --log-cli-level=INFO
