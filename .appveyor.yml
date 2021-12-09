@@ -346,8 +346,8 @@ test_script:
   - sh: mkdir __testhome__
   - cd __testhome__
     # run test selection
-  - cmd: python -m pytest -s -v -m "not (turtle)" --cov=datalad -k test_tests_utils --pyargs %DTS%
-  - sh: PATH=$PWD/../tools/coverage-bin:$PATH python -m pytest -s -v -m "not (turtle)" --cov=datalad -k test_tests_utils --pyargs ${DTS}
+  - cmd: python -m pytest -c ../tox.ini -s -v -m "not (turtle)" --cov=datalad -k test_tests_utils --pyargs %DTS%
+  - sh: PATH=$PWD/../tools/coverage-bin:$PATH python -m pytest -c ../tox.ini -s -v -m "not (turtle)" --cov=datalad -k test_tests_utils --pyargs ${DTS}
 
 
 after_test:
