@@ -86,7 +86,7 @@ class ForEachDataset(Interface):
     is provided to operate across the hierarchy of datasets. It is very similar to
     `git submodule foreach` command with the following major differences
 
-    - by default (unless [CMD: --subdatasets-only][PY: `subdatasets_only=True`]) it would
+    - by default (unless [CMD: --subdatasets-only CMD][PY: `subdatasets_only=True` PY]) it would
       include operation on the original dataset as well,
     - subdatasets could be traversed in bottom-up order,
     - can execute commands in parallel (see `jobs` option), but would account for the order,
@@ -95,20 +95,22 @@ class ForEachDataset(Interface):
 
     Additional notes:
 
-    - for execution of `"external"` commands we use the environment used to execute external
+    - for execution of "external" commands we use the environment used to execute external
       git and git-annex commands.
 
     *Command format*
 
     || REFLOW >>
     [CMD: --cmd-type external CMD][PY: cmd_type='external' PY]: A few placeholders are
-    supported in the command via Python format
-    specification. "{pwd}" will be replaced with the full path of the current
-    working directory. "{ds}" and "{refds}" will provide instances of the dataset currently
-    operated on and the reference "context" dataset which was provided via ``dataset``
-    argument to ``foreach-dataset``. "{tmpdir}" will be replaced with the full
-    path of a temporary directory.
+    supported in the command via Python format specification:
     << REFLOW ||
+
+
+    - "{pwd}" will be replaced with the full path of the current working directory.
+    - "{ds}" and "{refds}" will provide instances of the dataset currently
+      operated on and the reference "context" dataset which was provided via ``dataset``
+      argument.
+    - "{tmpdir}" will be replaced with the full path of a temporary directory.
     """
     _examples_ = [
          dict(text="Aggressively  git clean  all datasets, running 5 parallel jobs",
@@ -259,7 +261,8 @@ class ForEachDataset(Interface):
             recursive=recursive, recursion_limit=recursion_limit,
             contains=contains,
             bottomup=bottomup,
-            result_xfm='paths'
+            result_xfm='paths',
+            result_renderer='disabled',
         )
 
         if subdatasets_only or contains:
