@@ -54,6 +54,11 @@ from datalad.config import (
     write_config_section,
 )
 
+from datalad.consts import (
+    ILLEGAL_CHARS_WIN,
+    RESERVED_NAMES_WIN
+)
+
 import datalad.utils as ut
 from datalad.utils import (
     Path,
@@ -3424,6 +3429,9 @@ class GitRepo(CoreGitRepo):
             if (props.get('state', None) in ('modified', 'untracked') and
                 not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
+            if not on_windows:
+                # check that non-Windows users generate win-compatible filenames
+                _check_for_win_compat(to_add)
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
@@ -3627,3 +3635,33 @@ except ImportError as e:
     lgr.debug(
         'Not retro-fitting GitRepo with deprecated symbols, '
         'datalad-deprecated package not found')
+
+
+def _check_for_win_compat(files):
+    """Check file names for illegal characters or reserved names on Windows
+    
+    In the case that a non-Windows-compatible file is detected, warn users
+    about potential interoperability issues.
+    """
+    for file in files.keys():
+        f = Path(file).stem
+        if f.casefold() in [r.casefold() for r in RESERVED_NAMES_WIN]:
+            lgr.warning(
+                "Interoperability warning: The file name %s is a reserved name "
+                "on Windows systems, and can not be shared with Windows "
+                "machines. Consider renaming.", f)
+        chars = re.findall(ILLEGAL_CHARS_WIN, f)
+        if chars:
+            lgr.warning(
+                "Interoperability warning: The following characters are "
+                "considered illegal on Windows operating systems: %s. "
+                "Consider renaming %s to ensure cross-platform compatibility.",
+                chars, file)
+        # check for file name ending in a dot or space
+        if file.endswith('.') or file.endswith(' '):
+            lgr.warning(
+                "Interoperability warning: Windows systems can not "
+                "receive or work with files that end with spaces or dots. "
+                "Consider renaming %s ", file
+            )
+
