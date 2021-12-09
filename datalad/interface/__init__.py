@@ -57,7 +57,7 @@ _group_2dataset = (
         ('datalad.local.addurls', 'Addurls'),
         ('datalad.local.copy_file', 'CopyFile'),
         ('datalad.local.download_url', 'DownloadURL'),
-        ('datalad.local.foreach', 'ForEach', 'foreach'),
+        ('datalad.local.foreach_dataset', 'ForEachDataset', 'foreach-dataset'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.local.rerun', 'Rerun'),
         ('datalad.local.run_procedure', 'RunProcedure'),

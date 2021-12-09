@@ -5,7 +5,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test foreach command"""
+"""Test foreach-dataset command"""
 
 import sys
 
@@ -44,16 +44,16 @@ def check_basic_resilience(populator, path):
     ds.save()
     kwargs = dict(recursive=True)
 
-    res_external = ds.foreach(
+    res_external = ds.foreach_dataset(
         [sys.executable, '-c', 'from datalad.distribution.dataset import Dataset; ds=Dataset("."); print(ds.path)'],
         **kwargs)
-    res_python = ds.foreach("ds.path", cmd_type='eval', **kwargs)
+    res_python = ds.foreach_dataset("ds.path", cmd_type='eval', **kwargs)
 
     # a sample python function to pass to foreach
     def get_path(ds, **kwargs):
         return ds.path
 
-    res_python_func = ds.foreach(get_path, **kwargs)
+    res_python_func = ds.foreach_dataset(get_path, **kwargs)
 
     assert_status('ok', res_external)
     assert_status('ok', res_python)
@@ -68,13 +68,13 @@ def check_basic_resilience(populator, path):
     eq_(topdown_dss, [_['result'] for _ in res_python])
 
     bottomup_dss = ds.subdatasets(result_xfm='paths', recursive=True, bottomup=True) + [ds.path]
-    eq_(bottomup_dss, [_['result'] for _ in ds.foreach("ds.path", bottomup=True, cmd_type='eval', **kwargs)])
+    eq_(bottomup_dss, [_['result'] for _ in ds.foreach_dataset("ds.path", bottomup=True, cmd_type='eval', **kwargs)])
 
     # more radical example - cleanup
     # Make all datasets dirty
     for d in bottomup_dss:
         (Path(d) / "dirt").write_text("")
-    res_clean = ds.foreach(['git', 'clean', '-f'], jobs=10, **kwargs)
+    res_clean = ds.foreach_dataset(['git', 'clean', '-f'], jobs=10, **kwargs)
     assert_status('ok', res_clean)
     # no dirt should be left
     for d in bottomup_dss:
@@ -96,7 +96,7 @@ def test_basic_resilience():
 @with_tempfile(mkdir=True)
 def check_python_eval(cmd, path):
     ds = Dataset(path).create()
-    res = ds.foreach(cmd, cmd_type='eval')
+    res = ds.foreach_dataset(cmd, cmd_type='eval')
     eq_(len(res), 1)
     expected_variables = {'ds', 'pwd', 'refds'}
     eq_(expected_variables.intersection(res[0]['result']), expected_variables)
@@ -110,10 +110,10 @@ def check_python_exec(cmd, path):
     ds = Dataset(path).create()
 
     # but exec has no result
-    res = ds.foreach(cmd, cmd_type='exec')
+    res = ds.foreach_dataset(cmd, cmd_type='exec')
     assert_not_in('result', res[0])
     # but allows for more complete/interesting setups in which we could import modules etc
-    res = ds.foreach('import sys; print("DIR: %s" % str(dir()))', output_streams='capture', cmd_type='exec')
+    res = ds.foreach_dataset('import sys; print("DIR: %s" % str(dir()))', output_streams='capture', cmd_type='exec')
     assert_in('ds', res[0]['stdout'])
     assert_in('sys', res[0]['stdout'])
     eq_(res[0]['stderr'], '')

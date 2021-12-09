@@ -62,7 +62,7 @@ from datalad.utils import (
     swallow_outputs,
 )
 
-lgr = logging.getLogger('datalad.local.foreach')
+lgr = logging.getLogger('datalad.local.foreach_dataset')
 
 
 _PYTHON_CMDS = {
@@ -79,7 +79,7 @@ _SAFE_TO_CONSUME_MAP = {
 }
 
 @build_doc
-class ForEach(Interface):
+class ForEachDataset(Interface):
     r"""Run a command or Python code on the dataset and/or each of its sub-datasets.
 
     This command provides a convenience for the cases were no dedicated DataLad command
@@ -106,14 +106,14 @@ class ForEach(Interface):
     specification. "{pwd}" will be replaced with the full path of the current
     working directory. "{ds}" and "{refds}" will provide instances of the dataset currently
     operated on and the reference "context" dataset which was provided via ``dataset``
-    argument to ``foreach``. "{tmpdir}" will be replaced with the full
+    argument to ``foreach-dataset``. "{tmpdir}" will be replaced with the full
     path of a temporary directory.
     << REFLOW ||
     """
     _examples_ = [
          dict(text="Aggressively  git clean  all datasets, running 5 parallel jobs",
-              code_py="foreach(['git', 'clean', '-dfx'], recursive=True, jobs=5)",
-              code_cmd="datalad foreach -r -J 5 git clean -dfx"),
+              code_py="foreach_dataset(['git', 'clean', '-dfx'], recursive=True, jobs=5)",
+              code_cmd="datalad foreach-dataset -r -J 5 git clean -dfx"),
      ]
 
     _params_ = dict(
@@ -191,7 +191,7 @@ class ForEach(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='foreach')
+    @datasetmethod(name='foreach_dataset')
     @eval_results
     def __call__(
             cmd,
@@ -248,7 +248,7 @@ class ForEach(Interface):
             protocol = NoCapture if output_streams == 'pass-through' else StdOutErrCapture
 
         refds = require_dataset(
-            dataset, check_installed=True, purpose='foreach execution')
+            dataset, check_installed=True, purpose='foreach-dataset execution')
         pwd = getpwd()  # Note: 'run' has some more elaborate logic for this
 
         #
@@ -276,7 +276,7 @@ class ForEach(Interface):
         def run_cmd(dspath):
             ds = Dataset(dspath)
             status_rec = get_status_dict(
-                'foreach',
+                'foreach-dataset',
                 ds=ds,
                 path=ds.path,
                 command=cmd
@@ -351,7 +351,7 @@ class ForEach(Interface):
                 # get a better version with exception handling redoing the whole
                 # status dict from scratch
                 yield get_status_dict(
-                    'foreach',
+                    'foreach-dataset',
                     ds=ds,
                     path=ds.path,
                     command=cmd,
@@ -365,7 +365,7 @@ class ForEach(Interface):
             pc_kw = {}
         else:
             pc_class = ProducerConsumerProgressLog
-            pc_kw = dict(lgr=lgr, label="foreach", unit="datasets")
+            pc_kw = dict(lgr=lgr, label="foreach-dataset", unit="datasets")
 
         if python:
             effective_jobs = pc_class.get_effective_jobs(jobs)
