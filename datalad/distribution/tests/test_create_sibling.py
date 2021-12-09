@@ -114,7 +114,7 @@ def assert_postupdate_hooks(path, installed=True, flat=False):
         datasets = glob(opj(path, '*'))
     else:
         ds = Dataset(path)
-        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, fulfilled=True)
+        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, state='present')
     for ds_ in datasets:
         ds_ = Dataset(ds_)
         hook_path = opj(ds_.path, '.git', 'hooks', 'post-update')

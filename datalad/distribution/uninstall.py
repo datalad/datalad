@@ -117,7 +117,7 @@ class Uninstall(Interface):
             # drop requires recursive with kill
             # check check of the subdatasets to see if it is safe to enable it
             if all(not len(Dataset(d).subdatasets(
-                    fulfilled=True,
+                    state='absent',
                     result_xfm='paths',
                     return_type='list',
                     result_renderer='disabled'))

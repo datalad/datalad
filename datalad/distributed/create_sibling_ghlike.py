@@ -638,7 +638,7 @@ def _get_present_datasets(ds, recursive, recursion_limit):
     if recursive:
         for sub in ds.subdatasets(
                 # we want to report on missing dataset in here
-                fulfilled=None,
+                state='any',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 result_xfm='datasets'):

@@ -79,7 +79,7 @@ def test_invalid_call(origin, tdir):
     # unavailable subdataset
     dummy_sub = ds.create('sub')
     dummy_sub.drop(what='all', reckless='kill', recursive=True)
-    assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in('sub', ds.subdatasets(state='absent', result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
     assert_raises(ValueError, ds.push, 'sub')
 

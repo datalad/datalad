@@ -53,7 +53,7 @@ def _minimal_annotate_paths(paths_by_ds, errors, action="annotate_path",
 
         subdatasets = Dataset(dpath).subdatasets(
             path=paths,
-            fulfilled=None,
+            state='any',
             recursive=recursive,
             recursion_limit=recursion_limit,
             result_renderer='disabled',

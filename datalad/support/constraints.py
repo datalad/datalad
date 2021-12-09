@@ -31,6 +31,19 @@ def _type_str(t):
     return _strip_typerepr(str(t))
 
 
+class _NoneDeprecated:
+    """A helper construct to ease migrations for option=None.
+
+    Should be instantiated, so it gains `__repr__` and thus would render nicely
+    in docs etc.
+    """
+    def __repr__(self):
+        return 'None(DEPRECATED)'
+
+
+NoneDeprecated = _NoneDeprecated()
+
+
 class Constraint(object):
     """Base class for input value conversion/validation.
 
@@ -244,7 +257,7 @@ class EnsureStrPrefix(EnsureStr):
 class EnsureNone(Constraint):
     """Ensure an input is of value `None`"""
     def __call__(self, value):
-        if value is None:
+        if value is None or isinstance(value, _NoneDeprecated):
             return None
         else:
             raise ValueError("value must be `None`")

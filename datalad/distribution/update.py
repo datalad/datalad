@@ -242,7 +242,7 @@ class Update(Interface):
         saw_subds = False
         for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
-                fulfilled=True,
+                state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',
