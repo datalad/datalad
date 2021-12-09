@@ -524,6 +524,17 @@ definitions = {
         'default': True,
         'type': EnsureBool(),
     },
+    'datalad.save.windows-compat-warning': {
+        'ui': ('yesno', {
+            'title': 'Warn when Windows-incompatible file names are saved',
+            'text': "Certain characters or names can make file names "
+                    "incompatible with Windows. Datasets containing such files "
+                    "can not be retrieved from a Windows machine. If set, a "
+                    "warning will alert users on Non-Windows systems about "
+                    "potential cross-platform issues."}),
+        'type': EnsureBool(),
+        'default': True,
+    },
 }
 
 

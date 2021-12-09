@@ -50,6 +50,7 @@ from datalad.cmd import (
     StdOutErrCapture,
 )
 from datalad.config import (
+    ConfigManager,
     parse_gitconfig_dump,
     write_config_section,
 )
@@ -103,6 +104,7 @@ _pardirsep = pardir + sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
+cfg = ConfigManager()
 
 
 # outside the repo base classes only used in ConfigManager
@@ -3429,7 +3431,9 @@ class GitRepo(CoreGitRepo):
             if (props.get('state', None) in ('modified', 'untracked') and
                 not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
-            if not on_windows:
+            if not on_windows and \
+                    cfg.obtain("datalad.save.windows-compat-warning",
+                               default=True):
                 # check that non-Windows users generate win-compatible filenames
                 _check_for_win_compat(to_add)
             lgr.debug(
