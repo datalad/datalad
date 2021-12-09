@@ -9,53 +9,57 @@
 """Create and update a dataset from a list of URLs.
 """
 
-from collections import defaultdict
-from collections.abc import Mapping
-
 import json
 import logging
 import os
 import re
 import string
 import sys
-
+from collections import defaultdict
+from collections.abc import Mapping
 from functools import partial
 from urllib.parse import urlparse
 
-from datalad.support.external_versions import external_versions
 import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
-from datalad.dochelpers import (
-    single_or_plural,
+from datalad.dochelpers import single_or_plural
+from datalad.interface.base import (
+    Interface,
+    build_doc,
 )
-from datalad.log import log_progress, with_result_progress
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.common_opts import (
+    jobs_opt,
+    nosave_opt,
+)
+from datalad.interface.results import (
+    annexjson2result,
+    get_status_dict,
+)
 from datalad.interface.utils import (
     generic_result_renderer,
     render_action_summary,
 )
-from datalad.interface.results import annexjson2result, get_status_dict
-from datalad.interface.common_opts import (
-    jobs_opt,
-    nosave_opt,
+from datalad.log import (
+    log_progress,
+    with_result_progress,
 )
 from datalad.support.exceptions import (
     CapturedException,
     CommandError,
 )
+from datalad.support.external_versions import external_versions
 from datalad.support.itertools import groupby_sorted
 from datalad.support.network import get_url_filename
-from datalad.support.path import split_ext
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
     no_parentds_in_futures,
 )
+from datalad.support.path import split_ext
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
+    Path,
     ensure_list,
     get_suggestions_msg,
-    Path,
     unlink,
 )
 
@@ -178,7 +182,7 @@ def clean_meta_args(args):
 def get_subpaths(filename):
     """Convert "//" marker in `filename` to a list of subpaths.
 
-    >>> from datalad.plugin.addurls import get_subpaths
+    >>> from datalad.local.addurls import get_subpaths
     >>> get_subpaths("p1/p2//p3/p4//file")
     ('p1/p2/p3/p4/file', ['p1/p2', 'p1/p2/p3/p4'])
 
@@ -1161,10 +1165,16 @@ class Addurls(Interface):
        --batch --with-files'.
     """
 
-    from datalad.distribution.dataset import datasetmethod
+    from datalad.distribution.dataset import (
+        EnsureDataset,
+        datasetmethod,
+    )
     from datalad.interface.utils import eval_results
-    from datalad.distribution.dataset import EnsureDataset
-    from datalad.support.constraints import EnsureChoice, EnsureNone, EnsureStr
+    from datalad.support.constraints import (
+        EnsureChoice,
+        EnsureNone,
+        EnsureStr,
+    )
     from datalad.support.param import Parameter
 
     _params_ = dict(
@@ -1330,7 +1340,10 @@ class Addurls(Interface):
 
         from requests.exceptions import RequestException
 
-        from datalad.distribution.dataset import Dataset, require_dataset
+        from datalad.distribution.dataset import (
+            Dataset,
+            require_dataset,
+        )
         from datalad.support.annexrepo import AnnexRepo
 
         lgr = logging.getLogger("datalad.local.addurls")
