@@ -12,10 +12,11 @@
 from os.path import isabs
 
 from datalad.api import (
-    clone,
     Dataset,
+    clone,
 )
 from datalad.consts import DATALAD_SPECIAL_REMOTE
+from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
     assert_false,
     assert_in,
@@ -26,13 +27,12 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import Path
 
 from ..base import (
-    AnnexCustomRemote,
     DEFAULT_AVAILABILITY,
     DEFAULT_COST,
+    AnnexCustomRemote,
     ensure_datalad_remote,
     init_datalad_remote,
 )
@@ -127,7 +127,8 @@ def check_interaction_scenario(remote_class, tdir, scenario):
 
 
 import re
-ERROR_ARGS = re.compile('ERROR .*(missing|takes) .*\d+ .*argument')
+
+ERROR_ARGS = re.compile(r'ERROR .*(missing|takes) .*\d+ .*argument')
 BASE_INTERACTION_SCENARIOS = [
     [],  # default of doing nothing
     [  # support of EXPORT which by default is not supported

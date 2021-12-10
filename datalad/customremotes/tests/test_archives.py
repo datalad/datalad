@@ -8,24 +8,30 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from unittest.mock import patch
+import glob
+import logging
 import os
 import os.path as op
-import sys
 import re
-import logging
-import glob
+import sys
 from time import sleep
+from unittest.mock import patch
 
-from ..archives import (
-    ArchiveAnnexCustomRemote,
-    link_file_load,
+from datalad import cfg as dl_cfg
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
 )
-from ...support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
+
 from ...consts import ARCHIVES_SPECIAL_REMOTE
-from .test_base import (
-    BASE_INTERACTION_SCENARIOS,
-    check_interaction_scenario,
+from ...support.annexrepo import AnnexRepo
+from ...tests.test_archives import (
+    fn_archive_obscure,
+    fn_archive_obscure_ext,
+    fn_in_archive_obscure,
 )
 from ...tests.utils import (
     abspath,
@@ -45,24 +51,15 @@ from ...tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.cmd import (
-    GitWitlessRunner,
-    KillOutput,
-    StdOutErrCapture,
-    WitlessRunner,
+from ...utils import unlink
+from ..archives import (
+    ArchiveAnnexCustomRemote,
+    link_file_load,
 )
-from datalad.support.exceptions import CommandError
-from ...utils import (
-    unlink,
+from .test_base import (
+    BASE_INTERACTION_SCENARIOS,
+    check_interaction_scenario,
 )
-
-
-from ...tests.test_archives import (
-    fn_archive_obscure,
-    fn_archive_obscure_ext,
-    fn_in_archive_obscure,
-)
-from datalad import cfg as dl_cfg
 
 #import line_profiler
 #prof = line_profiler.LineProfiler()
@@ -234,8 +231,8 @@ def test_interactions(tdir):
             ('VALUE dl+archive://somekey3#path', None),
             ('VALUE',
              re.compile(
-                 'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to fetch any '
-                 'archive containing somekey. Tried: \[\]')
+                 r'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to fetch any '
+                 r'archive containing somekey. Tried: \[\]')
              )
         ],
         # # incorrect response received from annex -- something isn't right but ... later
@@ -265,8 +262,10 @@ def test_interactions(tdir):
 def check_observe_tqdm(topdir, topurl, outdir):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
-    from datalad.api import add_archive_content
-    from datalad.api import create
+    from datalad.api import (
+        add_archive_content,
+        create,
+    )
     ds = create(outdir)
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):
