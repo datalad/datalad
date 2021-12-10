@@ -81,28 +81,28 @@ environment:
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     # Windows core tests
-    - ID: WinP39core
-      # ~35 min
-      DTS: datalad.core datalad.dataset datalad.runner
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      # Python version specification is non-standard on windows
-      PY: 39-x64
-      # TODO: use datalad/git-annex (github release packages) but
-      # it would need setup of a GITHUB_TOKEN to access.
-      # This one is set in master but kept without change in maint for now
-      # INSTALL_GITANNEX: git-annex -m datalad/packages
+    #- ID: WinP39core
+    #  # ~35 min
+    #  DTS: datalad.core datalad.dataset datalad.runner
+    #  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+    #  # Python version specification is non-standard on windows
+    #  PY: 39-x64
+    #  # TODO: use datalad/git-annex (github release packages) but
+    #  # it would need setup of a GITHUB_TOKEN to access.
+    #  # This one is set in master but kept without change in maint for now
+    #  # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
-    - ID: MacP38core
-      # ~40min
-      DTS: datalad.core datalad.dataset datalad.runner datalad.support
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      # does not give a functional installation
-      # INSTALL_GITANNEX: git-annex -m snapshot
-      #INSTALL_GITANNEX: git-annex=8.20201129
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+    #- ID: MacP38core
+    #  # ~40min
+    #  DTS: datalad.core datalad.dataset datalad.runner datalad.support
+    #  APPVEYOR_BUILD_WORKER_IMAGE: macOS
+    #  PY: 3.8
+    #  # does not give a functional installation
+    #  # INSTALL_GITANNEX: git-annex -m snapshot
+    #  #INSTALL_GITANNEX: git-annex=8.20201129
+    #  INSTALL_GITANNEX: git-annex
+    #  DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    #  CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Additional test runs
     - ID: Ubu20a1
@@ -135,23 +135,36 @@ environment:
       #       either tests only, or actual code too)
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
-    - ID: WinP39a2
-      # ~45min
-      DTS: >
-          datalad.local
-          datalad.support
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
+    #- ID: WinP39a2
+    #  # ~45min
+    #  DTS: >
+    #      datalad.local
+    #      datalad.support
+    #      datalad.ui
+    #  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+    #  PY: 39-x64
 
-    - ID: MacP38a1
+    #- ID: MacP38a1
+    #  # ~40min
+    #  DTS: >
+    #      datalad.cli
+    #      datalad.customremotes
+    #      datalad.distribution
+    #      datalad.downloaders
+    #      datalad.interface
+    #      datalad.tests
+    #      datalad.ui
+    #  APPVEYOR_BUILD_WORKER_IMAGE: macOS
+    #  PY: 3.8
+    #  INSTALL_GITANNEX: git-annex
+    #  DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    #  CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+    - ID: MacP38a2
       # ~40min
       DTS: >
-          datalad.cli
-          datalad.customremotes
-          datalad.distribution
-          datalad.downloaders
-          datalad.interface
+          datalad.local
+          datalad.distributed
+          datalad.support
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
