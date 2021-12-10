@@ -37,7 +37,7 @@ from datalad.tests.utils import (
     ok_,
     patch,
     SkipTest,
-    skip_if_on_windows,
+    skip_if_adjusted_branch,
     skip_wo_symlink_capability,
     swallow_logs,
     swallow_outputs,
@@ -682,8 +682,8 @@ def test_path_arg_call(path):
         save(dataset=ds, path=[testfile.name], to_git=True)
 
 
-# one can't create these file names on windows systems
-@skip_if_on_windows
+# one can't create these file names on FAT/NTFS systems
+@skip_if_adjusted_branch
 @with_tempfile
 def test_windows_incompatible_names(path):
     ds = Dataset(path).create()
