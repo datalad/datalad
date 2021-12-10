@@ -189,7 +189,7 @@ before_install:
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"; then
-      PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 );
+      PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow 30 );
       export DATALAD_TESTS_SETUP_TESTREPOS=1;
     fi
   # Just in case we need to check if nfs is there etc
