@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from contextlib import ExitStack
 
 import pytest
@@ -209,3 +210,18 @@ def capture_logs(caplog, monkeypatch):
         # And we should also set it within environ so underlying commands also
         # stay silent
         monkeypatch.setenv('DATALAD_LOG_LEVEL', '100')
+
+
+def pytest_ignore_collect(path):
+    # When pytest is told to run doctests, by default it will import every
+    # source file in its search, but a number of datalad source file have
+    # undesirable side effects when imported.  This hook should ensure that
+    # only `test_*.py` files and `*.py` files containing doctests are imported
+    # during test collection.
+    if path.basename.startswith("test_") or path.check(dir=1):
+        return False
+    if path.ext != ".py":
+        return True
+    return not any(
+        re.match(r"^\s*>>>", ln) for ln in path.read_text("utf-8").splitlines()
+    )
