@@ -50,7 +50,6 @@ from datalad.cmd import (
     StdOutErrCapture,
 )
 from datalad.config import (
-    ConfigManager,
     parse_gitconfig_dump,
     write_config_section,
 )
@@ -104,7 +103,6 @@ _pardirsep = pardir + sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
-cfg = ConfigManager()
 
 
 # outside the repo base classes only used in ConfigManager
@@ -3431,21 +3429,35 @@ class GitRepo(CoreGitRepo):
             if (props.get('state', None) in ('modified', 'untracked') and
                 not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
-            if not on_windows and \
-                    cfg.obtain("datalad.save.windows-compat-warning",
-                               default=True):
+            if self.config.obtain("datalad.save.windows-compat-warning") in \
+                    ('warning', 'error'):
                 # check that non-Windows users generate win-compatible filenames
-                _check_for_win_compat(to_add)
+                to_add, problems = self._check_for_win_compat(to_add)
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
-            for r in self._save_add(
-                    to_add,
-                    git_opts=None,
-                    **{k: kwargs[k] for k in kwargs
-                       if k in (('git',) if hasattr(self, 'annexstatus')
-                                else tuple())}):
-                yield r
+            if to_add:
+                for r in self._save_add(
+                        to_add,
+                        git_opts=None,
+                        **{k: kwargs[k] for k in kwargs
+                           if k in (('git',) if hasattr(self, 'annexstatus')
+                                    else tuple())}):
+                    yield r
+            if problems:
+                from datalad.interface.results import get_status_dict
+                msg = \
+                    'Incompatible name for Windows systems; disable with ' \
+                    'datalad.save.windows-compat-warning.',
+                for path in problems:
+                    yield get_status_dict(
+                        action='save',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(path)),
+                        status='impossible',
+                        message=msg,
+                        logger=lgr)
 
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though
@@ -3455,6 +3467,49 @@ class GitRepo(CoreGitRepo):
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
+
+    def _check_for_win_compat(self, files):
+        """Check file names for illegal characters or reserved names on Windows
+
+        In the case that a non-Windows-compatible file is detected, warn users
+        about potential interoperability issues.
+        """
+        from collections import defaultdict
+        problems = defaultdict(list)
+        for file in files.keys():
+            for part in Path(file).parts:
+                # check every component of the path for incompatibilities
+                if Path(part).stem.upper() in RESERVED_NAMES_WIN:
+                    problems['Elements using a reserved filename:'].append(part)
+                    problems['paths'].append(file)
+                if re.findall(ILLEGAL_CHARS_WIN, part):
+                    problems['Elements with illegal characters:'].append(part)
+                    problems['paths'].append(file)
+                if part.endswith('.'):
+                    problems['Elements ending with a dot:'].append(part)
+                    problems['paths'].append(file)
+                if part.endswith(' '):
+                    problems['Elements ending with a space:'].append(part)
+                    problems['paths'].append(file)
+        if not problems:
+            return files, None
+        msg = \
+            "Some elements of your dataset are not compatible with " \
+            "Windows systems. Disable this check by changing " \
+            "datalad.save.windows-compat-warning or consider renaming " \
+            "the following elements: "
+        for k, v in problems.items():
+            # use the key as an explanation, and report filenames only once
+            msg += f"\n{k} {[*{*v}]}" if k != 'paths' else ''
+        if self.config.obtain("datalad.save.windows-compat-warning") == 'warning':
+            lgr.warning(msg)
+            return files, None
+
+        elif self.config.obtain("datalad.save.windows-compat-warning") == 'error':
+            # take the problematic files out of to_add
+            for path in [*{*problems['paths']}]:
+                files.pop(path)
+            return files, [*{*problems['paths']}]
 
     def _save_add(self, files, git_opts=None):
         """Simple helper to add files in save()"""
@@ -3639,33 +3694,3 @@ except ImportError as e:
     lgr.debug(
         'Not retro-fitting GitRepo with deprecated symbols, '
         'datalad-deprecated package not found')
-
-
-def _check_for_win_compat(files):
-    """Check file names for illegal characters or reserved names on Windows
-    
-    In the case that a non-Windows-compatible file is detected, warn users
-    about potential interoperability issues.
-    """
-    for file in files.keys():
-        f = Path(file).stem
-        if f.casefold() in [r.casefold() for r in RESERVED_NAMES_WIN]:
-            lgr.warning(
-                "Interoperability warning: The file name %s is a reserved name "
-                "on Windows systems, and can not be shared with Windows "
-                "machines. Consider renaming.", f)
-        chars = re.findall(ILLEGAL_CHARS_WIN, f)
-        if chars:
-            lgr.warning(
-                "Interoperability warning: The following characters are "
-                "considered illegal on Windows operating systems: %s. "
-                "Consider renaming %s to ensure cross-platform compatibility.",
-                chars, file)
-        # check for file name ending in a dot or space
-        if file.endswith('.') or file.endswith(' '):
-            lgr.warning(
-                "Interoperability warning: Windows systems can not "
-                "receive or work with files that end with spaces or dots. "
-                "Consider renaming %s ", file
-            )
-
