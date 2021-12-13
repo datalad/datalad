@@ -197,9 +197,7 @@ class ForEachDataset(Interface):
     @eval_results
     def __call__(
             cmd,
-            # TODO: uncomment
-            # *,
-            # after https://github.com/datalad/datalad/pull/6176 is merged
+            *,
             cmd_type="auto",
             dataset=None,
             state='present',
