@@ -203,15 +203,9 @@ def test_script_shims():
         'datalad',
         'git-annex-remote-datalad-archives',
         'git-annex-remote-datalad']:
-        if not on_windows:
-            # those must be available for execution, and should not contain
-            which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
-            # test if there is no easy install shim in there
-            with open(which.rstrip()) as f:
-                content = f.read()
-        else:
-            from distutils.spawn import find_executable
-            content = find_executable(script)
+
+        from shutil import which
+        which(script)
 
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)
