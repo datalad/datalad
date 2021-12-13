@@ -249,11 +249,24 @@ class Configuration(Interface):
             prefix = ''
 
         if kwargs.get('action', None) == 'dump':
-            ui.message('{}{}={}'.format(
-                prefix,
-                ac.color_word(name, ac.BOLD),
-                res['value'] if res['value'] is not None else '',
-            ))
+            if 'value_type' in res:
+                value_type = res['value_type']
+                vtype = value_type.short_description() \
+                    if hasattr(value_type, 'short_description') else str(value_type)
+                vtype = f'Value constraint: {vtype}'
+                ui.message('\n'.join(wrap(
+                    vtype,
+                    initial_indent='# ',
+                    subsequent_indent='#                    ',
+                    break_on_hyphens=False,
+                )))
+            else:
+                vtype = ''
+            value = res['value'] if res['value'] is not None else ''
+            if value in (True, False):
+                # normalize booleans for git-config syntax
+                value = str(value).lower()
+            ui.message(f'{prefix}{ac.color_word(name, ac.BOLD)}={value}')
         else:
             ui.message('{}{}'.format(
                 prefix,
@@ -338,8 +351,10 @@ def _dump(cfg, name):
     )
     if name in cfg_defs:
         ui_def = cfg_defs[name].get('ui', [None, {}])[1]
-        for s, key in ((ui_def.get('title'), 'purpose'),
-                  (ui_def.get('text'), 'description')):
+        for s, key in (
+                (ui_def.get('title'), 'purpose'),
+                (ui_def.get('text'), 'description'),
+                (cfg_defs[name].get('type'), 'value_type')):
             if s:
                 res[key] = s
     return res
