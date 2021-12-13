@@ -3,15 +3,6 @@
 # (http://datalad.org) using DataLad's latest development state at the
 # time the container is built.
 #
-# Changelog
-# ---------
-# 0.13.5-41-g0a2978275  (2020/11/16)
-#  - Build most recent release 0.13.5
-# 0.12.6-611-g11932b3f4 (2020/04/28)
-#  - Added p7zip-full
-# 0.12.2-40-g4281360d7 (2020/03/15)
-#  - First maint branch build
-#
 #######################################################################
 
 
