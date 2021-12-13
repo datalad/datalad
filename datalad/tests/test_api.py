@@ -9,7 +9,7 @@
 '''Unit tests for Python API functionality.'''
 
 import re
-from datalad.utils import getargspec
+from datalad.utils import get_sig_param_names
 
 from datalad.tests.utils import assert_true, assert_false
 from datalad.tests.utils import SkipTest
@@ -36,35 +36,30 @@ def test_basic_setup():
 
 def _test_consistent_order_of_args(intf, spec_posargs):
     f = getattr(intf, '__call__')
-    args, varargs, varkw, defaults = getargspec(f)
+    args, kw_only = get_sig_param_names(f, ('pos_any', 'kw_only'))
     # now verify that those spec_posargs are first among args
-    if not spec_posargs:
-        raise SkipTest("no positional args") # print intf, "skipped"
-#    else:
-#        print intf, spec_posargs
-    if intf.__name__ == 'Save':
-        # it makes sense there to have most common argument first
-        # -- the message. But we don't enforce it on cmdline so it is
-        # optional
-        spec_posargs.add('message')
-    elif intf.__name__ in (
-            'AddReadme',
-            'Addurls',
-            # Clone gained a git_clone_opts REMAINDER option. This is
-            # positional on the command line, but positioning it at the front
-            # of the signature could break existing python callers.
-            'Clone',
-            'ExportArchive',
-            'ExportToFigshare',
-            'ExtractMetadata'):
-        if intf.__name__ not in ['Clone', 'ExtractMetadata']:
-            # ex-plugins had 'dataset' as the first positional argument
-            # and ExtractMetadata has 'types' as the first positional arg
-            eq_(args[0], 'dataset')
-        eq_(spec_posargs, spec_posargs)
+    # TODO*: The last odd one left from "plugins" era. Decided to leave alone
+    if intf.__name__ in ('ExtractMetadata',):
         return
 
-    eq_(set(args[:len(spec_posargs)]), spec_posargs)
+    # if we had used * to instruct to have keyword only args, then all
+    # args should actually be matched entirely
+    if kw_only:
+        # "special cases/exclusions"
+        if intf.__name__ == 'CreateSiblingRia':
+            # -s|--name is a mandatory option (for uniformity), so allowed to be used as posarg #2
+            eq_(set(args), spec_posargs.union({'name'}))
+        else:
+            eq_(set(args), spec_posargs)
+    else:
+        # and if no kw_only -- only those which are known to be positional
+        eq_(set(args[:len(spec_posargs)]), spec_posargs)
+        if spec_posargs:
+            # and really -- we should not even get here if there are some spec_posargs --
+            # new interfaces should use * to separate pos args from kwargs per our now
+            # accepted design doc:
+            # http://docs.datalad.org/en/latest/design/pos_vs_kw_parameters.html
+            assert False
 
 
 def test_consistent_order_of_args():

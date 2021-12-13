@@ -84,6 +84,7 @@ class Unlock(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             recursive=False,
             recursion_limit=None):

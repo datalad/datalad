@@ -120,6 +120,7 @@ class ExportArchiveORA(Interface):
     def __call__(
             target,
             opts=None,
+            *,  # opts is positional but optional in CLI
             dataset=None,
             remote=None,
             annex_wanted=None,

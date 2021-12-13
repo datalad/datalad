@@ -69,6 +69,7 @@ class DownloadURL(Interface):
                 ", ".join(map(repr, sorted(Provider.DOWNLOADERS)))),
             constraints=EnsureStr(),  # TODO: EnsureURL
             metavar='url',
+            args=('urls',),
             nargs='+'),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -123,7 +124,9 @@ class DownloadURL(Interface):
     @staticmethod
     @datasetmethod(name="download_url")
     @eval_results
-    def __call__(urls, dataset=None, path=None, overwrite=False,
+    def __call__(urls,
+                 *,
+                 dataset=None, path=None, overwrite=False,
                  archive=False, save=True, message=None):
         from ..downloaders.http import HTTPDownloader
         from ..downloaders.providers import Providers

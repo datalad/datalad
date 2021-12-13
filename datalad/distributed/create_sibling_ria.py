@@ -260,6 +260,7 @@ class CreateSiblingRia(Interface):
     @eval_results
     def __call__(url,
                  name,
+                 *,  # note that `name` is required but not posarg in CLI
                  dataset=None,
                  storage_name=None,
                  alias=None,

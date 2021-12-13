@@ -55,6 +55,7 @@ from datalad.utils import (
     get_dataset_root,
     get_open_files,
     get_path_prefix,
+    get_sig_param_names,
     get_timestamp_suffix,
     get_trace,
     getpwd, chpwd,
@@ -209,6 +210,17 @@ def test_getargspec():
 
     assert_raises(ValueError, getargspec, f1_star)
     yield eq_argspec, f1_star, (['a1', 'kw1', 'kw0'], None, None, (None, 1)), True
+
+
+def test_get_sig_param_names():
+    def f(a1, kw1=None, *args, kw2=None, **kwargs):
+        pass  # pragma: no cover
+
+    # note: `a1` could be used either positionally or via keyword, so is listed in kw_any
+    assert_equal(get_sig_param_names(f, ('kw_only', 'kw_any')), (['kw2'], ['a1', 'kw1', 'kw2']))
+    assert_equal(get_sig_param_names(f, ('any',)), (['a1', 'kw1', 'kw2'],))
+    assert_equal(get_sig_param_names(f, tuple()), ())
+    assert_raises(ValueError, get_sig_param_names, f, ('mumba',))
 
 
 @with_tempfile(mkdir=True)

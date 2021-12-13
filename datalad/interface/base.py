@@ -353,8 +353,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     """
     from datalad.utils import getargspec
     # get the signature
-    ndefaults = 0
-    args, varargs, varkw, defaults = getargspec(func)
+    args, varargs, varkw, defaults = getargspec(func, include_kwonlyargs=True)
     defaults = defaults or tuple()
     if add_args:
         add_argnames = sorted(add_args.keys())
@@ -666,7 +665,7 @@ class Interface(object):
         from datalad.utils import getargspec
         # get the signature
         ndefaults = 0
-        args, varargs, varkw, defaults = getargspec(cls.__call__)
+        args, varargs, varkw, defaults = getargspec(cls.__call__, include_kwonlyargs=True)
         if defaults is not None:
             ndefaults = len(defaults)
         default_offset = ndefaults - len(args)
@@ -757,10 +756,10 @@ class Interface(object):
     def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
         from datalad.utils import getargspec
-        argspec = getargspec(cls.__call__)
-        if argspec[2] is None:
+        argspec = getargspec(cls.__call__, include_kwonlyargs=True)
+        if argspec.keywords is None:
             # no **kwargs in the call receiver, pull argnames from signature
-            argnames = getargspec(cls.__call__)[0]
+            argnames = argspec.args
         else:
             # common options
             # XXX define or better get from elsewhere
@@ -858,7 +857,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     dict
     """
     from datalad.utils import getargspec
-    argspec = getargspec(call)
+    argspec = getargspec(call, include_kwonlyargs=True)
     defaults = argspec.defaults
     nargs = len(argspec.args)
     defaults = defaults or []  # ensure it is a list and not None

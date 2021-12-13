@@ -363,6 +363,7 @@ class Status(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             annex=None,
             untracked='normal',

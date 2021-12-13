@@ -157,6 +157,8 @@ ArgSpecFake = collections.namedtuple(
     "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
+# adding cache here somehow does break it -- even 'datalad wtf' does not run
+# @lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
 def getargspec(func, *, include_kwonlyargs=False):
     """Compat shim for getargspec deprecated in python 3.
 
@@ -210,6 +212,60 @@ def getargspec(func, *, include_kwonlyargs=False):
     # harmonize defaults to how original getargspec returned them -- just a tuple
     args4[3] = None if not defaults else tuple(defaults.values())
     return ArgSpecFake(*args4)
+
+
+# Definitions to be (re)used in the next function
+_SIG_P = inspect.Parameter
+_SIG_KIND_SELECTORS = {
+    'pos_only': {_SIG_P.POSITIONAL_ONLY,},
+    'pos_any': {_SIG_P.POSITIONAL_ONLY, _SIG_P.POSITIONAL_OR_KEYWORD},
+    'kw_any': {_SIG_P.POSITIONAL_OR_KEYWORD, _SIG_P.KEYWORD_ONLY},
+    'kw_only': {_SIG_P.KEYWORD_ONLY,},
+}
+_SIG_KIND_SELECTORS['any'] = set().union(*_SIG_KIND_SELECTORS.values())
+
+
+@lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
+def get_sig_param_names(f, kinds: tuple) -> tuple:
+    """A helper to selectively return parameters from inspect.signature.
+
+    inspect.signature is the ultimate way for introspecting callables.  But
+    its interface is not so convenient for a quick selection of parameters
+    (AKA arguments) of desired type or combinations of such.  This helper
+    should make it easier to retrieve desired collections of parameters.
+
+    Since often it is desired to get information about multiple specific types
+    of parameters, `kinds` is a list, so in a single invocation of `signature`
+    and looping through the results we can obtain all information.
+
+    Parameters
+    ----------
+    f: callable
+    kinds: tuple with values from {'pos_any', 'pos_only', 'kw_any', 'kw_only', 'any'}
+      Is a list of what kinds of args to return in result (tuple). Each element
+      should be one of: 'any_pos' - positional or keyword which could be used
+      positionally. 'kw_only' - keyword only (cannot be used positionally) arguments,
+      'any_kw` - any keyword (could be a positional which could be used as a keyword),
+      `any` -- any type from the above.
+
+    Returns
+    -------
+    tuple:
+      Each element is a list of parameters (names only) of that "kind".
+    """
+    selectors = []
+    for kind in kinds:
+        if kind not in _SIG_KIND_SELECTORS:
+            raise ValueError(f"Unknown 'kind' {kind}. Known are: {', '.join(_SIG_KIND_SELECTORS)}")
+        selectors.append(_SIG_KIND_SELECTORS[kind])
+
+    out = [[] for _ in kinds]
+    for p_name, p in inspect.signature(f).parameters.items():
+        for i, selector in enumerate(selectors):
+            if p.kind in selector:
+                out[i].append(p_name)
+
+    return tuple(out)
 
 
 def any_re_search(regexes, value):

@@ -120,6 +120,7 @@ class Diff(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             fr='HEAD',
             to=None,
             dataset=None,

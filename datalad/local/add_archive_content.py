@@ -213,6 +213,7 @@ class AddArchiveContent(Interface):
 
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
+            args=("archive",),
             doc="archive file or a key (if %s specified)" % _KEY_OPT,
             constraints=EnsureStr()),
     )
@@ -222,6 +223,7 @@ class AddArchiveContent(Interface):
     @eval_results
     def __call__(
             archive,
+            *,
             dataset=None,
             annex=None,
             add_archive_leading_dir=False,

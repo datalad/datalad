@@ -244,10 +244,12 @@ class Clone(Interface):
     def __call__(
             source,
             path=None,
+            git_clone_opts=None,
+            *,
             dataset=None,
             description=None,
             reckless=None,
-            git_clone_opts=None):
+        ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.

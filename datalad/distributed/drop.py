@@ -167,6 +167,7 @@ class Drop(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             what='filecontent',
             reckless=None,
             dataset=None,

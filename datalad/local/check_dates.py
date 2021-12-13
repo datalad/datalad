@@ -144,6 +144,7 @@ class CheckDates(Interface):
     @staticmethod
     @eval_results
     def __call__(paths,
+                 *,
                  reference_date="@1514764800",
                  revs=None,
                  annex="all",

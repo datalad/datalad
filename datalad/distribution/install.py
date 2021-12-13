@@ -175,6 +175,7 @@ class Install(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             source=None,
             dataset=None,
             get_data=False,

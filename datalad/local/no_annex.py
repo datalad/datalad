@@ -73,6 +73,7 @@ class NoAnnex(Interface):
     @staticmethod
     @datasetmethod(name='no_annex')
     @eval_results
+    # TODO*: make dataset, pattern into kwargs after *,?
     def __call__(dataset, pattern, ref_dir='.', makedirs=False):
         # could be extended to accept actual largefile expressions
         from os.path import join as opj

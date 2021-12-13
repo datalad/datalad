@@ -165,7 +165,9 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     @eval_results
-    def __call__(path=None, message=None, dataset=None,
+    def __call__(path=None,
+                 *,
+                 message=None, dataset=None,
                  version_tag=None,
                  recursive=False, recursion_limit=None,
                  updated=False,

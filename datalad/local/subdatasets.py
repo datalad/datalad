@@ -206,6 +206,7 @@ class Subdatasets(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             state='any',
             fulfilled=NoneDeprecated,

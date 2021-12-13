@@ -199,6 +199,7 @@ class Rerun(Interface):
     @eval_results
     def __call__(
             revision=None,
+            *,
             since=None,
             dataset=None,
             branch=None,
