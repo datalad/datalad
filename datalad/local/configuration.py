@@ -155,9 +155,6 @@ class Configuration(Interface):
         # - global and recursion makes no sense
 
         if action == 'dump':
-            if spec:
-                raise ValueError(
-                    'Configuration selection is not supported for dumping')
             if scope:
                 raise ValueError(
                     'Scope selection is not supported for dumping')
@@ -279,8 +276,9 @@ def configuration(action, scope, specs, res_kwargs, ds=None):
         raise ValueError("Unsupported action '{}'".format(action))
 
     if action == 'dump':
-        # dumping is querying for all known keys
-        specs = [(n,) for n in sorted(set(cfg_defs.keys()).union(cfg.keys()))]
+        if not specs:
+            # dumping is querying for all known keys
+            specs = [(n,) for n in sorted(set(cfg_defs.keys()).union(cfg.keys()))]
         scope = None
 
     for spec in specs:

@@ -56,7 +56,6 @@ def test_something(path, new_home):
     ds.save()
 
     # catches unsupported argument combinations
-    assert_raises(ValueError, ds.configuration, 'dump', spec='some')
     assert_raises(ValueError, ds.configuration, 'dump', scope='branch')
     assert_raises(ValueError, ds.configuration, 'set', spec=('onlyname',))
     assert_raises(ValueError, ds.configuration, 'set', spec='nosection=value')
