@@ -111,7 +111,9 @@ def test_subprocess_return_code_capture():
     # windows doesn't support SIGINT but would need a Ctrl-C
     signal_to_send = signal.SIGTERM if on_windows else signal.SIGINT
     result_pool = dict()
-    result = run_command(['timeout', '3'] if on_windows else ["sleep", "10000"],
+    result = run_command(["waitfor", "/T", "10000", "TheComputerTurnsIntoATulip"]
+                         if on_windows
+                         else ["sleep", "10000"],
                          KillProtocol,
                          None,
                          {
@@ -419,7 +421,9 @@ def test_timeout():
             TestProtocol.received_timeouts.append((self.counter.__next__(), fd))
 
     run_command(
-        ['timeout', '1'] if on_windows else ["sleep", "1"],
+        ["waitfor", "/T", "1", "TheComputerTurnsIntoATulip"]
+        if on_windows
+        else ["sleep", "1"],
         stdin=None,
         protocol=TestProtocol,
         timeout=.1
