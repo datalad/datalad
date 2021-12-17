@@ -35,6 +35,8 @@ from ..support.network import iso8601_to_epoch
 
 from datalad import cfg as dlcfg
 from datalad.config import anything2bool
+from datalad.distribution.dataset import Dataset
+from datalad.local.gitcredential import GitCredentialInterface
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.credentials')
@@ -43,6 +45,11 @@ lgr = getLogger('datalad.downloaders.credentials')
 @auto_repr
 class Credential(object):
     """Base class for different types of credentials
+
+    Note: While subclasses can define their own `_FIELDS`, they are actually
+    assumed to have particular keys by the implementation of (some)
+    authenticators. `HTTPRequestsAuthenticator` and its subclasses for example,
+    assume `user` and `password` to be valid keys.
     """
 
     # Should be defined in a subclass as an OrderedDict of fields
@@ -54,7 +61,8 @@ class Credential(object):
         'optional',  # Not mandatory thus not requested if not set
     }
 
-    def __init__(self, name, url=None, keyring=None):
+    def __init__(self, name, url=None, keyring=None, auth_url=None,
+                 dataset=None):
         """
         Parameters
         ----------
@@ -66,9 +74,16 @@ class Credential(object):
         keyring : a keyring
             An object providing (g|s)et_password.  If None, keyring module is used
             as is
+        auth_url : str, optional
+            URL string this credential is going to be used with. This context
+            may be needed to query some credential systems (like git-credential).
+        dataset : str, Path or Dataset
+            The dataset datalad is operating on with this credential. This may
+            be needed for context in order to query local configs.
         """
         self.name = name
         self.url = url
+        self.set_context(auth_url=auth_url, dataset=dataset)
         self._keyring = keyring or keyring_
         self._prepare()
 
@@ -206,6 +221,50 @@ class Credential(object):
         """Deletes credential values from the keyring"""
         for f in self._FIELDS:
             self._keyring.delete(self.name, f)
+
+    def set_context(self, auth_url=None, dataset=None):
+        """Set URL/dataset context after instantiation
+
+        ATM by design the system of providers+downloaders+credentials doesn't
+        necessarily provide access to that information at instantiation time of
+        `Credential` objects. Hence, allow to provide this whenever we can.
+
+        Arguments are only applied if provided. Hence, `None` does not overwrite
+        a possibly already existing attribute.
+
+        Note
+        ----
+        Eventually, this is going to need a major overhaul. `Providers` etc. are
+        built to be mostly unaware of their context, which is why
+        `get_dataset_root()` tends to be the only way of assessing what dataset
+        we are operating on. This will, however, fail to detect the correct
+        dataset, if it can'T be deduced from PWD, though.
+
+        Parameters
+        ----------
+        auth_url : str, optional
+            URL string this credential is going to be used with. This context
+            may be needed to query some credential systems (like git-credential).
+        dataset : str, Path or Dataset, optional
+            The dataset datalad is operating on with this credential. This may
+            be needed for context in order to query local configs.
+        """
+
+        # TODO: change of context should probably not be allowed. When context
+        #       is actually needed for a particular credential store, this
+        #       object represents such associated creds.
+        #       Allowing to switch context within the same instance leads to
+        #       trouble determining when exactly a reload is needed and what is
+        #       to be overwritten or not.
+
+
+
+        if auth_url:
+            self.auth_url = auth_url
+        if isinstance(dataset, Dataset):
+            self.ds = dataset
+        else:
+            self.ds = Dataset(dataset) if dataset else None
 
 
 class UserPassword(Credential):
@@ -388,10 +447,71 @@ class LORIS_Token(CompositeCredential):
         super(CompositeCredential, self).__init__(name, url, keyring)
 
 
-CREDENTIAL_TYPES = {
-    'user_password': UserPassword,
-    'aws-s3': AWS_S3,
-    'nda-s3': NDA_S3,
-    'token': Token,
-    'loris-token': LORIS_Token
-}
+class GitCredential(Credential):
+    """Credential to access git-credential
+    """
+
+
+    _FIELDS = OrderedDict([('user', {}),
+                           ('password', {'hidden': True})])
+
+    # substitute keys used within datalad by the ones used by git-credential
+    _FIELDS_GIT = {'user': 'username',
+                   'password': 'password'}
+
+    is_expired = False  # no expiration provisioned
+
+    def __init__(self, name, url=None, keyring=None,
+                 auth_url=None, dataset=None):
+        super().__init__(name, url=url, keyring=keyring,
+                         auth_url=auth_url, dataset=dataset)
+
+    def _get_field_value(self, field):
+
+        from datalad import cfg as dlcfg
+        cfg = self.ds.config if self.ds else dlcfg
+        cfg.reload()
+        from_cfg = cfg.get('datalad.credential.{name}.{field}'.format(
+            name=self.name,
+            field=field.replace('_', '-')
+        ))
+
+        if from_cfg:
+            # config takes precedence
+            return from_cfg
+
+        # Note:
+        # In opposition to the keyring approach of other `Credential`s,
+        # we don't query for single values, but for an entire "description".
+        # Currently required methods have to return single values, though.
+        # Hence, calls to `git credential fill` could be optimised. Not easy to
+        # assess when exactly this class can know whether it's context is yet to
+        # be completed, though, so that another `fill` would actually yield
+        # something different than before.
+
+        self._git_cred.fill()
+        git_field = self._FIELDS_GIT[field]  # translate to git-credential terms
+        if git_field in self._git_cred and self._git_cred[git_field]:
+            return self._git_cred[git_field]
+
+        # we got nothing
+        return
+
+    def set(self, **kwargs):
+        for f, v in kwargs.items():
+            if f not in self._FIELDS:
+                raise ValueError("Unknown field %s. Known are: %s"
+                                 % (f, self._FIELDS.keys()))
+
+        mapped = {self._FIELDS_GIT[k]: v for k, v in kwargs.items()}
+        self._git_cred = GitCredentialInterface(url=self.auth_url, repo=self.ds,
+                                                **mapped)
+        self._git_cred.approve()
+
+    def delete(self):
+        """Deletes credential"""
+        self._git_cred.reject()
+
+    def set_context(self, auth_url=None, dataset=None):
+        super().set_context(auth_url, dataset)
+        self._git_cred = GitCredentialInterface(url=auth_url, repo=dataset)
