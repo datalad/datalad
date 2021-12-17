@@ -671,7 +671,9 @@ def _get_dot_git(pathobj, *, ok_missing=False, resolved=False):
     Returns
     -------
     Path
-      Absolute path to the (resolved) .git directory
+      Path to the (resolved) .git directory. If `resolved` is False, and
+      the given `pathobj` is not an absolute path, the returned path will
+      also be relative.
     """
     dot_git = pathobj / '.git'
     if dot_git.is_dir():
