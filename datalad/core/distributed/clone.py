@@ -686,7 +686,7 @@ def clone_dataset(
         else:
             # yoh: Not sure if we ever get here but I felt that there could
             #      be a case when this might happen and original error would
-            #      not be sufficient to troubleshoot what is going on.
+            #      not be sufficient to troubleshoot what is going on
             error_msg = "Awkward error -- we failed to clone properly. " \
                         "Although no errors were encountered, target " \
                         "dataset at %s seems to be not fully installed. " \
@@ -694,7 +694,7 @@ def clone_dataset(
             error_args = (destds.path, cand['giturl'])
         yield get_status_dict(
             status='error',
-            message=(error_msg, error_args),
+            message=(error_msg, *error_args),
             **result_props)
         return
 
