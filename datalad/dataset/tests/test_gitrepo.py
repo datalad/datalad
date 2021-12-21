@@ -317,8 +317,11 @@ def test_get_dot_git(emptycase, gitdircase, barecase, gitfilecase):
         eq_(_get_dot_git(emptycase, ok_missing=True, resolved=r),
             emptycase / '.git')
 
-        eq_(_get_dot_git(gitdircase, resolved=r), gitdircase / '.git')
+        eq_(_get_dot_git(gitdircase, resolved=r),
+            (gitdircase.resolve() if r else gitdircase) / '.git')
 
-        eq_(_get_dot_git(barecase, resolved=r), barecase)
+        eq_(_get_dot_git(barecase, resolved=r),
+            barecase.resolve() if r else barecase)
 
-        eq_(_get_dot_git(gitfilecase, resolved=r), gitfilecase / 'subdir')
+        eq_(_get_dot_git(gitfilecase, resolved=r),
+            (gitfilecase.resolve() if r else gitfilecase) / 'subdir')
