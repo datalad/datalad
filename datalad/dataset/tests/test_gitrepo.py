@@ -39,7 +39,10 @@ from datalad.tests.utils import (
     SkipTest,
 )
 
-from datalad.dataset.gitrepo import GitRepo
+from datalad.dataset.gitrepo import (
+    GitRepo,
+    _get_dot_git,
+)
 
 from datalad.support.exceptions import (
     CommandError,
@@ -294,3 +297,31 @@ def test_fake_dates(path):
     eq_(gr.get_active_branch(), "other")
     eq_(seconds_initial + 3,
         int(gr.format_commit('%at')))
+
+
+@with_tempfile(mkdir=True)
+@with_tree(tree={".git": {}})
+@with_tree(tree={"HEAD": "",
+                 "config": ""})
+@with_tree(tree={".git": "gitdir: subdir"})
+def test_get_dot_git(emptycase, gitdircase, barecase, gitfilecase):
+    emptycase = Path(emptycase)
+    gitdircase = Path(gitdircase)
+    barecase = Path(barecase)
+    gitfilecase = Path(gitfilecase)
+
+    # the test is not actually testing resolving (we can trust that)
+    # but it is exercising the internal code paths involved in it
+    for r in (True, False):
+        assert_raises(RuntimeError, _get_dot_git, emptycase, resolved=r)
+        eq_(_get_dot_git(emptycase, ok_missing=True, resolved=r),
+            emptycase / '.git')
+
+        eq_(_get_dot_git(gitdircase, resolved=r),
+            (gitdircase.resolve() if r else gitdircase) / '.git')
+
+        eq_(_get_dot_git(barecase, resolved=r),
+            barecase.resolve() if r else barecase)
+
+        eq_(_get_dot_git(gitfilecase, resolved=r),
+            (gitfilecase.resolve() if r else gitfilecase) / 'subdir')

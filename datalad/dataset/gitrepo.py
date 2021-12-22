@@ -651,8 +651,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 #
 # Internal helpers
 #
-def _get_dot_git(pathobj, *, ok_missing=False):
-    """Given a pathobj to a repository return path to .git/ directory
+def _get_dot_git(pathobj, *, ok_missing=False, resolved=False):
+    """Given a pathobj to a repository return path to the .git directory
 
     Parameters
     ----------
@@ -660,6 +660,8 @@ def _get_dot_git(pathobj, *, ok_missing=False):
     ok_missing: bool, optional
       Allow for .git to be missing (useful while sensing before repo is
       initialized)
+    resolved : bool, optional
+      Whether to resolve any symlinks in the path, at a performance cost.
 
     Raises
     ------
@@ -669,23 +671,30 @@ def _get_dot_git(pathobj, *, ok_missing=False):
     Returns
     -------
     Path
-      Absolute path to resolved .git/ directory
+      Path to the (resolved) .git directory. If `resolved` is False, and
+      the given `pathobj` is not an absolute path, the returned path will
+      also be relative.
     """
     dot_git = pathobj / '.git'
-    if dot_git.is_file():
+    if dot_git.is_dir():
+        # deal with the common case immediately, an existing dir
+        return dot_git.resolve() if resolved else dot_git
+    elif not dot_git.exists():
+        # missing or bare
+        if (pathobj / 'HEAD').exists() and (pathobj / 'config').exists():
+            return pathobj.resolve() if resolved else pathobj
+        elif not ok_missing:
+            raise RuntimeError("Missing .git in %s." % pathobj)
+        else:
+            # resolve to the degree possible
+            return dot_git.resolve(strict=False)
+    # continue with more special cases
+    elif dot_git.is_file():
         with dot_git.open() as f:
             line = f.readline()
             if line.startswith("gitdir: "):
                 dot_git = pathobj / line[7:].strip()
+                return dot_git.resolve() if resolved else dot_git
             else:
                 raise InvalidGitRepositoryError("Invalid .git file")
-    elif dot_git.is_symlink():
-        dot_git = dot_git.resolve()
-    elif not dot_git.exists() and \
-            (pathobj / 'HEAD').exists() and \
-            (pathobj / 'config').exists():
-        # looks like a bare repo
-        dot_git = pathobj
-    elif not (ok_missing or dot_git.exists()):
-        raise RuntimeError("Missing .git in %s." % pathobj)
-    return dot_git
+    raise RuntimeError("Unaccounted condition")
