@@ -6,11 +6,9 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import (
-    dirname,
-    join as opj,
-)
 import sys
+from os.path import dirname
+from os.path import join as opj
 
 # This is needed for versioneer to be importable when building with PEP 517.
 # See <https://github.com/warner/python-versioneer/issues/193> and links
@@ -18,19 +16,12 @@ import sys
 sys.path.append(dirname(__file__))
 
 import versioneer
-
 from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
-    # no longer needed, all scenario docs are in the handbook now
-    # keeping the original examples here only to be able to execute them
-    # as part of the tests
-    #BuildRSTExamplesFromScripts,
     BuildSchema,
-    findsome,
     datalad_setup,
 )
-
 
 requires = {
     'core': [
@@ -196,13 +187,6 @@ datalad_setup(
                   'Bug Tracker': 'https://github.com/datalad/datalad/issues'},
     extras_require=requires,
     cmdclass=cmdclass,
-    package_data={
-        'datalad':
-            findsome('resources',
-                     {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
-            findsome(opj('downloaders', 'configs'), {'cfg'}) +
-            findsome(opj('distribution', 'tests'), {'yaml'}) +
-            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
-    },
+    include_package_data=True,
     **setup_kwargs
 )
