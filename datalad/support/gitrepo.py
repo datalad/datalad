@@ -3437,13 +3437,12 @@ class GitRepo(CoreGitRepo):
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
             if to_add:
-                for r in self._save_add(
+                yield from self._save_add(
                         to_add,
                         git_opts=None,
                         **{k: kwargs[k] for k in kwargs
                            if k in (('git',) if hasattr(self, 'annexstatus')
                                     else tuple())}):
-                    yield r
             if problems:
                 from datalad.interface.results import get_status_dict
                 msg = \
