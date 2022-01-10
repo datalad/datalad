@@ -3442,7 +3442,7 @@ class GitRepo(CoreGitRepo):
                         git_opts=None,
                         **{k: kwargs[k] for k in kwargs
                            if k in (('git',) if hasattr(self, 'annexstatus')
-                                    else tuple())}):
+                                    else tuple())})
             if problems:
                 from datalad.interface.results import get_status_dict
                 msg = \
@@ -3475,7 +3475,7 @@ class GitRepo(CoreGitRepo):
         """
         from collections import defaultdict
         problems = defaultdict(list)
-        for file in files.keys():
+        for file in files:
             for part in Path(file).parts:
                 # check every component of the path for incompatibilities
                 if Path(part).stem.upper() in RESERVED_NAMES_WIN:
