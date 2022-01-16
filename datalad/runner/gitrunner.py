@@ -46,13 +46,13 @@ class GitRunnerBase(object):
         if found.  If it is empty (but not None), we do nothing
         """
         if GitRunnerBase._GIT_PATH is None:
-            from distutils.spawn import find_executable
+            from shutil import which
 
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
             if (os.environ.get('DATALAD_USE_DEFAULT_GIT', '0').lower()
                     in ('1', 'on', 'true', 'yes')):
-                git_fpath = find_executable("git")
+                git_fpath = which("git")
                 if git_fpath:
                     GitRunnerBase._GIT_PATH = ''
                     lgr.log(9, "Will use default git %s", git_fpath)
@@ -65,8 +65,8 @@ class GitRunnerBase(object):
 
     @staticmethod
     def _get_bundled_path():
-        from distutils.spawn import find_executable
-        annex_fpath = find_executable("git-annex")
+        from shutil import which
+        annex_fpath = which("git-annex")
         if not annex_fpath:
             # not sure how to live further anyways! ;)
             alongside = False
@@ -76,7 +76,7 @@ class GitRunnerBase(object):
             # we only need to consider bundled git if it's actually different
             # from default. (see issue #5030)
             alongside = op.lexists(bundled_git_path) and \
-                        bundled_git_path != op.realpath(find_executable('git'))
+                        bundled_git_path != op.realpath(which('git'))
 
         return annex_path if alongside else ''
 

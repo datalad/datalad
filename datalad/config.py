@@ -355,6 +355,7 @@ class ConfigManager(object):
                         "DataLad. Set both 'user.name' and 'user.email' "
                         "configuration variables."
                     )
+                    break  # one warning enough
             ConfigManager._checked_git_identity = True
 
     def reload(self, force=False):

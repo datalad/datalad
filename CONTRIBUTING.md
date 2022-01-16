@@ -611,11 +611,16 @@ Refer datalad/config.py for information on how to add these environment variable
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
   Specifies network interfaces to bring down/up for testing. Currently used by travis.
-- *DATALAD_CMD_PROTOCOL*: 
-  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
+- *DATALAD_TESTS_KNOWNFAILURES_PROBE*:
+  Binary flag to test whether "known failures" still actually are failures. That
+  is - change behavior of tests, that decorated with any of the `known_failure`,
+  to not skip, but executed and *fail* if they would pass (indicating that the
+  decorator may be removed/reconsidered).
+- *DATALAD_CMD_PROTOCOL*:
+  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
-- *DATALAD_CMD_PROTOCOL_PREFIX*: 
+- *DATALAD_CMD_PROTOCOL_PREFIX*:
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
 - *DATALAD_USE_DEFAULT_GIT*:
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).

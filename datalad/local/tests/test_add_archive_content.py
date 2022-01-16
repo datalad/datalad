@@ -618,7 +618,7 @@ class TestAddArchiveOptions():
 
     def assert_no_trash_left_behind(self):
         assert_equal(
-            list(find_files('\.datalad..*', self.annex.path, exclude="config",
+            list(find_files(r'\.datalad..*', self.annex.path, exclude="config",
                             dirs=True)),
             []
         )
