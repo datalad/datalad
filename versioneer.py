@@ -1511,7 +1511,7 @@ def get_cmdclass(cmdclass=None):
     cmds = {} if cmdclass is None else cmdclass.copy()
 
     # we add "version" to both distutils and setuptools
-    from distutils.core import Command
+    from setuptools import Command
 
     class cmd_version(Command):
         description = "report generated version string"

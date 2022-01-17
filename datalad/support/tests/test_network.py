@@ -300,8 +300,8 @@ def test_url_samples():
     _check_ri('weird_url:/', SSHRI, hostname='weird_url', path='/')
     _check_ri('example.com:/', SSHRI, hostname='example.com', path='/')
     _check_ri('example.com:path/sp1', SSHRI, hostname='example.com', path='path/sp1')
-    _check_ri('example.com/path/sp1\:fname', PathRI, localpath='example.com/path/sp1\:fname',
-              path='example.com/path/sp1\:fname')
+    _check_ri('example.com/path/sp1\\:fname', PathRI, localpath='example.com/path/sp1\\:fname',
+              path='example.com/path/sp1\\:fname')
     # ssh is as stupid as us, so we will stay "Consistently" dumb
     """
     $> ssh example.com/path/sp1:fname

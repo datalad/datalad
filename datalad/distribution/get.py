@@ -47,6 +47,7 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InsufficientArgumentsError,
 )
@@ -245,7 +246,15 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 f"candidate '{name}', but only one is allowed. "
                 f"Check datalad.get.subdataset-source-candidate-* configuration!"
             )
-        url = tmpl.format(**sm_candidate_props)
+        try:
+            url = tmpl.format(**sm_candidate_props)
+        except KeyError as e:
+            ce = CapturedException(e)
+            lgr.warning(
+                "Failed to format template %r for a submodule clone. "
+                "Error: %s", tmpl, ce
+            )
+            continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
         # outside. Additional guesswork can only make it slower

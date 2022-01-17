@@ -18,15 +18,15 @@ def test_CapturedException():
     except Exception as e:
         captured_exc = CapturedException(e)
 
-    assert_re_in("BOOM \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
-    assert_re_in("^\[.*\]", captured_exc.format_oneline_tb(include_str=False))  # only traceback
+    assert_re_in(r"BOOM \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
+    assert_re_in(r"^\[.*\]", captured_exc.format_oneline_tb(include_str=False))  # only traceback
 
     try:
         raise NotImplementedError
     except Exception as e:
         captured_exc = CapturedException(e)
 
-    assert_re_in("NotImplementedError \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
+    assert_re_in(r"NotImplementedError \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
 
     def f():
         def f2():
@@ -58,10 +58,10 @@ def test_CapturedException():
 
     estr_full = captured_exc.format_oneline_tb(10)
 
-    assert_re_in("new message \[test_captured_exception.py:test_CapturedException:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr_full)
-    assert_re_in("new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
-    assert_re_in("new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
-    assert_re_in("new message \[test_captured_exception.py:f2:[0-9]+\]", estr1)
+    assert_re_in(r"new message \[test_captured_exception.py:test_CapturedException:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr_full)
+    assert_re_in(r"new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
+    assert_re_in(r"new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
+    assert_re_in(r"new message \[test_captured_exception.py:f2:[0-9]+\]", estr1)
     # default: no limit:
     assert_equal(estr_, estr_full)
 
