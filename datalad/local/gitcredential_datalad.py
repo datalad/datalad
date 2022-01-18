@@ -11,6 +11,12 @@ from datalad.utils import Path
 git_credential_datalad_help = """\
 Git credential interface to DataLad's credential management system.
 
+In order to use this, one needs to configure git to use the credential helper
+'datalad'. In the simplest case this can be achieved by 'git config --add
+--global credential.helper datalad'. This can be restricted to apply to
+certain URLs only. See 'man gitcredentials' and
+http://docs.datalad.org/credentials.html for details.
+
 Only DataLad's UserPassword-type credentials are supported. This helper
 passes standard 'get', 'store' actions on to the respective interfaces in
 DataLad.
