@@ -819,13 +819,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
-            msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
-            with open(msg_path, "wb") as ofh:
-                ofh.write(ensure_bytes(msg))
+            msg_path = repo.dot_git / "COMMIT_EDITMSG"
+            msg_path.write_text(msg)
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -d . -r -F %s'",
-                     msg_path)
+                     # shorten to the relative path for a more concise message
+                     msg_path.relative_to(ds.pathobj))
             if repo.dirty and not explicit:
                 # Give clean-up hints if a formerly clean repo is left dirty
                 lgr.info(
