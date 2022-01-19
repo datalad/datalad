@@ -511,6 +511,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
                       message='Slated for transport, but no content present')
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
 def test_ria_push(srcpath, dstpath):
