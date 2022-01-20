@@ -33,3 +33,7 @@ Valid locations for these files are listed in :ref:`chap_design_credentials`.
 In opposition to Git's approach, `url_re` is a regular expression that matches the entire URL including the scheme.
 The name of the provider section (`data_example_provider`)needs to match the file name.
 The name of the credential section (`data_example_cred`) needs to match the `credential` entry in the provider section.
+
+DataLad will create a provider configuration interactively, whenever it first encounters an URL that requires authentication and no credentials can be matched yet.
+This behavior extends to the git credential helper and can therefore even be triggered by a `git clone`.
+However, `git-credential-datalad` will not do this, if the config variable `datalad.credentials.githelper.noninteractive` is set.

@@ -94,6 +94,16 @@ definitions = {
         'type': bool,
         'default': False,
     },
+    'datalad.credentials.githelper.noninteractive':{
+        'ui': ('yesno', {
+               'title': 'Non-interactive mode for git-credential helper',
+               'text': 'Should git-credential-datalad operate in '
+                       'non-interactive mode? This would mean to not ask for '
+                       'user confirmation when storing new '
+                       'credentials/provider configs.'}),
+        'type': bool,
+        'default': False,
+    },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
                'title': 'NDA database server',

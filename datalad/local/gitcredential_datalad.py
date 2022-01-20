@@ -6,7 +6,7 @@ from datalad.downloaders.providers import (
     Providers,
 )
 from datalad.local.gitcredential import _credspec2dict
-from datalad.utils import Path
+from datalad import ConfigManager
 
 git_credential_datalad_help = """\
 Git credential interface to DataLad's credential management system.
@@ -35,10 +35,11 @@ usage: git credential-datalad [option] <action>
 
 options:
     -h                   Show this help.
-    --non-interactive    Don't ask for user confirmation when storing to
-                         DataLad's credential system. This may fail if default
-                         names result in a conflict with existing ones.
-                         This mode is used for DataLad's CI tests.
+
+If DataLad's config variable 'datalad.credentials.githelper.noninteractive' is
+set: Don't ask for user confirmation when storing to DataLad's credential
+system. This may fail if default names result in a conflict with existing ones.
+This mode is used for DataLad's CI tests.
 """
 
 
@@ -46,16 +47,16 @@ def git_credential_datalad():
     """Entrypoint to query DataLad's credentials via git-credential
     """
 
-    if not 2 <= len(sys.argv) <= 3 \
+    if len(sys.argv) != 2 \
             or sys.argv[1] == "-h" \
-            or sys.argv[1] != "--non-interactive" \
-            or sys.argv[-1] not in ['get', 'store', 'erase']:
+            or sys.argv[1] not in ['get', 'store', 'erase']:
         help_explicit = sys.argv[1] == "-h"
         print(git_credential_datalad_help,
               file=sys.stdout if help_explicit else sys.stderr)
         sys.exit(0 if help_explicit else 1)
 
-    interactive = False if sys.argv[1] == "--non-interactive" else True
+    cfg = ConfigManager()
+    interactive = not cfg.obtain("datalad.credentials.githelper.noninteractive")
     action = sys.argv[-1]
     attrs = _credspec2dict(sys.stdin)
 

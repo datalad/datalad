@@ -76,7 +76,9 @@ def test_datalad_credential_helper(path):
     ds = Dataset(path).create()
 
     # tell git to use git-credential-datalad
-    ds.config.add('credential.helper', 'datalad --non-interactive', where='local')
+    ds.config.add('credential.helper', 'datalad', where='local')
+    ds.config.add('datalad.credentials.githelper.noninteractive', 'true',
+                  where='global')
 
     from datalad.downloaders.providers import Providers
 
