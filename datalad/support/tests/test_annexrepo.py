@@ -931,7 +931,7 @@ def test_AnnexRepo_get(src, dst):
 
     annex.drop(testfile)
     with patch.object(GitWitlessRunner, 'run_on_filelist_chunks',
-                      side_effect=check_run, auto_spec=True), \
+                      side_effect=check_run), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
     eq_(called, ['find', 'get'])
@@ -1597,7 +1597,6 @@ def test_annex_add_no_dotfiles(path):
 def test_annex_version_handling_at_min_version(path):
     with set_annex_version(AnnexRepo.GIT_ANNEX_MIN_VERSION):
         po = patch.object(AnnexRepo, '_check_git_annex_version',
-                          auto_spec=True,
                           side_effect=AnnexRepo._check_git_annex_version)
         with po as cmpc:
             eq_(AnnexRepo.git_annex_version, None)

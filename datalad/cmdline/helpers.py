@@ -120,7 +120,8 @@ class HelpAction(argparse.Action):
         else:
             opt_args_str = "*Options*"
             pos_args_str = "*Arguments*"
-        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
+        # in python 3.10 it switched from "optional arguments" to "options"
+        helpstr = re.sub(r'(optional arguments|options):', opt_args_str, helpstr)
         helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)

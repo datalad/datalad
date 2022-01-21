@@ -46,6 +46,11 @@ matrix:
     env:
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
+  - python: '3.10'
+    dist: focal
+    env:
+      - NOSE_SELECTION=
+      - NOSE_SELECTION_OP=not
   - if: type = cron
     python: 3.6
     # Single run for Python 3.6
