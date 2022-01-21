@@ -127,6 +127,8 @@ def test_help_np():
               'Plumbing commands',
               }:
         assert_in(s, sections)
+        # should be present only one time!
+        eq_(stdout.count(s), 1)
 
     if not get_terminal_size()[0] or 0:
         raise SkipTest(
