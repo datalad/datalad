@@ -65,6 +65,8 @@ def test_download_url_exceptions():
         'Temporary failure in name resolution' in msg
         or
         'Name or service not known' in msg  # nd80
+        or
+        'Failed to establish a new session' in msg  # Debian sid @ 20220121
     ):
         assert_in('http://example.com/bogus', msg)
 
