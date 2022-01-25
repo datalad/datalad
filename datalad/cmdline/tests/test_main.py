@@ -47,7 +47,6 @@ from datalad.utils import (
 
 from ..helpers import fail_with_short_help
 from ..main import (
-    _fix_datalad_ri,
     main,
 )
 
@@ -299,16 +298,6 @@ def test_fail_with_short_help():
                  "        father\n"
                  "Hint: You can become one\n")
 
-def test_fix_datalad_ri():
-    assert_equal(_fix_datalad_ri('/'), '/')
-    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
-    assert_equal(_fix_datalad_ri('//'), '///')
-    assert_equal(_fix_datalad_ri('///'), '///')
-    assert_equal(_fix_datalad_ri('//a'), '///a')
-    assert_equal(_fix_datalad_ri('///a'), '///a')
-    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
-    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
-
 
 def test_fail_with_short_help():
     out = StringIO()
@@ -343,17 +332,6 @@ def test_fail_with_short_help():
                  "        mother\n"
                  "        father\n"
                  "Hint: You can become one\n")
-
-
-def test_fix_datalad_ri():
-    assert_equal(_fix_datalad_ri('/'), '/')
-    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
-    assert_equal(_fix_datalad_ri('//'), '///')
-    assert_equal(_fix_datalad_ri('///'), '///')
-    assert_equal(_fix_datalad_ri('//a'), '///a')
-    assert_equal(_fix_datalad_ri('///a'), '///a')
-    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
-    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
 
 
 @with_tempfile
