@@ -277,7 +277,7 @@ def _is_stream_tty(stream):
     try:
         # TODO: check on windows if hasattr check would work correctly and
         # add value:
-        return stream.isatty()
+        return stream and stream.isatty()
     except ValueError as exc:
         # Who knows why it is a ValueError, but let's try to be specific
         # If there is a problem with I/O - non-interactive, otherwise reraise
