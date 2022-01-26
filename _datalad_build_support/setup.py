@@ -75,7 +75,7 @@ class BuildManPage(Command):
     def initialize_options(self):
         self.manpath = opj('build', 'man')
         self.rstpath = opj('docs', 'source', 'generated', 'man')
-        self.parser = 'datalad.cmdline.main:setup_parser'
+        self.parser = 'datalad.cli.parser:setup_parser'
 
     def finalize_options(self):
         if self.manpath is None:

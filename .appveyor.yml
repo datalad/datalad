@@ -102,7 +102,7 @@ environment:
     - ID: WinP39a1
       # ~45min
       DTS: >
-          datalad.cmdline
+          datalad.cli
           datalad.customremotes
           datalad.distribution
           datalad.distributed
@@ -125,7 +125,7 @@ environment:
     - ID: MacP38a1
       # ~45min
       DTS: >
-          datalad.cmdline
+          datalad.cli
           datalad.customremotes
           datalad.distribution
           datalad.downloaders

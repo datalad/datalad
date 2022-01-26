@@ -16,27 +16,17 @@ import logging
 lgr = logging.getLogger('datalad.interface.base')
 
 import os
-import sys
 import re
 import textwrap
 from importlib import import_module
-import inspect
-import string
 from collections import (
-    defaultdict,
     OrderedDict,
 )
 import warnings
 
-from ..ui import ui
-
 import datalad
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
-from datalad.support.constraints import (
-    EnsureKeyChoice,
-    EnsureChoice,
-)
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.support.exceptions import CapturedException
@@ -57,15 +47,6 @@ def get_api_name(intfspec):
         name = intfspec[3]
     else:
         name = intfspec[0].split('.')[-1]
-    return name
-
-
-def get_cmdline_command_name(intfspec):
-    """Given an interface specification return a cmdline command name"""
-    if len(intfspec) > 2:
-        name = intfspec[2]
-    else:
-        name = intfspec[0].split('.')[-1].replace('_', '-')
     return name
 
 
@@ -168,19 +149,6 @@ def get_cmd_doc(interface):
     return intf_doc
 
 
-def get_cmd_ex(interface):
-    """Return the examples for the command defined by 'interface'.
-
-    Parameters
-    ----------
-    interface : subclass of Interface
-    """
-    intf_ex = "\n\n*Examples*\n\n"
-    for example in interface._examples_:
-        intf_ex += build_example(example, api='cmdline')
-    return intf_ex
-
-
 def dedent_docstring(text):
     """Remove uniform indentation from a multiline docstring"""
     # Problem is that first line might often have no offset, so might
@@ -253,89 +221,6 @@ def alter_interface_docs_for_api(docs):
     return docs
 
 
-def alter_interface_docs_for_cmdline(docs):
-    """Apply modifications to interface docstrings for cmdline doc use."""
-    # central place to alter the impression of docstrings,
-    # like removing Python API specific sections, and argument markup
-    if not docs:
-        return docs
-    docs = dedent_docstring(docs)
-    # clean cmdline sections
-    docs = re.sub(
-        r'\|\| PYTHON \>\>.*?\<\< PYTHON \|\|',
-        '',
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    # clean cmdline in-line bits
-    docs = re.sub(
-        r'\[PY:\s[^\[\]]*\sPY\]',
-        '',
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    docs = re.sub(
-        r'\[CMD:\s([^\[\]]*)\sCMD\]',
-        lambda match: match.group(1),
-        docs,
-        flags=re.MULTILINE)
-    docs = re.sub(
-        r'\|\| CMDLINE \>\>(.*?)\<\< CMDLINE \|\|',
-        lambda match: match.group(1),
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    # remove :role:`...` RST markup for cmdline docs
-    docs = re.sub(
-        r':\S+:`[^`]*`[\\]*',
-        lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    # make the handbook doc references more accessible
-    # the URL is a redirect configured at readthedocs
-    docs = re.sub(
-        r'(handbook:[0-9]-[0-9]*)',
-        '\\1 (http://handbook.datalad.org/symbols)',
-        docs)
-    # remove None constraint. In general, `None` on the cmdline means don't
-    # give option at all, but specifying `None` explicitly is practically
-    # impossible
-    docs = re.sub(
-        r',\sor\svalue\smust\sbe\s`None`',
-        '',
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    # capitalize variables and remove backticks to uniformize with
-    # argparse output
-    docs = re.sub(
-        r'([^`]+)`([a-zA-Z0-9_]+)`([^`]+)',
-        lambda match: f'{match.group(1)}{match.group(2).upper()}{match.group(3)}',
-        docs)
-    # select only the cmdline alternative from argument specifications
-    docs = re.sub(
-        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
-        lambda match: f'``{match.group(2)}``',
-        docs)
-    # clean up sphinx API refs
-    docs = re.sub(
-        r'\~datalad\.api\.\S*',
-        lambda match: "`{0}`".format(match.group(0)[13:]),
-        docs)
-    # dedicated support for version markup
-    docs = docs.replace('.. versionadded::', 'New in version')
-    docs = docs.replace('.. versionchanged::', 'Changed in version')
-    docs = docs.replace('.. deprecated::', 'Deprecated in version')
-    # Remove RST paragraph markup
-    docs = re.sub(
-        r'^.. \S+::',
-        lambda match: match.group(0)[3:-2].upper(),
-        docs,
-        flags=re.MULTILINE)
-    docs = re.sub(
-        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    return docs
-
-
 def is_api_arg(arg):
     """Return True if argument is our API argument or self or used for internal
     purposes
@@ -395,6 +280,8 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     return func
 
 
+# TODO should export code_field and indicator, rather than have modes
+# TODO this should be a doc helper
 def build_example(example, api='python'):
     """Build a code example.
 
@@ -549,293 +436,37 @@ def build_doc(cls, **kwargs):
     return cls
 
 
-NA_STRING = 'N/A'  # we might want to make it configurable via config
-
-
-class nagen(object):
-    """A helper to provide a desired missing value if no value is known
-
-    Usecases
-    - could be used as a generator for `defaultdict`
-    - since it returns itself upon getitem, should work even for complex
-      nested dictionaries/lists .format templates
-    """
-    def __init__(self, missing=NA_STRING):
-        self.missing = missing
-
-    def __repr__(self):
-        cls = self.__class__.__name__
-        args = str(self.missing) if self.missing != NA_STRING else ''
-        return '%s(%s)' % (cls, args)
-
-    def __str__(self):
-        return self.missing
-
-    def __getitem__(self, *args):
-        return self
-
-    def __getattr__(self, item):
-        return self
-
-
-def nadict(*items):
-    """A generator of default dictionary with the default nagen"""
-    dd = defaultdict(nagen)
-    dd.update(*items)
-    return dd
-
-
-class DefaultOutputFormatter(string.Formatter):
-    """A custom formatter for default output rendering using .format
-    """
-    # TODO: make missing configurable?
-    def __init__(self, missing=nagen()):
-        """
-        Parameters
-        ----------
-        missing: string, optional
-          What to output for the missing values
-        """
-        super(DefaultOutputFormatter, self).__init__()
-        self.missing = missing
-
-    def _d(self, msg, *args):
-        # print("   HERE %s" % (msg % args))
-        pass
-
-    def get_value(self, key, args, kwds):
-        assert not args
-        self._d("get_value: %r %r %r", key, args, kwds)
-        return kwds.get(key, self.missing)
-
-    # def get_field(self, field_name, args, kwds):
-    #     assert not args
-    #     self._d("get_field: %r args=%r kwds=%r" % (field_name, args, kwds))
-    #     try:
-    #         out = string.Formatter.get_field(self, field_name, args, kwds)
-    #     except Exception as exc:
-    #         # TODO needs more than just a value
-    #         return "!ERR %s" % exc
-
-
-class DefaultOutputRenderer(object):
-    """A default renderer for .format'ed output line
-    """
-    def __init__(self, format):
-        self.format = format
-        # We still need custom output formatter since at the "first level"
-        # within .format template all items there is no `nadict`
-        self.formatter = DefaultOutputFormatter()
-
-    @classmethod
-    def _dict_to_nadict(cls, v):
-        """Traverse datastructure and replace any regular dict with nadict"""
-        if isinstance(v, list):
-            return [cls._dict_to_nadict(x) for x in v]
-        elif isinstance(v, dict):
-            return nadict((k, cls._dict_to_nadict(x)) for k, x in v.items())
-        else:
-            return v
-
-    def __call__(self, x, **kwargs):
-        dd = nadict(
-            (k, nadict({k_.replace(':', '#'): self._dict_to_nadict(v_)
-                for k_, v_ in v.items()})
-                if isinstance(v, dict) else v)
-            for k, v in x.items()
-        )
-
-        msg = self.formatter.format(self.format, **dd)
-        return ui.message(msg)
-
-
 class Interface(object):
     """Base class for interface implementations"""
 
     # exit code to return if user-interrupted
     # if None, would just reraise the Exception, so if in --dbg
     # mode would fall into the debugger
-    _interrupted_exit_code = 1
+    # ONLY-USED-IN-CLI (directly and via call_from_parser)
+    # no longer supported
+    #_interrupted_exit_code = 1
 
-    @classmethod
-    def setup_parser(cls, parser):
-        # XXX needs safety check for name collisions
-        # XXX allow for parser kwargs customization
-        parser_kwargs = {}
-        from datalad.utils import getargspec
-        # get the signature
-        ndefaults = 0
-        args, varargs, varkw, defaults = getargspec(cls.__call__, include_kwonlyargs=True)
-        if defaults is not None:
-            ndefaults = len(defaults)
-        default_offset = ndefaults - len(args)
-        prefix_chars = parser.prefix_chars
-        for i, arg in enumerate(args):
-            if not is_api_arg(arg):
-                continue
-            param = cls._params_[arg]
-            defaults_idx = default_offset + i
-            cmd_args = param.cmd_args
-            if cmd_args == tuple():
-                # explicitly provided an empty sequence of argument names
-                # this shall not appear in the parser
-                continue
+    # CLI supported feeding command specific arguments to the
+    # `argparse.add_parser()` call for a particular command.
+    # this feature was unused, undocumented, and got removed
+    # because it would needlessly tie internals to the argparse
+    # API
+    #parser_args = {}
 
-            parser_kwargs = param.cmd_kwargs
-            has_default = defaults_idx >= 0
-            if cmd_args:
-                if cmd_args[0][0] in prefix_chars:
-                    # TODO: All the Parameter(args=...) values in this code
-                    # base use hyphens, so there is no point in the below
-                    # conversion. If it looks like no extensions rely on this
-                    # behavior either, this could be dropped.
-                    parser_args = [c.replace('_', '-') for c in cmd_args]
-                else:
-                    # Argparse will not convert dashes to underscores for
-                    # arguments that don't start with a prefix character, so
-                    # the above substitution must be avoided so that
-                    # call_from_parser() can find the corresponding parameter.
-                    parser_args = cmd_args
-            elif has_default:
-                # Construct the option from the Python parameter name.
-                parser_args = ("--{}".format(arg.replace("_", "-")),)
-            else:
-                # If args= wasn't given and its a positional argument in the
-                # function, add a positional argument to argparse. If `dest` is
-                # specified, we need to remove it from the keyword arguments
-                # because add_argument() expects it as the first argument. Note
-                # that `arg` shouldn't have a dash here, but `metavar` can be
-                # used if a dash is preferred for the command-line help.
-                parser_args = (parser_kwargs.pop("dest", arg),)
+    # when Parameter(args=tuple(), ...), i.e. no arguments specified,
+    # is encountered in Interface._params_, it will be ignored by the CLI
 
-            if has_default:
-                parser_kwargs['default'] = defaults[defaults_idx]
-            help = alter_interface_docs_for_cmdline(param._doc)
-            if help and help.rstrip()[-1] != '.':
-                help = help.rstrip() + '.'
-            if param.constraints is not None:
-                parser_kwargs['type'] = param.constraints
-                # include value constraint description and default
-                # into the help string
-                cdoc = alter_interface_docs_for_cmdline(
-                    param.constraints.long_description())
-                if cdoc[0] == '(' and cdoc[-1] == ')':
-                    cdoc = cdoc[1:-1]
-                help += '  Constraints: %s' % cdoc
-                if 'metavar' not in parser_kwargs and \
-                        isinstance(param.constraints, EnsureChoice):
-                    parser_kwargs['metavar'] = \
-                        '{%s}' % '|'.join(
-                            # don't use short_description(), because
-                            # it also needs to give valid output for
-                            # Python syntax (quotes...), but here we
-                            # can simplify to shell syntax where everything
-                            # is a string
-                            p for p in param.constraints._allowed
-                            # in the cmdline None pretty much means
-                            # don't give the options, so listing it
-                            # doesn't make sense. Moreover, any non-string
-                            # value cannot be given and very likely only
-                            # serves a special purpose in the Python API
-                            # or implementation details
-                            if isinstance(p, str))
-            if defaults_idx >= 0:
-                # if it is a flag, in commandline it makes little sense to show
-                # showing the Default: (likely boolean).
-                #   See https://github.com/datalad/datalad/issues/3203
-                if not parser_kwargs.get('action', '').startswith('store_'):
-                    # [Default: None] also makes little sense for cmdline
-                    if defaults[defaults_idx] is not None:
-                        help += " [Default: %r]" % (defaults[defaults_idx],)
-            # create the parameter, using the constraint instance for type
-            # conversion
-            parser.add_argument(*parser_args, help=help,
-                                **parser_kwargs)
+    # any Parameter in Interface._params_ for which is_api_arg() == False
+    # will be ignored by the CLI
 
-    @classmethod
-    def call_from_parser(cls, args):
-        # XXX needs safety check for name collisions
-        from datalad.utils import getargspec
-        argspec = getargspec(cls.__call__, include_kwonlyargs=True)
-        if argspec.keywords is None:
-            # no **kwargs in the call receiver, pull argnames from signature
-            argnames = argspec.args
-        else:
-            # common options
-            # XXX define or better get from elsewhere
-            common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
-                           'help', 'log_level', 'logger',
-                           'result_renderer', 'subparser')
-            argnames = [name for name in dir(args)
-                        if not (name.startswith('_') or name in common_opts)]
-        kwargs = {k: getattr(args, k)
-                  for k in argnames
-                  # some arguments might be Python-only and do not appear in the
-                  # parser Namespace
-                  if hasattr(args, k) and is_api_arg(k)}
-        # we are coming from the entry point, this is the toplevel command,
-        # let it run like generator so we can act on partial results quicker
-        # TODO remove following condition test when transition is complete and
-        # run indented code unconditionally
-        if _has_eval_results_call(cls):
-            # set all common args explicitly  to override class defaults
-            # that are tailored towards the the Python API
-            kwargs['return_type'] = 'generator'
-            kwargs['result_xfm'] = None
-            # allow commands to override the default, unless something other
-            # than the default 'tailored' is requested
-            kwargs['result_renderer'] = \
-                args.common_result_renderer \
-                if args.common_result_renderer != 'tailored' \
-                else getattr(cls, 'result_renderer', 'generic')
-            if '{' in args.common_result_renderer:
-                # stupid hack, could and should become more powerful
-                kwargs['result_renderer'] = DefaultOutputRenderer(
-                    args.common_result_renderer)
+    # if Interface.result_renderer_cmdline is defined, the CLI will prefer
+    # it over another Interface.result_renderer
 
-            if args.common_on_failure:
-                kwargs['on_failure'] = args.common_on_failure
-            # compose filter function from to be invented cmdline options
-            res_filter = cls._get_result_filter(args)
-            if res_filter is not None:
-                # Don't add result_filter if it's None because then
-                # eval_results can't distinguish between --report-{status,type}
-                # not specified via the CLI and None passed via the Python API.
-                kwargs['result_filter'] = res_filter
-        try:
-            ret = cls.__call__(**kwargs)
-            if inspect.isgenerator(ret):
-                ret = list(ret)
-            return ret
-        except KeyboardInterrupt as exc:
-            ui.error("\nInterrupted by user while doing magic: %s"
-                     % CapturedException(exc))
-            if cls._interrupted_exit_code is not None:
-                sys.exit(cls._interrupted_exit_code)
-            else:
-                raise
+    # if Interface.short_description is not provided, the first line of the
+    # auto-generated description will be used -- effectively the first line
+    # of the class docstring (via get_cmd_doc())
 
-    @classmethod
-    def _get_result_filter(cls, args):
-        from datalad import cfg
-        result_filter = None
-        if args.common_report_status or 'datalad.runtime.report-status' in cfg:
-            report_status = args.common_report_status or \
-                            cfg.obtain('datalad.runtime.report-status')
-            if report_status == "all":
-                pass  # no filter
-            elif report_status == 'success':
-                result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
-            elif report_status == 'failure':
-                result_filter = EnsureKeyChoice('status',
-                                                ('impossible', 'error'))
-            else:
-                result_filter = EnsureKeyChoice('status', (report_status,))
-        if args.common_report_type:
-            tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
-            result_filter = result_filter & tfilt if result_filter else tfilt
-        return result_filter
-
+    # https://github.com/datalad/datalad/issues/6376
     @classmethod
     def get_refds_path(cls, dataset):
         """Return a resolved reference dataset path from a `dataset` argument.
@@ -879,6 +510,8 @@ def get_allargs_as_kwargs(call, args, kwargs):
     return kwargs_
 
 
+# Only needed to support command implementations before the introduction
+# of @eval_results
 def _has_eval_results_call(cls):
     """Return True if cls has a __call__ decorated with @eval_results
     """

@@ -15,13 +15,11 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.base import (
     dedent_docstring,
     alter_interface_docs_for_api,
-    alter_interface_docs_for_cmdline,
 )
 from datalad.tests.utils import (
     assert_false,
     assert_in,
     assert_not_in,
-    eq_,
 )
 
 
@@ -111,35 +109,3 @@ def test_alter_interface_docs_for_api():
     assert_in('in between', altpd)
     assert_in('appended', altpd)
     assert_not_in('cmdline', altpd)
-
-
-def test_alter_interface_docs_for_cmdline():
-    alt = alter_interface_docs_for_cmdline(demo_doc)
-    alt_l = alt.split('\n')
-    # dedented
-    assert_false(alt_l[0].startswith(' '))
-    assert_false(alt_l[-1].startswith(' '))
-    assert_not_in('PY', alt)
-    assert_not_in('CMD', alt)
-    assert_not_in('REFLOW', alt)
-    assert_in('a b', alt)
-    assert_in('not\n   reflowed', alt)
-    assert_in("Something for the cmdline only Multiline!", alt)
-    # args
-    altarg = alter_interface_docs_for_cmdline(demo_argdoc)
-    # RST role markup
-    eq_(alter_interface_docs_for_cmdline(':murks:`me and my buddies`'),
-        'me and my buddies')
-    # spread across lines
-    eq_(alter_interface_docs_for_cmdline(':term:`Barbara\nStreisand`'),
-        'Barbara\nStreisand')
-    # multiple on one line
-    eq_(alter_interface_docs_for_cmdline(
-        ':term:`one` bla bla :term:`two` bla'),
-        'one bla bla two bla')
-
-    altpd = alter_interface_docs_for_cmdline(demo_paramdoc)
-    assert_not_in('python', altpd)
-    assert_in('in between', altpd)
-    assert_in('appended', altpd)
-    assert_in('cmdline', altpd)

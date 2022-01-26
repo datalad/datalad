@@ -94,7 +94,6 @@ from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
 from ..support.network import RI
 from ..dochelpers import borrowkwargs
-from ..cmdline.helpers import get_repo_instance
 from ..consts import (
     ARCHIVES_TEMP_DIR,
 )

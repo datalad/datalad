@@ -128,7 +128,7 @@ setup_kwargs = {}
 # a bit of a dance needed, as on windows the situation is different
 entry_points = {
     'console_scripts': [
-        'datalad=datalad.cmdline.main:main',
+        'datalad=datalad.cli.main:main',
         'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
         'git-annex-remote-datalad=datalad.customremotes.datalad:main',
         'git-annex-remote-ora=datalad.distributed.ora_remote:main',
