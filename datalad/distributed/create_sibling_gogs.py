@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -62,6 +62,8 @@ class CreateSiblingGogs(Interface):
     In order to be able to use this command, a personal access token has to be
     generated on the platform
     (Account->Your Settings->Applications->Generate New Token).
+
+    .. versionadded:: 0.16
     """
 
     _params_ = _GOGS.create_sibling_params
@@ -73,6 +75,7 @@ class CreateSiblingGogs(Interface):
     @eval_results
     def __call__(
             reponame,
+            *,
             # possibly retrieve a default from config
             api=None,
             dataset=None,

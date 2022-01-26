@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,12 +15,14 @@ from os import linesep
 from distutils.version import LooseVersion
 from itertools import chain
 
-from datalad.dochelpers import exc_str
 from datalad.log import lgr
 # import version helper from config to have only one implementation
 # config needs this to avoid circular imports
 from datalad.config import get_git_version as __get_git_version
-from .exceptions import CommandError
+from .exceptions import (
+    CapturedException,
+    CommandError,
+)
 
 __all__ = ['UnknownVersion', 'ExternalVersions', 'external_versions']
 
@@ -159,7 +161,7 @@ class ExternalVersions(object):
     }
     _INTERESTING = (
         'annexremote',
-        'appdirs',
+        'platformdirs',
         'boto',
         'exifread',
         'git',
@@ -174,7 +176,6 @@ class ExternalVersions(object):
         'cmd:7z',
         'requests',
         'scrapy',
-        'wrapt',
     )
 
     def __init__(self):
@@ -243,7 +244,7 @@ class ExternalVersions(object):
                     version = self._deduce_version(version)
                 except Exception as exc:
                     lgr.debug("Failed to deduce version of %s due to %s"
-                              % (modname, exc_str(exc)))
+                              % (modname, CapturedException(exc)))
                     return None
             else:
                 if module is None:
@@ -255,7 +256,7 @@ class ExternalVersions(object):
                             return None
                         except Exception as exc:
                             lgr.warning("Failed to import module %s due to %s",
-                                        modname, exc_str(exc))
+                                        modname, CapturedException(exc))
                             return None
                     else:
                         module = sys.modules[modname]

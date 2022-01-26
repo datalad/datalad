@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -39,7 +39,6 @@ from datalad.tests.utils import (
     skip_wo_symlink_capability,
     swallow_outputs,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 
@@ -64,10 +63,10 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'dir2': {'testindir3': 'someother3'}})
 
 
-@with_testrepos('.*git.*', flavors=['clone'])
+@with_tempfile()
 def test_save(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(annex=False)
 
     with open(op.join(path, "new_file.tst"), "w") as f:
         f.write("something")
@@ -448,7 +447,7 @@ def test_add_subdataset(path, other):
     # now add, it should pick up the source URL
     ds.save('other')
     # and that is why, we can reobtain it from origin
-    ds.uninstall('other')
+    ds.drop('other', what='all', reckless='kill', recursive=True)
     ok_(not other_clone.is_installed())
     ds.get('other')
     ok_(other_clone.is_installed())

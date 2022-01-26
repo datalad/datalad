@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Miscellaneous utilities to assist with testing"""
 
+import base64
 import glob
 import gzip
 import inspect
@@ -20,6 +21,7 @@ import re
 import tempfile
 import platform
 import multiprocessing
+import multiprocessing.queues
 import logging
 import random
 import socket
@@ -30,6 +32,7 @@ import time
 from difflib import unified_diff
 from contextlib import contextmanager
 from unittest.mock import patch
+import ssl
 
 from http.server import (
     HTTPServer,
@@ -90,7 +93,7 @@ from ..support.external_versions import external_versions
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
 from ..support.network import RI
-from ..dochelpers import exc_str, borrowkwargs
+from ..dochelpers import borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import (
     ARCHIVES_TEMP_DIR,
@@ -102,6 +105,8 @@ from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
+from datalad.core.local.repo import repo_from_path
+
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -135,7 +140,7 @@ def skip_if_no_module(module):
     try:
         imp = __import__(module)
     except Exception as exc:
-        raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
+        raise SkipTest("Module %s fails to load" % module) from exc
 
 
 def skip_if_scrapy_without_selector():
@@ -341,12 +346,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
     assert_in(file_repo_path, repo.get_indexed_files())  # file is known to Git
 
     if annex:
-        try:
-            # operates on relative to curdir path
-            repo.get_file_key(file_repo_path)
-            in_annex = True
-        except FileNotInAnnexError as e:
-            in_annex = False
+        in_annex = 'key' in repo.get_file_annexinfo(file_repo_path)
     else:
         in_annex = False
 
@@ -378,30 +378,23 @@ def _prep_file_under_git(path, filename):
 
     Helper to be used by few functions
     """
+    path = Path(path)
     if filename is None:
         # path provides the path and the name
-        path, filename = pathsplit(path)
-    try:
-        # if succeeds when must not (not `annexed`) -- fail
-        repo = get_repo_instance(path, class_=AnnexRepo)
-        annex = True
-    except RuntimeError as e:
-        # TODO: make a dedicated Exception
-        if "No annex repository found in" in str(e):
-            repo = get_repo_instance(path, class_=GitRepo)
-            annex = False
-        else:
-            raise
+        filename = Path(path.name)
+        path = path.parent
+    else:
+        filename = Path(filename)
 
-    # path to the file within the repository
-    # repo.path is a "realpath" so to get relpath working correctly
-    # we need to realpath our path as well
-    # do absolute() in addition to always get an absolute path
-    # even with non-existing paths on windows
-    path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
-    file_repo_dir = relpath(path, repo.path)
-    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
-    return annex, file_repo_path, filename, path, repo
+    ds = Dataset(utils.get_dataset_root(path))
+
+    return isinstance(ds.repo, AnnexRepo), \
+        str(path.absolute().relative_to(ds.path) / filename) \
+        if not filename.is_absolute() \
+        else str(filename.relative_to(ds.pathobj)), \
+        filename, \
+        str(path), \
+        ds.repo
 
 
 #
@@ -583,9 +576,50 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format, *args)
 
 
-def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
+def _multiproc_serve_path_via_http(
+        hostname, path_to_serve_from, queue, use_ssl=False, auth=None): # pragma: no cover
+    handler = SilentHTTPHandler
+    if auth:
+        # to-be-expected key for basic auth
+        auth_test = (b'Basic ' + base64.b64encode(
+            bytes('%s:%s' % auth, 'utf-8'))).decode('utf-8')
+
+        # ad-hoc basic-auth handler
+        class BasicAuthHandler(SilentHTTPHandler):
+            def do_HEAD(self, authenticated):
+                if authenticated:
+                    self.send_response(200)
+                else:
+                    self.send_response(401)
+                    self.send_header(
+                        'WWW-Authenticate', 'Basic realm=\"Protected\"')
+                self.send_header('content-type', 'text/html')
+                self.end_headers()
+
+            def do_GET(self):
+                if self.headers.get('Authorization') == auth_test:
+                    super().do_GET()
+                else:
+                    self.do_HEAD(False)
+                    self.wfile.write(bytes('Auth failed', 'utf-8'))
+        handler = BasicAuthHandler
+
     chpwd(path_to_serve_from)
-    httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
+    httpd = HTTPServer((hostname, 0), handler)
+    if use_ssl:
+        ca_dir = Path(__file__).parent / 'ca'
+        ssl_key = ca_dir / 'certificate-key.pem'
+        ssl_cert = ca_dir / 'certificate-pub.pem'
+        if any(not p.exists for p in (ssl_key, ssl_cert)):
+            raise RuntimeError(
+                'SSL requested, but no key/cert file combination can be '
+                f'located under {ca_dir}')
+        # turn on SSL
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(str(ssl_cert), str(ssl_key))
+        httpd.socket = context.wrap_socket (
+            httpd.socket,
+            server_side=True)
     queue.put(httpd.server_port)
     httpd.serve_forever()
 
@@ -602,12 +636,17 @@ class HTTPPath(object):
     ----------
     path : str
         Directory with content to serve.
+    use_ssl : bool
+    auth : tuple
+        Username, password
     """
-    def __init__(self, path):
+    def __init__(self, path, use_ssl=False, auth=None):
         self.path = path
         self.url = None
         self._env_patch = None
         self._mproc = None
+        self.use_ssl = use_ssl
+        self.auth = auth
 
     def __enter__(self):
         self.start()
@@ -626,23 +665,82 @@ class HTTPPath(object):
         # http://jasonincode.com/customizing-hosts-file-in-docker/
         # so we just force to use 127.0.0.1 while on wheezy
         #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-        hostname = '127.0.0.1'
+        if self.use_ssl:
+            # we cannot use IPs with SSL certificates
+            hostname = 'localhost'
+        else:
+            hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
         self._mproc = multiprocessing.Process(
             target=_multiproc_serve_path_via_http,
-            args=(hostname, self.path, queue))
+            args=(hostname, self.path, queue),
+            kwargs=dict(use_ssl=self.use_ssl, auth=self.auth))
         self._mproc.start()
-        port = queue.get(timeout=300)
-        self.url = 'http://{}:{}/'.format(hostname, port)
+        try:
+            port = queue.get(timeout=300)
+        except multiprocessing.queues.Empty as e:
+            if self.use_ssl:
+                raise SkipTest('No working SSL support') from e
+            else:
+                raise
+        self.url = 'http{}://{}:{}/'.format(
+            's' if self.use_ssl else '',
+            hostname,
+            port)
         lgr.debug("HTTP: serving %s under %s", self.path, self.url)
 
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
-        env.pop('http_proxy', None)
+        if self.use_ssl:
+            env.pop('https_proxy', None)
+            env['REQUESTS_CA_BUNDLE'] = str(
+                Path(__file__).parent / 'ca' / 'ca_bundle.pem')
+        else:
+            env.pop('http_proxy', None)
         self._env_patch = patch.dict('os.environ', env, clear=True)
         self._env_patch.start()
+        if self.use_ssl:
+            # verify that the SSL/cert setup is functional, if not skip the
+            # test
+            # python-requests does its own thing re root CA trust
+            # if this fails, check datalad/tests/ca/prov.sh for ca_bundle
+            try:
+                import requests
+                from requests.auth import HTTPBasicAuth
+                r = requests.get(
+                    self.url,
+                    verify=True,
+                    auth=HTTPBasicAuth(*self.auth) if self.auth else None)
+                r.raise_for_status()
+            # be robust and skip if anything goes wrong, rather than just a
+            # particular SSL issue
+            #except requests.exceptions.SSLError as e:
+            except Exception as e:
+                self.stop()
+                raise SkipTest('No working HTTPS setup') from e
+            # now verify that the stdlib tooling also works
+            # if this fails, check datalad/tests/ca/prov.sh
+            # for info on deploying a datalad-root.crt
+            from urllib.request import (
+                urlopen,
+                Request,
+            )
+            try:
+                req = Request(self.url)
+                if self.auth:
+                    req.add_header(
+                        "Authorization",
+                        b"Basic " + base64.standard_b64encode(
+                            '{0}:{1}'.format(*self.auth).encode('utf-8')))
+                urlopen(req)
+            # be robust and skip if anything goes wrong, rather than just a
+            # particular SSL issue
+            #except URLError as e:
+            except Exception as e:
+                self.stop()
+                raise SkipTest('No working HTTPS setup') from e
 
     def stop(self):
         """Stop serving `path`.
@@ -653,10 +751,21 @@ class HTTPPath(object):
 
 
 @optional_args
-def serve_path_via_http(tfunc, *targs):
+def serve_path_via_http(tfunc, *targs, use_ssl=False, auth=None):
     """Decorator which serves content of a directory via http url
-    """
 
+    Parameters
+    ----------
+    path : str
+        Directory with content to serve.
+    use_ssl : bool
+        Flag whether to set up SSL encryption and return a HTTPS
+        URL. This require a valid certificate setup (which is tested
+        for proper function) or it will cause a SkipTest to be raised.
+    auth : tuple or None
+        If a (username, password) tuple is given, the server access will
+        be protected via HTTP basic auth.
+    """
     @wraps(tfunc)
     @attr('serve_path_via_http')
     def  _wrap_serve_path_via_http(*args, **kwargs):
@@ -671,7 +780,7 @@ def serve_path_via_http(tfunc, *targs):
         else:
             args, path = (), args[0]
 
-        with HTTPPath(path) as url:
+        with HTTPPath(path, use_ssl=use_ssl, auth=auth) as url:
             return tfunc(*(args + (path, url)), **kwargs)
     return  _wrap_serve_path_via_http
 
@@ -933,7 +1042,7 @@ def _get_testrepos_uris(regex, flavors):
         _nested_submodule_annex_test_repo = NestedDataset()
         _inner_submodule_annex_test_repo = InnerSubmodule()
         _TESTREPOS = {'basic_annex':
-                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                        {'network': 'https://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
                          'local-url': _basic_annex_test_repo.url},
                       'basic_git':
@@ -1378,24 +1487,6 @@ def ignore_nose_capturing_stdout(func):
     return func
 
 
-def skip_httpretty_on_problematic_pythons(func):
-    """As discovered some httpretty bug causes a side-effect
-    on other tests on some Pythons.  So we skip the test if such
-    problematic combination detected
-
-    References
-    https://travis-ci.org/datalad/datalad/jobs/94464988
-    http://stackoverflow.com/a/29603206/1265472
-    """
-
-    @make_decorator(func)
-    def  _wrap_skip_httpretty_on_problematic_pythons(*args, **kwargs):
-        if sys.version_info[:3] == (3, 4, 2):
-            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
-        return func(*args, **kwargs)
-    return  _wrap_skip_httpretty_on_problematic_pythons
-
-
 @optional_args
 def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
@@ -1690,10 +1781,10 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     ds.create('subds_unavailable_clean')
     ds.create(opj('subdir', 'subds_unavailable_clean'))
     # uninstall some subdatasets (still clean)
-    ds.uninstall([
+    ds.drop([
         'subds_unavailable_clean',
         opj('subdir', 'subds_unavailable_clean')],
-        check=False)
+        what='all', reckless='kill', recursive=True)
     assert_repo_status(ds.path)
     # make a dirty subdataset
     ds.create('subds_modified')
@@ -1775,20 +1866,20 @@ def get_deeply_nested_structure(path):
     """ Here is what this does (assuming UNIX, locked):
     |  .
     |  ├── directory_untracked
-    |  │   └── link2dir -> ../subdir
+    |  │  └── link2dir -> ../subdir
     |  ├── OBSCURE_FILENAME_file_modified
     |  ├── link2dir -> subdir
     |  ├── link2subdsdir -> subds_modified/subdir
     |  ├── link2subdsroot -> subds_modified
     |  ├── subdir
-    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
-    |  │   ├── file_modified
-    |  │   ├── git_file.txt
-    |  │   └── link2annex_files.txt -> annexed_file.txt
+    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
+    |  │   ├── file_modified
+    |  │   ├── git_file.txt
+    |  │   └── link2annex_files.txt -> annexed_file.txt
     |  └── subds_modified
     |      ├── link2superdsdir -> ../subdir
     |      ├── subdir
-    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
+    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
     |      └── subds_lvl1_modified
     |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
@@ -1817,7 +1908,7 @@ def get_deeply_nested_structure(path):
     )
     create_tree(
         str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
-        {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
+        {OBSCURE_FILENAME + u'_directory_untracked': {"untracked_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')

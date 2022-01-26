@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -100,20 +100,19 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     subds2 = ds.create('sub2', force=True, annex=False)
     ds.save(recursive=True)
     assert_repo_status(ds.path)
-
     # don't specify special remote. By default should be git-remote + "-storage"
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
-                                post_update_hook=True)
+                                post_update_hook=True, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
     # remotes exist, but only in super
-    siblings = ds.siblings(result_renderer=None)
+    siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in siblings})
-    sub_siblings = subds.siblings(result_renderer=None)
+    sub_siblings = subds.siblings(result_renderer='disabled')
     eq_({'here'}, {s['name'] for s in sub_siblings})
-    sub2_siblings = subds2.siblings(result_renderer=None)
+    sub2_siblings = subds2.siblings(result_renderer='disabled')
     eq_({'here'}, {s['name'] for s in sub2_siblings})
 
     # check bare repo:
@@ -159,21 +158,22 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 
     # now, again but recursive.
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
-                                recursive=True, existing='reconfigure')
+                                recursive=True, existing='reconfigure',
+                                new_store_ok=True)
     eq_(len(res), 3)
     assert_result_count(res, 1, path=str(ds.pathobj), status='ok', action="create-sibling-ria")
     assert_result_count(res, 1, path=str(subds.pathobj), status='ok', action="create-sibling-ria")
     assert_result_count(res, 1, path=str(subds2.pathobj), status='ok', action="create-sibling-ria")
 
     # remotes now exist in super and sub
-    siblings = ds.siblings(result_renderer=None)
+    siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in siblings})
-    sub_siblings = subds.siblings(result_renderer=None)
+    sub_siblings = subds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in sub_siblings})
     # but no special remote in plain git subdataset:
-    sub2_siblings = subds2.siblings(result_renderer=None)
+    sub2_siblings = subds2.siblings(result_renderer='disabled')
     eq_({'datastore', 'here'},
         {s['name'] for s in sub2_siblings})
 
@@ -182,7 +182,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
         ds.create_sibling_ria("ria+ssh://test-store:",
                               "datastore",
                               existing='reconfigure',
-                              trust_level=trust)
+                              trust_level=trust,
+                              new_store_ok=True)
         res = ds.repo.repo_info()
         assert_in('[datastore-storage]',
                   [r['description']
@@ -229,7 +230,8 @@ def test_create_push_url(detection_path, ds_path, store_path):
     with patch('datalad.support.sshconnector.SSHManager.get_connection',
                new=detector(SSHManager.get_connection, detection_path)):
 
-        ds.create_sibling_ria(url, "datastore", push_url=push_url)
+        ds.create_sibling_ria(url, "datastore", push_url=push_url,
+                              new_store_ok=True)
         # used ssh_manager despite file-url hence used push-url (ria+ssh):
         assert detection_path.exists()
 
@@ -271,8 +273,9 @@ def test_create_alias(ds_path, ria_path, clone_path):
     dsa = Dataset(ds_path / "a").create()
 
     res = dsa.create_sibling_ria(url="ria+file://{}".format(ria_path),
-                                name="origin",
-                                alias="ds-a")
+                                 name="origin",
+                                 alias="ds-a",
+                                 new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -284,8 +287,9 @@ def test_create_alias(ds_path, ria_path, clone_path):
     dsb = Dataset(ds_path / "b").create()
 
     res = dsb.create_sibling_ria(url="ria+file://{}".format(ria_path),
-                                name="origin",
-                                alias="ds-b")
+                                 name="origin",
+                                 alias="ds-b",
+                                 new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -299,7 +303,8 @@ def test_create_alias(ds_path, ria_path, clone_path):
     with swallow_logs(logging.WARNING) as cml:
         res = dsc.create_sibling_ria(url="ria+file://{}".format(ria_path),
                                      name="origin",
-                                     alias="ds-a")
+                                     alias="ds-a",
+                                     new_store_ok=True)
         assert_in("Alias 'ds-a' already exists in the RIA store, not adding an alias",
                   cml.out)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
@@ -316,12 +321,13 @@ def test_storage_only(base_path, ds_path):
     ds.save(recursive=True)
     assert_repo_status(ds.path)
 
-    res = ds.create_sibling_ria(store_url, "datastore", storage_sibling='only')
+    res = ds.create_sibling_ria(store_url, "datastore", storage_sibling='only',
+                                new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
     # the storage sibling uses the main name, not -storage
-    siblings = ds.siblings(result_renderer=None)
+    siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'here'},
         {s['name'] for s in siblings})
 
@@ -343,21 +349,35 @@ def test_no_storage(store1, store2, ds_path):
     ds.save(recursive=True)
     assert_repo_status(ds.path)
 
-    res = ds.create_sibling_ria(store1_url, "datastore1", storage_sibling=False)
+    res = ds.create_sibling_ria(store1_url, "datastore1", storage_sibling=False,
+                                new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore1', 'here'},
-        {s['name'] for s in ds.siblings(result_renderer=None)})
+        {s['name'] for s in ds.siblings(result_renderer='disabled')})
 
     # deprecated way of disabling storage still works
-    res = ds.create_sibling_ria(store2_url, "datastore2", disable_storage__=True)
+    res = ds.create_sibling_ria(store2_url, "datastore2",
+                                disable_storage__=True, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore2', 'datastore1', 'here'},
-        {s['name'] for s in ds.siblings(result_renderer=None)})
+        {s['name'] for s in ds.siblings(result_renderer='disabled')})
 
     # smoke test that we can push to it
     res = ds.push(to='datastore1')
     assert_status('ok', res)
     # but nothing was copied, because there is no storage sibling
     assert_result_count(res, 0, action='copy')
+
+
+@with_tempfile
+def test_no_store(path):
+    ds = Dataset(path).create()
+    # check that we fail without '--new-store-ok' when there is no store
+    assert_result_count(
+        ds.create_sibling_ria(
+            "'ria+file:///no/where'", "datastore",
+            on_failure='ignore'),
+        1,
+        status="error")
 
 # TODO: explicit naming of special remote

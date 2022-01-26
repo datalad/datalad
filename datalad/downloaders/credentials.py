@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -24,8 +24,10 @@ import time
 
 from collections import OrderedDict
 
-from ..dochelpers import exc_str
-from ..support.exceptions import AccessDeniedError
+from ..support.exceptions import (
+    AccessDeniedError,
+    CapturedException,
+)
 from ..support.keyring_ import keyring as keyring_
 from ..ui import ui
 from ..utils import auto_repr
@@ -93,7 +95,8 @@ class Credential(object):
                 self._is_field_optional(f) or self._get_field_value(f) is not None
                 for f in self._FIELDS)
         except Exception as exc:
-            lgr.warning("Failed to query keyring: %s" % exc_str(exc))
+            ce = CapturedException(exc)
+            lgr.warning("Failed to query keyring: %s", ce)
             return False
 
     def _get_field_value(self, field):

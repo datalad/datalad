@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -171,7 +171,6 @@ def test_repo_cache(path):
     assert_true(isinstance(ds.repo, AnnexRepo))
 
 
-@known_failure_windows  # leaves modified .gitmodules behind
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
     # from scratch
@@ -200,7 +199,7 @@ def test_subdatasets(path):
     eq_(len(subdss), 1)
     eq_(subds.path, ds.subdatasets(result_xfm='paths')[0])
     eq_(subdss, ds.subdatasets(recursive=True))
-    eq_(subdss, ds.subdatasets(fulfilled=True))
+    eq_(subdss, ds.subdatasets(state='present'))
     ds.save(message="with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
@@ -458,7 +457,7 @@ def test_property_reevaluation(repo1):
     assert_is_not_none(ds.id)
     first_id = ds.id
 
-    ds.remove()
+    ds.drop(what='all', reckless='kill', recursive=True)
     # repo is gone, and config is again reevaluated to only provide user/system
     # level config:
     assert_false(lexists(ds.path))

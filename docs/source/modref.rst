@@ -38,7 +38,6 @@ Dataset operations
    api.remove
    api.save
    api.update
-   api.uninstall
    api.unlock
 
 Metadata handling
@@ -73,7 +72,6 @@ Plumbing commands
 .. autosummary::
    :toctree: generated
 
-   api.annotate_paths
    api.clean
    api.clone
    api.copy_file
@@ -116,7 +114,6 @@ Support functionality
    support.gitrepo
    support.annexrepo
    support.archives
-   customremotes.main
    customremotes.base
    customremotes.archives
 

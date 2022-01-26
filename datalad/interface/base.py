@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -29,8 +29,8 @@ from collections import (
 import warnings
 
 from ..ui import ui
-from ..dochelpers import exc_str
 
+import datalad
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import (
@@ -39,6 +39,7 @@ from datalad.support.constraints import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.support.exceptions import CapturedException
 
 
 default_logchannels = {
@@ -111,7 +112,7 @@ def get_cmd_summaries(descriptions, groups, width=79):
     group is preceded by an entry describing the group.
     """
     cmd_summary = []
-    for grp in sorted(groups, key=lambda x: x[1]):
+    for grp in sorted(groups, key=lambda x: x[0]):
         grp_descr = grp[1]
         grp_cmds = descriptions[grp[0]]
 
@@ -144,8 +145,9 @@ def load_interface(spec):
     try:
         mod = import_module(spec[0], package='datalad')
     except Exception as e:
+        ce = CapturedException(e)
         lgr.error("Internal error, cannot import interface '%s': %s",
-                  spec[0], exc_str(e))
+                  spec[0], ce)
         intf = None
     else:
         intf = getattr(mod, spec[1])
@@ -220,6 +222,11 @@ def alter_interface_docs_for_api(docs):
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE)
+    # select only the python alternative from argument specifications
+    docs = re.sub(
+        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
+        lambda match: f'``{match.group(1)}``',
+        docs)
     docs = re.sub(
         r'\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
         lambda match: match.group(1),
@@ -239,8 +246,8 @@ def alter_interface_docs_for_api(docs):
             '\\1 (http://handbook.datalad.org/symbols)',
             docs)
     docs = re.sub(
-        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(1)),
+        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
@@ -298,14 +305,23 @@ def alter_interface_docs_for_cmdline(docs):
     # capitalize variables and remove backticks to uniformize with
     # argparse output
     docs = re.sub(
-        r'`\S*`',
-        lambda match: match.group(0).strip('`').upper(),
+        r'([^`]+)`([a-zA-Z0-9_]+)`([^`]+)',
+        lambda match: f'{match.group(1)}{match.group(2).upper()}{match.group(3)}',
+        docs)
+    # select only the cmdline alternative from argument specifications
+    docs = re.sub(
+        r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
+        lambda match: f'``{match.group(2)}``',
         docs)
     # clean up sphinx API refs
     docs = re.sub(
         r'\~datalad\.api\.\S*',
         lambda match: "`{0}`".format(match.group(0)[13:]),
         docs)
+    # dedicated support for version markup
+    docs = docs.replace('.. versionadded::', 'New in version')
+    docs = docs.replace('.. versionchanged::', 'Changed in version')
+    docs = docs.replace('.. deprecated::', 'Deprecated in version')
     # Remove RST paragraph markup
     docs = re.sub(
         r'^.. \S+::',
@@ -313,8 +329,8 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
-        lambda match: textwrap.fill(match.group(1)),
+        r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
@@ -337,8 +353,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     """
     from datalad.utils import getargspec
     # get the signature
-    ndefaults = 0
-    args, varargs, varkw, defaults = getargspec(func)
+    args, varargs, varkw, defaults = getargspec(func, include_kwonlyargs=True)
     defaults = defaults or tuple()
     if add_args:
         add_argnames = sorted(add_args.keys())
@@ -469,6 +484,9 @@ def build_doc(cls, **kwargs):
     cls: Interface
       class defining a datalad command
     """
+    if datalad.in_librarymode():
+        lgr.debug("Not assembling DataLad API docs in libary-mode")
+        return cls
 
     # Note, that this is a class decorator, which is executed only once when the
     # class is imported. It builds the docstring for the class' __call__ method
@@ -523,6 +541,9 @@ def build_doc(cls, **kwargs):
         suffix=alter_interface_docs_for_api(call_doc),
         add_args=add_args
     )
+
+    if hasattr(cls.__call__, '_dataset_method'):
+        cls.__call__._dataset_method.__doc__ = cls.__call__.__doc__
 
     # return original
     return cls
@@ -644,7 +665,7 @@ class Interface(object):
         from datalad.utils import getargspec
         # get the signature
         ndefaults = 0
-        args, varargs, varkw, defaults = getargspec(cls.__call__)
+        args, varargs, varkw, defaults = getargspec(cls.__call__, include_kwonlyargs=True)
         if defaults is not None:
             ndefaults = len(defaults)
         default_offset = ndefaults - len(args)
@@ -735,10 +756,10 @@ class Interface(object):
     def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
         from datalad.utils import getargspec
-        argspec = getargspec(cls.__call__)
-        if argspec[2] is None:
+        argspec = getargspec(cls.__call__, include_kwonlyargs=True)
+        if argspec.keywords is None:
             # no **kwargs in the call receiver, pull argnames from signature
-            argnames = getargspec(cls.__call__)[0]
+            argnames = argspec.args
         else:
             # common options
             # XXX define or better get from elsewhere
@@ -761,14 +782,16 @@ class Interface(object):
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
-            # allow commands to override the default, unless something other than
-            # default is requested
+            # allow commands to override the default, unless something other
+            # than the default 'tailored' is requested
             kwargs['result_renderer'] = \
-                args.common_output_format if args.common_output_format != 'tailored' \
-                else getattr(cls, 'result_renderer', 'default')
-            if '{' in args.common_output_format:
+                args.common_result_renderer \
+                if args.common_result_renderer != 'tailored' \
+                else getattr(cls, 'result_renderer', 'generic')
+            if '{' in args.common_result_renderer:
                 # stupid hack, could and should become more powerful
-                kwargs['result_renderer'] = DefaultOutputRenderer(args.common_output_format)
+                kwargs['result_renderer'] = DefaultOutputRenderer(
+                    args.common_result_renderer)
 
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
@@ -785,7 +808,8 @@ class Interface(object):
                 ret = list(ret)
             return ret
         except KeyboardInterrupt as exc:
-            ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
+            ui.error("\nInterrupted by user while doing magic: %s"
+                     % CapturedException(exc))
             if cls._interrupted_exit_code is not None:
                 sys.exit(cls._interrupted_exit_code)
             else:
@@ -833,7 +857,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     dict
     """
     from datalad.utils import getargspec
-    argspec = getargspec(call)
+    argspec = getargspec(call, include_kwonlyargs=True)
     defaults = argspec.defaults
     nargs = len(argspec.args)
     defaults = defaults or []  # ensure it is a list and not None

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,10 +12,7 @@
 import json
 from logging import getLogger
 
-from datalad.dochelpers import (
-    borrowkwargs,
-    exc_str,
-)
+from datalad.dochelpers import borrowkwargs
 from datalad.downloaders.http import HTTPDownloader
 from datalad.support.exceptions import DownloadError
 from datalad.utils import auto_repr
@@ -44,8 +41,8 @@ class SHubDownloader(HTTPDownloader):
             shub_info = json.loads(content)
         except json.decoder.JSONDecodeError as e:
             raise DownloadError(
-                "Failed to get information from {}: {}"
-                .format(info_url, exc_str(e)))
+                "Failed to get information from {}"
+                .format(info_url)) from e
         return shub_info["image"]
 
     @borrowkwargs(HTTPDownloader)

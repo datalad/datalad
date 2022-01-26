@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,8 +15,7 @@ from datalad.log import log_progress
 
 from PIL import Image
 from datalad.metadata.extractors.base import BaseMetadataExtractor
-from datalad.dochelpers import exc_str
-
+from datalad.support.exceptions import CapturedException
 
 vocabulary = {
     "spatial_resolution(dpi)": {
@@ -78,7 +77,7 @@ class MetadataExtractor(BaseMetadataExtractor):
                 img = Image.open(absfp)
             except Exception as e:
                 lgr.debug("Image metadata extractor failed to load %s: %s",
-                          absfp, exc_str(e))
+                          absfp, CapturedException(e))
                 continue
             meta = {
                 'type': 'dctype:Image',

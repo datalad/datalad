@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -300,8 +300,8 @@ def test_url_samples():
     _check_ri('weird_url:/', SSHRI, hostname='weird_url', path='/')
     _check_ri('example.com:/', SSHRI, hostname='example.com', path='/')
     _check_ri('example.com:path/sp1', SSHRI, hostname='example.com', path='path/sp1')
-    _check_ri('example.com/path/sp1\:fname', PathRI, localpath='example.com/path/sp1\:fname',
-              path='example.com/path/sp1\:fname')
+    _check_ri('example.com/path/sp1\\:fname', PathRI, localpath='example.com/path/sp1\\:fname',
+              path='example.com/path/sp1\\:fname')
     # ssh is as stupid as us, so we will stay "Consistently" dumb
     """
     $> ssh example.com/path/sp1:fname
@@ -466,16 +466,8 @@ def test_get_local_file_url():
                 #('/a b/', 'file:///a%20b/'),
                 ('/a b/name', 'file:///a%20b/name'),
             ):
-        try:
-            # Yarik found no better way to trigger.  .decode() isn't enough
-            print("D: %s" % path)
-        except UnicodeEncodeError:
-            if sys.version_info < (3, 7):
-                # observed test failing on ubuntu 18.04 with python 3.6
-                # (reproduced in conda env locally with python 3.6.10 when LANG=C
-                # We will just skip this tricky one
-                continue
-            raise
+        # Yarik found no better way to trigger.  .decode() isn't enough
+        print("D: %s" % path)
         if isabs(path):
             eq_(get_local_file_url(path), url)
         else:

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -8,11 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import re
-from distutils.version import LooseVersion
+from packaging.version import Version
 
-from ..version import (
-    __version__,
-)
+from .. import __version__
 from datalad.support import path as op
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
@@ -48,10 +46,10 @@ def test__version__():
                     "Following line must have matched our regex: %r" % line)
             regd = reg.groupdict()
             changelog_version = regd['version']
-            lv_changelog_version = LooseVersion(changelog_version)
+            lv_changelog_version = Version(changelog_version)
             # we might have a suffix - sanitize
             san__version__ = __version__.rstrip('.dirty')
-            lv__version__ = LooseVersion(san__version__)
+            lv__version__ = Version(san__version__)
             if '???' in regd['date'] and 'will be better than ever' in regd['codename']:
                 # we only have our template
                 # we can only assert that its version should be higher than

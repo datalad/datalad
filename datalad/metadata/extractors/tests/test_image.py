@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -20,9 +20,8 @@ from datalad.tests.utils import (
 try:
     from PIL import Image
 except ImportError as exc:
-    from datalad.dochelpers import exc_str
     raise SkipTest(
-       "No PIL module available or it cannot be imported: %s" % exc_str(exc))
+       "No PIL module available or it cannot be imported") from exc
 
 from shutil import copy
 from os.path import (

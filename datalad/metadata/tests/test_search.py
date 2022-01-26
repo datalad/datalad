@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -10,49 +10,50 @@
 """Some additional tests for search command (some are within test_base)"""
 
 import logging
-from shutil import copy
-from unittest.mock import patch, MagicMock
 import os
 from os import makedirs
-from os.path import (
-    dirname,
-    join as opj,
+from os.path import dirname
+from os.path import join as opj
+from shutil import copy
+from unittest.mock import (
+    MagicMock,
+    patch,
 )
 
 from pkg_resources import EntryPoint
 
-from datalad.api import Dataset
-from datalad.utils import (
-    chpwd,
-    swallow_logs,
-    swallow_outputs,
+from datalad.api import (
+    Dataset,
+    search,
 )
+from datalad.support.exceptions import NoDatasetFound
 from datalad.tests.utils import (
+    SkipTest,
     assert_equal,
     assert_in,
-    assert_re_in,
     assert_is_generator,
     assert_raises,
+    assert_re_in,
     assert_repo_status,
     assert_result_count,
     eq_,
     known_failure_githubci_win,
     ok_file_under_git,
     patch_config,
-    SkipTest,
     with_tempfile,
     with_testsui,
 )
-from datalad.support.exceptions import NoDatasetFound
+from datalad.utils import (
+    chpwd,
+    swallow_logs,
+    swallow_outputs,
+)
 
-from datalad.api import search
-
+from ..indexers.base import MetadataIndexer
 from ..search import (
     _listdict2dictlist,
     _meta2autofield_dict,
 )
-
-from ..indexers.base import MetadataIndexer
 
 
 @with_testsui(interactive=False)
@@ -235,7 +236,7 @@ type
 
     # test default behavior while limiting set of keys reported
     with swallow_outputs() as cmo:
-        ds.search(['\.id', 'artist$'], show_keys='short')
+        ds.search([r'\.id', 'artist$'], show_keys='short')
         out_lines = [l for l in cmo.out.split(os.linesep) if l]
         # test that only the ones matching were returned
         assert_equal(
@@ -291,7 +292,7 @@ type
          {'audio.format': 'mp3'}),
         # field selection by expression
         ('egrep',
-         'audio\.+:mp3',
+         r'audio\.+:mp3',
          opj('stim', 'stim1.mp3'),
          {'audio.format': 'mp3'}),
         # random keyword query

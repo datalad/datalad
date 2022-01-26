@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -32,7 +32,7 @@ from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     render_action_summary,
 )
 from datalad.interface.results import annexjson2result, get_status_dict
@@ -1306,7 +1306,9 @@ class Addurls(Interface):
     @staticmethod
     @datasetmethod(name='addurls')
     @eval_results
-    def __call__(dataset, urlfile, urlformat, filenameformat,
+    def __call__(urlfile, urlformat, filenameformat,
+                 *,
+                 dataset=None,
                  input_type="ext", exclude_autometa=None, meta=None, key=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
@@ -1572,7 +1574,7 @@ filename_format='{filenameformat}'"""
         refds = res.get("addurls.refds")
         if refds:
             res = dict(res, refds=refds)
-        default_result_renderer(res)
+        generic_result_renderer(res)
 
     custom_result_summary_renderer_pass_summary = True
 

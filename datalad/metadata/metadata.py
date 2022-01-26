@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -21,10 +21,13 @@ from collections import (
 )
 
 from datalad import cfg
-from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import _minimal_annotate_paths
 from datalad.interface.base import Interface
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
 from datalad.interface.base import build_doc
 from datalad.metadata.definitions import version as vocabulary_version
 from datalad.support.collections import ReadOnlyDict, _val2hashable
@@ -35,6 +38,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CapturedException
 from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
 from datalad.support.json_py import (
@@ -58,15 +62,13 @@ from datalad.utils import (
     as_unicode,
 )
 from datalad.ui import ui
-from datalad.dochelpers import (
-    exc_str,
-    single_or_plural,
-)
+from datalad.dochelpers import single_or_plural
 from datalad.consts import (
     OLDMETADATA_DIR,
     OLDMETADATA_FILENAME,
 )
 from datalad.log import log_progress
+from datalad.core.local.status import get_paths_by_ds
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -515,8 +517,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             )
             raise ValueError(
                 "Failed to load metadata extractor for '%s', "
-                "broken dataset configuration (%s)?: %s" %
-                (mtype, ds, exc_str(e)))
+                "broken dataset configuration (%s)?" %
+                (mtype, ds)) from e
         try:
             dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
@@ -528,8 +530,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     default=True,
                     valtype=EnsureBool()))
         except Exception as e:
-            lgr.error('Failed to get dataset metadata ({}): {}'.format(
-                mtype, exc_str(e)))
+            lgr.error('Failed to get dataset metadata (%s): %s',
+                      mtype, CapturedException(e))
             if cfg.get('datalad.runtime.raiseonerror'):
                 log_progress(
                     lgr.error,
@@ -880,6 +882,7 @@ class Metadata(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             get_aggregates=False,
             reporton='all',
@@ -940,24 +943,17 @@ class Metadata(Interface):
             # error generation happens during annotation
             path = op.curdir
 
+        paths_by_ds, errors = get_paths_by_ds(
+            require_dataset(dataset),
+            dataset,
+            paths=ensure_list(path),
+            subdsroot_mode='super')
         content_by_ds = OrderedDict()
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                path=path,
-                # MIH: we are querying the aggregated metadata anyways, and that
-                # mechanism has its own, faster way to go down the hierarchy
-                #recursive=recursive,
-                #recursion_limit=recursion_limit,
+        for ap in _minimal_annotate_paths(
+                paths_by_ds,
+                errors,
                 action='metadata',
-                # uninstalled subdatasets could be queried via aggregated metadata
-                # -> no 'error'
-                unavailable_path_status='',
-                nondataset_path_status='error',
-                # we need to know when to look into aggregated data
-                force_subds_discovery=True,
-                force_parentds_discovery=True,
-                return_type='generator',
-                on_failure='ignore'):
+                refds=refds_path):
             if ap.get('status', None):
                 # this is done
                 yield ap
@@ -1009,7 +1005,7 @@ class Metadata(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         if res['status'] != 'ok' or not res.get('action', None) == 'metadata':
-            # logging complained about this already
+            generic_result_renderer(res)
             return
         # list the path, available metadata keys, and tags
         path = op.relpath(res['path'],

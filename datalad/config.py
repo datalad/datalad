@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,7 +26,6 @@ from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
 )
-from datalad.dochelpers import exc_str
 
 import re
 import os
@@ -396,6 +395,7 @@ class ConfigManager(object):
                         "DataLad. Set both 'user.name' and 'user.email' "
                         "configuration variables."
                     )
+                    break  # one warning enough
             ConfigManager._checked_git_identity = True
 
     def reload(self, force=False):
@@ -559,7 +559,7 @@ class ConfigManager(object):
                 raise ValueError(
                     "value '{}' of existing configuration for '{}' cannot be "
                     "converted to the desired type '{}' ({})".format(
-                        _value, var, valtype, exc_str(e)))
+                        _value, var, valtype, e)) from e
 
         # now we need to try to obtain something from the user
         from datalad.ui import ui
@@ -613,7 +613,7 @@ class ConfigManager(object):
         except Exception as e:
             raise ValueError(
                 "cannot convert user input `{}` to desired type ({})".format(
-                    _value, exc_str(e)))
+                    _value, e)) from e
             # XXX we could consider "looping" until we have a value of proper
             # type in case of a user typo...
 

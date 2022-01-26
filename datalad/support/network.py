@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -41,7 +41,6 @@ from urllib.parse import (
 )
 from urllib.error import URLError
 
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     on_windows,
     PurePath,
@@ -51,27 +50,12 @@ from datalad.utils import ensure_dir, ensure_bytes, ensure_unicode, map_items
 from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
+from datalad.support.exceptions import CapturedException
 
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
-# Change introduced in 3.7: Moved from RFC 2396 to RFC 3986 for quoting URL
-# strings. "~" is now included in the set of reserved characters.
-# For consistency we will provide urlquote
-if sys.version_info >= (3, 7):
-    from urllib.parse import quote as urlquote
-else:
-    from urllib.parse import quote as _urlquote
-
-    def urlquote(url, safe='/', **kwargs):
-        safe += '~'
-        return _urlquote(url, safe=safe, **kwargs)
-
-    urlquote.__doc__ = _urlquote.__doc__ + """
-
-This DataLad version of the function assumes ~ to be a safe character to be
-consistent with Python >= 3.7
-"""
+from urllib.parse import quote as urlquote
 
 
 def is_windows_path(path):
@@ -1014,7 +998,7 @@ def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
             except Exception as e:  # it is OK to ignore any error and fall back on the true source
                 lgr.warning(
                     "cannot load cache from '%s', fall back to download: %s",
-                    doc_fname, exc_str(e))
+                    doc_fname, CapturedException(e))
 
     if doc is None:
         if fetcher is None:

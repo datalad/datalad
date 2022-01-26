@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
+import datalad
 from datalad.coreapi import *
 
 
@@ -35,7 +36,8 @@ def _command_summary():
     return "\n".join(get_cmd_summaries(grp_short_descriptions, groups))
 
 
-__doc__ += "\n\n{}".format(_command_summary())
+if not datalad.in_librarymode():
+    __doc__ += "\n\n{}".format(_command_summary())
 
 
 def _generate_extension_api():
@@ -44,8 +46,8 @@ def _generate_extension_api():
     from importlib import import_module
     from pkg_resources import iter_entry_points
     from .interface.base import get_api_name
+    from datalad.support.exceptions import CapturedException
 
-    from datalad.dochelpers import exc_str
     import logging
     lgr = logging.getLogger('datalad.api')
 
@@ -59,7 +61,8 @@ def _generate_extension_api():
                 'Loaded entrypoint %s from datalad.extensions',
                 entry_point.name)
         except Exception as e:
-            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, exc_str(e))
+            ce = CapturedException(e)
+            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, ce)
             continue
 
         for intfspec in interfaces:

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,15 +12,20 @@
 
 __docformat__ = 'restructuredtext'
 
-from appdirs import AppDirs
 from os import environ
-from os.path import join as opj, expanduser
-from datalad.support.constraints import EnsureBool
-from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureListOf
-from datalad.support.constraints import EnsureStr
+from os.path import expanduser
+from os.path import join as opj
+
+from platformdirs import AppDirs
+
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureInt,
+    EnsureListOf,
+    EnsureNone,
+    EnsureStr,
+)
 from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -398,6 +403,24 @@ definitions = {
                'text': 'Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores).'}),
         'type': EnsureInt(),
         'default': 1,
+    },
+    'datalad.runtime.max-batched': {
+        'ui': ('question', {
+            'title': 'Maximum number of batched commands to run in parallel',
+            'text': 'Automatic cleanup of batched commands will try to keep at most this many commands running.'}),
+        'type': EnsureInt(),
+        'default': 20,
+    },
+    'datalad.runtime.max-inactive-age': {
+        'ui': ('question', {
+            'title': 'Maximum time (in seconds) a batched command can be'
+                     ' inactive before it is eligible for cleanup',
+            'text': 'Automatic cleanup of batched commands will consider an'
+                    ' inactive command eligible for cleanup if more than this'
+                    ' many seconds have transpired since the command\'s last'
+                    ' activity.'}),
+        'type': EnsureInt(),
+        'default': 60,
     },
     'datalad.runtime.max-jobs': {
         'ui': ('question', {

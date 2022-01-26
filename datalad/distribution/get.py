@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -47,6 +47,7 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InsufficientArgumentsError,
 )
@@ -245,7 +246,15 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 f"candidate '{name}', but only one is allowed. "
                 f"Check datalad.get.subdataset-source-candidate-* configuration!"
             )
-        url = tmpl.format(**sm_candidate_props)
+        try:
+            url = tmpl.format(**sm_candidate_props)
+        except KeyError as e:
+            ce = CapturedException(e)
+            lgr.warning(
+                "Failed to format template %r for a submodule clone. "
+                "Error: %s", tmpl, ce
+            )
+            continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
         # outside. Additional guesswork can only make it slower
@@ -285,6 +294,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # take out any duplicate source candidates
     # unique() takes out the duplicated at the tail end
     clone_urls = unique(clone_urls, lambda x: x['url'])
+    lgr.debug('Assembled %i clone candidates for %s: %s',
+              len(clone_urls), sm_path, [cand['url'] for cand in clone_urls])
 
     return clone_urls
 
@@ -367,13 +378,15 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         for rec in cand_cfg:
             # check whether any of this configuration originated from the
             # superdataset. if so, inherit the config in the new subdataset
-            # clone. if not, keep things clean in order to be able to move with
-            # any outside configuration change
+            # clone unless that config is already specified in the new
+            # subdataset which can happen during postclone_cfg routines.
+            # if not, keep things clean in order to be able to move with any
+            # outside configuration change
             for c in ('datalad.get.subdataset-source-candidate-{}{}'.format(
                           rec['cost'], rec['name']),
                       'datalad.get.subdataset-source-candidate-{}'.format(
                           rec['name'])):
-                if c in super_cfg.keys():
+                if c in super_cfg.keys() and c not in subds.config.keys():
                     subds.config.set(c, super_cfg.get(c), scope='local',
                                      reload=False)
                     need_reload = True
@@ -403,7 +416,8 @@ def _install_necessary_subdatasets(
     # to visit only subdataset on the trajectory to the target path
     subds_trail = ds.subdatasets(contains=path, recursive=True,
                                  on_failure="ignore",
-                                 result_filter=is_ok_dataset)
+                                 result_filter=is_ok_dataset,
+                                 result_renderer='disabled')
     if not subds_trail:
         # there is not a single known subdataset (installed or not)
         # for this path -- job done
@@ -435,12 +449,15 @@ def _install_necessary_subdatasets(
                 else:
                     # report unconditionally to caller
                     yield res
-
+        if sd.pathobj == path:
+            # we've just got the target subdataset, we're done
+            return
         # now check whether the just installed subds brought us any closer to
         # the target path
         subds_trail = sd.subdatasets(contains=path, recursive=False,
                                      on_failure='ignore',
-                                     result_filter=is_ok_dataset)
+                                     result_filter=is_ok_dataset,
+                                     result_renderer='disabled')
         if not subds_trail:
             # no (newly available) subdataset gets us any closer
             return
@@ -591,7 +608,7 @@ def _install_targetpath(
         return
     if recursion_limit == 'existing':
         for res in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 path=target_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
@@ -822,6 +839,7 @@ class Get(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             source=None,
             dataset=None,
             recursive=False,
@@ -953,7 +971,7 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
-                if res['path'] not in content_by_ds:
+                if 'path' not in res or res['path'] not in content_by_ds:
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res

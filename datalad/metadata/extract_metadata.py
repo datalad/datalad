@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -70,6 +70,9 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
+    # Note: types is a required option and files (path!) is posarg --
+    # This is not consistent with the other uses, but since it is being redone in metalad
+    # anyways -- kept as is.without adding * following current design docs.
     def __call__(types, files=None, dataset=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",

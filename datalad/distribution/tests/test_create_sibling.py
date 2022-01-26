@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -114,7 +114,7 @@ def assert_postupdate_hooks(path, installed=True, flat=False):
         datasets = glob(opj(path, '*'))
     else:
         ds = Dataset(path)
-        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, fulfilled=True)
+        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, state='present')
     for ds_ in datasets:
         ds_ = Dataset(ds_)
         hook_path = opj(ds_.path, '.git', 'hooks', 'post-update')
@@ -536,15 +536,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
-    try:
-        res = ds.create_sibling(url, ui=have_webui())
-    except UnicodeDecodeError:
-        if sys.version_info < (3, 7):
-            # observed test failing on ubuntu 18.04 with python 3.6
-            # (reproduced in conda env locally with python 3.6.10 when LANG=C
-            # We will just skip this tricky one
-            raise SkipTest("Known failure")
-        raise
+    res = ds.create_sibling(url, ui=have_webui())
     assert_in_results(res, action="create_sibling", sibling_name=sibname)
     published = ds.push(to=sibname, data='anything')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
@@ -869,3 +861,20 @@ def test_preserve_attrs(src, dest):
     assert s.st_mtime == 1234567890
     with open(opj(dest, "src", "foo", "bar")) as fp:
         assert fp.read() == "This is test text."
+
+
+@with_tempfile(mkdir=True)
+def test_only_one_level_without_recursion(path):
+    # this tests for https://github.com/datalad/datalad/issues/5614: accidental
+    # recursion of one level by default
+    path = Path(path)
+    ds_main = Dataset(path / "main").create()
+    ds_main.create('sub1')
+
+    ds_main.create_sibling(
+        name="dummy",
+        sshurl=str(path / "toplevelsibling"))
+    # this should exist
+    ok_((path / 'toplevelsibling').exists())
+    # this shouldn't
+    assert_false(Path(path / 'toplevelsibling' / 'sub1').exists())

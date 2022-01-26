@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -14,71 +14,66 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from os import (
-    remove,
-)
-
-from io import StringIO
 import sys
+from io import StringIO
+from os import remove
 from unittest.mock import patch
 
-from datalad.utils import (
-    chpwd,
-    on_windows,
-    Path,
-)
-
-from datalad.distribution.dataset import Dataset
-from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import (
-    CommandError,
-    IncompleteResultsError,
-)
 from datalad.api import (
     install,
     run,
 )
-from datalad.core.local.run import (
-    run_command,
-)
-from datalad.interface.rerun import (
-    get_run_info,
+from datalad.core.local.run import run_command
+from datalad.core.local.tests.test_run import last_commit_msg
+from datalad.distribution.dataset import Dataset
+from datalad.local.rerun import (
     diff_revision,
+    get_run_info,
     new_or_modified,
 )
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+)
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
-    assert_raises,
-    assert_false,
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    SkipTest,
     assert_dict_equal,
+    assert_false,
+    assert_in,
     assert_in_results,
+    assert_not_in,
+    assert_not_in_results,
+    assert_raises,
     assert_repo_status,
-    with_tempfile,
-    with_tree,
+    assert_result_count,
+    assert_status,
+    create_tree,
+    eq_,
+    known_failure_windows,
+    neq_,
     ok_,
     ok_exists,
     ok_file_has_content,
     ok_file_under_git,
-    create_tree,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
-    eq_,
-    neq_,
-    assert_status,
-    assert_result_count,
-    assert_in,
-    assert_not_in,
-    assert_not_in_results,
+    skip_if_adjusted_branch,
+    slow,
     swallow_logs,
     swallow_outputs,
-    known_failure_windows,
-    known_failure_githubci_win,
-    slow,
-    skip_if_adjusted_branch,
-    SkipTest,
+    with_tempfile,
+    with_tree,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
+    on_windows,
 )
 
-from datalad.core.local.tests.test_run import last_commit_msg
-
+cat_command = 'cat' if not on_windows else 'type'
+touch_command = "touch " if not on_windows else "type nul > "
+grep_command = 'grep ' if not on_windows else 'findstr '
 
 @slow  # 17.1880s
 @known_failure_windows
@@ -91,7 +86,7 @@ def test_rerun(path, nodspath):
     # run inside the dataset
     with chpwd(path), \
             swallow_outputs():
-        ds.run('echo x$(cat sub/sequence) > sub/sequence')
+        ds.run(f'echo x$({cat_command} sub/sequence) > sub/sequence')
     # command ran once, all clean
     assert_repo_status(ds.path)
     eq_('x\n', open(probe_path).read())
@@ -170,7 +165,6 @@ def test_rerun_empty_branch(path):
     assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
     ds = Dataset(path).create()
@@ -194,7 +188,7 @@ def test_rerun_onto(path):
     ds.run('echo static-content > static')
     ds.repo.tag("static")
     with swallow_outputs():
-        ds.run('echo x$(cat grows) > grows')
+        ds.run(f'echo x$({cat_command} grows) > grows')
     ds.rerun()
     eq_('xx\n', open(grow_file).read())
 
@@ -259,7 +253,7 @@ def test_rerun_chain(path):
     commits = []
 
     with swallow_outputs():
-        ds.run('echo x$(cat grows) > grows')
+        ds.run(f'echo x$({cat_command} grows) > grows')
     ds.repo.tag("first-run", commit=DEFAULT_BRANCH)
 
     for _ in range(3):
@@ -300,7 +294,6 @@ def test_rerun_just_one_commit(path):
                   report=True, return_type="list")
 
 
-@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
@@ -315,8 +308,8 @@ def test_run_failure(path):
                 # but is close enough to make running the test worthwhile
                 ds.run("echo x>{} & false".format(op.join("sub", "grows")))
             else:
-                ds.run("echo x$(cat {0}) > {0} && false"
-                       .format(op.join("sub", "grows")))
+                ds.run("echo x$({0} {1}) > {1} && false"
+                       .format(cat_command, op.join("sub", "grows")))
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -366,7 +359,7 @@ def test_rerun_branch(path):
     outfile = op.join(path, "run-file")
 
     with swallow_outputs():
-        ds.run('echo x$(cat run-file) > run-file')
+        ds.run(f'echo x$({cat_command} run-file) > run-file')
     ds.rerun()
     eq_('xx\n', open(outfile).read())
 
@@ -447,7 +440,6 @@ def test_rerun_invalid_merge_run_commit(path):
     eq_(len(ds.repo.get_revisions(hexsha_orig + ".." + DEFAULT_BRANCH)), 1)
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
@@ -457,8 +449,8 @@ def test_rerun_outofdate_tree(path):
         f.write("abc\ndef")
     ds.save("foo", to_git=True)
     # Create initial run.
-    ds.run('grep def foo > out')
-    eq_('def\n', open(output_file).read())
+    ds.run(f'{grep_command} def foo > out')
+    assert_in('def', open(output_file).read())
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
@@ -466,7 +458,6 @@ def test_rerun_outofdate_tree(path):
         assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
@@ -478,7 +469,6 @@ def test_rerun_ambiguous_revision_file(path):
         len(ds.repo.get_revisions("ambig")))
 
 
-@known_failure_windows
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
@@ -487,7 +477,7 @@ def test_rerun_subdir(path):
     ds = Dataset(path).create(force=True)
     subdir = op.join(path, 'subdir')
     with chpwd(subdir):
-        run("touch test.dat")
+        run(touch_command + "test.dat")
     assert_repo_status(ds.path)
 
     # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
@@ -510,7 +500,7 @@ def test_rerun_subdir(path):
 
     # but if we run ds.run -- runs within top of the dataset
     with chpwd(subdir):
-        ds.run("touch test2.dat")
+        ds.run(touch_command + "test2.dat")
     assert_repo_status(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
     rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
@@ -569,12 +559,11 @@ def test_new_or_modified(path):
         {"to_modify", op.join("d", "to_modify")})
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo")
-    ds.run(["touch", "bar"], message='BAR', sidecar=True)
+    ds.run([touch_command + "bar"], message='BAR', sidecar=True)
     # a run record sidecar file was added with the last commit
     assert(any(d['path'].startswith(op.join(ds.path, '.datalad', 'runinfo'))
                for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
@@ -586,7 +575,7 @@ def test_rerun_script(path):
     ok_exists(script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("touch bar\n", lines)
+        assert_in(touch_command + "bar\n", lines)
         # The commit message is there too.
         assert_in("# BAR\n", lines)
         assert_in("# (record: {})\n".format(bar_hexsha), lines)
@@ -595,7 +584,7 @@ def test_rerun_script(path):
     ds.rerun(since="", script=script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("touch bar\n", lines)
+        assert_in(touch_command + "bar\n", lines)
         # Automatic commit messages aren't included.
         assert_not_in("# echo a >foo\n", lines)
         assert_in("echo a >foo\n", lines)
@@ -603,7 +592,7 @@ def test_rerun_script(path):
     # --script=- writes to stdout.
     with patch("sys.stdout", new_callable=StringIO) as cmout:
         ds.rerun(script="-")
-        assert_in("touch bar",
+        assert_in(touch_command + "bar",
                   cmout.getvalue().splitlines())
 
 
@@ -748,7 +737,7 @@ def test_run_inputs_outputs(src, path):
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
     # We uninstall subdatasets to fully resolve globs.
-    ds.uninstall("s0")
+    ds.drop("s0", what='all', reckless='kill', recursive=True)
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
     ok_file_has_content(
@@ -766,7 +755,6 @@ def test_run_inputs_outputs(src, path):
                         strip=True)
 
 
-@known_failure_windows
 @with_tree({"foo": "foo"})
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).create(annex=False, force=True)

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -9,6 +9,7 @@
 """Test WitlessRunner
 """
 
+import logging
 import os
 import signal
 import sys
@@ -30,29 +31,25 @@ from datalad.tests.utils import (
     integration,
     ok_,
     ok_file_has_content,
+    skip_if_on_windows,
+    swallow_logs,
     with_tempfile,
 )
 from datalad.utils import (
+    CMD_MAX_ARG,
     Path,
     on_windows,
 )
 
 from .. import (
     CommandError,
+    KillOutput,
     Protocol,
     Runner,
     StdOutCapture,
     StdOutErrCapture,
 )
-
-
-def py2cmd(code):
-    """Helper to invoke some Python code through a cmdline invocation of
-    the Python interpreter.
-
-    This should be more portable in some cases.
-    """
-    return [sys.executable, '-c', code]
+from .utils import py2cmd
 
 
 @assert_cwd_unchanged
@@ -157,7 +154,7 @@ def test_runner_stdin_no_capture():
     runner = Runner()
     runner.run(
         py2cmd('import sys; print(sys.stdin.read()[-10:])'),
-        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 10000).encode('utf-8'),
+        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 2 + '\n').encode('utf-8'),
         protocol=None
     )
 
@@ -294,3 +291,23 @@ def test_faulty_poll_detection():
     protocol = Protocol()
     protocol.process = PopenMock()
     assert_raises(CommandError, protocol._prepare_result)
+
+
+def test_kill_output():
+    runner = Runner()
+    res = runner.run(
+        py2cmd('import sys; sys.stdout.write("aaaa\\n"); sys.stderr.write("bbbb\\n")'),
+        protocol=KillOutput)
+    eq_(res['stdout'], '')
+    eq_(res['stderr'], '')
+
+
+@skip_if_on_windows  # no "hint" on windows since no ulimit command there
+def test_too_long():
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        with assert_raises(OSError):  # we still raise an exception if we exceed too much
+            Runner().run(
+                [sys.executable, '-c', 'import sys; print(len(sys.argv))'] + [str(i) for i in range(CMD_MAX_ARG)],
+                protocol=StdOutCapture
+            )
+        cml.assert_logged('.*use.*ulimit.*')

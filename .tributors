@@ -179,5 +179,14 @@
         "blog": "https://remi-gau.github.io/",
         "orcid": "0000-0002-1535-9767",
         "affiliation": "Université catholique de Louvain"
+    },
+    "mslw": {
+        "name": "Michał Szczepanik",
+        "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich",
+        "blog": "https://github.com/mslw"
+    },
+    "bpinsard": {
+        "name": "Basile",
+        "blog": "https://github.com/bpinsard"
     }
 }

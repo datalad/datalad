@@ -1,7 +1,13 @@
 from unittest.mock import patch
-from nose.tools import assert_equal, assert_true
-from datalad.support.exceptions import CapturedException
-from datalad.tests.utils import assert_re_in
+from datalad.support.exceptions import (
+    format_exception_with_cause,
+    CapturedException,
+)
+from datalad.tests.utils import (
+    assert_equal,
+    assert_re_in,
+    assert_true,
+)
 from datalad import cfg
 
 
@@ -12,15 +18,15 @@ def test_CapturedException():
     except Exception as e:
         captured_exc = CapturedException(e)
 
-    assert_re_in("BOOM \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
-    assert_re_in("^\[.*\]", captured_exc.format_oneline_tb(include_str=False))  # only traceback
+    assert_re_in(r"BOOM \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
+    assert_re_in(r"^\[.*\]", captured_exc.format_oneline_tb(include_str=False))  # only traceback
 
     try:
         raise NotImplementedError
     except Exception as e:
         captured_exc = CapturedException(e)
 
-    assert_re_in("NotImplementedError \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
+    assert_re_in(r"NotImplementedError \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
 
     def f():
         def f2():
@@ -52,10 +58,10 @@ def test_CapturedException():
 
     estr_full = captured_exc.format_oneline_tb(10)
 
-    assert_re_in("new message \[test_captured_exception.py:test_CapturedException:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr_full)
-    assert_re_in("new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
-    assert_re_in("new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
-    assert_re_in("new message \[test_captured_exception.py:f2:[0-9]+\]", estr1)
+    assert_re_in(r"new message \[test_captured_exception.py:test_CapturedException:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr_full)
+    assert_re_in(r"new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
+    assert_re_in(r"new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
+    assert_re_in(r"new message \[test_captured_exception.py:f2:[0-9]+\]", estr1)
     # default: no limit:
     assert_equal(estr_, estr_full)
 
@@ -78,3 +84,28 @@ def test_CapturedException():
     # CapturedException.__repr__:
     assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",
                  captured_exc.__repr__())
+
+
+def makeitraise():
+    def raise_valueerror():
+        try:
+            raise_runtimeerror()
+        except Exception as e:
+            raise ValueError from e
+
+    def raise_runtimeerror():
+        raise RuntimeError("Mike")
+
+    try:
+        raise_valueerror()
+    except Exception as e:
+        raise RuntimeError from e
+
+
+def test_format_exception_with_cause():
+    try:
+        makeitraise()
+    except Exception as e:
+        assert_equal(
+            format_exception_with_cause(e),
+            'RuntimeError -caused by- ValueError -caused by- Mike')

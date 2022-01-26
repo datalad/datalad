@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -17,7 +17,6 @@ import logging
 from os.path import lexists
 import itertools
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -215,6 +214,7 @@ class Update(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             sibling=None,
             merge=False,
             how=None,
@@ -243,7 +243,7 @@ class Update(Interface):
         saw_subds = False
         for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
-                fulfilled=True,
+                state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',

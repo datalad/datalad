@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -132,7 +132,12 @@ def test_invalid_args(path):
     assert_raises(ValueError, install, 'ssh://mars/Zoidberg', source='Zoidberg')
     # make fake dataset
     ds = create(path)
-    assert_raises(IncompleteResultsError, install, '/higherup.', 'Zoidberg', dataset=ds)
+    # explicit 'source' as a kwarg
+    assert_raises(IncompleteResultsError, install, '/higherup.', source='Zoidberg', dataset=ds)
+    # or obscure form for multiple installation "things"
+    assert_raises(IncompleteResultsError, install, ['/higherup.', 'Zoidberg'], dataset=ds)
+    # and if just given without keyword arg for source -- standard Python exception
+    assert_raises(TypeError, install, '/higherup.', 'Zoidberg', dataset=ds)
 
 
 # This test caused a mysterious segvault in gh-1350. I reimplementation of
@@ -175,7 +180,6 @@ def test_invalid_args(path):
 
 
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_install_datasets_root(tdir):
     with chpwd(tdir):
@@ -197,8 +201,6 @@ def test_install_datasets_root(tdir):
         assert_in("already exists and not empty", str(cme.exception))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:360
-@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -239,8 +241,7 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:298
-@known_failure_windows
+@known_failure_githubci_win
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -319,8 +320,8 @@ def test_install_recursive(src, path_nr, path_r):
     for sub in ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(not sub.is_installed(),
             "Unintentionally installed: %s" % (sub,))
-    # this also means, subdatasets to be listed as not fulfilled:
-    eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
+    # this also means, subdatasets to be listed as absent:
+    eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
         {'subm 1', '2'})
 
     # now recursively:
@@ -350,8 +351,8 @@ def test_install_recursive(src, path_nr, path_r):
         ainfo = subds.repo.get_content_annexinfo(init=None,
                                                  eval_availability=True)
         assert_false(any(st["has_content"] for st in ainfo.values()))
-    # no unfulfilled subdatasets:
-    ok_(top_ds.subdatasets(recursive=True, fulfilled=False) == [])
+    # no absent subdatasets:
+    ok_(top_ds.subdatasets(recursive=True, state='absent') == [])
 
     # check if we can install recursively into a dataset
     # https://github.com/datalad/datalad/issues/2982
@@ -360,7 +361,7 @@ def test_install_recursive(src, path_nr, path_r):
     for subsub in subds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subsub.is_installed())
 
-    # check that we get subdataset instances manufactored from notneeded results
+    # check that we get subdataset instances manufactured from notneeded results
     # to install existing subdatasets again
     eq_(subds, ds.install('recursive-in-ds'))
 
@@ -396,8 +397,6 @@ def test_install_recursive_with_data(src, path):
             ok_(all_have_content(subds.repo))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
-@known_failure_windows
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -440,10 +439,8 @@ def test_install_into_dataset(source, top_path):
 
 
 @slow   # 15sec on Yarik's laptop
-@known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
@@ -468,8 +465,6 @@ def test_failed_install_multiple(top_path):
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:318
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_install_known_subdataset(src, path):
@@ -479,8 +474,8 @@ def test_install_known_subdataset(src, path):
     # subdataset not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
-    assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
     # install it:
     ds.install('subm 1')
     ok_(subds.is_installed())
@@ -489,8 +484,8 @@ def test_install_known_subdataset(src, path):
     # new repository initiated
     eq_(set(subds.repo.get_indexed_files()),
         {'test.dat', 'INFO.txt', 'test-annex.dat'})
-    assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
 
     # now, get the data by reinstalling with -g:
     ok_(subds.repo.file_has_content('test-annex.dat') is False)
@@ -620,7 +615,6 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@skip_if_on_windows  # Due to "another process error"
 def test_install_recursive_repeat(src, path):
     top_src = Dataset(src).create(force=True)
     sub1_src = top_src.create('sub 1', force=True)
@@ -777,7 +771,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     def check_consistent_installation(ds):
         datasets = [ds] + list(
-            map(Dataset, ds.subdatasets(recursive=True, fulfilled=True,
+            map(Dataset, ds.subdatasets(recursive=True, state='present',
                                         result_xfm='paths')))
         assert len(datasets) == 2  # in this test
         for ds in datasets:
@@ -902,7 +896,7 @@ def check_datasets_datalad_org(suffix, tdir):
         ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
         1,
         status='ok')
-    assert_status('ok', ds.remove())
+    assert_status('ok', ds.drop(what='all', reckless='kill', recursive=True))
 
 
 def test_datasets_datalad_org():
@@ -919,6 +913,30 @@ def test_relpath_semantics(path):
         sub = install(
             dataset='super', source='subsrc', path=op.join('super', 'sub'))
         eq_(sub.path, op.join(super.path, 'sub'))
+
+
+@with_tempfile
+def test_install_branch(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a")
+    ds_a.create("sub")
+
+    repo_a = ds_a.repo
+    repo_a.commit(msg="c1", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
+    repo_a.commit(msg="c2", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH)
+
+    ds_b = install(source=ds_a.path, path=str(path / "ds_b"),
+                   branch=DEFAULT_BRANCH + "-other", recursive=True)
+
+    repo_b = ds_b.repo
+    eq_(repo_b.get_corresponding_branch() or repo_b.get_active_branch(),
+        DEFAULT_BRANCH + "-other")
+
+    repo_sub = Dataset(ds_b.pathobj / "sub").repo
+    eq_(repo_sub.get_corresponding_branch() or repo_sub.get_active_branch(),
+        DEFAULT_BRANCH)
 
 
 def _create_test_install_recursive_github(path):  # pragma: no cover
@@ -956,4 +974,4 @@ def test_install_recursive_github(path):
         #'git@github.com:datalad/testrepo_gh.git',
     ]):
         ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
-        eq_(len(ds.subdatasets(recursive=True, fulfilled=True)), 2)
+        eq_(len(ds.subdatasets(recursive=True, state='present')), 2)

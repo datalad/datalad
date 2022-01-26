@@ -55,13 +55,12 @@ Dataset operations
    datalad add-readme: Add information on DataLad dataset to a README <generated/man/datalad-add-readme>
    datalad addurls: Update dataset content from a list of URLs <generated/man/datalad-addurls>
    datalad copy-file: Copy file identity and availability from one dataset to another <generated/man/datalad-copy-file>
-   datalad drop: Drop file content from a dataset <generated/man/datalad-drop>
+   datalad drop: Drop datasets or dataset components <generated/man/datalad-drop>
    datalad get: Obtain any dataset content <generated/man/datalad-get>
    datalad install: Install a dataset from a (remote) source <generated/man/datalad-install>
    datalad no-annex: Configure a dataset to never put file content into an annex <generated/man/datalad-no-annex>
    datalad remove: Unlink components from a dataset <generated/man/datalad-remove>
    datalad subdatasets: Query and manipulate subdataset records of a dataset <generated/man/datalad-subdatasets>
-   datalad uninstall: Drop subdatasets <generated/man/datalad-uninstall>
    datalad unlock: Make dataset file content editable <generated/man/datalad-unlock>
 
 
@@ -116,12 +115,21 @@ Helpers and support utilities
    :maxdepth: 1
 
    datalad add-archive-content: Extract and add the content of an archive to a dataset <generated/man/datalad-add-archive-content>
-   datalad annotate-paths: Obsolete helper <generated/man/datalad-annotate-paths>
    datalad clean: Remove temporary left-overs of DataLad operations <generated/man/datalad-clean>
    datalad check-dates: Scan a dataset for dates and timestamps <generated/man/datalad-check-dates>
    datalad create-test-dataset: Test helper <generated/man/datalad-create-test-dataset>
    datalad download-url: Download helper with support for DataLad's credential system <generated/man/datalad-download-url>
+   datalad foreach-dataset: Run a command or Python code on the dataset and/or each of its sub-datasets <generated/man/datalad-foreach-dataset>
    datalad sshrun: Remote command execution using DataLad's connection management <generated/man/datalad-sshrun>
    datalad shell-completion: Helper to support command completion <generated/man/datalad-shell-completion>
    datalad test: Frontend for running DataLad's internal test battery <generated/man/datalad-test>
    datalad wtf: Report on a DataLad installation and its configuration <generated/man/datalad-wtf>
+
+
+Deprecated commands
+-------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   datalad uninstall: Drop subdatasets <generated/man/datalad-uninstall>

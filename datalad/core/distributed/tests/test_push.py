@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -78,8 +78,8 @@ def test_invalid_call(origin, tdir):
 
     # unavailable subdataset
     dummy_sub = ds.create('sub')
-    dummy_sub.uninstall()
-    assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    dummy_sub.drop(what='all', reckless='kill', recursive=True)
+    assert_in('sub', ds.subdatasets(state='absent', result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
     assert_raises(ValueError, ds.push, 'sub')
 
@@ -113,7 +113,7 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
                     scope='local')
     else:
         target = GitRepo(path=path, bare=bare, create=True)
-    ds.siblings('add', name=name, url=path, result_renderer=None)
+    ds.siblings('add', name=name, url=path, result_renderer='disabled')
     if annex and not bare and target.is_managed_branch():
         # maximum complication
         # the target repo already has a commit that is unrelated
@@ -511,7 +511,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
                       message='Slated for transport, but no content present')
 
 
-@skip_if_on_windows  # https://github.com/datalad/datalad/issues/4278
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
 def test_ria_push(srcpath, dstpath):
@@ -525,7 +525,7 @@ def test_ria_push(srcpath, dstpath):
         'ok',
         src.create_sibling_ria(
             "ria+{}".format(get_local_file_url(dstpath, compatibility='git')),
-            "datastore"))
+            "datastore", new_store_ok=True))
     res = src.push(to='datastore')
     assert_in_results(
         res, action='publish', target='datastore', status='ok',
@@ -594,7 +594,7 @@ def test_gh1763(src, target1, target2):
     target1 = mk_push_target(src, 'target1', target1, bare=False)
     target2 = mk_push_target(src, 'target2', target2, bare=False)
     src.siblings('configure', name='target2', publish_depends='target1',
-                 result_renderer=None)
+                 result_renderer='disabled')
     # a file to annex
     (src.pathobj / 'probe1').write_text('probe1')
     src.save('probe1', to_git=False)
@@ -929,7 +929,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     store_url = 'ria+' + get_local_file_url(storepath)
     with chpwd(orig_super.path):
         run(['datalad', 'create-sibling-ria', '--recursive',
-             '-s', 'store', store_url])
+             '-s', 'store', store_url, '--new-store-ok'])
         run(['datalad', 'push', '--recursive', '--to', 'store'])
 
     # we are using the 'store' sibling's URL, which should be a plain path

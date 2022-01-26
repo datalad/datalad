@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,14 +26,17 @@ from tempfile import mkdtemp
 from datalad.core.local.save import Save
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
-from datalad.interface.unlock import Unlock
+from datalad.local.unlock import Unlock
 
 from datalad.interface.base import Interface
-from datalad.interface.utils import default_result_renderer
+from datalad.interface.utils import generic_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import save_message_opt
+from datalad.interface.common_opts import (
+    save_message_opt,
+    jobs_opt
+)
 
 from datalad.config import anything2bool
 
@@ -174,7 +177,17 @@ class Run(Interface):
              code_cmd="""\
              datalad run -m 'run my script' -i 'data/*' \\
              -i 'datafile.txt' -o 'output_dir/*' -o \\
-             'outfile.txt' 'code/script.sh'""")
+             'outfile.txt' 'code/script.sh'"""),
+        dict(text="Use ** to match any file at any directory depth recursively. "
+                  "Single * does not check files within matched directories.",
+             code_py="""\
+             run(cmd='code/script.sh',
+                 message='run my script',
+                 inputs=['data/**/*.dat'],
+                 outputs=['output_dir/**'])""",
+             code_cmd="""\
+             datalad run -m 'run my script' -i 'data/**/*.dat' \\
+             -o 'output_dir/**' 'code/script.sh'""")
     ]
 
     result_renderer = "tailored"
@@ -251,13 +264,19 @@ class Run(Interface):
             uninstalled dataset will be left unexpanded because no subdatasets
             will be installed for a dry run.""",
             constraints=EnsureChoice(None, "basic", "command")),
+        jobs=jobs_opt
     )
+    _params_['jobs']._doc += """\
+        NOTE: This option can only parallelize input retrieval (get) and output
+        recording (save). DataLad does NOT parallelize your scripts for you.
+    """
 
     @staticmethod
     @datasetmethod(name='run')
     @eval_results
     def __call__(
             cmd=None,
+            *,
             dataset=None,
             inputs=None,
             outputs=None,
@@ -266,7 +285,8 @@ class Run(Interface):
             explicit=False,
             message=None,
             sidecar=None,
-            dry_run=None):
+            dry_run=None,
+            jobs=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
@@ -274,7 +294,8 @@ class Run(Interface):
                              explicit=explicit,
                              message=message,
                              sidecar=sidecar,
-                             dry_run=dry_run):
+                             dry_run=dry_run,
+                             jobs=jobs):
             yield r
 
     @staticmethod
@@ -288,7 +309,7 @@ class Run(Interface):
             else:
                 raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
         else:
-            default_result_renderer(res)
+            generic_result_renderer(res)
 
 
 def _display_basic(res):
@@ -404,7 +425,7 @@ def _install_and_reglob(dset_path, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset_path, inputs, extra_inputs=None):
+def prepare_inputs(dset_path, inputs, extra_inputs=None, jobs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -438,7 +459,7 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None):
                     message=("Input did not match existing file: %s",
                              miss))
         yield from get(dataset=dset_path, path=gp.expand_strict(),
-                       on_failure="ignore")
+                       on_failure="ignore", jobs=jobs)
 
 
 def _unlock_or_remove(dset_path, paths):
@@ -583,7 +604,7 @@ def _execute_command(command, pwd, expected_exit=None):
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
-                dry_run=False,
+                dry_run=False, jobs=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -676,7 +697,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     [] if assume_ready in ["inputs", "both"] else inputs,
                     # Ignore --assume-ready for extra_inputs. It's an unexposed
                     # implementation detail that lets wrappers sneak in inputs.
-                    extra_inputs):
+                    extra_inputs=extra_inputs,
+                    jobs=jobs):
                 yield res
 
             if assume_ready not in ["outputs", "both"]:
@@ -797,13 +819,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
-            msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
-            with open(msg_path, "wb") as ofh:
-                ofh.write(ensure_bytes(msg))
+            msg_path = repo.dot_git / "COMMIT_EDITMSG"
+            msg_path.write_text(msg)
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -d . -r -F %s'",
-                     msg_path)
+                     # shorten to the relative path for a more concise message
+                     msg_path.relative_to(ds.pathobj))
+            if repo.dirty and not explicit:
+                # Give clean-up hints if a formerly clean repo is left dirty
+                lgr.info(
+                    "The commands 'git clean -di' and/or 'git reset' "
+                    "could be used to get to a clean dataset state again. "
+                    "Consult their man pages for more information."
+                )
         raise exc
     elif do_save:
         with chpwd(pwd):
@@ -812,5 +841,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     path=outputs_to_save,
                     recursive=True,
                     message=msg,
+                    jobs=jobs,
                     return_type='generator'):
                 yield r

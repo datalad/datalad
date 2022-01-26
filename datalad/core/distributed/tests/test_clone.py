@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -72,10 +72,8 @@ from datalad.tests.utils import (
     skip_ssh,
     slow,
     swallow_logs,
-    use_cassette,
     with_sameas_remote,
     with_tempfile,
-    with_testrepos,
     with_tree,
     SkipTest,
 )
@@ -124,7 +122,6 @@ def test_invalid_args(path, otherpath, alienpath):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir, ds_path):
@@ -143,7 +140,6 @@ def test_clone_crcns(tdir, ds_path):
 
 @integration
 @skip_if_no_network
-@use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir):
     tdir = Path(tdir)
@@ -169,9 +165,8 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
-@with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-def test_clone_simple_local(src, path):
+def check_clone_simple_local(src, path):
     origin = Dataset(path)
 
     # now install it somewhere else
@@ -187,14 +182,20 @@ def test_clone_simple_local(src, path):
         ok_(not isinstance(ds.repo, AnnexRepo))
         ok_(GitRepo.is_valid_repo(ds.path))
         eq_(set(ds.repo.get_indexed_files()),
-            {'test.dat', 'INFO.txt'})
+            {'test.dat', 'INFO.txt', '.noannex',
+             str(Path('.datalad', 'config'))})
         assert_repo_status(path, annex=False)
     else:
         # must be an annex
         ok_(isinstance(ds.repo, AnnexRepo))
         ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
         eq_(set(ds.repo.get_indexed_files()),
-            {'test.dat', 'INFO.txt', 'test-annex.dat'})
+            {'test.dat',
+             'INFO.txt',
+             'test-annex.dat',
+             str(Path('.datalad', 'config')),
+             str(Path('.datalad', '.gitattributes')),
+             '.gitattributes'})
         assert_repo_status(path, annex=True)
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
@@ -212,12 +213,29 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_clone_simple_local(src, url):
+    srcobj = Path(src)
+    gitds = Dataset(srcobj / 'git').create(annex=False)
+    annexds = Dataset(srcobj/ 'annex').create(annex=True)
+    (annexds.pathobj / "test-annex.dat").write_text('annexed content')
+    annexds.save()
+    for ds in (gitds, annexds):
+        (ds.pathobj / 'test.dat').write_text('content')
+        (ds.pathobj / 'INFO.txt').write_text('content2')
+        ds.save(to_git=True)
+        ds.repo.call_git(["update-server-info"])
+    check_clone_simple_local(gitds.path)
+    check_clone_simple_local(gitds.pathobj)
+    check_clone_simple_local(f'{url}git')
+    check_clone_simple_local(annexds.path)
+    check_clone_simple_local(annexds.pathobj)
+    check_clone_simple_local(f'{url}annex')
 
-# AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
-@known_failure_githubci_win
-@with_testrepos(flavors=['local-url', 'network', 'local'])
+
 @with_tempfile
-def test_clone_dataset_from_just_source(url, path):
+def check_clone_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = clone(url, result_xfm='datasets', return_type='item-or-list')
 
@@ -226,6 +244,18 @@ def test_clone_dataset_from_just_source(url, path):
     ok_(GitRepo.is_valid_repo(ds.path))
     assert_repo_status(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
+
+
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_clone_dataset_from_just_source(src, url):
+    ds = Dataset(src).create()
+    (ds.pathobj / 'INFO.txt').write_text('content')
+    ds.save()
+    ds.repo.call_git(["update-server-info"])
+    check_clone_dataset_from_just_source(ds.path)
+    check_clone_dataset_from_just_source(ds.pathobj)
+    check_clone_dataset_from_just_source(url)
 
 
 # test fails randomly, likely a bug in one of the employed test helpers
@@ -264,8 +294,8 @@ def test_clone_isnot_recursive(path_src, path_nr, path_r):
     # check nothing is unintentionally installed
     subdss = ds.subdatasets(recursive=True)
     assert_result_count(subdss, len(subdss), state='absent')
-    # this also means, subdatasets to be listed as not fulfilled:
-    eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
+    # this also means, subdatasets to be listed as absent:
+    eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
         {'subm 1', '2'})
 
 
@@ -282,7 +312,7 @@ def test_clone_into_dataset(source_path, top_path):
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
-    assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_in('sub', ds.subdatasets(state='present', result_xfm='relpaths'))
     # sub is clean:
     assert_repo_status(subds.path, annex=None)
     # top is clean:
@@ -309,6 +339,24 @@ def test_clone_into_dataset(source_path, top_path):
     eq_(subds_.pathobj, ds.pathobj / "sub2")  # for paranoid yoh ;)
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
+    # don't do anything to the dataset, when cloning fails (gh-6138)
+    create_tree(ds.path, {'subdir': {'dummy2.txt': 'whatever'}})
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
+    results = ds.clone(source, "subdir",
+                       result_xfm=None,
+                       return_type='list',
+                       on_failure='ignore')
+    assert_in_results(results, status='error')
+    # status unchanged
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    # nothing was committed
+    eq_(hexsha_before, ds.repo.get_hexsha(DEFAULT_BRANCH))
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -323,8 +371,8 @@ def test_notclone_known_subdataset(src_path, path):
     # subdataset not installed:
     subds = Dataset(ds.pathobj / 'subm 1')
     assert_false(subds.is_installed())
-    assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
     # clone is not meaningful
     res = ds.clone('subm 1', on_failure='ignore')
     assert_status('error', res)
@@ -338,8 +386,8 @@ def test_notclone_known_subdataset(src_path, path):
     # Verify that it is the correct submodule installed and not
     # new repository initiated
     eq_(subds.id, sub_id)
-    assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
 
 
 @with_tempfile(mkdir=True)
@@ -719,7 +767,7 @@ def test_decode_source_spec():
             'localhost/another/path',
             'user@someho.st/mydir',
             'ssh://somewhe.re/else',
-            'git://github.com/datalad/testrepo--basic--r1',
+            'https://github.com/datalad/testrepo--basic--r1',
     ):
         props = decode_source_spec(url)
         dest = props.pop('default_destpath')
@@ -986,7 +1034,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     eq_(len(sds), 1)
     eq_(sds[0]['gitmodule_datalad-url'], ria_url)
     assert_repo_status(ds.path)
-    ds.uninstall('sub', check=False)
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     assert_repo_status(ds.path)
 
     # .gitmodules still there:
@@ -1066,7 +1114,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
     url2 = "ria+{}".format(get_local_file_url(str(storepath2)))
     for d in (ds, subds, subgit):
         create_ds_in_store(io, storepath2, d.id, '2', '1')
-        d.create_sibling_ria(url2, "anotherstore")
+        d.create_sibling_ria(url2, "anotherstore", new_store_ok=True)
         d.push('.', to='anotherstore', data='nothing')
         store2_loc, _, _ = get_layout_locations(1, storepath2, d.id)
         Runner(cwd=str(store2_loc)).run(['git', 'update-server-info'])
@@ -1084,7 +1132,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
         # TODO: create-sibling-ria required for config! => adapt to RF'd
         #       creation (missed on rebase?)
         create_ds_in_store(io, storepath, d.id, '2', '1')
-        d.create_sibling_ria(upl_url, "store")
+        d.create_sibling_ria(upl_url, "store", new_store_ok=True)
 
         if d is not subgit:
             # Now, simulate the problem by reconfiguring the special remote to
@@ -1171,7 +1219,8 @@ def test_no_ria_postclonecfg(dspath, storepath, clonepath):
     file_url = "ria+{}".format(get_local_file_url(str(storepath)))
     ssh_url = "ria+ssh://datalad-test:{}".format(storepath.as_posix())
     ds.create_sibling_ria(file_url, "teststore",
-                          push_url=ssh_url, alias="testds")
+                          push_url=ssh_url, alias="testds",
+                          new_store_ok=True)
     ds.push('.', to='teststore')
 
     # Now clone via SSH. Should not reconfigure although `url` doesn't match the
@@ -1230,7 +1279,7 @@ def test_ria_postclone_noannex(dspath, storepath, clonepath):
     create_store(io, storepath, '1')
     lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
     create_ds_in_store(io, storepath, ds.id, '2', '1')
-    ds.create_sibling_ria(lcl_url, "store")
+    ds.create_sibling_ria(lcl_url, "store", new_store_ok=True)
     ds.push('.', to='store')
 
 
@@ -1553,9 +1602,9 @@ def test_fetch_git_special_remote(url_path, url, path):
 def test_nonuniform_adjusted_subdataset(path):
     # https://github.com/datalad/datalad/issues/5107
     topds = Dataset(Path(path) / "top").create()
-    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    subds_url = 'https://github.com/datalad/testrepo--basic--r1'
     topds.clone(
-        source='git://github.com/datalad/testrepo--basic--r1',
+        source='https://github.com/datalad/testrepo--basic--r1',
         path='subds')
     eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
         subds_url)
@@ -1582,6 +1631,27 @@ def test_clone_recorded_subds_reset(path):
 
 
 @with_tempfile
+def test_clone_git_clone_opts(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a", annex=False)
+
+    repo_a = ds_a.repo
+    repo_a.commit(msg="c1", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
+    repo_a.commit(msg="c2", options=["--allow-empty"])
+    repo_a.tag("atag")
+
+    ds_b = clone(ds_a.path, path / "ds_b",
+                 git_clone_opts=[f"--branch={DEFAULT_BRANCH}",
+                                 "--single-branch", "--no-tags"])
+    repo_b = ds_b.repo
+    eq_(repo_b.get_active_branch(), DEFAULT_BRANCH)
+    eq_(set(x["refname"] for x in repo_b.for_each_ref_(fields="refname")),
+        {f"refs/heads/{DEFAULT_BRANCH}",
+         f"refs/remotes/{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"})
+
+
+@with_tempfile
 @with_tempfile
 def test_clone_url_mapping(src_path, dest_path):
     src = create(src_path)
@@ -1590,7 +1660,7 @@ def test_clone_url_mapping(src_path, dest_path):
     assert_raises(IncompleteResultsError, clone, 'rambo', dest_path)
     # rather than adding test URL mapping here, consider
     # test_url_mapping_specs(), it is cheaper there
-  
+
     # anticipate windows test paths and escape them
     escaped_subst = (r',rambo,%s' % src_path).replace('\\', '\\\\')
     for specs in (
@@ -1605,7 +1675,7 @@ def test_clone_url_mapping(src_path, dest_path):
             with patch.dict(dest.config._merged_store, specs):
                 clone('rambo', dest_path)
         finally:
-            dest.remove(check=False)
+            dest.drop(what='all', reckless='kill', recursive=True)
 
     # check submodule config impact
     dest.create()

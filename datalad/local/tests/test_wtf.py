@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -20,7 +20,7 @@ from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
 )
-from datalad.version import __version__
+from datalad import __version__
 
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (

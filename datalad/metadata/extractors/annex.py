@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -61,7 +61,7 @@ class MetadataExtractor(BaseMetadataExtractor):
                 increment=True)
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
                     for k, v in meta.items()}
-            key = repo.get_file_key(file, batch=True)
+            key = repo.get_file_annexinfo(file).get('key')
             if key:
                 meta['key'] = key
             yield (file, meta)

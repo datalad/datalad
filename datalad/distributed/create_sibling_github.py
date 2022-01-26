@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -128,6 +128,21 @@ class CreateSiblingGithub(Interface):
     In order to be able to use this command, a personal access token has to be
     generated on the platform (Account->Settings->Developer Settings->Personal
     access tokens->Generate new token).
+
+    .. versionchanged:: 0.16
+       || REFLOW >>
+       The API has been aligned with the some
+       ``create_sibling_...||create-sibling-...`` commands of other GitHub-like
+       services, such as GOGS, GIN, GitTea.<< REFLOW ||
+
+    .. deprecated:: 0.16
+       The ``dryrun||--dryrun`` option will be removed in a future release, use
+       the renamed ``dry_run||--dry-run`` option instead.
+       The ``github_login||--github-login`` option will be removed in a future
+       release, use the ``credential||--credential`` option instead.
+       The ``github_organization||--github-organization`` option will be
+       removed in a future release, prefix the reposity name with ``<org>/``
+       instead.
     """
 
     _examples_ = [
@@ -193,8 +208,8 @@ class CreateSiblingGithub(Interface):
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
-            doc="""Deprecated. Use the renamed
-            [CMD: --dry-run CMD][PY: `dry_run` PY] parameter"""),
+            doc="""Deprecated. Use the renamed ``dry_run||--dry-run``
+            parameter"""),
     )
 
     @staticmethod
@@ -202,6 +217,7 @@ class CreateSiblingGithub(Interface):
     @eval_results
     def __call__(
             reponame,
+            *,
             dataset=None,
             recursive=False,
             recursion_limit=None,

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -62,7 +62,6 @@ def _test_bare_git_version_1(host, dspath, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
@@ -125,15 +124,15 @@ def _test_bare_git_version_1(host, dspath, store):
     assert_result_count(fsck_res,
                         1,
                         status='error',
-                        message='** Based on the location log, one.txt\n'
-                                '** was expected to be present, '
-                                'but its content is missing.')
+                        error_message='** Based on the location log, one.txt\n'
+                                      '** was expected to be present, '
+                                      'but its content is missing.')
     assert_result_count(fsck_res,
                         1,
                         status='error',
-                        message='** Based on the location log, subdir/two\n'
-                                '** was expected to be present, '
-                                'but its content is missing.')
+                        error_message='** Based on the location log, subdir/two\n'
+                                      '** was expected to be present, '
+                                      'but its content is missing.')
     eq_(len(ds.repo.whereis('one.txt')), 1)
     # and the other way around: upload via ora-remote and have it available via
     # git-remote:
@@ -170,7 +169,6 @@ def _test_bare_git_version_2(host, dspath, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
@@ -226,11 +224,11 @@ def _test_bare_git_version_2(host, dspath, store):
     assert_result_count(fsck_res,
                         1,
                         status='error',
-                        message='** Based on the location log, one.txt\n'
-                                '** was expected to be present, '
-                                'but its content is missing.')
-    assert_result_count(fsck_res, 1, status='ok')
-    eq_(len(fsck_res), 2)
+                        error_message='** Based on the location log, one.txt\n'
+                                      '** was expected to be present, '
+                                      'but its content is missing.')
+    assert_result_count(fsck_res, 3, status='ok')
+    eq_(len(fsck_res), 4)
     eq_(len(ds.repo.whereis('one.txt')), 1)
 
 
@@ -268,7 +266,6 @@ def test_bare_git_version_2():
 #
 #     ds = create(origin)
 #     populate_dataset(ds)
-#     ds.save()
 #     assert_repo_status(ds.path)
 #
 #     # add the ria remote:

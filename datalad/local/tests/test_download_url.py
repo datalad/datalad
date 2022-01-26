@@ -1,12 +1,12 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Tests for install-dataset command
+"""Tests for download-url command
 
 """
 
@@ -15,36 +15,33 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
-from ...api import (
+from datalad.api import (
+    Dataset,
     clone,
     download_url,
-    Dataset,
 )
-from ...utils import (
-    chpwd,
-    Path,
-)
-from ...downloaders.tests.utils import get_test_providers
-from ...tests.utils import (
+from datalad.tests.utils import (
+    DEFAULT_REMOTE,
     assert_cwd_unchanged,
     assert_false,
     assert_in,
+    assert_in_results,
     assert_message,
+    assert_not_in,
     assert_result_count,
+    create_tree,
     eq_,
     ok_,
     ok_exists,
-    with_tempfile,
-)
-from ...tests.utils import (
-    DEFAULT_REMOTE,
-    assert_in_results,
-    assert_not_in,
-    known_failure_windows,
     serve_path_via_http,
     skip_if_no_network,
     slow,
+    with_tempfile,
     with_tree,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
 )
 
 
@@ -68,6 +65,8 @@ def test_download_url_exceptions():
         'Temporary failure in name resolution' in msg
         or
         'Name or service not known' in msg  # nd80
+        or
+        'Failed to establish a new session' in msg  # Debian sid @ 20220121
     ):
         assert_in('http://example.com/bogus', msg)
 
@@ -83,7 +82,6 @@ def test_download_url_existing_dir_no_slash_exception(path):
                        res)
 
 
-@known_failure_windows
 @assert_cwd_unchanged
 @with_tree(tree=[
     ('file1.txt', 'abc'),
@@ -195,6 +193,16 @@ def test_download_url_archive(toppath, topurl, path):
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
                   ds.repo.format_commit("%B"))
+    # we should yield an impossible from add archive content when there is
+    # untracked content (gh-#6170)
+    create_tree(ds.path, {'this': 'dirty'})
+    assert_in_results(
+        ds.download_url([topurl + "archive.tar.gz"], archive=True,
+                        on_failure='ignore'),
+        status='impossible',
+        action='add-archive-content',
+        message='clean dataset required. Use `datalad status` to inspect '
+                'unsaved changes')
 
 
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})

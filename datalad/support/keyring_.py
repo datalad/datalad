@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -80,7 +80,7 @@ class Keyring(object):
         if field is None:
             raise NotImplementedError("Deletion of all fields associated with a name")
         try:
-            return self.__keyring.delete_password(self._get_service_name(name), field)
+            return self._keyring.delete_password(self._get_service_name(name), field)
         except self.__keyring_mod.errors.PasswordDeleteError as exc:
             if 'not found' in str(exc):
                 return

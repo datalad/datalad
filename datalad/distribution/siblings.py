@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -22,7 +22,6 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.distribution.update import Update
-from datalad.dochelpers import exc_str
 from datalad.downloaders.credentials import UserPassword
 from datalad.interface.base import (
     Interface,
@@ -43,7 +42,7 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     eval_results,
 )
 from datalad.support.annexrepo import AnnexRepo
@@ -56,6 +55,7 @@ from datalad.support.constraints import (
 from datalad.support.exceptions import (
     AccessDeniedError,
     AccessFailedError,
+    CapturedException,
     CommandError,
     DownloadError,
     InsufficientArgumentsError,
@@ -206,6 +206,7 @@ class Siblings(Interface):
     @eval_results
     def __call__(
             action='query',
+            *,
             dataset=None,
             name=None,
             url=None,
@@ -297,7 +298,7 @@ class Siblings(Interface):
 
         subds_pushurl = None
         for subds in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
             subds_repo = subds.repo
@@ -332,7 +333,7 @@ class Siblings(Interface):
             )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
-            default_result_renderer(res)
+            generic_result_renderer(res)
             return
         path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
@@ -563,6 +564,7 @@ def _configure_remote(
                         store=False):
                     repo.enable_remote(name)
             except (CommandError, DownloadError) as exc:
+                ce = CapturedException(exc)
                 # TODO yield
                 # this is unlikely to ever happen, now done for AnnexRepo
                 # instances only
@@ -574,7 +576,7 @@ def _configure_remote(
                     "Could not enable annex remote %s. This is expected if %s "
                     "is a pure Git remote, or happens if it is not accessible.",
                     name, name)
-                lgr.debug("Exception was: %s", exc_str(exc))
+                lgr.debug("Exception was: %s", ce)
 
             if as_common_datasrc:
                 # we need a fully configured remote here

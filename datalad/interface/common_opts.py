@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.results import known_result_xfms
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureBool,
     EnsureCallable,
     EnsureChoice,
     EnsureInt,
@@ -34,13 +35,43 @@ location_description = Parameter(
 recursion_flag = Parameter(
     args=("-r", "--recursive",),
     action="store_true",
-    doc="""if set, recurse into potential subdataset""")
+    doc="""if set, recurse into potential subdatasets""")
 
 recursion_limit = Parameter(
     args=("-R", "--recursion-limit",),
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
-    doc="""limit recursion into subdataset to the given number of levels""")
+    doc="""limit recursion into subdatasets to the given number of levels""")
+
+contains = Parameter(
+    args=('--contains',),
+    metavar='PATH',
+    action='append',
+    doc="""limit to the subdatasets containing the
+    given path. If a root path of a subdataset is given, the last
+    considered dataset will be the subdataset itself.[CMD:  This
+    option can be given multiple times CMD][PY:  Can be a list with
+    multiple paths PY], in which case datasets that
+    contain any of the given paths will be considered.""",
+    constraints=EnsureStr() | EnsureNone())
+
+fulfilled = Parameter(
+    args=("--fulfilled",),
+    doc="""DEPRECATED: use [CMD: --state CMD][PY: `state` PY]
+    instead. If given, must be a boolean flag indicating whether
+    to consider either only locally present or absent datasets.
+    By default all subdatasets are considered regardless of their
+    status.""",
+    constraints=EnsureBool() | EnsureNone())
+
+dataset_state = Parameter(
+    args=("--state",),
+    doc="""indicate which (sub)datasets to consider: either only locally present,
+    absent, or any of those two kinds.
+    """,
+    # yoh: intentionally left out the description of default since might be
+    # command specific
+    constraints=EnsureChoice('present', 'absent', 'any'))
 
 shared_access_opt = Parameter(
     args=('--shared-access',),
@@ -139,8 +170,9 @@ reckless_opt = Parameter(
     EnsureChoice(None, True, False, 'auto', 'ephemeral') | \
     EnsureStrPrefix('shared-'),
     metavar='auto|ephemeral|shared-...',
-    doc="""set up the dataset in a potentially unsafe way for performance,
-    or access reasons -- use with care, any dataset is marked as 'untrusted'.
+    doc="""Obtain a dataset or subdatset and set it up in a potentially 
+    unsafe way for performance, or access reasons. 
+    Use with care, any dataset is marked as 'untrusted'.
     The reckless mode is stored in a dataset's local configuration under
     'datalad.clone.reckless', and will be inherited to any of its subdatasets.
     Supported modes are:
@@ -151,10 +183,10 @@ reckless_opt = Parameter(
     w/o git-annex being aware of it. In case of a change in origin you need to
     update the clone before you're able to save new content on your end.
     Alternative to 'auto' when hardlinks are not an option, or number of consumed
-    inodes needs to be minimized. Please note, that this is meant to be used
-    with either non-bare repositories or a RIA store as origin! Do not come up
-    with your own usecase unless you are absolutely sure you know your git-annex 
-    internals very well!
+    inodes needs to be minimized. Note that this mode can only be used with clones from
+    non-bare repositories or a RIA store! Otherwise two different annex object tree
+    structures (dirhashmixed vs dirhashlower) will be used simultaneously, and annex keys
+    using the respective other structure will be inaccessible.
     ['shared-<mode>']: set up repository and annex permission to enable multi-user
     access. This disables the standard write protection of annex'ed files.
     <mode> can be any value support by 'git init --shared=', such as 'group', or
@@ -324,8 +356,23 @@ eval_params = dict(
         given.""",
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
     result_renderer=Parameter(
-        doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
+        doc="""select rendering mode command results.
+        'tailored' enables a command-specific rendering style that is typically
+        tailored to human consumption, if there is one for a specific
+        command, or otherwise falls back on the the 'generic' result renderer;
+        'generic' renders each result in one line  with key info like action,
+        status, path, and an optional message);
+        'json' a complete JSON line serialization of the full result record;
+        'json_pp' like 'json', but pretty-printed spanning multiple lines;
+        'disabled' turns off result rendering entirely;
+        '<template>' reports any value(s) of any result properties in any
+        format indicated by the template (e.g. '{path}', compare with JSON
+        output for all key-value choices). The template syntax follows the
+        Python "format() language". It is possible to report individual
+        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
+        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the
+        template, like so: '{metadata[music#Genre]}'.""",
+        default='tailored'),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an

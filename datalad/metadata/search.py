@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -46,10 +46,12 @@ from datalad.utils import (
     shortened_repr,
     unicode_srctypes,
 )
-from datalad.support.exceptions import NoDatasetFound
+from datalad.support.exceptions import (
+    CapturedException,
+    NoDatasetFound,
+)
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
-from datalad.dochelpers import exc_str
 from datalad.metadata.metadata import query_aggregated_metadata
 
 # TODO: consider using plain as_unicode, without restricting
@@ -202,7 +204,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                             'Failed to load indexer %s (%s): %s',
                             indexer.name,
                             str(indexer.dist),
-                            exc_str(e))
+                            CapturedException(e))
         lgr.debug(
             'Falling back to standard indexer for metadata format: %s',
             metadata_format_name)
@@ -426,7 +428,7 @@ class _WhooshSearch(_Search):
                 # we try to regenerate
                 lgr.warning(
                     "Cannot open existing index %s (%s), will regenerate",
-                    index_dir, exc_str(e)
+                    index_dir, CapturedException(e)
                 )
             except widx.IndexVersionError as e:  # (msg, version, release=None)
                 # Raised when you try to open an index using a format that the
@@ -434,7 +436,7 @@ class _WhooshSearch(_Search):
                 # you're trying to open is either not backward or forward
                 # compatible with this version of Whoosh.
                 # we try to regenerate
-                lgr.warning(exc_str(e))
+                lgr.warning(CapturedException(e))
                 pass
             except widx.OutOfDateError as e:
                 # Raised when you try to commit changes to an index which is not
@@ -450,7 +452,7 @@ class _WhooshSearch(_Search):
                 if 'unsupported pickle protocol' in str(e):
                     lgr.warning(
                         "Cannot open existing index %s (%s), will regenerate",
-                        index_dir, exc_str(e)
+                        index_dir, CapturedException(e)
                     )
                 else:
                     raise
@@ -1305,6 +1307,7 @@ class Search(Interface):
     @datasetmethod(name='search')
     @eval_results
     def __call__(query=None,
+                 *,
                  dataset=None,
                  force_reindex=False,
                  max_nresults=None,

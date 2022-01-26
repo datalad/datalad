@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -22,9 +22,14 @@ import warnings
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
+from datalad import __version__
 from ..cmd import WitlessRunner as Runner
-from ..interface.common_opts import eval_defaults
+from ..interface.common_opts import (
+    eval_defaults,
+    eval_params,
+)
 from ..log import is_interactive
+from datalad.support.exceptions import CapturedException
 from ..ui.utils import get_console_width
 from ..utils import (
     ensure_unicode,
@@ -32,10 +37,8 @@ from ..utils import (
     unlink,
     get_suggestions_msg,
 )
-from ..version import __version__, __full_version__
-from ..dochelpers import exc_str
 
-from appdirs import AppDirs
+from platformdirs import AppDirs
 from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -77,7 +80,8 @@ class HelpAction(argparse.Action):
                     shell=True)
                 sys.exit(0)
             except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
-                lgr.debug("Did not use manpage since %s", exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Did not use manpage since %s", ce)
         if option_string == '-h':
             usage = parser.format_usage()
             ucomps = re.match(
@@ -103,7 +107,7 @@ class HelpAction(argparse.Action):
         # better for help2man
         # for main command -- should be different sections. And since we are in
         # heavy output massaging mode...
-        if "commands for dataset operations" in helpstr.lower():
+        if "essential commands" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
             # tune up usage -- default one is way too heavy
@@ -116,7 +120,8 @@ class HelpAction(argparse.Action):
         else:
             opt_args_str = "*Options*"
             pos_args_str = "*Arguments*"
-        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
+        # in python 3.10 it switched from "optional arguments" to "options"
+        helpstr = re.sub(r'(optional arguments|options):', opt_args_str, helpstr)
         helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
@@ -239,25 +244,15 @@ def parser_add_common_options(parser, version=None):
     # and a different default: in Python API we have None as default and do not render
     # the results but return them.  In CLI we default to "default" renderer
     parser.add_argument(
-        '-f', '--output-format', dest='common_output_format',
+        # this should really have --result-renderer for homogeneity with the
+        # Python API, but adding it in addition makes the help output
+        # monsterous
+        '-f', '--output-format', # '--result-renderer',
+        dest='common_result_renderer',
         default='tailored',
         type=ensure_unicode,
-        metavar="{default,json,json_pp,tailored,'<template>'}",
-        help="""select format for returned command results. 'tailored'
-        enables a command-specific rendering style that is typically
-        tailored to human consumption, if there is one for a specific
-        command, or otherwise falls back on the the 'default' output
-        format (this is the standard behavior); 'default' give one line
-        per result reporting action, status, path and an optional message;
-        'json' renders a JSON object with all properties for each result (one per
-        line); 'json_pp' pretty-prints JSON spanning multiple lines;
-        '<template>' reports any value(s) of any result properties in any format
-        indicated by the template (e.g. '{path}'; compare with JSON
-        output for all key-value choices). The template syntax follows the Python
-        "format() language". It is possible to report individual
-        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
-        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the template,
-        like so: '{metadata[music#Genre]}'. [Default: '%(default)s']""")
+        metavar="{generic,json,json_pp,tailored,disabled,'<template>'}",
+        help=eval_params['result_renderer']._doc + " [Default: '%(default)s']")
     parser.add_argument(
         '--report-status', dest='common_report_status',
         choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
@@ -317,6 +312,10 @@ def get_repo_instance(path=os.curdir, class_=None):
     returns an instance representing it. May also check for a certain type
     instead of detecting the type of repository.
 
+    .. deprecated:: 0.16
+       Use the pattern `Dataset(get_dataset_root(path)).repo` instead. This
+       function will be removed in a future release.
+
     Parameters
     ----------
     path: str
@@ -329,15 +328,15 @@ def get_repo_instance(path=os.curdir, class_=None):
     ------
     RuntimeError, in case cwd is not inside a known repository.
     """
+    warnings.warn("get_repo_instance() was deprecated in 0.16. "
+                  "It will be removed in a future release.",
+                  DeprecationWarning)
 
-    from os.path import ismount, exists, normpath, isabs
-    from datalad.support.exceptions import InvalidGitRepositoryError
-    from ..utils import expandpath
-    from ..support.gitrepo import GitRepo
-    from ..support.annexrepo import AnnexRepo
+    from datalad.utils import get_dataset_root
+    from datalad.distribution.dataset import Dataset
+    from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.gitrepo import GitRepo
 
-    dir_ = expandpath(path)
-    abspath_ = path if isabs(path) else dir_
     if class_ is not None:
         if class_ == AnnexRepo:
             type_ = "annex"
@@ -345,34 +344,15 @@ def get_repo_instance(path=os.curdir, class_=None):
             type_ = "git"
         else:
             raise RuntimeError("Unknown class %s." % str(class_))
-
-    while not ismount(dir_):  # TODO: always correct termination?
-        if exists(opj(dir_, '.git')):
-            # found git dir
-            if class_ is None:
-                # detect repo type:
-                try:
-                    return AnnexRepo(dir_, create=False)
-                except RuntimeError as e:
-                    pass
-                try:
-                    return GitRepo(dir_, create=False)
-                except InvalidGitRepositoryError as e:
-                    raise RuntimeError("No datalad repository found in %s" %
-                                       abspath_)
-            else:
-                try:
-                    return class_(dir_, create=False)
-                except (RuntimeError, InvalidGitRepositoryError) as e:
-                    raise RuntimeError("No %s repository found in %s." %
-                                       (type_, abspath_))
-        else:
-            dir_ = normpath(opj(dir_, ".."))
-
-    if class_ is not None:
-        raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
-        raise RuntimeError("No datalad repository found in %s" % abspath_)
+        type_ = ''
+
+    dsroot = get_dataset_root(path)
+    if not dsroot:
+        raise RuntimeError(f"No {type_}s repository found at {path}.")
+
+    return Dataset(dsroot).repo
+
 
 #
 # Some logic modules extracted from main.py to de-spagetify
@@ -408,9 +388,10 @@ def _maybe_get_single_subparser(cmdlineargs, parser, interface_groups,
                 msg="too few arguments, run with --help or visit https://handbook.datalad.org",
                 exit_code=2)
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
-                  __full_version__, parsed_args, unparsed_args)
+                  __version__, parsed_args, unparsed_args)
     except Exception as exc:
-        lgr.debug("Early parsing failed with %s", exc_str(exc))
+        ce = CapturedException(exc)
+        lgr.debug("Early parsing failed with %s", ce)
         need_single_subparser = False
         unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
     # First unparsed could be either unknown option to top level "datalad"
@@ -534,7 +515,8 @@ def add_entrypoints_to_interface_groups(interface_groups):
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
-            lgr.warning('Failed to load entrypoint %s: %s', ep.name, exc_str(e))
+            ce = CapturedException(ce)
+            lgr.warning('Failed to load entrypoint %s: %s', ep.name, ce)
             continue
 
 

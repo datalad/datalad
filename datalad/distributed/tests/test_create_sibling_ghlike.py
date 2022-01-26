@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,7 +26,6 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     eq_,
-    skip_if_no_network,
     with_tempfile,
 )
 
@@ -47,7 +46,7 @@ def test_invalid_call(path):
 
     # conflicting sibling name
     ds.siblings('add', name='gin', url='http://example.com',
-                result_renderer=None)
+                result_renderer='disabled')
     res = ds.create_sibling_gin(
         'bogus', name='gin', credential='some', on_failure='ignore',
         dry_run=True)
@@ -94,13 +93,14 @@ def test_dryrun(path):
     eq_(res[-1]['request_data']['name'], 'bogus-subds')
 
     # ignore unavailable datasets
-    ds.uninstall('subds')
+    ds.drop('subds', what='all', reckless='kill', recursive=True)
     res = ds.create_sibling_gin(
         'bogus', recursive=True, credential='some', dry_run=True)
     eq_(len(res), 1)
 
 
-def check4real(testcmd, testdir, credential, api, delete_endpoint):
+def check4real(testcmd, testdir, credential, api, delete_endpoint,
+            access_protocol='https', moretests=None):
     token_var = f'DATALAD_CREDENTIAL_{credential.upper()}_TOKEN'
     if token_var not in os.environ:
         raise SkipTest(f'No {credential} access token available')
@@ -123,6 +123,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
             api=api,
             credential=credential,
             name='ghlike-sibling',
+            access_protocol=access_protocol,
         )
         assert_in_results(
             res,
@@ -137,9 +138,10 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
             name='ghlike-sibling',
         )
         # now do it again
-        ds.siblings('remove', name='ghlike-sibling', result_renderer=None)
+        ds.siblings('remove', name='ghlike-sibling', result_renderer='disabled')
         res = testcmd(
             reponame, dataset=ds, api=api, credential=credential,
+            access_protocol=access_protocol,
             on_failure='ignore')
         assert_result_count(res, 1)
         assert_in_results(
@@ -151,6 +153,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
         # existing=skip must not "fix" this:
         # https://github.com/datalad/datalad/issues/5941
         res = testcmd(reponame, dataset=ds, api=api, existing='skip',
+                      access_protocol=access_protocol,
                       credential=credential, on_failure='ignore')
         assert_result_count(res, 1)
         assert_in_results(
@@ -160,6 +163,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
         )
         # but existing=reconfigure does
         res = testcmd(reponame, dataset=ds, api=api, existing='reconfigure',
+                      access_protocol=access_protocol,
                       credential=credential)
         assert_result_count(res, 2)
         assert_in_results(
@@ -172,6 +176,8 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint):
             action='configure-sibling',
             status='ok',
         )
+        if moretests:
+            moretests(ds)
     finally:
         token = os.environ[token_var]
         requests.delete(

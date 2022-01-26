@@ -2,8 +2,189 @@
 
 Change log
 **********
+0.15.4 (Thu Dec 16 2021)
+========================
+
+Bug Fix
+-------
+
+-  BF: autorc - replace incorrect releaseTypes with “none”
+   `#6320 <https://github.com/datalad/datalad/pull/6320>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Minor enhancement to CONTRIBUTING.md
+   `#6309 <https://github.com/datalad/datalad/pull/6309>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  UX: If a clean repo is dirty after a failed run, give clean-up hints
+   `#6112 <https://github.com/datalad/datalad/pull/6112>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Stop using distutils
+   `#6113 <https://github.com/datalad/datalad/pull/6113>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  BF: RIARemote - set UI backend to annex to make it interactive
+   `#6287 <https://github.com/datalad/datalad/pull/6287>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+-  Fix invalid escape sequences
+   `#6293 <https://github.com/datalad/datalad/pull/6293>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  CI: Update environment for windows CI builds
+   `#6292 <https://github.com/datalad/datalad/pull/6292>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  bump the python version used for mac os tests
+   `#6288 <https://github.com/datalad/datalad/pull/6288>`__
+   (`@christian-monch <https://github.com/christian-monch>`__
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+-  ENH(UX): log a hint to use ulimit command in case of “Too long”
+   exception `#6173 <https://github.com/datalad/datalad/pull/6173>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Report correct HTTP URL for RIA store content
+   `#6091 <https://github.com/datalad/datalad/pull/6091>`__
+   (`@mih <https://github.com/mih>`__)
+-  BF: Don’t overwrite subdataset source candidates
+   `#6168 <https://github.com/datalad/datalad/pull/6168>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Bump sphinx requirement to bypass readthedocs defaults
+   `#6189 <https://github.com/datalad/datalad/pull/6189>`__
+   (`@mih <https://github.com/mih>`__)
+-  infra: Provide custom prefix to auto-related labels
+   `#6151 <https://github.com/datalad/datalad/pull/6151>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Remove all usage of exc_str()
+   `#6142 <https://github.com/datalad/datalad/pull/6142>`__
+   (`@mih <https://github.com/mih>`__)
+-  BF: obtain information about annex special remotes also from annex
+   journal `#6135 <https://github.com/datalad/datalad/pull/6135>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__
+   `@mih <https://github.com/mih>`__)
+-  BF: clone tried to save new subdataset despite failing to clone
+   `#6140 <https://github.com/datalad/datalad/pull/6140>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+
+Tests
+-----
+
+-  RF+BF: use skip_if_no_module helper instead of try/except for libxmp
+   and boto `#6148 <https://github.com/datalad/datalad/pull/6148>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  git://github.com -> https://github.com
+   `#6134 <https://github.com/datalad/datalad/pull/6134>`__
+   (`@mih <https://github.com/mih>`__)
+
+Authors: 6
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Christian Mnch
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
+0.15.3 (Sat Oct 30 2021)
+========================
+
+.. _bug-fix-1:
+
+Bug Fix
+-------
+
+-  BF: Don’t make create-sibling recursive by default
+   `#6116 <https://github.com/datalad/datalad/pull/6116>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  BF: Add dashes to ‘force’ option in non-empty directory error message
+   `#6078 <https://github.com/datalad/datalad/pull/6078>`__
+   (`@DisasterMo <https://github.com/DisasterMo>`__)
+-  DOC: Add supported URL types to download-url’s docstring
+   `#6098 <https://github.com/datalad/datalad/pull/6098>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  BF: Retain git-annex error messages & don’t show them if operation
+   successful `#6070 <https://github.com/datalad/datalad/pull/6070>`__
+   (`@DisasterMo <https://github.com/DisasterMo>`__)
+-  Remove uses of ``__full_version__`` and ``datalad.version``
+   `#6073 <https://github.com/datalad/datalad/pull/6073>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  BF: ORA shouldn’t crash while handling a failure
+   `#6063 <https://github.com/datalad/datalad/pull/6063>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  DOC: Refine –reckless docstring on usage and wording
+   `#6043 <https://github.com/datalad/datalad/pull/6043>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  BF: archives upon strip - use rmtree which retries etc instead of
+   rmdir `#6064 <https://github.com/datalad/datalad/pull/6064>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: do not leave test in a tmp dir destined for removal
+   `#6059 <https://github.com/datalad/datalad/pull/6059>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Next wave of exc_str() removals
+   `#6022 <https://github.com/datalad/datalad/pull/6022>`__
+   (`@mih <https://github.com/mih>`__)
+
+Pushed to ``maint``
+-------------------
+
+-  CI: Enable new codecov uploader in Appveyor CI
+   (`@adswa <https://github.com/adswa>`__)
+
+Internal
+--------
+
+-  UX: Log clone-candidate number and URLs
+   `#6092 <https://github.com/datalad/datalad/pull/6092>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  UX/ENH: Disable reporting, and don’t do superfluous internal
+   subdatasets calls
+   `#6094 <https://github.com/datalad/datalad/pull/6094>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Update codecov action to v2
+   `#6072 <https://github.com/datalad/datalad/pull/6072>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+
+Documentation
+-------------
+
+-  Design document on URL substitution feature
+   `#6065 <https://github.com/datalad/datalad/pull/6065>`__
+   (`@mih <https://github.com/mih>`__)
+
+.. _tests-1:
+
+Tests
+-----
+
+-  BF(TST): remove reuse of the same tape across unrelated tests
+   `#6127 <https://github.com/datalad/datalad/pull/6127>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Fail Travis tests on deprecation warnings
+   `#6074 <https://github.com/datalad/datalad/pull/6074>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  Ux get result handling broken
+   `#6052 <https://github.com/datalad/datalad/pull/6052>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  enable metalad tests again
+   `#6060 <https://github.com/datalad/datalad/pull/6060>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+
+Authors: 7
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Christian Mnch
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Michael Burgardt (`@DisasterMo <https://github.com/DisasterMo>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.15.2 (Wed Oct 06 2021)
 ========================
+
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -34,6 +215,8 @@ Bug Fix
 -  Discontinue exc_str() in all modern parts of the code base
    `#6007 <https://github.com/datalad/datalad/pull/6007>`__
    (`@mih <https://github.com/mih>`__)
+
+.. _tests-2:
 
 Tests
 -----
@@ -66,7 +249,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -85,11 +268,15 @@ Bug Fix
    `#5983 <https://github.com/datalad/datalad/pull/5983>`__
    (`@mih <https://github.com/mih>`__)
 
+.. _pushed-to-maint-1:
+
 Pushed to ``maint``
 -------------------
 
 -  Discontinue testing of hirni extension
    (`@mih <https://github.com/mih>`__)
+
+.. _internal-1:
 
 Internal
 --------
@@ -98,6 +285,8 @@ Internal
    `#5980 <https://github.com/datalad/datalad/pull/5980>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
+.. _documentation-1:
+
 Documentation
 -------------
 
@@ -105,7 +294,7 @@ Documentation
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-1:
+.. _tests-3:
 
 Tests
 -----
@@ -455,7 +644,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-2:
+.. _tests-4:
 
 Tests
 -----
@@ -469,7 +658,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -516,7 +705,7 @@ Bug Fix
    it for get `#5708 <https://github.com/datalad/datalad/pull/5708>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _pushed-to-maint-1:
+.. _pushed-to-maint-2:
 
 Pushed to ``maint``
 -------------------
@@ -526,7 +715,7 @@ Pushed to ``maint``
 -  RF(BF?)+DOC: provide User-Agent to entire session headers + use those
    if provided (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-1:
+.. _internal-2:
 
 Internal
 --------
@@ -547,7 +736,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-3:
+.. _tests-5:
 
 Tests
 -----
@@ -575,7 +764,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -614,7 +803,7 @@ Bug Fix
    `#5776 <https://github.com/datalad/datalad/pull/5776>`__
    (s.heunis@fz-juelich.de)
 
-.. _internal-2:
+.. _internal-3:
 
 Internal
 --------
@@ -626,7 +815,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-4:
+.. _tests-6:
 
 Tests
 -----
@@ -654,7 +843,7 @@ Authors: 4
 0.14.6 (Sun Jun 27 2021)
 ========================
 
-.. _internal-3:
+.. _internal-4:
 
 Internal
 --------
@@ -675,7 +864,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -756,14 +945,14 @@ Bug Fix
    (`@kyleam <https://github.com/kyleam>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _pushed-to-maint-2:
+.. _pushed-to-maint-3:
 
 Pushed to ``maint``
 -------------------
 
 -  MNT: Post-release dance (`@kyleam <https://github.com/kyleam>`__)
 
-.. _internal-4:
+.. _internal-5:
 
 Internal
 --------
@@ -776,7 +965,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-5:
+.. _tests-7:
 
 Tests
 -----

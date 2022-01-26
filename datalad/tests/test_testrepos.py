@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -40,7 +40,7 @@ def test_having_annex(path):
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):
     ok_('github.com' in url)
-    ok_(url.startswith('git://github.com/datalad/testrepo--'))
+    ok_(url.startswith('https://github.com/datalad/testrepo--'))
 
 @with_testrepos
 @with_tempfile

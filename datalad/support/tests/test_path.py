@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,7 +15,6 @@ from ..path import (
     robust_abspath,
     split_ext,
 )
-from ...dochelpers import exc_str
 from ...utils import (
     chpwd,
     rmtree,
@@ -39,7 +38,7 @@ def test_robust_abspath(tdir):
         except Exception as exc:
             # probably windows or above exception
             raise SkipTest(
-                "Cannot test in current environment: %s" % exc_str(exc))
+                "Cannot test in current environment") from exc
 
         assert_raises(OSError, abspath, curdir)
         eq_(robust_abspath(curdir), tdir)

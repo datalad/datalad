@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -16,15 +16,11 @@ from datalad.tests.utils import (
     assert_in,
     assert_not_in,
     SkipTest,
+    skip_if_no_module
 )
-try:
-    import formatters as fmt
-except ImportError:  # pragma: no cover
-    # must be running from installed version where formatters is not present
-    # These tests can be ran only with formatters, which is outside of the
-    # datalad module space in the root of the sourcebase
-    if not exists('formatters.py'):
-        raise SkipTest
+
+skip_if_no_module('formatters')
+import formatters as fmt
 
 from ..main import setup_parser
 

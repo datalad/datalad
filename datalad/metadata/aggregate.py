@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,8 +26,7 @@ from datalad.consts import (
     DATASET_CONFIG_FILE,
     DATASET_METADATA_FILE,
 )
-from datalad.dochelpers import exc_str
-from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import _minimal_annotate_paths
 from datalad.interface.base import Interface
 from datalad.interface.utils import (
     eval_results,
@@ -68,6 +67,7 @@ from datalad.support.constraints import (
 from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CapturedException
 from datalad.support import json_py
 from datalad.support.path import split_ext
 from datalad.utils import (
@@ -75,6 +75,7 @@ from datalad.utils import (
     all_same,
     ensure_list,
 )
+from datalad.core.local.status import get_paths_by_ds
 
 lgr = logging.getLogger('datalad.metadata.aggregate')
 
@@ -168,17 +169,13 @@ def _the_same_across_datasets(relpath, *dss):
         key = None
         present = True
         if isinstance(repo, AnnexRepo):
-            try:
-                key = repo.get_file_key(relpath)
-            except FileInGitError:
+            annexprops = repo.get_file_annexinfo(
+                relpath, eval_availability=True)
+            if 'key' not in annexprops:
                 continue
-            if not key:
-                raise ValueError(
-                    "Must have got a key, unexpectedly got %r for %s within %s"
-                    % (key, relpath, ds)
-                )
+            key = annexprops['key']
             # For now the rest (e.g. not tracked) remains an error
-            if not repo.file_has_content(relpath):
+            if not annexprops['has_content']:
                 present = False
                 backends.append(repo.get_key_backend(key))
         keys.append(key)
@@ -357,7 +354,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
                 except RuntimeError as exc:
                     # TODO: dedicated test - when meta content changes
                     lgr.debug("For now will just do re-extraction since caught %s",
-                              exc_str(exc))
+                              CapturedException(exc))
             # source one has it, so we might be able to copy it
             # TODO: dedicated test - when it is sufficient to copy we do not re-extract
 
@@ -698,7 +695,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
             # TODO evaluate whether this should be exposed as a switch
             # to run an explicit force-drop prior to calling remove()
             check=False,
-            result_renderer=None, return_type=list)
+            result_renderer='disabled', return_type=list)
         if not objs2add and not refds_path == ds_path:
             # this is not the base dataset, make sure to save removal in the
             # parentds -- not needed when objects get added, as removal itself
@@ -902,6 +899,7 @@ class AggregateMetaData(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             recursive=False,
             recursion_limit=None,
@@ -929,18 +927,17 @@ class AggregateMetaData(Interface):
 
         to_save = []
         to_aggregate = set()
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                path=path,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
+        paths_by_ds, errors = get_paths_by_ds(
+            require_dataset(dataset),
+            dataset,
+            paths=ensure_list(path),
+            subdsroot_mode='super')
+        for ap in _minimal_annotate_paths(
+                paths_by_ds,
+                errors,
                 action='aggregate_metadata',
-                # uninstalled subdatasets could be queried via aggregated metadata
-                # -> no 'error'
-                unavailable_path_status='',
-                nondataset_path_status='error',
-                return_type='generator',
-                on_failure='ignore'):
+                recursive=recursive,
+                recursion_limit=recursion_limit):
             if ap.get('status', None):
                 # this is done
                 yield ap

@@ -13,6 +13,9 @@ subsystems in DataLad.
 .. toctree::
    :maxdepth: 2
 
+   application_vs_library_mode
+   file_url_handling
+   result_records
    dataset_argument
    log_levels
    drop
@@ -20,3 +23,9 @@ subsystems in DataLad.
    miscpatterns
    exception_handling
    credentials
+   url_substitution
+   threaded_runner
+   batched_command
+   standard_parameters
+   pos_vs_kw_parameters
+   docstrings

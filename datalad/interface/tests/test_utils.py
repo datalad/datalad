@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -17,6 +17,8 @@ from os.path import (
     exists,
     join as opj,
 )
+import re
+
 from datalad.tests.utils import (
     assert_dict_equal,
     assert_equal,
@@ -262,8 +264,8 @@ def test_eval_results_plus_build_doc():
     assert_in("It's a number", doc1)
 
     # docstring shows correct override values of defaults in eval_params
-    assert_in("Default: 'tailored'", doc1)
-    assert_in("Default: 'item-or-list'", doc1)
+    assert_re_in("Default:\\s+'tailored'", doc1, match=False)
+    assert_re_in("Default:\\s+'item-or-list'", doc1, match=False)
 
     # docstring also contains eval_result's parameters:
     assert_in("result_filter", doc1)

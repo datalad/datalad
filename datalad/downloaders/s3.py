@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -19,7 +19,6 @@ from ..utils import (
 )
 from ..dochelpers import (
     borrowkwargs,
-    exc_str,
 )
 from ..support.network import (
     get_url_straight_filename,
@@ -31,6 +30,7 @@ from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
 from ..support.exceptions import (
     AccessPermissionExpiredError,
+    CapturedException,
     TargetFileAbsent,
 )
 from ..support.s3 import (
@@ -251,16 +251,18 @@ class S3Downloader(BaseDownloader):
             # Since likely things went bad if credential expired, just raise general
             # AccessDeniedError. Logic upstream should retry
             self._check_credential()
+            ce1 = CapturedException(e)
             lgr.debug("bucket.get_key (HEAD) failed with %s, trying GET request now",
-                      exc_str(e))
+                      ce1)
             try:
                 return self._get_key_via_get(key_name, version_id=version_id, headers=headers)
             except S3ResponseError:
                 # propagate S3 exceptions since they actually can provide the reason why we failed!
                 raise
             except Exception as e2:
+                ce2 = CapturedException(e2)
                 lgr.debug("We failed to get a key via HEAD due to %s and then via partial GET due to %s",
-                          e, e2)
+                          ce1, ce2)
                 # reraise original one
                 raise e
 
@@ -349,8 +351,8 @@ class S3Downloader(BaseDownloader):
                 url_filepath, version_id=params.get('versionId', None)
             )
         except S3ResponseError as e:
-            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
-                                % (url_filepath, url, e))
+            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s"
+                                % (url_filepath, url)) from e
         if key is None:
             raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
 

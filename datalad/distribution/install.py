@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -32,14 +32,16 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    CapturedException,
+    InsufficientArgumentsError,
+)
 from datalad.support.param import Parameter
 from datalad.support.network import (
     RI,
     PathRI,
 )
 from datalad.utils import ensure_list
-from datalad.dochelpers import exc_str
 
 from datalad.distribution.dataset import (
     datasetmethod,
@@ -150,6 +152,13 @@ class Install(Interface):
             metavar='SOURCE',
             doc="URL or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
+        branch=Parameter(
+            args=("--branch",),
+            doc="""Clone source at this branch or tag. This option applies only
+            to the top-level dataset not any subdatasets that may be cloned
+            when installing recursively. Note that if the source is a RIA URL
+            with a version, it takes precedence over this option.""",
+            constraints=EnsureStr() | EnsureNone()),
         get_data=Parameter(
             args=("-g", "--get-data",),
             doc="""if given, obtain all data content too""",
@@ -166,6 +175,7 @@ class Install(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             source=None,
             dataset=None,
             get_data=False,
@@ -173,7 +183,8 @@ class Install(Interface):
             recursive=False,
             recursion_limit=None,
             reckless=None,
-            jobs="auto"):
+            jobs="auto",
+            branch=None):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
@@ -325,8 +336,9 @@ class Install(Interface):
             try:
                 path_ri = RI(path)
             except Exception as e:
+                ce = CapturedException(e)
                 raise ValueError(
-                    "invalid path argument {}: ({})".format(path, exc_str(e)))
+                    "invalid path argument {}: ({})".format(path, ce))
             try:
                 # Wouldn't work for SSHRI ATM, see TODO within SSHRI
                 # yoh: path should be a local path, and mapping note within
@@ -352,6 +364,7 @@ class Install(Interface):
         res = Clone.__call__(
             source, path, dataset=ds, description=description,
             reckless=reckless,
+            git_clone_opts=["--branch=" + branch] if branch else None,
             # we need to disable error handling in order to have it done at
             # the very top, otherwise we are not able to order a global
             # "ignore-and-keep-going"

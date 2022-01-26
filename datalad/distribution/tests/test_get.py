@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -28,6 +28,7 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
     RemoteNotAvailableError,
 )
+from datalad.support.network import get_local_file_url
 from datalad.tests.utils import (
     ok_,
     eq_,
@@ -76,8 +77,6 @@ def _make_dataset_hierarchy(path):
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
-# AssertionError since does get extra record {'cost': 400, 'name': 'bang', 'url': 'youredead', 'from_config': True},
-@known_failure_githubci_win
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -184,6 +183,13 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     )
     assert_raises(ValueError, clone3.get, 'sub')
 
+    # smoke test to check for #5631: We shouldn't crash with a KeyError when a
+    # template can not be matched. Origin: https://github.com/datalad/datalad/pull/5644/files
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{not-a-key}-post'}):
+        f(clone, clone.subdatasets(return_type='item-or-list'))
+
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
 
@@ -244,8 +250,10 @@ def test_get_single_file(path):
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
-    eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    annexprops = ds.repo.get_file_annexinfo('test-annex.dat',
+                                            eval_availability=True)
+    eq_(result[0]['annexkey'], annexprops['key'])
+    ok_(annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)
@@ -365,8 +373,6 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
-@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
@@ -546,11 +552,11 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     ds = install(
         path, source=src,
         result_xfm='datasets', return_type='item-or-list')
-    eq_(len(ds.subdatasets(fulfilled=True)), 0)
+    eq_(len(ds.subdatasets(state='present')), 0)
 
     with chpwd(ds.path):
         results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
-    eq_(len(ds.subdatasets(fulfilled=True, recursive=True)), 2)
+    eq_(len(ds.subdatasets(state='present', recursive=True)), 2)
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)
@@ -705,5 +711,82 @@ def test_get_relays_command_errors(path):
     ds.save()
     ds.drop("foo", check=False)
     assert_result_count(
-        ds.get("foo", on_failure="ignore", result_renderer=None),
+        ds.get("foo", on_failure="ignore", result_renderer='disabled'),
         1, action="get", type="file", status="error")
+
+
+@with_tempfile()
+def test_missing_path_handling(path):
+    ds = Dataset(path).create()
+    ds.save()
+
+    class Struct:
+        pass
+
+    refds = Struct()
+    refds.pathobj = Path("foo")
+    refds.subdatasets = []
+    refds.path = "foo"
+
+    with \
+            patch("datalad.distribution.get._get_targetpaths") as get_target_path, \
+            patch("datalad.distribution.get.Interface.get_refds_path") as get_refds_path, \
+            patch("datalad.distribution.get.require_dataset") as require_dataset, \
+            patch("datalad.distribution.get._install_targetpath") as _install_targetpath, \
+            patch("datalad.distribution.get.Subdatasets") as subdatasets:
+
+        get_target_path.return_value = [{
+            "status": "error"
+        }]
+        get_refds_path.return_value = None
+        require_dataset.return_value = refds
+        _install_targetpath.return_value = [{
+            "status": "notneeded",
+            "path": "foo",
+            "contains": "xxx"
+        }]
+        subdatasets.return_value = [{
+            "type": "file",
+            "status": "impossible",
+            "path": "foo",
+            "message": "path not contained in any matching subdataset"}]
+
+        # Check for guarded access in error results
+        ds.get("foo")
+
+
+@known_failure_windows  # create-sibling-ria + ORA not fit for windows
+@with_tempfile
+@with_tempfile
+@with_tree(tree={'sub1': {'file1.txt': 'content 1'},
+                 'sub2': {'file2.txt': 'content 2'}})
+@with_tempfile
+@with_tempfile
+def test_source_candidate_subdataset(store1, store2, intermediate,
+                                     super, clone):
+
+    # This tests the scenario of gh-6159.
+    # However, the actual point is to test that `get` does not overwrite a
+    # source candidate config in subdatasets, if they already have such a
+    # config. This could come from any postclone_cfg routine, but the only one
+    # actually doing this ATM is postclone_cfg_ria.
+
+    ds = Dataset(intermediate).create(force=True)
+    ds.create("sub1", force=True)
+    ds.create("sub2", force=True)
+    ds.save(recursive=True)
+    ria_url_1 = "ria+" + get_local_file_url(store1, compatibility='git')
+    ds.create_sibling_ria(ria_url_1, "firststore", recursive=True,
+                          new_store_ok=True)
+    ds.push(".", to="firststore", recursive=True)
+    superds = Dataset(super).create()
+    superds.clone(source=ria_url_1 + "#" + ds.id, path="intermediate")
+    ria_url_2 = "ria+" + get_local_file_url(store2, compatibility='git')
+    superds.create_sibling_ria(ria_url_2, "secondstore", new_store_ok=True)
+    superds.push(".", to="secondstore")
+
+    cloneds = install(clone, source=ria_url_2 + "#" + superds.id)
+
+    # This would fail if source candidates weren't right, since cloneds only
+    # knows the second store so far (which doesn't have the subdatasets).
+    cloneds.get("intermediate", recursive=True)

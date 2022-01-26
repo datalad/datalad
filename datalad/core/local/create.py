@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -193,6 +193,7 @@ class Create(Interface):
     def __call__(
             path=None,
             initopts=None,
+            *,
             force=False,
             description=None,
             dataset=None,
@@ -335,9 +336,26 @@ class Create(Interface):
                 'status': 'error',
                 'message':
                     'will not create a dataset in a non-empty directory, use '
-                    '`force` option to ignore'})
+                    '`--force` option to ignore'})
             yield res
             return
+
+        # Check if specified cfg_proc(s) can be discovered, storing
+        # the results so they can be used when the time comes to run
+        # the procedure. If a procedure cannot be found, raise an
+        # error to prevent creating the dataset.
+        cfg_proc_specs = []
+        if cfg_proc:
+            discovered_procs = tbds.run_procedure(
+                discover=True, result_renderer='disabled')
+            for cfg_proc_ in cfg_proc:
+                for discovered_proc in discovered_procs:
+                    if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
+                        cfg_proc_specs.append(discovered_proc)
+                        break
+                else:
+                    raise ValueError("Cannot find procedure with name "
+                                     "'%s'" % cfg_proc_)
 
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
@@ -411,8 +429,8 @@ class Create(Interface):
             _status=add_to_git,
         )
 
-        for cfg_proc_ in cfg_proc:
-            for r in tbds.run_procedure('cfg_' + cfg_proc_):
+        for cfg_proc_spec in cfg_proc_specs:
+            for r in tbds.run_procedure(cfg_proc_spec):
                 yield r
 
         # the next only makes sense if we saved the created dataset,

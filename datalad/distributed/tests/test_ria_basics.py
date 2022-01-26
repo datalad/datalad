@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -42,6 +42,7 @@ from datalad.tests.utils import (
     assert_true,
     has_symlink_capability,
     known_failure_windows,
+    serve_path_via_http,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_ssh,
@@ -56,24 +57,17 @@ from datalad.utils import Path
 # Note, that exceptions to test for are generally CommandError since we are
 # talking to the special remote via annex.
 
-@known_failure_windows  # see gh-4469
+
 @with_tempfile
 @with_tempfile
-@with_tempfile
-def _test_initremote_basic(host, ds_path, store, link):
+def _test_initremote_basic(url, io, store, ds_path, link):
 
     ds_path = Path(ds_path)
     store = Path(store)
     link = Path(link)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
-    if host:
-        url = "ria+ssh://{host}{path}".format(host=host,
-                                              path=store)
-    else:
-        url = "ria+{}".format(store.as_uri())
     init_opts = common_init_opts + ['url={}'.format(url)]
 
     # fails on non-existing storage location
@@ -96,7 +90,6 @@ def _test_initremote_basic(host, ds_path, store, link):
                   )
 
     # set up store:
-    io = SSHRemoteIO(host) if host else LocalIO()
     create_store(io, store, '1')
     # still fails, since ds isn't setup in the store
     assert_raises(CommandError,
@@ -159,17 +152,54 @@ def _test_initremote_basic(host, ds_path, store, link):
             # annex too old - doesn't know --sameas
             pass
         else:
-            raise 
+            raise
     # TODO: - check output of failures to verify it's failing the right way
     #       - might require to run initremote directly to get the output
 
 
-def test_initremote_basic():
+# TODO: Skipped due to gh-4436
+@known_failure_windows
+@skip_ssh
+@with_tempfile
+def test_initremote_basic_sshurl(storepath):
+    _test_initremote_basic(
+        'ria+ssh://datalad-test{}'.format(Path(storepath).as_posix()), \
+        SSHRemoteIO('datalad-test'), \
+        storepath,
+    )
 
-    # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_initremote_basic)), \
-          'datalad-test'
-    yield _test_initremote_basic, None
+
+# ora remote cannot handle windows file:// URLs
+@known_failure_windows
+@with_tempfile
+def test_initremote_basic_fileurl(storepath):
+    _test_initremote_basic(
+        "ria+{}".format(Path(storepath).as_uri()),
+        LocalIO(),
+        storepath,
+    )
+
+
+# https://github.com/datalad/datalad/issues/6160
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_initremote_basic_httpurl(storepath, storeurl):
+    _test_initremote_basic(
+        f"ria+{storeurl}",
+        LocalIO(),
+        storepath,
+    )
+
+
+@with_tempfile(mkdir=True)
+@serve_path_via_http(use_ssl=True)
+def test_initremote_basic_httpsurl(storepath, storeurl):
+    _test_initremote_basic(
+        f"ria+{storeurl}",
+        LocalIO(),
+        storepath,
+    )
 
 
 @skip_wo_symlink_capability
@@ -182,7 +212,6 @@ def _test_initremote_alias(host, ds_path, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     if host:
         url = "ria+ssh://{host}{path}".format(host=host,
@@ -228,7 +257,6 @@ def _test_initremote_rewrite(host, ds_path, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     url = "mystore:"
@@ -282,7 +310,6 @@ def _test_remote_layout(host, dspath, store, archiv_store):
     archiv_store = Path(archiv_store)
     ds = Dataset(dspath).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -314,7 +341,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         get_layout_locations(1, store, ds.id)
     store_objects = get_all_files(dsobj_dir)
     local_objects = get_all_files(ds.pathobj / '.git' / 'annex' / 'objects')
-    assert_equal(len(store_objects), 2)
+    assert_equal(len(store_objects), 4)
 
     if not ds.repo.is_managed_branch():
         # with managed branches the local repo uses hashdirlower instead
@@ -345,6 +372,16 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         # now fsck the new remote to get the new special remote indexed
         ds.repo.fsck(remote='archive', fast=True)
         assert_equal(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
+        # test creating an archive with filters on files
+        ds.export_archive_ora(archive_dir / 'archive2.7z', annex_wanted='(include=*.txt)')
+        # test with wanted expression of a specific remote
+        ds.repo.set_preferred_content("wanted", "include=subdir/*", remote="store")
+        ds.export_archive_ora(archive_dir / 'archive3.7z', remote="store")
+        # test with the current sha
+        ds.export_archive_ora(
+            archive_dir / 'archive4.7z',
+            froms=ds.repo.get_revisions()[1],
+            )
 
 
 @slow  # 12sec + ? on travis
@@ -364,7 +401,6 @@ def _test_version_check(host, dspath, store):
 
     ds = Dataset(dspath).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -462,7 +498,6 @@ def _test_gitannex(host, store, dspath):
     ds = Dataset(dspath).create()
 
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -580,7 +615,6 @@ def test_push_url(storepath, dspath, blockfile):
 
     ds = Dataset(dspath).create()
     populate_dataset(ds)
-    ds.save()
     assert_repo_status(ds.path)
 
     # set up store:
@@ -624,17 +658,19 @@ def test_push_url(storepath, dspath, blockfile):
     assert_in(store_uuid, known_sources)
 
 
-@skip_if_no_network
+# create-sibling-ria cannot handle windows paths
 @known_failure_windows
 @with_tempfile
 @with_tempfile
-def test_url_keys(dspath, storepath):
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_url_keys(dspath, storepath, httppath, httpurl):
     ds = Dataset(dspath).create()
     repo = ds.repo
     filename = 'url_no_size.html'
     # URL-type key without size
     repo.call_annex([
-        'addurl', '--relaxed', '--raw', '--file', filename, 'http://example.com',
+        'addurl', '--relaxed', '--raw', '--file', filename, httpurl,
     ])
     ds.save()
     # copy target
@@ -642,6 +678,7 @@ def test_url_keys(dspath, storepath):
         name='ria',
         url='ria+file://{}'.format(storepath),
         storage_sibling='only',
+        new_store_ok=True
     )
     ds.get(filename)
     repo.call_annex(['copy', '--to', 'ria', filename])
@@ -656,7 +693,7 @@ def test_url_keys(dspath, storepath):
     repo.call_annex(['fsck', '-f', 'ria'])
     assert_equal(len(ds.repo.whereis(filename)), 3)
     # mapped key in whereis output
-    assert_in('%%example', repo.call_annex(['whereis', filename]))
+    assert_in('127.0.0.1', repo.call_annex(['whereis', filename]))
 
     repo.call_annex(['move', '-f', 'ria', filename])
     # check that it does not magically reappear, because it actually

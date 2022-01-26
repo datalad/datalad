@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,6 +26,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     known_failure_githubci_win,
+    skip_if_no_module,
     with_tempfile,
 )
 
@@ -43,11 +44,7 @@ def test_error(path):
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_ds_extraction(path):
-    from datalad.tests.utils import SkipTest
-    try:
-        import libxmp
-    except Exception as e:
-        raise SkipTest('Cannot import libxmp: {}'.format(e))
+    skip_if_no_module('libxmp')
 
     ds = Dataset(path).create()
     copy(testpath, path)
@@ -83,11 +80,7 @@ def test_ds_extraction(path):
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_file_extraction(path):
-    from datalad.tests.utils import SkipTest
-    try:
-        import libxmp
-    except Exception as e:
-        raise SkipTest('Cannot import libxmp: {}'.format(e))
+    skip_if_no_module('libxmp')
 
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):

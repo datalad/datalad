@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -20,7 +20,7 @@ from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
 
-from ..version import __version__
+from .. import __version__
 from . import _TEMP_PATHS_GENERATED
 from .utils import get_tempfile_kwargs
 from datalad.customremotes.base import init_datalad_remote

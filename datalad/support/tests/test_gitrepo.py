@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -492,18 +492,18 @@ def test_GitRepo_files_decorator():
 @with_tempfile
 def test_GitRepo_remote_add(path):
     gr = GitRepo(path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     out = gr.get_remotes()
     assert_in('github', out)
     eq_(len(out), 1)
-    eq_('git://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
+    eq_('https://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
 
 
 @with_tempfile
 def test_GitRepo_remote_remove(path):
 
     gr = GitRepo(path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     out = gr.get_remotes()
     eq_(len(out), 1)
     gr.remove_remote('github')
@@ -515,9 +515,9 @@ def test_GitRepo_remote_remove(path):
 def test_GitRepo_get_remote_url(path):
 
     gr = GitRepo(path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     eq_(gr.get_remote_url('github'),
-        'git://github.com/datalad/testrepo--basic--r1')
+        'https://github.com/datalad/testrepo--basic--r1')
 
 
 @with_tempfile
@@ -1518,9 +1518,7 @@ def test_gitrepo_call_git_methods(path):
     eq_(list(gr.call_git_items_(["ls-files"], read_only=True)),
         ["bar", "foo.txt"])
     eq_(list(gr.call_git_items_(["ls-files", "-z"], sep="\0", read_only=True)),
-        # Note: The custom separator has trailing empty item, but this is an
-        # arbitrary command with unknown output it isn't safe to trim it.
-        ["bar", "foo.txt", ""])
+        ["bar", "foo.txt"])
 
     with assert_raises(AssertionError):
         gr.call_git_oneline(["ls-files"], read_only=True)
@@ -1549,7 +1547,8 @@ def test_protocols():
     # which happened with git-annex-standalone 7.20191017+git2-g7b13db551-1~ndall+1
 
     # http is well tested already
-    for proto in 'git', 'https':
+    # 'git' is not longer supported
+    for proto in ('https', ):
         yield _test_protocols, proto
 
 

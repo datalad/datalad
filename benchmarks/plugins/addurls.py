@@ -57,7 +57,8 @@ class addurls1(SuprocBenchmarks):
     def time_addurls(self, exclude_autometa):
         lgr.warning("CSV: " + self.listfile.read_text())
         ret = dl.addurls(
-            self.ds, str(self.listfile), '{url}', '{filename}',
+            str(self.listfile), '{url}', '{filename}',
+            dataset=self.ds,
             exclude_autometa=exclude_autometa
         )
         assert not any(r['status'] == 'error' for r in ret)
