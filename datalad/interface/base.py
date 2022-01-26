@@ -60,6 +60,7 @@ def get_api_name(intfspec):
     return name
 
 
+# ONLY-USED-IN-CLI
 def get_cmdline_command_name(intfspec):
     """Given an interface specification return a cmdline command name"""
     if len(intfspec) > 2:
@@ -168,6 +169,7 @@ def get_cmd_doc(interface):
     return intf_doc
 
 
+# ONLY-USED-IN-CLI
 def get_cmd_ex(interface):
     """Return the examples for the command defined by 'interface'.
 
@@ -655,9 +657,11 @@ class Interface(object):
     # exit code to return if user-interrupted
     # if None, would just reraise the Exception, so if in --dbg
     # mode would fall into the debugger
+    # ONLY-USED-IN-CLI (directly and via call_from_parser)
     _interrupted_exit_code = 1
 
     @classmethod
+    # ONLY-USED-IN-CLI
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
         # XXX allow for parser kwargs customization
@@ -753,6 +757,7 @@ class Interface(object):
                                 **parser_kwargs)
 
     @classmethod
+    # ONLY-USED-IN-CLI
     def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
         from datalad.utils import getargspec
@@ -816,6 +821,7 @@ class Interface(object):
                 raise
 
     @classmethod
+    # ONLY-USED-IN-CLI (via call_from_parser)
     def _get_result_filter(cls, args):
         from datalad import cfg
         result_filter = None
@@ -836,6 +842,7 @@ class Interface(object):
             result_filter = result_filter & tfilt if result_filter else tfilt
         return result_filter
 
+    # https://github.com/datalad/datalad/issues/6376
     @classmethod
     def get_refds_path(cls, dataset):
         """Return a resolved reference dataset path from a `dataset` argument"""

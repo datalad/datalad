@@ -104,6 +104,7 @@ _group_4plumbing = (
 
 
 # Some known extensions and their commands to suggest whenever lookup fails
+# ONLY-USED-IN-CLI
 _known_extension_commands = {
     'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
@@ -111,7 +112,7 @@ _known_extension_commands = {
     'datalad-neuroimaging': ('bids2scidata',)
 }
 
-
+# ONLY-USED-IN-CLI
 _deprecated_commands = {
     'add': "save",
     'uninstall': 'drop',

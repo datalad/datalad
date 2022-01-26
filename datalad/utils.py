@@ -86,6 +86,7 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
+# ONLY-USED-IN-CLI
 on_msys_tainted_paths = on_windows \
                         and 'MSYS_NO_PATHCONV' not in os.environ \
                         and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
@@ -1574,7 +1575,7 @@ def lock_if_required(lock_required, lock):
 #
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
 
-
+# ONLY-USED-IN-CLI
 def setup_exceptionhook(ipython=False):
     """Overloads default sys.excepthook with our exceptionhook handler.
 
