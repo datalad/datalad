@@ -2323,22 +2323,28 @@ class AnnexRepo(GitRepo, RepoInterface):
             json_objects = bcmd(files)
         else:
             cmd = ['whereis'] + options
-            files_arg = None
-            if key:
-                cmd = cmd + ["--key"] + files
-            else:
-                files_arg = files
 
-            try:
-                json_objects = self.call_annex_records(cmd, files=files_arg)
-            except CommandError as e:
-                if e.stderr.startswith('Invalid'):
-                    # would happen when git-annex is called with incompatible options
-                    raise
-                # whereis may exit non-zero when there are too few known copies
-                # callers of whereis are interested in exactly that information,
-                # which we deliver via result, not via exception
-                json_objects = e.kwargs.get('stdout_json', [])
+            def _call_cmd(cmd, files=None):
+                """Helper to reuse consistently in case of --key and not invocations"""
+                try:
+                    return self.call_annex_records(cmd, files=files)
+                except CommandError as e:
+                    if e.stderr.startswith('Invalid'):
+                        # would happen when git-annex is called with incompatible options
+                        raise
+                    # whereis may exit non-zero when there are too few known copies
+                    # callers of whereis are interested in exactly that information,
+                    # which we deliver via result, not via exception
+                    return e.kwargs.get('stdout_json', [])
+
+            if key:
+                # whereis --key takes only a single key at a time so we need to loop
+                json_objects = []
+                for k in files:
+                    json_objects.extend(_call_cmd(cmd + ["--key", k]))
+            else:
+                json_objects = _call_cmd(cmd, files)
+
 
         if output in {'descriptions', 'uuids'}:
             return [
