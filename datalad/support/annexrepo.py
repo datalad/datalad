@@ -566,6 +566,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         ver = cls.git_annex_version
         kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
+        # applies to get, drop, move, copy, whereis
+        kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -2316,10 +2318,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ensure_list(options, copy=True)
         if batch:
+            # TODO: --batch-keys was added to 8.20210903
             if key:
-                raise ValueError("batch=True is incompatible with `key`")
+                if not self._check_version_kludges("grp1-supports-batch-keys"):
+                    raise ValueError("batch=True for `key=True` requires git-annex >= 8.20210903")
+                bkw = {'batch_opt': '--batch-keys'}
+            else:
+                bkw = {}
             bcmd = self._batched.get('whereis', annex_options=options,
-                                     json=True, path=self.path)
+                                     json=True, path=self.path, **bkw)
             json_objects = bcmd(files)
         else:
             cmd = ['whereis'] + options
@@ -3761,7 +3768,7 @@ class BatchedAnnex(BatchedCommand):
     """
 
     def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
-                 json=False, output_proc=None):
+                 json=False, output_proc=None, batch_opt='--batch'):
         if not isinstance(annex_cmd, list):
             annex_cmd = [annex_cmd]
         cmd = \
@@ -3771,7 +3778,7 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch'] + \
+            [batch_opt] + \
             (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None

@@ -2581,9 +2581,15 @@ def test_whereis_batch_eqv(path):
         else:
             assert_equal(out_non_batch, out_non_batch_keys)
 
-    # --key= and --batch are incompatible.
-    with assert_raises(ValueError):
-        repo_b.whereis(files=files, batch=True, key=True)
+        if external_versions['cmd:annex'] >= '8.20210903':
+            # --batch-keys support was introduced
+            assert_equal(out_non_batch_keys,
+                         repo_b.whereis(files=keys, batch=True, key=True, output=output))
+
+    if external_versions['cmd:annex'] < '8.20210903':
+        # --key= and --batch are incompatible.
+        with assert_raises(ValueError):
+            repo_b.whereis(files=files, batch=True, key=True)
 
 
 def test_done_deprecation():
