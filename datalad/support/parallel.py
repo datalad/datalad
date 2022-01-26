@@ -115,10 +115,6 @@ class ProducerConsumer:
     codebase `addurls.py`, `get.py`, `save.py`, etc.
     """
 
-    # We cannot use threads with asyncio WitlessRunner inside until
-    # 3.8.0 release (v3.8.0b2~37 to be exact)
-    # See https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
-    _can_use_threads = sys.version_info >= (3, 8, 0, 'final')
     # Users should not specify -J100 and then just come complaining without
     # being informed that they are out of luck
     _alerted_already = False
@@ -259,17 +255,6 @@ class ProducerConsumer:
             # "auto" could be for some auto-scaling based on a single future time
             # to complete, scaling up/down. Ten config variable could accept "auto" as well
             jobs = cfg.obtain('datalad.runtime.max-jobs')
-        if jobs >= 1 and not cls._can_use_threads:
-            # if we have arrived with jobs=1 and older python, we will not
-            # even alert that we are running serially.  The fact is that
-            # ProducerConsumer with jobs=1 does parallel run of the producer
-            # so in principle already partially parallelized.
-            if jobs > 1:
-                (lgr.debug if ProducerConsumer._alerted_already else lgr.warning)(
-                    "Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
-                    "Will run serially", jobs)
-                ProducerConsumer._alerted_already = True
-            jobs = 0
         return jobs
 
     def __iter__(self):
