@@ -385,14 +385,16 @@ def test_commanderror_jsonmsgs(src, exp):
         in_('use `git-annex export`', cme.exception.stderr)
 
 
-def test_librarymode():
+@with_tempfile
+def test_librarymode(path):
+    ds = Dataset(path).create()
     was_mode = datalad.__runtime_mode
     try:
         # clean --dry-run is just a no-op command that is cheap
         # to execute. It has no particular role here, other than
         # to make the code pass the location where library mode
         # should be turned on via the cmdline API
-        run_main(['-c', 'datalad.runtime.librarymode=yes', 'clean', '--dry-run'])
+        run_main(['-c', 'datalad.runtime.librarymode=yes', 'clean', '-d', path, '--dry-run'])
         ok_(datalad.in_librarymode())
     finally:
         # restore pre-test behavior
