@@ -1487,24 +1487,6 @@ def ignore_nose_capturing_stdout(func):
     return func
 
 
-def skip_httpretty_on_problematic_pythons(func):
-    """As discovered some httpretty bug causes a side-effect
-    on other tests on some Pythons.  So we skip the test if such
-    problematic combination detected
-
-    References
-    https://travis-ci.org/datalad/datalad/jobs/94464988
-    http://stackoverflow.com/a/29603206/1265472
-    """
-
-    @make_decorator(func)
-    def  _wrap_skip_httpretty_on_problematic_pythons(*args, **kwargs):
-        if sys.version_info[:3] == (3, 4, 2):
-            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
-        return func(*args, **kwargs)
-    return  _wrap_skip_httpretty_on_problematic_pythons
-
-
 @optional_args
 def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct

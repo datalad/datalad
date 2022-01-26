@@ -125,7 +125,7 @@ we outline the workflow used by the developers:
 
 ## Development environment
 
-We support Python 3 only (>= 3.6).
+We support Python 3 only (>= 3.7).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.

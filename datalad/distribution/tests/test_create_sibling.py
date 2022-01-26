@@ -536,15 +536,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
-    try:
-        res = ds.create_sibling(url, ui=have_webui())
-    except UnicodeDecodeError:
-        if sys.version_info < (3, 7):
-            # observed test failing on ubuntu 18.04 with python 3.6
-            # (reproduced in conda env locally with python 3.6.10 when LANG=C
-            # We will just skip this tricky one
-            raise SkipTest("Known failure")
-        raise
+    res = ds.create_sibling(url, ui=have_webui())
     assert_in_results(res, action="create_sibling", sibling_name=sibname)
     published = ds.push(to=sibname, data='anything')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
