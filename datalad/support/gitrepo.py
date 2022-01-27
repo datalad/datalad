@@ -3429,10 +3429,9 @@ class GitRepo(CoreGitRepo):
             if (props.get('state', None) in ('modified', 'untracked') and
                 not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
-            if self.config.obtain("datalad.save.windows-compat-warning") in \
-                    ('warning', 'error'):
-                # check that non-Windows users generate win-compatible filenames
-                to_add, problems = self._check_for_win_compat(to_add)
+            compat_config = \
+                self.config.obtain("datalad.save.windows-compat-warning")
+            to_add, problems = self._check_for_win_compat(to_add, compat_config)
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
@@ -3467,12 +3466,26 @@ class GitRepo(CoreGitRepo):
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
 
-    def _check_for_win_compat(self, files):
+    def _check_for_win_compat(self, files, config):
         """Check file names for illegal characters or reserved names on Windows
 
         In the case that a non-Windows-compatible file is detected, warn users
         about potential interoperability issues.
+
+        Parameters
+        ----------
+        files
+          list of files to add
+        config
+          value of self.config.obtain("datalad.save.windows-compat-warning"),
+          used to choose appropriate behavior. "none" performs no check,
+          "warning" warns in case of incompatibilities, and "error" results in
+          an error result in case of incompatibilities
         """
+        # don't perform any check when the configuration is set to 'none'
+        if config == 'none':
+            return files, None
+
         from collections import defaultdict
         problems = defaultdict(list)
         for file in files:
@@ -3500,11 +3513,11 @@ class GitRepo(CoreGitRepo):
         for k, v in problems.items():
             # use the key as an explanation, and report filenames only once
             msg += f"\n{k} {[*{*v}]}" if k != 'paths' else ''
-        if self.config.obtain("datalad.save.windows-compat-warning") == 'warning':
+        if config == 'warning':
             lgr.warning(msg)
             return files, None
 
-        elif self.config.obtain("datalad.save.windows-compat-warning") == 'error':
+        elif config == 'error':
             # take the problematic files out of to_add
             for path in [*{*problems['paths']}]:
                 files.pop(path)
