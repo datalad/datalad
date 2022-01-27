@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -31,7 +31,10 @@ from datalad.interface.common_opts import (
     recursion_limit,
     recursion_flag,
 )
-from datalad.interface.utils import eval_results
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
 import datalad.support.ansi_colors as ac
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
@@ -360,6 +363,7 @@ class Status(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             annex=None,
             untracked='normal',
@@ -418,10 +422,13 @@ class Status(Interface):
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: more cover
-        if not (res['status'] == 'ok'
-                and res['action'] in ('status', 'diff')
-                and res.get('state', None) != 'clean'):
-            # logging reported already
+        if (res['status'] == 'ok' and res['action'] in ('status', 'diff')
+                and res.get('state') == 'clean'):
+            # this renderer will be silent for clean status|diff results
+            return
+        if res['status'] != 'ok' or res['action'] not in ('status', 'diff'):
+            # whatever this renderer cannot account for, send to generic
+            generic_result_renderer(res)
             return
         from datalad.ui import ui
         # when to render relative paths:

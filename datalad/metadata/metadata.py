@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -24,7 +24,10 @@ from datalad import cfg
 from datalad.interface.annotate_paths import _minimal_annotate_paths
 from datalad.interface.base import Interface
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
 from datalad.interface.base import build_doc
 from datalad.metadata.definitions import version as vocabulary_version
 from datalad.support.collections import ReadOnlyDict, _val2hashable
@@ -879,6 +882,7 @@ class Metadata(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             get_aggregates=False,
             reporton='all',
@@ -1001,7 +1005,7 @@ class Metadata(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         if res['status'] != 'ok' or not res.get('action', None) == 'metadata':
-            # logging complained about this already
+            generic_result_renderer(res)
             return
         # list the path, available metadata keys, and tags
         path = op.relpath(res['path'],

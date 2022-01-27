@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -209,6 +209,7 @@ class CreateSiblingGitlab(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             site=None,
             project=None,
             layout=None,
@@ -262,7 +263,7 @@ class CreateSiblingGitlab(Interface):
             for subds in ds.subdatasets(
                     path=path,
                     # we can only operate on present datasets
-                    fulfilled=True,
+                    state='present',
                     recursive=recursive,
                     recursion_limit=recursion_limit,
                     contains=None,

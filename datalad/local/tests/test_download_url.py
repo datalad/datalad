@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -65,6 +65,8 @@ def test_download_url_exceptions():
         'Temporary failure in name resolution' in msg
         or
         'Name or service not known' in msg  # nd80
+        or
+        'Failed to establish a new session' in msg  # Debian sid @ 20220121
     ):
         assert_in('http://example.com/bogus', msg)
 

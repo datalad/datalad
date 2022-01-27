@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -57,6 +57,7 @@ _group_2dataset = (
         ('datalad.local.addurls', 'Addurls'),
         ('datalad.local.copy_file', 'CopyFile'),
         ('datalad.local.download_url', 'DownloadURL'),
+        ('datalad.local.foreach_dataset', 'ForEachDataset', 'foreach-dataset'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.local.rerun', 'Rerun'),
         ('datalad.local.run_procedure', 'RunProcedure'),

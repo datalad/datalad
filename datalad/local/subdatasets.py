@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import re
 import os
+import warnings
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import generic_result_renderer
@@ -21,9 +22,9 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import (
-    EnsureBool,
     EnsureStr,
     EnsureNone,
+    NoneDeprecated,
 )
 from datalad.support.param import Parameter
 from datalad.support.exceptions import (
@@ -31,6 +32,9 @@ from datalad.support.exceptions import (
     CommandError
 )
 from datalad.interface.common_opts import (
+    contains,
+    dataset_state,
+    fulfilled,
     recursion_flag,
     recursion_limit,
 )
@@ -158,26 +162,11 @@ class Subdatasets(Interface):
             a dataset method PY].""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
-        fulfilled=Parameter(
-            args=("--fulfilled",),
-            doc="""if given, must be a boolean flag indicating whether
-            to report either only locally present or absent datasets.
-            By default subdatasets are reported regardless of their
-            status""",
-            constraints=EnsureBool() | EnsureNone()),
+        state=dataset_state,
+        fulfilled=fulfilled,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        contains=Parameter(
-            args=('--contains',),
-            metavar='PATH',
-            action='append',
-            doc="""limit report to the subdatasets containing the
-            given path. If a root path of a subdataset is given the last
-            reported dataset will be the subdataset itself.[CMD:  This
-            option can be given multiple times CMD][PY:  Can be a list with
-            multiple paths PY], in which case datasets will be reported that
-            contain any of the given paths.""",
-            constraints=EnsureStr() | EnsureNone()),
+        contains=contains,
         bottomup=Parameter(
             args=("--bottomup",),
             action="store_true",
@@ -217,14 +206,37 @@ class Subdatasets(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
-            fulfilled=None,
+            state='any',
+            fulfilled=NoneDeprecated,
             recursive=False,
             recursion_limit=None,
             contains=None,
             bottomup=False,
             set_property=None,
             delete_property=None):
+        if fulfilled is not NoneDeprecated:
+            # the two mirror options do not agree and the deprecated one is
+            # not at default value
+            warnings.warn("subdatasets's `fulfilled` option is deprecated "
+                          "and will be removed in a future release, "
+                          "use the `state` option instead.",
+                          DeprecationWarning)
+            if state != 'any':
+                raise ValueError("Do not specify both 'fulfilled' and 'state', use 'state'")
+            # honor the old option for now
+            state = {
+                None: 'any',
+                True: 'present',
+                False: 'absent',
+            }[fulfilled]
+        # Path of minimal resistance/code-change - internally here we will reuse fulfilled
+        fulfilled = {
+            'any': None,
+            'present': True,
+            'absent': False,
+        }[state]
         ds = require_dataset(
             dataset, check_installed=True, purpose='report on subdataset(s)')
 

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -120,7 +120,8 @@ class HelpAction(argparse.Action):
         else:
             opt_args_str = "*Options*"
             pos_args_str = "*Arguments*"
-        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
+        # in python 3.10 it switched from "optional arguments" to "options"
+        helpstr = re.sub(r'(optional arguments|options):', opt_args_str, helpstr)
         helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
@@ -311,6 +312,10 @@ def get_repo_instance(path=os.curdir, class_=None):
     returns an instance representing it. May also check for a certain type
     instead of detecting the type of repository.
 
+    .. deprecated:: 0.16
+       Use the pattern `Dataset(get_dataset_root(path)).repo` instead. This
+       function will be removed in a future release.
+
     Parameters
     ----------
     path: str
@@ -323,15 +328,15 @@ def get_repo_instance(path=os.curdir, class_=None):
     ------
     RuntimeError, in case cwd is not inside a known repository.
     """
+    warnings.warn("get_repo_instance() was deprecated in 0.16. "
+                  "It will be removed in a future release.",
+                  DeprecationWarning)
 
-    from os.path import ismount, exists, normpath, isabs
-    from datalad.support.exceptions import InvalidGitRepositoryError
-    from ..utils import expandpath
-    from ..support.gitrepo import GitRepo
-    from ..support.annexrepo import AnnexRepo
+    from datalad.utils import get_dataset_root
+    from datalad.distribution.dataset import Dataset
+    from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.gitrepo import GitRepo
 
-    dir_ = expandpath(path)
-    abspath_ = path if isabs(path) else dir_
     if class_ is not None:
         if class_ == AnnexRepo:
             type_ = "annex"
@@ -339,34 +344,15 @@ def get_repo_instance(path=os.curdir, class_=None):
             type_ = "git"
         else:
             raise RuntimeError("Unknown class %s." % str(class_))
-
-    while not ismount(dir_):  # TODO: always correct termination?
-        if exists(opj(dir_, '.git')):
-            # found git dir
-            if class_ is None:
-                # detect repo type:
-                try:
-                    return AnnexRepo(dir_, create=False)
-                except RuntimeError as e:
-                    pass
-                try:
-                    return GitRepo(dir_, create=False)
-                except InvalidGitRepositoryError as e:
-                    raise RuntimeError("No datalad repository found in %s" %
-                                       abspath_)
-            else:
-                try:
-                    return class_(dir_, create=False)
-                except (RuntimeError, InvalidGitRepositoryError) as e:
-                    raise RuntimeError("No %s repository found in %s." %
-                                       (type_, abspath_))
-        else:
-            dir_ = normpath(opj(dir_, ".."))
-
-    if class_ is not None:
-        raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
-        raise RuntimeError("No datalad repository found in %s" % abspath_)
+        type_ = ''
+
+    dsroot = get_dataset_root(path)
+    if not dsroot:
+        raise RuntimeError(f"No {type_}s repository found at {path}.")
+
+    return Dataset(dsroot).repo
+
 
 #
 # Some logic modules extracted from main.py to de-spagetify

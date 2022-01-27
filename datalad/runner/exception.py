@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -10,6 +10,11 @@
 """
 
 import logging
+from typing import (
+    Dict,
+    List,
+)
+
 
 lgr = logging.getLogger('datalad.runner.exception')
 
@@ -76,7 +81,7 @@ class CommandError(RuntimeError):
         return self.to_str()
 
 
-def _format_json_error_messages(recs):
+def _format_json_error_messages(recs: List[Dict]):
     # there could be many, condense
     msgs = {}
     for r in recs:

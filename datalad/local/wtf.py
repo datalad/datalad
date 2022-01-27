@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -382,7 +382,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
+    def __call__(*, dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict

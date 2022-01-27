@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -53,7 +53,7 @@ def _minimal_annotate_paths(paths_by_ds, errors, action="annotate_path",
 
         subdatasets = Dataset(dpath).subdatasets(
             path=paths,
-            fulfilled=None,
+            state='any',
             recursive=recursive,
             recursion_limit=recursion_limit,
             result_renderer='disabled',

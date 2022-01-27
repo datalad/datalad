@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -365,9 +365,17 @@ def eval_results(wrapped):
         # .is_installed and .config can be costly, so ensure we do
         # it only once. See https://github.com/datalad/datalad/issues/3575
         dataset_arg = allkwargs.get('dataset', None)
-        from datalad.distribution.dataset import Dataset
-        ds = dataset_arg if isinstance(dataset_arg, Dataset) \
-            else Dataset(dataset_arg) if dataset_arg else None
+        ds = None
+        if dataset_arg is not None:
+            from datalad.distribution.dataset import Dataset
+            if isinstance(dataset_arg, Dataset):
+                ds = dataset_arg
+            else:
+                try:
+                    ds = Dataset(dataset_arg)
+                except ValueError:
+                    pass
+
         # look for hooks
         hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 

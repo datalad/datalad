@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -10,20 +10,12 @@
 """
 
 import logging
-import os
-import subprocess
-import tempfile
-import warnings
 
 from .coreprotocols import NoCapture
 from .exception import CommandError
-from .nonasyncrunner import run_command
-from .utils import (
-    auto_repr,
-    ensure_unicode,
-    try_multiple,
-    unlink,
-)
+from .nonasyncrunner import ThreadedRunner
+from .protocol import GeneratorMixIn
+
 
 lgr = logging.getLogger('datalad.runner.runner')
 
@@ -34,7 +26,7 @@ class WitlessRunner(object):
     It aims to be as simple as possible, providing only essential
     functionality.
     """
-    __slots__ = ['cwd', 'env']
+    __slots__ = ['cwd', 'env', 'threaded_runner']
 
     def __init__(self, cwd=None, env=None):
         """
@@ -53,6 +45,9 @@ class WitlessRunner(object):
         # stringify to support Path instances on PY35
         self.cwd = str(cwd) if cwd is not None else None
 
+        self.threaded_runner = None
+
+
     def _get_adjusted_env(self, env=None, cwd=None, copy=True):
         """Return an adjusted copy of an execution environment
 
@@ -67,7 +62,15 @@ class WitlessRunner(object):
             env['PWD'] = cwd
         return env
 
-    def run(self, cmd, protocol=None, stdin=None, cwd=None, env=None, **kwargs):
+    def run(self,
+            cmd,
+            protocol=None,
+            stdin=None,
+            cwd=None,
+            env=None,
+            timeout=None,
+            exception_on_error=True,
+            **kwargs):
         """Execute a command and communicate with it.
 
         Parameters
@@ -79,9 +82,16 @@ class WitlessRunner(object):
           Protocol class handling interaction with the running process
           (e.g. output capture). A number of pre-crafted classes are
           provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
-        stdin : byte stream, optional
-          File descriptor like, or bytes objects used as stdin for the process.
-          Passed verbatim to run_command().
+          If the protocol has the GeneratorMixIn-mixin, the run-method
+          will return an iterator and can therefore be used in a for-clause.
+        stdin : file-like, string, bytes, Queue, or None
+          If stdin is a file-like, it will be directly used as stdin for the
+          subprocess. The caller is responsible for writing to it and closing it.
+          If stdin is a string or bytes, those will be fed to stdin of the
+          subprocess. If all data is written, stdin will be closed.
+          If stdin is a Queue, all elements (bytes) put into the Queue will
+          be passed to stdin until None is read from the queue. If None is read,
+          stdin of the subprocess is closed.
         cwd : path-like, optional
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise. Overrides
@@ -92,15 +102,51 @@ class WitlessRunner(object):
           This must be a complete environment definition, no values
           from the current environment will be inherited. Overrides
           any `env` given to the constructor.
+        timeout:
+          None or the seconds after which a timeout callback is
+          invoked, if no progress was made in communicating with
+          the sub-process, or if waiting for the subprocess exit
+          took more than the specified time. See the protocol and
+          `ThreadedRunner` descriptions for a more detailed discussion
+          on timeouts.
+        exception_on_error : bool, optional
+          This argument is only interpreted if the protocol is a subclass
+          of `GeneratorMixIn`. If it is `True` (default), a
+          `CommandErrorException` is raised by the generator if the
+          sub process exited with a return code not equal to zero. If the
+          parameter is `False`, no exception is raised. In both cases the
+          return code can be read from the attribute `return_code` of
+          the generator.
         kwargs :
           Passed to the Protocol class constructor.
 
         Returns
         -------
-        dict
-          At minimum there will be keys 'stdout', 'stderr' with
-          unicode strings of the cumulative standard output and error
-          of the process as values.
+          Union[Any, Generator]
+
+            If the protocol is not a subclass of `GeneratorMixIn`, the
+            result of protocol._prepare_result will be returned.
+
+            If the protocol is a subclass of `GeneratorMixIn`, a Generator
+            will be returned. This allows to use this method in constructs like:
+
+                for protocol_output in runner.run():
+                    ...
+
+            Where the iterator yields whatever protocol.pipe_data_received
+            sends into the generator.
+            If all output was yielded and the process has terminated, the
+            generator will raise StopIteration(return_code), where
+            return_code is the return code of the process. The return code
+            of the process will also be stored in the "return_code"-attribute
+            of the runner. So you could write:
+
+               gen = runner.run()
+               for file_descriptor, data in gen:
+                   ...
+
+               # get the return code of the process
+               result = gen.return_code
 
         Raises
         ------
@@ -123,14 +169,24 @@ class WitlessRunner(object):
         )
 
         lgr.debug('Run %r (cwd=%s)', cmd, cwd)
-        results = run_command(
-            cmd,
-            protocol,
-            stdin,
+
+        self.threaded_runner = ThreadedRunner(
+            cmd=cmd,
+            protocol_class=protocol,
+            stdin=stdin,
             protocol_kwargs=kwargs,
+            timeout=timeout,
+            exception_on_error=exception_on_error,
             cwd=cwd,
-            env=env,
+            env=env
         )
+
+        results_or_iterator = self.threaded_runner.run()
+
+        if issubclass(protocol, GeneratorMixIn):
+            return results_or_iterator
+        else:
+            results = results_or_iterator
 
         # log before any exception is raised
         lgr.debug("Finished %r with status %s", cmd, results['code'])

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -557,7 +557,9 @@ class CreateSibling(Interface):
     @staticmethod
     @datasetmethod(name='create_sibling')
     @eval_results
-    def __call__(sshurl, name=None, target_dir=None,
+    def __call__(sshurl,
+                 *,
+                 name=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None,
                  recursive=False,
@@ -680,7 +682,7 @@ class CreateSibling(Interface):
                         for sds in ds.subdatasets(
                             recursive=recursive,
                             recursion_limit=recursion_limit,
-                            fulfilled=True,
+                            state='present',
                             result_renderer='disabled')
                     ],
                     # save cycles, we are only looking for datasets

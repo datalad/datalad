@@ -1,6 +1,6 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -55,6 +55,7 @@ from datalad.utils import (
     get_dataset_root,
     get_open_files,
     get_path_prefix,
+    get_sig_param_names,
     get_timestamp_suffix,
     get_trace,
     getpwd, chpwd,
@@ -177,7 +178,7 @@ def test_getargspec():
         # and lets try on a wrapped one -- only ours can do the right thing
         def decorator(f):
             @wraps(f)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args, **kwargs):  # pragma: no cover
                 return f(*args, **kwargs)
             return wrapper
         fw = decorator(f)
@@ -187,28 +188,39 @@ def test_getargspec():
             assert_raises(ValueError, getargspec, fw)
         eq_(getargspec(fw, include_kwonlyargs=has_kwonlyargs), expected)
 
-    def f0():
+    def f0():  # pragma: no cover
         pass
 
     yield eq_argspec, f0, ([], None, None, None)
 
-    def f1(a1, kw1=None, kw0=1):
+    def f1(a1, kw1=None, kw0=1):  # pragma: no cover
         pass
 
     yield eq_argspec, f1, (['a1', 'kw1', 'kw0'], None, None, (None, 1))
 
     # Having *a already makes keyword args to be kwonlyargs, in that
     # inspect.get*spec would barf
-    def f1_args(a1, *a, kw1=None, kw0=1, **kw):
+    def f1_args(a1, *a, kw1=None, kw0=1, **kw):  # pragma: no cover
         pass
 
     yield eq_argspec, f1_args, (['a1', 'kw1', 'kw0'], 'a', 'kw', (None, 1)), True
 
-    def f1_star(a1, *, kw1=None, kw0=1):
+    def f1_star(a1, *, kw1=None, kw0=1):  # pragma: no cover
         pass
 
     assert_raises(ValueError, getargspec, f1_star)
     yield eq_argspec, f1_star, (['a1', 'kw1', 'kw0'], None, None, (None, 1)), True
+
+
+def test_get_sig_param_names():
+    def f(a1, kw1=None, *args, kw2=None, **kwargs):
+        pass  # pragma: no cover
+
+    # note: `a1` could be used either positionally or via keyword, so is listed in kw_any
+    assert_equal(get_sig_param_names(f, ('kw_only', 'kw_any')), (['kw2'], ['a1', 'kw1', 'kw2']))
+    assert_equal(get_sig_param_names(f, ('any',)), (['a1', 'kw1', 'kw2'],))
+    assert_equal(get_sig_param_names(f, tuple()), ())
+    assert_raises(ValueError, get_sig_param_names, f, ('mumba',))
 
 
 @with_tempfile(mkdir=True)
@@ -719,7 +731,7 @@ def test_all_same():
         yield 'a'
         yield 'a'
         yield 'b'
-        raise ValueError("Should not get here since on b should return")
+        raise ValueError("Should not get here since on b should return")  # pragma: no cover
 
     ok_(not all_same(never_get_to_not_needed()))
 

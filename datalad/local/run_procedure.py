@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -327,6 +327,7 @@ class RunProcedure(Interface):
     @eval_results
     def __call__(
             spec=None,
+            *,
             dataset=None,
             discover=False,
             help_proc=False):
@@ -482,11 +483,7 @@ class RunProcedure(Interface):
         from datalad.interface.utils import generic_result_renderer
         from datalad.ui import ui
 
-        if res['status'] != 'ok':
-            # logging complained about this already
-            return
-
-        if 'procedure' not in res.get('action', ''):
+        if res['status'] != 'ok' or 'procedure' not in res.get('action', ''):
             # it's not our business
             generic_result_renderer(res)
             return

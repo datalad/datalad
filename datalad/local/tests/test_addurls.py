@@ -1,13 +1,13 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test addurls plugin"""
+"""Test addurls"""
 
 from copy import deepcopy
 import json
@@ -544,7 +544,8 @@ class TestAddurls(object):
             os.mkdir(subdir)
             with chpwd(subdir):
                 shutil.copy(self.json_file, "in.json")
-                addurls(dataset_arg, url_file, "{url}", fname_format,
+                addurls(url_file, "{url}", fname_format,
+                        dataset=dataset_arg,
                         result_renderer='disabled')
                 # Files specified in the CSV file are always relative to the
                 # dataset.
@@ -567,7 +568,8 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
         dspath = os.path.join(path, "ds")
-        addurls(dspath, self.json_file, "{url}", "{name}",
+        addurls(self.json_file, "{url}", "{name}",
+                dataset=dspath,
                 cfg_proc=["yoda"], result_renderer='disabled')
         for fname in ["a", "b", "c", "code"]:
             ok_exists(os.path.join(dspath, fname))

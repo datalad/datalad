@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -144,6 +144,7 @@ class CheckDates(Interface):
     @staticmethod
     @eval_results
     def __call__(paths,
+                 *,
                  reference_date="@1514764800",
                  revs=None,
                  annex="all",

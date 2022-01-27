@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -77,8 +77,6 @@ def _make_dataset_hierarchy(path):
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
-# AssertionError since does get extra record {'cost': 400, 'name': 'bang', 'url': 'youredead', 'from_config': True},
-@known_failure_githubci_win
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -184,6 +182,13 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         "should-really-not-work"
     )
     assert_raises(ValueError, clone3.get, 'sub')
+
+    # smoke test to check for #5631: We shouldn't crash with a KeyError when a
+    # template can not be matched. Origin: https://github.com/datalad/datalad/pull/5644/files
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{not-a-key}-post'}):
+        f(clone, clone.subdatasets(return_type='item-or-list'))
 
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
@@ -547,11 +552,11 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     ds = install(
         path, source=src,
         result_xfm='datasets', return_type='item-or-list')
-    eq_(len(ds.subdatasets(fulfilled=True)), 0)
+    eq_(len(ds.subdatasets(state='present')), 0)
 
     with chpwd(ds.path):
         results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
-    eq_(len(ds.subdatasets(fulfilled=True, recursive=True)), 2)
+    eq_(len(ds.subdatasets(state='present', recursive=True)), 2)
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)

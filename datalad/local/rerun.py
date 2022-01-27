@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -38,6 +38,8 @@ from datalad.interface.base import (
 )
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
+from datalad.interface.common_opts import jobs_opt
+
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
@@ -168,6 +170,7 @@ class Rerun(Interface):
             every one. Care should also be taken when using [CMD: --onto
             CMD][PY: `onto` PY] because checking out a new HEAD can easily fail
             when the working tree has modifications."""),
+        jobs=jobs_opt
     )
 
     _examples_ = [
@@ -196,6 +199,7 @@ class Rerun(Interface):
     @eval_results
     def __call__(
             revision=None,
+            *,
             since=None,
             dataset=None,
             branch=None,
@@ -204,7 +208,8 @@ class Rerun(Interface):
             script=None,
             report=False,
             assume_ready=None,
-            explicit=False):
+            explicit=False,
+            jobs=None):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -268,7 +273,7 @@ class Rerun(Interface):
             handler = _report
         else:
             handler = partial(_rerun, assume_ready=assume_ready,
-                              explicit=explicit)
+                              explicit=explicit, jobs=jobs)
 
         for res in handler(ds, results):
             yield res
@@ -390,7 +395,7 @@ def _mark_nonrun_result(result, which):
     return result
 
 
-def _rerun(dset, results, assume_ready=None, explicit=False):
+def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
     ds_repo = dset.repo
     # Keep a map from an original hexsha to a new hexsha created by the rerun
     # (i.e. a reran, cherry-picked, or merged commit).
@@ -517,6 +522,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False):
                                  explicit=explicit,
                                  rerun_outputs=auto_outputs,
                                  message=message,
+                                 jobs=jobs,
                                  rerun_info=run_info):
                 yield r
         new_head = ds_repo.get_hexsha()

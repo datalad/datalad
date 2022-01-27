@@ -231,7 +231,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
     if sys.platform == "win32":
         GITS = ["git.cmd", "git.exe"]
 
-    out, rc = run_command(GITS, ["rev-parse", "--git-dir"], cwd=root,
+    out, rc = run_command(GITS, ["--git-dir=.git", "rev-parse", "--git-dir"], cwd=root,
                           hide_stderr=True)
     if rc != 0:
         if verbose:
@@ -240,7 +240,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
 
     # if there is a tag matching tag_prefix, this yields TAG-NUM-gHEX[-dirty]
     # if there isn't one, this yields HEX[-dirty] (no NUM)
-    describe_out, rc = run_command(GITS, ["describe", "--tags", "--dirty",
+    describe_out, rc = run_command(GITS, ["--git-dir=.git", "describe", "--tags", "--dirty",
                                           "--always", "--long",
                                           "--match", "%s*" % tag_prefix],
                                    cwd=root)
@@ -248,7 +248,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
     if describe_out is None:
         raise NotThisMethod("'git describe' failed")
     describe_out = describe_out.strip()
-    full_out, rc = run_command(GITS, ["rev-parse", "HEAD"], cwd=root)
+    full_out, rc = run_command(GITS, ["--git-dir=.git", "rev-parse", "HEAD"], cwd=root)
     if full_out is None:
         raise NotThisMethod("'git rev-parse' failed")
     full_out = full_out.strip()
@@ -299,12 +299,12 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
     else:
         # HEX: no tags
         pieces["closest-tag"] = None
-        count_out, rc = run_command(GITS, ["rev-list", "HEAD", "--count"],
+        count_out, rc = run_command(GITS, ["--git-dir=.git", "rev-list", "HEAD", "--count"],
                                     cwd=root)
         pieces["distance"] = int(count_out)  # total number of commits
 
     # commit date: see ISO-8601 comment in git_versions_from_keywords()
-    date = run_command(GITS, ["show", "-s", "--format=%ci", "HEAD"],
+    date = run_command(GITS, ["--git-dir=.git", "show", "-s", "--format=%ci", "HEAD"],
                        cwd=root)[0].strip()
     # Use only the last line.  Previous lines may contain GPG signature
     # information.

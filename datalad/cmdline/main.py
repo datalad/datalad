@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -151,6 +151,8 @@ def setup_parser(
 
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
+    # record that we came in via the cmdline
+    datalad.__api = 'cmdline'
     args = args or sys.argv
     if on_msys_tainted_paths:
         # Possibly present DataLadRIs were stripped of a leading /
@@ -188,6 +190,8 @@ def main(args=None):
 
     # enable overrides
     datalad.cfg.reload(force=True)
+    if 'datalad.runtime.librarymode' in datalad.cfg:
+        datalad.enable_librarymode()
 
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
@@ -261,6 +265,8 @@ def main(args=None):
         ce = CapturedException(exc)
         lgr.error("Failed to render results due to %s", ce)
         sys.exit(1)
+    # all good, not strictly needed, but makes internal testing easier
+    sys.exit(0)
 
 
 lgr.log(5, "Done importing cmdline.main")

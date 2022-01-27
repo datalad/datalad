@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -206,6 +206,7 @@ class Siblings(Interface):
     @eval_results
     def __call__(
             action='query',
+            *,
             dataset=None,
             name=None,
             url=None,
@@ -297,7 +298,7 @@ class Siblings(Interface):
 
         subds_pushurl = None
         for subds in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
             subds_repo = subds.repo

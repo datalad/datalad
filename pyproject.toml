@@ -1,6 +1,6 @@
 [build-system]
 # wheel to get more lightweight (not EASY-INSTALL) entry-points
-requires = ["setuptools>=40.8.0", "wheel"]
+requires = ["packaging", "setuptools>=40.8.0", "wheel"]
 
 [tool.isort]
 force_grid_wrap = 2

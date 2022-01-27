@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -14,28 +14,14 @@ from io import StringIO
 from unittest.mock import patch
 
 import datalad
-from ..main import (
-    _fix_datalad_ri,
-    main,
-)
-from ..helpers import fail_with_short_help
 from datalad import __version__
-from datalad.cmd import (
-    WitlessRunner as Runner,
-    StdOutErrCapture,
-)
-from datalad.ui.utils import (
-    get_console_width,
-    get_terminal_size,
-)
 from datalad.api import (
-    create,
     Dataset,
+    create,
 )
-from datalad.utils import (
-    chpwd,
-    Path,
-)
+from datalad.cmd import StdOutErrCapture
+from datalad.cmd import WitlessRunner as Runner
+from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
     SkipTest,
     assert_equal,
@@ -45,12 +31,26 @@ from datalad.tests.utils import (
     assert_re_in,
     eq_,
     in_,
+    ok_,
     ok_startswith,
     on_windows,
     slow,
     with_tempfile,
 )
-from datalad.support.exceptions import CommandError
+from datalad.ui.utils import (
+    get_console_width,
+    get_terminal_size,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
+)
+
+from ..helpers import fail_with_short_help
+from ..main import (
+    _fix_datalad_ri,
+    main,
+)
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -70,21 +70,28 @@ def run_main(args, exit_code=0, expect_stderr=False):
     stdout, stderr  strings
        Output produced
     """
-    with patch('sys.stderr', new_callable=StringIO) as cmerr:
-        with patch('sys.stdout', new_callable=StringIO) as cmout:
-            with assert_raises(SystemExit) as cm:
-                main(["datalad"] + list(args))
-            assert_equal(cm.exception.code, exit_code)
-            stdout = cmout.getvalue()
-            stderr = cmerr.getvalue()
-            if expect_stderr is False:
-                assert_equal(stderr, "")
-            elif expect_stderr is True:
-                # do nothing -- just return
-                pass
-            else:
-                # must be a string
-                assert_equal(stderr, expect_stderr)
+    was_mode = datalad.__api
+    try:
+        with patch('sys.stderr', new_callable=StringIO) as cmerr:
+            with patch('sys.stdout', new_callable=StringIO) as cmout:
+                with assert_raises(SystemExit) as cm:
+                    main(["datalad"] + list(args))
+                eq_('cmdline', datalad.get_apimode())
+                assert_equal(cm.exception.code, exit_code)
+                stdout = cmout.getvalue()
+                stderr = cmerr.getvalue()
+                if expect_stderr is False:
+                    assert_equal(stderr, "")
+                elif expect_stderr is True:
+                    # do nothing -- just return
+                    pass
+                else:
+                    # must be a string
+                    assert_equal(stderr, expect_stderr)
+    finally:
+        # restore what we had
+        datalad.__api = was_mode
+
     return stdout, stderr
 
 
@@ -116,7 +123,7 @@ def test_help_np():
     # enough of bin/datalad and .tox/py27/bin/datalad -- guarantee consistency! ;)
     ok_startswith(stdout, 'Usage: datalad')
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
-    sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
+    sections = [l[1:-1] for l in filter(re.compile(r'^\*.*\*$').match, stdout.split('\n'))]
     for s in {'Essential commands',
               'Commands for metadata handling',
               'Miscellaneous commands',
@@ -125,6 +132,8 @@ def test_help_np():
               'Plumbing commands',
               }:
         assert_in(s, sections)
+        # should be present only one time!
+        eq_(stdout.count(s), 1)
 
     if not get_terminal_size()[0] or 0:
         raise SkipTest(
@@ -199,14 +208,9 @@ def test_script_shims():
     runner = Runner()
     script = 'datalad'
     if not on_windows:
-        # those must be available for execution, and should not contain
-        which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
-        # test if there is no easy install shim in there
-        with open(which.rstrip()) as f:
-            content = f.read()
-    else:
-        from distutils.spawn import find_executable
-        content = find_executable(script)
+
+        from shutil import which
+        which(script)
 
     # and let's check that it is our script
     out = runner.run([script, '--version'], protocol=StdOutErrCapture)
@@ -379,3 +383,20 @@ def test_commanderror_jsonmsgs(src, exp):
             protocol=StdOutErrCapture)
     if ds.repo.git_annex_version >= "8.20201129":
         in_('use `git-annex export`', cme.exception.stderr)
+
+
+@with_tempfile
+def test_librarymode(path):
+    ds = Dataset(path).create()
+    was_mode = datalad.__runtime_mode
+    try:
+        # clean --dry-run is just a no-op command that is cheap
+        # to execute. It has no particular role here, other than
+        # to make the code pass the location where library mode
+        # should be turned on via the cmdline API
+        run_main(['-c', 'datalad.runtime.librarymode=yes', 'clean', '-d', path, '--dry-run'])
+        ok_(datalad.in_librarymode())
+    finally:
+        # restore pre-test behavior
+        datalad.__runtime_mode = was_mode
+        datalad.cfg.overrides.pop('datalad.runtime.librarymode')

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -260,6 +260,7 @@ class CreateSiblingRia(Interface):
     @eval_results
     def __call__(url,
                  name,
+                 *,  # note that `name` is required but not posarg in CLI
                  dataset=None,
                  storage_name=None,
                  alias=None,
@@ -449,7 +450,7 @@ class CreateSiblingRia(Interface):
             # recursion when querying for them and _no_recursion with the
             # actual call. Theoretically this can be parallelized.
 
-            for subds in ds.subdatasets(fulfilled=True,
+            for subds in ds.subdatasets(state='present',
                                         recursive=True,
                                         recursion_limit=recursion_limit,
                                         result_xfm='datasets'):

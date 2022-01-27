@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -11,25 +11,23 @@
 import inspect
 import logging
 import os.path
-from os.path import exists
-
 from logging import makeLogRecord
-
+from os.path import exists
 from unittest.mock import patch
 
+from datalad import cfg as dl_cfg
 from datalad.log import (
     ColorFormatter,
     LoggerHelper,
-    log_progress,
     TraceBack,
+    log_progress,
     with_progress,
     with_result_progress,
 )
-from datalad import cfg as dl_cfg
-from datalad.support.constraints import EnsureBool
 from datalad.support import ansi_colors as colors
-
+from datalad.support.constraints import EnsureBool
 from datalad.tests.utils import (
+    SkipTest,
     assert_equal,
     assert_in,
     assert_no_open_files,
@@ -41,7 +39,6 @@ from datalad.tests.utils import (
     ok_generator,
     swallow_logs,
     with_tempfile,
-    SkipTest,
 )
 from datalad.utils import on_windows
 
@@ -69,12 +66,12 @@ def test_logging_to_a_file(dst):
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
     # (...)? is added to swallow possible traceback logs
-    regex = "\\[ERROR\\]"
+    regex = r"\[ERROR\]"
     if EnsureBool()(dl_cfg.get('datalad.log.timestamp', False)):
-        regex = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3} " + regex
+        regex = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} " + regex
     if EnsureBool()(dl_cfg.get('datalad.log.vmem', False)):
-        regex += ' RSS/VMS: \\S+/\\S+( \\S+)?\\s*'
-    regex += "(\\s+\\S+\\s*)? " + msg
+        regex += r' RSS/VMS: \S+/\S+( \S+)?\s*'
+    regex += r"(\s+\S+\s*)? " + msg
     assert_re_in(regex, line, match=True)
 
     # Python's logger is ok (although not documented as supported) to accept
@@ -150,7 +147,11 @@ def test_filters():
 
 
 def test_traceback():
-    from inspect import currentframe, getframeinfo
+    from inspect import (
+        currentframe,
+        getframeinfo,
+    )
+
     # do not move lines below among themselves -- we rely on consistent line numbers ;)
     tb_line = getframeinfo(currentframe()).lineno + 2
     def rec(tb, n):

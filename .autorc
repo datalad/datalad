@@ -17,10 +17,10 @@
     { "releaseType": "major", "name": "semver-major" },
     { "releaseType": "minor", "name": "semver-minor" },
     { "releaseType": "patch", "name": "semver-patch" },
-    { "releaseType": "dependencies", "name": "semver-dependencies" },
-    { "releaseType": "documentation", "name": "semver-documentation" },
-    { "releaseType": "internal", "name": "semver-internal" },
-    { "releaseType": "performance", "name": "semver-performance" },
-    { "releaseType": "tests", "name": "semver-tests" }
+    { "releaseType": "none", "name": "semver-dependencies" },
+    { "releaseType": "none", "name": "semver-documentation" },
+    { "releaseType": "none", "name": "semver-internal" },
+    { "releaseType": "none", "name": "semver-performance" },
+    { "releaseType": "none", "name": "semver-tests" }
   ]
 }

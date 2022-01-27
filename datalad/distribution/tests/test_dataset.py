@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -199,7 +199,7 @@ def test_subdatasets(path):
     eq_(len(subdss), 1)
     eq_(subds.path, ds.subdatasets(result_xfm='paths')[0])
     eq_(subdss, ds.subdatasets(recursive=True))
-    eq_(subdss, ds.subdatasets(fulfilled=True))
+    eq_(subdss, ds.subdatasets(state='present'))
     ds.save(message="with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())

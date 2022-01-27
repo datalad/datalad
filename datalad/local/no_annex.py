@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -73,6 +73,7 @@ class NoAnnex(Interface):
     @staticmethod
     @datasetmethod(name='no_annex')
     @eval_results
+    # TODO*: make dataset, pattern into kwargs after *,?
     def __call__(dataset, pattern, ref_dir='.', makedirs=False):
         # could be extended to accept actual largefile expressions
         from os.path import join as opj

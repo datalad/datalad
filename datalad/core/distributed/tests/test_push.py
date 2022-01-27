@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -79,7 +79,7 @@ def test_invalid_call(origin, tdir):
     # unavailable subdataset
     dummy_sub = ds.create('sub')
     dummy_sub.drop(what='all', reckless='kill', recursive=True)
-    assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in('sub', ds.subdatasets(state='absent', result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
     assert_raises(ValueError, ds.push, 'sub')
 
@@ -511,7 +511,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
                       message='Slated for transport, but no content present')
 
 
-@skip_if_on_windows  # https://github.com/datalad/datalad/issues/4278
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
 def test_ria_push(srcpath, dstpath):

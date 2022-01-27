@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -244,10 +244,12 @@ class Clone(Interface):
     def __call__(
             source,
             path=None,
+            git_clone_opts=None,
+            *,
             dataset=None,
             description=None,
             reckless=None,
-            git_clone_opts=None):
+        ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.

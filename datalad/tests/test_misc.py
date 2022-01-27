@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -7,7 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 from .utils import *
 
@@ -36,7 +36,7 @@ def test_get_response_stamp():
 def test_test():
     try:
         import numpy
-        assert LooseVersion(numpy.__version__) >= '1.2'
+        assert Version(numpy.__version__) >= Version('1.2')
     except:
         raise SkipTest("Need numpy 1.2")
 

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -915,16 +915,16 @@ class GitRepo(CoreGitRepo):
 
     @property
     def bare(self):
-        if self.config.getbool("core", "bare") and \
-                self.pathobj == self.dot_git:
-            return True
-        elif not self.config.getbool("core", "bare") and \
-                not self.pathobj == self.dot_git:
-            return False
-        else:
-            raise InvalidGitRepositoryError("GitRepo contains inconsistent hints"
-                                            " on whether or not it is a bare "
-                                            "repository.")
+        """Returns a bool indicating whether the repository is bare
+
+        Importantly, this is not reporting the configuration value
+        of 'core.bare', in order to be usable at a stage where a
+        Repo instance is not yet equipped with a ConfigManager.
+        Instead, it is testing whether the repository path and its
+        "dot_git" are identical. The value of 'core.bare' can be query
+        from the ConfigManager in a fully initialized instance.
+        """
+        return self.pathobj == self.dot_git
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -247,7 +247,11 @@ class ExportToFigshare(Interface):
     @staticmethod
     @datasetmethod(name='export_to_figshare')
     @eval_results
-    def __call__(dataset, filename=None, missing_content='error', no_annex=False,
+    # TODO*: yet another former plugin with dataset first -- do we need that???
+    def __call__(filename=None,
+                 *,
+                 dataset=None,
+                 missing_content='error', no_annex=False,
                  # TODO: support working with projects and articles within them
                  # project_id=None,
                  article_id=None):
@@ -282,7 +286,7 @@ class ExportToFigshare(Interface):
         )
         archive_out = next(
             export_archive(
-                dataset,
+                dataset=dataset,
                 filename=filename,
                 archivetype='zip',
                 missing_content=missing_content,

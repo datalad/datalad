@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -638,7 +638,7 @@ def _get_present_datasets(ds, recursive, recursion_limit):
     if recursive:
         for sub in ds.subdatasets(
                 # we want to report on missing dataset in here
-                fulfilled=None,
+                state='any',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 result_xfm='datasets'):

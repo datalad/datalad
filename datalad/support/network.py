@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -55,23 +55,7 @@ from datalad.support.exceptions import CapturedException
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
-# Change introduced in 3.7: Moved from RFC 2396 to RFC 3986 for quoting URL
-# strings. "~" is now included in the set of reserved characters.
-# For consistency we will provide urlquote
-if sys.version_info >= (3, 7):
-    from urllib.parse import quote as urlquote
-else:
-    from urllib.parse import quote as _urlquote
-
-    def urlquote(url, safe='/', **kwargs):
-        safe += '~'
-        return _urlquote(url, safe=safe, **kwargs)
-
-    urlquote.__doc__ = _urlquote.__doc__ + """
-
-This DataLad version of the function assumes ~ to be a safe character to be
-consistent with Python >= 3.7
-"""
+from urllib.parse import quote as urlquote
 
 
 def is_windows_path(path):

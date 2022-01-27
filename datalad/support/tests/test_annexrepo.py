@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -29,6 +29,7 @@ from os.path import (
     pardir,
     exists,
 )
+from queue import Queue
 from shutil import copyfile
 
 from urllib.parse import urljoin
@@ -131,6 +132,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import (
     AnnexRepo,
     AnnexJsonProtocol,
+    GeneratorAnnexJsonProtocol,
 )
 
 
@@ -929,7 +931,7 @@ def test_AnnexRepo_get(src, dst):
 
     annex.drop(testfile)
     with patch.object(GitWitlessRunner, 'run_on_filelist_chunks',
-                      side_effect=check_run, auto_spec=True), \
+                      side_effect=check_run), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
     eq_(called, ['find', 'get'])
@@ -1595,7 +1597,6 @@ def test_annex_add_no_dotfiles(path):
 def test_annex_version_handling_at_min_version(path):
     with set_annex_version(AnnexRepo.GIT_ANNEX_MIN_VERSION):
         po = patch.object(AnnexRepo, '_check_git_annex_version',
-                          auto_spec=True,
                           side_effect=AnnexRepo._check_git_annex_version)
         with po as cmpc:
             eq_(AnnexRepo.git_annex_version, None)
@@ -2570,3 +2571,39 @@ def test_done_deprecation():
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
         _ = AnnexJsonProtocol()
         warn_mock.assert_not_called()
+
+
+def test_generator_annex_json_protocol():
+
+    runner = Runner()
+    stdin_queue = Queue()
+
+    def json_object(count: int):
+        json_template = '{{"id": "some-id", "count": {count}}}'
+        return json_template.format(count=count).encode()
+
+    count = 123
+    stdin_queue.put(json_object(count=count))
+    for result in runner.run(cmd="cat", protocol=GeneratorAnnexJsonProtocol, stdin=stdin_queue):
+        assert_equal(
+            result,
+            {
+                "id": "some-id",
+                "count": count,
+            }
+        )
+        if count == 133:
+            break
+        count += 1
+        stdin_queue.put(json_object(count=count))
+
+
+def test_captured_exception():
+    class RaiseMock:
+        def add_(self, *args, **kwargs):
+            raise CommandError("RaiseMock.add_")
+
+    with patch("datalad.support.annexrepo.super") as repl_super:
+        repl_super.return_value = RaiseMock()
+        gen = AnnexRepo.add_(object(), [])
+        assert_raises(CommandError, gen.send, None)

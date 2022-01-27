@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -30,6 +30,7 @@ import warnings
 
 from ..ui import ui
 
+import datalad
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import (
@@ -352,8 +353,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     """
     from datalad.utils import getargspec
     # get the signature
-    ndefaults = 0
-    args, varargs, varkw, defaults = getargspec(func)
+    args, varargs, varkw, defaults = getargspec(func, include_kwonlyargs=True)
     defaults = defaults or tuple()
     if add_args:
         add_argnames = sorted(add_args.keys())
@@ -484,6 +484,9 @@ def build_doc(cls, **kwargs):
     cls: Interface
       class defining a datalad command
     """
+    if datalad.in_librarymode():
+        lgr.debug("Not assembling DataLad API docs in libary-mode")
+        return cls
 
     # Note, that this is a class decorator, which is executed only once when the
     # class is imported. It builds the docstring for the class' __call__ method
@@ -662,7 +665,7 @@ class Interface(object):
         from datalad.utils import getargspec
         # get the signature
         ndefaults = 0
-        args, varargs, varkw, defaults = getargspec(cls.__call__)
+        args, varargs, varkw, defaults = getargspec(cls.__call__, include_kwonlyargs=True)
         if defaults is not None:
             ndefaults = len(defaults)
         default_offset = ndefaults - len(args)
@@ -753,10 +756,10 @@ class Interface(object):
     def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
         from datalad.utils import getargspec
-        argspec = getargspec(cls.__call__)
-        if argspec[2] is None:
+        argspec = getargspec(cls.__call__, include_kwonlyargs=True)
+        if argspec.keywords is None:
             # no **kwargs in the call receiver, pull argnames from signature
-            argnames = getargspec(cls.__call__)[0]
+            argnames = argspec.args
         else:
             # common options
             # XXX define or better get from elsewhere
@@ -854,7 +857,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     dict
     """
     from datalad.utils import getargspec
-    argspec = getargspec(call)
+    argspec = getargspec(call, include_kwonlyargs=True)
     defaults = argspec.defaults
     nargs = len(argspec.args)
     defaults = defaults or []  # ensure it is a list and not None

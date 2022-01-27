@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -167,6 +167,7 @@ class Drop(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             what='filecontent',
             reckless=None,
             dataset=None,
@@ -311,7 +312,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 # must be resolved!
                 path=paths or None,
                 # nothing to drop with unavailable subdatasets
-                fulfilled=True,
+                state='present',
                 # we can use the full recursion depth, only the first layer
                 # of calls to _drop_dataset() must/can have recursive=True
                 recursive=recursive,
@@ -451,7 +452,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
         subdatasets = ds.subdatasets(
             path=paths,
             # we only care about the present ones
-            fulfilled=True,
+            state='present',
             # first-level is enough, if that has none, there will be none
             recursive=False,
             result_xfm='paths',

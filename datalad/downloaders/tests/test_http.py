@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -8,15 +8,21 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for http downloader"""
 
+import builtins
+import os
+import re
 import time
 from calendar import timegm
-import re
-
-import os
-import builtins
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
+from datalad.support.network import (
+    download_url,
+    get_url_straight_filename,
+)
+from datalad.utils import ensure_unicode
+
+from ...support.exceptions import AccessFailedError
 from ..base import (
     BaseDownloader,
     DownloadError,
@@ -31,17 +37,9 @@ from ..credentials import (
 from ..http import (
     HTMLFormAuthenticator,
     HTTPBaseAuthenticator,
-    HTTPDownloader,
     HTTPBearerTokenAuthenticator,
+    HTTPDownloader,
     process_www_authenticate,
-)
-from ...support.exceptions import AccessFailedError
-from datalad.support.network import (
-    download_url,
-    get_url_straight_filename,
-)
-from datalad.utils import (
-    ensure_unicode,
 )
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
@@ -56,6 +54,13 @@ except (ImportError, AttributeError):
     httpretty = NoHTTPPretty()
 
 from unittest.mock import patch
+
+from ...support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+)
+from ...support.network import get_url_disposition_filename
+from ...support.status import FileStatus
 from ...tests.utils import (
     SkipTest,
     assert_equal,
@@ -66,7 +71,7 @@ from ...tests.utils import (
     assert_raises,
     known_failure_githubci_win,
     ok_file_has_content,
-    serve_path_via_http, with_tree,
+    serve_path_via_http,
     skip_if,
     skip_if_no_network,
     swallow_logs,
@@ -76,14 +81,9 @@ from ...tests.utils import (
     with_memory_keyring,
     with_tempfile,
     with_testsui,
+    with_tree,
     without_http_proxy,
 )
-from ...support.exceptions import (
-    AccessDeniedError,
-    AnonymousAccessDeniedError,
-)
-from ...support.status import FileStatus
-from ...support.network import get_url_disposition_filename
 from ...utils import read_file
 
 
@@ -170,7 +170,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # and it still results in some warning being spit out
     # Note: we need to avoid mocking opening of the lock file!
     with swallow_logs(), \
-         patch.object(builtins, 'open', fake_open(write_=_raise_IOError, skip_regex='.*\.lck$')):
+         patch.object(builtins, 'open', fake_open(write_=_raise_IOError, skip_regex=r'.*\.lck$')):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
 
     # incomplete download scenario - should have 3 tries

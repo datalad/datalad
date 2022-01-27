@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -47,6 +47,7 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InsufficientArgumentsError,
 )
@@ -245,7 +246,15 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 f"candidate '{name}', but only one is allowed. "
                 f"Check datalad.get.subdataset-source-candidate-* configuration!"
             )
-        url = tmpl.format(**sm_candidate_props)
+        try:
+            url = tmpl.format(**sm_candidate_props)
+        except KeyError as e:
+            ce = CapturedException(e)
+            lgr.warning(
+                "Failed to format template %r for a submodule clone. "
+                "Error: %s", tmpl, ce
+            )
+            continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
         # outside. Additional guesswork can only make it slower
@@ -599,7 +608,7 @@ def _install_targetpath(
         return
     if recursion_limit == 'existing':
         for res in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 path=target_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
@@ -830,6 +839,7 @@ class Get(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             source=None,
             dataset=None,
             recursive=False,

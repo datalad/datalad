@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -570,7 +570,6 @@ class TestAddArchiveOptions():
         # there should be no .datalad temporary files hanging around
         self.assert_no_trash_left_behind()
 
-    @known_failure_windows
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
         mv_out = self.annex.call_git(
@@ -619,7 +618,7 @@ class TestAddArchiveOptions():
 
     def assert_no_trash_left_behind(self):
         assert_equal(
-            list(find_files('\.datalad..*', self.annex.path, exclude="config",
+            list(find_files(r'\.datalad..*', self.annex.path, exclude="config",
                             dirs=True)),
             []
         )

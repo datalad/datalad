@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -60,7 +60,10 @@ class AddReadme(Interface):
     @staticmethod
     @datasetmethod(name='add_readme')
     @eval_results
-    def __call__(dataset, filename='README.md', existing='skip'):
+    def __call__(filename='README.md',
+                 *,
+                 dataset=None,
+                 existing='skip'):
         from os.path import lexists
         from os.path import join as opj
         from io import open

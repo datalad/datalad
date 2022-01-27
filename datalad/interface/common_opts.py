@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.results import known_result_xfms
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureBool,
     EnsureCallable,
     EnsureChoice,
     EnsureInt,
@@ -41,6 +42,36 @@ recursion_limit = Parameter(
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdatasets to the given number of levels""")
+
+contains = Parameter(
+    args=('--contains',),
+    metavar='PATH',
+    action='append',
+    doc="""limit to the subdatasets containing the
+    given path. If a root path of a subdataset is given, the last
+    considered dataset will be the subdataset itself.[CMD:  This
+    option can be given multiple times CMD][PY:  Can be a list with
+    multiple paths PY], in which case datasets that
+    contain any of the given paths will be considered.""",
+    constraints=EnsureStr() | EnsureNone())
+
+fulfilled = Parameter(
+    args=("--fulfilled",),
+    doc="""DEPRECATED: use [CMD: --state CMD][PY: `state` PY]
+    instead. If given, must be a boolean flag indicating whether
+    to consider either only locally present or absent datasets.
+    By default all subdatasets are considered regardless of their
+    status.""",
+    constraints=EnsureBool() | EnsureNone())
+
+dataset_state = Parameter(
+    args=("--state",),
+    doc="""indicate which (sub)datasets to consider: either only locally present,
+    absent, or any of those two kinds.
+    """,
+    # yoh: intentionally left out the description of default since might be
+    # command specific
+    constraints=EnsureChoice('present', 'absent', 'any'))
 
 shared_access_opt = Parameter(
     args=('--shared-access',),

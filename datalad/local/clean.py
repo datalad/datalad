@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -104,7 +104,8 @@ class Clean(Interface):
     @staticmethod
     @datasetmethod(name='clean')
     @eval_results
-    def __call__(dataset=None, what=None, dry_run=False,
+    def __call__(*,
+                 dataset=None, what=None, dry_run=False,
                  recursive=False, recursion_limit=None):
 
         ds = require_dataset(dataset,
@@ -113,7 +114,7 @@ class Clean(Interface):
         res_kwargs = dict(action='clean [dry-run]' if dry_run else 'clean',
                           logger=lgr, refds=ds.path)
         for wds in itertools.chain([ds], ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',

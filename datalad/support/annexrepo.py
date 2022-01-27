@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -18,8 +18,8 @@ import logging
 import os
 import re
 import warnings
-
 from itertools import chain
+from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
@@ -27,19 +27,33 @@ from os.path import (
     exists,
     lexists,
     isdir,
-    normpath
+    normpath,
 )
-from multiprocessing import cpu_count
 from weakref import (
     finalize,
-    WeakValueDictionary
+    WeakValueDictionary,
 )
 
+from datalad.cmd import (
+    BatchedCommand,
+    GitWitlessRunner,
+    # KillOutput,
+    SafeDelCloseMixin,
+    StdOutCapture,
+    StdOutErrCapture,
+    WitlessProtocol,
+)
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
     borrowdoc,
-    borrowkwargs
+    borrowkwargs,
 )
+from datalad.log import log_progress
+from datalad.runner.protocol import GeneratorMixIn
+from datalad.runner.utils import LineSplitter
+# must not be loads, because this one would log, and we need to log ourselves
+from datalad.support.json_py import json_loads
+from datalad.support.exceptions import CapturedException
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
@@ -50,18 +64,6 @@ from datalad.utils import (
     PurePosixPath,
     split_cmdline,
     unlink,
-)
-from datalad.log import log_progress
-# must not be loads, because this one would log, and we need to log ourselves
-from datalad.support.json_py import json_loads
-from datalad.cmd import (
-    BatchedCommand,
-    GitWitlessRunner,
-    # KillOutput,
-    SafeDelCloseMixin,
-    StdOutCapture,
-    StdOutErrCapture,
-    WitlessProtocol,
 )
 
 # imports from same module:
@@ -935,12 +937,20 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         try:
             if files:
-                return runner.run_on_filelist_chunks(
-                    cmd,
-                    files,
-                    protocol=protocol,
-                    env=env,
-                    **kwargs)
+                if issubclass(protocol, GeneratorMixIn):
+                    return runner.run_on_filelist_chunks_items_(
+                        cmd,
+                        files,
+                        protocol=protocol,
+                        env=env,
+                        **kwargs)
+                else:
+                    return runner.run_on_filelist_chunks(
+                        cmd,
+                        files,
+                        protocol=protocol,
+                        env=env,
+                        **kwargs)
             else:
                 return runner.run(
                     cmd,
@@ -1215,11 +1225,29 @@ class AnnexRepo(GitRepo, RepoInterface):
         ------
         See `_call_annex()` for information on Exceptions.
         """
-        out = self._call_annex(
-            args,
-            files=files,
-            protocol=StdOutErrCapture)['stdout']
-        yield from (out.split(sep) if sep else out.splitlines())
+        class GeneratorStdOutErrCapture(GeneratorMixIn, StdOutErrCapture):
+            def __init__(self):
+                GeneratorMixIn.__init__(self)
+                StdOutErrCapture.__init__(self)
+
+            def pipe_data_received(self, fd, data):
+                if fd == 1:
+                    self.send_result(("stdout", data.decode(self.encoding)))
+                    return
+                super().pipe_data_received(fd, data)
+
+        line_splitter = LineSplitter(separator=sep)
+        for source, content in self._call_annex(
+                                args,
+                                files=files,
+                                protocol=GeneratorStdOutErrCapture):
+
+            if source == "stdout":
+                yield from line_splitter.process(content)
+
+        remaining_content = line_splitter.finish_processing()
+        if remaining_content is not None:
+            yield remaining_content
 
     def call_annex_oneline(self, args, files=None):
         """Call annex for a single line of output.
@@ -3519,6 +3547,9 @@ class AnnexJsonProtocol(WitlessProtocol):
         self.total_nbytes = total_nbytes
         self._unprocessed = None
 
+    def add_to_output(self, json_object):
+        self.json_out.append(json_object)
+
     def connection_made(self, transport):
         super().connection_made(transport)
         self._pbars = set()
@@ -3664,7 +3695,7 @@ class AnnexJsonProtocol(WitlessProtocol):
         # TODO the protocol could be made aware of the runner's CWD and
         # also any dataset the annex command is operating on. This would
         # enable 'file' property conversion to absolute paths
-        self.json_out.append(j)
+        self.add_to_output(j)
 
         if self.total_nbytes:
             if self.total_nbytes <= self._byte_count:
@@ -3710,6 +3741,17 @@ class AnnexJsonProtocol(WitlessProtocol):
                 len(self._unprocessed), self._unprocessed
             )
         super().process_exited()
+
+
+class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
+    def __init__(self,
+                 done_future=None,
+                 total_nbytes=None):
+        GeneratorMixIn.__init__(self)
+        AnnexJsonProtocol.__init__(self, done_future, total_nbytes)
+
+    def add_to_output(self, json_object):
+        self.send_result(json_object)
 
 
 class AnnexInitOutput(WitlessProtocol):

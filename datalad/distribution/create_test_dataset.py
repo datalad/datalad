@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -153,7 +153,7 @@ class CreateTestDataset(Interface):
     )
 
     @staticmethod
-    def __call__(path=None, spec=None, seed=None):
+    def __call__(path=None, *, spec=None, seed=None):
         levels = _parse_spec(spec)
 
         if seed is not None:

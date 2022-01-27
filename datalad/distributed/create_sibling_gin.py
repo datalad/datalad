@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -91,12 +91,16 @@ class CreateSiblingGin(Interface):
              code_py="""\
                  > ds = Dataset('.')
                  > ds.create_sibling_gin('myrepo', name='gin')
+                 # first push creates git-annex branch remotely and obtains annex UUID
+                 > ds.push(to='gin')
                  > ds.siblings('configure', name='gin', as_common_datasrc='gin-storage')
                  # announce availability (redo for other siblings)
                  > ds.push(to='gin')
                  """,
              code_cmd="""\
                  % datalad create-sibling-gin myrepo -s gin
+                 # first push creates git-annex branch remotely and obtains annex UUID
+                 % datalad push --to gin
                  % datalad siblings configure -s gin --as-common-datasrc gin-storage
                  # announce availability (redo for other siblings)
                  % datalad push --to gin
@@ -113,6 +117,7 @@ class CreateSiblingGin(Interface):
     @eval_results
     def __call__(
             reponame,
+            *,
             dataset=None,
             recursive=False,
             recursion_limit=None,

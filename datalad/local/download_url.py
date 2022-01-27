@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -69,6 +69,7 @@ class DownloadURL(Interface):
                 ", ".join(map(repr, sorted(Provider.DOWNLOADERS)))),
             constraints=EnsureStr(),  # TODO: EnsureURL
             metavar='url',
+            args=('urls',),
             nargs='+'),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -123,7 +124,9 @@ class DownloadURL(Interface):
     @staticmethod
     @datasetmethod(name="download_url")
     @eval_results
-    def __call__(urls, dataset=None, path=None, overwrite=False,
+    def __call__(urls,
+                 *,
+                 dataset=None, path=None, overwrite=False,
                  archive=False, save=True, message=None):
         from ..downloaders.http import HTTPDownloader
         from ..downloaders.providers import Providers
@@ -141,7 +144,7 @@ class DownloadURL(Interface):
                          "ds": ds}
 
         got_ds_instance = isinstance(dataset, Dataset)
-        dir_is_target = not path or path.endswith(op.sep)
+        dir_is_target = not path or str(path).endswith(op.sep)
         path = str(resolve_path(path or op.curdir, ds=dataset))
         if dir_is_target:
             # resolve_path() doesn't preserve trailing separators. Add one for

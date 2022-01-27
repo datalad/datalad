@@ -137,7 +137,8 @@ Federal Ministry of Education and Research (BMBF 01GQ1411). Additional support
 is provided by the German federal state of Saxony-Anhalt and the European
 Regional Development Fund (ERDF), Project: Center for Behavioral Brain
 Sciences, Imaging Platform.  This work is further facilitated by the ReproNim
-project (NIH 1P41EB019936-01A1).
+project (NIH 1P41EB019936-01A1). Mac mini instance for development is provided
+by [MacStadium](https://www.macstadium.com/).
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
@@ -200,6 +201,7 @@ project (NIH 1P41EB019936-01A1).
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
+[![macstadium](https://uploads-ssl.webflow.com/5ac3c046c82724970fc60918/5c019d917bba312af7553b49_MacStadium-developerlogo.png)](https://www.macstadium.com/)
 
 [Git]: https://git-scm.com
 [Git-annex]: http://git-annex.branchable.com

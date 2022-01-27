@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # -*- coding: utf-8 -*-
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -230,9 +230,18 @@ def test_something(path, new_home):
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
     # lame datalad unittest sections in his precious ~/.gitconfig
-    env = get_home_envvars(new_home)
+
+    # Note: An easier way to test this, would be to just set GIT_CONFIG_GLOBAL
+    # to point somewhere else. However, this is not supported by git before
+    # 2.32. Hence, stick with changed HOME in this test, but be sure to unset a
+    # possible GIT_CONFIG_GLOBAL in addition.
+
+    patched_env = os.environ.copy()
+    patched_env.pop('GIT_CONFIG_GLOBAL', None)
+    patched_env.update(get_home_envvars(new_home))
     with patch.dict('os.environ',
-                    dict(get_home_envvars(new_home), DATALAD_SNEAKY_ADDITION='ignore')):
+                    dict(patched_env, DATALAD_SNEAKY_ADDITION='ignore'),
+                    clear=True):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
         globalcfg = ConfigManager()
@@ -606,8 +615,12 @@ def test_dataset_systemglobal_mode(path):
 def test_global_config():
 
     # from within tests, global config should be read from faked $HOME (see
-    # setup_package)
-    glb_cfg_file = Path(os.path.expanduser('~')) / '.gitconfig'
+    # setup_package) or from GIT_CONFIG_GLOBAL
+
+    if 'GIT_CONFIG_GLOBAL' in os.environ.keys():
+        glb_cfg_file = Path(os.environ.get('GIT_CONFIG_GLOBAL'))
+    else:
+        glb_cfg_file = Path(os.path.expanduser('~')) / '.gitconfig'
     assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._stores['git']['files'])
     assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
     assert_equal(dl_cfg.get("user.email"), "test@example.com")

@@ -16,12 +16,13 @@ import os.path as op
 import shutil
 from collections import OrderedDict
 from operator import itemgetter
+from pathlib import Path
 from urllib.parse import urlparse
 
 from annexremote import UnsupportedRequest
 
-from datalad.cmdline.helpers import get_repo_instance
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.archives import ArchivesCache
 from datalad.support.cache import DictCache
@@ -31,6 +32,7 @@ from datalad.support.network import URL
 from datalad.utils import (
     ensure_bytes,
     getpwd,
+    get_dataset_root,
     unique,
     unlink,
 )
@@ -97,7 +99,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # MIH figure out what the following is all about
         # in particular path==None
-        self.repo = get_repo_instance(class_=AnnexRepo) \
+        self.repo = Dataset(get_dataset_root(Path.cwd())).repo \
             if not path \
             else AnnexRepo(path, create=False, init=False)
 

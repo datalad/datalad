@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -120,6 +120,7 @@ class ExportArchiveORA(Interface):
     def __call__(
             target,
             opts=None,
+            *,  # opts is positional but optional in CLI
             dataset=None,
             remote=None,
             annex_wanted=None,

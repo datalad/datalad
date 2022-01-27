@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -13,7 +13,10 @@ import logging
 import os
 import os.path as op
 
-from .runner import WitlessRunner
+from .runner import (
+    GeneratorMixIn,
+    WitlessRunner,
+)
 from .utils import (
     borrowdoc,
     generate_file_chunks,
@@ -43,13 +46,13 @@ class GitRunnerBase(object):
         if found.  If it is empty (but not None), we do nothing
         """
         if GitRunnerBase._GIT_PATH is None:
-            from distutils.spawn import find_executable
+            from shutil import which
 
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
             if (os.environ.get('DATALAD_USE_DEFAULT_GIT', '0').lower()
                     in ('1', 'on', 'true', 'yes')):
-                git_fpath = find_executable("git")
+                git_fpath = which("git")
                 if git_fpath:
                     GitRunnerBase._GIT_PATH = ''
                     lgr.log(9, "Will use default git %s", git_fpath)
@@ -62,8 +65,8 @@ class GitRunnerBase(object):
 
     @staticmethod
     def _get_bundled_path():
-        from distutils.spawn import find_executable
-        annex_fpath = find_executable("git-annex")
+        from shutil import which
+        annex_fpath = which("git-annex")
         if not annex_fpath:
             # not sure how to live further anyways! ;)
             alongside = False
@@ -73,7 +76,7 @@ class GitRunnerBase(object):
             # we only need to consider bundled git if it's actually different
             # from default. (see issue #5030)
             alongside = op.lexists(bundled_git_path) and \
-                        bundled_git_path != op.realpath(find_executable('git'))
+                        bundled_git_path != op.realpath(which('git'))
 
         return annex_path if alongside else ''
 
@@ -133,9 +136,41 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
             copy=False,
         )
 
-    def run_on_filelist_chunks(self, cmd, files, protocol=None,
-                               cwd=None, env=None, **kwargs):
-        """Run a git-style command multiple times if `files` is too long
+    def _get_chunked_results(self,
+                             cmd,
+                             files,
+                             protocol=None,
+                             cwd=None,
+                             env=None,
+                             **kwargs):
+
+        assert isinstance(cmd, list)
+
+        file_chunks = generate_file_chunks(files, cmd)
+        for i, file_chunk in enumerate(file_chunks):
+            # do not pollute with message when there only ever is a single chunk
+            if len(file_chunk) < len(files):
+                lgr.debug(
+                    'Process file list chunk %i (length %i)', i, len(file_chunk))
+
+            yield self.run(
+                cmd=cmd + ['--'] + file_chunk,
+                protocol=protocol,
+                cwd=cwd,
+                env=env,
+                **kwargs)
+
+    def run_on_filelist_chunks(self,
+                                cmd,
+                                files,
+                                protocol=None,
+                                cwd=None,
+                                env=None,
+                                **kwargs):
+        """
+        Run a git-style command multiple times if `files` is too long,
+        using a non-generator protocol, i.e. a protocol that is not
+        derived from `datalad.runner.protocol.GeneratorMixIn`.
 
         Parameters
         ----------
@@ -177,24 +212,57 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
         FileNotFoundError
           When a given executable does not exist.
         """
-        assert isinstance(cmd, list)
-        file_chunks = generate_file_chunks(files, cmd)
+
+        assert not issubclass(protocol, GeneratorMixIn), \
+            "cannot use GitWitlessRunner.run_on_filelist_chunks() " \
+            "with a protocol that inherits GeneratorMixIn, use " \
+            "GitWitlessRunner.run_on_filelist_chunks_items_() instead"
 
         results = None
-        for i, file_chunk in enumerate(file_chunks):
-            # do not pollute with message when there only ever is a single chunk
-            if len(file_chunk) < len(files):
-                lgr.debug('Process file list chunk %i (length %i)',
-                          i, len(file_chunk))
-            res = self.run(
-                cmd + ['--'] + file_chunk,
-                protocol=protocol,
-                cwd=cwd,
-                env=env,
-                **kwargs)
+        for res in self._get_chunked_results(cmd=cmd,
+                                             files=files,
+                                             protocol=protocol,
+                                             cwd=cwd,
+                                             env=env,
+                                             **kwargs):
             if results is None:
                 results = res
             else:
                 for k, v in res.items():
                     results[k] += v
         return results
+
+    def run_on_filelist_chunks_items_(self,
+                                      cmd,
+                                      files,
+                                      protocol=None,
+                                      cwd=None,
+                                      env=None,
+                                      **kwargs):
+        """
+        Run a git-style command multiple times if `files` is too long,
+        using a generator protocol, i.e. a protocol that is
+        derived from `datalad.runner.protocol.GeneratorMixIn`.
+
+        Parameters
+        ----------
+        see GitWitlessRunner.run_on_filelist_chunks() for a definition
+        of parameters
+
+        Returns
+        -------
+        Generator that yields output of the cmd
+        """
+
+        assert issubclass(protocol, GeneratorMixIn), \
+            "cannot use GitWitlessRunner.run_on_filelist_chunks_items_() " \
+            "with a protocol that does not inherits GeneratorMixIn, use " \
+            "GitWitlessRunner.run_on_filelist_chunks() instead"
+
+        for chunk_generator in self._get_chunked_results(cmd=cmd,
+                                                         files=files,
+                                                         protocol=protocol,
+                                                         cwd=cwd,
+                                                         env=env,
+                                                         **kwargs):
+            yield from chunk_generator

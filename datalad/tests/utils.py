@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -105,6 +105,8 @@ from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
+from datalad.core.local.repo import repo_from_path
+
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -376,30 +378,23 @@ def _prep_file_under_git(path, filename):
 
     Helper to be used by few functions
     """
+    path = Path(path)
     if filename is None:
         # path provides the path and the name
-        path, filename = pathsplit(path)
-    try:
-        # if succeeds when must not (not `annexed`) -- fail
-        repo = get_repo_instance(path, class_=AnnexRepo)
-        annex = True
-    except RuntimeError as e:
-        # TODO: make a dedicated Exception
-        if "No annex repository found in" in str(e):
-            repo = get_repo_instance(path, class_=GitRepo)
-            annex = False
-        else:
-            raise
+        filename = Path(path.name)
+        path = path.parent
+    else:
+        filename = Path(filename)
 
-    # path to the file within the repository
-    # repo.path is a "realpath" so to get relpath working correctly
-    # we need to realpath our path as well
-    # do absolute() in addition to always get an absolute path
-    # even with non-existing paths on windows
-    path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
-    file_repo_dir = relpath(path, repo.path)
-    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
-    return annex, file_repo_path, filename, path, repo
+    ds = Dataset(utils.get_dataset_root(path))
+
+    return isinstance(ds.repo, AnnexRepo), \
+        str(path.absolute().relative_to(ds.path) / filename) \
+        if not filename.is_absolute() \
+        else str(filename.relative_to(ds.pathobj)), \
+        filename, \
+        str(path), \
+        ds.repo
 
 
 #
@@ -1492,24 +1487,6 @@ def ignore_nose_capturing_stdout(func):
     return func
 
 
-def skip_httpretty_on_problematic_pythons(func):
-    """As discovered some httpretty bug causes a side-effect
-    on other tests on some Pythons.  So we skip the test if such
-    problematic combination detected
-
-    References
-    https://travis-ci.org/datalad/datalad/jobs/94464988
-    http://stackoverflow.com/a/29603206/1265472
-    """
-
-    @make_decorator(func)
-    def  _wrap_skip_httpretty_on_problematic_pythons(*args, **kwargs):
-        if sys.version_info[:3] == (3, 4, 2):
-            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
-        return func(*args, **kwargs)
-    return  _wrap_skip_httpretty_on_problematic_pythons
-
-
 @optional_args
 def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
@@ -1889,20 +1866,20 @@ def get_deeply_nested_structure(path):
     """ Here is what this does (assuming UNIX, locked):
     |  .
     |  ├── directory_untracked
-    |  │   └── link2dir -> ../subdir
+    |  │  └── link2dir -> ../subdir
     |  ├── OBSCURE_FILENAME_file_modified
     |  ├── link2dir -> subdir
     |  ├── link2subdsdir -> subds_modified/subdir
     |  ├── link2subdsroot -> subds_modified
     |  ├── subdir
-    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
-    |  │   ├── file_modified
-    |  │   ├── git_file.txt
-    |  │   └── link2annex_files.txt -> annexed_file.txt
+    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
+    |  │   ├── file_modified
+    |  │   ├── git_file.txt
+    |  │   └── link2annex_files.txt -> annexed_file.txt
     |  └── subds_modified
     |      ├── link2superdsdir -> ../subdir
     |      ├── subdir
-    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
+    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
     |      └── subds_lvl1_modified
     |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
