@@ -113,7 +113,17 @@ def test_read_access(store_path, store_url, ds_path):
     create_store(io, store_path, '1')
     create_ds_in_store(io, store_path, ds.id, '2', '1')
     ds.repo.init_remote('ora-remote', options=init_opts)
-    ds.repo.fsck(remote='ora-remote', fast=True)
+    fsck_results = ds.repo.fsck(remote='ora-remote', fast=True)
+    # Note: Failures in the special remote will show up as a success=False
+    # result for fsck -> the call itself would not fail.
+    for r in fsck_results:
+        if "note" in r:
+            # we could simply assert "note" to not be in r, but we want proper
+            # error reporting - content of note, not just its unexpected
+            # existence.
+            assert_equal(r["success"], "true",
+                         msg="git-annex-fsck failed with ORA over HTTP: %s" % r)
+        assert_equal(r["error-messages"], [])
     store_uuid = ds.siblings(name='ora-remote',
                              return_type='item-or-list',
                              result_renderer='disabled')['annex-uuid']
