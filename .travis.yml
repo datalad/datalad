@@ -113,7 +113,10 @@ after_success:
   # cron jobs test more and then PRs will be falling behind since they would not
   # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
   - cd __testhome__;
-  - python -m coverage combine -a /tmp/.coverage-entrypoints-*;
+  - ls -l .coverage
+  - python -m coverage report;
+  - python -m coverage combine -a /tmp/.coverage-entrypoints-* | nl | tail
+  - ls -l .coverage
   - python -m coverage report;
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
       codecov;
