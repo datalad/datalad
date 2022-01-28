@@ -849,17 +849,17 @@ class Get(Interface):
             reckless=None,
             jobs='auto',
     ):
-        refds_path = Interface.get_refds_path(dataset)
         if not (dataset or path):
             raise InsufficientArgumentsError(
                 "Neither dataset nor target path(s) provided")
-        if dataset and not path:
-            # act on the whole dataset if nothing else was specified
-            path = refds_path
-
         # we have to have a single dataset to operate on
         refds = require_dataset(
             dataset, check_installed=True, purpose='get content of %s' % shortened_repr(path))
+        # some functions downstream expect a str
+        refds_path = refds.path
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = refds_path
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not

@@ -219,7 +219,7 @@ class Install(Interface):
                                  purpose='install')
             common_kwargs['dataset'] = dataset
         # pre-compute for results below
-        refds_path = Interface.get_refds_path(ds)
+        refds_path = ds if ds is None else ds.path
 
         # switch into the two scenarios without --source:
         # 1. list of URLs

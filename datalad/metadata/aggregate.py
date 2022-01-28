@@ -907,7 +907,7 @@ class AggregateMetaData(Interface):
             incremental=False,
             force_extraction=False,
             save=True):
-        refds_path = Interface.get_refds_path(dataset)
+        refds_path = require_dataset(dataset)
 
         # it really doesn't work without a dataset
         ds = require_dataset(

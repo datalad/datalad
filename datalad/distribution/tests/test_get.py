@@ -730,7 +730,6 @@ def test_missing_path_handling(path):
 
     with \
             patch("datalad.distribution.get._get_targetpaths") as get_target_path, \
-            patch("datalad.distribution.get.Interface.get_refds_path") as get_refds_path, \
             patch("datalad.distribution.get.require_dataset") as require_dataset, \
             patch("datalad.distribution.get._install_targetpath") as _install_targetpath, \
             patch("datalad.distribution.get.Subdatasets") as subdatasets:
@@ -738,7 +737,6 @@ def test_missing_path_handling(path):
         get_target_path.return_value = [{
             "status": "error"
         }]
-        get_refds_path.return_value = None
         require_dataset.return_value = refds
         _install_targetpath.return_value = [{
             "status": "notneeded",
