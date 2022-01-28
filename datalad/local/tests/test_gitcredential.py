@@ -151,3 +151,43 @@ def test_datalad_credential_helper(path):
         dlcred = UserPassword(name=provider_name)
         eq_(dlcred.get('user'), 'dl-user')
         eq_(dlcred.get('password'), 'dl-pwd')
+
+
+@with_tempfile
+def test_credential_cycle(path):
+
+    # Test that we break a possible cycle when DataLad is configured to query
+    # git-credential and Git is configured to query Datalad.
+    # This may happen in a not-so-obvious fashion, if git-credential-datalad
+    # was configured generally rather than for a specific URL, while there's a
+    # datalad provider config pointing to Git for a particular URL.
+
+    ds = Dataset(path).create()
+
+    # tell git to use git-credential-datalad
+    ds.config.add('credential.helper', 'datalad', where='local')
+    ds.config.add('datalad.credentials.githelper.noninteractive', 'true',
+                  where='global')
+
+    provider_dir = ds.pathobj / '.datalad' / 'providers'
+    provider_dir.mkdir(parents=True, exist_ok=True)
+    provider_cfg = provider_dir / 'test_cycle.cfg'
+    provider_cfg.write_text("""
+[provider:test_cycle]
+    url_re = http.*://.*data\.example\.com
+    authentication_type = http_basic_auth
+    credential = test_cycle_cred
+[credential:test_cycle_cred]
+    type = git
+""")
+    ds.save(message="Add provider config")
+
+    gitcred = GitCredentialInterface(url="https://some.data.exampe.com",
+                                     repo=ds)
+
+    # There's nothing set up yet, helper should return empty.
+    # Importantly, it shouldn't end up in an endless recursion, but just
+    # return w/o something filled in.
+    gitcred.fill()
+    eq_(gitcred['username'], '')
+    eq_(gitcred['password'], '')

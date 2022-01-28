@@ -1,6 +1,9 @@
 import sys
 
-from datalad.downloaders import UserPassword
+from datalad.downloaders import (
+    GitCredential,
+    UserPassword,
+)
 from datalad.downloaders.providers import (
     AUTHENTICATION_TYPES,
     Providers,
@@ -169,6 +172,15 @@ def _action_get(attrs, providers):
         dlcred = UserPassword()
     else:
         dlcred = provider.credential
+        # Safeguard against circular querying. We are a git-credential-helper.
+        # If we find a datalad credential that tells DataLad to query Git, we
+        # need to ignore it. Otherwise we'd end up right here again.
+        if isinstance(provider.credential, GitCredential):
+            # Just return the unchanged description we got from Git
+            for k, v in attrs.items():
+                print('{}={}'.format(k, v))
+            return
+
     for dlk, gitk in (('user', 'username'), ('password', 'password')):
         val = dlcred.get(dlk)
         if val is not None:
