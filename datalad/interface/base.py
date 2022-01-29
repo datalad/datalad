@@ -838,7 +838,8 @@ class Interface(object):
 
     @classmethod
     def get_refds_path(cls, dataset):
-        """Return a resolved reference dataset path from a `dataset` argument"""
+        """Return a resolved reference dataset path from a `dataset` argument.
+        Deprecated - please use require_dataset() instead."""
         # theoretically a dataset could come in as a relative path -> resolve
         if dataset is None:
             return dataset
