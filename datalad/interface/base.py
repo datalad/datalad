@@ -26,7 +26,6 @@ import warnings
 
 import datalad
 from datalad.interface.common_opts import eval_params
-from datalad.interface.common_opts import eval_defaults
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.support.exceptions import CapturedException
@@ -412,7 +411,9 @@ def build_doc(cls, **kwargs):
     if not _has_eval_results_call(cls):
         add_args = None
     else:
-        add_args = {k: getattr(cls, k, v) for k, v in eval_defaults.items()}
+        # defaults for all common parameters are guaranteed to be available
+        # from the class
+        add_args = {k: getattr(cls, k) for k in eval_params}
 
     # ATTN: An important consequence of this update() call is that it
     # fulfills the docstring's promise of overriding any existing

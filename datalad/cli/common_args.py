@@ -17,10 +17,7 @@ from .helpers import (
     HelpAction,
     LogLevelAction,
 )
-from datalad.interface.base import (
-    eval_defaults,
-    eval_params,
-)
+from datalad.interface.base import eval_params
 from datalad.utils import ensure_unicode
 
 
@@ -80,7 +77,7 @@ common_args = dict(
     on_failure=(
         ('--on-failure',),
         dict(dest='common_on_failure',
-             default=eval_defaults['on_failure'],
+             default=eval_params['on_failure'].cmd_kwargs['default'],
              choices=['ignore', 'continue', 'stop'],
              help="""when an operation fails: 'ignore' and continue with remaining
         operations, the error is logged but does not lead to a non-zero exit
