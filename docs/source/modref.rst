@@ -138,6 +138,15 @@ Test infrastructure
    tests.utils_testrepos
    tests.heavyoutput
 
+Command interface
+=================
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   interface.base
+
 Command line interface infrastructure
 =====================================
 

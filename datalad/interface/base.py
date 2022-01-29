@@ -15,6 +15,10 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.interface.base')
 
+from abc import (
+    ABC,
+    abstractmethod,
+)
 import os
 import re
 import textwrap
@@ -339,9 +343,12 @@ def update_docstring_with_examples(cls_doc, ex):
     Take _examples_ of a command, build the Python examples, and append
     them to the docstring.
 
-    cls_doc: docstring
+    Parameters
+    ----------
+    cls_doc: str
+      docstring
     ex: list
-        list of dicts with examples
+      list of dicts with examples
     """
     from textwrap import indent
     if len(cls_doc):
@@ -368,7 +375,7 @@ def build_doc(cls, **kwargs):
     Parameters
     ----------
     cls: Interface
-      class defining a datalad command
+      DataLad command implementation
     """
     if datalad.in_librarymode():
         lgr.debug("Not assembling DataLad API docs in libary-mode")
@@ -437,41 +444,145 @@ def build_doc(cls, **kwargs):
     return cls
 
 
-class Interface(object):
-    """Base class for interface implementations"""
+class Interface(ABC):
+    '''Abstract base class for DataLad command implementations
 
-    # exit code to return if user-interrupted
-    # if None, would just reraise the Exception, so if in --dbg
-    # mode would fall into the debugger
-    # ONLY-USED-IN-CLI (directly and via call_from_parser)
-    # no longer supported
-    #_interrupted_exit_code = 1
+    Any DataLad command implementation must be derived from this class. The
+    code snippet below shows a complete sketch of a Python class with such an
+    implementation.
 
-    # CLI supported feeding command specific arguments to the
-    # `argparse.add_parser()` call for a particular command.
-    # this feature was unused, undocumented, and got removed
-    # because it would needlessly tie internals to the argparse
-    # API
-    #parser_args = {}
+    Importantly, no instances of command classes will created. Instead the main
+    entry point is a static ``__call__()`` method, which must be implemented
+    for any command. It is incorporated as a function in :mod:`datalad.api`, by
+    default under the name of the file the implementation resides (e.g.,
+    ``command`` for a ``command.py`` file).  Therefore the file should have a
+    name that is a syntax-compliant function name. The default naming rule can
+    be overwritten with an explicit alternative name (see
+    :func:`datalad.interface.base.get_api_name`).
 
-    # when Parameter(args=tuple(), ...), i.e. no arguments specified,
-    # is encountered in Interface._params_, it will be ignored by the CLI
+    For commands implementing functionality that is operating on DataLad
+    datasets, a command can be also be bound to the
+    :class:`~datalad.distribution.dataset.Dataset` class as a method using
+    the ``@datasetmethod`` decorator, under the specified name.
 
-    # any Parameter in Interface._params_ for which is_api_arg() == False
-    # will be ignored by the CLI
+    Any ``__call__()`` implementation should be decorated with
+    :func:`datalad.interface.utils.eval_results`. This adds support for
+    standard result processing, and a range of common command parameters that
+    do not need to be manually added to the signature of ``__call__()``. Any
+    implementation decorated in this way should be implemented as a generator,
+    and ``yield`` :ref:`result records <chap_design_result_records>`.
 
-    # if Interface.result_renderer_cmdline is defined, the CLI will prefer
-    # it over another Interface.result_renderer
+    Any argument or keyword argument that appears in the signature of
+    ``__call__()`` must have a matching item in :attr:`Interface._params_`.
+    The dictionary maps argument names to
+    :class:`datalad.support.param.Parameter` specifications. The specification
+    contain CLI argument declarations, value constraint and data type
+    conversation specifications, documentation, and optional
+    ``argparse``-specific arguments for CLI parser construction.
 
-    # if Interface.short_description is not provided, the first line of the
-    # auto-generated description will be used -- effectively the first line
-    # of the class docstring (via get_cmd_doc())
+    The class decorator :func:`datalad.interface.base.build_doc` inspects an
+    :class:`Interface` implementation, and builds a standard docstring from
+    various sources of structured information within the class (also see
+    below). The documentation is automatically tuned differently, depending on
+    the target API (Python vs CLI).
+
+    .. code:: python
+
+        @build_doc
+        class ExampleCommand(Interface):
+            """SHORT DESCRIPTION
+
+            LONG DESCRIPTION
+            ...
+            """
+
+            # COMMAND PARAMETER DEFINITIONS
+            _params_ = dict(
+                example=Parameter(
+                    args=("--example",),
+                    doc="""Parameter description....""",
+                    constraints=...),
+                ...
+                )
+            )
+
+            # RESULT PARAMETER OVERRIDES
+            return_type= 'list'
+            ...
+
+            # USAGE EXAMPLES
+            _examples_ = [
+                dict(text="Example description...",
+                     code_py="Example Python code...",
+                     code_cmd="Example shell code ..."),
+                ...
+            ]
+
+            @staticmethod
+            @datasetmethod(name='example_command')
+            @eval_results
+            def __call__(example=None, ...):
+                ...
+
+                yield dict(...)
+
+    The basic implementation setup described above can be customized for
+    individual commands in various way that alter the behavior and
+    presentation of a specific command. The following overview uses
+    the code comment markers in the above snippet to illustrate where
+    in the class implementation these adjustments can be made.
+
+    (SHORT/LONG) DESCRIPTION
+
+    ``Interface.short_description`` can be defined to provide an
+    explicit short description to be used in documentation and help output,
+    replacing the auto-generated extract from the first line of the full
+    description.
+
+    COMMAND PARAMETER DEFINITIONS
+
+    When a parameter specification declares ``Parameter(args=tuple(), ...)``,
+    i.e. no arguments specified, it will be ignored by the CLI. Likewise, any
+    ``Parameter`` specification for which :func:`is_api_arg` returns ``False``
+    will also be ignored by the CLI. Additionally, any such parameter will
+    not be added to the parameter description list in the Python docstring.
+
+    RESULT PARAMETER OVERRIDES
+
+    The :func:`datalad.interface.utils.eval_results` decorator automatically
+    add a range of additional arguments to a command, which are defined in
+    :py:data:`datalad.interface.common_opts.eval_params`. For any such
+    parameter an Interface implementation can define an interface-specific
+    default value, by declaring a class member with the respective parameter
+    name and the desired default as its assigned value. This feature can be
+    used to tune the default command behavior, for example, with respect to the
+    default result rendering style, or its error behavior.
+
+    In addition to the common parameters of the Python API, an additional
+    ``Interface.result_renderer_cmdline`` can be defined, in order to
+    instruct the CLI to prefer the specified alternative result renderer
+    over an ``Interface.result_renderer`` specification.
+
+    USAGE EXAMPLES
+
+    Any number of usage examples can be described in an ``_examples_`` list
+    class attribute. Such an example contains a description, and code examples
+    for Python and CLI.
+    '''
+    _params_ = {}
+
+    @abstractmethod
+    def __call__():
+        """Must be implemented by any command"""
 
     # https://github.com/datalad/datalad/issues/6376
     @classmethod
     def get_refds_path(cls, dataset):
-        """Return a resolved reference dataset path from a `dataset` argument.
-        Deprecated - please use require_dataset() instead."""
+        """Return a resolved reference dataset path from a `dataset` argument
+
+        .. deprecated:: 0.16
+           Use ``require_dataset()`` instead.
+        """
         # theoretically a dataset could come in as a relative path -> resolve
         if dataset is None:
             return dataset
@@ -482,8 +593,19 @@ class Interface(object):
         return refds_path
 
 
+# pull all defaults from all eval_results() related parameters and assign them
+# as attributes to the class, which then becomes the one place to query for
+# default and potential overrides
+for k, p in eval_params.items():
+    setattr(Interface,
+            # name is always given
+            k,
+            # but there may be no default (rather unlikely, though)
+            p.cmd_kwargs.get('default', None))
+
+
 def get_allargs_as_kwargs(call, args, kwargs):
-    """Generate a kwargs dict from a call signature and *args, **kwargs
+    """Generate a kwargs dict from a call signature and ``*args``, ``**kwargs``
 
     Basically resolving the argnames for all positional arguments, and
     resolving the defaults for all kwargs that are not given in a kwargs
