@@ -42,7 +42,10 @@ options:
 If DataLad's config variable 'datalad.credentials.githelper.noninteractive' is
 set: Don't ask for user confirmation when storing to DataLad's credential
 system. This may fail if default names result in a conflict with existing ones.
-This mode is used for DataLad's CI tests.
+This mode is used for DataLad's CI tests. Note, that this config can not
+reliably be read from local configs (a repository's .git/config or
+.datalad/config) as this credential helper when called by Git doesn't get to
+know what repository it is operating on.
 """
 
 

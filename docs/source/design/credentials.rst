@@ -77,7 +77,7 @@ In addition, there's a special case for interfacing `git-credential`: A dedicate
 This class has identical fields to the :class:`UserPassword` class and thus can be used by the same authenticators.
 Since Git's way to deal with credentials doesn't involve labels but only matching URLs, it is - in some sense - the equivalent of datalad's provider layer.
 However, providers don't talk to a backend, credentials do.
-Hence, a more seemless integration requires some changes in the design of datalad's credential system as a whole.
+Hence, a more seamless integration requires some changes in the design of datalad's credential system as a whole.
 
 In the opposite direction - making Git aware of datalad's credentials, there's no special casing, though.
 Datalad comes with a `git-credential-datalad` executable.
