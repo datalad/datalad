@@ -79,6 +79,7 @@ _group_2metadata = (
 _group_3misc = (
     'Miscellaneous commands',
     [
+        ('datalad.local.configuration', 'Configuration'),
         ('datalad.local.wtf', 'WTF'),
         ('datalad.local.clean', 'Clean'),
         ('datalad.local.add_archive_content', 'AddArchiveContent'),

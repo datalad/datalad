@@ -94,6 +94,7 @@ Miscellaneous commands
    api.add_readme
    api.addurls
    api.check_dates
+   api.configuration
    api.export_archive
    api.export_to_figshare
    api.no_annex
