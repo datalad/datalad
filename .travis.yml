@@ -92,7 +92,9 @@ script:
   # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
   - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
-  - sudo pip install .
+  # might be what screws up joining coverage?
+  #- sudo pip install .
+  - pip install -e .
   # Report WTF information using system wide installed version
   - datalad wtf
   - mkdir -p __testhome__
@@ -114,9 +116,11 @@ after_success:
   # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
   - cd __testhome__;
   - ls -l .coverage
+  - ls -la
   - python -m coverage report;
   - python -m coverage combine -a /tmp/.coverage-entrypoints-* | nl | tail
   - ls -l .coverage
+  - ls -la
   - python -m coverage report;
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
       codecov;
