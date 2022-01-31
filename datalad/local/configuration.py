@@ -84,13 +84,26 @@ class Configuration(Interface):
     hence can be used to ship (default and branch-specific) configuration with
     a dataset.
 
-    Any DATALAD_* environment variable is also mapped to a configuration item.
-    Their values take precedence over any other specification. In variable
-    names '_' encodes a '.' in the configuration name, and '__' encodes a '-',
-    such that 'DATALAD_SOME__VAR' is mapped to 'datalad.some-var'.
+    Besides storing configuration settings statically via this command or ``git
+    config``, DataLad also reads any :envvar:`DATALAD_*` environment on process
+    startup or import, and maps it to a configuration item.  Their values take
+    precedence over any other specification. In variable names ``_`` encodes a
+    ``.`` in the configuration name, and ``__`` encodes a ``-``, such that
+    ``DATALAD_SOME__VAR`` is mapped to ``datalad.some-var``.  Additionally, a
+    :envvar:`DATALAD_CONFIG_OVERRIDES_JSON` environment variable is
+    queried, which may contain configuration key-value mappings as a
+    JSON-formatted string of a JSON-object::
 
-    Recursive operation is supported for querying and modifying configuration
-    across a hierarchy of datasets.
+      DATALAD_CONFIG_OVERRIDES_JSON='{"datalad.credential.example_com.user": "jane", ...}'
+
+    This is useful when characters are part of the configuration key that
+    cannot be encoded into an environment variable name. If both individual
+    configuration variables *and* JSON-overrides are used, the former take
+    precedent over the latter, overriding the respective *individual* settings
+    from configurations declared in the JSON-overrides.
+
+    This command supports recursive operation for querying and modifying
+    configuration across a hierarchy of datasets.
     """
     _examples_ = [
         dict(text="Dump the effective configuration, including an annotation for common items",
