@@ -136,46 +136,6 @@ def get_tree_roots(paths):
     return roots
 
 
-# TODO remove
-# only `remove` and `uninstall` use this, the uses path `path_is_subpath`
-def path_is_under(values, path=None):
-    """Whether a given path is a subdirectory of any of the given test values
-
-    Parameters
-    ----------
-    values : sequence or dict
-      Paths to be tested against. This can be a dictionary in which case
-      all values from all keys will be tested against.
-    path : path or None
-      Test path. If None is given, the process' working directory is
-      used.
-
-    Returns
-    -------
-    bool
-    """
-    if path is None:
-        from datalad.utils import getpwd
-        path = getpwd()
-    if isinstance(values, dict):
-        values = chain(*values.values())
-    path_drive, _ = op.splitdrive(path)
-    for p in values:
-        p_drive, _ = op.splitdrive(p)
-        # need to protect against unsupported use of relpath() with
-        # abspaths on windows from different drives (gh-3724)
-        if path_drive != p_drive:
-            # different drives, enough evidence for "not under"
-            continue
-        rpath = relpath(p, start=path)
-        if rpath == curdir \
-                or rpath == pardir \
-                or set(psplit(rpath)) == {pardir}:
-            # first match is enough
-            return True
-    return False
-
-
 # TODO(OPT)? YOH: from a cursory review seems like possibly an expensive function
 # whenever many paths were provided (e.g. via shell glob).
 # Might be worth testing on some usecase and py-spy'ing if notable portion
