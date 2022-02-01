@@ -9,7 +9,7 @@ Command line interface
 
 .. topic:: Specification scope and status
 
-   This is incomplete specification describes the current implementation.
+   This incomplete specification describes the current implementation.
 
 The command line interface (CLI) implementation is located at ``datalad.cli``.
 It provides a console entry point that automatically constructs an
@@ -91,7 +91,7 @@ extensions) are constructed. This can take a considerable amount of time
 that grows with the number of installed extensions.
 
 The information necessary to configure a subparser for a DataLad command is
-determine by inspecting the respective
+determined by inspecting the respective
 :class:`~datalad.interface.base.Interface` class for that command, and reusing
 individual components for the parser. This includes:
 
@@ -118,7 +118,7 @@ Once the main command line entry point determine that a command shall be
 executed, it triggers a handler function that was assigned and parameterized
 with the underlying command :class:`~datalad.interface.base.Interface` during
 parser construction. At the time of execution, this handler is given the result
-of ``argparsed``-based command line argument parsing (i.e., a ``Namespace``
+of ``argparse``-based command line argument parsing (i.e., a ``Namespace``
 instance).
 
 From this parser result, the handler constructs positional and keyword
@@ -128,6 +128,6 @@ such as those for result filtering and rendering, which influence the central
 processing of result recorded yielded by a command.
 
 If an underlying command returns a Python generator it is unwound to trigger
-the respective underlying processing. The handler before no error handling.
+the respective underlying processing. The handler performs no error handling.
 This is left to the main command line entry point.
 
