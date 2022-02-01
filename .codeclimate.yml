@@ -1,0 +1,17 @@
+version: "2"
+checks:
+  file-lines:
+    config:
+      threshold: 500
+plugins:
+  bandit:
+    enabled: true
+    checks:
+      assert_used:
+        enabled: false
+exclude_patterns:
+- "_datalad_build_support/"
+- "versioneer.py"
+- "*/_version.py"
+- "tools/"
+- "**/tests/"
