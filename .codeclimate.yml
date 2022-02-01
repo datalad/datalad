@@ -11,6 +11,7 @@ plugins:
         enabled: false
 exclude_patterns:
 - "_datalad_build_support/"
+- "benchmarks/"
 - "versioneer.py"
 - "*/_version.py"
 - "tools/"
