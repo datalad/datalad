@@ -91,7 +91,7 @@ def test_call_from_parser_default_args():
             eq_(kwargs['common_result_renderer'], "generic")
             # with dissolution of _OLD_STYLE_COMMANDS yoh yet to find
             # a real interface which had return_type (defined in
-            # eval_defaults and eval_params) but no @eval_results
+            # eval_params) but no @eval_results
             # eq_(kwargs['return_type'], "generator")
             eq_(arg, "nothing")
             yield "nothing is"

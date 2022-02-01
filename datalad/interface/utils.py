@@ -55,7 +55,6 @@ import datalad.support.ansi_colors as ac
 from datalad.interface.base import default_logchannels
 from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
-from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
 from datalad.core.local.resulthooks import (
     get_jsonhooks_from_config,
@@ -342,11 +341,7 @@ def eval_results(wrapped):
                 p_name,
                 # otherwise determine the command class and pull any
                 # default set in that class
-                getattr(
-                    wrapped_class,
-                    p_name,
-                    # or the common default
-                    eval_defaults[p_name]))
+                getattr(wrapped_class, p_name))
             for p_name in eval_params}
 
         # short cuts and configured setup for common options
