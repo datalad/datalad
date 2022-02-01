@@ -585,6 +585,12 @@ def _process_results(
                and dlcfg.obtain('datalad.ui.suppress-similar-results') \
             else float("inf")
 
+    if result_renderer == 'tailored' and not hasattr(cmd_class,
+                                                     'custom_result_renderer'):
+        # a tailored result renderer is requested, but the class
+        # does not provide any, fall back to the generic one
+        result_renderer = 'generic'
+
     for res in results:
         if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
@@ -667,9 +673,8 @@ def _process_results(
                 sort_keys=True,
                 indent=2 if result_renderer.endswith('_pp') else None,
                 default=str))
-        elif result_renderer in ('tailored', 'generic', 'default'):
-            if hasattr(cmd_class, 'custom_result_renderer'):
-                cmd_class.custom_result_renderer(res, **allkwargs)
+        elif result_renderer == 'tailored':
+            cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
             try:
                 result_renderer(res, **allkwargs)
