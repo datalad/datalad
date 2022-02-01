@@ -123,20 +123,12 @@ def main(args=sys.argv):
         sys.exit(2)
 
     # execute the command, either with a debugger catching
-    # a crash, or with a simplistic exception handler
+    # a crash, or with a simplistic exception handler.
+    # note that result rendering is happening in the
+    # execution handler, when the command-generator is unwound
     ret = _run_with_debugger(cmdlineargs) \
         if cmdlineargs.common_debug or cmdlineargs.common_idebug \
         else _run_with_exception_handler(cmdlineargs)
-
-    # render any result, but guard it, because also result renderer could crash
-    try:
-        if hasattr(cmdlineargs, 'result_renderer'):
-            cmdlineargs.result_renderer(ret, cmdlineargs)
-    except Exception as exc:
-        from datalad.support.exceptions import CapturedException
-        ce = CapturedException(exc)
-        lgr.error("Failed to render results due to %s", ce)
-        sys.exit(1)
 
     # all good, not strictly needed, but makes internal testing easier
     sys.exit(0)
