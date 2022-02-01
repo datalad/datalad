@@ -66,12 +66,6 @@ from datalad.core.local.resulthooks import (
 lgr = logging.getLogger('datalad.interface.utils')
 
 
-def cls2cmdlinename(cls):
-    "Return the cmdline command name from an Interface class"
-    r = re.compile(r'([a-z0-9])([A-Z])')
-    return r.sub('\\1-\\2', cls.__name__).lower()
-
-
 # TODO remove
 # only `drop` and `uninstall` are still using this
 def handle_dirty_dataset(ds, mode, msg=None):
