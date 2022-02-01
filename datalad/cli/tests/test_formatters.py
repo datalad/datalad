@@ -9,20 +9,25 @@
 """"""
 
 from io import StringIO as SIO
-from os.path import exists
 from datalad.tests.utils import (
     ok_,
     ok_startswith,
     assert_in,
     assert_not_in,
     SkipTest,
-    skip_if_no_module
 )
 
-skip_if_no_module('formatters')
-import formatters as fmt
+import importlib.util
+from pathlib import Path
+file_path = \
+    Path(__file__).parents[3] / '_datalad_build_support' / 'formatters.py'
+if not file_path.exists():
+    raise SkipTest(f'Cannot find {file_path}')
+spec = importlib.util.spec_from_file_location('formatters', file_path)
+fmt = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fmt)
 
-from ..main import setup_parser
+from ..parser import setup_parser
 
 demo_example = """
 #!/bin/sh

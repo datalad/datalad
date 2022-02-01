@@ -13,6 +13,7 @@ subsystems in DataLad.
 .. toctree::
    :maxdepth: 2
 
+   cli
    application_vs_library_mode
    file_url_handling
    result_records

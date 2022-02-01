@@ -145,6 +145,7 @@ Command line interface infrastructure
 .. autosummary::
    :toctree: generated
 
-   cmdline.main
-   cmdline.helpers
-   cmdline.common_args
+   cli.exec
+   cli.main
+   cli.parser
+   cli.renderer
