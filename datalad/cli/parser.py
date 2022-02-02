@@ -116,6 +116,15 @@ def setup_parser(
         completing,
     ) if not (return_subparsers or help_ignore_extensions) else None
 
+    if target_subparser_name is None:
+        # we cannot be lean, we must built the full parser
+        # and for that must load all extensions too, e.g., to
+        # be able to list extension command in --help output
+        # (in case of a help request, the extension loading will not
+        #  have happened yet in single_subparser_possible())
+        from .helpers import add_entrypoints_to_interface_groups
+        add_entrypoints_to_interface_groups(interface_groups)
+
     # --help specification was delayed since it causes immediate printout of
     # --help output before we setup --help for each command
     parser_add_common_opt(parser, 'help')
