@@ -3405,7 +3405,7 @@ class GitRepo(CoreGitRepo):
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
-            if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
+            if hasattr(self, 'uuid') and not kwargs.get('git', False):
                 # we cannot simply hook into the coming add-call
                 # as this would go to annex, so make a dedicted git-add
                 # call to ensure .gitmodules is not annexed
@@ -3431,7 +3431,7 @@ class GitRepo(CoreGitRepo):
                     to_add,
                     git_opts=None,
                     **{k: kwargs[k] for k in kwargs
-                       if k in (('git',) if hasattr(self, 'annexstatus')
+                       if k in (('git',) if hasattr(self, 'uuid')
                                 else tuple())}):
                 yield r
 
