@@ -636,7 +636,14 @@ def test_bare(src, path):
     ds = Dataset(src).create()
     dlconfig_sha = ds.repo.call_git(['rev-parse', 'HEAD:.datalad/config'])
     # can we handle a bare repo version of it?
-    gr = AnnexRepo.clone(src, path, clone_options=['--bare'])
+    gr = AnnexRepo.clone(
+        src, path, clone_options=['--bare', '-b', DEFAULT_BRANCH])
+    # we had to specifically checkout the standard branch, because on crippled
+    # FS, HEAD will point to an adjusted branch by default, and the test logic
+    # below does not account for this case.
+    # this should just make sure the bare repo has the expected setup,
+    # but it should still be bare. Let's check that to be sure
+    assert_true(gr.bare)
     # do we read the correct local config?
     assert_in(gr.pathobj / 'config', gr.config._stores['git']['files'])
     # do we pick up the default branch config too?
