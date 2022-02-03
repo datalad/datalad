@@ -99,9 +99,11 @@ def setup_parser(
         epilog='"Be happy!"',
         formatter_class=formatter_class,
         add_help=False,
-        # set to False so parse_known_args does not add its error handling
-        # Added while RFing from using _parse_known_args to parse_known_args.
-        exit_on_error=False,
+        # TODO: when dropping support for Python 3.8: uncomment below
+        # and use parse_known_args instead of _parse_known_args:
+        # # set to False so parse_known_args does not add its error handling
+        # # Added while RFing from using _parse_known_args to parse_known_args.
+        # exit_on_error=False,
     )
 
     # common options
@@ -295,7 +297,7 @@ def single_subparser_possible(cmdlineargs, parser, interface_groups,
     # Before doing anything additional and possibly expensive see may be that
     # we have got the command already
     try:
-        parsed_args, unparsed_args = parser.parse_known_args(
+        parsed_args, unparsed_args = parser._parse_known_args(
             cmdlineargs[1:], argparse.Namespace())
         # before anything handle possible datalad --version
         if not unparsed_args and getattr(parsed_args, 'version', None):
