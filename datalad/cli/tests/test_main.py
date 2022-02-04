@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     ok_startswith,
     on_windows,
     slow,
+    skip_if_no_module,
     with_tempfile,
 )
 from datalad.ui.utils import (
@@ -316,9 +317,13 @@ def test_librarymode(path):
 
 @with_tempfile
 def test_completion(out_fn):
+    skip_if_no_module('argcomplete')
 
-    def get_completions(s: str, expected, exit_code=2) -> list[str]:
-        """
+    from datalad.cmd import WitlessRunner
+    runner = WitlessRunner()
+
+    def get_completions(s: str, expected) -> list[str]:
+        """Run 'datalad' external command and collect completions
 
         Parameters
         ----------
@@ -339,16 +344,15 @@ def test_completion(out_fn):
         if os.path.exists(out_fn):  # reuse but ensure it is gone
             os.unlink(out_fn)
         comp_line = f'datalad {s}'
-        with patch.dict('os.environ',
-                {
-                    '_ARGCOMPLETE': '1',
-                    '_ARGCOMPLETE_STDOUT_FILENAME': out_fn,
-                    'COMP_LINE': comp_line,
-                    # without -1 seems to get "finished completion", someone can investigate more
-                    'COMP_POINT': str(len(comp_line)-1),  # always at the end ATM
-                 }), \
-            patch.object(os, '_exit', print):
-            run_main([], exit_code=exit_code, expect_stderr=True)
+        runner.run(
+            comp_line.split(' '),
+            env=dict(os.environ,
+                     _ARGCOMPLETE='1',
+                     _ARGCOMPLETE_STDOUT_FILENAME=out_fn,
+                     COMP_LINE=comp_line,
+                     # without -1 seems to get "finished completion", someone can investigate more
+                     COMP_POINT=str(len(comp_line)-1),  # always at the end ATM
+                     ))
         with open(out_fn, 'rb') as f:
             entries = f.read().split(b'\x0b')
             entries = [e.decode() for e in entries]
@@ -363,7 +367,7 @@ def test_completion(out_fn):
     get_completions('i', {'install'})
     get_completions(' ', ['--dbg', '-c'] + all_commands)
     # if command already matches -- we get only that hit ATM, not others which begin with it
-    get_completions('create', ['create '], exit_code=1)
-    get_completions('create -', ['--dataset'], exit_code=1)
+    get_completions('create', ['create '])
+    get_completions('create -', ['--dataset'])
     # but for incomplete one we do get all create* commands
     get_completions('creat', [c for c in all_commands if c.startswith('create')])
