@@ -43,8 +43,10 @@ from datalad.ui.utils import (
 from datalad.utils import (
     chpwd,
 )
+from datalad.interface.base import get_interface_groups
 
 from ..main import main
+from ..helpers import get_commands_from_groups
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -89,6 +91,13 @@ def run_main(args, exit_code=0, expect_stderr=False):
     return stdout, stderr
 
 
+def assert_all_commands_present(out):
+    """Helper to reuse to assert that all known commands are present in output
+    """
+    for cmd in get_commands_from_groups(get_interface_groups()):
+        assert_re_in(fr"\b{cmd}\b", out, match=False)
+
+
 # TODO: switch to stdout for --version output
 def test_version():
     # we just get a version if not asking for a version of some command
@@ -129,6 +138,8 @@ def test_help_np():
         # should be present only one time!
         eq_(stdout.count(s), 1)
 
+    assert_all_commands_present(stdout)
+
     if not get_terminal_size()[0] or 0:
         raise SkipTest(
             "Could not determine terminal size, skipping the rest of the test")
@@ -147,6 +158,23 @@ def test_help_np():
             "Following lines in --help output were longer than %s chars:\n%s"
             % (accepted_width, '\n'.join(long_lines))
         )
+
+
+def test_dashh():
+    stdout, stderr = run_main(['-h'])
+    # Note: for -h we do not do ad-hoc tune up of Usage: to guarantee having
+    # datalad instead of python -m nose etc, so we can only verify that we have
+    # options listed
+    assert_re_in(r'^Usage: .*\[', stdout.splitlines()[0])
+    assert_all_commands_present(stdout)
+    assert_re_in('Use .--help. to get more comprehensive information', stdout.splitlines())
+
+
+def test_dashh_clone():
+    # test -h on a sample command
+    stdout, stderr = run_main(['clone', '-h'])
+    assert_re_in(r'^Usage: .* clone \[', stdout.splitlines()[0])
+    assert_re_in('Use .--help. to get more comprehensive information', stdout.splitlines())
 
 
 def test_usage_on_insufficient_args():
