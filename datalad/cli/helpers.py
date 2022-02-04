@@ -52,6 +52,9 @@ class HelpAction(argparse.Action):
         else:
             helpstr = self._get_long_help(parser)
 
+        # normalize capitalization to what we "always" had
+        helpstr = f'Usage:{helpstr[6:]}'
+
         if interactive and option_string == '--help':
             import pydoc
             pydoc.pager(helpstr)
@@ -61,6 +64,10 @@ class HelpAction(argparse.Action):
 
     def _get_long_help(self, parser):
         helpstr = parser.format_help()
+        if ' ' in parser.prog:  # subcommand
+            # in case of a subcommand there is no need to pull the
+            # list of top-level subcommands
+            return helpstr
         helpstr = re.sub(
             r'^[uU]sage: .*?\n\s*\n',
             'Usage: datalad [global-opts] command [command-opts]\n\n',
@@ -116,8 +123,6 @@ class HelpAction(argparse.Action):
 
     def _get_short_help(self, parser):
         usage = parser.format_usage()
-        # normalize capitalization to what we "always" had
-        usage = f'Usage:{usage[6:]}'
         hint = "Use '--help' to get more comprehensive information."
         if ' ' in parser.prog:  # subcommand
             # in case of a subcommand there is no need to pull the
