@@ -141,7 +141,7 @@ def add_entrypoints_to_interface_groups(interface_groups):
     from pkg_resources import iter_entry_points  # delay expensive import
     for ep in iter_entry_points('datalad.extensions'):
         lgr.debug(
-            'Loading entrypoint %s from datalad.extensions for docs building',
+            'Loading entrypoint %s from datalad.extensions',
             ep.name)
         try:
             spec = ep.load()
