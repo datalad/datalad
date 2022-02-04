@@ -81,24 +81,29 @@ class HelpAction(argparse.Action):
 
     def _get_short_help(self, parser):
         usage = parser.format_usage()
-        ucomps = re.match(
-            r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
-            usage,
-            re.DOTALL)
-        if ucomps:
-            ucomps = ucomps.groupdict()
-            indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
-            usage = '{pre}{{{cmds}}}{post}'.format(
-                pre=ucomps['pre'],
-                cmds='\n'.join(wrap(
-                    ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
-                    break_on_hyphens=False,
-                    subsequent_indent=' ' * indent_level)),
-                post=ucomps['post'],
-            )
-        return "%s\n%s" % (
-            usage,
-            "Use '--help' to get more comprehensive information.")
+        hint = "Use '--help' to get more comprehensive information."
+        if ' ' in parser.prog:  # subcommand
+            # in case of a subcommand there is no need to pull the
+            # list of top-level subcommands
+            return f"{usage}\n{hint}"
+
+        # load all extensions and command specs
+        # this does not fully tune all the command docs
+        from datalad.interface.base import get_interface_groups
+        interface_groups = get_interface_groups()
+        add_entrypoints_to_interface_groups(interface_groups)
+        # get the list of commands and format them like
+        # argparse would present subcommands
+        commands = get_commands_from_groups(interface_groups).keys()
+        indent = usage.splitlines()[-1]
+        indent = indent[:-len(indent.lstrip())] + ' '
+        usage += f'{indent[1:]}{{'
+        usage += '\n'.join(wrap(
+            ', '.join(sorted(c.strip() for c in commands)),
+            break_on_hyphens=False,
+            subsequent_indent=indent))
+        usage += f'}}\n{indent[1:]}...\n'
+        return f"{usage}\n{hint}"
 
     def _try_manpage(self, parser):
         try:
