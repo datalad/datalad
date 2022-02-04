@@ -163,10 +163,9 @@ def setup_parser(
         # parseinfo could be None here, when we could not identify
         # a subcommand, but need to locate matching ones for
         # completion
-        grp_short_descriptions = defaultdict(list)
         # create subparser, use module suffix as cmd name
         subparsers = parser.add_subparsers()
-        for group_name, _, _interfaces \
+        for _, _, _interfaces \
                 in sorted(interface_groups, key=lambda x: x[1]):
             for _intfspec in _interfaces:
                 cmd_name = get_cmdline_command_name(_intfspec)
@@ -187,8 +186,7 @@ def setup_parser(
                     subparsers,
                     cmd_name,
                     formatter_class,
-                    group_name,
-                    grp_short_descriptions
+                    completing=completing,
                 )
                 if subparser:  # interface can fail to load
                     all_parsers[cmd_name] = subparser
@@ -203,7 +201,7 @@ def setup_parser(
         return parser
 
 
-def setup_parser_for_interface(parser, cls):
+def setup_parser_for_interface(parser, cls, completing=False):
     # XXX needs safety check for name collisions
     # XXX allow for parser kwargs customization
     # get the signature, order of arguments is taken from it
@@ -227,11 +225,12 @@ def setup_parser_for_interface(parser, cls):
 
         # set up the parameter
         setup_parserarg_for_interface(
-            parser, arg, param, defaults_idx, prefix_chars, defaults)
+            parser, arg, param, defaults_idx, prefix_chars, defaults,
+            completing=completing)
 
 
 def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
-                                  prefix_chars, defaults):
+                                  prefix_chars, defaults, completing=False):
     cmd_args = param.cmd_args
     parser_kwargs = param.cmd_kwargs
     has_default = defaults_idx >= 0
@@ -262,27 +261,32 @@ def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
 
     if has_default:
         parser_kwargs['default'] = defaults[defaults_idx]
-    help = alter_interface_docs_for_cmdline(param._doc)
-    if help and help.rstrip()[-1] != '.':
-        help = help.rstrip() + '.'
     if param.constraints is not None:
-        _amend_action_args_for_parameter_constraint(param, parser_kwargs, help)
-    if defaults_idx >= 0:
-        # if it is a flag, in commandline it makes little sense to show
-        # showing the Default: (likely boolean).
-        #   See https://github.com/datalad/datalad/issues/3203
-        if not parser_kwargs.get('action', '').startswith('store_'):
-            # [Default: None] also makes little sense for cmdline
-            if defaults[defaults_idx] is not None:
-                help += " [Default: %r]" % (defaults[defaults_idx],)
+        parser_kwargs['type'] = param.constraints
+    if completing:
+        help = None
+    else:
+        help = alter_interface_docs_for_cmdline(param._doc)
+        if help and help.rstrip()[-1] != '.':
+            help = help.rstrip() + '.'
+            if param.constraints is not None:
+                _amend_help_for_parameter_constraint(
+                    param, parser_kwargs, help)
+        if defaults_idx >= 0:
+            # if it is a flag, in commandline it makes little sense to show
+            # showing the Default: (likely boolean).
+            #   See https://github.com/datalad/datalad/issues/3203
+            if not parser_kwargs.get('action', '').startswith('store_'):
+                # [Default: None] also makes little sense for cmdline
+                if defaults[defaults_idx] is not None:
+                    help += " [Default: %r]" % (defaults[defaults_idx],)
     # create the parameter, using the constraint instance for type
     # conversion
     parser.add_argument(*parser_args, help=help,
                         **parser_kwargs)
 
 
-def _amend_action_args_for_parameter_constraint(param, args, help):
-    args['type'] = param.constraints
+def _amend_help_for_parameter_constraint(param, args, help):
     # include value constraint description and default
     # into the help string
     cdoc = alter_interface_docs_for_cmdline(
@@ -409,11 +413,9 @@ def try_suggest_extension_with_command(parser, cmd, completing, known_cmds):
         )
 
 
-def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
-                  grp_short_descriptions):
+def add_subparser(_intfspec, subparsers, cmd_name, formatter_class,
+                  completing=False):
     """Given an interface spec, add a subparser to subparsers under cmd_name
-
-    That subparser is also gets added to the grp_short_descriptions
     """
     _intf = load_interface(_intfspec)
     if _intf is None:
@@ -424,11 +426,12 @@ def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
     parser_args = dict(formatter_class=formatter_class)
     # use class description, if no explicit description is available
     intf_doc = get_cmd_doc(_intf)
-    parser_args['description'] = alter_interface_docs_for_cmdline(
-        intf_doc)
-    if hasattr(_intf, '_examples_'):
-        intf_ex = alter_interface_docs_for_cmdline(get_cmd_ex(_intf))
-        parser_args['description'] += intf_ex
+    if not completing:
+        parser_args['description'] = alter_interface_docs_for_cmdline(
+            intf_doc)
+        if hasattr(_intf, '_examples_'):
+            intf_ex = alter_interface_docs_for_cmdline(get_cmd_ex(_intf))
+            parser_args['description'] += intf_ex
 
     # create the sub-parser
     subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
@@ -437,7 +440,7 @@ def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
     # not unconditionally have it available initially
     parser_add_common_opt(subparser, 'help')
     # let module configure the parser
-    setup_parser_for_interface(subparser, _intf)
+    setup_parser_for_interface(subparser, _intf, completing=completing)
     # and we would add custom handler for --version
     parser_add_version_opt(
         subparser, _intf.__module__.split('.', 1)[0], include_name=True)
@@ -452,10 +455,6 @@ def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
     if hasattr(_intf, 'result_renderer_cmdline'):
         plumbing_args['result_renderer'] = _intf.result_renderer_cmdline
     subparser.set_defaults(**plumbing_args)
-    # store short description for later
-    sdescr = getattr(_intf, 'short_description',
-                     parser_args['description'].split('\n')[0])
-    grp_short_descriptions[group_name].append((cmd_name, sdescr))
     return subparser
 
 
