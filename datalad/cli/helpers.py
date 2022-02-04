@@ -46,48 +46,9 @@ class HelpAction(argparse.Action):
         if interactive \
                 and option_string == '--help' \
                 and ' ' in parser.prog:  # subcommand
-            try:
-                import subprocess
-                # get the datalad manpage to use
-                manfile = os.environ.get('MANPATH', '/usr/share/man') \
-                    + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
-                # extract version field from the manpage
-                if not os.path.exists(manfile):
-                    raise IOError("manfile is not found")
-                with gzip.open(manfile) as f:
-                    man_th = [line for line in f if line.startswith(b".TH")][0]
-                man_version = man_th.split(b' ')[-1].strip(b" '\"\t\n").decode('utf-8')
-
-                # don't show manpage if man_version not equal to current datalad_version
-                if __version__ != man_version:
-                    raise ValueError
-                subprocess.check_call(
-                    'man %s 2> /dev/null' % manfile,
-                    shell=True)
-                sys.exit(0)
-            except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
-                ce = CapturedException(e)
-                lgr.debug("Did not use manpage since %s", ce)
+            self._try_manpage(parser)
         if option_string == '-h':
-            usage = parser.format_usage()
-            ucomps = re.match(
-                r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
-                usage,
-                re.DOTALL)
-            if ucomps:
-                ucomps = ucomps.groupdict()
-                indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
-                usage = '{pre}{{{cmds}}}{post}'.format(
-                    pre=ucomps['pre'],
-                    cmds='\n'.join(wrap(
-                        ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
-                        break_on_hyphens=False,
-                        subsequent_indent=' ' * indent_level)),
-                    post=ucomps['post'],
-                )
-            helpstr = "%s\n%s" % (
-                usage,
-                "Use '--help' to get more comprehensive information.")
+            helpstr = self._get_short_help(parser)
         else:
             helpstr = parser.format_help()
         # better for help2man
@@ -117,6 +78,51 @@ class HelpAction(argparse.Action):
         else:
             print(helpstr)
         sys.exit(0)
+
+    def _get_short_help(self, parser):
+        usage = parser.format_usage()
+        ucomps = re.match(
+            r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
+            usage,
+            re.DOTALL)
+        if ucomps:
+            ucomps = ucomps.groupdict()
+            indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
+            usage = '{pre}{{{cmds}}}{post}'.format(
+                pre=ucomps['pre'],
+                cmds='\n'.join(wrap(
+                    ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
+                    break_on_hyphens=False,
+                    subsequent_indent=' ' * indent_level)),
+                post=ucomps['post'],
+            )
+        return "%s\n%s" % (
+            usage,
+            "Use '--help' to get more comprehensive information.")
+
+    def _try_manpage(self, parser):
+        try:
+            import subprocess
+            # get the datalad manpage to use
+            manfile = os.environ.get('MANPATH', '/usr/share/man') \
+                + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
+            # extract version field from the manpage
+            if not os.path.exists(manfile):
+                raise IOError("manfile is not found")
+            with gzip.open(manfile) as f:
+                man_th = [line for line in f if line.startswith(b".TH")][0]
+            man_version = man_th.split(b' ')[-1].strip(b" '\"\t\n").decode('utf-8')
+
+            # don't show manpage if man_version not equal to current datalad_version
+            if __version__ != man_version:
+                raise ValueError
+            subprocess.check_call(
+                'man %s 2> /dev/null' % manfile,
+                shell=True)
+            sys.exit(0)
+        except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
+            ce = CapturedException(e)
+            lgr.debug("Did not use manpage since %s", ce)
 
 
 class LogLevelAction(argparse.Action):
