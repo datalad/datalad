@@ -114,9 +114,13 @@ def setup_parser(
         cmdlineargs,
         parser,
         completing,
-    )
+    ) if not return_subparsers else ('allparsers', None)
 
     command_provider = 'core'
+
+    if status == 'full' and not help_ignore_extensions:
+        from .helpers import add_entrypoints_to_interface_groups
+        add_entrypoints_to_interface_groups(interface_groups)
 
     if status == 'subcommand' and parseinfo not in \
             get_commands_from_groups(interface_groups):
@@ -151,7 +155,7 @@ def setup_parser(
 
     all_parsers = {}  # name: (sub)parser
 
-    if status == 'subcommand':
+    if status in ('allparsers', 'subcommand'):
         # parseinfo could be None here, when we could not identify
         # a subcommand, but need to locate matching ones for
         # completion
@@ -162,15 +166,18 @@ def setup_parser(
                 in sorted(interface_groups, key=lambda x: x[1]):
             for _intfspec in _interfaces:
                 cmd_name = get_cmdline_command_name(_intfspec)
-                if command_provider and cmd_name != parseinfo:
-                    # a known command, but know what we are looking for
-                    continue
-                if command_provider is None and not cmd_name.startswith(
-                        parseinfo):
-                    # an unknown command, and has no common prefix with
-                    # the current command candidate, not even good
-                    # for completion
-                    continue
+                if status == 'subcommand':
+                    # in case only a subcommand is desired, we could
+                    # skip some processing
+                    if command_provider and cmd_name != parseinfo:
+                        # a known command, but know what we are looking for
+                        continue
+                    if command_provider is None and not cmd_name.startswith(
+                            parseinfo):
+                        # an unknown command, and has no common prefix with
+                        # the current command candidate, not even good
+                        # for completion
+                        continue
                 subparser = add_subparser(
                     _intfspec,
                     subparsers,
