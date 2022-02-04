@@ -122,8 +122,11 @@ def setup_parser(
         from .helpers import add_entrypoints_to_interface_groups
         add_entrypoints_to_interface_groups(interface_groups)
 
-    if status == 'subcommand' and parseinfo not in \
-            get_commands_from_groups(interface_groups):
+    # when completing and we have no incomplete option or parameter
+    # we still need to offer all commands for completion
+    if (completing and status == 'allknown') or (
+            status == 'subcommand' and parseinfo not in
+            get_commands_from_groups(interface_groups)):
         # we know the command is not in the core package
         # still a chance it could be in an extension
         command_provider = 'extension'
@@ -155,7 +158,8 @@ def setup_parser(
 
     all_parsers = {}  # name: (sub)parser
 
-    if status in ('allparsers', 'subcommand'):
+    if (completing and status == 'allknown') or status \
+            in ('allparsers', 'subcommand'):
         # parseinfo could be None here, when we could not identify
         # a subcommand, but need to locate matching ones for
         # completion
