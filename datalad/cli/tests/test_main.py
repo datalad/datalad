@@ -91,10 +91,14 @@ def run_main(args, exit_code=0, expect_stderr=False):
     return stdout, stderr
 
 
+def get_all_commands() -> list[str]:
+    return list(get_commands_from_groups(get_interface_groups()))
+
+
 def assert_all_commands_present(out):
     """Helper to reuse to assert that all known commands are present in output
     """
-    for cmd in get_commands_from_groups(get_interface_groups()):
+    for cmd in get_all_commands():
         assert_re_in(fr"\b{cmd}\b", out, match=False)
 
 
@@ -308,3 +312,58 @@ def test_librarymode(path):
         # restore pre-test behavior
         datalad.__runtime_mode = was_mode
         datalad.cfg.overrides.pop('datalad.runtime.librarymode')
+
+
+@with_tempfile
+def test_completion(out_fn):
+
+    def get_completions(s: str, expected, exit_code=2) -> list[str]:
+        """
+
+        Parameters
+        ----------
+        s: str
+          what to append to 'datalad ' invocation
+        expected: iterable of str
+          What entries to expect - would raise AssertionError if any is
+          not present in output
+        exit_code: int, optional
+          If incomplete/malformed we seems to get 2, most frequently used
+          so default
+
+        Returns
+        -------
+        list of str
+          Entries output
+        """
+        if os.path.exists(out_fn):  # reuse but ensure it is gone
+            os.unlink(out_fn)
+        comp_line = f'datalad {s}'
+        with patch.dict('os.environ',
+                {
+                    '_ARGCOMPLETE': '1',
+                    '_ARGCOMPLETE_STDOUT_FILENAME': out_fn,
+                    'COMP_LINE': comp_line,
+                    # without -1 seems to get "finished completion", someone can investigate more
+                    'COMP_POINT': str(len(comp_line)-1),  # always at the end ATM
+                 }), \
+            patch.object(os, '_exit', print):
+            run_main([], exit_code=exit_code, expect_stderr=True)
+        with open(out_fn, 'rb') as f:
+            entries = f.read().split(b'\x0b')
+            entries = [e.decode() for e in entries]
+        diff = set(expected).difference(entries)
+        if diff:
+            raise AssertionError(
+                f"Entries {sorted(diff)} were expected but not found in the completion output: {entries}"
+            )
+        return entries  # for extra analyzes if so desired
+
+    all_commands = get_all_commands()
+    get_completions('i', {'install'})
+    get_completions(' ', ['--dbg', '-c'] + all_commands)
+    # if command already matches -- we get only that hit ATM, not others which begin with it
+    get_completions('create', ['create '], exit_code=1)
+    get_completions('create -', ['--dataset'], exit_code=1)
+    # but for incomplete one we do get all create* commands
+    get_completions('creat', [c for c in all_commands if c.startswith('create')])
