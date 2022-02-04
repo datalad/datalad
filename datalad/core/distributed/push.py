@@ -125,9 +125,11 @@ class Push(Interface):
             or "numcopies" settings for the remote (thus "nothing" otherwise).
             'auto-if-wanted' would enable '--auto' mode only if there is a 
             "wanted" setting for the remote, and transfer 'anything' otherwise.
+            'only' would result in a pure 'git annex copy', transferring nothing
+            but annexed contents.
             """,
             constraints=EnsureChoice(
-                'anything', 'nothing', 'auto', 'auto-if-wanted')),
+                'anything', 'nothing', 'auto', 'auto-if-wanted', 'only')),
         force=Parameter(
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
@@ -476,115 +478,118 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             return
         target = _target
 
-    log_progress(
-        lgr.info, pbar_id, "Push refspecs",
-        label="Push to '{}'".format(target), update=1, total=4)
-
-    # define config var name for potential publication dependencies
-    depvar = 'remote.{}.datalad-publish-depends'.format(target)
-    # list of remotes that are publication dependencies for the
-    # target remote
-    publish_depends = ensure_list(ds.config.get(depvar, []))
-    if publish_depends:
-        lgr.debug("Discovered publication dependencies for '%s': %s'",
-                  target, publish_depends)
-
     # cache repo type
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
-
-    # TODO prevent this when `target` is a special remote
-    # (possibly redo) a push attempt to figure out what needs pushing
-    # do this on the main target only, and apply the result to all
-    # dependencies
-    try:
-        if _target:
-            # only do it when an explicit target was given, otherwise
-            # we can reuse the result from the auto-probing above
-            wannabe_gitpush = repo.push(
-                remote=target,
-                git_options=['--dry-run'])
-    except Exception as e:
-        lgr.debug(
-            'Dry-run push to check push configuration failed, '
-            'assume no configuration: %s', e)
-        wannabe_gitpush = []
-    refspecs2push = [
-        # if an upstream branch is set, go with it
-        p['from_ref']
-        if ds.config.get(
-            # refs come in as refs/heads/<branchname>
-            # need to cut the prefix
-            'branch.{}.remote'.format(p['from_ref'][11:]),
-            None) == target and ds.config.get(
-                'branch.{}.merge'.format(p['from_ref'][11:]),
-                None)
-        # if not, define target refspec explicitly to avoid having to
-        # set an upstream branch, which would happen implicitly from
-        # a users POV, and may also be hard to decide when publication
-        # dependencies are present
-        else '{}:{}'.format(p['from_ref'], p['to_ref'])
-        for p in wannabe_gitpush
-        # TODO: what if a publication dependency doesn't have it yet
-        # should we not attempt to push, because the main target has it?
-        if 'uptodate' not in p['operations'] and (
-            # cannot think of a scenario where we would want to push a
-            # managed branch directly, instead of the corresponding branch
-            'refs/heads/adjusted' not in p['from_ref'])
-    ]
-    # TODO this is not right with managed branches
-    active_branch = repo.get_active_branch()
-    if active_branch and is_annex_repo:
-        # we could face a managed branch, in which case we need to
-        # determine the actual one and make sure it is sync'ed with the
-        # managed one, and push that one instead. following methods can
-        # be called unconditionally
-        repo.localsync(managed_only=True)
-        active_branch = repo.get_corresponding_branch(
-            active_branch) or active_branch
-
-    if not refspecs2push and not active_branch:
-        # nothing was set up for push, and we have no active branch
-        # this is a weird one, let's confess and stop here
-        # I don't think we need to support such a scenario
-        if not active_branch:
-            yield dict(
-                res_kwargs,
-                status='impossible',
-                message=
-                'There is no active branch, cannot determine remote '
-                'branch'
-            )
-            return
-
-    # make sure that we always push the active branch (the context for the
-    # potential path arguments) and the annex branch -- because we claim
-    # to know better than any git config
-    must_have_branches = [active_branch] if active_branch else []
-    if is_annex_repo:
-        must_have_branches.append('git-annex')
-    for branch in must_have_branches:
-        _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
-
-    # we know what to push and where, now dependency processing first
-    for r in publish_depends:
-        # simply make a call to this function again, all the same, but
-        # target is different
-        yield from _push(
-            dspath,
-            content,
-            # to this particular dependency
-            r,
-            data,
-            force,
-            jobs,
-            res_kwargs.copy(),
-            pbars,
-            got_path_arg=got_path_arg,
-        )
 
     # and lastly the primary push target
     target_is_git_remote = repo.config.get(
         'remote.{}.url'.format(target), None) is not None
+    refspecs2push = None
+
+    # perform git push unless only data is to be transferred
+    if data != 'only':
+        log_progress(
+            lgr.info, pbar_id, "Push refspecs",
+            label="Push to '{}'".format(target), update=1, total=4)
+
+        # define config var name for potential publication dependencies
+        depvar = 'remote.{}.datalad-publish-depends'.format(target)
+        # list of remotes that are publication dependencies for the
+        # target remote
+        publish_depends = ensure_list(ds.config.get(depvar, []))
+        if publish_depends:
+            lgr.debug("Discovered publication dependencies for '%s': %s'",
+                      target, publish_depends)
+
+        # TODO prevent this when `target` is a special remote
+        # (possibly redo) a push attempt to figure out what needs pushing
+        # do this on the main target only, and apply the result to all
+        # dependencies
+        try:
+            if _target:
+                # only do it when an explicit target was given, otherwise
+                # we can reuse the result from the auto-probing above
+                wannabe_gitpush = repo.push(
+                    remote=target,
+                    git_options=['--dry-run'])
+        except Exception as e:
+            lgr.debug(
+                'Dry-run push to check push configuration failed, '
+                'assume no configuration: %s', e)
+            wannabe_gitpush = []
+        refspecs2push = [
+            # if an upstream branch is set, go with it
+            p['from_ref']
+            if ds.config.get(
+                # refs come in as refs/heads/<branchname>
+                # need to cut the prefix
+                'branch.{}.remote'.format(p['from_ref'][11:]),
+                None) == target and ds.config.get(
+                    'branch.{}.merge'.format(p['from_ref'][11:]),
+                    None)
+            # if not, define target refspec explicitly to avoid having to
+            # set an upstream branch, which would happen implicitly from
+            # a users POV, and may also be hard to decide when publication
+            # dependencies are present
+            else '{}:{}'.format(p['from_ref'], p['to_ref'])
+            for p in wannabe_gitpush
+            # TODO: what if a publication dependency doesn't have it yet
+            # should we not attempt to push, because the main target has it?
+            if 'uptodate' not in p['operations'] and (
+                # cannot think of a scenario where we would want to push a
+                # managed branch directly, instead of the corresponding branch
+                'refs/heads/adjusted' not in p['from_ref'])
+        ]
+        # TODO this is not right with managed branches
+        active_branch = repo.get_active_branch()
+        if active_branch and is_annex_repo:
+            # we could face a managed branch, in which case we need to
+            # determine the actual one and make sure it is sync'ed with the
+            # managed one, and push that one instead. following methods can
+            # be called unconditionally
+            repo.localsync(managed_only=True)
+            active_branch = repo.get_corresponding_branch(
+                active_branch) or active_branch
+
+        if not refspecs2push and not active_branch:
+            # nothing was set up for push, and we have no active branch
+            # this is a weird one, let's confess and stop here
+            # I don't think we need to support such a scenario
+            if not active_branch:
+                yield dict(
+                    res_kwargs,
+                    status='impossible',
+                    message=
+                    'There is no active branch, cannot determine remote '
+                    'branch'
+                )
+                return
+
+        # make sure that we always push the active branch (the context for the
+        # potential path arguments) and the annex branch -- because we claim
+        # to know better than any git config
+        must_have_branches = [active_branch] if active_branch else []
+        if is_annex_repo:
+            must_have_branches.append('git-annex')
+        for branch in must_have_branches:
+            _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
+
+        # we know what to push and where, now dependency processing first
+        for r in publish_depends:
+            # simply make a call to this function again, all the same, but
+            # target is different
+            yield from _push(
+                dspath,
+                content,
+                # to this particular dependency
+                r,
+                data,
+                force,
+                jobs,
+                res_kwargs.copy(),
+                pbars,
+                got_path_arg=got_path_arg,
+            )
 
     # git-annex data copy
     #
