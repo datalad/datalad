@@ -153,7 +153,7 @@ def add_entrypoints_to_interface_groups(interface_groups):
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
-            ce = CapturedException(ce)
+            ce = CapturedException(e)
             lgr.warning('Failed to load entrypoint %s: %s', ep.name, ce)
             continue
 
