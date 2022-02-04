@@ -94,6 +94,7 @@ def setup_parser(
     # main parser
     parser = ArgumentParserDisableAbbrev(
         fromfile_prefix_chars=None,
+        prog='datalad',
         # usage="%(prog)s ...",
         description=help_gist,
         epilog='"Be happy!"',
