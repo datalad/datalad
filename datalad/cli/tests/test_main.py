@@ -92,7 +92,7 @@ def run_main(args, exit_code=0, expect_stderr=False):
     return stdout, stderr
 
 
-def get_all_commands() -> list[str]:
+def get_all_commands() -> list:
     return list(get_commands_from_groups(get_interface_groups()))
 
 
@@ -322,7 +322,7 @@ def test_completion(out_fn):
     from datalad.cmd import WitlessRunner
     runner = WitlessRunner()
 
-    def get_completions(s: str, expected) -> list[str]:
+    def get_completions(s: str, expected) -> list:
         """Run 'datalad' external command and collect completions
 
         Parameters
