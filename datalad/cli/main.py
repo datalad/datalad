@@ -63,10 +63,10 @@ def main(args=sys.argv):
     # record that we came in via the cmdline
     datalad.__api = 'cmdline'
     completing = "_ARGCOMPLETE" in os.environ
-    if completing:
+    if completing and 'COMP_LINE' in os.environ:
         import shlex
         # TODO support posix=False too?
-        args = shlex.split(os.environ.get('COMP_LINE')) or args
+        args = shlex.split(os.environ['COMP_LINE']) or args
 
     if _on_msys_tainted_paths():
         # Possibly present DataLadRIs were stripped of a leading /
