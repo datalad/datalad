@@ -64,7 +64,7 @@ from datalad.ui import ui
 
 from datalad.utils import (
     chpwd,
-    ensure_bytes,
+    ensure_list,
     ensure_unicode,
     get_dataset_root,
     getpwd,
@@ -651,7 +651,7 @@ def _format_iospecs(specs, **kwargs):
     list
       All formatted items.
     """
-    if specs is None:
+    if not specs:
         return
     elif len(specs) == 1 and specs[0] \
             and specs[0][0] == '{' and specs[0][-1] == '}' \
@@ -726,6 +726,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         lgr.warning("No command given")
         return
 
+    specs = {
+        k: ensure_list(v) for k, v in (('inputs', inputs),
+                                       ('extra_inputs', extra_inputs),
+                                       ('outputs', outputs))
+    }
+
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -762,9 +768,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     cmd_fmt_kwargs = _get_substitutions(ds)
     # amend with unexpanded dependency/output specifications, which might
     # themselves contain substitution placeholder
-    for n, val in (('inputs', inputs),
-                   ('extra_inputs', extra_inputs),
-                   ('outputs', outputs)):
+    for n, val in specs.items():
         if val:
             cmd_fmt_kwargs[n] = val
 
@@ -772,19 +776,16 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # expands placeholders in dependency/output specification before
     # globbing
     try:
-        inputs_gp = GlobbedPaths(
-            _format_iospecs(inputs, **cmd_fmt_kwargs),
-            pwd=pwd,
-            expand=expand in ["inputs", "both"])
-        extra_inputs_gp = GlobbedPaths(
-            _format_iospecs(extra_inputs, **cmd_fmt_kwargs),
-            pwd=pwd,
-            # Follow same expansion rules as `inputs`.
-            expand=expand in ["inputs", "both"])
-        outputs_gp = GlobbedPaths(
-            _format_iospecs(outputs, **cmd_fmt_kwargs),
-            pwd=pwd,
-            expand=expand in ["outputs", "both"])
+        globbed = {
+            k: GlobbedPaths(
+                _format_iospecs(v, **cmd_fmt_kwargs),
+                pwd=pwd,
+                expand=expand in (
+                    # extra_inputs follow same expansion rules as `inputs`.
+                    ["both"] + (['outputs'] if k == 'outputs' else ['inputs'])
+                ))
+            for k, v in specs.items()
+        }
     except KeyError as exc:
         yield get_status_dict(
             'run',
@@ -802,19 +803,21 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         with chpwd(pwd):
             for res in prepare_inputs(
                     ds_path,
-                    [] if assume_ready in ["inputs", "both"] else inputs_gp,
+                    [] if assume_ready in ["inputs", "both"]
+                    else globbed['inputs'],
                     # Ignore --assume-ready for extra_inputs. It's an unexposed
                     # implementation detail that lets wrappers sneak in inputs.
-                    extra_inputs=extra_inputs_gp,
+                    extra_inputs=globbed['extra_inputs'],
                     jobs=jobs):
                 yield res
 
             if assume_ready not in ["outputs", "both"]:
-                if outputs_gp:
-                    for res in _install_and_reglob(ds_path, outputs_gp):
+                if globbed['outputs']:
+                    for res in _install_and_reglob(
+                            ds_path, globbed['outputs']):
                         yield res
-                    for res in _unlock_or_remove(ds_path,
-                                                 outputs_gp.expand_strict()):
+                    for res in _unlock_or_remove(
+                            ds_path, globbed['outputs'].expand_strict()):
                         yield res
 
                 if rerun_outputs is not None:
@@ -836,8 +839,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
         # the following override any matching non-glob substitution
         # values
-        inputs=inputs_gp,
-        outputs=outputs_gp,
+        inputs=globbed['inputs'],
+        outputs=globbed['outputs'],
     )
     try:
         cmd_expanded = format_command(ds, cmd, **cmd_fmt_kwargs)
@@ -859,17 +862,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # rerun does not handle any prop being None, hence all
         # the `or/else []`
         'chain': rerun_info["chain"] if rerun_info else [],
-        # for all following we need to make sure that the raw
-        # specifications, incl. any placeholders make it into
-        # the run-record to enable "parametric" re-runs
-        # ...except when expansion was requested
-        'inputs': inputs_gp.paths
-        if expand in ["inputs", "both"] else (inputs or []),
-        'extra_inputs': extra_inputs_gp.paths
-        if expand in ["inputs", "both"] else (extra_inputs or []),
-        'outputs': outputs_gp.paths
-        if expand in ["outputs", "both"] else (outputs or []),
     }
+    # for all following we need to make sure that the raw
+    # specifications, incl. any placeholders make it into
+    # the run-record to enable "parametric" re-runs
+    # ...except when expansion was requested
+    for k, v in specs.items():
+        run_info[k] = globbed[k].paths \
+            if expand in ["both"] + (
+                ['outputs'] if k == 'outputs' else ['inputs']) \
+            else v or []
+
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
         run_info['pwd'] = rel_pwd
@@ -882,10 +885,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         yield get_status_dict(
             "run [dry-run]", ds=ds, status="ok", message="Dry run",
             run_info=run_info,
-            dry_run_info=dict(cmd_expanded=cmd_expanded,
-                              pwd_full=pwd,
-                              inputs=inputs_gp.expand(),
-                              outputs=outputs_gp.expand()))
+            dry_run_info=dict(
+                cmd_expanded=cmd_expanded,
+                pwd_full=pwd,
+                **{k: globbed[k].expand() for k in ('inputs', 'outputs')},
+            )
+        )
         return
 
     if not inject:
@@ -899,9 +904,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if explicit or expand in ["outputs", "both"]:
         # also for explicit mode we have to re-glob to be able to save all
         # matching outputs
-        outputs_gp.expand(refresh=True)
+        globbed['outputs'].expand(refresh=True)
         if expand in ["outputs", "both"]:
-            run_info["outputs"] = outputs_gp.paths
+            run_info["outputs"] = globbed['outputs'].paths
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
@@ -937,7 +942,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
 
-    outputs_to_save = outputs_gp.expand_strict() if explicit else None
+    outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
     if outputs_to_save is not None and use_sidecar:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save

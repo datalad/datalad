@@ -746,6 +746,12 @@ def test_io_substitution(path):
 
     # we could just ds.rerun() now, and it should work, but this would make
     # rerun be a dependency of a core test
+    # instead just double-run, but with a non-list input-spec.
+    # should have same outcome
+    ds.run(cmd_str, inputs="{outputs}", outputs="*.t*",
+           result_renderer='disabled')
+    for f in files:
+        ok_((ds.pathobj / f).read_text().startswith('mod::mod::'))
 
 
 def test_format_iospecs():
