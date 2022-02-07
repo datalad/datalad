@@ -317,6 +317,8 @@ class ThreadedRunner:
 
         self.protocol = self.protocol_class(**self.protocol_kwargs)
 
+        # The following command is generated internally by datalad
+        # and trusted. Security check is therefore skipped.
         kwargs = {
             **self.popen_kwargs,
             **dict(
@@ -324,19 +326,23 @@ class ThreadedRunner:
                 stdin=subprocess.PIPE if self.write_stdin else self.stdin,
                 stdout=subprocess.PIPE if self.catch_stdout else None,
                 stderr=subprocess.PIPE if self.catch_stderr else None,
-                shell=True if isinstance(self.cmd, str) else False
+                shell=True if isinstance(self.cmd, str) else False      # nosec
             )
         }
 
         try:
-            self.process = subprocess.Popen(self.cmd, **kwargs)
+            # The following command is generated internally by datalad
+            # and trusted. Security check is therefore skipped.
+            self.process = subprocess.Popen(self.cmd, **kwargs)         # nosec
+
         except OSError as e:
             if not on_windows and "argument list too long" in str(e).lower():
                 lgr.error(
                     "Caught exception suggesting too large stack size limits. "
                     "Hint: use 'ulimit -s' command to see current limit and "
-                    "e.g. 'ulimit -s 8192' to reduce it to avoid this exception. "
-                    "See https://github.com/datalad/datalad/issues/6106 for more "
+                    "e.g. 'ulimit -s 8192' to reduce it to avoid this "
+                    "exception. See "
+                    "https://github.com/datalad/datalad/issues/6106 for more "
                     "information."
                 )
             raise
