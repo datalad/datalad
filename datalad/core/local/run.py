@@ -23,6 +23,7 @@ from os.path import normpath
 from os.path import relpath
 from tempfile import mkdtemp
 
+import datalad
 from datalad.core.local.save import Save
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
@@ -829,9 +830,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             repo = ds.repo
             msg_path = repo.dot_git / "COMMIT_EDITMSG"
             msg_path.write_text(msg)
+            if datalad.get_apimode() == 'python':
+                help = f"\"Dataset('{ds.path}').save(path='.', " \
+                       "recursive=True, message_file='%s')\""
+            else:
+                help = "'datalad save -d . -r -F %s'"
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
-                     "'datalad save -d . -r -F %s'",
+                     f"{help}",
                      # shorten to the relative path for a more concise message
                      msg_path.relative_to(ds.pathobj))
             if repo.dirty and not explicit:
