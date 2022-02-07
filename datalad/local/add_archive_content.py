@@ -413,11 +413,10 @@ class AddArchiveContent(Interface):
         if annex_options:
             if isinstance(annex_options, str):
                 annex_options = split_cmdline(annex_options)
-
         delete_after_rpath = None
 
-        prefix_dir = basename(tempfile.mktemp(prefix=".datalad",
-                                              dir=annex.path)) \
+        prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad",
+                                               dir=annex.path)) \
             if delete_after \
             else None
 
@@ -692,7 +691,9 @@ class AddArchiveContent(Interface):
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
             earchive.clean(force=True)
-
+            # remove tempfile directories (not cleaned up automatically):
+            if prefix_dir is not None and lexists(prefix_dir):
+                os.rmdir(prefix_dir)
         yield get_status_dict(
             ds=ds,
             status='ok',
