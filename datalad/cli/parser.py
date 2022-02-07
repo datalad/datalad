@@ -98,7 +98,13 @@ def setup_parser(
         description=help_gist,
         epilog='"Be happy!"',
         formatter_class=formatter_class,
-        add_help=False)
+        add_help=False,
+        # TODO: when dropping support for Python 3.8: uncomment below
+        # and use parse_known_args instead of _parse_known_args:
+        # # set to False so parse_known_args does not add its error handling
+        # # Added while RFing from using _parse_known_args to parse_known_args.
+        # exit_on_error=False,
+    )
 
     # common options
     parser_add_common_options(parser)
