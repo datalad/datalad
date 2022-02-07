@@ -753,6 +753,7 @@ def test_missing_path_handling(path):
         ds.get("foo")
 
 
+@slow  # started to >~30sec. https://github.com/datalad/datalad/issues/6412
 @known_failure_windows  # create-sibling-ria + ORA not fit for windows
 @with_tempfile
 @with_tempfile
