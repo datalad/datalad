@@ -430,7 +430,6 @@ class ThreadedRunner:
         self.process_waiting_thread.start()
 
         if issubclass(self.protocol_class, GeneratorMixIn):
-            assert isinstance(self.protocol, GeneratorMixIn)
             return _ResultGenerator(self, self.protocol.result_queue)
 
         return self.process_loop()
@@ -454,29 +453,38 @@ class ThreadedRunner:
         self.wait_for_threads()
         return self.result
 
+    def _handle_file_timeout(self, source):
+        if self.protocol.timeout(self.fileno_mapping[source]) is True:
+            self.remove_file_number(source)
+
+    def _handle_process_timeout(self):
+        if self.protocol.timeout(None) is True:
+            self.ensure_stdin_stdout_stderr_closed()
+            self.process.terminate()
+            self.process.wait()
+            self.remove_process()
+
+    def _handle_source_timeout(self, source):
+        if source is None:
+            self._handle_process_timeout()
+        else:
+            self._handle_file_timeout(source)
+
+    def _update_timeouts(self):
+        last_touched = list(self.last_touched.items())
+        new_times = dict()
+        current_time = time.time()
+        for source, last_time in last_touched:
+            if current_time - last_time >= self.timeout:
+                new_times[source] = current_time
+                self._handle_source_timeout(source)
+        self.last_touched = {
+            **self.last_touched,
+            **new_times}
+
     def process_timeouts(self):
         if self.timeout is not None:
-            last_touched = list(self.last_touched.items())
-            new_times = dict()
-            current_time = time.time()
-            for source, last_time in last_touched:
-                if current_time - last_time >= self.timeout:
-                    new_times[source] = current_time
-                    if source is None:
-                        if self.protocol.timeout(None) is True:
-                            self.ensure_stdin_stdout_stderr_closed()
-                            self.process.terminate()
-                            self.process.wait()
-                            self.remove_process()
-                    else:
-                        if self.protocol.timeout(self.fileno_mapping[source]) is True:
-                            self.remove_file_number(source)
-
-            # Update triggered timeouts
-            self.last_touched = {
-                **self.last_touched,
-                **new_times
-            }
+            self._update_timeouts()
 
     def should_continue(self) -> bool:
         # Continue with queue processing if there is still a process or
