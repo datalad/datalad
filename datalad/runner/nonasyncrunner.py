@@ -240,7 +240,7 @@ class ThreadedRunner:
 
         self.last_touched = dict()
         self.active_file_numbers = set()
-        self.deadlock_check_interval = 10
+        self.stall_check_interval = 10
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -494,8 +494,8 @@ class ThreadedRunner:
             or not self.output_queue.empty())
 
     def is_stalled(self) -> bool:
-        # If all threads have exited and the queue is empty,
-        # we might have a blocking condition.
+        # If all threads have exited and the queue is empty, we might have a
+        # stall condition.
         live_threads = [
             thread.is_alive()
             for thread in (
@@ -504,6 +504,15 @@ class ThreadedRunner:
                 self.process_waiting_thread,
             ) if thread is not None]
         return not any(live_threads) and self.output_queue.empty()
+
+    def check_for_stall(self):
+        if self.stall_check_interval == 0:
+            self.stall_check_interval = 11
+            if self.is_stalled():
+                lgr.warning(
+                    "ThreadedRunner.process_queue(): stall detected")
+                return
+        self.stall_check_interval -= 1
 
     def process_queue(self):
         """
@@ -526,14 +535,7 @@ class ThreadedRunner:
                     timeout=ThreadedRunner.timeout_resolution)
                 break
             except Empty:
-                # Check for deadlock situation every 1000 ms
-                if self.deadlock_check_interval == 0:
-                    self.deadlock_check_interval = 11
-                    if self.is_stalled():
-                        lgr.warning(
-                            "ThreadedRunner.process_queue(): stall detected")
-                        return
-                self.deadlock_check_interval -= 1
+                self.check_for_stall()
                 self.process_timeouts()
                 continue
 
