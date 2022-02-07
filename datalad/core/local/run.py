@@ -608,6 +608,60 @@ def format_command(dset, command, **kwds):
     return sfmt.format(command, **kwds)
 
 
+def _get_substitutions(dset):
+    """Get substitution mapping
+
+    Parameters
+    ----------
+    dset : Dataset
+      Providing the to-be-queried configuration.
+
+    Returns
+    -------
+    dict
+      Mapping substitution keys to their values.
+    """
+    return {
+        k.replace("datalad.run.substitutions.", ""): v
+        for k, v in dset.config.items("datalad.run.substitutions")
+    }
+
+
+def _format_iospecs(specs, **kwargs):
+    """Expand substitutions in specification lists.
+
+    The expansion is generally a format() call on each items, using
+    the kwargs as substitution mapping. A special case is, however,
+    a single-item specification list that exclusively contains a
+    plain substitution reference, i.e., ``{subst}``, that matches
+    a kwargs-key (minus the brace chars), whose value is a list.
+    In this case the entire specification list is substituted for
+    the list in kwargs, which is returned as such. This enables
+    the replace/re-use sequences, e.g. --inputs '{outputs}'
+
+    Parameters
+    ----------
+    specs: list(str) or None
+      Specification items to format.
+    **kwargs:
+      Placeholder key-value mapping to apply to specification items.
+
+    Returns
+    -------
+    list
+      All formatted items.
+    """
+    if specs is None:
+        return
+    elif len(specs) == 1 and specs[0] \
+            and specs[0][0] == '{' and specs[0][-1] == '}' \
+            and isinstance(kwargs.get(specs[0][1:-1]), list):
+        return kwargs[specs[0][1:-1]]
+    return [
+        s.format(**kwargs) for s in specs
+    ]
+
+
 def _execute_command(command, pwd):
     from datalad.cmd import WitlessRunner
 
@@ -702,15 +756,44 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     'use `datalad status` to inspect unsaved changes'))
             return
 
+    # everything below expects the string-form of the command
     cmd = normalize_command(cmd)
+    # pull substitutions from config
+    cmd_fmt_kwargs = _get_substitutions(ds)
+    # amend with unexpanded dependency/output specifications, which might
+    # themselves contain substitution placeholder
+    for n, val in (('inputs', inputs),
+                   ('extra_inputs', extra_inputs),
+                   ('outputs', outputs)):
+        if val:
+            cmd_fmt_kwargs[n] = val
 
-    inputs = GlobbedPaths(inputs, pwd=pwd,
-                          expand=expand in ["inputs", "both"])
-    extra_inputs = GlobbedPaths(extra_inputs, pwd=pwd,
-                                # Follow same expansion rules as `inputs`.
-                                expand=expand in ["inputs", "both"])
-    outputs = GlobbedPaths(outputs, pwd=pwd,
-                           expand=expand in ["outputs", "both"])
+    # try-expect to catch expansion issues in _format_iospecs() which
+    # expands placeholders in dependency/output specification before
+    # globbing
+    try:
+        inputs_gp = GlobbedPaths(
+            _format_iospecs(inputs, **cmd_fmt_kwargs),
+            pwd=pwd,
+            expand=expand in ["inputs", "both"])
+        extra_inputs_gp = GlobbedPaths(
+            _format_iospecs(extra_inputs, **cmd_fmt_kwargs),
+            pwd=pwd,
+            # Follow same expansion rules as `inputs`.
+            expand=expand in ["inputs", "both"])
+        outputs_gp = GlobbedPaths(
+            _format_iospecs(outputs, **cmd_fmt_kwargs),
+            pwd=pwd,
+            expand=expand in ["outputs", "both"])
+    except KeyError as exc:
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=(
+                'input/output specification has an unrecognized '
+                'placeholder: %s', exc))
+        return
 
     # ATTN: For correct path handling, all dataset commands call should be
     # unbound. They should (1) receive a string dataset argument, (2) receive
@@ -719,19 +802,19 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         with chpwd(pwd):
             for res in prepare_inputs(
                     ds_path,
-                    [] if assume_ready in ["inputs", "both"] else inputs,
+                    [] if assume_ready in ["inputs", "both"] else inputs_gp,
                     # Ignore --assume-ready for extra_inputs. It's an unexposed
                     # implementation detail that lets wrappers sneak in inputs.
-                    extra_inputs=extra_inputs,
+                    extra_inputs=extra_inputs_gp,
                     jobs=jobs):
                 yield res
 
             if assume_ready not in ["outputs", "both"]:
-                if outputs:
-                    for res in _install_and_reglob(ds_path, outputs):
+                if outputs_gp:
+                    for res in _install_and_reglob(ds_path, outputs_gp):
                         yield res
                     for res in _unlock_or_remove(ds_path,
-                                                 outputs.expand_strict()):
+                                                 outputs_gp.expand_strict()):
                         yield res
 
                 if rerun_outputs is not None:
@@ -743,16 +826,21 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         cmd_exitcode = 0
         exc = None
 
+    # prepare command formatting by extending the set of configurable
+    # substitutions with the essential components
+    cmd_fmt_kwargs.update(
+        pwd=pwd,
+        dspath=ds_path,
+        # Check if the command contains "{tmpdir}" to avoid creating an
+        # unnecessary temporary directory in most but not all cases.
+        tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
+        # the following override any matching non-glob substitution
+        # values
+        inputs=inputs_gp,
+        outputs=outputs_gp,
+    )
     try:
-        cmd_expanded = format_command(
-            ds, cmd,
-            pwd=pwd,
-            dspath=ds_path,
-            # Check if the command contains "{tmpdir}" to avoid creating an
-            # unnecessary temporary directory in most but not all cases.
-            tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
-            inputs=inputs,
-            outputs=outputs)
+        cmd_expanded = format_command(ds, cmd, **cmd_fmt_kwargs)
     except KeyError as exc:
         yield get_status_dict(
             'run',
@@ -768,10 +856,19 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # - exit code of the command
     run_info = {
         'cmd': cmd,
+        # rerun does not handle any prop being None, hence all
+        # the `or/else []`
         'chain': rerun_info["chain"] if rerun_info else [],
-        'inputs': inputs.paths,
-        'extra_inputs': extra_inputs.paths,
-        'outputs': outputs.paths,
+        # for all following we need to make sure that the raw
+        # specifications, incl. any placeholders make it into
+        # the run-record to enable "parametric" re-runs
+        # ...except when expansion was requested
+        'inputs': inputs_gp.paths
+        if expand in ["inputs", "both"] else (inputs or []),
+        'extra_inputs': extra_inputs_gp.paths
+        if expand in ["inputs", "both"] else (extra_inputs or []),
+        'outputs': outputs_gp.paths
+        if expand in ["outputs", "both"] else (outputs or []),
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
@@ -787,8 +884,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             run_info=run_info,
             dry_run_info=dict(cmd_expanded=cmd_expanded,
                               pwd_full=pwd,
-                              inputs=inputs.expand(),
-                              outputs=outputs.expand()))
+                              inputs=inputs_gp.expand(),
+                              outputs=outputs_gp.expand()))
         return
 
     if not inject:
@@ -800,8 +897,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # TODO: If a warning or error is desired when an --output pattern doesn't
     # have a match, this would be the spot to do it.
     if explicit or expand in ["outputs", "both"]:
-        outputs.expand(refresh=True)
-        run_info["outputs"] = outputs.paths
+        # also for explicit mode we have to re-glob to be able to save all
+        # matching outputs
+        outputs_gp.expand(refresh=True)
+        if expand in ["outputs", "both"]:
+            run_info["outputs"] = outputs_gp.paths
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
@@ -837,7 +937,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
 
-    outputs_to_save = outputs.expand_strict() if explicit else None
+    outputs_to_save = outputs_gp.expand_strict() if explicit else None
     if outputs_to_save is not None and use_sidecar:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save

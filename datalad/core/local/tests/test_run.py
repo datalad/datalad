@@ -45,6 +45,8 @@ from datalad.api import (
 from datalad.core.local.run import (
     format_command,
     run_command,
+    _format_iospecs,
+    _get_substitutions,
 )
 from datalad.tests.utils import (
     assert_false,
@@ -65,6 +67,7 @@ from datalad.tests.utils import (
     ok_,
     ok_exists,
     ok_file_has_content,
+    patch_config,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
@@ -723,3 +726,56 @@ def test_dry_run(path):
         ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
         assert_in("sub/b*", cmo.out)
         assert_not_in("baz", cmo.out)
+
+
+@with_tree(tree={OBSCURE_FILENAME + ".t": "obscure",
+                 "normal.txt": "normal"})
+def test_io_substitution(path):
+    files = [OBSCURE_FILENAME + ".t", "normal.txt"]
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    # prefix the content of any given file with 'mod::'
+    cmd = "import sys; from pathlib import Path; t = [(Path(p), 'mod::' + Path(p).read_text()) for p in sys.argv[1:]]; [k.write_text(v) for k, v in t]"
+    cmd_str = "{} -c \"{}\" {{inputs}}".format(sys.executable, cmd)
+    # this should run and not crash with permission denied
+    ds.run(cmd_str, inputs=["{outputs}"], outputs=["*.t*"],
+           result_renderer='disabled')
+    # all filecontent got the prefix
+    for f in files:
+        ok_((ds.pathobj / f).read_text().startswith('mod::'))
+
+    # we could just ds.rerun() now, and it should work, but this would make
+    # rerun be a dependency of a core test
+
+
+def test_format_iospecs():
+    seq = ['one', 'two']
+    eq_(seq, _format_iospecs(['{dummy}'], dummy=seq))
+    # garbage when combined with longer spec-sequences
+    # but this is unavoidable without introducing a whitelist
+    # of supported value types -- which would limit flexibility
+    eq_(["['one', 'two']", 'other'],
+        _format_iospecs(['{dummy}', 'other'], dummy=seq))
+
+
+def test_substitution_config():
+    # use a shim to avoid having to create an actual dataset
+    # the tested function only needs a `ds.config` to be a ConfigManager
+    from datalad import cfg
+
+    class dset:
+        config = cfg
+
+    # empty be default
+    eq_(_get_substitutions(dset), {})
+    # basic access
+    with patch_config({"datalad.run.substitutions.dummy": 'ork'}):
+        eq_(_get_substitutions(dset), dict(dummy='ork'))
+    # can report multi-value
+    with patch_config({"datalad.run.substitutions.dummy": ['a', 'b']}):
+        eq_(_get_substitutions(dset), dict(dummy=['a', 'b']))
+
+        # verify combo with iospec formatting
+        eq_(_format_iospecs(['{dummy}'],
+                            **_get_substitutions(dset)),
+            ['a', 'b'])
