@@ -14,21 +14,14 @@ __docformat__ = 'restructuredtext'
 
 import inspect
 import logging
-import os
 import sys
-import re
 from functools import wraps
 from time import time
-from os import curdir
-from os import pardir
 from os import listdir
-import os.path as op
 from os.path import join as opj
 from os.path import isdir
 from os.path import relpath
 from os.path import sep
-from os.path import split as psplit
-from itertools import chain
 
 import json
 
