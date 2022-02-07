@@ -292,10 +292,9 @@ class ThreadedRunner:
                result = gen.return_code
         """
         if isinstance(self.stdin, (int, IO, type(None))):
-            # indicate that we will not write anything to stdin, that
-            # means the user can pass None, or he can pass a
-            # file-like and write to it from a different thread.
-            self.write_stdin = False  # the caller will write to the parameter
+            # We will not write anything to stdin. If the caller passed a
+            # file-like he can write to it from a different thread.
+            self.write_stdin = False
 
         elif isinstance(self.stdin, (str, bytes)):
             # Establish a queue to write to the process and
@@ -304,18 +303,16 @@ class ThreadedRunner:
             self.stdin_queue = Queue()
             self.stdin_queue.put(self.stdin)
             self.stdin_queue.put(None)
+
         elif isinstance(self.stdin, Queue):
             # Establish a queue to write to the process.
             self.write_stdin = True
             self.stdin_queue = self.stdin
+
         else:
-            # indicate that we will not write anything to stdin, that
-            # means the user can pass None, or he can pass a
-            # file-like and write to it from a different thread.
-            lgr.warning(f"Unknown instance class: {type(self.stdin)}, "
-                        f"assuming file-like input: {self.stdin}")
-            # We assume that the caller will write to the given
-            # file descriptor.
+            # We do not recognize the input class will and just pass is through
+            # to Popen(). We assume that the caller handles any writing if
+            # desired.
             self.write_stdin = False
 
         self.protocol = self.protocol_class(**self.protocol_kwargs)
