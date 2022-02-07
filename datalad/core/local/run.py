@@ -11,58 +11,56 @@
 __docformat__ = 'restructuredtext'
 
 
-import logging
 import json
-import warnings
-
-from pathlib import Path
-
-from argparse import REMAINDER
+import logging
 import os
 import os.path as op
-from os.path import join as opj
-from os.path import normpath
-from os.path import relpath
+from pathlib import Path
+import warnings
+from argparse import REMAINDER
 from tempfile import mkdtemp
 
 import datalad
+import datalad.support.ansi_colors as ac
+from datalad.config import anything2bool
 from datalad.core.local.save import Save
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
-from datalad.local.unlock import Unlock
-
-from datalad.interface.base import Interface
-from datalad.interface.utils import generic_result_renderer
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import (
-    save_message_opt,
-    jobs_opt
+from datalad.interface.base import (
+    Interface,
+    build_doc,
 )
-
-from datalad.config import anything2bool
-
-import datalad.support.ansi_colors as ac
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureBool
+from datalad.interface.common_opts import (
+    jobs_opt,
+    save_message_opt,
+)
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
+from datalad.local.unlock import Unlock
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+)
 from datalad.support.exceptions import (
     CapturedException,
-    CommandError
+    CommandError,
 )
 from datalad.support.globbedpaths import GlobbedPaths
-from datalad.support.param import Parameter
 from datalad.support.json_py import dump2stream
-
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import require_dataset
-from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.dataset import datasetmethod
-
+from datalad.support.param import Parameter
 from datalad.ui import ui
-
 from datalad.utils import (
+    SequenceFormatter,
     chpwd,
     ensure_list,
     ensure_unicode,
@@ -70,7 +68,6 @@ from datalad.utils import (
     getpwd,
     join_cmdline,
     quote_cmdlinearg,
-    SequenceFormatter,
 )
 
 lgr = logging.getLogger('datalad.core.local.run')
@@ -398,7 +395,7 @@ def get_command_pwds(dataset):
             dataset = get_dataset_root(pwd)
 
         if dataset:
-            rel_pwd = relpath(pwd, dataset)
+            rel_pwd = op.relpath(pwd, dataset)
         else:
             rel_pwd = pwd  # and leave handling to caller
     return pwd, rel_pwd
@@ -735,8 +732,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
-        pwd = normpath(opj(dataset.path, rel_pwd))
-        rel_pwd = relpath(pwd, dataset.path)
+        pwd = op.normpath(op.join(dataset.path, rel_pwd))
+        rel_pwd = op.relpath(pwd, dataset.path)
     else:
         pwd, rel_pwd = get_command_pwds(dataset)
 
