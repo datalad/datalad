@@ -265,6 +265,11 @@ def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
         parser_kwargs['type'] = param.constraints
     if completing:
         help = None
+        # if possible, define choices to enable their completion
+        if 'choices' not in parser_kwargs and \
+                isinstance(param.constraints, EnsureChoice):
+            parser_kwargs['choices'] = [
+                c for c in param.constraints._allowed if c is not None]
     else:
         help = _amend_param_parser_kwargs_for_help(
             parser_kwargs, param,
