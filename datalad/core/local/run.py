@@ -104,7 +104,10 @@ class Run(Interface):
     the command execution is made.
 
     If the given command errors, a `CommandError` exception with the same exit
-    code will be raised, and no modifications will be saved.
+    code will be raised, and no modifications will be saved. A command
+    execution will not be attempted, by default, when an error occurred during
+    input or output preparation. This default ``stop`` behavior can be
+    overridden via [CMD: --on-failure ... CMD][PY: `on_failure=...` PY].
 
     *Command format*
 
@@ -191,6 +194,11 @@ class Run(Interface):
     ]
 
     result_renderer = "tailored"
+    # make run stop immediately on non-success results.
+    # this prevents command execution after failure to obtain inputs of prepare
+    # outputs. but it can be overriding via the common 'on_failure' parameter
+    # if needed.
+    on_failure = 'stop'
 
     _params_ = dict(
         cmd=Parameter(
