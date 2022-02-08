@@ -28,7 +28,7 @@ for nt in sys.argv[2:]:
     ds.config.add(
         'datalad.metadata.nativetype',
         nt,
-        where='dataset',
+        scope='branch',
         reload=False)
 
 ds.save(

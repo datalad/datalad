@@ -293,11 +293,6 @@ def configuration(action, scope, specs, res_kwargs, ds=None):
     else:
         cfg = ds.config
 
-    # TODO for now we map to the old name, until ConfigManager
-    # is adjusted
-    if scope == 'branch':
-        scope = 'dataset'
-
     if action not in config_actions:
         raise ValueError("Unsupported action '{}'".format(action))
 
@@ -388,7 +383,7 @@ def _get(cfg, scope, name):
 
 
 def _set(cfg, scope, name, value):
-    cfg.set(name, value, where=scope, force=True, reload=False)
+    cfg.set(name, value, scope=scope, force=True, reload=False)
     return dict(
         action='set_configuration',
         name=name,
@@ -398,7 +393,7 @@ def _set(cfg, scope, name, value):
 
 def _unset(cfg, scope, name):
     try:
-        cfg.unset(name, where=scope, reload=False)
+        cfg.unset(name, scope=scope, reload=False)
     except CommandError as e:
         # we could also check if the option exists in the merged/effective
         # config first, but then we would have to make sure that there could

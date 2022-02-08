@@ -461,7 +461,7 @@ def _configure_remote(
             repo.config.add(
                 fetchvar,
                 '+refs/heads/*:refs/remotes/{}/*'.format(name),
-                where='local')
+                scope='local')
 
         if pushurl:
             repo.set_remote_url(name, pushurl, push=True)
@@ -533,17 +533,17 @@ def _configure_remote(
             if depvar in ds.config:
                 # config vars are incremental, so make sure we start from
                 # scratch
-                ds.config.unset(depvar, where='local', reload=False)
+                ds.config.unset(depvar, scope='local', reload=False)
             for d in ensure_list(publish_depends):
                 lgr.info(
                     'Configure additional publication dependency on "%s"',
                     d)
-                ds.config.add(depvar, d, where='local', reload=False)
+                ds.config.add(depvar, d, scope='local', reload=False)
             ds.config.reload()
 
         if publish_by_default:
             if dfltvar in ds.config:
-                ds.config.unset(dfltvar, where='local', reload=False)
+                ds.config.unset(dfltvar, scope='local', reload=False)
             for refspec in ensure_list(publish_by_default):
                 lgr.info(
                     'Configure additional default publication refspec "%s"',

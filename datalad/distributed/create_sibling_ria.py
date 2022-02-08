@@ -706,7 +706,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            gr.config.add("datalad.ora-remote.uuid", uuid, where='local')
+            gr.config.add("datalad.ora-remote.uuid", uuid, scope='local')
 
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
@@ -734,7 +734,7 @@ def _create_sibling_ria(
     ds.config.set(
         "remote.{}.annex-ignore".format(name),
         value="true",
-        where="local")
+        scope="local")
     ds.siblings(
         'configure',
         name=name,

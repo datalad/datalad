@@ -359,7 +359,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     )
         else:
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
-            self.config.set('annex.backend', backend, where='local')
+            self.config.set('annex.backend', backend, scope='local')
 
     @classmethod
     def _cleanup(cls, path, batched):
@@ -696,7 +696,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # in order to make git-annex use it, when talking to the remote.
             # (see http://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/)
             var = 'remote.{0}.{1}'.format(name, 'annexurl')
-            self.config.set(var, url, where='local', reload=True)
+            self.config.set(var, url, scope='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
 
     def set_remote_dead(self, name):
@@ -1394,7 +1394,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 new_value = orig_value.replace(orig_branch, new_branch)
                 self.config.add(var=new_section + "." + opt,
                                 value=new_value,
-                                where='local',
+                                scope='local',
                                 reload=False)
         self._call_annex(['init'] + opts, protocol=AnnexInitOutput)
         # TODO: When to expect stderr?

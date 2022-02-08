@@ -155,6 +155,6 @@ class CreateSiblingGin(Interface):
                 ds = Dataset(res['path'])
                 if isinstance(ds.repo, AnnexRepo):
                     ds.config.set(f'remote.{name}.annex-ignore', 'false',
-                                  where='local')
+                                  scope='local')
                     res['annex-ignore'] = 'false'
             yield res

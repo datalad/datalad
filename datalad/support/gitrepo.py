@@ -2160,7 +2160,7 @@ class GitRepo(CoreGitRepo):
         """
 
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
-        self.config.set(var, url, where='local', reload=True)
+        self.config.set(var, url, scope='local', reload=True)
 
     def get_branch_commits_(self, branch=None, limit=None, stop=None):
         """Return commit hexshas for a branch
@@ -3589,7 +3589,7 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # submodule, if we keep that, any git command will fail
     # after we move .git
     # Ben: Shouldn't we re-setup a possible worktree afterwards?
-    repo.config.unset('core.worktree', where='local')
+    repo.config.unset('core.worktree', scope='local')
     # what we have here is some kind of reference, remove and
     # replace by the target
     os.remove(subds_dotgit)
