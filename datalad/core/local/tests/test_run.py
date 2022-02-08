@@ -144,6 +144,21 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+    with chpwd(path):
+        # make sure that an invalid input declaration prevents command
+        # execution by default
+        assert_raises(
+            IncompleteResultsError,
+            ds.run, 'cd .> dummy0', inputs=['not-here'])
+        ok_(not (ds.pathobj / 'dummy0').exists())
+        # but the default behavior can be changed
+        assert_raises(
+            IncompleteResultsError,
+            ds.run, 'cd .> dummy0', inputs=['not-here'],
+            on_failure='continue')
+        # it has stilled failed, but the command got executed nevertheless
+        ok_((ds.pathobj / 'dummy0').exists())
+
 
 @known_failure_windows
 # ^ For an unknown reason, appveyor started failing after we removed
