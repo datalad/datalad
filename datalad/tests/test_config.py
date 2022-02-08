@@ -41,6 +41,7 @@ from datalad.utils import (
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
+    _where_to_scope,
     ConfigManager,
     parse_gitconfig_dump,
     rewrite_url,
@@ -752,3 +753,21 @@ def test_external_modification(path):
     runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
     config.reload()
     assert_equal(config[key], '11')
+
+
+# TODO: remove along with the removal of deprecated 'where'
+def test_where_to_scope():
+
+    @_where_to_scope
+    def f(scope=None):
+        return scope
+
+    # others aren't affected but we map where to scope
+    assert_equal(f(where='local'), 'local')
+    assert_equal(f(scope='local'), 'local')
+    # we do mapping to 'branch' for where
+    assert_equal(f(where='dataset'), 'branch')
+    # but not for 'scope' -- since that is the target new name, we pass as is
+    assert_equal(f(scope='dataset'), 'dataset')
+    # we do not allow both
+    assert_raises(ValueError, f, where='local', scope='local')

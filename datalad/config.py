@@ -87,7 +87,7 @@ def _scope_reload(obj):
 
 
 #
-# TODO: remove when deprecated 'where' is removed
+# TODO: remove when deprecated 'where' is removed. Some time >= 0.17
 #
 def _where_to_scope(func):
     @wraps(func)
