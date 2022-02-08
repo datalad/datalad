@@ -150,7 +150,7 @@ def setup_parser(
                 command_provider = None
 
     # TODO check if not needed elsewhere
-    if status == 'help' or completing  and status in ('allknown', 'unknownopt'):
+    if status == 'help' or completing and status in ('allknown', 'unknownopt'):
         # --help specification was delayed since it causes immediate
         # printout of
         # --help output before we setup --help for each command
@@ -266,37 +266,19 @@ def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
     if completing:
         help = None
     else:
-        help = alter_interface_docs_for_cmdline(param._doc)
-        if help and help.rstrip()[-1] != '.':
-            help = help.rstrip() + '.'
-            if param.constraints is not None:
-                _amend_help_for_parameter_constraint(
-                    param, parser_kwargs, help)
-        if defaults_idx >= 0:
-            # if it is a flag, in commandline it makes little sense to show
-            # showing the Default: (likely boolean).
-            #   See https://github.com/datalad/datalad/issues/3203
-            if not parser_kwargs.get('action', '').startswith('store_'):
-                # [Default: None] also makes little sense for cmdline
-                if defaults[defaults_idx] is not None:
-                    help += " [Default: %r]" % (defaults[defaults_idx],)
+        help = _amend_param_parser_kwargs_for_help(
+            parser_kwargs, param,
+            defaults[defaults_idx] if defaults_idx >= 0 else None)
     # create the parameter, using the constraint instance for type
     # conversion
     parser.add_argument(*parser_args, help=help,
                         **parser_kwargs)
 
 
-def _amend_help_for_parameter_constraint(param, args, help):
-    # include value constraint description and default
-    # into the help string
-    cdoc = alter_interface_docs_for_cmdline(
-        param.constraints.long_description())
-    if cdoc[0] == '(' and cdoc[-1] == ')':
-        cdoc = cdoc[1:-1]
-    help += '  Constraints: %s' % cdoc
-    if 'metavar' not in args and \
+def _amend_param_parser_kwargs_for_help(parser_kwargs, param, default=None):
+    if 'metavar' not in parser_kwargs and \
             isinstance(param.constraints, EnsureChoice):
-        args['metavar'] = \
+        parser_kwargs['metavar'] = \
             '{%s}' % '|'.join(
                 # don't use short_description(), because
                 # it also needs to give valid output for
@@ -311,6 +293,30 @@ def _amend_help_for_parameter_constraint(param, args, help):
                 # serves a special purpose in the Python API
                 # or implementation details
                 if isinstance(p, str))
+    help = alter_interface_docs_for_cmdline(param._doc)
+    if help:
+        help = help.rstrip()
+        if help[-1] != '.':
+            help += '.'
+        if param.constraints is not None:
+            help += _get_help_for_parameter_constraint(param)
+    if default is not None and \
+            not parser_kwargs.get('action', '').startswith('store_'):
+        # if it is a flag, in commandline it makes little sense to show
+        # showing the Default: (likely boolean).
+        # See https://github.com/datalad/datalad/issues/3203
+        help += " [Default: %r]" % (default,)
+    return help
+
+
+def _get_help_for_parameter_constraint(param):
+    # include value constraint description and default
+    # into the help string
+    cdoc = alter_interface_docs_for_cmdline(
+        param.constraints.long_description())
+    if cdoc[0] == '(' and cdoc[-1] == ')':
+        cdoc = cdoc[1:-1]
+    return '  Constraints: %s' % cdoc
 
 
 def single_subparser_possible(cmdlineargs, parser, completing):
