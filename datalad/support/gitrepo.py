@@ -3494,7 +3494,7 @@ class GitRepo(CoreGitRepo):
                 if Path(part).stem.upper() in RESERVED_NAMES_WIN:
                     problems['Elements using a reserved filename:'].append(part)
                     problems['paths'].append(file)
-                if re.findall(ILLEGAL_CHARS_WIN, part):
+                if re.search(ILLEGAL_CHARS_WIN, part):
                     problems['Elements with illegal characters:'].append(part)
                     problems['paths'].append(file)
                 if part.endswith('.'):
