@@ -397,7 +397,7 @@ def test_add_files(path):
         # special case 4: give the dir:
         if arg[0] == test_list_4:
             result = ds.save('dir', to_git=arg[1])
-            status = ds.repo.annexstatus(['dir'])
+            status = ds.repo.get_content_annexinfo(['dir'])
         else:
             result = ds.save(arg[0], to_git=arg[1])
             for a in ensure_list(arg[0]):
@@ -505,7 +505,7 @@ def test_gh1597(path):
     # must not come under annex management
     assert_not_in(
         'key',
-        ds.repo.annexstatus(paths=['.gitmodules']).popitem()[1])
+        ds.repo.get_content_annexinfo(paths=['.gitmodules']).popitem()[1])
 
 
 @with_tempfile(mkdir=True)
