@@ -3336,9 +3336,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     def annexstatus(self, paths=None, untracked='all'):
         """
         .. deprecated:: 0.16
-
-        Use get_content_annexinfo() or the test helper
-        datalad/utils/get_annexstatus() instead.
+            Use get_content_annexinfo() or the test helper
+            datalad/utils/get_annexstatus() instead.
         """
         info = self.get_content_annexinfo(
             paths=paths,
