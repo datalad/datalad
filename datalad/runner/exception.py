@@ -23,7 +23,7 @@ class CommandError(RuntimeError):
     """Thrown if a command call fails.
 
     Note: Subclasses should override `to_str` rather than `__str__` because
-    `to_str` is called directly in datalad.cmdline.main.
+    `to_str` is called directly in datalad.cli.main.
     """
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,

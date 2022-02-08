@@ -9,26 +9,26 @@
 """
 """
 
-from collections import namedtuple
-
 import json
+import logging
+import os
+import re
 import threading
-from fasteners import InterProcessLock
+from collections import namedtuple
 from functools import lru_cache
+from pathlib import Path
+
+from fasteners import InterProcessLock
+
 import datalad
-from datalad.consts import (
-    DATASET_CONFIG_FILE,
-)
-from datalad.cmd import (
-    GitWitlessRunner,
+from datalad.consts import DATASET_CONFIG_FILE
+from datalad.runner import (
+    CommandError,
+    GitRunner,
+    KillOutput,
     StdOutErrCapture,
 )
 
-import re
-import os
-from pathlib import Path
-
-import logging
 lgr = logging.getLogger('datalad.config')
 
 # git-config key syntax with a section and a subsection
@@ -68,7 +68,7 @@ _stat_result = namedtuple('_stat_result', 'st_ino st_size st_ctime st_mtime')
 @lru_cache()
 def get_git_version(runner=None):
     """Return version of available git"""
-    runner = runner or GitWitlessRunner()
+    runner = runner or GitRunner()
     return runner.run('git version'.split(),
                       protocol=StdOutErrCapture)['stdout'].split()[2]
 
@@ -107,9 +107,11 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     --------
     dict, set
       Configuration items are returned as key/value pairs in a dictionary.
-      The second tuple-item will be a set of path objects comprising all
-      source files, if origin information was included in the dump
-      (--show-origin). An empty set is returned otherwise.
+      The second tuple-item will be a set of identifiers comprising all
+      source files/blobs, if origin information was included
+      in the dump (--show-origin). An empty set is returned otherwise.
+      For actual files a Path object is included in the set, for a git-blob
+      a Git blob ID prefixed with 'blob:' is reported.
     """
     dct = {}
     fileset = set()
@@ -128,6 +130,10 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
                 break
             if line.startswith('command line:'):
                 # no origin that we could as a pathobj
+                break
+            if line.startswith('blob:'):
+                # take verbatim to allow distinguishing files from blobs
+                fileset.add(line)
                 break
             # try getting key/value pair from the present chunk
             k, v = _gitcfg_rec_to_keyvalue(line)
@@ -302,6 +308,7 @@ class ConfigManager(object):
         self._repo_pathobj = None
         if dataset:
             if hasattr(dataset, 'dot_git'):
+                # `dataset` is actually a Repo instance
                 self._repo_dot_git = dataset.dot_git
                 self._repo_pathobj = dataset.pathobj
             elif dataset.repo:
@@ -332,6 +339,7 @@ class ConfigManager(object):
         self._runner = None
         if dataset is not None:
             if hasattr(dataset, '_git_runner'):
+                # `dataset` is actually a Repo instance
                 self._runner = dataset._git_runner
             elif dataset.repo:
                 self._runner = dataset.repo._git_runner
@@ -340,7 +348,7 @@ class ConfigManager(object):
                 # to pick up the right config files
                 run_kwargs['cwd'] = dataset.path
         if self._runner is None:
-            self._runner = GitWitlessRunner(**run_kwargs)
+            self._runner = GitRunner(**run_kwargs)
 
         self.reload(force=True)
 
@@ -378,14 +386,35 @@ class ConfigManager(object):
 
         # figure out what needs to be reloaded at all
         to_run = {}
-        # committed dataset config
-        dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE \
-            if self._repo_pathobj else None
-        if (self._src_mode != 'local' and
-                dataset_cfgfile and
-                dataset_cfgfile.exists()) and (
-                force or self._need_reload(self._stores['dataset'])):
-            to_run['dataset'] = run_args + ['--file', str(dataset_cfgfile)]
+        # committed branch config
+        # well, actually not necessarily committed
+
+        if self._src_mode != 'local' and self._repo_pathobj:
+            # we have to read the branch config from this existing repo
+            if self._repo_dot_git == self._repo_pathobj:
+                # this is a bare repo, we go with the default HEAD,
+                # if it has a config
+                try:
+                    # will blow if absent
+                    self._runner.run([
+                        'git', 'cat-file', '-e', 'HEAD:.datalad/config'],
+                        protocol=KillOutput)
+                    to_run['dataset'] = run_args + [
+                        '--blob', 'HEAD:.datalad/config']
+                except CommandError:
+                    # all good, just no branch config
+                    pass
+            else:
+                # non-bare repo
+                # we could use the same strategy as for bare repos, and rely
+                # on the committed config, however, for now we must pay off
+                # the sins of the past and work with the file at hand
+                dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE
+                if dataset_cfgfile.exists() and (
+                        force or self._need_reload(self._stores['dataset'])):
+                    # we have the file and are forced or encourages to (re)load
+                    to_run['dataset'] = run_args + [
+                        '--file', str(dataset_cfgfile)]
 
         if self._src_mode != 'dataset' and (
                 force or self._need_reload(self._stores['git'])):
@@ -439,13 +468,24 @@ class ConfigManager(object):
         store['stats'] = self._get_stats(store)
         return store
 
-    @staticmethod
-    def _get_stats(store):
+    def _get_stats(self, store):
         stats = {}
         for f in store['files']:
-            if f.exists:
-                stat = f.stat()
-                stats[f] = _stat_result(stat.st_ino, stat.st_size, stat.st_ctime, stat.st_mtime)
+            if isinstance(f, Path):
+                if f.exists():
+                    stat = f.stat()
+                    stats[f] = _stat_result(
+                        stat.st_ino,
+                        stat.st_size,
+                        stat.st_ctime,
+                        stat.st_mtime)
+                else:
+                    stats[f] = None
+            elif f.startswith('blob:'):
+                # we record the specific shasum of the blob
+                stats[f] = self._runner.run(
+                    ['git', 'rev-parse', f[5:]],
+                    protocol=StdOutErrCapture)['stdout'].strip()
             else:
                 stats[f] = None
         return stats
@@ -487,6 +527,7 @@ class ConfigManager(object):
         # could theoretically import all kind of weird things for type
         # conversion
         from datalad.interface.common_cfg import definitions as cfg_defs
+
         # fetch what we know about this variable
         cdef = cfg_defs.get(var, {})
         # type conversion setup
@@ -668,7 +709,7 @@ class ConfigManager(object):
                     key,
                     self.overrides.get(
                         key,
-                        self._stores['local']['cfg'].get(
+                        self._stores['git']['cfg'].get(
                             key,
                             default)))
 

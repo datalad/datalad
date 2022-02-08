@@ -18,7 +18,7 @@ from datalad.cmd import (
     StdOutCapture,
     WitlessRunner,
 )
-from datalad.cmdline.main import main
+from datalad.cli.main import main
 
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_ssh

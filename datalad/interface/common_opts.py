@@ -390,3 +390,9 @@ eval_defaults = {
     k: p.cmd_kwargs.get('default', None)
     for k, p in eval_params.items()
 }
+"""\
+.. deprecated:: 0.16
+   This variable will be removed in a future release. The default values for
+   all Parameters (possibly overriding by command-specific settings) are now
+   available as :class:`Interface` attributes.
+"""

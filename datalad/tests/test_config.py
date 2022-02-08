@@ -17,6 +17,8 @@ from os.path import join as opj
 
 from unittest.mock import patch
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     assert_equal,
     assert_false,
     assert_in,
@@ -47,6 +49,7 @@ from datalad.config import (
 from datalad.cmd import CommandError
 
 from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad import cfg as dl_cfg
 
 
@@ -627,11 +630,38 @@ def test_global_config():
 
 
 @with_tempfile()
-def test_bare(path):
-    # can we handle a bare repo?
-    gr = GitRepo(path, create=True, bare=True)
+@with_tempfile()
+def test_bare(src, path):
+    # create a proper datalad dataset with all bells and whistles
+    ds = Dataset(src).create()
+    dlconfig_sha = ds.repo.call_git(['rev-parse', 'HEAD:.datalad/config'])
+    # can we handle a bare repo version of it?
+    gr = AnnexRepo.clone(
+        src, path, clone_options=['--bare', '-b', DEFAULT_BRANCH])
+    # we had to specifically checkout the standard branch, because on crippled
+    # FS, HEAD will point to an adjusted branch by default, and the test logic
+    # below does not account for this case.
+    # this should just make sure the bare repo has the expected setup,
+    # but it should still be bare. Let's check that to be sure
+    assert_true(gr.bare)
     # do we read the correct local config?
     assert_in(gr.pathobj / 'config', gr.config._stores['git']['files'])
+    # do we pick up the default branch config too?
+    assert_in('blob:HEAD:.datalad/config',
+              gr.config._stores['dataset']['files'])
+    # and track its reload stamp via its file shasum
+    assert_equal(
+        dlconfig_sha,
+        gr.config._stores['dataset']['stats']['blob:HEAD:.datalad/config'])
+    # check that we can pick up the dsid from the commit branch config
+    assert_equal(ds.id, gr.config.get('datalad.dataset.id'))
+    # and it is coming from the correct source
+    assert_equal(
+        ds.id,
+        gr.config.get_from_source('dataset', 'datalad.dataset.id'))
+    assert_equal(
+        None,
+        gr.config.get_from_source('local', 'datalad.dataset.id'))
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', gr.config)
     # not set something that wasn't there
@@ -642,6 +672,21 @@ def test_bare(path):
     assert_equal(gr.config.get(obscure_key), 'myvalue')
     # now make sure the config is where we think it is
     assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
+    # update committed config and check update
+    old_id = ds.id
+    ds.config.set('datalad.dataset.id', 'surprise!', where='dataset')
+    ds.save()
+    # fetch into default branch (like `update`, but for bare-repos)
+    gr.call_git([
+        'fetch', f'{DEFAULT_REMOTE}', f'{DEFAULT_BRANCH}:{DEFAULT_BRANCH}'])
+    # without a reload, no state change, like with non-bare repos
+    assert_equal(
+        old_id,
+        gr.config.get_from_source('dataset', 'datalad.dataset.id'))
+    # a non-forced reload() must be enough, because state change
+    # detection kicks in
+    gr.config.reload()
+    assert_equal('surprise!', gr.config.get('datalad.dataset.id'))
 
 
 @with_tempfile()

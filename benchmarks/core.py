@@ -10,30 +10,15 @@
 import os
 import sys
 import os.path as osp
-from os.path import join as opj
-import tarfile
-import timeit
 
-from time import time
 from subprocess import call
 
-from datalad.cmd import (
-    WitlessRunner,
-    GitWitlessRunner,
+from datalad.runner import (
+    Runner,
+    GitRunner,
     StdOutErrCapture,
 )
 
-from datalad.api import save
-from datalad.api import create
-from datalad.api import create_test_dataset
-from datalad.api import Dataset
-from datalad.api import install
-from datalad.api import ls
-from datalad.api import remove
-from datalad.api import uninstall
-
-from datalad.utils import rmtree
-from datalad.utils import getpwd
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
 #import gc
@@ -47,6 +32,7 @@ from .common import SuprocBenchmarks
 scripts_dir = osp.join(osp.dirname(__file__), 'scripts')
 heavyout_cmd = "{} 1000".format(osp.join(scripts_dir, 'heavyout'))
 
+
 class startup(SuprocBenchmarks):
     """
     Benchmarks for datalad commands startup
@@ -59,9 +45,6 @@ class startup(SuprocBenchmarks):
         self.env = os.environ.copy()
         self.env['PATH'] = '%s:%s' % (python_path, self.env.get('PATH', ''))
 
-    def time_help_np(self):
-        call(["datalad", "--help-np"], env=self.env)
-        
     def time_import(self):
         call([sys.executable, "-c", "import datalad"])
 
@@ -70,12 +53,12 @@ class startup(SuprocBenchmarks):
 
 
 class witlessrunner(SuprocBenchmarks):
-    """Some rudimentary tests to see if there is no major slowdowns of WitlessRunner
+    """Some rudimentary tests to see if there is no major slowdowns of Runner
     """
 
     def setup(self):
-        self.runner = WitlessRunner()
-        self.git_runner = GitWitlessRunner()
+        self.runner = Runner()
+        self.git_runner = GitRunner()
 
     def time_echo(self):
         self.runner.run(["echo"])
