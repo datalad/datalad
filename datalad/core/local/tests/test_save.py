@@ -688,7 +688,7 @@ def test_path_arg_call(path):
 def test_windows_incompatible_names(path):
     ds = Dataset(path).create()
     create_tree(path, {
-        'imgood' : 'Look what a nice name I have',
+        'imgood': 'Look what a nice name I have',
         'illegal:character.txt': 'strange choice of name',
         'spaceending ': 'who does these things?',
         'lookmumadot.': 'why would you do this?',
@@ -719,6 +719,24 @@ def test_windows_incompatible_names(path):
         assert_in("Elements with illegal characters:", cml.out)
         assert_in("Elements ending with a dot:", cml.out)
         assert_in("Elements ending with a space:", cml.out)
+
+    # check that a setting of 'none' really does nothing
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'none')
+    ds.save('.datalad/config')
+    create_tree(path, {
+        'more illegal:characters?.py': 'My arch nemesis uses Windows and I will'
+                                       'destroy them! Muahahaha'
+    })
+    with swallow_logs(new_level=logging.WARN) as cml:
+        res = ds.save()
+        # we shouldn't see warnings
+        assert_not_in(
+            "Some elements of your dataset are not compatible with Windows "
+            "systems. Disable this check by changing "
+            "datalad.save.windows-compat-warning or consider renaming the "
+            "following elements:", cml.out)
+        # make sure the file is saved successfully
+        assert_result_count(res, 1, status='ok', action='save')
 
 
 @with_tree(tree={
