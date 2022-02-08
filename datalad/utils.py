@@ -86,9 +86,6 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
-on_msys_tainted_paths = on_windows \
-                        and 'MSYS_NO_PATHCONV' not in os.environ \
-                        and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 
 
 # Takes ~200msec, so should not be called at import time
@@ -363,7 +360,7 @@ def _is_stream_tty(stream):
     try:
         # TODO: check on windows if hasattr check would work correctly and
         # add value:
-        return stream.isatty()
+        return stream and stream.isatty()
     except ValueError as exc:
         # Who knows why it is a ValueError, but let's try to be specific
         # If there is a problem with I/O - non-interactive, otherwise reraise
@@ -1572,33 +1569,6 @@ def lock_if_required(lock_required, lock):
 #
 # Additional handlers
 #
-_sys_excepthook = sys.excepthook  # Just in case we ever need original one
-
-
-def setup_exceptionhook(ipython=False):
-    """Overloads default sys.excepthook with our exceptionhook handler.
-
-       If interactive, our exceptionhook handler will invoke
-       pdb.post_mortem; if not interactive, then invokes default handler.
-    """
-
-    def _datalad_pdb_excepthook(type, value, tb):
-        import traceback
-        traceback.print_exception(type, value, tb)
-        print()
-        if is_interactive():
-            import pdb
-            pdb.post_mortem(tb)
-
-    if ipython:
-        from IPython.core import ultratb
-        sys.excepthook = ultratb.FormattedTB(mode='Verbose',
-                                             # color_scheme='Linux',
-                                             call_pdb=is_interactive())
-    else:
-        sys.excepthook = _datalad_pdb_excepthook
-
-
 def ensure_dir(*args):
     """Make sure directory exists.
 

@@ -31,7 +31,7 @@ from datalad.utils import (
     on_windows,
 )
 
-from datalad.cmdline.main import main
+from datalad.cli.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,

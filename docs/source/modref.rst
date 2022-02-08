@@ -37,6 +37,7 @@ Dataset operations
    api.push
    api.remove
    api.save
+   api.status
    api.update
    api.unlock
 
@@ -94,6 +95,7 @@ Miscellaneous commands
    api.add_readme
    api.addurls
    api.check_dates
+   api.configuration
    api.export_archive
    api.export_to_figshare
    api.no_annex
@@ -137,6 +139,15 @@ Test infrastructure
    tests.utils_testrepos
    tests.heavyoutput
 
+Command interface
+=================
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   interface.base
+
 Command line interface infrastructure
 =====================================
 
@@ -144,6 +155,7 @@ Command line interface infrastructure
 .. autosummary::
    :toctree: generated
 
-   cmdline.main
-   cmdline.helpers
-   cmdline.common_args
+   cli.exec
+   cli.main
+   cli.parser
+   cli.renderer

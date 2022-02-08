@@ -79,6 +79,7 @@ _group_2metadata = (
 _group_3misc = (
     'Miscellaneous commands',
     [
+        ('datalad.local.configuration', 'Configuration'),
         ('datalad.local.wtf', 'WTF'),
         ('datalad.local.clean', 'Clean'),
         ('datalad.local.add_archive_content', 'AddArchiveContent'),
@@ -101,18 +102,3 @@ _group_4plumbing = (
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.shell_completion', 'ShellCompletion', 'shell-completion'),
     ])
-
-
-# Some known extensions and their commands to suggest whenever lookup fails
-_known_extension_commands = {
-    'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
-    'datalad-crawler': ('crawl', 'crawl-init'),
-    'datalad-deprecated': ('ls',),
-    'datalad-neuroimaging': ('bids2scidata',)
-}
-
-
-_deprecated_commands = {
-    'add': "save",
-    'uninstall': 'drop',
-}

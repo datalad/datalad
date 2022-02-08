@@ -1279,6 +1279,12 @@ class RIARemote(SpecialRemote):
         try:
             self.io.get(abs_key_path, filename, self.annex.progress)
         except Exception as e1:
+            if isinstance(self.io, HTTPRemoteIO):
+                # no client-side archive access over HTTP
+                # Note: This is intentional, as it would mean one additional
+                # request per key. However, server response to the GET can
+                # consider archives on their end.
+                raise
             # catch anything and keep it around for a potential re-raise
             try:
                 self.io.get_from_archive(archive_path, key_path, filename,
@@ -1298,6 +1304,9 @@ class RIARemote(SpecialRemote):
         if self.io.exists(abs_key_path):
             # we have an actual file for this key
             return True
+        if isinstance(self.io, HTTPRemoteIO):
+            # no client-side archive access over HTTP
+            return False
         # do not make a careful check whether an archive exists, because at
         # present this requires an additional SSH call for remote operations
         # which may be rather slow. Instead just try to run 7z on it and let

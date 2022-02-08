@@ -131,11 +131,7 @@ def dump2xzstream(obj, fname):
 
 
 def load_stream(fname, compressed=None):
-    _open = LZMAFile \
-        if compressed or compressed is None and fname.endswith('.xz') \
-        else io.open
-
-    with _open(fname, mode='rb') as f:
+    with _suitable_open(fname, compressed)(fname, mode='rb') as f:
         jreader = codecs.getreader('utf-8')(f)
         cont_line = u''
         for line in jreader:
@@ -184,11 +180,7 @@ def load(fname, fixup=True, compressed=None, **kw):
     **kw
       Passed into the load (and loads after fixups) function
     """
-    _open = LZMAFile \
-        if compressed or compressed is None and fname.endswith('.xz') \
-        else io.open
-
-    with _open(fname, 'rb') as f:
+    with _suitable_open(fname, compressed)(fname, 'rb') as f:
         try:
             jreader = codecs.getreader('utf-8')(f)
             return jsonload(jreader, **kw)
@@ -203,7 +195,7 @@ def load(fname, fixup=True, compressed=None, **kw):
             # Load entire content and replace common "abusers" which break JSON
             # comprehension but in general
             # are Ok
-            with _open(fname,'rb') as f:
+            with _suitable_open(fname)(fname,'rb') as f:
                 s_orig = s = codecs.getreader('utf-8')(f).read()
 
             for o, r in {
@@ -215,3 +207,26 @@ def load(fname, fixup=True, compressed=None, **kw):
                 # we have done nothing, so just reraise previous exception
                 raise
             return loads(s, **kw)
+
+
+def _suitable_open(fname, compressed=None):
+    """Helper to return an appropriate open() implementation for a JSON file
+
+    Parameters
+    ----------
+    fname: str
+      The target file name which will be inspected for a '.xz' extension when
+      compressed is None.
+    compressed: None or bool, optional
+      If not None, determined when the return function will be capable of
+      (de)compression. If None, this will be guessed from the file name.
+
+    Returns
+    -------
+    LZMAFile or io.open
+      LZMAFile is returned when (de)compression is requested, or the file name
+      suggests a compressed file.
+    """
+    return LZMAFile \
+        if compressed or compressed is None and fname.endswith('.xz') \
+        else io.open

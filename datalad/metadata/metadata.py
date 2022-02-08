@@ -888,7 +888,8 @@ class Metadata(Interface):
             reporton='all',
             recursive=False):
         # prep results
-        refds_path = Interface.get_refds_path(dataset)
+        refds_path = dataset if dataset is None \
+            else require_dataset(dataset).path
         res_kwargs = dict(action='metadata', logger=lgr)
         if refds_path:
             res_kwargs['refds'] = refds_path

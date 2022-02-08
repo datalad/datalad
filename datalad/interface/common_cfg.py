@@ -83,7 +83,7 @@ definitions = {
                'title': 'Crawler download caching',
                'text': 'Should the crawler cache downloaded files?'}),
         'destination': 'local',
-        'type': bool,
+        'type': EnsureBool(),
     },
     # this is actually used in downloaders, but kept cfg name original
     'datalad.credentials.force-ask': {
@@ -91,7 +91,7 @@ definitions = {
                'title': 'Force (re-)entry of credentials',
                'text': 'Should DataLad prompt for credential (re-)entry? This '
                        'can be used to update previously stored credentials.'}),
-        'type': bool,
+        'type': EnsureBool(),
         'default': False,
     },
     'datalad.externals.nda.dbserver': {
