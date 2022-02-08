@@ -842,5 +842,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     recursive=True,
                     message=msg,
                     jobs=jobs,
-                    return_type='generator'):
+                    return_type='generator',
+                    # we want this command and its parameterization to be in full
+                    # control about the rendering of results, hence we must turn
+                    # off internal rendering
+                    result_renderer='disabled'):
                 yield r
