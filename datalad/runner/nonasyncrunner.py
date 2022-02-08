@@ -505,14 +505,15 @@ class ThreadedRunner:
             ) if thread is not None]
         return not any(live_threads) and self.output_queue.empty()
 
-    def check_for_stall(self):
+    def check_for_stall(self) -> bool:
         if self.stall_check_interval == 0:
             self.stall_check_interval = 11
             if self.is_stalled():
                 lgr.warning(
                     "ThreadedRunner.process_queue(): stall detected")
-                return
+                return True
         self.stall_check_interval -= 1
+        return False
 
     def process_queue(self):
         """
@@ -535,7 +536,8 @@ class ThreadedRunner:
                     timeout=ThreadedRunner.timeout_resolution)
                 break
             except Empty:
-                self.check_for_stall()
+                if self.check_for_stall() is True:
+                    return
                 self.process_timeouts()
                 continue
 
