@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     ok_startswith,
     on_windows,
     slow,
+    skip_if_no_module,
     with_tempfile,
 )
 from datalad.ui.utils import (
@@ -43,8 +44,10 @@ from datalad.ui.utils import (
 from datalad.utils import (
     chpwd,
 )
+from datalad.interface.base import get_interface_groups
 
 from ..main import main
+from ..helpers import get_commands_from_groups
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -89,6 +92,17 @@ def run_main(args, exit_code=0, expect_stderr=False):
     return stdout, stderr
 
 
+def get_all_commands() -> list:
+    return list(get_commands_from_groups(get_interface_groups()))
+
+
+def assert_all_commands_present(out):
+    """Helper to reuse to assert that all known commands are present in output
+    """
+    for cmd in get_all_commands():
+        assert_re_in(fr"\b{cmd}\b", out, match=False)
+
+
 # TODO: switch to stdout for --version output
 def test_version():
     # we just get a version if not asking for a version of some command
@@ -129,6 +143,8 @@ def test_help_np():
         # should be present only one time!
         eq_(stdout.count(s), 1)
 
+    assert_all_commands_present(stdout)
+
     if not get_terminal_size()[0] or 0:
         raise SkipTest(
             "Could not determine terminal size, skipping the rest of the test")
@@ -147,6 +163,23 @@ def test_help_np():
             "Following lines in --help output were longer than %s chars:\n%s"
             % (accepted_width, '\n'.join(long_lines))
         )
+
+
+def test_dashh():
+    stdout, stderr = run_main(['-h'])
+    # Note: for -h we do not do ad-hoc tune up of Usage: to guarantee having
+    # datalad instead of python -m nose etc, so we can only verify that we have
+    # options listed
+    assert_re_in(r'^Usage: .*\[', stdout.splitlines()[0])
+    assert_all_commands_present(stdout)
+    assert_re_in('Use .--help. to get more comprehensive information', stdout.splitlines())
+
+
+def test_dashh_clone():
+    # test -h on a sample command
+    stdout, stderr = run_main(['clone', '-h'])
+    assert_re_in(r'^Usage: .* clone \[', stdout.splitlines()[0])
+    assert_re_in('Use .--help. to get more comprehensive information', stdout.splitlines())
 
 
 def test_usage_on_insufficient_args():
@@ -280,3 +313,61 @@ def test_librarymode(path):
         # restore pre-test behavior
         datalad.__runtime_mode = was_mode
         datalad.cfg.overrides.pop('datalad.runtime.librarymode')
+
+
+@with_tempfile
+def test_completion(out_fn):
+    skip_if_no_module('argcomplete')
+
+    from datalad.cmd import WitlessRunner
+    runner = WitlessRunner()
+
+    def get_completions(s: str, expected) -> list:
+        """Run 'datalad' external command and collect completions
+
+        Parameters
+        ----------
+        s: str
+          what to append to 'datalad ' invocation
+        expected: iterable of str
+          What entries to expect - would raise AssertionError if any is
+          not present in output
+        exit_code: int, optional
+          If incomplete/malformed we seems to get 2, most frequently used
+          so default
+
+        Returns
+        -------
+        list of str
+          Entries output
+        """
+        if os.path.exists(out_fn):  # reuse but ensure it is gone
+            os.unlink(out_fn)
+        comp_line = f'datalad {s}'
+        runner.run(
+            comp_line.split(' '),
+            env=dict(os.environ,
+                     _ARGCOMPLETE='1',
+                     _ARGCOMPLETE_STDOUT_FILENAME=out_fn,
+                     COMP_LINE=comp_line,
+                     # without -1 seems to get "finished completion", someone can investigate more
+                     COMP_POINT=str(len(comp_line)-1),  # always at the end ATM
+                     ))
+        with open(out_fn, 'rb') as f:
+            entries = f.read().split(b'\x0b')
+            entries = [e.decode() for e in entries]
+        diff = set(expected).difference(entries)
+        if diff:
+            raise AssertionError(
+                f"Entries {sorted(diff)} were expected but not found in the completion output: {entries}"
+            )
+        return entries  # for extra analyzes if so desired
+
+    all_commands = get_all_commands()
+    get_completions('i', {'install'})
+    get_completions(' ', ['--dbg', '-c'] + all_commands)
+    # if command already matches -- we get only that hit ATM, not others which begin with it
+    get_completions('create', ['create '])
+    get_completions('create -', ['--dataset'])
+    # but for incomplete one we do get all create* commands
+    get_completions('creat', [c for c in all_commands if c.startswith('create')])

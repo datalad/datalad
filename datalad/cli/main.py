@@ -62,6 +62,11 @@ def main(args=sys.argv):
     lgr.log(5, "Starting main(%r)", args)
     # record that we came in via the cmdline
     datalad.__api = 'cmdline'
+    completing = "_ARGCOMPLETE" in os.environ
+    if completing and 'COMP_LINE' in os.environ:
+        import shlex
+        # TODO support posix=False too?
+        args = shlex.split(os.environ['COMP_LINE']) or args
 
     if _on_msys_tainted_paths():
         # Possibly present DataLadRIs were stripped of a leading /
@@ -71,7 +76,7 @@ def main(args=sys.argv):
     # PYTHON_ARGCOMPLETE_OK
     # TODO possibly construct a dedicated parser just for autocompletion
     # rather than lobotomizing the normal one
-    parser = setup_parser(args, completing="_ARGCOMPLETE" in os.environ)
+    parser = setup_parser(args, completing=completing)
     try:
         import argcomplete
         argcomplete.autocomplete(parser)
