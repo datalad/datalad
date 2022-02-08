@@ -356,7 +356,7 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(*sorted(SECTION_CALLABLES) + ['*']) | EnsureNone(),
+            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES) + ['*']),
             doc="""section to include.  If not set - depends on flavor.
             '*' could be used to force all sections.
             [CMD: This option can be given multiple times. CMD]"""),
@@ -368,7 +368,7 @@ class WTF(Interface):
             Use [CMD: --section CMD][PY: `section` PY] to list other sections"""),
         decor=Parameter(
             args=("-D", "--decor"),
-            constraints=EnsureChoice('html_details') | EnsureNone(),
+            constraints=EnsureChoice('html_details', None),
             doc="""decoration around the rendering to facilitate embedding into
             issues etc, e.g. use 'html_details' for posting collapsible entry
             to GitHub issues."""),

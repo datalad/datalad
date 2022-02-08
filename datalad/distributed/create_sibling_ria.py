@@ -222,8 +222,7 @@ class CreateSiblingRia(Interface):
             installation is required on the target host."""),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice(
-                'skip', 'error', 'reconfigure') | EnsureNone(),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', None),
             metavar='MODE',
             doc="""Action to perform, if a (storage) sibling is already
             configured under the given name and/or a target already exists.
@@ -242,8 +241,7 @@ class CreateSiblingRia(Interface):
         trust_level=Parameter(
             args=("--trust-level",),
             metavar="TRUST-LEVEL",
-            constraints=EnsureChoice(
-                'trust', 'semitrust', 'untrust') | EnsureNone(),
+            constraints=EnsureChoice('trust', 'semitrust', 'untrust', None),
             doc="""specify a trust level for the storage sibling. If not
             specified, the default git-annex trust level is used. 'trust'
             should be used with care (see the git-annex-trust man page).""",),
