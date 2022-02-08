@@ -27,6 +27,9 @@ env:
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"
+    # Prevent interactive credential entry (note "true" is the command to run)
+    # See also the core.askPass setting below
+    - GIT_ASKPASS=true
 
 matrix:
   include:
@@ -223,6 +226,13 @@ before_install:
 install:
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
+  # Don't let git ask for credentials in CI runs. Note, that this variable
+  # technically is not a flag, but an executable (which is why name and value
+  # are a bit confusing here - we just want a no-op basically). The environment
+  # variable GIT_ASKPASS overwrites this, but neither env var nor this config
+  # are supported by git-credential on all systems and git versions (most recent
+  # ones should work either way, though). Hence use both across CI builds.
+  - git config --global core.askPass ""
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location

@@ -53,6 +53,9 @@ shallow_clone: false
 
 environment:
   DATALAD_TESTS_SSH: 1
+  # Prevent interactive credential entry (note "true" is the command to run)
+  # See also the core.askPass setting below
+  GIT_ASKPASS: true
 
   # Do not use `image` as a matrix dimension, to have fine-grained control over
   # what tests run on which platform
@@ -212,6 +215,8 @@ init:
   # Identity setup
   - git config --global user.email "test@appveyor.land"
   - git config --global user.name "Appveyor Almighty"
+  # Companion to the GIT_ASKPASS environment setting above
+  - git config --global core.askPass ""
   # globally setting filter.annex.process (needs git-annex 8.20211117) to reduce git-add runtime
   # https://git-annex.branchable.com/bugs/Windows__58___substantial_per-file_cost_for___96__add__96__/
   - cmd: git config --system filter.annex.process "git-annex filter-process"

@@ -30,9 +30,9 @@ from ..utils import (
     unlink,
 )
 from .credentials import (
-    CREDENTIAL_TYPES,
     CompositeCredential,
 )
+from datalad.downloaders import CREDENTIAL_TYPES
 from ..support.exceptions import (
     AccessDeniedError,
     AccessPermissionExpiredError,
@@ -47,8 +47,6 @@ from ..support.locking import (
     try_lock,
     try_lock_informatively,
 )
-
-from ..support.network import RI
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -143,6 +141,12 @@ class BaseDownloader(object, metaclass=ABCMeta):
             needs_authentication = authenticator.requires_authentication
         else:
             needs_authentication = self.credential
+
+        # TODO: not sure yet, where is/are the right spot(s) to pass the URL:
+        if hasattr(self.credential, 'set_context'):
+            lgr.debug("set credential context as %s", url)
+            self.credential.set_context(auth_url=url)
+
         attempt, incomplete_attempt = 0, 0
         result = None
         credential_was_refreshed = False
@@ -293,7 +297,6 @@ class BaseDownloader(object, metaclass=ABCMeta):
             break
         return provider
 
-
     def _enter_credentials(
             self, url, denied_msg,
             auth_types=[], new_provider=True):
@@ -338,6 +341,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 raise DownloadError(
                     "Failed to download from %s given available credentials"
                     % url)
+
+        lgr.debug("set credential context as %s", url)
+        self.credential.set_context(auth_url=url)
 
     @staticmethod
     def _get_temp_download_filename(filepath):
