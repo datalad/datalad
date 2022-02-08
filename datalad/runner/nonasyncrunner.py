@@ -240,7 +240,7 @@ class ThreadedRunner:
 
         self.last_touched = dict()
         self.active_file_numbers = set()
-        self.deadlock_check_interval = 10
+        self.stall_check_interval = 10
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -292,10 +292,9 @@ class ThreadedRunner:
                result = gen.return_code
         """
         if isinstance(self.stdin, (int, IO, type(None))):
-            # indicate that we will not write anything to stdin, that
-            # means the user can pass None, or he can pass a
-            # file-like and write to it from a different thread.
-            self.write_stdin = False  # the caller will write to the parameter
+            # We will not write anything to stdin. If the caller passed a
+            # file-like he can write to it from a different thread.
+            self.write_stdin = False
 
         elif isinstance(self.stdin, (str, bytes)):
             # Establish a queue to write to the process and
@@ -304,22 +303,22 @@ class ThreadedRunner:
             self.stdin_queue = Queue()
             self.stdin_queue.put(self.stdin)
             self.stdin_queue.put(None)
+
         elif isinstance(self.stdin, Queue):
             # Establish a queue to write to the process.
             self.write_stdin = True
             self.stdin_queue = self.stdin
+
         else:
-            # indicate that we will not write anything to stdin, that
-            # means the user can pass None, or he can pass a
-            # file-like and write to it from a different thread.
-            lgr.warning(f"Unknown instance class: {type(self.stdin)}, "
-                        f"assuming file-like input: {self.stdin}")
-            # We assume that the caller will write to the given
-            # file descriptor.
+            # We do not recognize the input class will and just pass is through
+            # to Popen(). We assume that the caller handles any writing if
+            # desired.
             self.write_stdin = False
 
         self.protocol = self.protocol_class(**self.protocol_kwargs)
 
+        # The following command is generated internally by datalad
+        # and trusted. Security check is therefore skipped.
         kwargs = {
             **self.popen_kwargs,
             **dict(
@@ -327,19 +326,23 @@ class ThreadedRunner:
                 stdin=subprocess.PIPE if self.write_stdin else self.stdin,
                 stdout=subprocess.PIPE if self.catch_stdout else None,
                 stderr=subprocess.PIPE if self.catch_stderr else None,
-                shell=True if isinstance(self.cmd, str) else False
+                shell=True if isinstance(self.cmd, str) else False      # nosec
             )
         }
 
         try:
-            self.process = subprocess.Popen(self.cmd, **kwargs)
+            # The following command is generated internally by datalad
+            # and trusted. Security check is therefore skipped.
+            self.process = subprocess.Popen(self.cmd, **kwargs)         # nosec
+
         except OSError as e:
             if not on_windows and "argument list too long" in str(e).lower():
                 lgr.error(
                     "Caught exception suggesting too large stack size limits. "
                     "Hint: use 'ulimit -s' command to see current limit and "
-                    "e.g. 'ulimit -s 8192' to reduce it to avoid this exception. "
-                    "See https://github.com/datalad/datalad/issues/6106 for more "
+                    "e.g. 'ulimit -s 8192' to reduce it to avoid this "
+                    "exception. See "
+                    "https://github.com/datalad/datalad/issues/6106 for more "
                     "information."
                 )
             raise
@@ -427,7 +430,6 @@ class ThreadedRunner:
         self.process_waiting_thread.start()
 
         if issubclass(self.protocol_class, GeneratorMixIn):
-            assert isinstance(self.protocol, GeneratorMixIn)
             return _ResultGenerator(self, self.protocol.result_queue)
 
         return self.process_loop()
@@ -451,29 +453,38 @@ class ThreadedRunner:
         self.wait_for_threads()
         return self.result
 
+    def _handle_file_timeout(self, source):
+        if self.protocol.timeout(self.fileno_mapping[source]) is True:
+            self.remove_file_number(source)
+
+    def _handle_process_timeout(self):
+        if self.protocol.timeout(None) is True:
+            self.ensure_stdin_stdout_stderr_closed()
+            self.process.terminate()
+            self.process.wait()
+            self.remove_process()
+
+    def _handle_source_timeout(self, source):
+        if source is None:
+            self._handle_process_timeout()
+        else:
+            self._handle_file_timeout(source)
+
+    def _update_timeouts(self):
+        last_touched = list(self.last_touched.items())
+        new_times = dict()
+        current_time = time.time()
+        for source, last_time in last_touched:
+            if current_time - last_time >= self.timeout:
+                new_times[source] = current_time
+                self._handle_source_timeout(source)
+        self.last_touched = {
+            **self.last_touched,
+            **new_times}
+
     def process_timeouts(self):
         if self.timeout is not None:
-            last_touched = list(self.last_touched.items())
-            new_times = dict()
-            current_time = time.time()
-            for source, last_time in last_touched:
-                if current_time - last_time >= self.timeout:
-                    new_times[source] = current_time
-                    if source is None:
-                        if self.protocol.timeout(None) is True:
-                            self.ensure_stdin_stdout_stderr_closed()
-                            self.process.terminate()
-                            self.process.wait()
-                            self.remove_process()
-                    else:
-                        if self.protocol.timeout(self.fileno_mapping[source]) is True:
-                            self.remove_file_number(source)
-
-            # Update triggered timeouts
-            self.last_touched = {
-                **self.last_touched,
-                **new_times
-            }
+            self._update_timeouts()
 
     def should_continue(self) -> bool:
         # Continue with queue processing if there is still a process or
@@ -483,8 +494,8 @@ class ThreadedRunner:
             or not self.output_queue.empty())
 
     def is_stalled(self) -> bool:
-        # If all threads have exited and the queue is empty,
-        # we might have a blocking condition.
+        # If all threads have exited and the queue is empty, we might have a
+        # stall condition.
         live_threads = [
             thread.is_alive()
             for thread in (
@@ -493,6 +504,16 @@ class ThreadedRunner:
                 self.process_waiting_thread,
             ) if thread is not None]
         return not any(live_threads) and self.output_queue.empty()
+
+    def check_for_stall(self) -> bool:
+        if self.stall_check_interval == 0:
+            self.stall_check_interval = 11
+            if self.is_stalled():
+                lgr.warning(
+                    "ThreadedRunner.process_queue(): stall detected")
+                return True
+        self.stall_check_interval -= 1
+        return False
 
     def process_queue(self):
         """
@@ -515,14 +536,8 @@ class ThreadedRunner:
                     timeout=ThreadedRunner.timeout_resolution)
                 break
             except Empty:
-                # Check for deadlock situation every 1000 ms
-                if self.deadlock_check_interval == 0:
-                    self.deadlock_check_interval = 11
-                    if self.is_stalled():
-                        lgr.warning(
-                            "ThreadedRunner.process_queue(): stall detected")
-                        return
-                self.deadlock_check_interval -= 1
+                if self.check_for_stall() is True:
+                    return
                 self.process_timeouts()
                 continue
 
