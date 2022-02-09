@@ -2,8 +2,64 @@
 
 Change log
 **********
+0.16.0 (Wed Feb 09 2022)
+========================
+
+Enhancement
+-----------
+
+-  BF: When download-url gets Pathobject as path convert it to a string
+   `#6364 <https://github.com/datalad/datalad/pull/6364>`__
+   (`@adswa <https://github.com/adswa>`__)
+
+Bug Fix
+-------
+
+-  Fix AnnexRepo.whereis key=True mode operation, and add batch mode
+   support `#6379 <https://github.com/datalad/datalad/pull/6379>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  DOC: run - adjust description for -i/-o to mention that it could be a
+   directory `#6416 <https://github.com/datalad/datalad/pull/6416>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: ORA over HTTP tried to check archive
+   `#6355 <https://github.com/datalad/datalad/pull/6355>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: condition access to isatty to have stream eval to True
+   `#6360 <https://github.com/datalad/datalad/pull/6360>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: python 3.10 compatibility fixes
+   `#6363 <https://github.com/datalad/datalad/pull/6363>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Remove two(!) copies of a test
+   `#6374 <https://github.com/datalad/datalad/pull/6374>`__
+   (`@mih <https://github.com/mih>`__)
+-  Warn just once about incomplete git config
+   `#6343 <https://github.com/datalad/datalad/pull/6343>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Make version detection robust to GIT_DIR specification
+   `#6341 <https://github.com/datalad/datalad/pull/6341>`__
+   (`@effigies <https://github.com/effigies>`__
+   `@mih <https://github.com/mih>`__)
+-  BF(Q&D): do not crash - issue warning - if template fails to format
+   `#6319 <https://github.com/datalad/datalad/pull/6319>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 5
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Chris Markiewicz (`@effigies <https://github.com/effigies>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.15.4 (Thu Dec 16 2021)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -86,7 +142,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -184,7 +240,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -235,6 +291,8 @@ Tests
    `#6023 <https://github.com/datalad/datalad/pull/6023>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _authors-5-1:
+
 Authors: 5
 ----------
 
@@ -249,7 +307,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -658,7 +716,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -764,7 +822,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -864,7 +922,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
