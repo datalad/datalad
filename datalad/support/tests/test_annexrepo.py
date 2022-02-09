@@ -415,7 +415,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_equal(lfull[WEB_SPECIAL_REMOTE_UUID]['description'], 'web')
 
     # --all and --key are incompatible
-    assert_raises(CommandError, ar.whereis, [], options='--all', output='full', key=True)
+    assert_raises(CommandError, ar.whereis, [testfile], options='--all', output='full', key=True)
 
     # output='descriptions'
     ldesc = ar.whereis(testfile, output='descriptions')
@@ -2566,13 +2566,29 @@ def test_whereis_batch_eqv(path):
     repo_b.drop(["baz"], options=["--from=" + DEFAULT_REMOTE, "--force"])
 
     files = ["foo", "bar", "baz"]
+    keys = repo_b.get_file_key(files)
     for output in "full", "uuids", "descriptions":
-        assert_equal(repo_b.whereis(files=files, batch=False, output=output),
+        out_non_batch = repo_b.whereis(files=files, batch=False, output=output)
+        assert_equal(out_non_batch,
                      repo_b.whereis(files=files, batch=True, output=output))
+        out_non_batch_keys = repo_b.whereis(files=keys, batch=False, key=True, output=output)
+        # should be identical
+        if output == 'full':
+            # we need to map files to keys though
+            assert_equal(out_non_batch_keys,
+                         {k: out_non_batch[f] for f, k in zip(files, keys)})
+        else:
+            assert_equal(out_non_batch, out_non_batch_keys)
 
-    # --key= and --batch are incompatible.
-    with assert_raises(ValueError):
-        repo_b.whereis(files=files, batch=True, key=True)
+        if external_versions['cmd:annex'] >= '8.20210903':
+            # --batch-keys support was introduced
+            assert_equal(out_non_batch_keys,
+                         repo_b.whereis(files=keys, batch=True, key=True, output=output))
+
+    if external_versions['cmd:annex'] < '8.20210903':
+        # --key= and --batch are incompatible.
+        with assert_raises(ValueError):
+            repo_b.whereis(files=files, batch=True, key=True)
 
 
 def test_done_deprecation():
