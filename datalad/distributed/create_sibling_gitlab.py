@@ -511,7 +511,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
     # but respect any existing config
     ignore_var = 'remote.{}.annex-ignore'.format(remotename)
     if ignore_var not in ds.config:
-        ds.config.add(ignore_var, 'true', where='local')
+        ds.config.add(ignore_var, 'true', scope='local')
 
     for res in ds.siblings(
             'configure',

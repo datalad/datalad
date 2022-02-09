@@ -46,70 +46,14 @@ class HelpAction(argparse.Action):
         if interactive \
                 and option_string == '--help' \
                 and ' ' in parser.prog:  # subcommand
-            try:
-                import subprocess
-                # get the datalad manpage to use
-                manfile = os.environ.get('MANPATH', '/usr/share/man') \
-                    + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
-                # extract version field from the manpage
-                if not os.path.exists(manfile):
-                    raise IOError("manfile is not found")
-                with gzip.open(manfile) as f:
-                    man_th = [line for line in f if line.startswith(b".TH")][0]
-                man_version = man_th.split(b' ')[-1].strip(b" '\"\t\n").decode('utf-8')
-
-                # don't show manpage if man_version not equal to current datalad_version
-                if __version__ != man_version:
-                    raise ValueError
-                subprocess.check_call(
-                    'man %s 2> /dev/null' % manfile,
-                    shell=True)
-                sys.exit(0)
-            except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
-                ce = CapturedException(e)
-                lgr.debug("Did not use manpage since %s", ce)
+            self._try_manpage(parser)
         if option_string == '-h':
-            usage = parser.format_usage()
-            ucomps = re.match(
-                r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
-                usage,
-                re.DOTALL)
-            if ucomps:
-                ucomps = ucomps.groupdict()
-                indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
-                usage = '{pre}{{{cmds}}}{post}'.format(
-                    pre=ucomps['pre'],
-                    cmds='\n'.join(wrap(
-                        ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
-                        break_on_hyphens=False,
-                        subsequent_indent=' ' * indent_level)),
-                    post=ucomps['post'],
-                )
-            helpstr = "%s\n%s" % (
-                usage,
-                "Use '--help' to get more comprehensive information.")
+            helpstr = self._get_short_help(parser)
         else:
-            helpstr = parser.format_help()
-        # better for help2man
-        # for main command -- should be different sections. And since we are in
-        # heavy output massaging mode...
-        if "essential commands" in helpstr.lower():
-            opt_args_str = '*Global options*'
-            pos_args_str = '*Commands*'
-            # tune up usage -- default one is way too heavy
-            helpstr = re.sub(r'^[uU]sage: .*?\n\s*\n',
-                             'Usage: datalad [global-opts] command [command-opts]\n\n',
-                             helpstr,
-                             flags=re.MULTILINE | re.DOTALL)
-            # and altogether remove sections with long list of commands
-            helpstr = re.sub(r'positional arguments:\s*\n\s*{.*}\n', '', helpstr)
-        else:
-            opt_args_str = "*Options*"
-            pos_args_str = "*Arguments*"
-        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
-        helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
-        # usage is on the same line
-        helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
+            helpstr = self._get_long_help(parser)
+
+        # normalize capitalization to what we "always" had
+        helpstr = f'Usage:{helpstr[6:]}'
 
         if interactive and option_string == '--help':
             import pydoc
@@ -117,6 +61,118 @@ class HelpAction(argparse.Action):
         else:
             print(helpstr)
         sys.exit(0)
+
+    def _get_long_help(self, parser):
+        helpstr = parser.format_help()
+        if ' ' in parser.prog:  # subcommand
+            # in case of a subcommand there is no need to pull the
+            # list of top-level subcommands
+            return helpstr
+        helpstr = re.sub(
+            r'^[uU]sage: .*?\n\s*\n',
+            'Usage: datalad [global-opts] command [command-opts]\n\n',
+            helpstr,
+            flags=re.MULTILINE | re.DOTALL)
+        # split into preamble and options
+        preamble = []
+        options = []
+        in_options = False
+        for line in helpstr.splitlines():
+            if line == 'optional arguments:':
+                in_options = True
+                continue
+            (options if in_options else preamble).append(line)
+
+        intf = self._get_all_interfaces()
+        from datalad.interface.base import (
+            get_cmd_doc,
+            load_interface,
+        )
+        from .interface import (
+            get_cmdline_command_name,
+            alter_interface_docs_for_cmdline,
+        )
+        preamble = get_description_with_cmd_summary(
+            # produce a mapping of command groups to
+            # [(cmdname, description), ...]
+            {
+                i[0]: [(
+                    get_cmdline_command_name(c),
+                    # alter_interface_docs_for_cmdline is only needed, because
+                    # some commands use sphinx markup in their summary line
+                    # stripping that takes 10-30ms for a typical datalad
+                    # installation with some extensions
+                    alter_interface_docs_for_cmdline(
+                        # we only take the first line
+                        get_cmd_doc(
+                            # we must import the interface class
+                            # this will engage @build_doc -- unavoidable right
+                            # now
+                            load_interface(c)
+                        ).split('\n', maxsplit=1)[0]))
+                    for c in i[2]]
+                for i in intf
+            },
+            intf,
+            '\n'.join(preamble),
+        )
+        return '{}\n\n*Global options*\n{}\n'.format(
+            preamble,
+            '\n'.join(options),
+        )
+
+    def _get_short_help(self, parser):
+        usage = parser.format_usage()
+        hint = "Use '--help' to get more comprehensive information."
+        if ' ' in parser.prog:  # subcommand
+            # in case of a subcommand there is no need to pull the
+            # list of top-level subcommands
+            return f"{usage}\n{hint}"
+
+        # get the list of commands and format them like
+        # argparse would present subcommands
+        commands = get_commands_from_groups(self._get_all_interfaces())
+        indent = usage.splitlines()[-1]
+        indent = indent[:-len(indent.lstrip())] + ' '
+        usage += f'{indent[1:]}{{'
+        usage += '\n'.join(wrap(
+            ', '.join(sorted(c.strip() for c in commands)),
+            break_on_hyphens=False,
+            subsequent_indent=indent))
+        usage += f'}}\n{indent[1:]}...\n'
+        return f"{usage}\n{hint}"
+
+    def _get_all_interfaces(self):
+        # load all extensions and command specs
+        # this does not fully tune all the command docs
+        from datalad.interface.base import get_interface_groups
+        interface_groups = get_interface_groups()
+        add_entrypoints_to_interface_groups(interface_groups)
+        return interface_groups
+
+    def _try_manpage(self, parser):
+        try:
+            import subprocess
+            # get the datalad manpage to use
+            manfile = os.environ.get('MANPATH', '/usr/share/man') \
+                + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
+            # extract version field from the manpage
+            if not os.path.exists(manfile):
+                raise IOError("manfile is not found")
+            with gzip.open(manfile) as f:
+                man_th = [line for line in f if line.startswith(b".TH")][0]
+            man_version = man_th.split(b' ')[-1].strip(b" '\"\t\n").decode('utf-8')
+
+            # don't show manpage if man_version not equal to current datalad_version
+            if __version__ != man_version:
+                raise ValueError
+            subprocess.check_call(
+                'man %s 2> /dev/null' % manfile,
+                shell=True)
+            sys.exit(0)
+        except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
+            ce = CapturedException(e)
+            lgr.debug("Did not use manpage since %s", ce)
 
 
 class LogLevelAction(argparse.Action):
@@ -135,7 +191,7 @@ def add_entrypoints_to_interface_groups(interface_groups):
     from pkg_resources import iter_entry_points  # delay expensive import
     for ep in iter_entry_points('datalad.extensions'):
         lgr.debug(
-            'Loading entrypoint %s from datalad.extensions for docs building',
+            'Loading entrypoint %s from datalad.extensions',
             ep.name)
         try:
             spec = ep.load()
@@ -147,7 +203,7 @@ def add_entrypoints_to_interface_groups(interface_groups):
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
-            ce = CapturedException(ce)
+            ce = CapturedException(e)
             lgr.warning('Failed to load entrypoint %s: %s', ep.name, ce)
             continue
 
@@ -189,16 +245,16 @@ def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
-    detailed_description = '%s\n%s\n\n%s' \
-                           % (parser_description,
-                              '\n'.join(cmd_summary),
-                              textwrap.fill(dedent_docstring("""\
+    detailed_description = '{}{}\n{}\n'.format(
+        parser_description,
+        '\n'.join(cmd_summary),
+        textwrap.fill(dedent_docstring("""\
     Detailed usage information for individual commands is
     available via command-specific --help, i.e.:
     datalad <command> --help"""),
-                                            console_width - 5,
-                                            initial_indent='',
-                                            subsequent_indent=''))
+                      console_width - 5,
+                      initial_indent='',
+                      subsequent_indent=''))
     return detailed_description
 
 

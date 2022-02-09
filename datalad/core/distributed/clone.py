@@ -768,7 +768,7 @@ def clone_dataset(
         # known to later clones of subdatasets via get()
         destds.config.set(
             'datalad.clone.reckless', reckless,
-            where='local',
+            scope='local',
             reload=True)
     else:
         # We would still want to reload configuration to ensure that any of the
@@ -900,7 +900,7 @@ def postclone_preannex_cfg_ria(ds, remote="origin"):
     # store could also hold simple standard annexes w/o an intended ORA remote.
     # This needs the introduction of a new version label in RIA datasets, making
     # the following call conditional.
-    ds.config.set(f'remote.{remote}.annex-ignore', 'true', where='local')
+    ds.config.set(f'remote.{remote}.annex-ignore', 'true', scope='local')
 
 
 def postclonecfg_ria(ds, props, remote="origin"):
@@ -989,7 +989,7 @@ def postclonecfg_ria(ds, props, remote="origin"):
         # placeholder, this should make things work with any store setup we
         # support (paths, ports, ...)
         ria_store_url + '#{id}',
-        where='local')
+        scope='local')
 
     # setup publication dependency, if a corresponding special remote exists
     # and was enabled (there could be RIA stores that actually only have repos)
@@ -1133,7 +1133,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
         ds.config.set(
-            'annex.hardlink', 'true', where='local', reload=True)
+            'annex.hardlink', 'true', scope='local', reload=True)
 
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
@@ -1165,7 +1165,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
         # we don't want annex copy-to <remote>
         ds.config.set(
             f'remote.{remote}.annex-ignore', 'true',
-            where='local')
+            scope='local')
 
         ds.repo.set_remote_dead('here')
 

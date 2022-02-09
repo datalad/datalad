@@ -1335,7 +1335,7 @@ def test_inherit_src_candidates(lcl, storepath, url):
     # we get two subdatasets
     eq_(len(datasets), 2)
     for ds in datasets:
-        eq_(ConfigManager(dataset=ds, source='dataset-local').get(
+        eq_(ConfigManager(dataset=ds, source='branch-local').get(
             'datalad.get.subdataset-source-candidate-200origin'),
             'ria+%s#{id}' % url)
 
@@ -1403,7 +1403,7 @@ def test_ephemeral(origin_path, bare_path,
     (clone1.pathobj / 'addition.txt').write_text("even more")
     clone1.save()
     origin.config.set("receive.denyCurrentBranch", "updateInstead",
-                      where="local")
+                      scope="local")
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
     clone1.push(to=DEFAULT_REMOTE,

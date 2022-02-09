@@ -891,7 +891,7 @@ def test_placeholders(path):
         1, status="impossible", action="run")
 
     # Configured placeholders.
-    ds.config.add("datalad.run.substitutions.license", "gpl3", where="local")
+    ds.config.add("datalad.run.substitutions.license", "gpl3", scope="local")
     ds.run("echo {license} >configured-license")
     ok_file_has_content(op.join(path, "configured-license"), "gpl3",
                         strip=True)

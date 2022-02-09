@@ -309,7 +309,7 @@ class Save(Interface):
                         # calls
                         paths=None,
                         # prevent whining of GitRepo
-                        git=True if not hasattr(ds.repo, 'annexstatus')
+                        git=True if not hasattr(ds.repo, 'uuid')
                         else to_git,
                         # we are supplying the full status already, do not
                         # detect anything else

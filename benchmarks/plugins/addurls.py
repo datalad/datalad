@@ -29,7 +29,7 @@ class addurls1(SuprocBenchmarks):
                 **get_tempfile_kwargs({}, prefix='bm_addurls1')))
 
         self.ds = dl.create(self.temp / "ds")
-        self.ds.config.set('annex.security.allowed-url-schemes', 'file', where='local')
+        self.ds.config.set('annex.security.allowed-url-schemes', 'file', scope='local')
 
         # populate list.csv and files
         srcpath = PurePosixPath(self.temp)

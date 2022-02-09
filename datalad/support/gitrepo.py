@@ -2165,7 +2165,7 @@ class GitRepo(CoreGitRepo):
         """
 
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
-        self.config.set(var, url, where='local', reload=True)
+        self.config.set(var, url, scope='local', reload=True)
 
     def get_branch_commits_(self, branch=None, limit=None, stop=None):
         """Return commit hexshas for a branch
@@ -3410,7 +3410,7 @@ class GitRepo(CoreGitRepo):
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
-            if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
+            if hasattr(self, 'uuid') and not kwargs.get('git', False):
                 # we cannot simply hook into the coming add-call
                 # as this would go to annex, so make a dedicted git-add
                 # call to ensure .gitmodules is not annexed
@@ -3435,12 +3435,13 @@ class GitRepo(CoreGitRepo):
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
+
             if to_add:
                 yield from self._save_add(
                         to_add,
                         git_opts=None,
                         **{k: kwargs[k] for k in kwargs
-                           if k in (('git',) if hasattr(self, 'annexstatus')
+                           if k in (('git',) if hasattr(self, 'uuid')
                                     else tuple())})
             if problems:
                 from datalad.interface.results import get_status_dict
@@ -3456,6 +3457,7 @@ class GitRepo(CoreGitRepo):
                         status='impossible',
                         message=msg,
                         logger=lgr)
+
 
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though
@@ -3668,7 +3670,7 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # submodule, if we keep that, any git command will fail
     # after we move .git
     # Ben: Shouldn't we re-setup a possible worktree afterwards?
-    repo.config.unset('core.worktree', where='local')
+    repo.config.unset('core.worktree', scope='local')
     # what we have here is some kind of reference, remove and
     # replace by the target
     os.remove(subds_dotgit)

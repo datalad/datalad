@@ -222,8 +222,7 @@ class CreateSiblingRia(Interface):
             installation is required on the target host."""),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice(
-                'skip', 'error', 'reconfigure') | EnsureNone(),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', None),
             metavar='MODE',
             doc="""Action to perform, if a (storage) sibling is already
             configured under the given name and/or a target already exists.
@@ -242,8 +241,7 @@ class CreateSiblingRia(Interface):
         trust_level=Parameter(
             args=("--trust-level",),
             metavar="TRUST-LEVEL",
-            constraints=EnsureChoice(
-                'trust', 'semitrust', 'untrust') | EnsureNone(),
+            constraints=EnsureChoice('trust', 'semitrust', 'untrust', None),
             doc="""specify a trust level for the storage sibling. If not
             specified, the default git-annex trust level is used. 'trust'
             should be used with care (see the git-annex-trust man page).""",),
@@ -706,7 +704,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            gr.config.add("datalad.ora-remote.uuid", uuid, where='local')
+            gr.config.add("datalad.ora-remote.uuid", uuid, scope='local')
 
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
@@ -734,7 +732,7 @@ def _create_sibling_ria(
     ds.config.set(
         "remote.{}.annex-ignore".format(name),
         value="true",
-        where="local")
+        scope="local")
     ds.siblings(
         'configure',
         name=name,

@@ -268,7 +268,7 @@ def _test_initremote_rewrite(host, ds_path, store):
     else:
         replacement = "ria+{}".format(store.as_uri())
 
-    ds.config.set("url.{}.insteadOf".format(replacement), url, where='local')
+    ds.config.set("url.{}.insteadOf".format(replacement), url, scope='local')
 
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
@@ -471,7 +471,7 @@ def _test_version_check(host, dspath, store):
                   ds.repo.copy_to, 'new_file', 'store')
 
     # However, we can force it by configuration
-    ds.config.add("annex.ora-remote.store.force-write", "true", where='local')
+    ds.config.add("annex.ora-remote.store.force-write", "true", scope='local')
     ds.repo.copy_to('new_file', 'store')
 
 
@@ -686,7 +686,7 @@ def test_url_keys(dspath, storepath, httppath, httpurl):
     # in the store and on the web
     assert_equal(len(ds.repo.whereis(filename)), 2)
     # try download, but needs special permissions to even be attempted
-    ds.config.set('annex.security.allow-unverified-downloads', 'ACKTHPPT', where='local')
+    ds.config.set('annex.security.allow-unverified-downloads', 'ACKTHPPT', scope='local')
     repo.call_annex(['copy', '--from', 'ria', filename])
     assert_equal(len(ds.repo.whereis(filename)), 3)
     # smoke tests that execute the remaining pieces with the URL key

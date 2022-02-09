@@ -409,9 +409,9 @@ class _GitHubLike(object):
                     self.extra_remote_settings.items():
                 var = 'remote.{}.{}'.format(siblingname, var_name)
                 if existing in ('reconfigure', 'replace'):
-                    d.config.set(var, var_value, where='local')
+                    d.config.set(var, var_value, scope='local')
                 elif var not in d.config:
-                    d.config.add(var, var_value, where='local')
+                    d.config.add(var, var_value, scope='local')
             yield from d.siblings(
                 'configure',
                 name=siblingname,

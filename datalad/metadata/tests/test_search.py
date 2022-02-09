@@ -175,8 +175,8 @@ def test_within_ds_file_search(path):
     for m in ('egrep', 'textblob', 'autofield'):
         ds.config.add(
             'datalad.search.index-{}-documenttype'.format(m), 'all',
-            where='dataset')
-    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
+            scope='branch')
+    ds.config.add('datalad.metadata.nativetype', 'audio', scope='branch')
     makedirs(opj(path, 'stim'))
     for src, dst in (
             ('audio.mp3', opj('stim', 'stim1.mp3')),):

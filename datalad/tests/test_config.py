@@ -41,6 +41,7 @@ from datalad.utils import (
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
+    _where_to_scope,
     ConfigManager,
     parse_gitconfig_dump,
     rewrite_url,
@@ -124,9 +125,9 @@ def test_parse_gitconfig_dump():
 @with_tempfile(mkdir=True)
 def test_something(path, new_home):
     # will refuse to work on dataset without a dataset
-    assert_raises(ValueError, ConfigManager, source='dataset')
+    assert_raises(ValueError, ConfigManager, source='branch')
     # now read the example config
-    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='branch')
     assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
@@ -227,8 +228,14 @@ def test_something(path, new_home):
     cfg.set('mike.should.have', 'a beer', force=True)
     assert_equal(cfg['mike.should.have'], 'a beer')
 
+    # test deprecated 'where' interface and old 'dataset' (not 'branch') value
+    # TODO: remove along with the removal of deprecated 'where'
+    cfg.set('mike.should.have', 'wasknown', where='dataset')
+    assert_equal(cfg['mike.should.have'], 'wasknown')
+    assert_equal(cfg.get_from_source('dataset', 'mike.should.have'), 'wasknown')
+
     # fails unknown location
-    assert_raises(ValueError, cfg.add, 'somesuch', 'shit', where='umpalumpa')
+    assert_raises(ValueError, cfg.add, 'somesuch', 'shit', scope='umpalumpa')
 
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
@@ -250,7 +257,7 @@ def test_something(path, new_home):
         globalcfg = ConfigManager()
         assert_not_in('datalad.unittest.youcan', globalcfg)
         assert_in('datalad.sneaky.addition', globalcfg)
-        cfg.add('datalad.unittest.youcan', 'removeme', where='global')
+        cfg.add('datalad.unittest.youcan', 'removeme', scope='global')
         assert(exists(global_gitconfig))
         # it did not go into the dataset's config!
         assert_not_in('datalad.unittest.youcan', cfg)
@@ -262,9 +269,9 @@ def test_something(path, new_home):
                 CommandError,
                 globalcfg.unset,
                 'datalad.unittest.youcan',
-                where='local')
+                scope='local')
         assert(globalcfg.has_section('datalad.unittest'))
-        globalcfg.unset('datalad.unittest.youcan', where='global')
+        globalcfg.unset('datalad.unittest.youcan', scope='global')
         # but after we unset the only value -- that section is no longer listed
         assert (not globalcfg.has_section('datalad.unittest'))
         assert_not_in('datalad.unittest.youcan', globalcfg)
@@ -272,7 +279,7 @@ def test_something(path, new_home):
 
     cfg = ConfigManager(
         Dataset(opj(path, 'ds')),
-        source='dataset',
+        source='branch',
         overrides={'datalad.godgiven': True})
     assert_equal(cfg.get('datalad.godgiven'), True)
     # setter has no effect
@@ -292,7 +299,7 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='branch')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
@@ -373,7 +380,7 @@ def test_obtain(path):
     ask()
 
     # fixup destination
-    cfg_defs[dummy]['destination'] = 'dataset'
+    cfg_defs[dummy]['destination'] = 'branch'
 
     @with_testsui(responses='5.3')
     def ask():
@@ -407,12 +414,12 @@ def test_from_env():
         assert_in('datalad.crazy.cfg', cfg)
         assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
         # not in dataset-only mode
-        cfg = ConfigManager(Dataset('nowhere'), source='dataset')
+        cfg = ConfigManager(Dataset('nowhere'), source='branch')
         assert_not_in('datalad.crazy.cfg', cfg)
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
-    cfg.set('datalad.crazy.override', 'fromoverride', where='override')
+    cfg.set('datalad.crazy.override', 'fromoverride', scope='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
     with patch.dict('os.environ',
@@ -466,30 +473,30 @@ def test_overrides():
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', cfg)
     # set
-    cfg.set('user.name', 'myoverride', where='override')
+    cfg.set('user.name', 'myoverride', scope='override')
     assert_equal(cfg['user.name'], 'myoverride')
     # unset just removes override, not entire config
-    cfg.unset('user.name', where='override')
+    cfg.unset('user.name', scope='override')
     assert_in('user.name', cfg)
     assert_not_equal('user.name', 'myoverride')
     # add
     # there is no initial increment
-    cfg.add('user.name', 'myoverride', where='override')
+    cfg.add('user.name', 'myoverride', scope='override')
     assert_equal(cfg['user.name'], 'myoverride')
     # same as with add, not a list
     assert_equal(cfg['user.name'], 'myoverride')
     # but then there is
-    cfg.add('user.name', 'myother', where='override')
+    cfg.add('user.name', 'myother', scope='override')
     assert_equal(cfg['user.name'], ['myoverride', 'myother'])
     # rename
     assert_not_in('ups.name', cfg)
-    cfg.rename_section('user', 'ups', where='override')
+    cfg.rename_section('user', 'ups', scope='override')
     # original variable still there
     assert_in('user.name', cfg)
     # rename of override in effect
     assert_equal(cfg['ups.name'], ['myoverride', 'myother'])
     # remove entirely by section
-    cfg.remove_section('ups', where='override')
+    cfg.remove_section('ups', scope='override')
     from datalad.utils import Path
     assert_not_in(
         'ups.name', cfg,
@@ -544,7 +551,7 @@ def test_rewrite_url():
 @with_tempfile()
 def test_no_leaks(path1, path2):
     ds1 = Dataset(path1).create()
-    ds1.config.set('i.was.here', 'today', where='local')
+    ds1.config.set('i.was.here', 'today', scope='local')
     assert_in('i.was.here', ds1.config.keys())
     ds1.config.reload()
     assert_in('i.was.here', ds1.config.keys())
@@ -563,12 +570,12 @@ def test_no_leaks(path1, path2):
         assert_not_in(ds1.pathobj / '.git' / 'config',
                       ds2.config._stores['git']['files'])
         assert_not_in(ds1.pathobj / '.datalad' / 'config',
-                      ds2.config._stores['dataset']['files'])
+                      ds2.config._stores['branch']['files'])
         # these are the right ones
         assert_in(ds2.pathobj / '.git' / 'config',
                   ds2.config._stores['git']['files'])
         assert_in(ds2.pathobj / '.datalad' / 'config',
-                  ds2.config._stores['dataset']['files'])
+                  ds2.config._stores['branch']['files'])
 
 
 @with_tempfile()
@@ -577,7 +584,7 @@ def test_no_local_write_if_no_dataset(path):
     with chpwd(path):
         cfg = ConfigManager()
         with assert_raises(CommandError):
-            cfg.set('a.b.c', 'd', where='local')
+            cfg.set('a.b.c', 'd', scope='local')
 
 
 @with_tempfile
@@ -590,7 +597,7 @@ def test_dataset_local_mode(path):
     # from .git/config
     assert_in('annex.version', ds.config)
     # now check that dataset-local mode doesn't have the global piece
-    cfg = ConfigManager(ds, source='dataset-local')
+    cfg = ConfigManager(ds, source='branch-local')
     assert_not_in('user.name', cfg)
     assert_in('datalad.dataset.id', cfg)
     assert_in('annex.version', cfg)
@@ -648,17 +655,17 @@ def test_bare(src, path):
     assert_in(gr.pathobj / 'config', gr.config._stores['git']['files'])
     # do we pick up the default branch config too?
     assert_in('blob:HEAD:.datalad/config',
-              gr.config._stores['dataset']['files'])
+              gr.config._stores['branch']['files'])
     # and track its reload stamp via its file shasum
     assert_equal(
         dlconfig_sha,
-        gr.config._stores['dataset']['stats']['blob:HEAD:.datalad/config'])
+        gr.config._stores['branch']['stats']['blob:HEAD:.datalad/config'])
     # check that we can pick up the dsid from the commit branch config
     assert_equal(ds.id, gr.config.get('datalad.dataset.id'))
     # and it is coming from the correct source
     assert_equal(
         ds.id,
-        gr.config.get_from_source('dataset', 'datalad.dataset.id'))
+        gr.config.get_from_source('branch', 'datalad.dataset.id'))
     assert_equal(
         None,
         gr.config.get_from_source('local', 'datalad.dataset.id'))
@@ -668,13 +675,13 @@ def test_bare(src, path):
     obscure_key = 'sec.reallyobscurename!@@.key'
     assert_not_in(obscure_key, gr.config)
     # to the local config, which is easily accessible
-    gr.config.set(obscure_key, 'myvalue', where='local')
+    gr.config.set(obscure_key, 'myvalue', scope='local')
     assert_equal(gr.config.get(obscure_key), 'myvalue')
     # now make sure the config is where we think it is
     assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
     # update committed config and check update
     old_id = ds.id
-    ds.config.set('datalad.dataset.id', 'surprise!', where='dataset')
+    ds.config.set('datalad.dataset.id', 'surprise!', scope='branch')
     ds.save()
     # fetch into default branch (like `update`, but for bare-repos)
     gr.call_git([
@@ -682,7 +689,7 @@ def test_bare(src, path):
     # without a reload, no state change, like with non-bare repos
     assert_equal(
         old_id,
-        gr.config.get_from_source('dataset', 'datalad.dataset.id'))
+        gr.config.get_from_source('branch', 'datalad.dataset.id'))
     # a non-forced reload() must be enough, because state change
     # detection kicks in
     gr.config.reload()
@@ -732,7 +739,7 @@ def test_external_modification(path):
 
     key = 'sec.sub.key'
     assert_not_in(key, config)
-    config.set(key, '1', where='local')
+    config.set(key, '1', scope='local')
     assert_equal(config[key], '1')
 
     # we pick up the case where we modified so size changed
@@ -746,3 +753,21 @@ def test_external_modification(path):
     runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
     config.reload()
     assert_equal(config[key], '11')
+
+
+# TODO: remove along with the removal of deprecated 'where'
+def test_where_to_scope():
+
+    @_where_to_scope
+    def f(scope=None):
+        return scope
+
+    # others aren't affected but we map where to scope
+    assert_equal(f(where='local'), 'local')
+    assert_equal(f(scope='local'), 'local')
+    # we do mapping to 'branch' for where
+    assert_equal(f(where='dataset'), 'branch')
+    # but not for 'scope' -- since that is the target new name, we pass as is
+    assert_equal(f(scope='dataset'), 'dataset')
+    # we do not allow both
+    assert_raises(ValueError, f, where='local', scope='local')

@@ -19,6 +19,7 @@ from datalad.tests.utils import (
     assert_in,
     assert_not_in,
     assert_raises,
+    get_annexstatus,
     known_failure_githubci_win,
     slow,
     with_tempfile,
@@ -58,7 +59,7 @@ def test_get_content_info(path):
     # - git ls-files
     # - git annex findref HEAD
     # - git annex find --include '*'
-    for f, r in ds.repo.annexstatus().items():
+    for f, r in get_annexstatus(ds.repo).items():
         if f.match('*_untracked'):
             assert(r.get('gitshasum', None) is None)
         if f.match('*_deleted'):
@@ -116,7 +117,7 @@ def test_get_content_info(path):
                     assert_in(status[p]['type'], ('file', 'symlink'), p)
 
     # git annex status integrity
-    annexstatus = ds.repo.annexstatus()
+    annexstatus = get_annexstatus(ds.repo)
     for t in ('file',):
         for s in ('untracked', 'added', 'deleted', 'clean',
                   'ingit_clean', 'dropped_clean', 'modified',

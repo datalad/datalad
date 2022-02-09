@@ -94,6 +94,7 @@ def setup_parser(
     # main parser
     parser = ArgumentParserDisableAbbrev(
         fromfile_prefix_chars=None,
+        prog='datalad',
         # usage="%(prog)s ...",
         description=help_gist,
         epilog='"Be happy!"',
@@ -115,50 +116,86 @@ def setup_parser(
     # try to figure out whether the parser construction can be limited to
     # a single (sub)command -- don't even try to do this, when we are in
     # any of the doc-building capacities -- timing is not relevant there
-    target_subparser_name = single_subparser_possible(
+    status, parseinfo = single_subparser_possible(
         cmdlineargs,
         parser,
-        interface_groups,
         completing,
-    ) if not (return_subparsers or help_ignore_extensions) else None
+    ) if not return_subparsers else ('allparsers', None)
 
-    if target_subparser_name is None:
-        # we cannot be lean, we must built the full parser
-        # and for that must load all extensions too, e.g., to
-        # be able to list extension command in --help output
-        # (in case of a help request, the extension loading will not
-        #  have happened yet in single_subparser_possible())
+    command_provider = 'core'
+
+    if status == 'full' and not help_ignore_extensions:
         from .helpers import add_entrypoints_to_interface_groups
         add_entrypoints_to_interface_groups(interface_groups)
 
-    # --help specification was delayed since it causes immediate printout of
-    # --help output before we setup --help for each command
-    parser_add_common_opt(parser, 'help')
+    # when completing and we have no incomplete option or parameter
+    # we still need to offer all commands for completion
+    if (completing and status == 'allknown') or (
+            status == 'subcommand' and parseinfo not in
+            get_commands_from_groups(interface_groups)):
+        # we know the command is not in the core package
+        # still a chance it could be in an extension
+        command_provider = 'extension'
+        # we need the full help, or we have a potential command that
+        # lives in an extension, must load all extension, expensive
+        from .helpers import add_entrypoints_to_interface_groups
+        # need to load all the extensions and try again
+        # TODO load extensions one-by-one and stop when a command was found
+        add_entrypoints_to_interface_groups(interface_groups)
 
-    grp_short_descriptions = defaultdict(list)
-    # create subparser, use module suffix as cmd name
+        if status == 'subcommand':
+            known_commands = get_commands_from_groups(interface_groups)
+            if parseinfo not in known_commands:
+                # certainly not possible to identify a single parser that
+                # could be constructed, but we can be helpful
+                # will sys.exit() unless we are completing
+                try_suggest_extension_with_command(
+                    parser, parseinfo, completing, known_commands)
+                # in completion mode we can get here, even for a command
+                # that does not exist at all!
+                command_provider = None
+
+    # TODO check if not needed elsewhere
+    if status == 'help' or completing and status in ('allknown', 'unknownopt'):
+        # --help specification was delayed since it causes immediate
+        # printout of
+        # --help output before we setup --help for each command
+        parser_add_common_opt(parser, 'help')
+
     all_parsers = {}  # name: (sub)parser
-    subparsers = parser.add_subparsers()
-    for group_name, _, _interfaces \
-            in sorted(interface_groups, key=lambda x: x[1]):
-        for _intfspec in _interfaces:
-            cmd_name = get_cmdline_command_name(_intfspec)
-            if target_subparser_name and cmd_name != target_subparser_name:
-                continue
-            subparser = add_subparser(
-                _intfspec, subparsers, cmd_name, formatter_class, group_name,
-                grp_short_descriptions
-            )
-            if subparser:  # interface can fail to load
-                all_parsers[cmd_name] = subparser
 
-    # create command summary
-    if '--help' in cmdlineargs or '--help-np' in cmdlineargs:
-        from .helpers import get_description_with_cmd_summary
-        parser.description = get_description_with_cmd_summary(
-            grp_short_descriptions,
-            interface_groups,
-            parser.description)
+    if (completing and status == 'allknown') or status \
+            in ('allparsers', 'subcommand'):
+        # parseinfo could be None here, when we could not identify
+        # a subcommand, but need to locate matching ones for
+        # completion
+        # create subparser, use module suffix as cmd name
+        subparsers = parser.add_subparsers()
+        for _, _, _interfaces \
+                in sorted(interface_groups, key=lambda x: x[1]):
+            for _intfspec in _interfaces:
+                cmd_name = get_cmdline_command_name(_intfspec)
+                if status == 'subcommand':
+                    # in case only a subcommand is desired, we could
+                    # skip some processing
+                    if command_provider and cmd_name != parseinfo:
+                        # a known command, but know what we are looking for
+                        continue
+                    if command_provider is None and not cmd_name.startswith(
+                            parseinfo):
+                        # an unknown command, and has no common prefix with
+                        # the current command candidate, not even good
+                        # for completion
+                        continue
+                subparser = add_subparser(
+                    _intfspec,
+                    subparsers,
+                    cmd_name,
+                    formatter_class,
+                    completing=completing,
+                )
+                if subparser:  # interface can fail to load
+                    all_parsers[cmd_name] = subparser
 
     # "main" parser is under "datalad" name
     all_parsers['datalad'] = parser
@@ -170,7 +207,7 @@ def setup_parser(
         return parser
 
 
-def setup_parser_for_interface(parser, cls):
+def setup_parser_for_interface(parser, cls, completing=False):
     # XXX needs safety check for name collisions
     # XXX allow for parser kwargs customization
     # get the signature, order of arguments is taken from it
@@ -194,11 +231,12 @@ def setup_parser_for_interface(parser, cls):
 
         # set up the parameter
         setup_parserarg_for_interface(
-            parser, arg, param, defaults_idx, prefix_chars, defaults)
+            parser, arg, param, defaults_idx, prefix_chars, defaults,
+            completing=completing)
 
 
 def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
-                                  prefix_chars, defaults):
+                                  prefix_chars, defaults, completing=False):
     cmd_args = param.cmd_args
     parser_kwargs = param.cmd_kwargs
     has_default = defaults_idx >= 0
@@ -229,37 +267,29 @@ def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
 
     if has_default:
         parser_kwargs['default'] = defaults[defaults_idx]
-    help = alter_interface_docs_for_cmdline(param._doc)
-    if help and help.rstrip()[-1] != '.':
-        help = help.rstrip() + '.'
     if param.constraints is not None:
-        _amend_action_args_for_parameter_constraint(param, parser_kwargs, help)
-    if defaults_idx >= 0:
-        # if it is a flag, in commandline it makes little sense to show
-        # showing the Default: (likely boolean).
-        #   See https://github.com/datalad/datalad/issues/3203
-        if not parser_kwargs.get('action', '').startswith('store_'):
-            # [Default: None] also makes little sense for cmdline
-            if defaults[defaults_idx] is not None:
-                help += " [Default: %r]" % (defaults[defaults_idx],)
+        parser_kwargs['type'] = param.constraints
+    if completing:
+        help = None
+        # if possible, define choices to enable their completion
+        if 'choices' not in parser_kwargs and \
+                isinstance(param.constraints, EnsureChoice):
+            parser_kwargs['choices'] = [
+                c for c in param.constraints._allowed if c is not None]
+    else:
+        help = _amend_param_parser_kwargs_for_help(
+            parser_kwargs, param,
+            defaults[defaults_idx] if defaults_idx >= 0 else None)
     # create the parameter, using the constraint instance for type
     # conversion
     parser.add_argument(*parser_args, help=help,
                         **parser_kwargs)
 
 
-def _amend_action_args_for_parameter_constraint(param, args, help):
-    args['type'] = param.constraints
-    # include value constraint description and default
-    # into the help string
-    cdoc = alter_interface_docs_for_cmdline(
-        param.constraints.long_description())
-    if cdoc[0] == '(' and cdoc[-1] == ')':
-        cdoc = cdoc[1:-1]
-    help += '  Constraints: %s' % cdoc
-    if 'metavar' not in args and \
+def _amend_param_parser_kwargs_for_help(parser_kwargs, param, default=None):
+    if 'metavar' not in parser_kwargs and \
             isinstance(param.constraints, EnsureChoice):
-        args['metavar'] = \
+        parser_kwargs['metavar'] = \
             '{%s}' % '|'.join(
                 # don't use short_description(), because
                 # it also needs to give valid output for
@@ -274,17 +304,37 @@ def _amend_action_args_for_parameter_constraint(param, args, help):
                 # serves a special purpose in the Python API
                 # or implementation details
                 if isinstance(p, str))
+    help = alter_interface_docs_for_cmdline(param._doc)
+    if help:
+        help = help.rstrip()
+        if help[-1] != '.':
+            help += '.'
+        if param.constraints is not None:
+            help += _get_help_for_parameter_constraint(param)
+    if default is not None and \
+            not parser_kwargs.get('action', '').startswith('store_'):
+        # if it is a flag, in commandline it makes little sense to show
+        # showing the Default: (likely boolean).
+        # See https://github.com/datalad/datalad/issues/3203
+        help += " [Default: %r]" % (default,)
+    return help
 
 
-def single_subparser_possible(cmdlineargs, parser, interface_groups,
-                              completing):
+def _get_help_for_parameter_constraint(param):
+    # include value constraint description and default
+    # into the help string
+    cdoc = alter_interface_docs_for_cmdline(
+        param.constraints.long_description())
+    if cdoc[0] == '(' and cdoc[-1] == ')':
+        cdoc = cdoc[1:-1]
+    return '  Constraints: %s' % cdoc
+
+
+def single_subparser_possible(cmdlineargs, parser, completing):
     """Performs early analysis of the cmdline
 
     Looks at the first unparsed argument and if a known command,
     would return only that one.
-
-    For the analysis to be complete etc, would also load commands from
-    entrypoints
 
     When a plain command invocation with `--version` is detected, it will be
     acted on directly (until sys.exit(0) to avoid wasting time on unnecessary
@@ -292,7 +342,14 @@ def single_subparser_possible(cmdlineargs, parser, interface_groups,
 
     Returns
     -------
-    None or str
+    {'error', 'allknown', 'help', 'unknownopt', 'subcommand'}, None or str
+        Returns a status label and a parameter for this status.
+        'error': parsing failed, 'allknown': the parser successfully
+        identified all arguments, 'help': a help request option was found,
+        'unknownopt': an unknown or incomplete option was found,
+        'subcommand': a potential subcommand name was found. For the latter
+        two modes the second return value is the option or command name.
+        For all other modes the second return value is None.
     """
     # Before doing anything additional and possibly expensive see may be that
     # we have got the command already
@@ -317,11 +374,11 @@ def single_subparser_possible(cmdlineargs, parser, interface_groups,
         from datalad.support.exceptions import CapturedException
         ce = CapturedException(exc)
         lgr.debug("Early parsing failed with %s", ce)
-        return
+        return 'error', None
 
     if not unparsed_args:
         # cannot possibly be a subcommand
-        return
+        return 'allknown', None
 
     unparsed_arg = unparsed_args[0]
 
@@ -331,30 +388,17 @@ def single_subparser_possible(cmdlineargs, parser, interface_groups,
     if unparsed_arg in ('--help', '--help-np', '-h'):
         # not need to try to tune things, all these will result in everything
         # to be imported and parsed
-        return
-    elif not completing and unparsed_arg.startswith('-'):  # unknown option
+        return 'help', None
+    elif unparsed_arg.startswith('-'):  # unknown or incomplete option
+        if completing:
+            return 'unknownopt', unparsed_arg
         # will sys.exit
         fail_with_short_help(parser,
                              msg=f"unrecognized argument {unparsed_arg}",
                              # matches exit code of InsufficientArgumentsError
                              exit_code=2)
-    else:  # the command to handle
-        cmd = unparsed_arg
-        known_commands = get_commands_from_groups(interface_groups)
-        if cmd not in known_commands:
-            from .helpers import add_entrypoints_to_interface_groups
-            # need to load all the extensions and try again
-            add_entrypoints_to_interface_groups(interface_groups)
-            known_commands = get_commands_from_groups(interface_groups)
-
-        if cmd not in known_commands:
-            # certainly not possible to identify a single parser that
-            # could be constructed, but we can be helpful
-            # will sys.exit() unless we are completing
-            try_suggest_extension_with_command(
-                parser, cmd, completing, known_commands)
-        else:
-            return cmd
+    else:  # potential command to handle
+        return 'subcommand', unparsed_arg
 
 
 def try_suggest_extension_with_command(parser, cmd, completing, known_cmds):
@@ -386,11 +430,9 @@ def try_suggest_extension_with_command(parser, cmd, completing, known_cmds):
         )
 
 
-def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
-                  grp_short_descriptions):
+def add_subparser(_intfspec, subparsers, cmd_name, formatter_class,
+                  completing=False):
     """Given an interface spec, add a subparser to subparsers under cmd_name
-
-    That subparser is also gets added to the grp_short_descriptions
     """
     _intf = load_interface(_intfspec)
     if _intf is None:
@@ -401,11 +443,12 @@ def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
     parser_args = dict(formatter_class=formatter_class)
     # use class description, if no explicit description is available
     intf_doc = get_cmd_doc(_intf)
-    parser_args['description'] = alter_interface_docs_for_cmdline(
-        intf_doc)
-    if hasattr(_intf, '_examples_'):
-        intf_ex = alter_interface_docs_for_cmdline(get_cmd_ex(_intf))
-        parser_args['description'] += intf_ex
+    if not completing:
+        parser_args['description'] = alter_interface_docs_for_cmdline(
+            intf_doc)
+        if hasattr(_intf, '_examples_'):
+            intf_ex = alter_interface_docs_for_cmdline(get_cmd_ex(_intf))
+            parser_args['description'] += intf_ex
 
     # create the sub-parser
     subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
@@ -414,7 +457,7 @@ def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
     # not unconditionally have it available initially
     parser_add_common_opt(subparser, 'help')
     # let module configure the parser
-    setup_parser_for_interface(subparser, _intf)
+    setup_parser_for_interface(subparser, _intf, completing=completing)
     # and we would add custom handler for --version
     parser_add_version_opt(
         subparser, _intf.__module__.split('.', 1)[0], include_name=True)
@@ -429,10 +472,6 @@ def add_subparser(_intfspec, subparsers, cmd_name, formatter_class, group_name,
     if hasattr(_intf, 'result_renderer_cmdline'):
         plumbing_args['result_renderer'] = _intf.result_renderer_cmdline
     subparser.set_defaults(**plumbing_args)
-    # store short description for later
-    sdescr = getattr(_intf, 'short_description',
-                     parser_args['description'].split('\n')[0])
-    grp_short_descriptions[group_name].append((cmd_name, sdescr))
     return subparser
 
 

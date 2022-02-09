@@ -77,14 +77,27 @@ common_args = dict(
     on_failure=(
         ('--on-failure',),
         dict(dest='common_on_failure',
-             default=eval_params['on_failure'].cmd_kwargs['default'],
+             # setting the default to None here has the following implications
+             # - the global default is solely defined in
+             #   datalad.interface.common_opts.eval_params and is in-effect for
+             #   Python API and CLI
+             # - this global default is written to each command Interface class
+             #   and can be overridden there on a per-command basis, with such
+             #   override being honored by both APIs
+             # - the CLI continues to advertise the choices defined below as
+             #   the possible values for '--on-failure'
+             # - the Python docstring reflects a possibly command-specific
+             #   default
+             default=None,
              choices=['ignore', 'continue', 'stop'],
-             help="""when an operation fails: 'ignore' and continue with remaining
-        operations, the error is logged but does not lead to a non-zero exit
-        code of the command; 'continue' works like 'ignore', but an error
-        causes a non-zero exit code; 'stop' halts on first failure and yields
-        non-zero exit code. A failure is any result with status 'impossible'
-        or 'error'. [Default: '%(default)s']""")),
+             help="""when an operation fails: 'ignore' and continue with
+             remaining operations, the error is logged but does not lead to a
+             non-zero exit code of the command; 'continue' works like 'ignore',
+             but an error causes a non-zero exit code; 'stop' halts on first
+             failure and yields non-zero exit code. A failure is any result
+             with status 'impossible' or 'error'. [Default: '%s', but
+             individual commands may define an alternative default]"""
+             % eval_params['on_failure'].cmd_kwargs['default'])),
     report_status=(
         ('--report-status',),
         dict(dest='common_report_status',

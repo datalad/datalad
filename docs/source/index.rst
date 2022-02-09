@@ -27,6 +27,7 @@ Concepts and technologies
    background
    related
    basics
+   credentials
    metadata
    customization
    design/index
