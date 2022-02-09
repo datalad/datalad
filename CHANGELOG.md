@@ -1,3 +1,31 @@
+# 0.16.0 (Wed Feb 09 2022)
+
+#### 🚀 Enhancement
+
+- BF: When download-url gets Pathobject as path convert it to a string [#6364](https://github.com/datalad/datalad/pull/6364) ([@adswa](https://github.com/adswa))
+
+#### 🐛 Bug Fix
+
+- Fix AnnexRepo.whereis key=True mode operation, and add batch mode support [#6379](https://github.com/datalad/datalad/pull/6379) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: run - adjust description for -i/-o to mention that it could be a directory [#6416](https://github.com/datalad/datalad/pull/6416) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: ORA over HTTP tried to check archive [#6355](https://github.com/datalad/datalad/pull/6355) ([@bpoldrack](https://github.com/bpoldrack) [@yarikoptic](https://github.com/yarikoptic))
+- BF: condition access to isatty to have stream eval to True [#6360](https://github.com/datalad/datalad/pull/6360) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: python 3.10 compatibility fixes [#6363](https://github.com/datalad/datalad/pull/6363) ([@yarikoptic](https://github.com/yarikoptic))
+- Remove two(!) copies of a test [#6374](https://github.com/datalad/datalad/pull/6374) ([@mih](https://github.com/mih))
+- Warn just once about incomplete git config [#6343](https://github.com/datalad/datalad/pull/6343) ([@yarikoptic](https://github.com/yarikoptic))
+- Make version detection robust to GIT_DIR specification [#6341](https://github.com/datalad/datalad/pull/6341) ([@effigies](https://github.com/effigies) [@mih](https://github.com/mih))
+- BF(Q&D): do not crash - issue warning - if template fails to format [#6319](https://github.com/datalad/datalad/pull/6319) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Chris Markiewicz ([@effigies](https://github.com/effigies))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.15.4 (Thu Dec 16 2021)
 
 #### 🐛 Bug Fix
