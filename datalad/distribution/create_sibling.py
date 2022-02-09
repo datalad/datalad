@@ -673,7 +673,7 @@ class CreateSibling(Interface):
                 for r in diff_dataset(
                     ds,
                     fr=since,
-                    to=None,
+                    to='HEAD',
                     # make explicit, but doesn't matter, no recursion in diff()
                     constant_refs=True,
                     # contrain to the paths of all locally existing subdatasets
