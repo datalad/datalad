@@ -551,7 +551,9 @@ class CreateSibling(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""limit processing to subdatasets that have been changed since
             a given state (by tag, branch, commit, etc). This can be used to
-            create siblings for recently added subdatasets."""),
+            create siblings for recently added subdatasets.
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point."""),
     )
 
     @staticmethod
@@ -591,6 +593,17 @@ class CreateSibling(Interface):
                     "package. Please install the Python package "
                     "`datalad_deprecated` to be able to deploy it."
                 )
+
+        # push uses '^' to annotate the previous pushed committish, and None for default
+        # behavior. '' was/is (to be deprecated) used in `publish` and 'create-sibling'.
+        # Alert user about the mistake
+        if since == '':
+            # deprecation was added prior 0.16.0
+            import warnings
+            warnings.warn("'since' should point to commitish or use '^'.",
+                          DeprecationWarning)
+            since = '^'
+
         #
         # nothing without a base dataset
         #
@@ -655,7 +668,7 @@ class CreateSibling(Interface):
                 "No sibling name given. Using %s'%s' as sibling name",
                 "URL hostname " if ssh_sibling else "",
                 name)
-        if since == '':
+        if since == '^':
             # consider creating siblings only since the point of
             # the last update
             # XXX here we assume one to one mapping of names from local branches
