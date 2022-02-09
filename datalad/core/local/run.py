@@ -685,7 +685,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 rerun_info=None,
                 extra_inputs=None,
                 rerun_outputs=None,
-                inject=False):
+                inject=False,
+                parametric_record=False):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -714,6 +715,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
+    parametric_record : bool, optional
+        If enabled, substitution placeholders in the input/output specification
+        are retained verbatim in the run record. This enables using a single
+        run record for multiple different re-runs via individual
+        parametrization.
 
     Yields
     ------
@@ -769,19 +775,23 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         if val:
             cmd_fmt_kwargs[n] = val
 
+    # apply the substitution to the IO specs
+    expanded_specs = {
+        k: _format_iospecs(v, **cmd_fmt_kwargs) for k, v in specs.items()
+    }
     # try-expect to catch expansion issues in _format_iospecs() which
     # expands placeholders in dependency/output specification before
     # globbing
     try:
         globbed = {
             k: GlobbedPaths(
-                _format_iospecs(v, **cmd_fmt_kwargs),
+                v,
                 pwd=pwd,
                 expand=expand in (
                     # extra_inputs follow same expansion rules as `inputs`.
                     ["both"] + (['outputs'] if k == 'outputs' else ['inputs'])
                 ))
-            for k, v in specs.items()
+            for k, v in expanded_specs.items()
         }
     except KeyError as exc:
         yield get_status_dict(
@@ -868,7 +878,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info[k] = globbed[k].paths \
             if expand in ["both"] + (
                 ['outputs'] if k == 'outputs' else ['inputs']) \
-            else v or []
+            else (v if parametric_record
+                  else expanded_specs[k]) or []
 
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
