@@ -515,6 +515,30 @@ def test_incorrect_msg_interpolation():
     TestUtils2().__call__("%eatthis")
 
 
+class CustomResultRenderer(Interface):
+    result_renderer = "tailored"
+    _params_ = dict(x=Parameter(args=("x",)))
+
+    @staticmethod
+    @eval_results
+    def __call__(x):
+        yield get_status_dict(action="foo", status="ok", message="message",
+                              x=x, logger=lgr)
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        # This custom result renderer gets the command's keyword arguments and
+        # all of the common ones too, even those not explicitly specified.
+        assert_in("x", kwargs)
+        assert_in("on_failure", kwargs)
+        assert_in("result_filter", kwargs)
+        assert_in("result_renderer", kwargs)
+
+
+def test_custom_result_renderer():
+    list(CustomResultRenderer().__call__("arg"))
+
+
 class CustomSummary(Interface):
     result_renderer = "tailored"
     _params_ = dict(x=Parameter(args=("x",)))
