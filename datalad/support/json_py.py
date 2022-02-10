@@ -28,6 +28,8 @@ from simplejson import dump as jsondump
 from simplejson import loads as json_loads
 from simplejson import JSONDecodeError
 
+from datalad.support.exceptions import CapturedException
+
 
 # produce relatively compact, but also diff-friendly format
 json_dump_kwargs = dict(
@@ -46,7 +48,6 @@ compressed_json_dump_kwargs = dict(
 
 # Let's just reuse top level one for now
 from ..log import lgr
-from ..dochelpers import exc_str
 
 
 def dump(obj, fname, compressed=False):
@@ -194,7 +195,10 @@ def load(fname, fixup=True, compressed=None, **kw):
         except JSONDecodeError as exc:
             if not fixup:
                 raise
-            lgr.warning("Failed to decode content in %s: %s. Trying few tricks", fname, exc_str(exc))
+            ce = CapturedException(exc)
+            lgr.warning(
+                "Failed to decode content in %s: %s. Trying few tricks",
+                fname, ce)
 
             # Load entire content and replace common "abusers" which break JSON
             # comprehension but in general

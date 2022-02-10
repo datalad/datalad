@@ -8,29 +8,32 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
-import os.path as op
-
 import logging
-
+import os.path as op
 from unittest.mock import patch
 
-from ..providers import Provider
-from ..providers import Providers
-from ..providers import HTTPDownloader
-from ...utils import chpwd
-from ...utils import create_tree
-from ...tests.utils import assert_in
-from ...tests.utils import assert_false
-from ...tests.utils import assert_greater
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_raises
-from ...tests.utils import ok_exists
-from ...tests.utils import swallow_logs
-from ...tests.utils import with_tempfile
-from ...tests.utils import with_tree
-from ...tests.utils import with_testsui
-
 from ...support.external_versions import external_versions
+from ...tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_in,
+    assert_raises,
+    ok_exists,
+    swallow_logs,
+    with_tempfile,
+    with_testsui,
+    with_tree,
+)
+from ...utils import (
+    chpwd,
+    create_tree,
+)
+from ..providers import (
+    HTTPDownloader,
+    Provider,
+    Providers,
+)
 
 
 def test_Providers_OnStockConfiguration():
@@ -103,19 +106,19 @@ def test_get_downloader_class():
 @with_tree(tree={
   'providers': {'atest.cfg':"""\
 [provider:syscrcns]
-url_re = https?://crcns\.org/.*
+url_re = https?://crcns\\.org/.*
 authentication_type = none
 """}})
 @with_tree(tree={
   'providers': {'atestwithothername.cfg':"""\
 [provider:usercrcns]
-url_re = https?://crcns\.org/.*
+url_re = https?://crcns\\.org/.*
 authentication_type = none
 """}})
 @with_tree(tree={
   '.datalad': {'providers': {'atest.cfg':"""\
 [provider:dscrcns]
-url_re = https?://crcns\.org/.*
+url_re = https?://crcns\\.org/.*
 authentication_type = none
 """}},
    '.git': { "HEAD" : ""}})
@@ -164,7 +167,7 @@ def test_providers_enter_new(path):
         providers = Providers.from_config_files(reload=True)
 
         url = "blah://thing"
-        url_re = "blah:\/\/.*"
+        url_re = r"blah:\/\/.*"
         auth_type = "http_auth"
         creds = "user_password"
 
@@ -212,11 +215,11 @@ def test_providers_enter_new(path):
 
 @with_tree(tree={'providers.cfg': """\
 [provider:foo0]
-url_re = https?://foo\.org/.*
+url_re = https?://foo\\.org/.*
 authentication_type = none
 
 [provider:foo1]
-url_re = https?://foo\.org/.*
+url_re = https?://foo\\.org/.*
 authentication_type = none
 """})
 def test_providers_multiple_matches(path):
@@ -232,11 +235,11 @@ def test_providers_multiple_matches(path):
 
 @with_tree(tree={'providers.cfg': """\
 [provider:foo0]
-url_re = https?://[foo-a\.org]/.*
+url_re = https?://[foo-a\\.org]/.*
 authentication_type = none
 
 [provider:foo1]
-url_re = https?://foo\.org/.*
+url_re = https?://foo\\.org/.*
 authentication_type = none
 """})
 def test_providers_badre(path):

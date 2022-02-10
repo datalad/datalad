@@ -7,7 +7,7 @@ Support functionality for using DueCredit
 # Note Text was added/exposed only since DueCredit 0.6.5
 from .due import due, Doi, Text
 from ..utils import never_fail, swallow_logs
-from ..dochelpers import exc_str
+from datalad.support.exceptions import CapturedException
 
 import logging
 lgr = logging.getLogger('datalad.duecredit')
@@ -62,7 +62,7 @@ def duecredit_dataset(dataset):
     except Exception as exc:
         lgr.debug(
             "Failed to obtain metadata for %s. Will not provide duecredit entry: %s",
-            dataset, exc_str(exc)
+            dataset, CapturedException(exc)
         )
         return
 

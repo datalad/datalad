@@ -478,6 +478,7 @@ tools/ci/prep-travis-forssh.sh
 tools/coverage-bin/datalad
 tools/coverage-bin/git-annex-remote-datalad
 tools/coverage-bin/git-annex-remote-datalad-archives
+tools/coverage-bin/git-annex-remote-ora
 tools/testing/.gitignore
 tools/testing/make_test_repo
 tools/testing/make_test_repos

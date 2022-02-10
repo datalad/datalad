@@ -42,12 +42,12 @@ from datalad.utils import (
     get_wrapped_class,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import IncompleteResultsError
-from datalad import cfg as dlcfg
-from datalad.dochelpers import (
-    exc_str,
-    single_or_plural,
+from datalad.support.exceptions import (
+    CapturedException,
+    IncompleteResultsError,
 )
+from datalad import cfg as dlcfg
+from datalad.dochelpers import single_or_plural
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -622,8 +622,8 @@ def _process_results(
                 except TypeError as exc:
                     raise TypeError(
                         "Failed to render %r with %r from %r: %s"
-                        % (msg, msgargs, res, exc_str(exc))
-                    )
+                        % (msg, msgargs, res, str(exc))
+                    ) from exc
             else:
                 res_lgr(msg)
 
@@ -666,7 +666,7 @@ def _process_results(
                 result_renderer(res, **allkwargs)
             except Exception as e:
                 lgr.warning('Result rendering failed for: %s [%s]',
-                            res, exc_str(e))
+                            res, CapturedException(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
@@ -697,7 +697,7 @@ def keep_result(res, rfilter, **kwargs):
     except ValueError as e:
         # make sure to report the excluded result to massively improve
         # debugging experience
-        lgr.debug('Not reporting result (%s): %s', exc_str(e), res)
+        lgr.debug('Not reporting result (%s): %s', CapturedException(e), res)
         return False
     return True
 

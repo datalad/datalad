@@ -71,6 +71,7 @@ from shlex import (
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
+from datalad.support.exceptions import CapturedException
 
 
 unicode_srctypes = str, bytes
@@ -276,7 +277,7 @@ def _is_stream_tty(stream):
     try:
         # TODO: check on windows if hasattr check would work correctly and
         # add value:
-        return stream.isatty()
+        return stream and stream.isatty()
     except ValueError as exc:
         # Who knows why it is a ValueError, but let's try to be specific
         # If there is a problem with I/O - non-interactive, otherwise reraise
@@ -789,8 +790,8 @@ def ensure_unicode(s, encoding=None, confidence=None):
         try:
             return s.decode('utf-8')
         except UnicodeDecodeError as exc:
-            from .dochelpers import exc_str
-            lgr.debug("Failed to decode a string as utf-8: %s", exc_str(exc))
+            lgr.debug("Failed to decode a string as utf-8: %s",
+                      CapturedException(exc))
         # And now we could try to guess
         from chardet import detect
         enc = detect(s)
@@ -1984,7 +1985,6 @@ def get_dataset_root(path):
 # ATM used in datalad_crawler extension, so do not remove yet
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
-    from .dochelpers import exc_str
     for trial in range(1, ntrials+1):
         try:
             return f(*args, **kwargs)
@@ -1993,7 +1993,7 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
                 raise  # just reraise on the last trial
             t = base ** trial
             lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
-                        exc_str(exc), trial, t)
+                        CapturedException(exc), trial, t)
             sleep(t)
 
 
@@ -2027,7 +2027,6 @@ def try_multiple_dec(
       Logger to log upon failure.  If not provided, will use stock logger
       at the level of 5 (heavy debug).
     """
-    from .dochelpers import exc_str
     if not exceptions:
         exceptions = (OSError, WindowsError, PermissionError) \
             if on_windows else OSError
@@ -2053,7 +2052,7 @@ def try_multiple_dec(
                         t = duration ** (trial + 1)
                     logger(
                         "Caught %s on trial #%d. Sleeping %f and retrying",
-                        exc_str(exc), trial, t)
+                        CapturedException(exc), trial, t)
                     sleep(t)
                 else:
                     raise
@@ -2169,10 +2168,9 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
             try:
                 dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
             except Exception as exc:
-                from .dochelpers import exc_str
                 lgr.warning(
                     'Could not determine file-format, assuming TSV: %s',
-                    exc_str(exc)
+                    CapturedException(exc)
                 )
                 dialect = 'excel-tab'
 
@@ -2272,9 +2270,8 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
                 else:
                     log("Expected path %s to be within sys.path, but it was gone!" % dirname_)
     except Exception as e:
-        from datalad.dochelpers import exc_str
         raise RuntimeError(
-            "Failed to import module from %s: %s" % (modpath, exc_str(e)))
+            "Failed to import module from %s" % modpath) from e
 
     return mod
 

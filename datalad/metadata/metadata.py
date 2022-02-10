@@ -35,6 +35,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CapturedException
 from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
 from datalad.support.json_py import (
@@ -58,10 +59,7 @@ from datalad.utils import (
     as_unicode,
 )
 from datalad.ui import ui
-from datalad.dochelpers import (
-    exc_str,
-    single_or_plural,
-)
+from datalad.dochelpers import single_or_plural
 from datalad.consts import (
     OLDMETADATA_DIR,
     OLDMETADATA_FILENAME,
@@ -515,8 +513,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             )
             raise ValueError(
                 "Failed to load metadata extractor for '%s', "
-                "broken dataset configuration (%s)?: %s" %
-                (mtype, ds, exc_str(e)))
+                "broken dataset configuration (%s)?" %
+                (mtype, ds)) from e
         try:
             dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
@@ -528,8 +526,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     default=True,
                     valtype=EnsureBool()))
         except Exception as e:
-            lgr.error('Failed to get dataset metadata ({}): {}'.format(
-                mtype, exc_str(e)))
+            lgr.error('Failed to get dataset metadata (%s): %s',
+                      mtype, CapturedException(e))
             if cfg.get('datalad.runtime.raiseonerror'):
                 log_progress(
                     lgr.error,

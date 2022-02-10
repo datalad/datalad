@@ -22,7 +22,6 @@ from os.path import (
     relpath,
 )
 
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     path_is_subpath,

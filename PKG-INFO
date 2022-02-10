@@ -1,8 +1,7 @@
 Metadata-Version: 2.1
 Name: datalad
-Version: 0.15.3
+Version: 0.15.5
 Summary: data distribution geared toward scientific datasets
-Home-page: UNKNOWN
 Author: The DataLad Team and Contributors
 Author-email: team@datalad.org
 License: UNKNOWN

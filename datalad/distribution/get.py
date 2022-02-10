@@ -47,6 +47,7 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InsufficientArgumentsError,
 )
@@ -245,7 +246,15 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 f"candidate '{name}', but only one is allowed. "
                 f"Check datalad.get.subdataset-source-candidate-* configuration!"
             )
-        url = tmpl.format(**sm_candidate_props)
+        try:
+            url = tmpl.format(**sm_candidate_props)
+        except KeyError as e:
+            ce = CapturedException(e)
+            lgr.warning(
+                "Failed to format template %r for a submodule clone. "
+                "Error: %s", tmpl, ce
+            )
+            continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
         # outside. Additional guesswork can only make it slower
@@ -369,13 +378,15 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         for rec in cand_cfg:
             # check whether any of this configuration originated from the
             # superdataset. if so, inherit the config in the new subdataset
-            # clone. if not, keep things clean in order to be able to move with
-            # any outside configuration change
+            # clone unless that config is already specified in the new
+            # subdataset which can happen during postclone_cfg routines.
+            # if not, keep things clean in order to be able to move with any
+            # outside configuration change
             for c in ('datalad.get.subdataset-source-candidate-{}{}'.format(
                           rec['cost'], rec['name']),
                       'datalad.get.subdataset-source-candidate-{}'.format(
                           rec['name'])):
-                if c in super_cfg.keys():
+                if c in super_cfg.keys() and c not in subds.config.keys():
                     subds.config.set(c, super_cfg.get(c), where='local',
                                      reload=False)
                     need_reload = True

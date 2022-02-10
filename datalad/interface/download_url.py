@@ -29,7 +29,6 @@ from ..distribution.dataset import EnsureDataset
 from ..distribution.dataset import path_under_rev_dataset
 from ..distribution.dataset import require_dataset
 from ..distribution.dataset import resolve_path
-from ..dochelpers import exc_str
 from ..support.annexrepo import AnnexRepo
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
@@ -130,7 +129,7 @@ class DownloadURL(Interface):
                          "ds": ds}
 
         got_ds_instance = isinstance(dataset, Dataset)
-        dir_is_target = not path or path.endswith(op.sep)
+        dir_is_target = not path or str(path).endswith(op.sep)
         path = str(resolve_path(path or op.curdir, ds=dataset))
         if dir_is_target:
             # resolve_path() doesn't preserve trailing separators. Add one for
@@ -270,7 +269,7 @@ URLs:
                                 options=['--relaxed'])
                         except CommandError as exc:
                             lgr.warning("Registering %s with %s failed: %s",
-                                        path, url, exc_str(exc))
+                                        path, url, CapturedException(exc))
 
                     if archive:
                         from datalad.api import add_archive_content

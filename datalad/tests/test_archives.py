@@ -9,40 +9,40 @@
 
 import os
 from unittest.mock import patch
-from datalad.tests.utils import (
-    assert_true,
-    assert_false,
-    assert_raises,
-    eq_,
-    with_tree,
-    with_tempfile,
-    swallow_outputs,
-    on_windows,
-    ok_file_has_content,
-    ok_generator,
-    OBSCURE_FILENAME,
-    SkipTest,
-    skip_if,
-)
 
-from datalad.dochelpers import exc_str
+from datalad import cfg as dl_cfg
+from datalad.support import path as op
+from datalad.support.archive_utils_patool import unixify_path
 from datalad.support.archives import (
     ArchivesCache,
+    ExtractedArchive,
     compress_files,
     decompress_file,
-    ExtractedArchive,
 )
-from datalad.support.archive_utils_patool import unixify_path
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.external_versions import external_versions
-from datalad.support import path as op
-from datalad import cfg as dl_cfg
+from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
+    assert_false,
+    assert_raises,
+    assert_true,
+    eq_,
+    ok_file_has_content,
+    ok_generator,
+    on_windows,
+    skip_if,
+    swallow_outputs,
+    with_tempfile,
+    with_tree,
+)
 
 fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
 # Debian sid version of python (3.7.5rc1) introduced a bug in mimetypes
 # Reported to cPython: https://bugs.python.org/issue38449
 import mimetypes
+
 mimedb = mimetypes.MimeTypes(strict=False)
 if None in mimedb.guess_type(fn_archive_obscure + '.tar.gz'):
     from . import lgr
@@ -161,7 +161,7 @@ def check_compress_file(ext, annex, path, name):
     try:
         decompress_file(archive, dir_extracted)
     except MissingExternalDependency as exc:
-        raise SkipTest(exc_str(exc))
+        raise SkipTest() from exc
     _filepath = op.join(dir_extracted, _filename)
 
     ok_file_has_content(_filepath, 'content')
@@ -250,6 +250,6 @@ def test_get_leading_directory():
     yield _test_get_leading_directory, ea, [op.join('d', 'd2', 'f'), op.join('d', 'd2', 'f2')], op.join('d', 'd2')
     yield _test_get_leading_directory, ea, [op.join('d', 'd2', 'f'), op.join('d', 'd2', 'f2')], 'd', {'depth': 1}
     # with some parasitic files
-    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('._d')], 'd', {'exclude': ['\._.*']}
-    yield _test_get_leading_directory, ea, [op.join('d', 'd1', 'f'), op.join('d', '._d'), '._x'], op.join('d', 'd1'), {'exclude': ['\._.*']}
+    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('._d')], 'd', {'exclude': [r'\._.*']}
+    yield _test_get_leading_directory, ea, [op.join('d', 'd1', 'f'), op.join('d', '._d'), '._x'], op.join('d', 'd1'), {'exclude': [r'\._.*']}
 

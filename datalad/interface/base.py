@@ -29,7 +29,6 @@ from collections import (
 import warnings
 
 from ..ui import ui
-from ..dochelpers import exc_str
 
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
@@ -39,6 +38,7 @@ from datalad.support.constraints import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.support.exceptions import CapturedException
 
 
 default_logchannels = {
@@ -144,8 +144,9 @@ def load_interface(spec):
     try:
         mod = import_module(spec[0], package='datalad')
     except Exception as e:
+        ce = CapturedException(e)
         lgr.error("Internal error, cannot import interface '%s': %s",
-                  spec[0], exc_str(e))
+                  spec[0], ce)
         intf = None
     else:
         intf = getattr(mod, spec[1])
@@ -785,7 +786,8 @@ class Interface(object):
                 ret = list(ret)
             return ret
         except KeyboardInterrupt as exc:
-            ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
+            ui.error("\nInterrupted by user while doing magic: %s"
+                     % CapturedException(exc))
             if cls._interrupted_exit_code is not None:
                 sys.exit(cls._interrupted_exit_code)
             else:

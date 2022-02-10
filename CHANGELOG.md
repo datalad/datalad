@@ -1,3 +1,68 @@
+# 0.16.0 (Wed Feb 09 2022)
+
+#### 🚀 Enhancement
+
+- BF: When download-url gets Pathobject as path convert it to a string [#6364](https://github.com/datalad/datalad/pull/6364) ([@adswa](https://github.com/adswa))
+
+#### 🐛 Bug Fix
+
+- Fix AnnexRepo.whereis key=True mode operation, and add batch mode support [#6379](https://github.com/datalad/datalad/pull/6379) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: run - adjust description for -i/-o to mention that it could be a directory [#6416](https://github.com/datalad/datalad/pull/6416) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: ORA over HTTP tried to check archive [#6355](https://github.com/datalad/datalad/pull/6355) ([@bpoldrack](https://github.com/bpoldrack) [@yarikoptic](https://github.com/yarikoptic))
+- BF: condition access to isatty to have stream eval to True [#6360](https://github.com/datalad/datalad/pull/6360) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: python 3.10 compatibility fixes [#6363](https://github.com/datalad/datalad/pull/6363) ([@yarikoptic](https://github.com/yarikoptic))
+- Remove two(!) copies of a test [#6374](https://github.com/datalad/datalad/pull/6374) ([@mih](https://github.com/mih))
+- Warn just once about incomplete git config [#6343](https://github.com/datalad/datalad/pull/6343) ([@yarikoptic](https://github.com/yarikoptic))
+- Make version detection robust to GIT_DIR specification [#6341](https://github.com/datalad/datalad/pull/6341) ([@effigies](https://github.com/effigies) [@mih](https://github.com/mih))
+- BF(Q&D): do not crash - issue warning - if template fails to format [#6319](https://github.com/datalad/datalad/pull/6319) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Chris Markiewicz ([@effigies](https://github.com/effigies))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.15.4 (Thu Dec 16 2021)
+
+#### 🐛 Bug Fix
+
+- BF: autorc - replace incorrect releaseTypes with "none" [#6320](https://github.com/datalad/datalad/pull/6320) ([@yarikoptic](https://github.com/yarikoptic))
+- Minor enhancement to CONTRIBUTING.md [#6309](https://github.com/datalad/datalad/pull/6309) ([@bpoldrack](https://github.com/bpoldrack))
+- UX: If a clean repo is dirty after a failed run, give clean-up hints [#6112](https://github.com/datalad/datalad/pull/6112) ([@adswa](https://github.com/adswa))
+- Stop using distutils [#6113](https://github.com/datalad/datalad/pull/6113) ([@jwodder](https://github.com/jwodder))
+- BF: RIARemote - set UI backend to annex to make it interactive [#6287](https://github.com/datalad/datalad/pull/6287) ([@yarikoptic](https://github.com/yarikoptic) [@bpoldrack](https://github.com/bpoldrack))
+- Fix invalid escape sequences [#6293](https://github.com/datalad/datalad/pull/6293) ([@jwodder](https://github.com/jwodder))
+- CI: Update environment for windows CI builds [#6292](https://github.com/datalad/datalad/pull/6292) ([@bpoldrack](https://github.com/bpoldrack))
+- bump the python version used for mac os tests [#6288](https://github.com/datalad/datalad/pull/6288) ([@christian-monch](https://github.com/christian-monch) [@bpoldrack](https://github.com/bpoldrack))
+- ENH(UX): log a hint to use ulimit command in case of "Too long" exception [#6173](https://github.com/datalad/datalad/pull/6173) ([@yarikoptic](https://github.com/yarikoptic))
+- Report correct HTTP URL for RIA store content [#6091](https://github.com/datalad/datalad/pull/6091) ([@mih](https://github.com/mih))
+- BF: Don't overwrite subdataset source candidates [#6168](https://github.com/datalad/datalad/pull/6168) ([@bpoldrack](https://github.com/bpoldrack))
+- Bump sphinx requirement to bypass readthedocs defaults [#6189](https://github.com/datalad/datalad/pull/6189) ([@mih](https://github.com/mih))
+- infra: Provide custom prefix to auto-related labels [#6151](https://github.com/datalad/datalad/pull/6151) ([@adswa](https://github.com/adswa))
+- Remove all usage of exc_str() [#6142](https://github.com/datalad/datalad/pull/6142) ([@mih](https://github.com/mih))
+- BF: obtain information about annex special remotes also from annex journal [#6135](https://github.com/datalad/datalad/pull/6135) ([@yarikoptic](https://github.com/yarikoptic) [@mih](https://github.com/mih))
+- BF: clone tried to save new subdataset despite failing to clone [#6140](https://github.com/datalad/datalad/pull/6140) ([@bpoldrack](https://github.com/bpoldrack))
+
+#### 🧪 Tests
+
+- RF+BF: use skip_if_no_module helper instead of try/except for libxmp and boto [#6148](https://github.com/datalad/datalad/pull/6148) ([@yarikoptic](https://github.com/yarikoptic))
+- git://github.com -> https://github.com [#6134](https://github.com/datalad/datalad/pull/6134) ([@mih](https://github.com/mih))
+
+#### Authors: 6
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.15.3 (Sat Oct 30 2021)
 
 #### 🐛 Bug Fix

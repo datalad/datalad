@@ -2,8 +2,147 @@
 
 Change log
 **********
+0.16.0 (Wed Feb 09 2022)
+========================
+
+Enhancement
+-----------
+
+-  BF: When download-url gets Pathobject as path convert it to a string
+   `#6364 <https://github.com/datalad/datalad/pull/6364>`__
+   (`@adswa <https://github.com/adswa>`__)
+
+Bug Fix
+-------
+
+-  Fix AnnexRepo.whereis key=True mode operation, and add batch mode
+   support `#6379 <https://github.com/datalad/datalad/pull/6379>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  DOC: run - adjust description for -i/-o to mention that it could be a
+   directory `#6416 <https://github.com/datalad/datalad/pull/6416>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: ORA over HTTP tried to check archive
+   `#6355 <https://github.com/datalad/datalad/pull/6355>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: condition access to isatty to have stream eval to True
+   `#6360 <https://github.com/datalad/datalad/pull/6360>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: python 3.10 compatibility fixes
+   `#6363 <https://github.com/datalad/datalad/pull/6363>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Remove two(!) copies of a test
+   `#6374 <https://github.com/datalad/datalad/pull/6374>`__
+   (`@mih <https://github.com/mih>`__)
+-  Warn just once about incomplete git config
+   `#6343 <https://github.com/datalad/datalad/pull/6343>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Make version detection robust to GIT_DIR specification
+   `#6341 <https://github.com/datalad/datalad/pull/6341>`__
+   (`@effigies <https://github.com/effigies>`__
+   `@mih <https://github.com/mih>`__)
+-  BF(Q&D): do not crash - issue warning - if template fails to format
+   `#6319 <https://github.com/datalad/datalad/pull/6319>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 5
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Chris Markiewicz (`@effigies <https://github.com/effigies>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
+0.15.4 (Thu Dec 16 2021)
+========================
+
+.. _bug-fix-1:
+
+Bug Fix
+-------
+
+-  BF: autorc - replace incorrect releaseTypes with “none”
+   `#6320 <https://github.com/datalad/datalad/pull/6320>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Minor enhancement to CONTRIBUTING.md
+   `#6309 <https://github.com/datalad/datalad/pull/6309>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  UX: If a clean repo is dirty after a failed run, give clean-up hints
+   `#6112 <https://github.com/datalad/datalad/pull/6112>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Stop using distutils
+   `#6113 <https://github.com/datalad/datalad/pull/6113>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  BF: RIARemote - set UI backend to annex to make it interactive
+   `#6287 <https://github.com/datalad/datalad/pull/6287>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+-  Fix invalid escape sequences
+   `#6293 <https://github.com/datalad/datalad/pull/6293>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  CI: Update environment for windows CI builds
+   `#6292 <https://github.com/datalad/datalad/pull/6292>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  bump the python version used for mac os tests
+   `#6288 <https://github.com/datalad/datalad/pull/6288>`__
+   (`@christian-monch <https://github.com/christian-monch>`__
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+-  ENH(UX): log a hint to use ulimit command in case of “Too long”
+   exception `#6173 <https://github.com/datalad/datalad/pull/6173>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Report correct HTTP URL for RIA store content
+   `#6091 <https://github.com/datalad/datalad/pull/6091>`__
+   (`@mih <https://github.com/mih>`__)
+-  BF: Don’t overwrite subdataset source candidates
+   `#6168 <https://github.com/datalad/datalad/pull/6168>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Bump sphinx requirement to bypass readthedocs defaults
+   `#6189 <https://github.com/datalad/datalad/pull/6189>`__
+   (`@mih <https://github.com/mih>`__)
+-  infra: Provide custom prefix to auto-related labels
+   `#6151 <https://github.com/datalad/datalad/pull/6151>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Remove all usage of exc_str()
+   `#6142 <https://github.com/datalad/datalad/pull/6142>`__
+   (`@mih <https://github.com/mih>`__)
+-  BF: obtain information about annex special remotes also from annex
+   journal `#6135 <https://github.com/datalad/datalad/pull/6135>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__
+   `@mih <https://github.com/mih>`__)
+-  BF: clone tried to save new subdataset despite failing to clone
+   `#6140 <https://github.com/datalad/datalad/pull/6140>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+
+Tests
+-----
+
+-  RF+BF: use skip_if_no_module helper instead of try/except for libxmp
+   and boto `#6148 <https://github.com/datalad/datalad/pull/6148>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  git://github.com -> https://github.com
+   `#6134 <https://github.com/datalad/datalad/pull/6134>`__
+   (`@mih <https://github.com/mih>`__)
+
+Authors: 6
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Christian Mnch
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.15.3 (Sat Oct 30 2021)
 ========================
+
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -66,6 +205,8 @@ Documentation
    `#6065 <https://github.com/datalad/datalad/pull/6065>`__
    (`@mih <https://github.com/mih>`__)
 
+.. _tests-1:
+
 Tests
 -----
 
@@ -99,7 +240,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -131,7 +272,7 @@ Bug Fix
    `#6007 <https://github.com/datalad/datalad/pull/6007>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-1:
+.. _tests-2:
 
 Tests
 -----
@@ -150,6 +291,8 @@ Tests
    `#6023 <https://github.com/datalad/datalad/pull/6023>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _authors-5-1:
+
 Authors: 5
 ----------
 
@@ -164,7 +307,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -209,7 +352,7 @@ Documentation
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-2:
+.. _tests-3:
 
 Tests
 -----
@@ -559,7 +702,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-3:
+.. _tests-4:
 
 Tests
 -----
@@ -573,7 +716,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -651,7 +794,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-4:
+.. _tests-5:
 
 Tests
 -----
@@ -679,7 +822,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -730,7 +873,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-5:
+.. _tests-6:
 
 Tests
 -----
@@ -779,7 +922,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -880,7 +1023,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-6:
+.. _tests-7:
 
 Tests
 -----
