@@ -875,9 +875,9 @@ class RegisterUrl(object):
         self.repo = repo or ds.repo
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
-        self.use_pointer = repo.is_managed_branch()
+        self.use_pointer = self.repo.is_managed_branch()
         self._avoid_fromkey = self.use_pointer and \
-            not repo._check_version_kludges("fromkey-supports-unlocked")
+            not self.repo._check_version_kludges("fromkey-supports-unlocked")
 
     def examinekey(self, parsed_key, filename, migrate=False):
         opts = []

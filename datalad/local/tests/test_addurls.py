@@ -9,23 +9,25 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test addurls"""
 
-from copy import deepcopy
 import json
 import logging
 import os
 import os.path as op
 import shutil
 import tempfile
+from copy import deepcopy
+from io import StringIO
+from unittest.mock import patch
 from urllib.parse import urlparse
 
-from unittest.mock import patch
-
-from io import StringIO
-
-from datalad.api import addurls, Dataset, subdatasets
+import datalad.local.addurls as au
+from datalad.api import (
+    addurls,
+    Dataset,
+    subdatasets,
+)
 from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
-import datalad.local.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
@@ -95,6 +97,7 @@ def test_formatter_no_mapping_arg():
         fmt.format("{0}", "not a mapping")
     # we provide that detail/element in a message
     assert_in("not a mapping", str(cme.exception))
+
 
 def test_formatter_placeholder_with_spaces():
     fmt = au.Formatter({})
@@ -347,6 +350,12 @@ def test_extract_csv_tsv_json_equal():
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
                   au._read, None, "invalid_input_type")
+
+
+@with_tempfile(mkdir=True)
+def test_registerurl_constructor(path):
+    ds = Dataset(path).create(force=True, annex=True)
+    au.RegisterUrl(ds)
 
 
 @with_tempfile(mkdir=True)
