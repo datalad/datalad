@@ -1,3 +1,9 @@
+datalad (0.15.5-1) unstable; urgency=medium
+
+  * Fresh upstream maintenance release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 09 Feb 2022 22:05:08 -0500
+
 datalad (0.15.3-1) unstable; urgency=medium
 
   * Freshish upstream maintenance release

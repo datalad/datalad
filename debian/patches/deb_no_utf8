@@ -131,7 +131,7 @@ Last-Update: 2018-06-05
          status="impossible")
 --- a/datalad/runner/tests/test_witless_runner.py
 +++ b/datalad/runner/tests/test_witless_runner.py
-@@ -60,7 +60,7 @@ def py2cmd(code):
+@@ -63,7 +63,7 @@ def py2cmd(code):
  @with_tempfile
  def test_runner(tempfile):
      runner = Runner()
