@@ -406,7 +406,22 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             # hence we must not publish the base dataset on its own without recursion,
             # if we want to have this mechanism do its job
             #push(to=remote_name)  # no recursion
-            assert_create_sshwebserver(
+            out1 = assert_create_sshwebserver(
+                name=remote_name,
+                sshurl=sshurl,
+                target_dir=target_dir_tpl,
+                recursive=True,
+                existing='skip',
+                ui=have_webui(),
+                since='^'
+            )
+            assert_postupdate_hooks(target_path_, installed=have_webui(), flat=flat)
+            assert_result_count(out1, 1, status='ok', sibling_name=remote_name)
+
+            # ensure that nothing is created since since is used.
+            # Also cover deprecation for since='' support.  Takes just 60ms or so.
+            # TODO: change or remove when removing since='' deprecation support
+            out2 = assert_create_sshwebserver(
                 name=remote_name,
                 sshurl=sshurl,
                 target_dir=target_dir_tpl,
@@ -415,7 +430,8 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
                 ui=have_webui(),
                 since=''
             )
-            assert_postupdate_hooks(target_path_, installed=have_webui(), flat=flat)
+            assert_result_count(out2, 1, status='notneeded', sibling_name=remote_name)
+
         # so it was created on remote correctly and wasn't just skipped
         assert(Dataset(_path_(target_path_, ('prefix-' if flat else '') + sub3_name)).is_installed())
         push(dataset=source, to=remote_name, recursive=True, since='^') # just a smoke test
