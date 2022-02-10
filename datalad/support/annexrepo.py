@@ -37,7 +37,6 @@ from weakref import (
 
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
-    exc_str,
     borrowdoc,
     borrowkwargs
 )
@@ -373,7 +372,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             """We might be too late in the game and either .debug or exc_str
             are no longer bound"""
             try:
-                return lgr.debug(exc_str(e))
+                return lgr.debug(str(e))
             except (AttributeError, NameError):
                 return
 
@@ -567,6 +566,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         ver = cls.git_annex_version
         kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
+        # applies to get, drop, move, copy, whereis
+        kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -764,6 +765,10 @@ class AnnexRepo(GitRepo, RepoInterface):
     def get_special_remotes(self):
         """Get info about all known (not just enabled) special remotes.
 
+        The present implementation is not able to report on special remotes
+        that have only been configured in a private annex repo
+        (annex.private=true).
+
         Returns
         -------
         dict
@@ -782,33 +787,51 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         argspec = re.compile(r'^([^=]*)=(.*)$')
         srs = {}
+
+        # We provide custom implementation to access this metadata since ATM
+        # no git-annex command exposes it on CLI.
+        #
+        # Information will potentially be obtained from remote.log within
+        # git-annex branch, and git-annex's journal, which might exist e.g.
+        # due to alwayscommit=false operations
+        sources = []
         try:
-            for line in self.call_git_items_(
-                    ['cat-file', 'blob', 'git-annex:remote.log'],
-                    read_only=True):
-                # be precise and split by spaces
-                fields = line.split(' ')
-                # special remote UUID
-                sr_id = fields[0]
-                # the rest are config args for enableremote
-                sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
-                if "name" not in sr_info:
-                    name = sr_info.get("sameas-name")
-                    if name is None:
-                        lgr.warning(
-                            "Encountered git-annex remote without a name or "
-                            "sameas-name value: %s",
-                            sr_info)
-                    else:
-                        sr_info["name"] = name
-                srs[sr_id] = sr_info
+            sources.append(
+                list(
+                    self.call_git_items_(
+                        ['cat-file', 'blob', 'git-annex:remote.log'],
+                        read_only=True)
+                )
+            )
         except CommandError as e:
             if 'Not a valid object name git-annex:remote.log' in e.stderr:
-                # no special remotes configures
-                return {}
+                # no special remotes configures - might still be in the journal
+                pass
             else:
                 # some unforeseen error
                 raise e
+
+        journal_path = self.dot_git / "annex" / "journal" / "remote.log"
+        if journal_path.exists():
+            sources.append(journal_path.read_text().splitlines())
+
+        for line in chain(*sources):
+            # be precise and split by spaces
+            fields = line.split(' ')
+            # special remote UUID
+            sr_id = fields[0]
+            # the rest are config args for enableremote
+            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            if "name" not in sr_info:
+                name = sr_info.get("sameas-name")
+                if name is None:
+                    lgr.warning(
+                        "Encountered git-annex remote without a name or "
+                        "sameas-name value: %s",
+                        sr_info)
+                else:
+                    sr_info["name"] = name
+            srs[sr_id] = sr_info
         return srs
 
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,
@@ -1567,11 +1590,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                     yield r
                     return
             except CommandError as e:
+                ce = CapturedException(e)
                 # TODO: RM DIRECT?  left for detection of direct mode submodules
                 if AnnexRepo._is_annex_work_tree_message(e.stderr):
                     raise DirectModeNoLongerSupportedError(
-                        self, exc_str(e)
-                    )
+                        self) from e
                 raise
 
         # Theoretically we could have done for git as well, if it could have
@@ -2067,7 +2090,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 #     raise
                 raise AnnexBatchCommandError(
                     cmd="addurl",
-                    msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
+                    msg="Adding url %s to file %s failed" % (url, file_)) from exc
             assert \
                 (out_json.get('command') == 'addurl'), \
                 "no exception was raised and no 'command' in result out_json=%s" % str(out_json)
@@ -2295,29 +2318,40 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ensure_list(options, copy=True)
         if batch:
+            # TODO: --batch-keys was added to 8.20210903
             if key:
-                raise ValueError("batch=True is incompatible with `key`")
+                if not self._check_version_kludges("grp1-supports-batch-keys"):
+                    raise ValueError("batch=True for `key=True` requires git-annex >= 8.20210903")
+                bkw = {'batch_opt': '--batch-keys'}
+            else:
+                bkw = {}
             bcmd = self._batched.get('whereis', annex_options=options,
-                                     json=True, path=self.path)
+                                     json=True, path=self.path, **bkw)
             json_objects = bcmd(files)
         else:
             cmd = ['whereis'] + options
-            files_arg = None
-            if key:
-                cmd = cmd + ["--key"] + files
-            else:
-                files_arg = files
 
-            try:
-                json_objects = self.call_annex_records(cmd, files=files_arg)
-            except CommandError as e:
-                if e.stderr.startswith('Invalid'):
-                    # would happen when git-annex is called with incompatible options
-                    raise
-                # whereis may exit non-zero when there are too few known copies
-                # callers of whereis are interested in exactly that information,
-                # which we deliver via result, not via exception
-                json_objects = e.kwargs.get('stdout_json', [])
+            def _call_cmd(cmd, files=None):
+                """Helper to reuse consistently in case of --key and not invocations"""
+                try:
+                    return self.call_annex_records(cmd, files=files)
+                except CommandError as e:
+                    if e.stderr.startswith('Invalid'):
+                        # would happen when git-annex is called with incompatible options
+                        raise
+                    # whereis may exit non-zero when there are too few known copies
+                    # callers of whereis are interested in exactly that information,
+                    # which we deliver via result, not via exception
+                    return e.kwargs.get('stdout_json', [])
+
+            if key:
+                # whereis --key takes only a single key at a time so we need to loop
+                json_objects = []
+                for k in files:
+                    json_objects.extend(_call_cmd(cmd + ["--key", k]))
+            else:
+                json_objects = _call_cmd(cmd, files)
+
 
         if output in {'descriptions', 'uuids'}:
             return [
@@ -3734,7 +3768,7 @@ class BatchedAnnex(BatchedCommand):
     """
 
     def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
-                 json=False, output_proc=None):
+                 json=False, output_proc=None, batch_opt='--batch'):
         if not isinstance(annex_cmd, list):
             annex_cmd = [annex_cmd]
         cmd = \
@@ -3744,7 +3778,7 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch'] + \
+            [batch_opt] + \
             (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None

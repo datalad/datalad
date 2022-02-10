@@ -13,16 +13,31 @@
 __docformat__ = 'restructuredtext'
 
 import os
+from glob import glob
 from os import unlink
 from os.path import (
     basename,
     exists,
-    join as opj,
+)
+from os.path import join as opj
+from os.path import (
     lexists,
     pardir,
 )
-from glob import glob
 
+from datalad.api import (
+    add_archive_content,
+    clean,
+)
+from datalad.consts import (
+    ARCHIVES_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    FileNotInRepositoryError,
+)
 from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_equal,
@@ -47,12 +62,6 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import (
-    CommandError,
-    FileNotInRepositoryError,
-)
 from datalad.utils import (
     chpwd,
     find_files,
@@ -60,15 +69,6 @@ from datalad.utils import (
     on_windows,
     rmtemp,
 )
-from datalad.api import (
-    add_archive_content,
-    clean,
-)
-from datalad.consts import (
-    ARCHIVES_SPECIAL_REMOTE,
-    DATALAD_SPECIAL_REMOTES_UUIDS,
-)
-
 
 treeargs = dict(
     tree=(
@@ -563,7 +563,7 @@ class TestAddArchiveOptions():
 
     def assert_no_trash_left_behind(self):
         assert_equal(
-            list(find_files('\.datalad..*', self.annex.path, dirs=True)),
+            list(find_files(r'\.datalad..*', self.annex.path, dirs=True)),
             []
         )
 

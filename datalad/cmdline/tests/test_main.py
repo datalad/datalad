@@ -14,28 +14,14 @@ from io import StringIO
 from unittest.mock import patch
 
 import datalad
-from ..main import (
-    _fix_datalad_ri,
-    main,
-)
-from ..helpers import fail_with_short_help
 from datalad import __version__
-from datalad.cmd import (
-    WitlessRunner as Runner,
-    StdOutErrCapture,
-)
-from datalad.ui.utils import (
-    get_console_width,
-    get_terminal_size,
-)
 from datalad.api import (
-    create,
     Dataset,
+    create,
 )
-from datalad.utils import (
-    chpwd,
-    Path,
-)
+from datalad.cmd import StdOutErrCapture
+from datalad.cmd import WitlessRunner as Runner
+from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
     SkipTest,
     assert_equal,
@@ -50,7 +36,19 @@ from datalad.tests.utils import (
     slow,
     with_tempfile,
 )
-from datalad.support.exceptions import CommandError
+from datalad.ui.utils import (
+    get_console_width,
+    get_terminal_size,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
+)
+
+from ..helpers import fail_with_short_help
+from ..main import (
+    main,
+)
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -116,7 +114,7 @@ def test_help_np():
     # enough of bin/datalad and .tox/py27/bin/datalad -- guarantee consistency! ;)
     ok_startswith(stdout, 'Usage: datalad')
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
-    sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
+    sections = [l[1:-1] for l in filter(re.compile(r'^\*.*\*$').match, stdout.split('\n'))]
     # but order is still not guaranteed (dict somewhere)! TODO
     # see https://travis-ci.org/datalad/datalad/jobs/80519004
     # thus testing sets
@@ -128,6 +126,8 @@ def test_help_np():
               'Plumbing commands',
               }:
         assert_in(s, sections)
+        # should be present only one time!
+        eq_(stdout.count(s), 1)
 
     if not get_terminal_size()[0] or 0:
         raise SkipTest(
@@ -204,15 +204,9 @@ def test_script_shims():
         'datalad',
         'git-annex-remote-datalad-archives',
         'git-annex-remote-datalad']:
-        if not on_windows:
-            # those must be available for execution, and should not contain
-            which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
-            # test if there is no easy install shim in there
-            with open(which.rstrip()) as f:
-                content = f.read()
-        else:
-            from distutils.spawn import find_executable
-            content = find_executable(script)
+
+        from shutil import which
+        which(script)
 
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)
@@ -306,16 +300,6 @@ def test_fail_with_short_help():
                  "        father\n"
                  "Hint: You can become one\n")
 
-def test_fix_datalad_ri():
-    assert_equal(_fix_datalad_ri('/'), '/')
-    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
-    assert_equal(_fix_datalad_ri('//'), '///')
-    assert_equal(_fix_datalad_ri('///'), '///')
-    assert_equal(_fix_datalad_ri('//a'), '///a')
-    assert_equal(_fix_datalad_ri('///a'), '///a')
-    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
-    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
-
 
 def test_fail_with_short_help():
     out = StringIO()
@@ -350,17 +334,6 @@ def test_fail_with_short_help():
                  "        mother\n"
                  "        father\n"
                  "Hint: You can become one\n")
-
-
-def test_fix_datalad_ri():
-    assert_equal(_fix_datalad_ri('/'), '/')
-    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
-    assert_equal(_fix_datalad_ri('//'), '///')
-    assert_equal(_fix_datalad_ri('///'), '///')
-    assert_equal(_fix_datalad_ri('//a'), '///a')
-    assert_equal(_fix_datalad_ri('///a'), '///a')
-    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
-    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
 
 
 @with_tempfile

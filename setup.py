@@ -42,6 +42,7 @@ requires = {
         'iso8601',
         'humanize',
         'fasteners>=0.14',
+        'packaging',
         'patool>=1.7',
         'tqdm',
         'wrapt',
@@ -95,7 +96,7 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx>=1.7.8, !=4.0.0',
+        'sphinx>=2, !=4.0.0',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [

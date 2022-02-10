@@ -31,7 +31,7 @@ from copy import copy
 from ..utils import auto_repr
 from ..utils import on_windows
 from .base import InteractiveUI
-from ..dochelpers import exc_str
+from datalad.support.exceptions import CapturedException
 
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel
@@ -326,7 +326,7 @@ class IPythonUI(DialogUI):
             except Exception as exc:
                 lgr.warning(
                     "Regular progressbar will be used -- cannot import tqdm_notebook: %s",
-                    exc_str(exc)
+                    CapturedException(exc)
                 )
                 self.__class__._tqdm_frontend = None
         if self._tqdm_frontend:

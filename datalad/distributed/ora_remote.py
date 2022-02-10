@@ -1286,6 +1286,12 @@ class RIARemote(SpecialRemote):
         try:
             self.io.get(abs_key_path, filename, self.annex.progress)
         except Exception as e1:
+            if isinstance(self.io, HTTPRemoteIO):
+                # no client-side archive access over HTTP
+                # Note: This is intentional, as it would mean one additional
+                # request per key. However, server response to the GET can
+                # consider archives on their end.
+                raise
             # catch anything and keep it around for a potential re-raise
             try:
                 self.io.get_from_archive(archive_path, key_path, filename,
@@ -1304,6 +1310,9 @@ class RIARemote(SpecialRemote):
         if self.io.exists(abs_key_path):
             # we have an actual file for this key
             return True
+        if isinstance(self.io, HTTPRemoteIO):
+            # no client-side archive access over HTTP
+            return False
         # do not make a careful check whether an archive exists, because at
         # present this requires an additional SSH call for remote operations
         # which may be rather slow. Instead just try to run 7z on it and let
@@ -1345,13 +1354,14 @@ class RIARemote(SpecialRemote):
         # we need a file-system compatible name for the key
         key = _sanitize_key(key)
 
+        dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         if isinstance(self.io, HTTPRemoteIO):
             # display the URL for a request
             # TODO: method of HTTPRemoteIO
-            return self.ria_store_url[4:] + "/annex/objects/" + \
-                   self.annex.dirhash(key) + key + "/" + key
+            # in case of a HTTP remote (unchecked for others), storage_host
+            # is not just a host, but a full URL without a path
+            return f'{self.storage_host}{dsobj_dir}/{key_path}'
 
-        dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         return str(dsobj_dir / key_path) if self._local_io() \
             else '{}: {}:{}'.format(
                 self.storage_host,
@@ -1424,7 +1434,9 @@ def _sanitize_key(key):
 def main():
     """cmdline entry point"""
     from annexremote import Master
+    from datalad.ui import ui
     master = Master()
     remote = RIARemote(master)
+    ui.set_backend('annex')  # interactive, stdin/stdout will be used for interactions with annex
     master.LinkRemote(remote)
     master.Listen()

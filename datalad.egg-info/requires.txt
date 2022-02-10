@@ -3,6 +3,7 @@ chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
+packaging
 patool>=1.7
 tqdm
 wrapt
@@ -32,6 +33,7 @@ chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
+packaging
 patool>=1.7
 tqdm
 wrapt
@@ -52,6 +54,7 @@ chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
+packaging
 patool>=1.7
 tqdm
 wrapt
@@ -84,6 +87,7 @@ chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
+packaging
 patool>=1.7
 tqdm
 wrapt
@@ -112,7 +116,7 @@ python-xmp-toolkit
 Pillow
 duecredit
 pypandoc
-sphinx!=4.0.0,>=1.7.8
+sphinx!=4.0.0,>=2
 sphinx-rtd-theme
 asv
 gprof2dot
@@ -122,7 +126,7 @@ coverage
 
 [devel-docs]
 pypandoc
-sphinx!=4.0.0,>=1.7.8
+sphinx!=4.0.0,>=2
 sphinx-rtd-theme
 
 [devel-utils]
@@ -163,6 +167,7 @@ chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
+packaging
 patool>=1.7
 tqdm
 wrapt

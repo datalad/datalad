@@ -20,9 +20,8 @@ from datalad.tests.utils import (
 try:
     from PIL import Image
 except ImportError as exc:
-    from datalad.dochelpers import exc_str
     raise SkipTest(
-       "No PIL module available or it cannot be imported: %s" % exc_str(exc))
+       "No PIL module available or it cannot be imported") from exc
 
 from shutil import copy
 from os.path import (

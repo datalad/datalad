@@ -41,7 +41,6 @@ from urllib.parse import (
 )
 from urllib.error import URLError
 
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     on_windows,
     PurePath,
@@ -51,6 +50,7 @@ from datalad.utils import ensure_dir, ensure_bytes, ensure_unicode, map_items
 from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
+from datalad.support.exceptions import CapturedException
 
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
@@ -1014,7 +1014,7 @@ def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
             except Exception as e:  # it is OK to ignore any error and fall back on the true source
                 lgr.warning(
                     "cannot load cache from '%s', fall back to download: %s",
-                    doc_fname, exc_str(e))
+                    doc_fname, CapturedException(e))
 
     if doc is None:
         if fetcher is None:

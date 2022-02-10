@@ -14,14 +14,11 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     eq_,
-    SkipTest,
+    skip_if_no_module,
     with_tempfile,
 )
-try:
-    import libxmp
-except Exception as exc:
-    from datalad.dochelpers import exc_str
-    raise SkipTest("libxmp cannot be imported: %s" % exc_str(exc))
+
+skip_if_no_module('libxmp')
 
 from shutil import copy
 from os.path import (

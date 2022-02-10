@@ -8,13 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the universal datalad's annex customremote"""
 
-from ...support.annexrepo import AnnexRepo
 from ...consts import DATALAD_SPECIAL_REMOTE
-from ...tests.utils import *
-from ...support.external_versions import external_versions
-
-from ...support.exceptions import CommandError
 from ...downloaders.tests.utils import get_test_providers
+from ...support.annexrepo import AnnexRepo
+from ...support.exceptions import CommandError
+from ...support.external_versions import external_versions
+from ...tests.utils import *
 from ..datalad import DataladAnnexCustomRemote
 
 
@@ -76,7 +75,10 @@ def test_basic_scenario_s3():
 
 
 
-from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario
+from .test_base import (
+    BASE_INTERACTION_SCENARIOS,
+    check_interaction_scenario,
+)
 
 
 @with_tree(tree={}) #'archive.tar.gz': {'f1.txt': 'content'}})
@@ -92,7 +94,7 @@ def test_interactions(tdir):
     fetch_scenarios.append(
         ('VALUE',
          re.compile(
-             'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to download from any')))
+             r'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to download from any')))
 
     for scenario in BASE_INTERACTION_SCENARIOS + [
         [

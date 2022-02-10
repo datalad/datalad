@@ -611,11 +611,16 @@ Refer datalad/config.py for information on how to add these environment variable
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
   Specifies network interfaces to bring down/up for testing. Currently used by travis.
-- *DATALAD_CMD_PROTOCOL*: 
-  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
+- *DATALAD_TESTS_KNOWNFAILURES_PROBE*:
+  Binary flag to test whether "known failures" still actually are failures. That
+  is - change behavior of tests, that decorated with any of the `known_failure`,
+  to not skip, but executed and *fail* if they would pass (indicating that the
+  decorator may be removed/reconsidered).
+- *DATALAD_CMD_PROTOCOL*:
+  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
-- *DATALAD_CMD_PROTOCOL_PREFIX*: 
+- *DATALAD_CMD_PROTOCOL_PREFIX*:
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
 - *DATALAD_USE_DEFAULT_GIT*:
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
@@ -666,15 +671,15 @@ The section that `auto` adds to the changelog on a new release consists of the
 titles of all pull requests merged into master since the previous release,
 organized by label.  `auto` recognizes the following PR labels:
 
-- `minor` — for changes corresponding to an increase in the minor version
+- `semver-minor` — for changes corresponding to an increase in the minor version
   component
-- `patch` — for changes corresponding to an increase in the patch/micro version
+- `semver-patch` — for changes corresponding to an increase in the patch/micro version
   component; this is the default label for unlabelled PRs
-- `internal` — for changes only affecting the internal API
-- `documentation` — for changes only affecting the documentation
-- `tests` — for changes to tests
-- `dependencies` — for updates to dependency versions
-- `performance` — for performance improvements
+- `semver-internal` — for changes only affecting the internal API
+- `semver-documentation` — for changes only affecting the documentation
+- `semver-tests` — for changes to tests
+- `semver-dependencies` — for updates to dependency versions
+- `semver-performance` — for performance improvements
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
 [contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

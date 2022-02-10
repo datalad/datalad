@@ -307,6 +307,24 @@ def test_clone_into_dataset(source_path, top_path):
     eq_(subds_.pathobj, ds.pathobj / "sub2")  # for paranoid yoh ;)
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
+    # don't do anything to the dataset, when cloning fails (gh-6138)
+    create_tree(ds.path, {'subdir': {'dummy2.txt': 'whatever'}})
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
+    results = ds.clone(source, "subdir",
+                       result_xfm=None,
+                       return_type='list',
+                       on_failure='ignore')
+    assert_in_results(results, status='error')
+    # status unchanged
+    assert_repo_status(ds.path,
+                       untracked=[str(ds.pathobj / 'subdir'),
+                                  'dummy.txt'])
+    # nothing was committed
+    eq_(hexsha_before, ds.repo.get_hexsha(DEFAULT_BRANCH))
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -717,7 +735,7 @@ def test_decode_source_spec():
             'localhost/another/path',
             'user@someho.st/mydir',
             'ssh://somewhe.re/else',
-            'git://github.com/datalad/testrepo--basic--r1',
+            'https://github.com/datalad/testrepo--basic--r1',
     ):
         props = decode_source_spec(url)
         dest = props.pop('default_destpath')
@@ -1551,9 +1569,9 @@ def test_fetch_git_special_remote(url_path, url, path):
 def test_nonuniform_adjusted_subdataset(path):
     # https://github.com/datalad/datalad/issues/5107
     topds = Dataset(Path(path) / "top").create()
-    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    subds_url = 'https://github.com/datalad/testrepo--basic--r1'
     topds.clone(
-        source='git://github.com/datalad/testrepo--basic--r1',
+        source='https://github.com/datalad/testrepo--basic--r1',
         path='subds')
     eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
         subds_url)

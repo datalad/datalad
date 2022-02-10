@@ -30,7 +30,7 @@ WORKDIR /home/DL_USER
 # Prepare system for working with Git
 RUN git config --global user.email "DL_GIT_USER_EMAIL"
 RUN git config --global user.name "DL_GIT_USER_NAME"
-# RUN git clone git://github.com/datalad/datalad
+# RUN git clone https://github.com/datalad/datalad
 RUN mkdir datalad
 
 WORKDIR /home/DL_USER/datalad

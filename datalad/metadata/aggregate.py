@@ -26,7 +26,6 @@ from datalad.consts import (
     DATASET_CONFIG_FILE,
     DATASET_METADATA_FILE,
 )
-from datalad.dochelpers import exc_str
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.utils import (
@@ -68,6 +67,7 @@ from datalad.support.constraints import (
 from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CapturedException
 from datalad.support import json_py
 from datalad.support.path import split_ext
 from datalad.utils import (
@@ -357,7 +357,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
                 except RuntimeError as exc:
                     # TODO: dedicated test - when meta content changes
                     lgr.debug("For now will just do re-extraction since caught %s",
-                              exc_str(exc))
+                              CapturedException(exc))
             # source one has it, so we might be able to copy it
             # TODO: dedicated test - when it is sufficient to copy we do not re-extract
 
