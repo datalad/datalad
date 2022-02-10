@@ -119,7 +119,7 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
         if fd == STDOUT_FILENO:
             remaining_line = self.line_splitter.finish_processing()
             if remaining_line is not None:
-                lgr.warning(f"unterminated line: {remaining_line}")
+                lgr.debug(f"unterminated line: {remaining_line}")
                 self.send_result((fd, remaining_line))
 
     def timeout(self, fd: Optional[int]) -> bool:
