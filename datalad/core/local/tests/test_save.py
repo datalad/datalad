@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test save command"""
 
+import logging
 import os
 import os.path as op
 
@@ -36,7 +37,9 @@ from datalad.tests.utils import (
     ok_,
     patch,
     SkipTest,
+    skip_if_adjusted_branch,
     skip_wo_symlink_capability,
+    swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -677,6 +680,63 @@ def test_path_arg_call(path):
         # a path, but we no longer do that
         #save(dataset=ds.path, path=[testfile.name], to_git=True)
         save(dataset=ds, path=[testfile.name], to_git=True)
+
+
+# one can't create these file names on FAT/NTFS systems
+@skip_if_adjusted_branch
+@with_tempfile
+def test_windows_incompatible_names(path):
+    ds = Dataset(path).create()
+    create_tree(path, {
+        'imgood': 'Look what a nice name I have',
+        'illegal:character.txt': 'strange choice of name',
+        'spaceending ': 'who does these things?',
+        'lookmumadot.': 'why would you do this?',
+        'COM1.txt': 'I am a serial port',
+        'dirs with spaces': {
+            'seriously?': 'you are stupid',
+            'why somuch?wrongstuff.': "I gave up"
+        },
+    })
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'error')
+    ds.save('.datalad/config')
+    res = ds.save(on_failure='ignore')
+    # check that none of the 6 problematic files was saved, but the good one was
+    assert_result_count(res, 6, status='impossible', action='save')
+    assert_result_count(res, 1, status='ok', action='save')
+
+    # check that the warning is emitted
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'warning')
+    ds.save('.datalad/config')
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.save()
+        cml.assert_logged(
+            "Some elements of your dataset are not compatible with Windows "
+            "systems. Disable this check by changing "
+            "datalad.save.windows-compat-warning or consider renaming the "
+            "following elements:")
+        assert_in("Elements using a reserved filename:", cml.out)
+        assert_in("Elements with illegal characters:", cml.out)
+        assert_in("Elements ending with a dot:", cml.out)
+        assert_in("Elements ending with a space:", cml.out)
+
+    # check that a setting of 'none' really does nothing
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'none')
+    ds.save('.datalad/config')
+    create_tree(path, {
+        'more illegal:characters?.py': 'My arch nemesis uses Windows and I will'
+                                       'destroy them! Muahahaha'
+    })
+    with swallow_logs(new_level=logging.WARN) as cml:
+        res = ds.save()
+        # we shouldn't see warnings
+        assert_not_in(
+            "Some elements of your dataset are not compatible with Windows "
+            "systems. Disable this check by changing "
+            "datalad.save.windows-compat-warning or consider renaming the "
+            "following elements:", cml.out)
+        # make sure the file is saved successfully
+        assert_result_count(res, 1, status='ok', action='save')
 
 
 @with_tree(tree={

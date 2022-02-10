@@ -54,6 +54,11 @@ from datalad.config import (
     write_config_section,
 )
 
+from datalad.consts import (
+    ILLEGAL_CHARS_WIN,
+    RESERVED_NAMES_WIN
+)
+
 import datalad.utils as ut
 from datalad.utils import (
     Path,
@@ -3424,16 +3429,35 @@ class GitRepo(CoreGitRepo):
             if (props.get('state', None) in ('modified', 'untracked') and
                 not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
+            compat_config = \
+                self.config.obtain("datalad.save.windows-compat-warning")
+            to_add, problems = self._check_for_win_compat(to_add, compat_config)
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
-            for r in self._save_add(
-                    to_add,
-                    git_opts=None,
-                    **{k: kwargs[k] for k in kwargs
-                       if k in (('git',) if hasattr(self, 'uuid')
-                                else tuple())}):
-                yield r
+
+            if to_add:
+                yield from self._save_add(
+                        to_add,
+                        git_opts=None,
+                        **{k: kwargs[k] for k in kwargs
+                           if k in (('git',) if hasattr(self, 'uuid')
+                                    else tuple())})
+            if problems:
+                from datalad.interface.results import get_status_dict
+                msg = \
+                    'Incompatible name for Windows systems; disable with ' \
+                    'datalad.save.windows-compat-warning.',
+                for path in problems:
+                    yield get_status_dict(
+                        action='save',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(path)),
+                        status='impossible',
+                        message=msg,
+                        logger=lgr)
+
 
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though
@@ -3443,6 +3467,63 @@ class GitRepo(CoreGitRepo):
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
+
+    def _check_for_win_compat(self, files, config):
+        """Check file names for illegal characters or reserved names on Windows
+
+        In the case that a non-Windows-compatible file is detected, warn users
+        about potential interoperability issues.
+
+        Parameters
+        ----------
+        files
+          list of files to add
+        config
+          value of self.config.obtain("datalad.save.windows-compat-warning"),
+          used to choose appropriate behavior. "none" performs no check,
+          "warning" warns in case of incompatibilities, and "error" results in
+          an error result in case of incompatibilities
+        """
+        # don't perform any check when the configuration is set to 'none'
+        if config == 'none':
+            return files, None
+
+        from collections import defaultdict
+        problems = defaultdict(list)
+        for file in files:
+            for part in Path(file).parts:
+                # check every component of the path for incompatibilities
+                if Path(part).stem.upper() in RESERVED_NAMES_WIN:
+                    problems['Elements using a reserved filename:'].append(part)
+                    problems['paths'].append(file)
+                if re.search(ILLEGAL_CHARS_WIN, part):
+                    problems['Elements with illegal characters:'].append(part)
+                    problems['paths'].append(file)
+                if part.endswith('.'):
+                    problems['Elements ending with a dot:'].append(part)
+                    problems['paths'].append(file)
+                if part.endswith(' '):
+                    problems['Elements ending with a space:'].append(part)
+                    problems['paths'].append(file)
+        if not problems:
+            return files, None
+        msg = \
+            "Some elements of your dataset are not compatible with " \
+            "Windows systems. Disable this check by changing " \
+            "datalad.save.windows-compat-warning or consider renaming " \
+            "the following elements: "
+        for k, v in problems.items():
+            # use the key as an explanation, and report filenames only once
+            msg += f"\n{k} {[*{*v}]}" if k != 'paths' else ''
+        if config == 'warning':
+            lgr.warning(msg)
+            return files, None
+
+        elif config == 'error':
+            # take the problematic files out of to_add
+            for path in [*{*problems['paths']}]:
+                files.pop(path)
+            return files, [*{*problems['paths']}]
 
     def _save_add(self, files, git_opts=None):
         """Simple helper to add files in save()"""
