@@ -3773,6 +3773,32 @@ class AnnexInitOutput(WitlessProtocol):
             lgr.info(line.strip())
 
 
+@auto_repr
+class BatchedAnnex(BatchedCommand):
+    """Container for an annex process which would allow for persistent communication
+    """
+
+    def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
+                 json=False, output_proc=None):
+        if not isinstance(annex_cmd, list):
+            annex_cmd = [annex_cmd]
+        cmd = \
+            ['git'] + \
+            (git_options if git_options else []) + \
+            ['annex'] + \
+            annex_cmd + \
+            (annex_options if annex_options else []) + \
+            (['--json', '--json-error-messages'] if json else []) + \
+            ['--batch'] + \
+            (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
+        output_proc = \
+            output_proc if output_proc else readline_json if json else None
+        super(BatchedAnnex, self).__init__(
+            cmd,
+            path=path,
+            output_proc=output_proc)
+
+
 # TODO: Why was this commented out?
 # @auto_repr
 class BatchedAnnexes(SafeDelCloseMixin, dict):
@@ -3784,7 +3810,7 @@ class BatchedAnnexes(SafeDelCloseMixin, dict):
         self.git_options = git_options or []
         super(BatchedAnnexes, self).__init__()
 
-    def get(self, codename, annex_cmd=None, **kwargs):
+    def get(self, codename, annex_cmd=None, **kwargs) -> BatchedAnnex:
         if annex_cmd is None:
             annex_cmd = codename
 
@@ -3847,29 +3873,3 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 def readline_json(stdout):
     toload = stdout.readline().strip()
     return json_loads(toload) if toload else {}
-
-
-@auto_repr
-class BatchedAnnex(BatchedCommand):
-    """Container for an annex process which would allow for persistent communication
-    """
-
-    def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
-                 json=False, output_proc=None):
-        if not isinstance(annex_cmd, list):
-            annex_cmd = [annex_cmd]
-        cmd = \
-            ['git'] + \
-            (git_options if git_options else []) + \
-            ['annex'] + \
-            annex_cmd + \
-            (annex_options if annex_options else []) + \
-            (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch'] + \
-            (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
-        output_proc = \
-            output_proc if output_proc else readline_json if json else None
-        super(BatchedAnnex, self).__init__(
-            cmd,
-            path=path,
-            output_proc=output_proc)

@@ -961,13 +961,21 @@ class BatchedRegisterUrl(RegisterUrl):
         super().__init__(ds, repo)
         self._batch_commands = {}
 
-    def _batch(self, command, batch_input,
-               output_proc=None, json=False, batch_options=None):
+    def _batch(self,
+               command,
+               batch_input,
+               output_proc=None,
+               json=False,
+               batch_options=None):
+
         bcmd = self._batch_commands.get(command)
         if not bcmd:
             repo = self.repo
             bcmd = repo._batched.get(
-                command, path=repo.path, json=json, output_proc=output_proc,
+                codename=command,
+                path=repo.path,
+                json=json,
+                output_proc=output_proc,
                 annex_options=batch_options)
             self._batch_commands[command] = bcmd
         return bcmd(batch_input)

@@ -119,7 +119,7 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
         if fd == STDOUT_FILENO:
             remaining_line = self.line_splitter.finish_processing()
             if remaining_line is not None:
-                lgr.warning(f"unterminated line: {remaining_line}")
+                lgr.debug(f"unterminated line: {remaining_line}")
                 self.send_result((fd, remaining_line))
 
     def timeout(self, fd: Optional[int]) -> bool:
@@ -389,12 +389,12 @@ class BatchedCommand(SafeDelCloseMixin):
         Get a single stdout line from the generator.
 
         If timeout was specified, and exception_on_timeout is False,
-        and if a timeout occurs, return None. Otherwise return the
-        str that was read from the generator.
+        and if a timeout occurs, return None. Otherwise, return the
+        string that was read from the generator.
         """
 
         # Implementation remarks:
-        # 1. We known that BatchedCommandProtocol only returns complete lines on
+        # 1. We know that BatchedCommandProtocol only returns complete lines on
         #    stdout, that makes this code simple.
         # 2. stderr is handled transparently within this method,
         #    by adding all stderr-content to an internal buffer.
@@ -469,7 +469,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 self.return_code = command_error.code
 
             if remaining:
-                lgr.warning(f"{self}: remaining content: {remaining}")
+                lgr.debug(f"{self}: remaining content: {remaining}")
 
             self.wait_timed_out = timeout is True
             if self.wait_timed_out:
