@@ -15,6 +15,8 @@ import logging
 import json
 import warnings
 
+from pathlib import Path
+
 from argparse import REMAINDER
 import os
 import os.path as op
@@ -322,8 +324,8 @@ class Run(Interface):
                res.get("action") == "run" and res.get("status") == "error":
                 msg_path = res.get("msg_path")
                 if msg_path:
+                    ds_path = res["path"]
                     if datalad.get_apimode() == 'python':
-                        ds_path = res["path"]
                         help = f"\"Dataset('{ds_path}').save(path='.', " \
                                "recursive=True, message_file='%s')\""
                     else:
@@ -334,7 +336,7 @@ class Run(Interface):
                         f"{help}",
                         # shorten to the relative path for a more concise
                         # message
-                        msg_path.relative_to(ds.pathobj))
+                        Path(msg_path).relative_to(ds_path))
             generic_result_renderer(res)
 
 
@@ -832,9 +834,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
-            msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
-            with open(msg_path, "wb") as ofh:
-                ofh.write(ensure_bytes(msg))
+            # must record path to be relative to ds.path to meet
+            # result record semantics (think symlink resolution, etc)
+            msg_path = ds.pathobj / \
+                repo.dot_git.relative_to(repo.pathobj) / "COMMIT_EDITMSG"
+            msg_path.write_text(msg)
 
     expected_exit = rerun_info.get("exit", 0) if rerun_info else None
     if cmd_exitcode and expected_exit != cmd_exitcode:
@@ -854,7 +858,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # Provide msg_path and explicit outputs so that, under
         # on_failure='stop', callers can react to a failure and then call
         # save().
-        msg_path=msg_path,
+        msg_path=str(msg_path) if msg_path else None,
         explicit_outputs=outputs_to_save)
 
     if do_save:
