@@ -45,6 +45,7 @@ from datalad.interface.utils import (
     eval_results,
     generic_result_renderer,
 )
+from datalad.core.local.status import Status
 from datalad.local.unlock import Unlock
 from datalad.support.constraints import (
     EnsureBool,
@@ -493,7 +494,7 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None, jobs=None):
                        jobs=jobs)
 
 
-def _unlock_or_remove(dset_path, paths):
+def _unlock_or_remove(dset_path, paths, remove=False):
     """Unlock `paths` if content is present; remove otherwise.
 
     Parameters
@@ -501,6 +502,8 @@ def _unlock_or_remove(dset_path, paths):
     dset_path : str
     paths : list of string
         Absolute paths of dataset files.
+    remove : bool, optional
+        If enabled, always remove instead of performing an availability test.
 
     Returns
     -------
@@ -517,11 +520,31 @@ def _unlock_or_remove(dset_path, paths):
             # common cases (e.g., when rerunning with --onto).
             lgr.debug("Filtered out non-existing path: %s", path)
 
-    if existing:
-        notpresent_results = []
-        # Note: If Unlock() is given a directory (including a subdataset) as a
-        # path, files without content present won't be reported, so those cases
-        # aren't being covered by the "remove if not present" logic below.
+    if not existing:
+        return
+
+    to_remove = []
+    if remove:
+        # when we force-remove, we use status to discover matching content
+        # and let unlock's remove fallback handle these results
+        to_remove = Status()(
+            dataset=dset_path,
+            path=existing,
+            eval_subdataset_state='commit',
+            untracked='no',
+            annex='no',
+            on_failure="ignore",
+            # no rendering here, the relevant results are yielded below
+            result_renderer='disabled',
+            return_type='generator',
+            # we only remove files, no subdatasets or directories
+            result_filter=lambda x: x.get('type') in ('file', 'symlink'),
+        )
+    else:
+        # Note: If Unlock() is given a directory (including a subdataset)
+        # as a path, files without content present won't be reported, so
+        # those cases aren't being covered by the "remove if not present"
+        # logic below.
         for res in Unlock()(dataset=dset_path,
                             path=existing,
                             on_failure='ignore',
@@ -529,22 +552,22 @@ def _unlock_or_remove(dset_path, paths):
                             return_type='generator'):
             if res["status"] == "impossible" and res["type"] == "file" \
                and "cannot unlock" in res["message"]:
-                notpresent_results.append(res)
+                to_remove.append(res)
                 continue
             yield res
-        # Avoid `datalad remove` because it calls git-rm underneath, which will
-        # remove leading directories if no other files remain. See gh-5486.
-        for res in notpresent_results:
-            try:
-                os.unlink(res["path"])
-            except OSError as exc:
-                ce = CapturedException(exc)
-                yield dict(res, action="run.remove", status="error",
-                           message=("Removing file failed: %s", ce),
-                           exception=ce)
-            else:
-                yield dict(res, action="run.remove", status="ok",
-                           message="Removed file")
+    # Avoid `datalad remove` because it calls git-rm underneath, which will
+    # remove leading directories if no other files remain. See gh-5486.
+    for res in to_remove:
+        try:
+            os.unlink(res["path"])
+        except OSError as exc:
+            ce = CapturedException(exc)
+            yield dict(res, action="run.remove", status="error",
+                       message=("Removing file failed: %s", ce),
+                       exception=ce)
+        else:
+            yield dict(res, action="run.remove", status="ok",
+                       message="Removed file")
 
 
 def normalize_command(command):
@@ -686,7 +709,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 extra_inputs=None,
                 rerun_outputs=None,
                 inject=False,
-                parametric_record=False):
+                parametric_record=False,
+                remove_outputs=False):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -720,6 +744,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         are retained verbatim in the run record. This enables using a single
         run record for multiple different re-runs via individual
         parametrization.
+    remove_outputs : bool, optional
+        If enabled, all declared outputs will be removed prior command
+        execution, except for paths that are also declared inputs.
 
     Yields
     ------
@@ -750,7 +777,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     lgr.debug('tracking command output underneath %s', ds)
 
-    if not (rerun_info or inject):  # Rerun already takes care of this.
+    if not (rerun_info or inject):
         # For explicit=True, we probably want to check whether any inputs have
         # modifications. However, we can't just do is_dirty(..., path=inputs)
         # because we need to consider subdatasets and untracked files.
@@ -824,7 +851,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                             ds_path, globbed['outputs']):
                         yield res
                     for res in _unlock_or_remove(
-                            ds_path, globbed['outputs'].expand_strict()):
+                            ds_path,
+                            globbed['outputs'].expand_strict()
+                            if not remove_outputs
+                            # when force-removing, exclude declared inputs
+                            else set(
+                                globbed['outputs'].expand_strict()).difference(
+                                    globbed['inputs'].expand_strict()),
+                            remove=remove_outputs):
                         yield res
 
                 if rerun_outputs is not None:
