@@ -802,7 +802,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     else:
         use_sidecar = sidecar
 
-
+    record_id = None
     if use_sidecar:
         # record ID is hash of record itself
         from hashlib import md5
@@ -859,7 +859,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # on_failure='stop', callers can react to a failure and then call
         # save().
         msg_path=str(msg_path) if msg_path else None,
-        explicit_outputs=outputs_to_save)
+        explicit_outputs=outputs_to_save,
+        record_id=record_id,
+    )
 
     if do_save:
         with chpwd(pwd):
