@@ -847,7 +847,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         status=status,
         message="Executed command",
         run_info=run_info,
-        exitcode=cmd_exitcode,
+        # use the same key that `get_status_dict()` would/will use
+        # to record the exit code in case of an exception
+        exit_code=cmd_exitcode,
         exception=exc,
         # Provide msg_path and explicit outputs so that, under
         # on_failure='stop', callers can react to a failure and then call
