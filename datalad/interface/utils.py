@@ -301,6 +301,16 @@ def eval_results(wrapped):
             # use verbatim, if not a known label
             common_params['result_xfm'])
         result_renderer = common_params['result_renderer']
+
+        if result_renderer == 'tailored' and not hasattr(wrapped_class,
+                                                         'custom_result_renderer'):
+            # a tailored result renderer is requested, but the class
+            # does not provide any, fall back to the generic one
+            result_renderer = 'generic'
+        if result_renderer == 'default':
+            # standardize on the new name 'generic' to avoid more complex
+            # checking below
+            result_renderer = 'generic'
         # look for potential override of logging behavior
         result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
 
@@ -530,16 +540,6 @@ def _process_results(
             if sys.stdout.isatty() \
                and dlcfg.obtain('datalad.ui.suppress-similar-results') \
             else float("inf")
-
-    if result_renderer == 'tailored' and not hasattr(cmd_class,
-                                                     'custom_result_renderer'):
-        # a tailored result renderer is requested, but the class
-        # does not provide any, fall back to the generic one
-        result_renderer = 'generic'
-    if result_renderer == 'default':
-        # standardize on the new name 'generic' to avoid more complex
-        # checking below
-        result_renderer = 'generic'
 
     for res in results:
         if not res or 'action' not in res:
