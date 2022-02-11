@@ -218,10 +218,19 @@ def setup_package():
                .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
     def prep_tmphome():
+        # re core.askPass:
+        # Don't let git ask for credentials in CI runs. Note, that this variable
+        # technically is not a flag, but an executable (which is why name and value
+        # are a bit confusing here - we just want a no-op basically). The environment
+        # variable GIT_ASKPASS overwrites this, but neither env var nor this config
+        # are supported by git-credential on all systems and git versions (most recent
+        # ones should work either way, though). Hence use both across CI builds.
         gitconfig = """\
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[core]
+	askPass =
 [datalad "log"]
 	exc = 1
 """
@@ -286,6 +295,10 @@ def setup_package():
     else:
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
+
+    # Prevent interactive credential entry (note "true" is the command to run)
+    # See also the core.askPass setting above
+    set_envvar('GIT_ASKPASS', 'true')
 
     # Set to non-interactive UI
     _test_states['ui_backend'] = ui.backend
