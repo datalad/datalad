@@ -367,6 +367,7 @@ class Clone(Interface):
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
+                    result_renderer='disabled',
                     on_failure='ignore'):
                 actually_saved_subds = actually_saved_subds or (
                         r['action'] == 'save' and
@@ -394,7 +395,8 @@ class Clone(Interface):
                      source]
                 )
                 yield from ds.save('.gitmodules',
-                                   amend=True, to_git=True)
+                                   amend=True, to_git=True,
+                                   result_renderer='disabled')
             else:
                 # We didn't really commit. Just call `subdatasets`
                 # in that case to have the modification included in the
