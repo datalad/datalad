@@ -146,6 +146,18 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+    # running without a command is a noop
+    with chpwd(path):
+        with swallow_logs(new_level=logging.INFO) as cml:
+            assert_raises(
+                IncompleteResultsError,
+                ds.run,
+                '7i3amhmuch9invalid',
+                # this is on_failure=stop by default
+            )
+            # must give recovery hint in Python notation
+            assert_in("can save the changes with \"Dataset(", cml.out)
+
     with chpwd(path):
         # make sure that an invalid input declaration prevents command
         # execution by default
@@ -659,6 +671,9 @@ def test_dry_run(path):
         assert_not_in("blah", cmo.out)
 
     ds.save()
+
+    # unknown dry-run mode
+    assert_raises(ValueError, ds.run, 'blah', dry_run='absurd')
 
     with swallow_outputs() as cmo:
         ds.run("blah ", dry_run="basic")
