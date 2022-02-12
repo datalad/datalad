@@ -28,9 +28,6 @@ jobs:
       run: |
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
-        # Prevent interactive credential entry
-        # See also the GIT_ASKPASS env var below
-        git config --global core.askPass ""
 
     - uses: actions/checkout@v1
     - name: Set up Python 3.7
@@ -56,10 +53,6 @@ jobs:
         datalad wtf
         dir
     - name: ${{ matrix.module }} tests
-      env:
-        # Prevent interactive credential entry
-        # (note "true" is the command to run)
-        GIT_ASKPASS: true
       run: |
         mkdir -p __testhome__
         cd __testhome__
