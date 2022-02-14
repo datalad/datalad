@@ -710,7 +710,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 rerun_outputs=None,
                 inject=False,
                 parametric_record=False,
-                remove_outputs=False):
+                remove_outputs=False,
+                skip_dirtycheck=False):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -747,6 +748,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     remove_outputs : bool, optional
         If enabled, all declared outputs will be removed prior command
         execution, except for paths that are also declared inputs.
+    skip_dirtycheck : bool, optional
+        If enabled, a check for dataset modifications is unconditionally
+        disabled, even if other parameters would indicate otherwise. This
+        can be used by callers that already performed analog verififcations
+        to avoid duplicate processing.
 
     Yields
     ------
@@ -777,7 +783,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     lgr.debug('tracking command output underneath %s', ds)
 
-    if not (rerun_info or inject):
+    # skip for callers that already take care of this
+    if not (skip_dirtycheck or rerun_info or inject):
         # For explicit=True, we probably want to check whether any inputs have
         # modifications. However, we can't just do is_dirty(..., path=inputs)
         # because we need to consider subdatasets and untracked files.
