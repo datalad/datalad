@@ -279,6 +279,7 @@ class Install(Interface):
                         on_failure='ignore',
                         return_type='generator',
                         result_xfm=None,
+                        result_renderer='disabled',
                         result_filter=None,
                         **common_kwargs):
                     # no post-processing of get'ed content on disk should be

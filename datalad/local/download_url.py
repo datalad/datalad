@@ -234,6 +234,7 @@ URLs:
                             # preserve relative path handling semantics.
                             dataset=dataset,
                             return_type="generator",
+                            result_renderer='disabled',
                             result_xfm=None,
                             result_filter=None,
                             on_failure="ignore"):
