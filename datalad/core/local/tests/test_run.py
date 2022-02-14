@@ -101,15 +101,17 @@ def test_basics(path, nodspath):
     with chpwd(path), \
             swallow_outputs():
         # provoke command failure
-        with assert_raises(CommandError) as cme:
-            ds.run('7i3amhmuch9invalid')
+        res = ds.run('7i3amhmuch9invalid', on_failure="ignore",
+                     result_renderer=None)
+        assert_result_count(res, 1, action="run", status="error")
+        run_res = [r for r in res if r["action"] == "run"][0]
         # let's not speculate that the exit code is always 127
-        ok_(cme.exception.code > 0)
+        ok_(run_res["run_info"]["exit"] > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('cd .> empty', message='TEST')
         assert_repo_status(ds.path)
-        assert_result_count(res, 2)
+        assert_result_count(res, 3)
         # TODO 'state' is still untracked!!!
         assert_result_count(res, 1, action='add',
                             path=op.join(ds.path, 'empty'), type='file')
@@ -143,6 +145,18 @@ def test_basics(path, nodspath):
         with swallow_logs(new_level=logging.WARN) as cml:
             ds.run()
             assert_in("No command given", cml.out)
+
+    # running without a command is a noop
+    with chpwd(path):
+        with swallow_logs(new_level=logging.INFO) as cml:
+            assert_raises(
+                IncompleteResultsError,
+                ds.run,
+                '7i3amhmuch9invalid',
+                # this is on_failure=stop by default
+            )
+            # must give recovery hint in Python notation
+            assert_in("can save the changes with \"Dataset(", cml.out)
 
     with chpwd(path):
         # make sure that an invalid input declaration prevents command
@@ -192,8 +206,9 @@ def test_py2_unicode_command(path):
         assert_repo_status(ds.path)
         ok_exists(op.join(path, u" β1 "))
 
-    with assert_raises(CommandError), swallow_outputs():
-        ds.run(u"bβ2.dat")
+    assert_in_results(
+        ds.run(u"bβ2.dat", result_renderer=None, on_failure="ignore"),
+        status="error", action="run")
 
 
 @with_tempfile(mkdir=True)
@@ -312,8 +327,10 @@ def test_run_assume_ready(path):
     ds.drop("f1", check=False)
     if not adjusted:
         # If the input is not actually ready, the command will fail.
-        with assert_raises(CommandError):
-            ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs")
+        assert_in_results(
+            ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs",
+                   on_failure="ignore", result_renderer=None),
+            action="run", status="error")
 
     # --assume-ready=outputs
 
@@ -482,7 +499,7 @@ def test_run_cmdline_disambiguation(path):
                 main(["datalad", "run", "--", "--message"])
             exec_cmd.assert_called_once_with(
                 '"--message"' if on_windows else "--message",
-                path, expected_exit=None)
+                path)
 
         # Our parser used to mishandle --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
@@ -494,7 +511,7 @@ def test_run_cmdline_disambiguation(path):
                     main(["datalad", "run"] + sep + ["echo", "--version"])
                 exec_cmd.assert_called_once_with(
                     '"echo" "--version"' if on_windows else "echo --version",
-                    path, expected_exit=None)
+                    path)
 
 
 @with_tempfile(mkdir=True)
@@ -654,6 +671,9 @@ def test_dry_run(path):
         assert_not_in("blah", cmo.out)
 
     ds.save()
+
+    # unknown dry-run mode
+    assert_raises(ValueError, ds.run, 'blah', dry_run='absurd')
 
     with swallow_outputs() as cmo:
         ds.run("blah ", dry_run="basic")

@@ -15,6 +15,8 @@ import logging
 import json
 import warnings
 
+from pathlib import Path
+
 from argparse import REMAINDER
 import os
 import os.path as op
@@ -318,6 +320,23 @@ class Run(Interface):
             else:
                 raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
         else:
+            if kwargs.get("on_failure") == "stop" and \
+               res.get("action") == "run" and res.get("status") == "error":
+                msg_path = res.get("msg_path")
+                if msg_path:
+                    ds_path = res["path"]
+                    if datalad.get_apimode() == 'python':
+                        help = f"\"Dataset('{ds_path}').save(path='.', " \
+                               "recursive=True, message_file='%s')\""
+                    else:
+                        help = "'datalad save -d . -r -F %s'"
+                    lgr.info(
+                        "The command had a non-zero exit code. "
+                        "If this is expected, you can save the changes with "
+                        f"{help}",
+                        # shorten to the relative path for a more concise
+                        # message
+                        Path(msg_path).relative_to(ds_path))
             generic_result_renderer(res)
 
 
@@ -580,7 +599,7 @@ def format_command(dset, command, **kwds):
     return sfmt.format(command, **kwds)
 
 
-def _execute_command(command, pwd, expected_exit=None):
+def _execute_command(command, pwd):
     from datalad.cmd import WitlessRunner
 
     exc = None
@@ -595,16 +614,6 @@ def _execute_command(command, pwd, expected_exit=None):
     except CommandError as e:
         exc = e
         cmd_exitcode = e.code
-
-        if expected_exit is not None and expected_exit != cmd_exitcode:
-            # we failed in a different way during a rerun.  This can easily
-            # happen if we try to alter a locked file
-            #
-            # TODO add the ability to `git reset --hard` the dataset tree on failure
-            # we know that we started clean, so we could easily go back, needs gh-1424
-            # to be able to do it recursively
-            raise exc
-
     lgr.info("== Command exit (modification check follows) =====")
     return cmd_exitcode or 0, exc
 
@@ -774,9 +783,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     if not inject:
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+        cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
 
     # Re-glob to capture any new outputs.
@@ -795,7 +802,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     else:
         use_sidecar = sidecar
 
-
+    record_id = None
     if use_sidecar:
         # record ID is hash of record itself
         from hashlib import md5
@@ -823,30 +830,40 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if outputs_to_save is not None and use_sidecar:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
+    msg_path = None
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
-            msg_path = repo.dot_git / "COMMIT_EDITMSG"
+            # must record path to be relative to ds.path to meet
+            # result record semantics (think symlink resolution, etc)
+            msg_path = ds.pathobj / \
+                repo.dot_git.relative_to(repo.pathobj) / "COMMIT_EDITMSG"
             msg_path.write_text(msg)
-            if datalad.get_apimode() == 'python':
-                help = f"\"Dataset('{ds.path}').save(path='.', " \
-                       "recursive=True, message_file='%s')\""
-            else:
-                help = "'datalad save -d . -r -F %s'"
-            lgr.info("The command had a non-zero exit code. "
-                     "If this is expected, you can save the changes with "
-                     f"{help}",
-                     # shorten to the relative path for a more concise message
-                     msg_path.relative_to(ds.pathobj))
-            if repo.dirty and not explicit:
-                # Give clean-up hints if a formerly clean repo is left dirty
-                lgr.info(
-                    "The commands 'git clean -di' and/or 'git reset' "
-                    "could be used to get to a clean dataset state again. "
-                    "Consult their man pages for more information."
-                )
-        raise exc
-    elif do_save:
+
+    expected_exit = rerun_info.get("exit", 0) if rerun_info else None
+    if cmd_exitcode and expected_exit != cmd_exitcode:
+        status = "error"
+    else:
+        status = "ok"
+
+    yield get_status_dict(
+        "run", ds=ds,
+        status=status,
+        message="Executed command",
+        run_info=run_info,
+        # use the same key that `get_status_dict()` would/will use
+        # to record the exit code in case of an exception
+        exit_code=cmd_exitcode,
+        exception=exc,
+        # Provide msg_path and explicit outputs so that, under
+        # on_failure='stop', callers can react to a failure and then call
+        # save().
+        msg_path=str(msg_path) if msg_path else None,
+        explicit_outputs=outputs_to_save,
+        record_id=record_id,
+    )
+
+    if do_save:
         with chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,
