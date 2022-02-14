@@ -188,5 +188,9 @@
     "bpinsard": {
         "name": "Basile",
         "blog": "https://github.com/bpinsard"
+    },
+    "taylols": {
+        "name": "Taylor Olson",
+        "email": "to.overlake@gmail.com"
     }
 }

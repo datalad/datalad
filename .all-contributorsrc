@@ -427,6 +427,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/1155388?v=4"
             ]
+        },
+        {
+            "login": "taylols",
+            "name": "Taylor Olson",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/taylols",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/28018084?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
