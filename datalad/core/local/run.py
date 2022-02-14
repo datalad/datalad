@@ -701,6 +701,87 @@ def _execute_command(command, pwd):
     return cmd_exitcode or 0, exc
 
 
+def _prep_worktree(ds_path, pwd, globbed,
+                   assume_ready=None, remove_outputs=False,
+                   rerun_outputs=None,
+                   jobs=None):
+    """
+    Yields
+    ------
+    dict
+      Result records
+    """
+    # ATTN: For correct path handling, all dataset commands call should be
+    # unbound. They should (1) receive a string dataset argument, (2) receive
+    # relative paths, and (3) happen within a chpwd(pwd) context.
+    with chpwd(pwd):
+        for res in prepare_inputs(
+                ds_path,
+                [] if assume_ready in ["inputs", "both"]
+                else globbed['inputs'],
+                # Ignore --assume-ready for extra_inputs. It's an unexposed
+                # implementation detail that lets wrappers sneak in inputs.
+                extra_inputs=globbed['extra_inputs'],
+                jobs=jobs):
+            yield res
+
+        if assume_ready not in ["outputs", "both"]:
+            if globbed['outputs']:
+                for res in _install_and_reglob(
+                        ds_path, globbed['outputs']):
+                    yield res
+                for res in _unlock_or_remove(
+                        ds_path,
+                        globbed['outputs'].expand_strict()
+                        if not remove_outputs
+                        # when force-removing, exclude declared inputs
+                        else set(
+                            globbed['outputs'].expand_strict()).difference(
+                                globbed['inputs'].expand_strict()),
+                        remove=remove_outputs):
+                    yield res
+
+            if rerun_outputs is not None:
+                for res in _unlock_or_remove(ds_path, rerun_outputs):
+                    yield res
+
+
+def _create_record(run_info, sidecar_flag, ds):
+    """
+    Returns
+    -------
+    str or None, str or None
+      The first value is either the full run record in JSON serialzied form,
+      or content-based ID hash, if the record was written to a file. In that
+      latter case, the second value is the path to the record sidecar file,
+      or None otherwise.
+    """
+    record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
+    if sidecar_flag is None:
+        use_sidecar = ds.config.get(
+            'datalad.run.record-sidecar', default=False)
+        use_sidecar = anything2bool(use_sidecar)
+    else:
+        use_sidecar = sidecar_flag
+
+    record_id = None
+    record_path = None
+    if use_sidecar:
+        # record ID is hash of record itself
+        from hashlib import md5
+        record_id = md5(record.encode('utf-8')).hexdigest()  # nosec
+        record_dir = ds.config.get(
+            'datalad.run.record-directory',
+            default=op.join('.datalad', 'runinfo'))
+        record_path = ds.pathobj / record_dir / record_id
+        if not op.lexists(record_path):
+            # go for compression, even for minimal records not much difference,
+            # despite offset cost
+            # wrap in list -- there is just one record
+            dump2stream([run_info], record_path, compressed=True)
+    return record_id or record, record_path
+
+
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
                 dry_run=False, jobs=None,
@@ -837,40 +918,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 'placeholder: %s', exc))
         return
 
-    # ATTN: For correct path handling, all dataset commands call should be
-    # unbound. They should (1) receive a string dataset argument, (2) receive
-    # relative paths, and (3) happen within a chpwd(pwd) context.
     if not (inject or dry_run):
-        with chpwd(pwd):
-            for res in prepare_inputs(
-                    ds_path,
-                    [] if assume_ready in ["inputs", "both"]
-                    else globbed['inputs'],
-                    # Ignore --assume-ready for extra_inputs. It's an unexposed
-                    # implementation detail that lets wrappers sneak in inputs.
-                    extra_inputs=globbed['extra_inputs'],
-                    jobs=jobs):
-                yield res
-
-            if assume_ready not in ["outputs", "both"]:
-                if globbed['outputs']:
-                    for res in _install_and_reglob(
-                            ds_path, globbed['outputs']):
-                        yield res
-                    for res in _unlock_or_remove(
-                            ds_path,
-                            globbed['outputs'].expand_strict()
-                            if not remove_outputs
-                            # when force-removing, exclude declared inputs
-                            else set(
-                                globbed['outputs'].expand_strict()).difference(
-                                    globbed['inputs'].expand_strict()),
-                            remove=remove_outputs):
-                        yield res
-
-                if rerun_outputs is not None:
-                    for res in _unlock_or_remove(ds_path, rerun_outputs):
-                        yield res
+        yield from _prep_worktree(
+            ds_path, pwd, globbed,
+            assume_ready=assume_ready,
+            remove_outputs=remove_outputs,
+            rerun_outputs=rerun_outputs,
+            jobs=None)
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.
@@ -957,27 +1011,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         if expand in ["outputs", "both"]:
             run_info["outputs"] = globbed['outputs'].paths
 
-    record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
-
-    if sidecar is None:
-        use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
-        use_sidecar = anything2bool(use_sidecar)
-    else:
-        use_sidecar = sidecar
-
-    record_id = None
-    if use_sidecar:
-        # record ID is hash of record itself
-        from hashlib import md5
-        # Disable security warning for MD5 use. Although MD5 is insecure, we
-        # just use it to identify a record.
-        record_id = md5(record.encode('utf-8')).hexdigest()  # nosec
-        record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
-        record_path = op.join(ds_path, record_dir, record_id)
-        if not op.lexists(record_path):
-            # go for compression, even for minimal records not much difference, despite offset cost
-            # wrap in list -- there is just one record
-            dump2stream([run_info], record_path, compressed=True)
+    # create the run record, either as a string, or written to a file
+    # depending on the config/request
+    record, record_path = _create_record(run_info, sidecar, ds)
 
     # compose commit message
     msg = u"""\
@@ -989,10 +1025,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 """
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd_expanded),
-        '"{}"'.format(record_id) if use_sidecar else record)
+        '"{}"'.format(record) if record_path else record)
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
-    if outputs_to_save is not None and use_sidecar:
+    if outputs_to_save is not None and record_path:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
     msg_path = None
@@ -1025,7 +1061,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # save().
         msg_path=str(msg_path) if msg_path else None,
         explicit_outputs=outputs_to_save,
-        record_id=record_id,
+        record_id=record if record_path else None,
     )
 
     if do_save:
