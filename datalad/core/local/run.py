@@ -1021,6 +1021,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # depending on the config/request
     record, record_path = _create_record(run_info, sidecar, ds)
 
+    # abbreviate version of the command for illustrative purposes
+    cmd_shorty = _format_cmd_shorty(cmd_expanded)
+
     # compose commit message
     msg = u"""\
 [DATALAD RUNCMD] {}
@@ -1030,7 +1033,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 ^^^ Do not change lines above ^^^
 """
     msg = msg.format(
-        message if message is not None else _format_cmd_shorty(cmd_expanded),
+        message if message is not None else cmd_shorty,
         '"{}"'.format(record) if record_path else record)
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
@@ -1056,7 +1059,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     run_result = get_status_dict(
         "run", ds=ds,
         status=status,
-        message="Executed command",
+        # use the abbrev. command as the message to give immediate clarity what
+        # completed/errors in the generic result rendering
+        message=cmd_shorty,
         run_info=run_info,
         # use the same key that `get_status_dict()` would/will use
         # to record the exit code in case of an exception
