@@ -792,7 +792,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 inject=False,
                 parametric_record=False,
                 remove_outputs=False,
-                skip_dirtycheck=False):
+                skip_dirtycheck=False,
+                yield_expanded=None):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -834,6 +835,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         disabled, even if other parameters would indicate otherwise. This
         can be used by callers that already performed analog verififcations
         to avoid duplicate processing.
+    yield_expanded : {'inputs', 'outputs', 'both'}, optional
+        Include a 'expanded_%s' item into the run result with the exanded list
+        of paths matching the inputs and/or outputs specification,
+        respectively.
+
 
     Yields
     ------
@@ -1047,7 +1053,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     else:
         status = "ok"
 
-    yield get_status_dict(
+    run_result = get_status_dict(
         "run", ds=ds,
         status=status,
         message="Executed command",
@@ -1060,9 +1066,22 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # on_failure='stop', callers can react to a failure and then call
         # save().
         msg_path=str(msg_path) if msg_path else None,
-        explicit_outputs=outputs_to_save,
-        record_id=record if record_path else None,
     )
+    if record_path:
+        # we the record is in a sidecar file, report its ID
+        run_result['record_id'] = record
+    for s in ('inputs', 'outputs'):
+        # this enables callers to further inspect the outputs without
+        # performing globbing again. Together with remove_outputs=True
+        # these would be guaranteed to be the outcome of the executed
+        # command. in contrast to `outputs_to_save` this does not
+        # include aux file, such as the run record sidecar file.
+        # calling .expand_strict() again is largely reporting cached
+        # information
+        # (format: relative paths)
+        if yield_expanded in (s, 'both'):
+            run_result[f'expanded_{s}'] = globbed[s].expand_strict()
+    yield run_result
 
     if do_save:
         with chpwd(pwd):
