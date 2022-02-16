@@ -14,41 +14,35 @@ Note: Tests of `run` that involve `rerun` are in interface.tests.test_run.
 __docformat__ = 'restructuredtext'
 
 import logging
-
 import os
 import os.path as op
+import sys
 from os import (
     mkdir,
     remove,
 )
-import sys
-
 from unittest.mock import patch
 
-from datalad.utils import (
-    chpwd,
-    ensure_unicode,
-    on_windows,
-)
-
-from datalad.cli.main import main
-from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import (
-    CommandError,
-    NoDatasetFound,
-    IncompleteResultsError,
-)
 from datalad.api import (
     clone,
     run,
 )
+from datalad.cli.main import main
 from datalad.core.local.run import (
-    format_command,
-    run_command,
     _format_iospecs,
     _get_substitutions,
+    format_command,
+    run_command,
+)
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+    NoDatasetFound,
 )
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    OBSCURE_FILENAME,
     assert_false,
     assert_in,
     assert_in_results,
@@ -59,11 +53,9 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
     known_failure_windows,
     neq_,
-    OBSCURE_FILENAME,
     ok_,
     ok_exists,
     ok_file_has_content,
@@ -73,7 +65,11 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-
+from datalad.utils import (
+    chpwd,
+    ensure_unicode,
+    on_windows,
+)
 
 cat_command = 'cat' if not on_windows else 'type'
 

@@ -15,15 +15,16 @@ import json
 import logging
 import os
 import os.path as op
-from pathlib import Path
 import warnings
 from argparse import REMAINDER
+from pathlib import Path
 from tempfile import mkdtemp
 
 import datalad
 import datalad.support.ansi_colors as ac
 from datalad.config import anything2bool
 from datalad.core.local.save import Save
+from datalad.core.local.status import Status
 from datalad.distribution.dataset import (
     Dataset,
     EnsureDataset,
@@ -45,7 +46,6 @@ from datalad.interface.utils import (
     eval_results,
     generic_result_renderer,
 )
-from datalad.core.local.status import Status
 from datalad.local.unlock import Unlock
 from datalad.support.constraints import (
     EnsureBool,
