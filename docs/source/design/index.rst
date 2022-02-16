@@ -14,6 +14,7 @@ subsystems in DataLad.
    :maxdepth: 2
 
    cli
+   provenance_capture
    application_vs_library_mode
    file_url_handling
    result_records

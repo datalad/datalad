@@ -145,7 +145,7 @@ class Run(Interface):
 
       Add a placeholder "name" with the value "joe"::
 
-        % git config --file=.datalad/config datalad.run.substitutions.name joe
+        % datalad configuration --scope branch set datalad.run.substitutions.name=joe
         % datalad save -m "Configure name placeholder" .datalad/config
 
       Access the new placeholder in a command::
