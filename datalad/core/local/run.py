@@ -224,7 +224,7 @@ class Run(Interface):
             metavar=("PATH"),
             action='append',
             doc="""A dependency for the run. Before running the command, the
-            content of this file will be retrieved. A value of "." means "run
+            content for this relative path will be retrieved. A value of "." means "run
             :command:`datalad get .`". The value can also be a glob. [CMD: This
             option can be given more than once. CMD]"""),
         outputs=Parameter(
@@ -232,7 +232,7 @@ class Run(Interface):
             dest="outputs",
             metavar=("PATH"),
             action='append',
-            doc="""Prepare this file to be an output file of the command. A
+            doc="""Prepare this relative path to be an output file of the command. A
             value of "." means "run :command:`datalad unlock .`" (and will fail
             if some content isn't present). For any other value, if the content
             of this file is present, unlock the file. Otherwise, remove it. The

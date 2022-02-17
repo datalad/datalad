@@ -568,6 +568,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         ver = cls.git_annex_version
         kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
+        # applies to get, drop, move, copy, whereis
+        kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -2329,29 +2331,40 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ensure_list(options, copy=True)
         if batch:
+            # TODO: --batch-keys was added to 8.20210903
             if key:
-                raise ValueError("batch=True is incompatible with `key`")
+                if not self._check_version_kludges("grp1-supports-batch-keys"):
+                    raise ValueError("batch=True for `key=True` requires git-annex >= 8.20210903")
+                bkw = {'batch_opt': '--batch-keys'}
+            else:
+                bkw = {}
             bcmd = self._batched.get('whereis', annex_options=options,
-                                     json=True, path=self.path)
+                                     json=True, path=self.path, **bkw)
             json_objects = bcmd(files)
         else:
             cmd = ['whereis'] + options
-            files_arg = None
-            if key:
-                cmd = cmd + ["--key"] + files
-            else:
-                files_arg = files
 
-            try:
-                json_objects = self.call_annex_records(cmd, files=files_arg)
-            except CommandError as e:
-                if e.stderr.startswith('Invalid'):
-                    # would happen when git-annex is called with incompatible options
-                    raise
-                # whereis may exit non-zero when there are too few known copies
-                # callers of whereis are interested in exactly that information,
-                # which we deliver via result, not via exception
-                json_objects = e.kwargs.get('stdout_json', [])
+            def _call_cmd(cmd, files=None):
+                """Helper to reuse consistently in case of --key and not invocations"""
+                try:
+                    return self.call_annex_records(cmd, files=files)
+                except CommandError as e:
+                    if e.stderr.startswith('Invalid'):
+                        # would happen when git-annex is called with incompatible options
+                        raise
+                    # whereis may exit non-zero when there are too few known copies
+                    # callers of whereis are interested in exactly that information,
+                    # which we deliver via result, not via exception
+                    return e.kwargs.get('stdout_json', [])
+
+            if key:
+                # whereis --key takes only a single key at a time so we need to loop
+                json_objects = []
+                for k in files:
+                    json_objects.extend(_call_cmd(cmd + ["--key", k]))
+            else:
+                json_objects = _call_cmd(cmd, files)
+
 
         if output in {'descriptions', 'uuids'}:
             return [
@@ -3779,7 +3792,7 @@ class BatchedAnnex(BatchedCommand):
     """
 
     def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
-                 json=False, output_proc=None):
+                 json=False, output_proc=None, batch_opt='--batch'):
         if not isinstance(annex_cmd, list):
             annex_cmd = [annex_cmd]
         cmd = \
@@ -3789,7 +3802,7 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch'] + \
+            [batch_opt] + \
             (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None
