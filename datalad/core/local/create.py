@@ -437,7 +437,9 @@ class Create(Interface):
                                         result_renderer='disabled',
                                         return_type='generator',
                                         ):
-                yield r
+                if r['status'] != 'ok':
+                    # only yield when there is an error
+                    yield r
 
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
