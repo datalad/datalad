@@ -347,7 +347,9 @@ class Create(Interface):
         cfg_proc_specs = []
         if cfg_proc:
             discovered_procs = tbds.run_procedure(
-                discover=True, result_renderer='disabled')
+                discover=True,
+                result_renderer='disabled',
+            )
             for cfg_proc_ in cfg_proc:
                 for discovered_proc in discovered_procs:
                     if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
@@ -430,7 +432,9 @@ class Create(Interface):
         )
 
         for cfg_proc_spec in cfg_proc_specs:
-            for r in tbds.run_procedure(cfg_proc_spec):
+            for r in tbds.run_procedure(cfg_proc_spec,
+                                        result_renderer='disabled',
+                                        ):
                 yield r
 
         # the next only makes sense if we saved the created dataset,
@@ -441,6 +445,7 @@ class Create(Interface):
             # -> make submodule
             for r in refds.save(
                     path=tbds.path,
+                    result_renderer='disabled'
             ):
                 yield r
 

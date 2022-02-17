@@ -464,7 +464,8 @@ class RunProcedure(Interface):
                 outputs=None,
                 # pass through here
                 on_failure='ignore',
-                return_type='generator'
+                return_type='generator',
+                result_renderer='disabled'
         ):
             yield r
 
