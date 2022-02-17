@@ -349,6 +349,7 @@ class Create(Interface):
             discovered_procs = tbds.run_procedure(
                 discover=True,
                 result_renderer='disabled',
+                return_type='generator',
             )
             for cfg_proc_ in cfg_proc:
                 for discovered_proc in discovered_procs:
@@ -434,6 +435,7 @@ class Create(Interface):
         for cfg_proc_spec in cfg_proc_specs:
             for r in tbds.run_procedure(cfg_proc_spec,
                                         result_renderer='disabled',
+                                        return_type='generator',
                                         ):
                 yield r
 
@@ -445,6 +447,7 @@ class Create(Interface):
             # -> make submodule
             for r in refds.save(
                     path=tbds.path,
+                    return_type='generator',
                     result_renderer='disabled'
             ):
                 yield r
