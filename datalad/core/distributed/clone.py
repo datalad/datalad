@@ -396,7 +396,8 @@ class Clone(Interface):
                 )
                 yield from ds.save('.gitmodules',
                                    amend=True, to_git=True,
-                                   result_renderer='disabled')
+                                   result_renderer='disabled',
+                                   return_type='generator')
             else:
                 # We didn't really commit. Just call `subdatasets`
                 # in that case to have the modification included in the
