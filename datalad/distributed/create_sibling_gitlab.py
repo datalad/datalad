@@ -269,6 +269,7 @@ class CreateSiblingGitlab(Interface):
                     contains=None,
                     bottomup=False,
                     result_xfm='datasets',
+                    result_renderer='disabled',
                     return_type='generator'):
                 for r in _proc_dataset(
                         ds, subds,
@@ -331,6 +332,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # fastest possible
             get_annex_info=False,
             recursive=False,
+            return_type='generator',
             result_renderer='disabled')
     }
     if remotename in dremotes and existing not in ['replace', 'reconfigure']:
@@ -339,7 +341,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             res_kwargs,
             status='error' if existing == 'error' else 'notneeded',
             message=('already has a configured sibling "%s"', remotename),
-            )
+        )
         return
 
     if layout is None:
