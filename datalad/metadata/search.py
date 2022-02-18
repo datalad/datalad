@@ -290,7 +290,7 @@ def _search_from_virgin_install(dataset, query):
                 DEFAULT_DATASET_PATH,
                 source='///',
                 result_renderer='disabled',
-                on_failur='continue',
+                on_failure='continue',
                 result_type='generator')
             ui.message(
                 "From now on you can refer to this dataset using the "
