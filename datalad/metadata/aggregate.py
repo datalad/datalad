@@ -402,9 +402,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         aggfrom_ds.get(
             path=[op.join(aggfrom_ds.path, p)
                   for p in objrelpaths.values()],
-            result_renderer='disabled',
-            result_type='generator',
-            on_failure='ignore')
+            result_renderer='disabled')
 
         # actually copy dump files
         for objrelpath in objrelpaths.values():
