@@ -815,7 +815,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if use_sidecar:
         # record ID is hash of record itself
         from hashlib import md5
-        record_id = md5(record.encode('utf-8')).hexdigest()
+        # Disable security warning for MD5 use. Although MD5 is insecure, we
+        # just use it to identify a record.
+        record_id = md5(record.encode('utf-8')).hexdigest()  # nosec
         record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
         record_path = op.join(ds_path, record_dir, record_id)
         if not op.lexists(record_path):
