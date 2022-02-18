@@ -98,15 +98,20 @@ class AddReadme(Interface):
                 # configure the README to go into Git
                 dataset.repo.set_gitattributes(
                     [(filename, {'annex.largefiles': 'nothing'})])
-                dataset.save(
+                yield from dataset.save(
                     path='.gitattributes',
                     message="[DATALAD] Configure README to be in Git",
-                    to_git=True
+                    to_git=True,
+                    return_type='generator',
+                    result_renderer='disabled'
                 )
 
         # get any metadata on the dataset itself
         dsinfo = dataset.metadata(
-            '.', reporton='datasets', return_type='item-or-list',
+            '.',
+            reporton='datasets',
+            return_type='item-or-list',
+            result_renderer='disabled',
             on_failure='ignore')
         meta = {}
         if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
@@ -232,9 +237,11 @@ files by whom, and when.
                 type='file',
                 action='add_readme')
 
-        for r in dataset.save(
+        yield from dataset.save(
                 fpath,
                 message='[DATALAD] added README',
                 result_filter=None,
-                result_xfm=None):
-            yield r
+                result_xfm=None,
+                return_type='generator',
+                result_renderer='disabled'
+        )
