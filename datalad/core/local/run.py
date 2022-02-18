@@ -443,8 +443,10 @@ def _install_and_reglob(dset_path, gpaths):
     while dirs_new and dirs != dirs_new:
         for res in install(dataset=dset_path,
                            path=dirs_new,
-                           result_xfm=None, return_type='generator',
-                           on_failure="ignore"):
+                           result_xfm=None,
+                           result_renderer='disabled',
+                           return_type='generator',
+                           on_failure='ignore'):
             if _is_nonexistent_path(res):
                 lgr.debug("Skipping install of non-existent path: %s",
                           res["path"])
@@ -486,8 +488,12 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None, jobs=None):
                     action="run", ds=ds, status="error",
                     message=("Input did not match existing file: %s",
                              miss))
-        yield from get(dataset=dset_path, path=gp.expand_strict(),
-                       on_failure="ignore", jobs=jobs)
+        yield from get(dataset=dset_path,
+                       path=gp.expand_strict(),
+                       on_failure='ignore',
+                       result_renderer='disabled',
+                       return_type='generator',
+                       jobs=jobs)
 
 
 def _unlock_or_remove(dset_path, paths):
@@ -521,7 +527,7 @@ def _unlock_or_remove(dset_path, paths):
         # aren't being covered by the "remove if not present" logic below.
         for res in Unlock()(dataset=dset_path,
                             path=existing,
-                            on_failure="ignore",
+                            on_failure='ignore',
                             result_renderer='disabled',
                             return_type='generator'):
             if res["status"] == "impossible" and res["type"] == "file" \
@@ -809,7 +815,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if use_sidecar:
         # record ID is hash of record itself
         from hashlib import md5
-        record_id = md5(record.encode('utf-8')).hexdigest()
+        # Disable security warning for MD5 use. Although MD5 is insecure, we
+        # just use it to identify a record.
+        record_id = md5(record.encode('utf-8')).hexdigest()  # nosec
         record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
         record_path = op.join(ds_path, record_dir, record_id)
         if not op.lexists(record_path):
@@ -878,5 +886,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     # we want this command and its parameterization to be in full
                     # control about the rendering of results, hence we must turn
                     # off internal rendering
-                    result_renderer='disabled'):
+                    result_renderer='disabled',
+                    on_failure='ignore'):
                 yield r
