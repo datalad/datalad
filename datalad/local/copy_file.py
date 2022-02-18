@@ -318,6 +318,8 @@ class CopyFile(Interface):
             # we provide an explicit file list
             recursive=False,
             message=message,
+            return_type='generator',
+            result_renderer='disabled'
         )
 
 
