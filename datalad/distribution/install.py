@@ -251,6 +251,7 @@ class Install(Interface):
                         # "ignore-and-keep-going"
                         on_failure='ignore',
                         return_type='generator',
+                        result_renderer='disabled',
                         result_xfm=None,
                         result_filter=None,
                         **common_kwargs):
@@ -371,6 +372,7 @@ class Install(Interface):
             # "ignore-and-keep-going"
             result_xfm=None,
             return_type='generator',
+            result_renderer='disabled',
             result_filter=None,
             on_failure='ignore')
         # helper
@@ -401,6 +403,7 @@ class Install(Interface):
                     on_failure='ignore',
                     return_type='generator',
                     result_xfm=None,
+                    result_renderer='disabled',
                     **common_kwargs):
                 r['refds'] = refds_path
                 yield r
