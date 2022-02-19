@@ -612,7 +612,8 @@ def _install_targetpath(
                 path=target_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                return_type='generator'):
+                return_type='generator',
+                result_renderer='disabled'):
             res.update(
                 contains=[Path(res['path'])],
                 action='get',
