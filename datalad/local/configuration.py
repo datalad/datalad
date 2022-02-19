@@ -221,6 +221,7 @@ class Configuration(Interface):
                 recursive=True,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',
+                return_type='generator',
                 result_renderer='disabled'):
             yield from configuration(
                 action, scope, specs, res_kwargs, Dataset(subds['path']))
