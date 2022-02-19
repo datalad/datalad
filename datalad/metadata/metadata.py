@@ -291,9 +291,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
             get(path=[op.join(agg_base_path, of)
                       for of in objfiles if of],
                 dataset=ds,
-                result_renderer='disabled',
-                on_failure='ignore',
-                return_type='generator')
+                result_renderer='disabled')
         for qap in to_query_available:
             # info about the dataset that contains the query path
             dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
