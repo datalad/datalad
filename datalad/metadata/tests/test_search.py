@@ -150,7 +150,12 @@ def _check_mocked_install(default_dspath, mock_install):
     assert_equal(
         list(gen), [report
                     for report in _mocked_search_results])
-    mock_install.assert_called_once_with(default_dspath, source='///')
+    mock_install.assert_called_once_with(
+        default_dspath,
+        source='///',
+        result_renderer='disabled',
+        on_failure='continue',
+        result_type='generator')
 
 
 @with_tempfile

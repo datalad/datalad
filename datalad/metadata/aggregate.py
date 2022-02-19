@@ -696,7 +696,6 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
             # to run an explicit force-drop prior to calling remove()
             check=False,
             result_renderer='disabled',
-            on_failure='ignore',
             return_type='list')
         if not objs2add and not refds_path == ds_path:
             # this is not the base dataset, make sure to save removal in the
@@ -711,9 +710,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     # any location in the dataset tree
     Dataset(refds_path).get(
         [f for f, t in objs2copy],
-        result_renderer='disabled',
-        result_type='generator',
-        on_failure='ignore')
+        result_renderer='disabled')
     for copy_from, copy_to in objs2copy:
         copy_from = op.join(agg_base_path, copy_from)
         copy_to = op.join(agg_base_path, copy_to)
