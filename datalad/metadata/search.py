@@ -289,9 +289,7 @@ def _search_from_virgin_install(dataset, query):
             default_ds = install(
                 DEFAULT_DATASET_PATH,
                 source='///',
-                result_renderer='disabled',
-                on_failure='continue',
-                result_type='generator')
+                result_renderer='disabled')
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
@@ -472,8 +470,7 @@ class _WhooshSearch(_Search):
         dsinfo = self.ds.metadata(
             get_aggregates=True,
             return_type='list',
-            result_renderer='disabled',
-            on_failure='ignore')
+            result_renderer='disabled')
 
         self._mk_schema(dsinfo)
 
