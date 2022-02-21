@@ -401,9 +401,11 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
 
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
-            ds.save(
+            yield from ds.save(
                 '.gitmodules', to_git=True,
-                message='[DATALAD] modified subdataset properties')
+                message='[DATALAD] modified subdataset properties',
+                result_renderer='disabled',
+                return_type='generator')
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
