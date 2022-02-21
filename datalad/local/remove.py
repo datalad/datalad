@@ -278,6 +278,7 @@ class Remove(Interface):
                 # we might have removed the reference dataset by now, recheck
                 message=message if message else '[DATALAD] removed content',
                 return_type='generator',
+                result_renderer='disabled',
                 result_xfm=None,
                 result_filter=None,
                 on_failure='ignore'):

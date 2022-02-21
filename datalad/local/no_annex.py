@@ -133,10 +133,12 @@ class NoAnnex(Interface):
             attrfile=gitattr_file)
         yield dict(res_kwargs, status='ok')
 
-        for r in ds.save(
-                gitattr_file,
-                to_git=True,
-                message="[DATALAD] exclude paths from annex'ing",
-                result_filter=None,
-                result_xfm=None):
-            yield r
+        yield from ds.save(
+            gitattr_file,
+            to_git=True,
+            message="[DATALAD] exclude paths from annex'ing",
+            result_filter=None,
+            result_xfm=None,
+            return_type='generator',
+            result_renderer='disabled',
+        )

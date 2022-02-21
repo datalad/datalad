@@ -1068,6 +1068,7 @@ class AggregateMetaData(Interface):
                 dataset=refds_path,
                 message='[DATALAD] Dataset aggregate metadata update',
                 return_type='generator',
+                result_renderer='disabled',
                 result_xfm=None,
                 result_filter=None,
                 on_failure='ignore'):

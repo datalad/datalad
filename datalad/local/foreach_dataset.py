@@ -261,6 +261,7 @@ class ForEachDataset(Interface):
             bottomup=bottomup,
             result_xfm='paths',
             result_renderer='disabled',
+            return_type='generator',
         )
 
         if subdatasets_only or contains:
