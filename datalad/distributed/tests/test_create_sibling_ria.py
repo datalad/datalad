@@ -104,7 +104,6 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
                                 post_update_hook=True, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
-    eq_(len(res), 1)
 
     # remotes exist, but only in super
     siblings = ds.siblings(result_renderer='disabled')
@@ -160,7 +159,6 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
                                 recursive=True, existing='reconfigure',
                                 new_store_ok=True)
-    eq_(len(res), 3)
     assert_result_count(res, 1, path=str(ds.pathobj), status='ok', action="create-sibling-ria")
     assert_result_count(res, 1, path=str(subds.pathobj), status='ok', action="create-sibling-ria")
     assert_result_count(res, 1, path=str(subds2.pathobj), status='ok', action="create-sibling-ria")
@@ -277,7 +275,6 @@ def test_create_alias(ds_path, ria_path, clone_path):
                                  alias="ds-a",
                                  new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
-    eq_(len(res), 1)
 
     ds_clone = clone(source="ria+file://{}#~ds-a".format(ria_path),
                      path=clone_path / "a")
@@ -291,7 +288,6 @@ def test_create_alias(ds_path, ria_path, clone_path):
                                  alias="ds-b",
                                  new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
-    eq_(len(res), 1)
 
     ds_clone = clone(source="ria+file://{}#~ds-b".format(ria_path),
                      path=clone_path / "b")
@@ -308,7 +304,6 @@ def test_create_alias(ds_path, ria_path, clone_path):
         assert_in("Alias 'ds-a' already exists in the RIA store, not adding an alias",
                   cml.out)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
-    eq_(len(res), 1)
 
 
 @skip_if_on_windows  # ORA remote is incompatible with windows clients
