@@ -38,6 +38,7 @@ from datalad.utils import (
 )
 
 from datalad.customremotes import RemoteError
+from datalad.customremotes.main import main as super_main
 from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -473,10 +474,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
 def main():
     """cmdline entry point"""
-    from annexremote import Master
-    master = Master()
-    remote = ArchiveAnnexCustomRemote(master)
-    master.LinkRemote(remote)
-    master.Listen()
-    # cleanup
-    remote.stop()
+    super_main(
+        cls=ArchiveAnnexCustomRemote,
+        remote_name='datalad-archives',
+        description=\
+        "extract content from archives (.tar{,.gz}, .zip, etc) which are "
+        "in turn managed by git-annex.  See `datalad add-archive-content` "
+        "command",
+    )
