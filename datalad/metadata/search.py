@@ -301,7 +301,9 @@ def _search_from_virgin_install(dataset, query):
             "Performing search using DataLad superdataset %r",
             default_ds.path
         )
-        for res in default_ds.search(query):
+        for res in default_ds.search(query,
+                                     return_type="generator",
+                                     result_renderer="disabled"):
             yield res
         return
     else:
@@ -466,13 +468,7 @@ class _WhooshSearch(_Search):
         if not exists(index_dir):
             os.makedirs(index_dir)
 
-        # this is a pretty cheap call that just pull this info from a file
-        dsinfo = self.ds.metadata(
-            get_aggregates=True,
-            return_type='list',
-            result_renderer='disabled')
-
-        self._mk_schema(dsinfo)
+        self._mk_schema()
 
         idx_obj = widx.create_in(index_dir, self.schema)
         idx = idx_obj.writer(
@@ -495,7 +491,6 @@ class _WhooshSearch(_Search):
             lgr.info,
             'autofieldidxbuild',
             'Start building search index',
-            total=len(dsinfo),
             label='Building search index',
             unit=' Datasets',
         )
@@ -654,7 +649,7 @@ class _BlobSearch(_WhooshSearch):
                 val2str=True,
                 schema=None).items()))
 
-    def _mk_schema(self, dsinfo):
+    def _mk_schema(self):
         from whoosh import fields as wf
         from whoosh.analysis import StandardAnalyzer
 
@@ -691,7 +686,7 @@ class _AutofieldSearch(_WhooshSearch):
     def _meta2doc(self, meta):
         return _meta2autofield_dict(meta, val2str=True, schema=self.schema)
 
-    def _mk_schema(self, dsinfo):
+    def _mk_schema(self):
         from whoosh import fields as wf
         from whoosh.analysis import SimpleAnalyzer
 
@@ -718,7 +713,6 @@ class _AutofieldSearch(_WhooshSearch):
             lgr.info,
             'idxschemabuild',
             'Start building search schema',
-            total=len(dsinfo),
             label='Building search schema',
             unit=' Datasets',
         )
