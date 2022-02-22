@@ -22,6 +22,7 @@ from datalad.utils import unique
 
 from datalad.customremotes import RemoteError
 from datalad.customremotes.base import AnnexCustomRemote
+from datalad.customremotes.main import main as super_main
 
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
@@ -114,8 +115,11 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
 def main():
     """cmdline entry point"""
-    from annexremote import Master
-    master = Master()
-    remote = DataladAnnexCustomRemote(master)
-    master.LinkRemote(remote)
-    master.Listen()
+    super_main(
+        cls=DataladAnnexCustomRemote,
+        remote_name='datalad',
+        description=\
+        "download content from various URLs (http{,s}, s3, etc) possibly "
+        "requiring authentication or custom access mechanisms using "
+        "DataLad's downloaders",
+    )

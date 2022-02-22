@@ -356,6 +356,7 @@ class CreateSiblingRia(Interface):
             # in subdatasets
             failed = False
             for r in ds.siblings(result_renderer='disabled',
+                                 return_type='generator',
                                  recursive=recursive,
                                  recursion_limit=recursion_limit):
                 log_progress(
@@ -451,6 +452,8 @@ class CreateSiblingRia(Interface):
             for subds in ds.subdatasets(state='present',
                                         recursive=True,
                                         recursion_limit=recursion_limit,
+                                        return_type='generator',
+                                        result_renderer='disabled',
                                         result_xfm='datasets'):
                 yield from _create_sibling_ria(
                     subds,
@@ -522,7 +525,11 @@ def _create_sibling_ria(
     # determine layout locations; go for a v1 store-level layout
     repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
 
-    ds_siblings = [r['name'] for r in ds.siblings(result_renderer='disabled')]
+    ds_siblings = [
+        r['name'] for r in ds.siblings(
+            result_renderer='disabled',
+            return_type='generator')
+    ]
     # Figure whether we are supposed to skip this very dataset
     if existing == 'skip' and (
             name in ds_siblings or (
@@ -733,7 +740,7 @@ def _create_sibling_ria(
         "remote.{}.annex-ignore".format(name),
         value="true",
         scope="local")
-    ds.siblings(
+    yield from ds.siblings(
         'configure',
         name=name,
         url=str(repo_path) if url.startswith("ria+file") else git_url,
@@ -742,6 +749,7 @@ def _create_sibling_ria(
         # Note, that this should be None if storage_sibling was not set
         publish_depends=storage_name,
         result_renderer='disabled',
+        return_type='generator',
         # Note, that otherwise a subsequent publish will report
         # "notneeded".
         fetch=True

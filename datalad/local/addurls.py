@@ -1424,6 +1424,7 @@ class Addurls(Interface):
             yield from ds.create(
                 result_xfm=None,
                 return_type='generator',
+                result_renderer='disabled',
                 cfg_proc=cfg_proc)
 
         annex_options = ["--fast"] if fast else []
@@ -1461,6 +1462,7 @@ class Addurls(Interface):
             else:
                 for res in subds.create(result_xfm=None,
                                         cfg_proc=cfg_proc,
+                                        result_renderer='disabled',
                                         return_type='generator'):
                     if res.get("action") == "create":
                         res["addurls.refds"] = ds_path
@@ -1575,6 +1577,7 @@ filename_format='{filenameformat}'"""
                 list(files_to_add),
                 message=message_addurls,
                 jobs=jobs,
+                result_renderer='disabled',
                 return_type='generator')
 
     @staticmethod

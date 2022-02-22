@@ -137,7 +137,8 @@ class Unlock(Interface):
                 annex="availability",
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                result_renderer='disabled',
+                result_renderer="disabled",
+                return_type="generator",
                 on_failure="ignore"):
             if res["action"] != "status" or res["status"] != "ok":
                 yield res

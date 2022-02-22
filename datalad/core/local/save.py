@@ -236,6 +236,10 @@ class Save(Interface):
                 on_failure='ignore',
                 # for save without recursion only commit matters
                 eval_subdataset_state='full' if recursive else 'commit',
+                return_type='generator',
+                # this could be, but for now only 'error' results are handled
+                # below
+                #on_failure='ignore',
                 result_renderer='disabled'):
             if s['status'] == 'error':
                 # Downstream code can't do anything with these. Let the caller
@@ -397,4 +401,3 @@ class Save(Interface):
 
 def _log_filter_save_dataset(res):
     return res.get('type') == 'dataset' and res.get('action') == 'save'
-

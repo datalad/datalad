@@ -423,6 +423,7 @@ class _GitHubLike(object):
                 recursive=False,
                 # TODO fetch=True, maybe only if one existed already
                 publish_depends=publish_depends,
+                return_type='generator',
                 result_renderer='disabled')
 
     def repo_create_request(self, reponame, organization, private,
@@ -641,7 +642,9 @@ def _get_present_datasets(ds, recursive, recursion_limit):
                 state='any',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                result_xfm='datasets'):
+                result_xfm='datasets',
+                result_renderer='disabled',
+                return_type='generator'):
             if not sub.is_installed():
                 lgr.info('Ignoring unavailable subdataset %s', sub)
                 continue

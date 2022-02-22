@@ -205,6 +205,8 @@ def test_get_subdatasets(origpath, path):
                       ('expansion', '<{refds_relname}>')])
     assert_status('ok', res)
     for r in res:
+        if r.get('action') != 'subdataset':
+            continue
         eq_(r['gitmodule_mike'], 'slow')
         eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
     # plain query again to see if it got into the files
