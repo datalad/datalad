@@ -231,9 +231,8 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 
-def test_script_shims():
+def check_script_shims(script):
     runner = Runner()
-    script = 'datalad'
     if not on_windows:
 
         from shutil import which
@@ -251,6 +250,15 @@ def test_script_shims():
     assert get_numeric_portion(version), f"Got no numeric portion from {version}"
     assert_equal(get_numeric_portion(__version__),
                  get_numeric_portion(version))
+
+
+def test_script_shims():
+    for script in [
+        'datalad',
+        'git-annex-remote-datalad-archives',
+        'git-annex-remote-datalad',
+    ]:
+        yield check_script_shims, script
 
 
 @slow  # 11.2591s
