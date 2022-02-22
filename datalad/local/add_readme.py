@@ -88,7 +88,11 @@ class AddReadme(Interface):
 
         # unlock, file could be annexed
         if lexists(fpath):
-            dataset.unlock(fpath)
+            yield from dataset.unlock(
+                fpath,
+                return_type='generator',
+                result_renderer='disabled'
+            )
         if not lexists(fpath):
             # if we have an annex repo, shall the README go to Git or annex?
 
