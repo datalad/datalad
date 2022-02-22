@@ -14,6 +14,7 @@ from datalad.customremotes import (
     RemoteError,
     SpecialRemote,
 )
+from datalad.customremotes.main import main as super_main
 from datalad.support.annexrepo import AnnexRepo
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
@@ -1427,10 +1428,9 @@ def _sanitize_key(key):
 
 def main():
     """cmdline entry point"""
-    from annexremote import Master
-    from datalad.ui import ui
-    master = Master()
-    remote = RIARemote(master)
-    ui.set_backend('annex')  # interactive, stdin/stdout will be used for interactions with annex
-    master.LinkRemote(remote)
-    master.Listen()
+    super_main(
+        cls=RIARemote,
+        remote_name='ora',
+        description=\
+        "transport file content to and from datasets hosted in RIA stores",
+    )
