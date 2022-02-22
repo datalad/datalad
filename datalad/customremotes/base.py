@@ -89,11 +89,6 @@ class AnnexCustomRemote(SpecialRemote):
     def remove(self, key):
         raise RemoteError("Removal of content from urls is not possible")
 
-    def whereis(self, key):
-        # All that information is stored in annex itself,
-        # we can't complement anything
-        raise RemoteError()
-
     def getcost(self):
         return self.COST
 

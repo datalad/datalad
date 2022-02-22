@@ -61,6 +61,13 @@ def check_basic_scenario(url, d):
     whereis2 = annex.whereis(filename, output='full')
     eq_(len(whereis2), 1)  # datalad
 
+    # make sure that there are no "hidden" error messages, despite the
+    # whereis command succeeding
+    # https://github.com/datalad/datalad/issues/6453#issuecomment-1047533276
+    from datalad.runner import StdOutErrCapture
+    out = annex._call_annex(['whereis'], protocol=StdOutErrCapture)
+    eq_(out['stderr'].strip(), '')
+
     # if we provide some bogus address which we can't access, we shouldn't pollute output
     with assert_raises(CommandError) as cme:
         annex.add_urls([url + '_bogus'])
