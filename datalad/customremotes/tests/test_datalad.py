@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the universal datalad's annex customremote"""
 
+import logging
 import glob
 import os.path as op
 
@@ -21,6 +22,7 @@ from datalad.tests.utils import (
     eq_,
     serve_path_via_http,
     skip_if_no_network,
+    swallow_logs,
     with_tempfile,
     with_tree,
 )
@@ -60,6 +62,16 @@ def check_basic_scenario(url, d):
 
     whereis2 = annex.whereis(filename, output='full')
     eq_(len(whereis2), 1)  # datalad
+
+    # make sure that there are no "hidden" error messages, despite the
+    # whereis command succeeding
+    # https://github.com/datalad/datalad/issues/6453#issuecomment-1047533276
+    from datalad.runner import StdOutErrCapture
+    # we need to swallow logs since if DATALAD_LOG_LEVEL is set low, we
+    # would get all the git-annex debug output in stderr
+    with swallow_logs(new_level=logging.INFO) as cml:
+        out = annex._call_annex(['whereis'], protocol=StdOutErrCapture)
+        eq_(out['stderr'].strip(), '')
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output
     with assert_raises(CommandError) as cme:
