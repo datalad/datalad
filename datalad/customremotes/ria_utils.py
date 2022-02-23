@@ -181,7 +181,8 @@ def create_store(io, base_path, version):
     io.mkdir(error_logs)
 
 
-def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=None):
+def create_ds_in_store(io, base_path, dsid, obj_version, store_version,
+                       alias=None, init_obj_tree=True):
     """Helper to create a dataset in a RIA store
 
     Note, that this is meant as an internal helper and part of intermediate
@@ -203,6 +204,9 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=No
       layout version of the dataset itself (object tree)
     alias: str, optional
       alias for the dataset in the store
+    init_obj_tree: bool
+      whether or not to create the base directory for an annex objects tree (
+      'annex/objects')
     """
 
     # TODO: Note for RF'ing, that this is about setting up a valid target
@@ -225,7 +229,8 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=No
     _ensure_version(io, dsgit_dir, obj_version)
 
     io.mkdir(archive_dir)
-    io.mkdir(dsobj_dir)
+    if init_obj_tree:
+        io.mkdir(dsobj_dir)
     if alias:
         alias_dir = base_path / "alias"
         io.mkdir(alias_dir)

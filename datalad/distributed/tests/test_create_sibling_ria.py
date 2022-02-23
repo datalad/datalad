@@ -18,6 +18,7 @@ from datalad.api import (
 )
 from datalad.tests.utils import (
     attr,
+    assert_false,
     assert_in,
     assert_raises,
     assert_repo_status,
@@ -356,6 +357,12 @@ def test_no_storage(store1, store2, ds_path):
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore2', 'datastore1', 'here'},
         {s['name'] for s in ds.siblings(result_renderer='disabled')})
+
+    # no annex/object dir should be created when there is no special remote
+    # to use it.
+    for s in [store1, store2]:
+        p = Path(s) / ds.id[:3] / ds.id [3:] / 'annex' / 'objects'
+        assert_false(p.exists())
 
     # smoke test that we can push to it
     res = ds.push(to='datastore1')
