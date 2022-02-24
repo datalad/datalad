@@ -148,8 +148,13 @@ def _check_mocked_install(default_dspath, mock_install):
     # we no longer do any custom path tune up from the one returned by search
     # so should match what search returns
     assert_equal(
-        list(gen), [report
-                    for report in _mocked_search_results])
+        list(gen),
+        [
+            report
+            for report
+            in _mocked_search_results
+        ])
+
     mock_install.assert_called_once_with(
         default_dspath,
         source='///',
