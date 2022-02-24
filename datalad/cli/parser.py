@@ -124,7 +124,7 @@ def setup_parser(
 
     command_provider = 'core'
 
-    if status == 'full' and not help_ignore_extensions:
+    if status == 'allparsers' and not help_ignore_extensions:
         from .helpers import add_entrypoints_to_interface_groups
         add_entrypoints_to_interface_groups(interface_groups)
 
