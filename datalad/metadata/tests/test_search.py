@@ -153,9 +153,7 @@ def _check_mocked_install(default_dspath, mock_install):
     mock_install.assert_called_once_with(
         default_dspath,
         source='///',
-        result_renderer='disabled',
-        on_failure='continue',
-        result_type='generator')
+        result_renderer='disabled')
 
 
 @with_tempfile
