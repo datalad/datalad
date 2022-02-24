@@ -1447,7 +1447,8 @@ def decode_source_spec(spec, cfg=None):
     # scheme.
     spec = cfg.rewrite_url(spec)
     # common starting point is a RI instance, support for accepting an RI
-    # instance is kept for backward-compatibility reasons
+    # instance is kept for backward-compatibility reasons.
+    # this conversion will raise ValueError for any unrecognized RI
     source_ri = RI(spec) if not isinstance(spec, RI) else spec
 
     # scenario switch, each case must set 'giturl' at the very minimum
