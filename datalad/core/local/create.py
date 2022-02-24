@@ -347,7 +347,10 @@ class Create(Interface):
         cfg_proc_specs = []
         if cfg_proc:
             discovered_procs = tbds.run_procedure(
-                discover=True, result_renderer='disabled')
+                discover=True,
+                result_renderer='disabled',
+                return_type='generator',
+            )
             for cfg_proc_ in cfg_proc:
                 for discovered_proc in discovered_procs:
                     if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
@@ -430,8 +433,11 @@ class Create(Interface):
         )
 
         for cfg_proc_spec in cfg_proc_specs:
-            for r in tbds.run_procedure(cfg_proc_spec):
-                yield r
+            yield from tbds.run_procedure(
+                cfg_proc_spec,
+                result_renderer='disabled',
+                return_type='generator',
+            )
 
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
@@ -439,10 +445,11 @@ class Create(Interface):
         if isinstance(refds, Dataset) and refds.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in refds.save(
-                    path=tbds.path,
-            ):
-                yield r
+            yield from refds.save(
+                path=tbds.path,
+                return_type='generator',
+                result_renderer='disabled',
+            )
 
         res.update({'status': 'ok'})
         yield res

@@ -22,4 +22,5 @@ git_attributes_file = op.join(ds.path, '.gitattributes')
 ds.save(
     git_attributes_file,
     message="Instruct annex to add text files to Git",
+    result_renderer='disabled'
 )
