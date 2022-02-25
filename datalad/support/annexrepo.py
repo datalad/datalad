@@ -1063,7 +1063,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
         except CommandError as e:
             # Note: Workaround for not existing files as long as annex doesn't
-            # report it within JSON response:
+            # report it within JSON response (for annex versions < 10.20220128):
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             not_existing = [
                 # cut the file path from the middle, no useful delimiter
@@ -1116,7 +1116,24 @@ class AnnexRepo(GitRepo, RepoInterface):
             #        "Running %s resulted in stderr output: %s",
             #        args, shorten(e.stderr)
             #    )
-
+        if external_versions['cmd:annex'] >= '10.20220128':
+            if 'did not match any file(s) known to git' in out['stderr']:
+                not_existing = [
+                    line[17:-70] for line in out['stderr'].splitlines()
+                    if line.startswith('error:') and
+                    line.endswith('to git')
+                ]
+                if not_existing:
+                    out = {'stdout_json': []}
+                out['stdout_json'].extend(
+                    {
+                    "command": args[0],
+                    "file": f,
+                    "note": "not found",
+                    "success": False,
+                    }
+                    for f in not_existing
+                )
         json_objects = out.pop('stdout_json')
 
         if out.get('stdout'):
