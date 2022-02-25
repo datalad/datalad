@@ -19,6 +19,11 @@ import shutil
 import sys
 import time
 import logging
+from typing import (
+    List,
+    Dict,
+    Optional,
+)
 from unittest.mock import patch
 
 from operator import itemgetter
@@ -37,6 +42,8 @@ from os.path import (
 from collections import OrderedDict
 
 from datalad.utils import (
+    DatasetFilteringIterator,
+    FilteringIterator,
     _path_,
     all_same,
     any_re_search,
@@ -1343,3 +1350,129 @@ def test_splitjoin_cmdline():
         eq_(join_cmdline(['abc', 'def']), '"abc" "def"')
     else:
         eq_(join_cmdline(['abc', 'def']), 'abc def')
+
+
+def test_filtering_iterator():
+    results = [
+        {
+            "status": "ok",
+            "key1": 2
+        },
+        {
+            "status": "notneeded",
+            "key1": 9
+        },
+        {
+            "status": "ok",
+            "key1": 3
+        }
+    ]
+
+    def iterate_it(patterns: List[Dict], expected: List[Dict]):
+        fi = FilteringIterator(results, patterns)
+        filtered = yield from fi
+        assert_equal(filtered, fi.filtered)
+        for e in expected:
+            assert_in(e, filtered)
+        assert_equal(len(filtered), len(expected))
+
+    yielded = list(iterate_it([{"status": "ok"}], [results[0], results[2]]))
+    assert_equal(yielded, [results[1]])
+
+    yielded = list(iterate_it([{"status": "notneeded"}], [results[1]]))
+    assert_equal(yielded, [results[0], results[2]])
+
+    # Expect to yield nothing and catch all because all elements match a pattern
+    yielded = list(iterate_it(
+        [
+            {"status": "notneeded"},
+            {"status": "ok"}
+        ],
+        results
+    ))
+    assert_equal(yielded, [])
+
+    # Expect to yield all and catch nothing because no pattern was provided
+    yielded = list(iterate_it([], []))
+    assert_equal(yielded, results)
+
+    # Expect to yield all and catch nothing because no element matches a pattern
+    yielded = list(iterate_it([{"status": "x"}], []))
+    assert_equal(yielded, results)
+
+
+def test_dataset_filtering_iterator():
+
+    from ..distribution.dataset import Dataset
+    from ..interface.results import YieldDatasets
+
+    results = [
+        {
+            "status": "ok",
+            "type": "dataset",
+            "path": "/d0",
+            "k": 0
+        },
+        {
+            "status": "notneeded",
+            "type": "dataset",
+            "path": "/d1",
+            "k": 1
+        },
+        {
+            "status": "ok",
+            "type": "dataset",
+            "path": "/d2",
+            "k": 2
+        },
+        {
+            "status": "ok",
+            "type": "not a dataset at all",
+            "k": 3
+        },
+    ]
+    dataset_results = [YieldDatasets()(result) for result in results[:-1]]
+
+    def iterate_it(patterns: Optional[List[Dict]],
+                   expected: List[Dataset],
+                   at_most_one: bool = True):
+        if expected is None:
+            dfi = DatasetFilteringIterator(results, at_most_one=at_most_one)
+        else:
+            dfi = DatasetFilteringIterator(results, patterns, at_most_one)
+        filtered = yield from dfi
+        assert_equal(filtered, dfi.filtered)
+        if at_most_one:
+            assert_equal(filtered, expected[0])
+        else:
+            for e in expected:
+                assert_in(e, filtered)
+            assert_equal(len(filtered), len(expected))
+
+    # Test a single selection
+    yielded = list(iterate_it([{"status": "ok", "k": 0}], [dataset_results[0]]))
+    assert_equal(yielded, results[1:])
+
+    # Test selection of multiple
+    yielded = list(iterate_it(
+        [{"status": "ok"}],
+        [dataset_results[0], dataset_results[2]],
+        False))
+    assert_equal(yielded, [results[1], results[3]])
+
+    # Test selection of any dataset
+    yielded = list(iterate_it(
+        patterns=None,
+        expected=dataset_results,
+        at_most_one=False))
+    assert_equal(yielded, [results[3]])
+
+    # Test not allowed selection of multiple
+    try:
+        yielded = list(iterate_it(
+            [{"status": "ok"}],
+            [dataset_results[0], dataset_results[2]]))
+        assert_equal(yielded, [results[1]])
+        raise Exception("expected ValueError, got nothing")
+    except ValueError:
+        pass
