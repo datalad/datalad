@@ -286,7 +286,10 @@ def _search_from_virgin_install(dataset, query):
                      "superdataset at %r?"
                      % DEFAULT_DATASET_PATH):
             from datalad.api import install
-            default_ds = install(DEFAULT_DATASET_PATH, source='///')
+            default_ds = install(
+                DEFAULT_DATASET_PATH,
+                source='///',
+                result_renderer='disabled')
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
@@ -383,7 +386,7 @@ class _WhooshSearch(_Search):
     def _meta2doc(self, meta, val2str=True, schema=None):
         raise NotImplementedError
 
-    def _mk_schema(self):
+    def _mk_schema(self, dsinfo):
         raise NotImplementedError
 
     def _mk_parser(self):

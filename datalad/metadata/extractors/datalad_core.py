@@ -62,7 +62,8 @@ class MetadataExtractor(BaseMetadataExtractor):
                 dataset=self.ds,
                 recursive=False,
                 return_type='generator',
-                result_renderer='disabled')
+                result_renderer='disabled',
+                on_failure='ignore')
         ]
         if subdsinfo:
             obj['haspart'] = subdsinfo
