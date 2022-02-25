@@ -94,6 +94,8 @@ def test_search_outside1_install_default_ds(tdir, default_dspath):
                   return_value=Dataset(default_dspath)) as mock_install, \
             patch('datalad.distribution.dataset.Dataset.search',
                   new_callable=_mock_search):
+
+            mock_install.return_value = iter([{"type": "dataset", "status": "ok", "path": "/tmp/t0"}])
             _check_mocked_install(default_dspath, mock_install)
 
             # now on subsequent run, we want to mock as if dataset already exists
@@ -101,6 +103,7 @@ def test_search_outside1_install_default_ds(tdir, default_dspath):
             from datalad.ui import ui
             ui.add_responses('yes')
             mock_install.reset_mock()
+            mock_install.return_value = iter([{"type": "dataset", "status": "ok", "path": "/tmp/t0"}])
             with patch(
                     'datalad.distribution.dataset.Dataset.is_installed',
                     True):
@@ -109,6 +112,7 @@ def test_search_outside1_install_default_ds(tdir, default_dspath):
             # and what if we say "no" to install?
             ui.add_responses('no')
             mock_install.reset_mock()
+            mock_install.return_value = iter([{"type": "dataset", "status": "ok", "path": "/tmp/t0"}])
             with assert_raises(NoDatasetFound):
                 list(search("."))
 
@@ -116,6 +120,7 @@ def test_search_outside1_install_default_ds(tdir, default_dspath):
             Dataset(default_dspath).create()
             ui.add_responses('no')
             mock_install.reset_mock()
+            mock_install.return_value = iter([{"type": "dataset", "status": "ok", "path": "/tmp/t0"}])
             with assert_raises(NoDatasetFound):
                 list(search("."))
 
@@ -158,7 +163,8 @@ def _check_mocked_install(default_dspath, mock_install):
     mock_install.assert_called_once_with(
         default_dspath,
         source='///',
-        result_renderer='disabled')
+        result_renderer='disabled',
+        return_type='generator')
 
 
 @with_tempfile
