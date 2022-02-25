@@ -597,7 +597,8 @@ def _create_sibling_ria(
             " and '{}'".format(storage_name) if storage_name else '',
         ))
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
-                       base_path, ds.id, '2', '1', alias)
+                       base_path, ds.id, '2', '1', alias,
+                       init_obj_tree=storage_sibling is not False)
     if storage_sibling:
         # we are using the main `name`, if the only thing we are creating
         # is the storage sibling

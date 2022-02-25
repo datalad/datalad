@@ -82,10 +82,7 @@ def _test_bare_git_version_1(host, dspath, store):
     create_store(io, store, '1')
     # set up the dataset location, too.
     # Note: Dataset layout version 1 (dirhash lower):
-    create_ds_in_store(io, store, ds.id, '1', '1')
-    # Avoid triggering a git-annex safety check. See gh-5253.
-    assert objdir.is_absolute()
-    io.remove_dir(objdir)
+    create_ds_in_store(io, store, ds.id, '1', '1', init_obj_tree=False)
 
     # Now, let's have the bare repo as a git remote and use it with annex
     git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
