@@ -403,14 +403,25 @@ class RI(object):
            uninitialized RI object of appropriate class with _str
            set to string representation if was provided
 
+        Raises
+        ------
+        ValueError
+          Whenever the RI type cannot be determined.
         """
         if cls is RI and ri is not None:
             # RI class was used as a factory
-            cls = _guess_ri_cls(ri)
+            try:
+                cls = _guess_ri_cls(ri)
+            except Exception as e:
+                # when anything goes wrong here, ensure a homogeneous
+                # exception with a regular error
+                raise ValueError(
+                    f"Could not determine resource identifier type for {ri!r}"
+                ) from e
 
         if cls is RI:
-            # should we fail or just pretend we are nothing??? ;-) XXX
-            raise ValueError("Could not deduce RI type for %r" % (ri,))
+            raise ValueError(
+                f"Could not determine resource identifier type for {ri!r}")
 
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
