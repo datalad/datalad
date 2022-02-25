@@ -2705,11 +2705,11 @@ class FilteringIterator:
     stored in the "filtered"-attribute, as well as returned as result of the
     iterator.
 
-    So the FilteIterator can be used like:
+    So the FilteringIterator can be used like this::
 
         filtered_dicts = yield from FilteringIterator(...)
 
-    or like
+    or like this::
 
         filtering_iterator = FilteringIterator(...)
         for e in filtering_iterator:
