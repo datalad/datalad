@@ -288,18 +288,15 @@ def _search_from_virgin_install(dataset, query):
             from datalad.api import install
             from datalad.utils import DatasetFilteringIterator
 
-            dataset_or_iterable = install(
+            iterable = install(
                 DEFAULT_DATASET_PATH,
                 source='///',
                 result_renderer='disabled',
                 return_type='generator')
-            if isinstance(dataset_or_iterable, Dataset):
-                default_ds = dataset_or_iterable
-            else:
-                default_ds = yield from DatasetFilteringIterator(
-                    iterable=dataset_or_iterable,
-                    at_most_one=True,
-                    success_only=False)
+            default_ds = yield from DatasetFilteringIterator(
+                iterable=iterable,
+                at_most_one=True,
+                success_only=False)
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
