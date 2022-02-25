@@ -301,10 +301,10 @@ def _search_from_virgin_install(dataset, query):
             "Performing search using DataLad superdataset %r",
             default_ds.path
         )
-        for res in default_ds.search(query,
-                                     return_type="generator",
-                                     result_renderer="disabled"):
-            yield res
+        yield from default_ds.search(
+            query,
+            return_type="generator",
+            result_renderer="disabled")
         return
     else:
         raise  # this function is called within exception handling block
