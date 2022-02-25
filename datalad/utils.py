@@ -2730,16 +2730,17 @@ class FilteringIterator:
 
     def __iter__(self):
         for element in self.iterable:
-            if isinstance(element, dict):
-                for pattern in self.patterns:
-                    if pattern.items() <= element.items():
-                        self.filtered.append(element)
-                        break
-                else:
-                    yield element
+            if isinstance(element, dict) and self._matches_patterns(element):
+                self.filtered.append(element)
             else:
                 yield element
         return self.filtered
+
+    def _matches_patterns(self, element: dict) -> bool:
+        for pattern in self.patterns:
+            if pattern.items() <= element.items():
+                return True
+        return False
 
 
 class DatasetFilteringIterator(FilteringIterator):
