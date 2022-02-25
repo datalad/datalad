@@ -19,6 +19,12 @@ import os
 import sys
 import tempfile
 from tempfile import NamedTemporaryFile
+from typing import (
+    Dict,
+    Iterable,
+    List,
+    Optional,
+)
 import platform
 import gc
 import glob
@@ -2689,3 +2695,88 @@ def check_symlink_capability(path, target):
             path.unlink()
         if target.exists():
             target.unlink()
+
+
+class FilteringIterator:
+    """
+    An iterator that takes an iterable and yields all elements that the given
+    iterable yields, except those elements that are dictionaries and match any
+    dictionary in the list of pattern dictionaries. The matching elements are
+    stored in the "filtered"-attribute, as well as returned as result of the
+    iterator.
+
+    So the FilteIterator can be used like:
+
+        filtered_dicts = yield from FilteringIterator(...)
+
+    or like
+
+        filtering_iterator = FilteringIterator(...)
+        for e in filtering_iterator:
+            process(e)
+            yield e
+        filtered_dicts = filtering_iterator.filtered
+
+    A dictionary matches a pattern dictionary, if its keys are a superset of
+    the keys of the pattern dictionary, and if the keys contained in both have
+    identical values.
+    """
+    def __init__(self,
+                 iterable: Iterable,
+                 patterns: List[Dict]):
+        self.iterable = iterable
+        self.patterns = patterns
+        self.filtered = []
+
+    def __iter__(self):
+        for element in self.iterable:
+            if isinstance(element, dict):
+                for pattern in self.patterns:
+                    if pattern.items() <= element.items():
+                        self.filtered.append(element)
+                        break
+                else:
+                    yield element
+            else:
+                yield element
+        return self.filtered
+
+
+class DatasetFilteringIterator(FilteringIterator):
+    def __init__(self,
+                 iterable: Iterable,
+                 patterns: Optional[List[Dict]] = None,
+                 at_most_one: bool = True,
+                 success_only: bool = False):
+
+        FilteringIterator.__init__(
+            self,
+            iterable,
+            [{"type": "dataset"}]
+            if patterns is None
+            else [{**pattern, "type": "dataset"} for pattern in patterns]
+        )
+        self.at_most_one = at_most_one
+        self.success_only = success_only
+
+    def __iter__(self):
+        # Imported here to prevent import loops
+        from .interface.results import YieldDatasets
+
+        results = yield from FilteringIterator.__iter__(self)
+        conversions = [
+            (YieldDatasets(self.success_only)(result), result)
+            for result in results
+        ]
+
+        # yield all dictionaries, that could not be converted as well
+        yield from [conv[1] for conv in conversions if conv[0] is None]
+
+        datasets = [conv[0] for conv in conversions if conv[0] is not None]
+        if self.at_most_one:
+            if len(datasets) != 1:
+                raise ValueError(f"Expected one dataset, got: {len(datasets)}")
+            self.filtered = datasets[0]
+            return datasets[0]
+        self.filtered = datasets
+        return datasets
