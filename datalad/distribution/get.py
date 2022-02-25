@@ -60,6 +60,7 @@ from datalad.support.parallel import (
     ProducerConsumerProgressLog,
 )
 from datalad.utils import (
+    FilteringIterator,
     unique,
     Path,
     get_dataset_root,
@@ -414,12 +415,21 @@ def _install_necessary_subdatasets(
     """
     # figuring out what dataset to start with, --contains limits --recursive
     # to visit only subdataset on the trajectory to the target path
-    subds_trail = ds.subdatasets(contains=path,
-                                 recursive=True,
-                                 on_failure='ignore',
-                                 result_filter=is_ok_dataset,
-                                 result_renderer='disabled',
-                                 return_type='generator')
+    iterable = ds.subdatasets(
+        contains=path,
+        recursive=True,
+        on_failure='ignore',
+        result_filter=is_ok_dataset,
+        result_renderer='disabled',
+        return_type='generator')
+
+    subds_trail = yield from FilteringIterator(
+        iterable=iterable,
+        patterns=[{
+            'action': 'subdataset',
+            'type': 'dataset',
+            'status': 'ok'}])
+
     if not subds_trail:
         # there is not a single known subdataset (installed or not)
         # for this path -- job done
@@ -456,11 +466,19 @@ def _install_necessary_subdatasets(
             return
         # now check whether the just installed subds brought us any closer to
         # the target path
-        subds_trail = sd.subdatasets(contains=path, recursive=False,
+        iterable = sd.subdatasets(contains=path, recursive=False,
                                      on_failure='ignore',
                                      result_filter=is_ok_dataset,
                                      result_renderer='disabled',
                                      return_type='generator')
+
+        subds_trail = yield from FilteringIterator(
+            iterable=iterable,
+            patterns=[{
+                'action': 'subdataset',
+                'type': 'dataset',
+                'status': 'ok'}])
+
         if not subds_trail:
             # no (newly available) subdataset gets us any closer
             return
