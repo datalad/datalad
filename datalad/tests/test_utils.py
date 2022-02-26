@@ -16,6 +16,7 @@ import inspect
 import os
 import os.path as op
 import shutil
+import stat
 import sys
 import time
 import logging
@@ -47,6 +48,7 @@ from datalad.utils import (
     create_tree,
     disable_logger,
     dlabspath,
+    ensure_write_permission,
     expandpath,
     file_basename,
     find_files,
@@ -71,6 +73,7 @@ from datalad.utils import (
     md5sum,
     never_fail,
     not_supported_on_windows,
+    obtain_write_permission,
     on_windows,
     partition,
     path_is_subpath,
@@ -1343,3 +1346,75 @@ def test_splitjoin_cmdline():
         eq_(join_cmdline(['abc', 'def']), '"abc" "def"')
     else:
         eq_(join_cmdline(['abc', 'def']), 'abc def')
+
+
+@with_tempfile
+def test_obtain_write_permission(path):
+    path = Path(path)
+
+    # there's nothing at path yet:
+    assert_raises(FileNotFoundError, obtain_write_permission, path)
+
+    # Revoke write permission
+    path.write_text("something")
+    path.chmod(path.stat().st_mode & ~stat.S_IWRITE)
+    assert_raises(PermissionError, path.write_text, "different thing")
+
+    # Obtain and try again:
+    obtain_write_permission(path)
+    path.write_text("different thing")
+
+    # Already having permission is no issue:
+    obtain_write_permission(path)
+    path.write_text("yet another thing")
+
+
+@with_tempfile(mkdir=True)
+def test_ensure_write_permission(path):
+
+    # This is testing the usecase of write protected directories needed for
+    # messing with an annex object tree (as done by the ORA special remote).
+    # However, that doesn't work on Windows since we can't revoke write
+    # permissions for the owner of a directory (at least on VFAT - may be
+    # true for NTFS as well - don't know).
+    # Hence, on windows/crippledFS only test on a file.
+
+    dir_ = Path(path)
+    if not on_windows and has_symlink_capability:
+        # set up write-protected dir containing a file
+        file_ = dir_ / "somefile"
+        file_.write_text("whatever")
+        dir_.chmod(dir_.stat().st_mode & ~stat.S_IWRITE)
+        assert_raises(PermissionError, file_.unlink)
+
+        # contextmanager lets us do it and restores permissions afterwards:
+        mode_before = dir_.stat().st_mode
+        with ensure_write_permission(dir_):
+            file_.unlink()
+
+        mode_after = dir_.stat().st_mode
+        assert_equal(mode_before, mode_after)
+        assert_raises(PermissionError, file_.write_text, "new file can't be "
+                                                         "written")
+
+        assert_raises(FileNotFoundError, ensure_write_permission(dir_ /
+                      "non" / "existent").__enter__)
+
+        # deletion within context doesn't let mode restoration fail:
+        with ensure_write_permission(dir_):
+            dir_.rmdir()
+
+        dir_.mkdir()  # recreate, since next block is executed unconditionally
+
+    # set up write-protected file:
+    file2 = dir_ / "protected.txt"
+    file2.write_text("unchangeable")
+    file2.chmod(file2.stat().st_mode & ~stat.S_IWRITE)
+    assert_raises(PermissionError, file2.write_text, "modification")
+
+    # within context we can:
+    with ensure_write_permission(file2):
+        file2.write_text("modification")
+
+    # mode is restored afterwards:
+    assert_raises(PermissionError, file2.write_text, "modification2")

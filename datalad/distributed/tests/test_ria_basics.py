@@ -787,6 +787,5 @@ def _test_permission(host, storepath, dspath):
 
 
 def test_obtain_permission():
-    # TODO: Skipped due to gh-4436
     yield skip_ssh(_test_permission), 'datalad-test'
     yield _test_permission, None
