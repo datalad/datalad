@@ -32,7 +32,6 @@ from datalad.interface.common_opts import (
     jobs_opt,
     reckless_opt,
 )
-from datalad.interface.results import is_ok_dataset
 from datalad.support.constraints import (
     EnsureInt,
     EnsureChoice,
@@ -419,7 +418,6 @@ def _install_necessary_subdatasets(
         contains=path,
         recursive=True,
         on_failure='ignore',
-        result_filter=is_ok_dataset,
         result_renderer='disabled',
         return_type='generator')
 
@@ -468,7 +466,6 @@ def _install_necessary_subdatasets(
         # the target path
         iterable = sd.subdatasets(contains=path, recursive=False,
                                      on_failure='ignore',
-                                     result_filter=is_ok_dataset,
                                      result_renderer='disabled',
                                      return_type='generator')
 
