@@ -55,7 +55,7 @@ jobs:
           then echo "[ERROR] Could not compare new version '$new_version' to changelog version '$changelog_version'"
                exit 1
           fi
-          ~/auto shipit $opts
+          ~/auto shipit -vv $opts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TWINE_USERNAME: __token__
