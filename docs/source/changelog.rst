@@ -2,6 +2,32 @@
 
 Change log
 **********
+0.15.6 (Sun Feb 27 2022)
+========================
+
+Bug Fix
+-------
+
+-  BF: do not use BaseDownloader instance wide InterProcessLock -
+   resolves stalling or errors during parallel installs
+   `#6507 <https://github.com/datalad/datalad/pull/6507>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  release workflow: add -vv to auto invocation
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Fix version incorrectly incremented by release process in CHANGELOGs
+   `#6459 <https://github.com/datalad/datalad/pull/6459>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF(TST): add another condition to skip under http_proxy set
+   `#6459 <https://github.com/datalad/datalad/pull/6459>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 1
+----------
+
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.15.5 (Wed Feb 09 2022)
 ========================
 
@@ -11,6 +37,8 @@ Enhancement
 -  BF: When download-url gets Pathobject as path convert it to a string
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -59,7 +87,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -142,7 +170,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -240,7 +268,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -307,7 +335,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -716,7 +744,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -822,7 +850,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -922,7 +950,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
