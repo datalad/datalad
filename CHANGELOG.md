@@ -1,3 +1,18 @@
+# 0.15.6 (Sun Feb 27 2022)
+
+#### 🐛 Bug Fix
+
+- BF: do not use BaseDownloader instance wide InterProcessLock - resolves stalling or errors during parallel installs [#6507](https://github.com/datalad/datalad/pull/6507) ([@yarikoptic](https://github.com/yarikoptic))
+- release workflow: add -vv to auto invocation ([@yarikoptic](https://github.com/yarikoptic))
+- Fix version incorrectly incremented by release process in CHANGELOGs [#6459](https://github.com/datalad/datalad/pull/6459) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(TST): add another condition to skip under http_proxy set [#6459](https://github.com/datalad/datalad/pull/6459) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.15.5 (Wed Feb 09 2022)
 
 #### 🚀 Enhancement
