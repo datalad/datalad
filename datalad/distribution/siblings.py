@@ -584,7 +584,21 @@ def _configure_remote(
                 # that git-annex will use too
                 remote_url = repo.config.get(f'remote.{name}.url')
                 ri = RI(remote_url)
-                if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
+                if not (isinstance(ri, URL) and ri.scheme in ('http', 'https')):
+                    yield dict(
+                        status='impossible',
+                        message='cannot configure as a common data source, '
+                                'URL protocol is not http or https',
+                        **result_props)
+                elif f'remote.{name}.annex-uuid' not in repo.config:
+                    yield dict(
+                        status='impossible',
+                        message='cannot configure as a common data source; '
+                                'the remote has no annex UUID, which may '
+                                'indicate absence of remote git-annex branch; '
+                                'consider running push first',
+                        **result_props)
+                else:
                     # XXX what if there is already a special remote
                     # of this name? Above check for remotes ignores special
                     # remotes. we need to `git annex dead REMOTE` on reconfigure
@@ -598,12 +612,7 @@ def _configure_remote(
                         'type=git',
                         'location={}'.format(remote_url),
                         'autoenable=true'])
-                else:
-                    yield dict(
-                        status='impossible',
-                        message='cannot configure as a common data source, '
-                                'URL protocol is not http or https',
-                        **result_props)
+
     #
     # place configure steps that also work for 'here' below
     #
