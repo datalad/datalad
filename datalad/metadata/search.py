@@ -11,7 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-import collections
 import logging
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
@@ -26,18 +25,29 @@ import sys
 from time import time
 
 from datalad import cfg
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
-from datalad.interface.utils import eval_results
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
-    require_dataset
-from datalad.support.gitrepo import GitRepo
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureInt
-
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
+from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import (
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
+from datalad.dochelpers import single_or_plural
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.utils import eval_results
+from datalad.support.constraints import (
+    EnsureInt,
+    EnsureNone,
+)
+from datalad.support.exceptions import (
+    CapturedException,
+    NoDatasetFound,
+)
+from datalad.support.param import Parameter
+from datalad.ui import ui
 from datalad.utils import (
     as_unicode,
     ensure_list,
@@ -46,12 +56,6 @@ from datalad.utils import (
     shortened_repr,
     unicode_srctypes,
 )
-from datalad.support.exceptions import (
-    CapturedException,
-    NoDatasetFound,
-)
-from datalad.ui import ui
-from datalad.dochelpers import single_or_plural
 from datalad.metadata.metadata import query_aggregated_metadata
 
 # TODO: consider using plain as_unicode, without restricting
