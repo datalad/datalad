@@ -75,6 +75,13 @@ from datalad.consts import (
 from datalad.log import log_progress
 from datalad.core.local.status import get_paths_by_ds
 
+# Check availability of new-generation metadata
+try:
+    from datalad_metalad.dump import Dump
+    next_generation_metadata_available = True
+except ImportError:
+    next_generation_metadata_available = False
+
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -273,7 +280,6 @@ def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
                 res.update(res, **kwargs)
                 if 'type' in qap:
                     res['type'] = qap['type']
-                print("1", res)
                 yield res
             else:
                 to_query_available.append(qap)
@@ -326,7 +332,6 @@ def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
                     r['query_matched'] = ap['query_matched']
                 if r.get('type', None) == 'file':
                     r['parentds'] = op.normpath(op.join(ds.path, qap['metaprovider']))
-                print("2", r)
                 yield r
                 reported.add(qap['rpath'])
 
@@ -1111,9 +1116,47 @@ def ng_query_aggregated_metadata(reporton: str,
     return None
 
 
-# Use new-generation metadata if available, else legacy metadata.
-try:
-    from datalad_metalad.dump import Dump
-    query_aggregated_metadata = ng_query_aggregated_metadata
-except ImportError:
-    query_aggregated_metadata = legacy_query_aggregated_metadata
+def query_aggregated_metadata(reporton: str,
+                              ds: Dataset,
+                              aps: List[Dict],
+                              recursive: bool = False,
+                              **kwargs):
+    """Query legacy and NG-metadata stored in a dataset or its metadata store
+
+    Parameters
+    ----------
+    reporton : {None, 'none', 'datasets', 'files', 'all'}
+      If `None`, reporting will be based on the `type` property of the
+      incoming annotated paths.
+    ds : Dataset
+      Dataset to query
+    aps : list
+      Sequence of annotated paths to query metadata for.
+    recursive : bool
+      Whether or not to report metadata underneath all query paths
+      recursively.
+    **kwargs
+      Any other argument will be passed on to the query result dictionary.
+
+    Returns
+    -------
+    generator
+      Of result dictionaries.
+    """
+
+    yield from legacy_query_aggregated_metadata(
+        reporton=reporton,
+        ds=ds,
+        aps=aps,
+        recursive=recursive,
+        **kwargs
+    )
+
+    if next_generation_metadata_available:
+        yield from ng_query_aggregated_metadata(
+            reporton=reporton,
+            ds=ds,
+            aps=aps,
+            recursive=recursive,
+            **kwargs
+        )
