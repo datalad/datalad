@@ -19,6 +19,11 @@ import os.path as op
 from collections import (
     OrderedDict,
 )
+from pathlib import Path
+from typing import (
+    Dict,
+    List,
+)
 
 from datalad import cfg
 from datalad.interface.annotate_paths import _minimal_annotate_paths
@@ -69,6 +74,7 @@ from datalad.consts import (
 )
 from datalad.log import log_progress
 from datalad.core.local.status import get_paths_by_ds
+
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -172,11 +178,11 @@ def _get_containingds_from_agginfo(info, rpath):
     return dspath
 
 
-def query_aggregated_metadata(reporton, ds, aps, recursive=False,
-                              **kwargs):
+def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
+                                     **kwargs):
     """Query the aggregated metadata in a dataset
 
-    Query paths (`aps`) have to be composed in an intelligent fashion
+    Query paths (`annotated_paths`) have to be composed in an intelligent fashion
     by the caller of this function, i.e. it should have been decided
     outside which dataset to query for any given path.
 
@@ -185,7 +191,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
 
     Parameters
     ----------
-    reporton : {None, 'none', 'dataset', 'files', 'all'}
+    reporton : {None, 'none', 'datasets', 'files', 'all'}
       If `None`, reporting will be based on the `type` property of the
       incoming annotated paths.
     ds : Dataset
@@ -267,6 +273,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                 res.update(res, **kwargs)
                 if 'type' in qap:
                     res['type'] = qap['type']
+                print("1", res)
                 yield res
             else:
                 to_query_available.append(qap)
@@ -319,6 +326,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                     r['query_matched'] = ap['query_matched']
                 if r.get('type', None) == 'file':
                     r['parentds'] = op.normpath(op.join(ds.path, qap['metaprovider']))
+                print("2", r)
                 yield r
                 reported.add(qap['rpath'])
 
@@ -1025,3 +1033,87 @@ class Metadata(Interface):
                  if meta else ' -' if 'metadata' in res else ' aggregated',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(ensure_list(meta['tag'])))))
+
+
+def ng_query_aggregated_metadata(reporton: str,
+                                 ds: Dataset,
+                                 aps: List[Dict],
+                                 recursive: bool = False,
+                                 **kwargs):
+    """Query metadata in a metadata store
+
+    Query paths (`aps["path"]`) have to be contained in the poth of the ds.
+    This requirement is due to the colling conventions of the legacy
+    implementation.
+
+    This function doesn't cache anything, hence the caller must
+    make sure to only call this once per dataset to avoid waste.
+
+    Parameters
+    ----------
+    reporton : {None, 'none', 'datasets', 'files', 'all'}
+      If `None`, reporting will be based on the `type` property of the
+      incoming annotated paths.
+    ds : Dataset
+      Dataset to query
+    aps : list
+      Sequence of annotated paths to query metadata for.
+    recursive : bool
+      Whether or not to report metadata underneath all query paths
+      recursively.
+    **kwargs
+      Any other argument will be passed on to the query result dictionary.
+
+    Returns
+    -------
+    generator
+      Of result dictionaries.
+    """
+
+    annotated_paths = aps
+    dataset = ds
+
+    matching_types = {
+        None: None,
+        "files": ("file",),
+        "datasets": ("dataset",),
+        "all": ("dataset", "file")
+    }[reporton]
+
+    for annotated_path in annotated_paths:
+        relative_path = Path(annotated_path["path"]).relative_to(dataset.pathobj)
+        if matching_types is None:
+            matching_types = (annotated_path["type"],)
+
+        for dump_result in Dump()(dataset=dataset.pathobj,
+                                  path=str(relative_path),
+                                  recursive=recursive,
+                                  result_renderer="disabled",
+                                  return_type="generator"):
+
+            if dump_result["status"] != "ok":
+                continue
+
+            metadata = dump_result["metadata"]
+            if metadata["type"] not in matching_types:
+                continue
+
+            yield {
+                "status": "ok",
+                "type": metadata["type"],
+                "path": str(dump_result["path"]),
+                "dsid": metadata["dataset_id"],
+                "refcommit": metadata["dataset_version"],
+                "metadata": {
+                    metadata["extractor_name"]: metadata["extracted_metadata"]
+                }
+            }
+    return None
+
+
+# Use new-generation metadata if available, else legacy metadata.
+try:
+    from datalad_metalad.dump import Dump
+    query_aggregated_metadata = ng_query_aggregated_metadata
+except ImportError:
+    query_aggregated_metadata = legacy_query_aggregated_metadata
