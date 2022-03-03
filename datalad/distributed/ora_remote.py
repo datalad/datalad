@@ -568,9 +568,8 @@ class SSHRemoteIO(IOBase):
             with self.ensure_writeable(path.parent):
                 self._run('rm {}'.format(sh_quote(str(path))), check=True)
         except RemoteCommandFailedError as e:
-            raise RIARemoteError(f"Unable to remove {path}. Could not "
-                                 "obtain write permission for containing"
-                                 "directory.") from e
+            raise RIARemoteError(f"Unable to remove {path} "
+                                 "or to obtain write permission in parent directory.") from e
 
     def remove_dir(self, path):
         with self.ensure_writeable(path.parent):
