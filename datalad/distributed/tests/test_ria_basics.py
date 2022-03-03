@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
+import stat
 
 from datalad.api import (
     Dataset,
@@ -34,6 +35,7 @@ from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
     SkipTest,
     assert_equal,
+    assert_false,
     assert_in,
     assert_not_in,
     assert_raises,
@@ -708,3 +710,82 @@ def test_sanitize_key():
                 ('/%&:', '%&s&a&c'),
             ):
         assert_equal(_sanitize_key(i), o)
+
+
+# Skipping on adjusted branch as a proxy for crippledFS. Write permissions of
+# the owner on a directory can't be revoked on VFAT. "adjusted branch" is a
+# bit broad but covers the CI cases. And everything RIA/ORA doesn't currently
+# properly run on crippled/windows anyway. Needs to be more precise when
+# RF'ing will hopefully lead to support on windows in principle.
+@skip_if_adjusted_branch
+@known_failure_windows
+@with_tempfile
+@with_tempfile
+def _test_permission(host, storepath, dspath):
+
+    # Test whether ORA correctly revokes and obtains write permissions within
+    # the annex object tree. That is: Revoke after ORA pushed a key to store
+    # in order to allow the object tree to safely be used with an ephemeral
+    # clone. And on removal obtain write permissions, like annex would
+    # internally on a drop (but be sure to restore if something went wrong).
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    ds = Dataset(dspath).create()
+    populate_dataset(ds)
+    ds.save()
+    assert_repo_status(ds.path)
+    testfile = 'one.txt'
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    if host:
+        store_url = "ria+ssh://{host}{path}".format(host=host,
+                                                    path=storepath)
+    else:
+        store_url = "ria+{}".format(storepath.as_uri())
+
+    create_store(io, storepath, '1')
+    create_ds_in_store(io, storepath, ds.id, '2', '1')
+    _, _, obj_tree = get_layout_locations(1, storepath, ds.id)
+    assert_true(obj_tree.is_dir())
+    file_key_in_store = obj_tree / 'X9' / '6J' / 'MD5E-s8--7e55db001d319a94b0b713529a756623.txt' / 'MD5E-s8--7e55db001d319a94b0b713529a756623.txt'
+
+    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    store_uuid = ds.siblings(name='store',
+                             return_type='item-or-list')['annex-uuid']
+    here_uuid = ds.siblings(name='here',
+                            return_type='item-or-list')['annex-uuid']
+
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
+    assert_false(file_key_in_store.exists())
+
+    ds.repo.call_annex(['copy', testfile, '--to', 'store'])
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
+    assert_true(file_key_in_store.exists())
+
+    # Revoke write permissions from parent dir in-store to test whether we
+    # still can drop (if we can obtain the permissions). Note, that this has
+    # no effect on VFAT.
+    file_key_in_store.parent.chmod(file_key_in_store.parent.stat().st_mode &
+                                   ~stat.S_IWUSR)
+    # we can't directly delete; key in store should be protected
+    assert_raises(PermissionError, file_key_in_store.unlink)
+
+    # ORA can still drop, since it obtains permission to:
+    ds.repo.call_annex(['drop', testfile, '--from', 'store'])
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
+    assert_false(file_key_in_store.exists())
+
+
+def test_obtain_permission():
+    yield skip_ssh(_test_permission), 'datalad-test'
+    yield _test_permission, None

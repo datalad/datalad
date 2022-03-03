@@ -1,8 +1,12 @@
+import functools
 import os
+import stat
+import sys
 from pathlib import (
     Path,
     PurePosixPath
 )
+from contextlib import contextmanager
 import requests
 import shutil
 from shlex import quote as sh_quote
@@ -20,6 +24,10 @@ from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
     verify_ria_url,
+)
+from datalad.utils import (
+    ensure_write_permission,
+    on_osx
 )
 
 
@@ -170,6 +178,9 @@ class IOBase(object):
 
 class LocalIO(IOBase):
     """IO operation if the object tree is local (e.g. NFS-mounted)"""
+
+    ensure_writeable = staticmethod(ensure_write_permission)
+
     def mkdir(self, path):
         path.mkdir(
             parents=True,
@@ -212,18 +223,21 @@ class LocalIO(IOBase):
         #         Set output stream for output/error/progress line
 
     def rename(self, src, dst):
-        src.rename(dst)
+        with self.ensure_writeable(dst.parent):
+            src.rename(dst)
 
     def remove(self, path):
         try:
-            path.unlink()
+            with self.ensure_writeable(path.parent):
+                path.unlink()
         except PermissionError as e:
-            raise RIARemoteError(
-                "Write permissions for a key's parent directory are "
-                "also required to drop content.") from e
+            raise RIARemoteError(f"Unable to remove {path}. Could not "
+                                 "obtain write permission for containing"
+                                 "directory.") from e
 
     def remove_dir(self, path):
-        path.rmdir()
+        with self.ensure_writeable(path.parent):
+            path.rmdir()
 
     def exists(self, path):
         return path.exists()
@@ -438,6 +452,54 @@ class SSHRemoteIO(IOBase):
             raise RIARemoteError("{}: {}".format(call, "".join(lines)))
         return "".join(lines[:-1])
 
+    @contextmanager
+    def ensure_writeable(self, path):
+        """Context manager to get write permission on `path` and restore
+        original mode afterwards.
+
+        If git-annex ever touched the key store, the keys will be in mode 444
+        directories, and we need to obtain permission first.
+
+        Parameters
+        ----------
+        path: Path
+          path to the target file
+        """
+
+        path = sh_quote(str(path))
+        # remember original mode -- better than to prescribe a fixed mode
+
+        if on_osx:
+            format_option = "-f%Dp"
+            # on macOS this would return decimal representation of mode (same
+            # as python's stat().st_mode
+            conversion = int
+        else:  # win is currently ignored anyway
+            format_option = "--format=\"%f\""
+            # in opposition to the above form for macOS, on debian this would
+            # yield the hexadecimal representation of the mode; hence conversion
+            # needed.
+            conversion = functools.partial(int, base=16)
+
+        output = self._run(f"stat {format_option} {path}",
+                           no_output=False, check=True)
+        mode = conversion(output)
+        if not mode & stat.S_IWRITE:
+            new_mode = oct(mode | stat.S_IWRITE)[-3:]
+            self._run(f"chmod {new_mode} {path}")
+            changed = True
+        else:
+            changed = False
+        try:
+            yield
+        finally:
+            if changed:
+                # restore original mode
+                self._run("chmod {mode} {file}".format(mode=oct(mode)[-3:],
+                                                       file=path),
+                          check=False)  # don't fail if path doesn't exist
+                                        # anymore
+
     def mkdir(self, path):
         self._run('mkdir -p {}'.format(sh_quote(str(path))))
 
@@ -498,18 +560,20 @@ class SSHRemoteIO(IOBase):
                     progress_cb(bytes_received)
 
     def rename(self, src, dst):
-        self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
+        with self.ensure_writeable(dst.parent):
+            self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
 
     def remove(self, path):
         try:
-            self._run('rm {}'.format(sh_quote(str(path))))
+            with self.ensure_writeable(path.parent):
+                self._run('rm {}'.format(sh_quote(str(path))), check=True)
         except RemoteCommandFailedError as e:
-            raise RIARemoteError(
-                "Write permissions for a key's parent"
-                "directory are also required to drop content.") from e
+            raise RIARemoteError(f"Unable to remove {path} "
+                                 "or to obtain write permission in parent directory.") from e
 
     def remove_dir(self, path):
-        self._run('rmdir {}'.format(sh_quote(str(path))))
+        with self.ensure_writeable(path.parent):
+            self._run('rmdir {}'.format(sh_quote(str(path))))
 
     def exists(self, path):
         try:

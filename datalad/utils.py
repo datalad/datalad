@@ -2689,3 +2689,59 @@ def check_symlink_capability(path, target):
             path.unlink()
         if target.exists():
             target.unlink()
+
+
+def obtain_write_permission(path):
+    """Obtains write permission for `path` and returns previous mode if a
+    change was actually made.
+
+    Parameters
+    ----------
+    path: Path
+      path to try to obtain write permission for
+
+    Returns
+    -------
+    int or None
+      previous mode of `path` as return by stat().st_mode if a change in
+      permission was actually necessary, `None` otherwise.
+    """
+
+    mode = path.stat().st_mode
+    # only IWRITE works on Windows, in principle
+    if not mode & stat.S_IWRITE:
+        path.chmod(mode | stat.S_IWRITE)
+        return mode
+    else:
+        return None
+
+
+@contextmanager
+def ensure_write_permission(path):
+    """Context manager to get write permission on `path` and
+    restore original mode afterwards.
+
+    Parameters
+    ----------
+    path: Path
+      path to the target file
+
+    Raises
+    ------
+    PermissionError
+       if write permission could not be obtained
+    """
+
+    restore = None
+    try:
+        restore = obtain_write_permission(path)
+        yield
+    finally:
+        if restore is not None:
+            try:
+                path.chmod(restore)
+            except FileNotFoundError:
+                # If `path` was deleted within the context block, there's
+                # nothing to do. Don't test exists(), though - asking for
+                # forgiveness to save a call.
+                pass
