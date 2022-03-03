@@ -132,9 +132,8 @@ class _CachedRepo(object):
         try:
             self._tmpdir.rmdir()
         except OSError as e:
-            lgr.warning(
-                'Failed to clean up temporary directory: %s',
-                exc_str(e))
+            ce = CapturedException(e)
+            lgr.warning('Failed to clean up temporary directory: %s', ce)
 
     def get_repotype(self):
         return type(self._repo)
