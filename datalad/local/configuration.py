@@ -139,8 +139,9 @@ class Configuration(Interface):
             configuration sources (including overrides via environment
             variables) are considered according to the normal
             rules of precedence. For action 'get' only 'branch' and 'local'
-            (with include 'global' here) are supported. For action 'dump',
-            a scope selection is ignored and all scopes are considered.""",
+            (which include 'global' here) are supported. For action 'dump',
+            a scope selection is ignored and all available scopes are
+            considered.""",
             constraints=EnsureChoice('global', 'local', 'branch', None)),
         spec=Parameter(
             args=("spec",),
@@ -200,7 +201,7 @@ class Configuration(Interface):
                 ds = require_dataset(
                     dataset,
                     check_installed=True,
-                    purpose='configuration')
+                    purpose='configure')
             except NoDatasetFound:
                 if action != 'dump' or dataset:
                     raise
