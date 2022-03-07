@@ -562,7 +562,12 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     Returns
     -------
     Dataset
-      Or raises an exception (InsufficientArgumentsError).
+      If a dataset could be determined.
+
+    Raises
+    ------
+    NoDatasetFound
+      If not dataset could be determined.
     """
     if dataset is not None and not isinstance(dataset, Dataset):
         dataset = Dataset(dataset)
@@ -587,8 +592,8 @@ def require_dataset(dataset, check_installed=True, purpose=None):
               dataset.path)
 
     if check_installed and not dataset.is_installed():
-        raise ValueError(u"No installed dataset found at "
-                         u"{0}.".format(dataset.path))
+        raise NoDatasetFound(
+            f"No installed dataset found at {dataset.path}")
 
     return dataset
 
