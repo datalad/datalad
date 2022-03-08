@@ -155,7 +155,9 @@ def diff_dataset(
         recursive=False,
         recursion_limit=None,
         eval_file_type=True,
-        reporting_order='depth-first'):
+        reporting_order='depth-first',
+        datasets_only=False,
+):
     """Internal helper to diff a dataset
 
     Parameters
@@ -195,6 +197,10 @@ def diff_dataset(
       and 'breadth-first' both report dataset content before considering
       subdatasets. Alternative 'bottom-up' mode is similar to 'depth-first'
       but dataset content is reported after reporting on subdatasets.
+    datasets_only : bool, optional
+      Consider only changes to (sub)datasets but limiting operation only to
+      paths of subdatasets.
+      Note: ATM incompatible with explicit specification of `path`.
 
     Yields
     ------
@@ -212,6 +218,11 @@ def diff_dataset(
     # we need to be able to compare with states that are not represented
     # in the worktree (anymore)
     if path:
+        if datasets_only:
+            raise NotImplementedError(
+                "Analysis of provided paths in datasets_only mode is not implemented"
+            )
+
         ps = []
         # sort any path argument into the respective subdatasets
         for p in sorted(ensure_list(path)):
@@ -282,7 +293,9 @@ def diff_dataset(
             annexinfo=annex,
             eval_file_type=eval_file_type,
             cache=content_info_cache,
-            order=reporting_order):
+            order=reporting_order,
+            datasets_only=datasets_only,
+    ):
         res.update(
             refds=ds.path,
             logger=lgr,
@@ -292,7 +305,7 @@ def diff_dataset(
 
 
 def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
-             annexinfo, eval_file_type, cache, order='depth-first'):
+             annexinfo, eval_file_type, cache, order='depth-first', datasets_only=False):
     if not ds.is_installed():
         # asked to query a subdataset that is not available
         lgr.debug("Skip diff of unavailable subdataset: %s", ds)
@@ -300,14 +313,29 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
 
     repo = ds.repo
     repo_path = repo.pathobj
-    # filter and normalize paths that match this dataset before passing them
-    # onto the low-level query method
-    paths = None if origpaths is None \
-        else OrderedDict(
-            (repo_path / p.relative_to(ds.pathobj), goinside)
-            for p, goinside in origpaths.items()
-            if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
+    if datasets_only:
+        assert not origpaths  # protected above with NotImplementedError
+        paths = OrderedDict(
+            (sds.pathobj.relative_to(ds.pathobj), False)
+            for sds in ds.subdatasets(
+                recursive=False,
+                state='present',
+                result_renderer='disabled',
+                result_xfm='datasets',
+            )
         )
+        if not paths:
+            # no subdatasets, nothing todo???
+            return
+    else:
+        # filter and normalize paths that match this dataset before passing them
+        # onto the low-level query method
+        paths = None if origpaths is None \
+            else OrderedDict(
+                (repo_path / p.relative_to(ds.pathobj), goinside)
+                for p, goinside in origpaths.items()
+                if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
+            )
     paths_arg = list(paths) if paths else None
     try:
         lgr.debug("Diff %s from '%s' to '%s'", ds, fr, to)
@@ -409,6 +437,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     eval_file_type=eval_file_type,
                     cache=cache,
                     order=order,
+                    datasets_only=datasets_only,
                 )
                 if order in ('depth-first', 'bottom-up'):
                     yield from _diff_ds(*call_args, **call_kwargs)
