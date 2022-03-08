@@ -14,6 +14,7 @@ import subprocess
 import logging
 from functools import wraps
 
+from datalad import ssh_manager
 from datalad.customremotes import (
     RemoteError,
     SpecialRemote,
@@ -320,12 +321,9 @@ class SSHRemoteIO(IOBase):
           on.
         """
 
-        from datalad.support.sshconnector import SSHManager
-        # connection manager -- we don't have to keep it around, I think
-        self.sshmanager = SSHManager()
         # the connection to the remote
         # we don't open it yet, not yet clear if needed
-        self.ssh = self.sshmanager.get_connection(
+        self.ssh = ssh_manager.get_connection(
             host,
             use_remote_annex_bundle=False,
         )
@@ -358,7 +356,6 @@ class SSHRemoteIO(IOBase):
             # TODO: Theoretically terminate() can raise if not successful.
             #       How to deal with that?
             self.shell.terminate()
-        self.sshmanager.close()
 
     def _append_end_markers(self, cmd):
         """Append end markers to remote command"""
