@@ -2719,7 +2719,8 @@ class GitRepo(CoreGitRepo):
             # and Git always reports POSIX paths
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
-            paths = [ut.PurePosixPath(p) for p in paths]
+            # note: will be list-ified below
+            paths = map(ut.PurePosixPath,  paths)
         elif paths is not None:
             return info
 
@@ -2952,7 +2953,7 @@ class GitRepo(CoreGitRepo):
         if paths:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
-            paths = [ut.Path(p) for p in paths]
+            paths = map(ut.Path, paths)
             paths = [
                 p.relative_to(self.pathobj) if p.is_absolute() else p
                 for p in paths
