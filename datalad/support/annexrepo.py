@@ -50,7 +50,10 @@ from datalad.dochelpers import (
 )
 from datalad.log import log_progress
 from datalad.runner.protocol import GeneratorMixIn
-from datalad.runner.utils import LineSplitter
+from datalad.runner.utils import (
+    AssemblingDecoderMixIn,
+    LineSplitter,
+)
 # must not be loads, because this one would log, and we need to log ourselves
 from datalad.support.json_py import json_loads
 from datalad.support.exceptions import CapturedException
@@ -1227,14 +1230,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         ------
         See `_call_annex()` for information on Exceptions.
         """
-        class GeneratorStdOutErrCapture(GeneratorMixIn, StdOutErrCapture):
+        class GeneratorStdOutErrCapture(GeneratorMixIn,
+                                        AssemblingDecoderMixIn,
+                                        StdOutErrCapture):
             def __init__(self):
                 GeneratorMixIn.__init__(self)
+                AssemblingDecoderMixIn.__init__(self)
                 StdOutErrCapture.__init__(self)
 
             def pipe_data_received(self, fd, data):
                 if fd == 1:
-                    self.send_result(("stdout", data.decode(self.encoding)))
+                    self.send_result(
+                        ("stdout", self.decode(fd, data, self.encoding)))
                     return
                 super().pipe_data_received(fd, data)
 
@@ -3772,12 +3779,16 @@ class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
         self.send_result(json_object)
 
 
-class AnnexInitOutput(WitlessProtocol):
+class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
     proc_out = True
     proc_err = True
 
+    def __init__(self, done_future=None, encoding=None):
+        WitlessProtocol.__init__(self, done_future, encoding)
+        AssemblingDecoderMixIn.__init__(self)
+
     def pipe_data_received(self, fd, byts):
-        line = byts.decode(self.encoding)
+        line = self.decode(fd, byts, self.encoding)
         if fd == 1:
             res = re.search("(scanning for .* files)", line, flags=re.IGNORECASE)
             if res:
