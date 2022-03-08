@@ -689,23 +689,14 @@ class CreateSibling(Interface):
                     to='HEAD',
                     # make explicit, but doesn't matter, no recursion in diff()
                     constant_refs=True,
-                    # contrain to the paths of all locally existing subdatasets
-                    path=[
-                        sds['path']
-                        for sds in ds.subdatasets(
-                            recursive=recursive,
-                            recursion_limit=recursion_limit,
-                            state='present',
-                            result_renderer='disabled')
-                    ],
                     # save cycles, we are only looking for datasets
                     annex=None,
                     untracked='no',
-                    # recursion was done faster by subdatasets()
-                    recursive=False,
+                    recursive=True,
                     # save cycles, we are only looking for datasets
                     eval_file_type=False,
                 )
+                # not installed subdatasets would be 'clean' so we would skip them
                 if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
             ]
             if not since:
