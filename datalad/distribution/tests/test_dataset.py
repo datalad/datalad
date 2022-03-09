@@ -271,7 +271,7 @@ def check_require_dataset(ds_path, topdir):
     os.mkdir(path)
     with chpwd(path):
         assert_raises(
-            InsufficientArgumentsError,
+            NoDatasetFound,
             require_dataset,
             None)
         create('.')
@@ -284,7 +284,7 @@ def check_require_dataset(ds_path, topdir):
             require_dataset('some', check_installed=False).path,
             abspath('some'))
         assert_raises(
-            ValueError,
+            NoDatasetFound,
             require_dataset,
             'some',
             check_installed=True)
