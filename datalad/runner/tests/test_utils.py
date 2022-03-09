@@ -178,19 +178,6 @@ def test_assembling_decoder_mix_in_multiple_fail():
     assert_equal(decoded_strings, ["A: ", "B: ", "C: "])
 
 
-@patch("datalad.runner.utils.logger")
-def xtest_assembling_decoder_mix_in_warning(logger_mock):
-    encoding = "utf-8"
-    data_bytes = "🐷🐶.".encode(encoding)
-
-    adm = AssemblingDecoderMixIn()
-    result = adm.decode(1, data_bytes[0:1], encoding)
-    assert_equal(result, '')
-    del adm
-
-    assert_equal(logger_mock.call_count, 1)
-
-
 def test_assembling_decoder_mix_in_warning():
     encoding = "utf-8"
     data_bytes = "🐷🐶.".encode(encoding)
