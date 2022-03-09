@@ -17,16 +17,6 @@ from typing import (
     Optional,
 )
 
-from datalad.dochelpers import borrowdoc
-from datalad.utils import (
-    auto_repr,
-    ensure_unicode,
-    generate_file_chunks,
-    join_cmdline,
-    try_multiple,
-    unlink,
-)
-
 
 class LineSplitter:
     """

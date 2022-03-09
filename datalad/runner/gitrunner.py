@@ -13,14 +13,14 @@ import logging
 import os
 import os.path as op
 
+from datalad.dochelpers import borrowdoc
+from datalad.utils import generate_file_chunks
+
 from .runner import (
     GeneratorMixIn,
     WitlessRunner,
 )
-from .utils import (
-    borrowdoc,
-    generate_file_chunks,
-)
+
 
 lgr = logging.getLogger('datalad.runner.gitrunner')
 

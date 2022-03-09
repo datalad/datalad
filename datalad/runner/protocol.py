@@ -16,8 +16,9 @@ from collections import deque
 from locale import getpreferredencoding
 from typing import Optional
 
+from datalad.utils import ensure_unicode
+
 from .exception import CommandError
-from .utils import ensure_unicode
 
 lgr = logging.getLogger('datalad.runner.protocol')
 
