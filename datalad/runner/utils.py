@@ -94,7 +94,7 @@ class LineSplitter:
 
 
 class AssemblingDecoderMixIn:
-    """ Mix in to safely decode data the is delivered in parts
+    """ Mix in to safely decode data that is delivered in parts
 
     This class can be used to decode data that is partially delivered.
     It detects partial encodings and stores the non-decoded data to
