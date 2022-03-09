@@ -11,26 +11,20 @@
 All runner-related code imports from here, so this is a comprehensive declaration
 of utility dependencies.
 """
+import logging
+from collections import defaultdict
 from typing import (
     List,
     Optional,
 )
 
-from datalad.dochelpers import borrowdoc
-from datalad.utils import (
-    auto_repr,
-    ensure_unicode,
-    generate_file_chunks,
-    join_cmdline,
-    try_multiple,
-    unlink,
-)
 
+logger = logging.getLogger("datalad.runner.utils")
 
 
 class LineSplitter:
     """
-    An line splitter that handles 'streamed content' and is based
+    A line splitter that handles 'streamed content' and is based
     on python's built-in splitlines().
     """
     def __init__(self, separator: Optional[str] = None):
@@ -97,3 +91,37 @@ class LineSplitter:
 
     def finish_processing(self) -> Optional[str]:
         return self.remaining_data
+
+
+class AssemblingDecoderMixIn:
+    """ Mix in to safely decode data that is delivered in parts
+
+    This class can be used to decode data that is partially delivered.
+    It detects partial encodings and stores the non-decoded data to
+    combine it with additional data, that is delivered later,  and
+    decodes the combined data.
+
+    Any un-decoded data is stored in the 'remaining_data'-attribute.
+    """
+    def __init__(self):
+        self.remaining_data = defaultdict(bytes)
+
+    def decode(self, fd: int, data: bytes, encoding: str) -> str:
+        assembled_data = self.remaining_data[fd] + data
+        try:
+            unicode_str = assembled_data.decode(encoding)
+            self.remaining_data[fd] = b''
+        except UnicodeDecodeError as e:
+            unicode_str = assembled_data[:e.start].decode(encoding)
+            self.remaining_data[fd] = assembled_data[e.start:]
+        return unicode_str
+
+    def __del__(self):
+        if any(self.remaining_data.values()):
+            logger.debug(
+                "unprocessed data in AssemblingDecoderMixIn:\n"
+                +"\n".join(
+                    f"fd: {key}, data: {value}"
+                    for key, value in self.remaining_data.items())
+                + "\n")
+            logger.warning("unprocessed data in AssemblingDecoderMixIn")

@@ -47,7 +47,10 @@ from datalad.runner.nonasyncrunner import (
     STDOUT_FILENO,
 )
 from datalad.runner.protocol import GeneratorMixIn
-from datalad.runner.utils import LineSplitter
+from datalad.runner.utils import (
+    AssemblingDecoderMixIn,
+    LineSplitter,
+)
 from datalad.support.exceptions import (
     CommandError,
     GitIgnoreError,
@@ -299,18 +302,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         CommandError if the call exits with a non-zero status.
         """
 
-        class GeneratorStdOutErrCapture(GeneratorMixIn, StdOutErrCapture):
+        class GeneratorStdOutErrCapture(GeneratorMixIn,
+                                        AssemblingDecoderMixIn,
+                                        StdOutErrCapture):
             """
             Generator-runner protocol that yields stdout and captures stderr
             in the provided stderr_buffer.
             """
             def __init__(self):
                 GeneratorMixIn.__init__(self)
+                AssemblingDecoderMixIn.__init__(self)
                 StdOutErrCapture.__init__(self)
 
             def pipe_data_received(self, fd, data):
                 if fd in (1, 2):
-                    self.send_result((fd, data.decode(self.encoding)))
+                    self.send_result((fd, self.decode(fd, data, self.encoding)))
                 else:
                     StdOutErrCapture.pipe_data_received(self, fd, data)
 
