@@ -11,11 +11,15 @@
 All runner-related code imports from here, so this is a comprehensive declaration
 of utility dependencies.
 """
+import logging
 from collections import defaultdict
 from typing import (
     List,
     Optional,
 )
+
+
+logger = logging.getLogger("datalad.runner.utils")
 
 
 class LineSplitter:
@@ -111,3 +115,7 @@ class AssemblingDecoderMixIn:
             unicode_str = assembled_data[:e.start].decode(encoding)
             self.remaining_data[fd] = assembled_data[e.start:]
         return unicode_str
+
+    def __del__(self):
+        if any(self.remaining_data.values()):
+            logger.warning("unprocessed data in AssemblingDecoderMixIn")
