@@ -204,3 +204,8 @@ def test_assembling_decoder_mix_in_warning():
         assert_in(
             call.warning("unprocessed data in AssemblingDecoderMixIn"),
             logger_mock.mock_calls)
+        assert_in(
+            call.debug(
+                "unprocessed data in AssemblingDecoderMixIn:\n"
+                "fd: 1, data: b'\\xf0'\n"),
+            logger_mock.mock_calls)

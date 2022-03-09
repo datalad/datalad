@@ -118,4 +118,10 @@ class AssemblingDecoderMixIn:
 
     def __del__(self):
         if any(self.remaining_data.values()):
+            logger.debug(
+                "unprocessed data in AssemblingDecoderMixIn:\n"
+                +"\n".join(
+                    f"fd: {key}, data: {value}"
+                    for key, value in self.remaining_data.items())
+                + "\n")
             logger.warning("unprocessed data in AssemblingDecoderMixIn")
