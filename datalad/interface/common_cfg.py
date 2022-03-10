@@ -337,6 +337,24 @@ definitions = {
         'default': not on_windows,
         'type': EnsureBool(),
     },
+    'datalad.ssh.try-use-annex-bundled-git': {
+        'ui': ('question', {
+               'title': "Whether to attempt adjusting the PATH in a remote "
+                        "shell to include Git binaries located in a detected "
+                        "git-annex bundle",
+               'text': "If enabled, this will be a 'best-effort' attempt that "
+                       "only supports remote hosts with a Bourne shell and "
+                       "the `which` command available. The remote PATH must "
+                       "already contain a git-annex installation. "
+                       "If git-annex is not found, or the detected git-annex "
+                       "does not have a bundled Git installation, detection "
+                       "failure will not result in an error, but only slow "
+                       "remote execution by one-time sensing overhead per "
+                       "each opened connection."}),
+        'destination': 'global',
+        'default': False,
+        'type': EnsureBool(),
+    },
     'datalad.annex.retry': {
         'ui': ('question',
                {'title': 'Value for annex.retry to use for git-annex calls',
