@@ -1192,9 +1192,9 @@ def test_annex_ssh(topdir):
     from datalad import ssh_manager
 
     # check whether we are the first to use these sockets:
-    hash_1 = get_connection_hash('datalad-test', bundled=True)
+    hash_1 = get_connection_hash('datalad-test')
     socket_1 = opj(str(ssh_manager.socket_dir), hash_1)
-    hash_2 = get_connection_hash('datalad-test2', bundled=True)
+    hash_2 = get_connection_hash('datalad-test2')
     socket_2 = opj(str(ssh_manager.socket_dir), hash_2)
     datalad_test_was_open = exists(socket_1)
     datalad_test2_was_open = exists(socket_2)

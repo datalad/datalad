@@ -104,7 +104,7 @@ def test_ssh_open_close(tmp_path, tfile1):
     socket_path = None
     if _ssh_manager_is_multiplex:
         socket_path = opj(str(manager.socket_dir),
-                   get_connection_hash('datalad-test', bundled=True))
+                   get_connection_hash('datalad-test'))
         # TODO: facilitate the test when it didn't exist
         existed_before = exists(socket_path)
 
@@ -162,9 +162,9 @@ def test_ssh_manager_close():
         manager.get_connection('ssh://datalad-test').open()
 
     ok_(exists(opj(str(manager.socket_dir),
-                   get_connection_hash('datalad-test', bundled=True))))
+                   get_connection_hash('datalad-test'))))
     ok_(exists(opj(str(manager.socket_dir),
-                   get_connection_hash('datalad-test2', bundled=True))))
+                   get_connection_hash('datalad-test2'))))
 
     manager.close()
 
@@ -266,27 +266,6 @@ def test_ssh_compound_cmds():
 
 
 @skip_if_on_windows
-@skip_nomultiplex_ssh
-def test_ssh_close_target():
-    manager = SSHManager()
-    path0 = manager.socket_dir / get_connection_hash(
-        'datalad-test', bundled=True)
-    path1 = manager.socket_dir / get_connection_hash(
-        'datalad-test', bundled=False)
-    existed0 = path0.exists()
-    existed1 = path1.exists()
-    manager.get_connection('ssh://datalad-test').open()
-    manager.get_connection('ssh://datalad-test',
-                           use_remote_annex_bundle=False).open()
-    manager.close(ctrl_path=[str(path0)])
-    # The requested path is closed.
-    eq_(existed0, path0.exists())
-    ok_(path1.exists())
-    if not existed1:
-        path1.unlink()
-
-
-@skip_if_on_windows
 @skip_ssh
 def test_ssh_custom_identity_file():
     ifile = "/tmp/dl-test-ssh-id"  # Travis
@@ -302,8 +281,7 @@ def test_ssh_custom_identity_file():
             if _ssh_manager_is_multiplex:
                 expected_socket = op.join(
                     str(manager.socket_dir),
-                    get_connection_hash("datalad-test", identity_file=ifile,
-                                        bundled=True))
+                    get_connection_hash("datalad-test", identity_file=ifile))
                 ok_(exists(expected_socket))
             manager.close()
             assert_in("-i", cml.out)
