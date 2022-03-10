@@ -21,6 +21,11 @@ from datalad.customremotes import (
 )
 from datalad.customremotes.main import main as super_main
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    AccessDeniedError,
+    AccessFailedError,
+    DownloadError
+)
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
@@ -737,7 +742,21 @@ class HTTPRemoteIO(object):
     def read_file(self, file_path):
 
         from datalad.support.network import download_url
-        content = download_url(self.store_url + file_path.as_posix())
+        url = self.store_url + file_path.as_posix()
+        try:
+            content = download_url(url)
+        except DownloadError as e:
+            # Note: This comes from the downloader. `check_response_status`
+            # in downloaders/http.py does not currently use
+            # `raise_from_status`, hence we don't get a proper HTTPError to
+            # check for a 404 and thereby distinguish from connection issues.
+            # When this is addressed in the downloader code, we need to
+            # adjust here.
+            if "not found" in str(e):
+                # Raise uniform exception across IO classes:
+                raise FileNotFoundError(f"{url} not found.") from e
+            else:
+                raise
         return content
 
 
@@ -921,6 +940,31 @@ class RIARemote(SpecialRemote):
                     " %s" % target
                 )
 
+        except AccessFailedError as exc:
+            # Downloader failed to access the store. Note, that the case of a
+            # 404 on the config file's URL is already handled as a
+            # FileNotFoundError (as raised by HTTPRemoteIO.read_file). Hence,
+            # if we get here there's a broader issue connecting to that
+            # store and it probably doesn't make sense to keep sending
+            # requests by treating it as a read-only store.
+
+            # RemoteError currently has `__cause__` put into its __str__
+            # unconditionally and this is what `annexremote` will put into a
+            # message to annex. Hence, cut off the ties here rather than
+            # raising "from exc" and provide a message that can be parsed by
+            # a regular user.
+            # TODO: How to deal with that needs to be reconsidered with now
+            # supported logging from within special remotes.
+            url = self.ria_store_url[4:] + dataset_tree_version_file.as_posix()
+            raise RIARemoteError(f"RIA store unavailable: Failed to access "
+                                 f"{url}")
+        except AccessDeniedError as exc:
+            # As with AccessFailedError above, reword error since message
+            # will be user-facing:
+            url = self.ria_store_url[4:] + dataset_tree_version_file.as_posix()
+            raise RIARemoteError(f"RIA store unavailable: Access denied to"
+                                 f" {url}")
+
     def verify_ds_in_store(self):
         """Check whether the dataset exists in store and reports a layout
         version we know
@@ -950,6 +994,32 @@ class RIARemote(SpecialRemote):
                 raise e
             else:
                 raise NoLayoutVersion from e
+
+        except AccessFailedError as exc:
+            # Downloader failed to access the store. Note, that the case of a
+            # 404 on the config file's URL is already handled as a
+            # FileNotFoundError (as raised by HTTPRemoteIO.read_file). Hence,
+            # if we get here there's a broader issue connecting to that
+            # store and it probably doesn't make sense to keep sending
+            # requests by treating it as a read-only store.
+
+            # RemoteError currently has `__cause__` put into its __str__
+            # unconditionally and this is what `annexremote` will put into a
+            # message to annex. Hence, cut off the ties here rather than
+            # raising "from exc" and provide a message that can be parsed by
+            # a regular user.
+            # TODO: How to deal with that needs to be reconsidered with now
+            # supported logging from within special remotes.
+
+            url = self.ria_store_url[4:] + object_tree_version_file.as_posix()
+            raise RIARemoteError(f"Dataset unavailable from RIA store: "
+                                 f"Failed to access {url}.")
+        except AccessDeniedError as exc:
+            # As with AccessFailedError above, reword error since message
+            # will be user-facing:
+            url = self.ria_store_url[4:] + object_tree_version_file.as_posix()
+            raise RIARemoteError(f"Dataset unavailable from RIA store: "
+                                 f" Access denied to {url}.")
 
     def _load_cfg(self, gitdir, name):
         # Whether or not to force writing to the remote. Currently used to
