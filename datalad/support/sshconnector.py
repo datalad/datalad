@@ -98,7 +98,7 @@ class BaseSSHConnection(object):
     """Representation of an SSH connection.
     """
     def __init__(self, sshri, identity_file=None,
-                 use_remote_annex_bundle=True, force_ip=False):
+                 use_remote_annex_bundle=None, force_ip=False):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -110,12 +110,20 @@ class BaseSSHConnection(object):
           or another resource identifier that can be converted into an SSHRI.
         identity_file : str or None
           Value to pass to ssh's -i option.
-        use_remote_annex_bundle : bool
-          If set, look for a git-annex installation on the remote and
-          prefer its binaries in the search path (i.e. prefer a bundled
-          Git over a system package).
+        use_remote_annex_bundle : bool, optional
+          If enabled, look for a git-annex installation on the remote and
+          prefer its Git binaries in the search path (i.e. prefer a bundled
+          Git over a system package). See also the configuration setting
+          datalad.ssh.try-use-annex-bundled-git
         force_ip : {False, 4, 6}
            Force the use of IPv4 or IPv6 addresses with -4 or -6.
+
+        .. versionchanged:: 0.16
+           The default for `use_remote_annex_bundle` changed from `True`
+           to `None`. Instead of attempting to use a potentially available
+           git-annex bundle on the remote host by default, this behavior
+           is now conditional on the `datalad.ssh.try-use-annex-bundled-git`
+           (off by default).
         """
         self._runner = None
 
@@ -157,8 +165,10 @@ class BaseSSHConnection(object):
         return self._runner
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
+        from datalad import cfg
         # locate annex and set the bundled vs. system Git machinery in motion
-        if self._use_remote_annex_bundle:
+        if self._use_remote_annex_bundle \
+                or cfg.obtain('datalad.ssh.try-use-annex-bundled-git'):
             remote_annex_installdir = self.get_annex_installdir()
             if remote_annex_installdir:
                 # make sure to use the bundled git version if any exists
@@ -600,19 +610,31 @@ class BaseSSHManager(object):
 
     assure_initialized = ensure_initialized
 
-    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+    def get_connection(self, url, use_remote_annex_bundle=None, force_ip=False):
         """Get an SSH connection handler
 
         Parameters
         ----------
         url: str
           ssh url
+        use_remote_annex_bundle : bool, optional
+          If enabled, look for a git-annex installation on the remote and
+          prefer its Git binaries in the search path (i.e. prefer a bundled
+          Git over a system package). See also the configuration setting
+          datalad.ssh.try-use-annex-bundled-git
         force_ip : {False, 4, 6}
           Force the use of IPv4 or IPv6 addresses.
 
         Returns
         -------
         BaseSSHConnection
+
+        .. versionchanged:: 0.16
+           The default for `use_remote_annex_bundle` changed from `True`
+           to `None`. Instead of attempting to use a potentially available
+           git-annex bundle on the remote host by default, this behavior
+           is now conditional on the `datalad.ssh.try-use-annex-bundled-git`
+           (off by default).
         """
         raise NotImplementedError
 
@@ -654,19 +676,31 @@ class NoMultiplexSSHManager(BaseSSHManager):
     """Does not "manage" and just returns a new connection
     """
 
-    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+    def get_connection(self, url, use_remote_annex_bundle=None, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
         ----------
         url: str
           ssh url
+        use_remote_annex_bundle : bool, optional
+          If enabled, look for a git-annex installation on the remote and
+          prefer its Git binaries in the search path (i.e. prefer a bundled
+          Git over a system package). See also the configuration setting
+          datalad.ssh.try-use-annex-bundled-git
         force_ip : {False, 4, 6}
           Force the use of IPv4 or IPv6 addresses.
 
         Returns
         -------
         SSHConnection
+
+        .. versionchanged:: 0.16
+           The default for `use_remote_annex_bundle` changed from `True`
+           to `None`. Instead of attempting to use a potentially available
+           git-annex bundle on the remote host by default, this behavior
+           is now conditional on the `datalad.ssh.try-use-annex-bundled-git`
+           (off by default).
         """
         sshri, identity_file = self._prep_connection_args(url)
 
@@ -743,19 +777,31 @@ class MultiplexSSHManager(BaseSSHManager):
                 len(self._prev_connections))
     assure_initialized = ensure_initialized
 
-    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+    def get_connection(self, url, use_remote_annex_bundle=None, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
         ----------
         url: str
           ssh url
+        use_remote_annex_bundle : bool, optional
+          If enabled, look for a git-annex installation on the remote and
+          prefer its Git binaries in the search path (i.e. prefer a bundled
+          Git over a system package). See also the configuration setting
+          datalad.ssh.try-use-annex-bundled-git
         force_ip : {False, 4, 6}
           Force the use of IPv4 or IPv6 addresses.
 
         Returns
         -------
         SSHConnection
+
+        .. versionchanged:: 0.16
+           The default for `use_remote_annex_bundle` changed from `True`
+           to `None`. Instead of attempting to use a potentially available
+           git-annex bundle on the remote host by default, this behavior
+           is now conditional on the `datalad.ssh.try-use-annex-bundled-git`
+           (off by default).
         """
         sshri, identity_file = self._prep_connection_args(url)
 
