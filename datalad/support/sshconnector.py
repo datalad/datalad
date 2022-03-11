@@ -53,7 +53,7 @@ lgr = logging.getLogger('datalad.support.sshconnector')
 
 
 def get_connection_hash(hostname, port='', username='', identity_file='',
-                        bundled='', force_ip=False):
+                        bundled=None, force_ip=False):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
@@ -63,7 +63,19 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
 
     Identity file corresponds to a file that will be passed via ssh's -i
     option.
+
+    All parameters correspond to the respective properties of an SSH
+    connection, except for `bundled`, which is unused.
+
+    .. deprecated:: 0.16
+       The ``bundled`` argument is ignored.
     """
+    if bundled is not None:
+        import warnings
+        warnings.warn(
+            "The `bundled` argument of `get_connection_hash()` is ignored. "
+            "It will be removed in a future release.",
+            DeprecationWarning)
     # returning only first 8 characters to minimize our chance
     # of hitting a limit on the max path length for the Unix socket.
     # Collisions would be very unlikely even if we used less than 8.
@@ -71,13 +83,12 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{identity_file}{username}{bundled}{force_ip}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}{force_ip}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
             identity_file=identity_file,
             username=username,
-            bundled=bundled,
             force_ip=force_ip or ''
         ).encode('utf-8')).hexdigest()[:8]
 
@@ -753,7 +764,6 @@ class MultiplexSSHManager(BaseSSHManager):
             port=sshri.port,
             identity_file=identity_file or "",
             username=sshri.username,
-            bundled=use_remote_annex_bundle,
             force_ip=force_ip,
         )
         # determine control master:
