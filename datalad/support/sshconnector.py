@@ -347,27 +347,6 @@ class NoMultiplexSSHConnection(BaseSSHConnection):
     The connection is opened for execution of a single process, and closed
     as soon as the process end.
     """
-    def __init__(self, sshri, **kwargs):
-        """Create a connection handler
-
-        The actual opening of the connection is performed on-demand.
-
-        Parameters
-        ----------
-        sshri: SSHRI
-          SSH resource identifier (contains all connection-relevant info),
-          or another resource identifier that can be converted into an SSHRI.
-        **kwargs
-          Pass on to BaseSSHConnection
-        """
-        super().__init__(sshri, **kwargs)
-        self._ssh_open_args += [
-            # we presently do not support any interactive authentication
-            # at the time of process execution
-            '-o', 'PasswordAuthentication=no',
-            '-o', 'KbdInteractiveAuthentication=no',
-        ]
-
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
 
