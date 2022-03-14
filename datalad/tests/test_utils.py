@@ -118,6 +118,7 @@ from .utils import (
     skip_if,
     skip_if_no_module,
     skip_if_on_windows,
+    skip_if_root,
     skip_known_failure,
     SkipTest,
     skip_wo_symlink_capability,
@@ -1348,6 +1349,7 @@ def test_splitjoin_cmdline():
         eq_(join_cmdline(['abc', 'def']), 'abc def')
 
 
+@skip_if_root
 @with_tempfile
 def test_obtain_write_permission(path):
     path = Path(path)
@@ -1369,6 +1371,7 @@ def test_obtain_write_permission(path):
     path.write_text("yet another thing")
 
 
+@skip_if_root
 @with_tempfile(mkdir=True)
 def test_ensure_write_permission(path):
 

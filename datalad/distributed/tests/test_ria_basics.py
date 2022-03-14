@@ -47,6 +47,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     skip_if_adjusted_branch,
     skip_if_no_network,
+    skip_if_root,
     skip_ssh,
     skip_wo_symlink_capability,
     slow,
@@ -788,4 +789,4 @@ def _test_permission(host, storepath, dspath):
 
 def test_obtain_permission():
     yield skip_ssh(_test_permission), 'datalad-test'
-    yield _test_permission, None
+    yield skip_if_root(_test_permission), None
