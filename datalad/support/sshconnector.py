@@ -577,7 +577,9 @@ class MultiplexSSHConnection(BaseSSHConnection):
 
         # start control master:
         lgr.debug("Opening %s by calling %s", self, cmd)
-        proc = Popen(cmd)
+        # The following call is exempt from bandit's security checks because
+        # we/the user control the content of 'cmd'.
+        proc = Popen(cmd)  # nosec
         stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
 
         # wait till the command exits, connection is conclusively
