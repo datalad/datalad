@@ -15,7 +15,6 @@ git calls to a ssh remote without the need to reauthenticate.
 
 import fasteners
 import os
-import platform
 import logging
 from socket import gethostname
 from hashlib import md5
@@ -99,7 +98,7 @@ class BaseSSHConnection(object):
     """Representation of an SSH connection.
     """
 
-    env_name_datalad_windows_ssh_client = "DATALAD_WINDOWS_SSH_CLIENT"
+    cfg_datalad_windows_ssh_client = "datalad.windows.ssh.client"
 
     def __init__(self, sshri, identity_file=None,
                  use_remote_annex_bundle=None, force_ip=False):
@@ -165,14 +164,26 @@ class BaseSSHConnection(object):
 
     @property
     def ssh_command(self):
+        """determine which ssh client should be used.
+
+        On Windows OpenSSH for Windows is required. It is searched in its
+        default location. This can be overriden by setting the datalad
+        config variable 'datalad.windows.ssh.client' to the path of the
+        system ssh client.
+
+        If a location is stored in the config variable, it takes precedence
+        over the default location.
+        """
         if self._ssh_command:
             return self._ssh_command
 
         # If on windows, enforce use of windows provided ssh client. This is
         # done because other ssh clients, for example the git-bundled
         # ssh-client, might not work on windows.
-        if platform.system() == "Windows":
-            cmd = os.environ.get(self.env_name_datalad_windows_ssh_client, None)
+        if on_windows:
+            from datalad import cfg
+
+            cmd = cfg.get(self.cfg_datalad_windows_ssh_client)
             if cmd is None:
                 cmd = r"C:\Windows\System32\OpenSSH\ssh.exe"
             if not Path(cmd).exists():
@@ -180,8 +191,8 @@ class BaseSSHConnection(object):
                     f"SSH client ({cmd}) was not found.\nPlease "
                     f"install OpenSSH for Windows. If you have installed "
                     f"OpenSSH for Windows in another location than the default "
-                    f"location, please point the environment variable "
-                    f"{self.env_name_datalad_windows_ssh_client} to the "
+                    f"location, please set the datalad configuration key "
+                    f"'{self.cfg_datalad_windows_ssh_client}' to the "
                     f"location of the installed 'ssh.exe' file.")
                 raise RuntimeError("ssh-executable not found")
             self._ssh_command = cmd
