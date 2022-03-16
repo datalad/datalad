@@ -107,6 +107,19 @@ definitions = {
         'type': EnsureBool(),
         'default': False,
     },
+    'datalad.credentials.repeat-secret-entry': {
+        'ui': ('yesno', {
+               'title': 'Require entering secrets twice for interactive '
+                        'specification?'}),
+        'type': EnsureBool(),
+        'default': True,
+    },
+    'datalad.credentials.hidden-secret-entry': {
+        'ui': ('yesno', {
+               'title': 'Hide secret in interactive entry?'}),
+        'type': EnsureBool(),
+        'default': True,
+    },
     'datalad.credentials.githelper.noninteractive':{
         'ui': ('yesno', {
                'title': 'Non-interactive mode for git-credential helper',

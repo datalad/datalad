@@ -33,7 +33,7 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     eval_results,
 )
 from datalad.support.constraints import (
@@ -237,7 +237,7 @@ class Configuration(Interface):
                 res['message'] = '{}{}'.format(
                     res['name'],
                     suffix)
-            default_result_renderer(res)
+            generic_result_renderer(res)
             return
         # TODO source
         from datalad.ui import ui

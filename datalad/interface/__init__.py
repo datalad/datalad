@@ -80,6 +80,7 @@ _group_3misc = (
     'Miscellaneous commands',
     [
         ('datalad.local.configuration', 'Configuration'),
+        ('datalad.local.credentials', 'Credentials'),
         ('datalad.local.wtf', 'WTF'),
         ('datalad.local.clean', 'Clean'),
         ('datalad.local.add_archive_content', 'AddArchiveContent'),

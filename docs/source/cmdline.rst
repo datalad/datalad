@@ -119,6 +119,7 @@ Helpers and support utilities
    datalad check-dates: Scan a dataset for dates and timestamps <generated/man/datalad-check-dates>
    datalad configuration: Get and set configuration <generated/man/datalad-configuration>
    datalad create-test-dataset: Test helper <generated/man/datalad-create-test-dataset>
+   datalad credentials: Get and set credentials <generated/man/datalad-credentials>
    datalad download-url: Download helper with support for DataLad's credential system <generated/man/datalad-download-url>
    datalad foreach-dataset: Run a command or Python code on the dataset and/or each of its sub-datasets <generated/man/datalad-foreach-dataset>
    datalad sshrun: Remote command execution using DataLad's connection management <generated/man/datalad-sshrun>

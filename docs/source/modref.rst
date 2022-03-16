@@ -96,6 +96,7 @@ Miscellaneous commands
    api.addurls
    api.check_dates
    api.configuration
+   api.credentials
    api.export_archive
    api.export_to_figshare
    api.no_annex
@@ -127,6 +128,7 @@ Configuration management
    :toctree: generated
 
    config
+   credman
 
 Test infrastructure
 ===================

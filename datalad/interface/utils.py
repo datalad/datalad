@@ -452,34 +452,36 @@ def eval_results(wrapped):
 
 
 def generic_result_renderer(res):
-    if res.get('status', None) != 'notneeded':
-        path = res.get('path', None)
-        if path and res.get('refds'):
-            try:
-                path = relpath(path, res['refds'])
-            except ValueError:
-                # can happen, e.g., on windows with paths from different
-                # drives. just go with the original path in this case
-                pass
-        ui.message('{action}({status}):{path}{type}{msg}{err}'.format(
-            action=ac.color_word(
-                res.get('action', '<action-unspecified>'),
-                ac.BOLD),
-            status=ac.color_status(res.get('status', '<status-unspecified>')),
-            path=' {}'.format(path) if path else '',
-            type=' ({})'.format(
-                ac.color_word(res['type'], ac.MAGENTA)
-            ) if 'type' in res else '',
-            msg=' [{}]'.format(
-                res['message'][0] % res['message'][1:]
-                if isinstance(res['message'], tuple) else res[
-                    'message'])
-            if res.get('message', None) else '',
-            err=ac.color_word(' [{}]'.format(
-                res['error_message'][0] % res['error_message'][1:]
-                if isinstance(res['error_message'], tuple) else res[
-                    'error_message']), ac.RED)
-            if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+    if res.get('status', None) == 'notneeded':
+        return
+
+    path = res.get('path', None)
+    if path and res.get('refds'):
+        try:
+            path = relpath(path, res['refds'])
+        except ValueError:
+            # can happen, e.g., on windows with paths from different
+            # drives. just go with the original path in this case
+            pass
+    ui.message('{action}({status}):{path}{type}{msg}{err}'.format(
+        action=ac.color_word(
+            res.get('action', '<action-unspecified>'),
+            ac.BOLD),
+        status=ac.color_status(res.get('status', '<status-unspecified>')),
+        path=' {}'.format(path) if path else '',
+        type=' ({})'.format(
+            ac.color_word(res['type'], ac.MAGENTA)
+        ) if 'type' in res else '',
+        msg=' [{}]'.format(
+            res['message'][0] % res['message'][1:]
+            if isinstance(res['message'], tuple) else res[
+                'message'])
+        if res.get('message', None) else '',
+        err=ac.color_word(' [{}]'.format(
+            res['error_message'][0] % res['error_message'][1:]
+            if isinstance(res['error_message'], tuple) else res[
+                'error_message']), ac.RED)
+        if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
 
 
 # keep for legacy compatibility
