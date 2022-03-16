@@ -590,20 +590,23 @@ def _configure_remote(
                         message='cannot configure as a common data source, '
                                 'URL protocol is not http or https',
                         **result_props)
-                elif f'remote.{name}.annex-uuid' not in repo.config:
-                    yield dict(
-                        status='impossible',
-                        message='cannot configure as a common data source; '
-                                'the remote has no annex UUID, which may '
-                                'indicate absence of remote git-annex branch; '
-                                'consider running push first',
-                        **result_props)
                 else:
                     # XXX what if there is already a special remote
                     # of this name? Above check for remotes ignores special
                     # remotes. we need to `git annex dead REMOTE` on reconfigure
                     # before we can init a new one
                     # XXX except it is not enough
+
+                    # Warn if configuring something that has no annex UUID
+                    # which will produce a weird entry in git-annex:remote.log
+                    if f'remote.{name}.annex-uuid' not in repo.config:
+                        lgr.warning(
+                            f'Configuring the remote {name} as a common data'
+                            f'source {as_common_datasrc}, but the resulting '
+                            f'special remote configuration may be incomplete. '
+                            f'The {name} remote has no annex UUID, which may '
+                            f'indicate absence of git-annex branch on the '
+                            f'remote end; consider pushing / updating first.')
 
                     # make special remote of type=git (see #335)
                     repo.call_annex([
