@@ -167,12 +167,9 @@ class BaseSSHConnection(object):
         """determine which ssh client should be used.
 
         On Windows OpenSSH for Windows is required. It is searched in its
-        default location. This can be overriden by setting the datalad
+        default location. This can be overridden by setting the datalad
         config variable 'datalad.windows.ssh.client' to the path of the
         system ssh client.
-
-        If a location is stored in the config variable, it takes precedence
-        over the default location.
         """
         if self._ssh_command:
             return self._ssh_command
@@ -183,9 +180,7 @@ class BaseSSHConnection(object):
         if on_windows:
             from datalad import cfg
 
-            cmd = cfg.get(self.cfg_datalad_windows_ssh_client)
-            if cmd is None:
-                cmd = r"C:\Windows\System32\OpenSSH\ssh.exe"
+            cmd = cfg.obtain(self.cfg_datalad_windows_ssh_client)
             if not Path(cmd).exists():
                 lgr.error(
                     f"SSH client ({cmd}) was not found.\nPlease "

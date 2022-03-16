@@ -564,6 +564,17 @@ definitions = {
         'default': 'warning',
 
     },
+    'datalad.windows.ssh.client': {
+        'ui': ('question', {
+            'title': "Location of OpenSSH for Windows' ssh.exe",
+            'text': "To use git with ssh on Windows the Windows system ssh"
+                    "client, i.e. OpenSSH for Windows, has to be installed. "
+                    "If it is not installed in the default location, its "
+                    "location can be set in this variable."}),
+        'destination': 'global',
+        'type': EnsureStr(),
+        'default': r'C:\Windows\System32\OpenSSH\ssh.exe',
+    }
 }
 
 
