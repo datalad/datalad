@@ -30,6 +30,17 @@ from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
 
+
+def get_default_ssh():
+    from datalad.utils import on_windows
+    from pathlib import Path
+
+    windows_openssh_path = r'C:\Windows\System32\OpenSSH\ssh.exe'
+    if on_windows and Path(windows_openssh_path).exists():
+        return windows_openssh_path
+    return "ssh"
+
+
 subst_rule_docs = """\
 A substitution specification is a string with a match and substitution
 expression, each following Python's regular expression syntax. Both expressions
@@ -564,16 +575,18 @@ definitions = {
         'default': 'warning',
 
     },
-    'datalad.windows.ssh.client': {
+    'datalad.ssh.executable': {
         'ui': ('question', {
-            'title': "Location of OpenSSH for Windows' ssh.exe",
-            'text': "To use git with ssh on Windows the Windows system ssh"
-                    "client, i.e. OpenSSH for Windows, has to be installed. "
-                    "If it is not installed in the default location, its "
-                    "location can be set in this variable."}),
+            'title': "Name of ssh executable for 'datalad sshrun'",
+            'text': "Specifies the name of the ssh-client executable that"
+                    "'datalad sshrun' will use. This might be an absolute "
+                    "path. On Windows systems it is currently be default set "
+                    "to point to the ssh executable of OpenSSH for Windows, "
+                    "if OpenSSH for Windows is installed. On other systems it "
+                    "defaults to 'ssh'."}),
         'destination': 'global',
         'type': EnsureStr(),
-        'default': r'C:\Windows\System32\OpenSSH\ssh.exe',
+        'default_fn': get_default_ssh,
     }
 }
 

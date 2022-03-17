@@ -98,7 +98,7 @@ class BaseSSHConnection(object):
     """Representation of an SSH connection.
     """
 
-    cfg_datalad_windows_ssh_client = "datalad.windows.ssh.client"
+    cfg_datalad_windows_ssh_client = "datalad.ssh.executable"
 
     def __init__(self, sshri, identity_file=None,
                  use_remote_annex_bundle=None, force_ip=False):
