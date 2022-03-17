@@ -182,7 +182,7 @@ def _run_with_exception_handler(cmdlineargs):
             exit_code = 3
         else:
             # some unforeseen problem
-            lgr.error('%s (%s)', ce, exc.__class__.__name__)
+            lgr.error('%s (%s)', ce.message, ce.name)
         sys.exit(exit_code)
 
 
