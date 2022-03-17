@@ -343,10 +343,11 @@ test_script:
   - cd __testhome__
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
   - cmd: python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
-  - sh:  python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+  - sh: PATH=$PWD/../tools/coverage-bin:$PATH python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
 
 
 after_test:
+  - sh: python -m coverage combine -a /tmp/.coverage-entrypoints-*;
   - python -m coverage xml
   - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
   - cmd: .\codecov.exe -f "coverage.xml"

@@ -233,8 +233,8 @@ install:
 script:
   # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
   - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
-  # Test installation system-wide
-  - sudo pip install .
+  # Test installation for user
+  - sudo pip install --user .
   # Report WTF information using system wide installed version
   - datalad wtf
   - mkdir -p __testhome__
