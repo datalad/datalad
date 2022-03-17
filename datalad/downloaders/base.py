@@ -632,7 +632,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         bytes
           content
         """
-        lgr.info("Fetching %r", url)
+        lgr.debug("Fetching %r", url)
         # Do not return headers, just content
         out = self.access(self._fetch, url, **kwargs)
         return out[0]
