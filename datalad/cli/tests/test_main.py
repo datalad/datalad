@@ -69,22 +69,27 @@ def run_main(args, exit_code=0, expect_stderr=False):
     """
     was_mode = datalad.__api
     try:
-        with patch('sys.stderr', new_callable=StringIO) as cmerr:
-            with patch('sys.stdout', new_callable=StringIO) as cmout:
-                with assert_raises(SystemExit) as cm:
-                    main(["datalad"] + list(args))
-                eq_('cmdline', datalad.get_apimode())
-                assert_equal(cm.exception.code, exit_code)
-                stdout = cmout.getvalue()
-                stderr = cmerr.getvalue()
-                if expect_stderr is False:
-                    assert_equal(stderr, "")
-                elif expect_stderr is True:
-                    # do nothing -- just return
-                    pass
-                else:
-                    # must be a string
-                    assert_equal(stderr, expect_stderr)
+        # we need to catch "stdout" from multiple places:
+        # sys.stdout but also from the UI, which insists on holding
+        # a dedicated handle
+        fakeout = StringIO()
+        with patch('sys.stderr', new_callable=StringIO) as cmerr, \
+             patch('sys.stdout', new=fakeout) as cmout, \
+             patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
+            with assert_raises(SystemExit) as cm:
+                main(["datalad"] + list(args))
+            eq_('cmdline', datalad.get_apimode())
+            assert_equal(cm.exception.code, exit_code)
+            stdout = cmout.getvalue()
+            stderr = cmerr.getvalue()
+            if expect_stderr is False:
+                assert_equal(stderr, "")
+            elif expect_stderr is True:
+                # do nothing -- just return
+                pass
+            else:
+                # must be a string
+                assert_equal(stderr, expect_stderr)
     finally:
         # restore what we had
         datalad.__api = was_mode
