@@ -1281,7 +1281,7 @@ class GitRepo(CoreGitRepo):
 
         Parameters
         ----------
-        files: str
+        files: list of str
           list of paths to remove
         recursive: False
           whether to allow recursive removal from subdirectories
@@ -3569,22 +3569,29 @@ class GitRepo(CoreGitRepo):
 
         need_partial_commit = True if self.get_staged_paths() else False
 
+        # Store all deleted items since will be used in multiple analyses,
+        # no need to sift them out multiple times
+        all_deleted = {
+            f: props
+            for f, props in status.items()
+            if props.get('state', None) == 'deleted'
+        }
         # remove first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list
         to_remove = [
             # TODO remove pathobj stringification when delete() can
             # handle it
             str(f.relative_to(self.pathobj))
-            for f, props in status.items()
-            if props.get('state', None) == 'deleted' and
+            for f, props in all_deleted.items()
             # staged deletions have a gitshasum reported for them
             # those should not be processed as git rm will error
             # due to them being properly gone already
-            not props.get('gitshasum', None)]
+            if not props.get('gitshasum', None)
+        ]
         vanished_subds = any(
-            props.get('type', None) == 'dataset' and
-            props.get('state', None) == 'deleted'
-            for f, props in status.items())
+            props.get('type', None) == 'dataset'
+            for f, props in all_deleted.items()
+        )
         if to_remove:
             for r in self.remove(
                     to_remove,
