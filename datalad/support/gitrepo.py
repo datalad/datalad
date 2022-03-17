@@ -59,6 +59,7 @@ from datalad.utils import (
     optional_args,
     on_windows,
     getpwd,
+    path_is_subpath,
     posix_relpath,
     ensure_dir,
     generate_file_chunks,
@@ -3704,6 +3705,22 @@ class GitRepo(CoreGitRepo):
                        if k in (('git',) if hasattr(self, 'annexstatus')
                                 else tuple())}):
                 yield r
+
+        # https://github.com/datalad/datalad/issues/6558
+        # file could have become a directory. Unfortunately git
+        # would then mistakenly refuse to commit if that old path is also
+        # given to commit, so we better filter it out
+        if status_state['deleted'] and status_state['added']:
+            # check if any "deleted" is a directory now. Then for those
+            # there should be some other path under that directory in 'added'
+            for f in (_ for _ in status_state['deleted'] if _.is_dir()):
+                # this could potentially be expensive if lots of files become
+                # directories, but it is unlikely to happen often
+                # Note: PurePath.is_relative_to was added in 3.9 and seems slowish
+                # path_is_subpath faster, also if comparing to "in f.parents"
+                f_str = str(f)
+                if any(path_is_subpath(str(f2), f_str) for f2 in status_state['added']):
+                    status.pop(f)  # do not bother giving it to commit below in _save_post
 
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though

@@ -170,6 +170,16 @@ def test_renamed_file():
         ds.save(recursive=recursive)
         assert_repo_status(path)
 
+        # https://github.com/datalad/datalad/issues/6558
+        new = (ds.pathobj / "new")
+        new.unlink()
+        new.mkdir()
+        (new / "file").touch()
+        ds.repo.call_git(["add"], files=[str(new / "file")])
+        ds.save(recursive=recursive)
+        assert_repo_status(path)
+
+
     for recursive in False,:  #, True TODO when implemented
         for annex in True, False:
             yield check_renamed_file, recursive, annex
