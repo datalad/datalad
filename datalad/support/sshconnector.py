@@ -126,6 +126,7 @@ class BaseSSHConnection(object):
            (off by default).
         """
         self._runner = None
+        self._ssh_executable = None
 
         from datalad.support.network import SSHRI, is_ssh
         if not is_ssh(sshri):
@@ -157,6 +158,15 @@ class BaseSSHConnection(object):
 
     def close(self):
         raise NotImplementedError
+
+    @property
+    def ssh_executable(self):
+        """determine which ssh client executable should be used.
+        """
+        if not self._ssh_executable:
+            from datalad import cfg
+            self._ssh_executable = cfg.obtain("datalad.ssh.executable")
+        return self._ssh_executable
 
     @property
     def runner(self):
@@ -370,7 +380,7 @@ class NoMultiplexSSHConnection(BaseSSHConnection):
           stdout, stderr of the command run.
         """
         # there is no dedicated "open" step, put all args together
-        ssh_cmd = ["ssh"] + self._ssh_open_args + self._ssh_args
+        ssh_cmd = [self.ssh_executable] + self._ssh_open_args + self._ssh_args
         return self._exec_ssh(
             ssh_cmd,
             cmd,
@@ -464,13 +474,19 @@ class MultiplexSSHConnection(BaseSSHConnection):
         # by itself
         self.open()
 
-        ssh_cmd = ["ssh"] + self._ssh_args
+        ssh_cmd = [self.ssh_executable] + self._ssh_args
         return self._exec_ssh(
             ssh_cmd,
             cmd,
             options=options,
             stdin=stdin,
             log_output=log_output)
+
+    def _assemble_multiplex_ssh_cmd(self, additional_arguments):
+        return [self.ssh_executable] \
+               + additional_arguments \
+               + self._ssh_args \
+               + [self.sshri.as_str()]
 
     def is_open(self):
         if not self.ctrl_path.exists():
@@ -481,7 +497,8 @@ class MultiplexSSHConnection(BaseSSHConnection):
             )
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(["-O", "check"])
+
         lgr.debug("Checking %s by calling %s", self, cmd)
         try:
             # expect_stderr since ssh would announce to stderr
@@ -535,11 +552,13 @@ class MultiplexSSHConnection(BaseSSHConnection):
             return False
 
         # create ssh control master command
-        cmd = ["ssh"] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(self._ssh_open_args)
 
         # start control master:
         lgr.debug("Opening %s by calling %s", self, cmd)
-        proc = Popen(cmd)
+        # The following call is exempt from bandit's security checks because
+        # we/the user control the content of 'cmd'.
+        proc = Popen(cmd)  # nosec
         stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
 
         # wait till the command exits, connection is conclusively
@@ -564,7 +583,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             lgr.debug("Not closing %s since was not opened by itself", self)
             return
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(["-O", "stop"])
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, protocol=StdOutErrCapture)
