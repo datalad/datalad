@@ -35,9 +35,11 @@ def get_default_ssh():
     from datalad.utils import on_windows
     from pathlib import Path
 
-    windows_openssh_path = r'C:\Windows\System32\OpenSSH\ssh.exe'
-    if on_windows and Path(windows_openssh_path).exists():
-        return windows_openssh_path
+    if on_windows:
+        windows_openssh_path = \
+            environ.get("WINDIR", r"C:\Windows") + r"\System32\OpenSSH\ssh.exe"
+        if Path(windows_openssh_path).exists():
+            return windows_openssh_path
     return "ssh"
 
 
