@@ -3466,10 +3466,6 @@ class GitRepo(CoreGitRepo):
             # we want to be able to add items down the line
             # make sure to detach from prev. owner
             status = _status.copy()
-        status = OrderedDict(
-            (k, v) for k, v in status.items()
-            if v.get('state', None) != 'clean'
-        )
         return status
 
     def get_staged_paths(self):
@@ -3554,9 +3550,36 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
-        status = self._save_pre(paths, _status, **kwargs)
+        status = self._save_pre(paths, _status, **kwargs) or {}
         amend = kwargs.get('amend', False)
-        if not status and not (message and amend):
+
+        # Sort status into status by state with explicit list of states
+        # (excluding clean we do not care about) we expect to be present
+        # and which we know of (unless None), and modified_or_untracked hybrid
+        # since it is used below
+        status_state = {
+            k: {}
+            for k in (None,  # not cared of explicitly here
+                      'added',  # not cared of explicitly here
+                      # 'clean'  # not even wanted since nothing to do about those
+                      'deleted',
+                      'modified',
+                      'untracked',
+                      'modified_or_untracked',  # hybrid group created here
+                      )}
+        for f, props in status.items():
+            state = props.get('state', None)
+            if state == 'clean':
+                # we don't care about clean
+                continue
+            status_state[state][f] = props
+            # The hybrid one to retain the same order as in original status
+            if state in ('modified', 'untracked'):
+                status_state['modified_or_untracked'][f] = props
+
+        # TODO: check on those None's -- may be those are also "nothing to worry about"
+        # and we could just return?
+        if not any(status_state.values()) and not (message and amend):
             # all clean, nothing todo
             lgr.debug('Nothing to save in %r, exiting early', self)
             return
@@ -3569,29 +3592,20 @@ class GitRepo(CoreGitRepo):
 
         need_partial_commit = True if self.get_staged_paths() else False
 
-        # Store all deleted items since will be used in multiple analyses,
-        # no need to sift them out multiple times
-        all_deleted = {
-            f: props
-            for f, props in status.items()
-            if props.get('state', None) == 'deleted'
-        }
         # remove first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list
         to_remove = [
             # TODO remove pathobj stringification when delete() can
             # handle it
             str(f.relative_to(self.pathobj))
-            for f, props in all_deleted.items()
+            for f, props in status_state['deleted'].items()
             # staged deletions have a gitshasum reported for them
             # those should not be processed as git rm will error
             # due to them being properly gone already
-            if not props.get('gitshasum', None)
-        ]
+            if not props.get('gitshasum', None)]
         vanished_subds = any(
             props.get('type', None) == 'dataset'
-            for f, props in all_deleted.items()
-        )
+            for props in status_state['deleted'].values())
         if to_remove:
             for r in self.remove(
                     to_remove,
@@ -3609,17 +3623,17 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-        # TODO this additional query should not be, base on status as given
+        # TODO this additional query should not be, based on status as given
         # if anyhow possible, however, when paths are given, status may
         # not contain all required information. In case of path=None AND
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
         submodule_change = False
-        untracked_dirs = [f.relative_to(self.pathobj)
-                          for f, props in status.items()
-                          if props.get('state', None) == 'untracked' and
-                          props.get('type', None) == 'directory']
+        untracked_dirs = [
+            f.relative_to(self.pathobj)
+            for f, props in status_state['untracked'].items()
+            if props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
             to_add_submodules = [
@@ -3639,9 +3653,8 @@ class GitRepo(CoreGitRepo):
                     yield r
         to_stage_submodules = {
             f: props
-            for f, props in status.items()
-            if props.get('state', None) in ('modified', 'untracked')
-            and props.get('type', None) == 'dataset'}
+            for f, props in status_state['modified_or_untracked'].items()
+            if props.get('type', None) == 'dataset'}
         if to_stage_submodules:
             lgr.debug(
                 '%i submodule path(s) to stage in %r %s',
@@ -3657,8 +3670,12 @@ class GitRepo(CoreGitRepo):
             # the config has changed too
             self.config.reload()
             # need to include .gitmodules in what needs saving
-            status[self.pathobj.joinpath('.gitmodules')] = dict(
-                type='file', state='modified')
+            f = self.pathobj.joinpath('.gitmodules')
+            # add/modify 'status' for it in-place and thus need to adjust
+            # status_state as well
+            status_state['modified_or_untracked'][f] = \
+                status_state['modified'][f] = \
+                status[f] = dict(type='file', state='modified')
             if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
                 # we cannot simply hook into the coming add-call
                 # as this would go to annex, so make a dedicted git-add
@@ -3674,9 +3691,8 @@ class GitRepo(CoreGitRepo):
             # TODO remove pathobj stringification when add() can
             # handle it
             str(f.relative_to(self.pathobj)): props
-            for f, props in status.items()
-            if (props.get('state', None) in ('modified', 'untracked') and
-                not (f in to_add_submodules or f in to_stage_submodules))}
+            for f, props in status_state['modified_or_untracked'].items()
+            if not (f in to_add_submodules or f in to_stage_submodules)}
         if to_add:
             lgr.debug(
                 '%i path(s) to add to %s %s',
