@@ -97,9 +97,6 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
 class BaseSSHConnection(object):
     """Representation of an SSH connection.
     """
-
-    cfg_datalad_windows_ssh_client = "datalad.ssh.executable"
-
     def __init__(self, sshri, identity_file=None,
                  use_remote_annex_bundle=None, force_ip=False):
         """Create a connection handler
@@ -129,7 +126,7 @@ class BaseSSHConnection(object):
            (off by default).
         """
         self._runner = None
-        self._ssh_command = None
+        self._ssh_executable = None
 
         from datalad.support.network import SSHRI, is_ssh
         if not is_ssh(sshri):
@@ -164,37 +161,12 @@ class BaseSSHConnection(object):
 
     @property
     def ssh_executable(self):
-        """determine which ssh client should be used.
-
-        On Windows OpenSSH for Windows is required. It is searched in its
-        default location. This can be overridden by setting the datalad
-        config variable 'datalad.windows.ssh.client' to the path of the
-        system ssh client.
+        """determine which ssh client executable should be used.
         """
-        if self._ssh_command:
-            return self._ssh_command
-
-        # If on windows, enforce use of windows provided ssh client. This is
-        # done because other ssh clients, for example the git-bundled
-        # ssh-client, might not work on windows.
-        if on_windows:
+        if not self._ssh_executable:
             from datalad import cfg
-
-            cmd = cfg.obtain(self.cfg_datalad_windows_ssh_client)
-            if not Path(cmd).exists():
-                lgr.error(
-                    f"SSH client ({cmd}) was not found.\nPlease "
-                    f"install OpenSSH for Windows. If you have installed "
-                    f"OpenSSH for Windows in another location than the default "
-                    f"location, please set the datalad configuration key "
-                    f"'{self.cfg_datalad_windows_ssh_client}' to the "
-                    f"location of the installed 'ssh.exe' file.")
-                raise RuntimeError("ssh-executable not found")
-            self._ssh_command = cmd
-        else:
-            self._ssh_command = "ssh"
-        lgr.debug(f"using ssh command: {self._ssh_command}")
-        return self._ssh_command
+            self._ssh_executable = cfg.obtain("datalad.ssh.executable")
+        return self._ssh_executable
 
     @property
     def runner(self):
@@ -408,7 +380,7 @@ class NoMultiplexSSHConnection(BaseSSHConnection):
           stdout, stderr of the command run.
         """
         # there is no dedicated "open" step, put all args together
-        ssh_cmd = [self.ssh_command] + self._ssh_open_args + self._ssh_args
+        ssh_cmd = [self.ssh_executable] + self._ssh_open_args + self._ssh_args
         return self._exec_ssh(
             ssh_cmd,
             cmd,
@@ -502,7 +474,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         # by itself
         self.open()
 
-        ssh_cmd = [self.ssh_command] + self._ssh_args
+        ssh_cmd = [self.ssh_executable] + self._ssh_args
         return self._exec_ssh(
             ssh_cmd,
             cmd,
@@ -519,7 +491,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             )
             return False
         # check whether controlmaster is still running:
-        cmd = [self.ssh_command, "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = [self.ssh_executable, "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s", self, cmd)
         try:
             # expect_stderr since ssh would announce to stderr
@@ -573,7 +545,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             return False
 
         # create ssh control master command
-        cmd = [self.ssh_command] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
+        cmd = [self.ssh_executable] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
 
         # start control master:
         lgr.debug("Opening %s by calling %s", self, cmd)
@@ -604,7 +576,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             lgr.debug("Not closing %s since was not opened by itself", self)
             return
         # stop controlmaster:
-        cmd = [self.ssh_command, "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = [self.ssh_executable, "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, protocol=StdOutErrCapture)
