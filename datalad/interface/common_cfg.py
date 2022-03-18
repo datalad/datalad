@@ -580,7 +580,7 @@ definitions = {
             'title': "Name of ssh executable for 'datalad sshrun'",
             'text': "Specifies the name of the ssh-client executable that"
                     "'datalad sshrun' will use. This might be an absolute "
-                    "path. On Windows systems it is currently be default set "
+                    "path. On Windows systems it is currently by default set "
                     "to point to the ssh executable of OpenSSH for Windows, "
                     "if OpenSSH for Windows is installed. On other systems it "
                     "defaults to 'ssh'."}),
