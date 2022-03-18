@@ -482,6 +482,12 @@ class MultiplexSSHConnection(BaseSSHConnection):
             stdin=stdin,
             log_output=log_output)
 
+    def _assemble_multiplex_ssh_cmd(self, additional_arguments):
+        return [self.ssh_executable] \
+               + additional_arguments \
+               + self._ssh_args \
+               + [self.sshri.as_str()]
+
     def is_open(self):
         if not self.ctrl_path.exists():
             lgr.log(
@@ -491,7 +497,8 @@ class MultiplexSSHConnection(BaseSSHConnection):
             )
             return False
         # check whether controlmaster is still running:
-        cmd = [self.ssh_executable, "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(["-O", "check"])
+
         lgr.debug("Checking %s by calling %s", self, cmd)
         try:
             # expect_stderr since ssh would announce to stderr
@@ -545,7 +552,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             return False
 
         # create ssh control master command
-        cmd = [self.ssh_executable] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(self._ssh_open_args)
 
         # start control master:
         lgr.debug("Opening %s by calling %s", self, cmd)
@@ -576,7 +583,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             lgr.debug("Not closing %s since was not opened by itself", self)
             return
         # stop controlmaster:
-        cmd = [self.ssh_executable, "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(["-O", "stop"])
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, protocol=StdOutErrCapture)
