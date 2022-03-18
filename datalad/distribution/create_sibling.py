@@ -79,7 +79,7 @@ from datalad.support.network import (
     PathRI,
     RI,
 )
-from datalad.support.sshconnector import sh_quote
+from datalad.utils import quote_cmdlinearg as sh_quote
 from datalad.support.param import Parameter
 from datalad.utils import (
     make_tempfile,

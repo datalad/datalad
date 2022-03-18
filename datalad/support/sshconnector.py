@@ -352,7 +352,7 @@ class NoMultiplexSSHConnection(BaseSSHConnection):
 
         It is the callers responsibility to properly quote commands
         for remote execution (e.g. filename with spaces of other special
-        characters). Use the `sh_quote()` from the module for this purpose.
+        characters).
 
         Parameters
         ----------
