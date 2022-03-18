@@ -163,7 +163,7 @@ class BaseSSHConnection(object):
         raise NotImplementedError
 
     @property
-    def ssh_command(self):
+    def ssh_executable(self):
         """determine which ssh client should be used.
 
         On Windows OpenSSH for Windows is required. It is searched in its
