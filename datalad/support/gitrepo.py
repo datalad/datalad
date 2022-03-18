@@ -18,6 +18,7 @@ import logging
 from collections import (
     OrderedDict,
 )
+from itertools import chain
 from os import linesep
 from os.path import (
     join as opj,
@@ -3483,14 +3484,14 @@ class GitRepo(CoreGitRepo):
             lgr.debug(CapturedException(e))
             return []
 
-    def _save_post(self, message, status, partial_commit, amend=False,
+    def _save_post(self, message, files, partial_commit, amend=False,
                    allow_empty=False):
         # helper to commit changes reported in status
 
         # TODO remove pathobj stringification when commit() can
         # handle it
         to_commit = [str(f.relative_to(self.pathobj))
-                     for f, props in status.items()] \
+                     for f in files] \
                     if partial_commit else None
         if not partial_commit or to_commit or allow_empty or \
                 (amend and message):
@@ -3577,6 +3578,7 @@ class GitRepo(CoreGitRepo):
             # The hybrid one to retain the same order as in original status
             if state in ('modified', 'untracked'):
                 status_state['modified_or_untracked'][f] = props
+        del status  # to ensure it is no longer used
 
         # TODO: check on those None's -- may be those are also "nothing to worry about"
         # and we could just return?
@@ -3676,7 +3678,7 @@ class GitRepo(CoreGitRepo):
             # status_state as well
             status_state['modified_or_untracked'][f] = \
                 status_state['modified'][f] = \
-                status[f] = dict(type='file', state='modified')
+                dict(type='file', state='modified')
             if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
                 # we cannot simply hook into the coming add-call
                 # as this would go to annex, so make a dedicted git-add
@@ -3713,20 +3715,21 @@ class GitRepo(CoreGitRepo):
         if status_state['deleted'] and status_state['added']:
             # check if any "deleted" is a directory now. Then for those
             # there should be some other path under that directory in 'added'
-            for f in (_ for _ in status_state['deleted'] if _.is_dir()):
+            for f in [_ for _ in status_state['deleted'] if _.is_dir()]:
                 # this could potentially be expensive if lots of files become
                 # directories, but it is unlikely to happen often
                 # Note: PurePath.is_relative_to was added in 3.9 and seems slowish
                 # path_is_subpath faster, also if comparing to "in f.parents"
                 f_str = str(f)
                 if any(path_is_subpath(str(f2), f_str) for f2 in status_state['added']):
-                    status.pop(f)  # do not bother giving it to commit below in _save_post
+                    status_state['deleted'].pop(f)  # do not bother giving it to commit below in _save_post
 
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though
         # possibly different message). If an empty commit was okay before, it's
         # okay now.
-        self._save_post(message, status, need_partial_commit, amend=amend,
+        status_state.pop('modified_or_untracked')  # pop the hybrid state
+        self._save_post(message, chain(*status_state.values()), need_partial_commit, amend=amend,
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
