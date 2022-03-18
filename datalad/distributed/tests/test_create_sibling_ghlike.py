@@ -35,10 +35,6 @@ def test_invalid_call(path):
     # no dataset
     assert_raises(ValueError, create_sibling_gin, 'bogus', dataset=path)
     ds = Dataset(path).create()
-    # without authorization
-    # force disable any configured token
-    with patch('datalad.distributed.create_sibling_ghlike.Token', None):
-        assert_raises(ValueError, ds.create_sibling_gin, 'bogus')
     # unsupported name
     assert_raises(
         ValueError,
