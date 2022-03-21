@@ -389,6 +389,6 @@ class AnnexSpecialRemoteProgressBar(ProgressBarBase):
         super(AnnexSpecialRemoteProgressBar, self).update(*args, **kwargs)
         # now use stored value
         if self.remote:
-            self.remote.progress(self.current)
+            self.remote.send_progress(self.current)
 
 progressbars['annex-remote'] = AnnexSpecialRemoteProgressBar
