@@ -52,7 +52,10 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                cause = getattr(exc, '__cause__', None)
+                # if we have a cause, use it, but if not report the top-level
+                # exception, because otherwise user-facing messaging will simply
+                # say "failed"
+                cause = getattr(exc, '__cause__', None) or ce
                 debug_msg = f"Failed to download {url} for key {key}: {ce}"
                 if cause:
                     debug_msg += f' [{cause}]'
