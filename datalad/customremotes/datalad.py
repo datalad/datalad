@@ -46,7 +46,10 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             urls.append(url)
             try:
                 downloaded_path = self._providers.download(
-                    url, path=file, overwrite=True
+                    url, path=file, overwrite=True,
+                    # this is adswa poking in the dark, trying to get progress
+                    # reporting and succeeding for unknown reasons
+                    progress_handler=self.annex.progress
                 )
                 assert(downloaded_path == file)
                 return
