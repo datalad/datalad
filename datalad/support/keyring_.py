@@ -86,7 +86,8 @@ class Keyring(object):
         try:
             return self._keyring.delete_password(self._get_service_name(name), field)
         except self.__keyring_mod.errors.PasswordDeleteError as exc:
-            if 'not found' in str(exc):
+            exc_str = str(exc).lower()
+            if 'not found' in exc_str or 'no such password' in exc_str:
                 return
             raise
 

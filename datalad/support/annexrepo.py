@@ -809,8 +809,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
             )
         except CommandError as e:
-            if 'Not a valid object name git-annex:remote.log' in e.stderr:
-                # no special remotes configures - might still be in the journal
+            if (
+                ('Not a valid object name git-annex:remote.log' in e.stderr) or  # e.g. git 2.30.2
+                ("fatal: path 'remote.log' does not exist in 'git-annex'" in e.stderr)  # e.g. 2.35.1+next.20220211-1
+            ):
+                # no special remotes configured - might still be in the journal
                 pass
             else:
                 # some unforeseen error
