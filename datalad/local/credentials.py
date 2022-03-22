@@ -342,15 +342,24 @@ class Credentials(Interface):
         # renderer can be used
         if 'name' in res:
             res['action'] = res['name']
-        res['status'] = res.get('cred_type', 'secret')
+        res['status'] = '{} {}'.format(
+            res.get('cred_type', 'secret'),
+            '✓' if res.get('cred_secret') else '✗',
+        )
+
         if 'message' not in res:
             # give the names of all properties
             # but avoid duplicating the type, hide the prefix,
             # add removal marker for vanished properties
             res['message'] = ','.join(
-                p[5:] if res[p] else f':{p[5:]}' for p in res
-                if p.startswith('cred_') and p not in (
-                    'cred_secret', 'cred_type'))
+                '{}{}{}{}'.format(
+                    f':{p[5:]}' if res[p] is None else p[5:],
+                    '' if res[p] is None else '=',
+                    '' if res[p] is None else res[p][:25],
+                    '…' if res[p] and len(res[p]) > 25 else '',
+                )
+                for p in sorted(res)
+                if p.startswith('cred_') and p not in ('cred_type', 'cred_secret'))
         generic_result_renderer(res)
 
 
