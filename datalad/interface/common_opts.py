@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.results import known_result_xfms
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureBool,
     EnsureCallable,
     EnsureChoice,
     EnsureInt,
@@ -34,13 +35,43 @@ location_description = Parameter(
 recursion_flag = Parameter(
     args=("-r", "--recursive",),
     action="store_true",
-    doc="""if set, recurse into potential subdataset""")
+    doc="""if set, recurse into potential subdatasets""")
 
 recursion_limit = Parameter(
     args=("-R", "--recursion-limit",),
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
-    doc="""limit recursion into subdataset to the given number of levels""")
+    doc="""limit recursion into subdatasets to the given number of levels""")
+
+contains = Parameter(
+    args=('--contains',),
+    metavar='PATH',
+    action='append',
+    doc="""limit to the subdatasets containing the
+    given path. If a root path of a subdataset is given, the last
+    considered dataset will be the subdataset itself.[CMD:  This
+    option can be given multiple times CMD][PY:  Can be a list with
+    multiple paths PY], in which case datasets that
+    contain any of the given paths will be considered.""",
+    constraints=EnsureStr() | EnsureNone())
+
+fulfilled = Parameter(
+    args=("--fulfilled",),
+    doc="""DEPRECATED: use [CMD: --state CMD][PY: `state` PY]
+    instead. If given, must be a boolean flag indicating whether
+    to consider either only locally present or absent datasets.
+    By default all subdatasets are considered regardless of their
+    status.""",
+    constraints=EnsureBool() | EnsureNone())
+
+dataset_state = Parameter(
+    args=("--state",),
+    doc="""indicate which (sub)datasets to consider: either only locally present,
+    absent, or any of those two kinds.
+    """,
+    # yoh: intentionally left out the description of default since might be
+    # command specific
+    constraints=EnsureChoice('present', 'absent', 'any'))
 
 shared_access_opt = Parameter(
     args=('--shared-access',),
@@ -325,8 +356,23 @@ eval_params = dict(
         given.""",
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
     result_renderer=Parameter(
-        doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
+        doc="""select rendering mode command results.
+        'tailored' enables a command-specific rendering style that is typically
+        tailored to human consumption, if there is one for a specific
+        command, or otherwise falls back on the the 'generic' result renderer;
+        'generic' renders each result in one line  with key info like action,
+        status, path, and an optional message);
+        'json' a complete JSON line serialization of the full result record;
+        'json_pp' like 'json', but pretty-printed spanning multiple lines;
+        'disabled' turns off result rendering entirely;
+        '<template>' reports any value(s) of any result properties in any
+        format indicated by the template (e.g. '{path}', compare with JSON
+        output for all key-value choices). The template syntax follows the
+        Python "format() language". It is possible to report individual
+        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
+        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the
+        template, like so: '{metadata[music#Genre]}'.""",
+        default='tailored'),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an
@@ -344,3 +390,9 @@ eval_defaults = {
     k: p.cmd_kwargs.get('default', None)
     for k, p in eval_params.items()
 }
+"""\
+.. deprecated:: 0.16
+   This variable will be removed in a future release. The default values for
+   all Parameters (possibly overriding by command-specific settings) are now
+   available as :class:`Interface` attributes.
+"""

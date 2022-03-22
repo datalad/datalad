@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,9 +12,10 @@
 
 from datalad.interface.results import (
     annexjson2result,
+    get_status_dict,
 )
 from datalad.distribution.dataset import Dataset
-
+from datalad.runner import CommandError
 from datalad.tests.utils import (
     eq_,
     with_tempfile,
@@ -44,3 +45,8 @@ def test_annexjson2result(dspath):
     eq_(annexjson2result(dict(file='dir1/file1'), ds),
         dict(status='error',
              path=str(ds.pathobj / 'dir1' / 'file1')))
+
+
+def tests_status_dict_exit_code():
+    d = get_status_dict(exception=CommandError(code=105))
+    eq_(d['exit_code'], 105)

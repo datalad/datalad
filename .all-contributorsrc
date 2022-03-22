@@ -383,6 +383,61 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/7570456?v=4"
             ]
+        },
+        {
+            "login": "DisasterMo",
+            "name": "Michael Burgardt",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/DisasterMo",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/49207524?v=4"
+            ]
+        },
+        {
+            "login": "Remi-Gau",
+            "name": "Remi Gau",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://remi-gau.github.io/",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/6961185?v=4"
+            ]
+        },
+        {
+            "login": "mslw",
+            "name": "Michał Szczepanik",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mslw",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/11985212?v=4"
+            ]
+        },
+        {
+            "login": "bpinsard",
+            "name": "Basile",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/bpinsard",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/1155388?v=4"
+            ]
+        },
+        {
+            "login": "taylols",
+            "name": "Taylor Olson",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/taylols",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/28018084?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7

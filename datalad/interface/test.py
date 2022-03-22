@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -56,7 +56,7 @@ class Test(Interface):
     )
 
     @staticmethod
-    def __call__(module=None, verbose=False, nocapture=False, pdb=False, stop=False):
+    def __call__(module=None, *, verbose=False, nocapture=False, pdb=False, stop=False):
         if not module:
             from pkg_resources import iter_entry_points
             module = ['datalad']

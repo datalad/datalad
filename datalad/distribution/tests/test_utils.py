@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -60,24 +60,3 @@ def test_get_flexible_source_candidates():
     # when source is not relative, but base_url is specified as just the destination path,
     # not really a "base url" as name was suggesting, then it should be ignored
     eq_(f('http://e.c/p', '/path'), ['http://e.c/p', 'http://e.c/p/.git'])
-
-
-@with_tempfile
-def test_get_git_dir(path):
-    # minimal, only missing coverage
-    assert_raises(RuntimeError, GitRepo.get_git_dir, path)
-
-    srcpath = opj(path, 'src')
-    targetpath = opj(path, 'target')
-    targetgitpath = opj(targetpath, '.git')
-    os.makedirs(srcpath)
-    os.makedirs(targetpath)
-    if not on_windows:
-        # with PY3 would also work with Windows 6+
-        os.symlink(srcpath, targetgitpath)
-        eq_(srcpath, GitRepo.get_git_dir(targetpath))
-        # cleanup for following test
-        unlink(targetgitpath)
-    with open(targetgitpath, 'w') as f:
-        f.write('gitdir: {}'.format(srcpath))
-    eq_(srcpath, GitRepo.get_git_dir(targetpath))

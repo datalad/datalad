@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,12 +12,11 @@ import glob
 import logging
 import os
 import os.path as op
-import re
 import sys
 from time import sleep
 from unittest.mock import patch
 
-from datalad import cfg as dl_cfg
+from datalad.api import Dataset
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
@@ -56,13 +55,6 @@ from ..archives import (
     ArchiveAnnexCustomRemote,
     link_file_load,
 )
-from .test_base import (
-    BASE_INTERACTION_SCENARIOS,
-    check_interaction_scenario,
-)
-
-#import line_profiler
-#prof = line_profiler.LineProfiler()
 
 
 # TODO: with_tree ATM for archives creates this nested top directory
@@ -91,7 +83,10 @@ def test_basic_scenario(d, d2):
     annex.commit(msg="Added the load file")
 
     # Operations with archive remote URL
-    annexcr = ArchiveAnnexCustomRemote(path=d)
+    # this is not using this class for its actual purpose
+    # being a special remote implementation
+    # likely all this functionality should be elsewhere
+    annexcr = ArchiveAnnexCustomRemote(annex=None, path=d)
     # few quick tests for get_file_url
 
     eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat"), "dl+archive:xyz#path=a.dat")
@@ -154,11 +149,10 @@ def test_basic_scenario(d, d2):
     tree={'a.tar.gz': {'d': {fn_in_archive_obscure: '123'}}}
 )
 def test_annex_get_from_subdir(topdir):
-    from datalad.api import add_archive_content
-    annex = AnnexRepo(topdir, backend='MD5E', init=True)
-    annex.add('a.tar.gz')
-    annex.commit()
-    add_archive_content('a.tar.gz', annex=annex, delete=True)
+    ds = Dataset(topdir)
+    ds.create(force=True)
+    ds.save('a.tar.gz')
+    ds.add_archive_content('a.tar.gz', delete=True)
     fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
     with chpwd(op.join(topdir, 'a', 'd')):
@@ -166,11 +160,11 @@ def test_annex_get_from_subdir(topdir):
         runner.run(
             ['git', 'annex', 'drop', '--', fn_in_archive_obscure],
             protocol=KillOutput)  # run git annex drop
-        assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
+        assert_false(ds.repo.file_has_content(fpath))             # and verify if file deleted from directory
         runner.run(
             ['git', 'annex', 'get', '--', fn_in_archive_obscure],
             protocol=KillOutput)   # run git annex get
-        assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
+        assert_true(ds.repo.file_has_content(fpath))              # and verify if file got into directory
 
 
 def test_get_git_environ_adjusted():
@@ -204,45 +198,6 @@ def test_no_rdflib_loaded():
     # print cmo.out
     assert_not_in("rdflib", out['stdout'])
     assert_not_in("rdflib", out['stderr'])
-
-
-@with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
-def test_interactions(tdir):
-    # Just a placeholder since constructor expects a repo
-    repo = AnnexRepo(tdir, create=True, init=True)
-    repo.add('archive.tar.gz')
-    repo.commit('added')
-    for scenario in BASE_INTERACTION_SCENARIOS + [
-        [
-            ('GETCOST', 'COST %d' % ArchiveAnnexCustomRemote.COST),
-        ],
-        [
-            # by default we do not require any fancy init
-            # no urls supported by default
-            ('CLAIMURL http://example.com', 'CLAIMURL-FAILURE'),
-            # we know that is just a single option, url, is expected so full
-            # one would be passed
-            ('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
-        ],
-        # basic interaction failing to fetch content from archive
-        [
-            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
-            ('VALUE dl+archive://somekey2#path', None),
-            ('VALUE dl+archive://somekey3#path', None),
-            ('VALUE',
-             re.compile(
-                 r'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to fetch any '
-                 r'archive containing somekey. Tried: \[\]')
-             )
-        ],
-        # # incorrect response received from annex -- something isn't right but ... later
-        # [
-        #     ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
-        #     # We reply with UNSUPPORTED-REQUEST in these cases
-        #     ('GETCOST', 'UNSUPPORTED-REQUEST'),
-        # ],
-    ]:
-        check_interaction_scenario(ArchiveAnnexCustomRemote, tdir, scenario)
 
 
 @with_tree(tree=

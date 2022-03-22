@@ -1,5 +1,5 @@
 #emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
-#ex: set sts=4 ts=4 sw=4 noet:
+#ex: set sts=4 ts=4 sw=4 et:
 """
 Support functionality for using DueCredit
 """
@@ -56,7 +56,7 @@ def duecredit_dataset(dataset):
         with swallow_logs(logging.ERROR) as cml:
             res = dataset.metadata(
                 reporton='datasets',  # Interested only in the dataset record
-                result_renderer=None,  # No need
+                result_renderer='disabled',  # No need
                 return_type='item-or-list'  # Expecting a single record
             )
     except Exception as exc:

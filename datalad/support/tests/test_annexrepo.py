@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -29,6 +29,7 @@ from os.path import (
     pardir,
     exists,
 )
+from queue import Queue
 from shutil import copyfile
 
 from urllib.parse import urljoin
@@ -131,6 +132,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import (
     AnnexRepo,
     AnnexJsonProtocol,
+    GeneratorAnnexJsonProtocol,
 )
 
 
@@ -182,16 +184,16 @@ def test_AnnexRepo_crippled_filesystem(dst):
     ar.config.set(
         "annex.crippledfilesystem",
         'true',
-        where='local')
+        scope='local')
     ok_(ar.is_crippled_fs())
     ar.config.set(
         "annex.crippledfilesystem",
         'false',
-        where='local')
+        scope='local')
     assert_false(ar.is_crippled_fs())
     # since we can't remove the entry, just rename it to fake its absence:
-    ar.config.rename_section("annex", "removed", where='local')
-    ar.config.set("annex.something", "value", where='local')
+    ar.config.rename_section("annex", "removed", scope='local')
+    ar.config.set("annex.something", "value", scope='local')
     assert_false(ar.is_crippled_fs())
 
 
@@ -644,15 +646,15 @@ tree1_md5e_keys = {
     'remotefile': 'MD5E-s21--bf7654b3de20d5926d407ea7d913deb0'
 }
 
-
-@with_tree(**tree1args)
-def __test_get_md5s(path):
-    # was used just to generate above dict
-    annex = AnnexRepo(path, init=True, backend='MD5E')
-    files = [basename(f) for f in find_files('.*', path)]
-    annex.add(files)
-    annex.commit()
-    print({f: annex.get_file_key(f) for f in files})
+# this code is only here for documentation purposes
+# @with_tree(**tree1args)
+# def __test_get_md5s(path):
+#     # was used just to generate above dict
+#     annex = AnnexRepo(path, init=True, backend='MD5E')
+#     files = [basename(f) for f in find_files('.*', path)]
+#     annex.add(files)
+#     annex.commit()
+#     print({f: p['key'] for f, p in annex.get_content_annexinfo(files)})
 
 
 @with_parametric_batch
@@ -834,7 +836,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.is_under_annex(filename_abs),
         "Annexed file is not a link.")
     assert_in('key', out_json)
-    key = repo.get_file_key(filename)
+    key = repo.get_file_annexinfo(filename)['key']
     assert_false(key == '')
     assert_equal(key, out_json['key'])
     ok_(repo.file_has_content(filename))
@@ -853,8 +855,9 @@ def test_AnnexRepo_add_to_annex(path):
     repo.add(filename)
     repo.commit(msg="Added another file to annex.")
     # known to annex:
-    ok_(repo.get_file_key(filename))
-    ok_(repo.file_has_content(filename))
+    fileprops = repo.get_file_annexinfo(filename, eval_availability=True)
+    ok_(fileprops['key'])
+    ok_(fileprops['has_content'])
 
     # and committed:
     assert_repo_status(repo, annex=True)
@@ -871,7 +874,7 @@ def test_AnnexRepo_add_to_git(path):
     repo.add(filename, git=True)
 
     # not in annex, but in git:
-    assert_raises(FileInGitError, repo.get_file_key, filename)
+    eq_(repo.get_file_annexinfo(filename), {})
     # uncommitted:
     ok_(repo.dirty)
     repo.commit("Added file to annex.")
@@ -885,7 +888,7 @@ def test_AnnexRepo_add_to_git(path):
     repo.add(filename, git=True)
     repo.commit(msg="Added another file to annex.")
     # not in annex, but in git:
-    assert_raises(FileInGitError, repo.get_file_key, filename)
+    eq_(repo.get_file_annexinfo(filename), {})
 
     # and committed:
     assert_repo_status(repo, annex=True)
@@ -968,7 +971,14 @@ def _test_AnnexRepo_get_contentlocation(batch, src, path, work_dir_outside):
 
     annex = AnnexRepo.clone(src, path)
     fname = 'test-annex.dat'
-    key = annex.get_file_key(fname)
+    key = annex.get_file_annexinfo(fname)['key']
+    # MIH at this point the whole test and get_contentlocation() itself
+    # is somewhat moot. The above call already has properties like
+    # 'hashdirmixed', 'hashdirlower', and 'key' from which the location
+    # could be built.
+    # with eval_availability=True, it also has 'objloc' with a absolute
+    # path to a verified annex key location
+
     # TODO: see if we can avoid this or specify custom exception
     eq_(annex.get_contentlocation(key, batch=batch), '')
 
@@ -1124,9 +1134,10 @@ def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
 
     ar.add("bar")
     ar.commit("add bar")
+    key = ar.get_content_annexinfo(["bar"]).popitem()[1]['key']
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        ar.drop_key(ar.get_file_key(["bar"]), batch=True)
+        ar.drop_key(key, batch=True)
         cml.assert_logged(
             msg="Not batching drop_key call because fake dates are enabled",
             level="DEBUG",
@@ -1181,9 +1192,9 @@ def test_annex_ssh(topdir):
     from datalad import ssh_manager
 
     # check whether we are the first to use these sockets:
-    hash_1 = get_connection_hash('datalad-test', bundled=True)
+    hash_1 = get_connection_hash('datalad-test')
     socket_1 = opj(str(ssh_manager.socket_dir), hash_1)
-    hash_2 = get_connection_hash('datalad-test2', bundled=True)
+    hash_2 = get_connection_hash('datalad-test2')
     socket_2 = opj(str(ssh_manager.socket_dir), hash_2)
     datalad_test_was_open = exists(socket_1)
     datalad_test2_was_open = exists(socket_2)
@@ -1439,7 +1450,7 @@ def test_annex_drop(src, dst):
     ar.get(testfile)
 
     # drop file by key:
-    testkey = ar.get_file_key(testfile)
+    testkey = ar.get_file_annexinfo(testfile)['key']
     result = ar.drop([testkey], key=True)
     assert_false(ar.file_has_content(testfile))
     ok_(isinstance(result, list))
@@ -1509,7 +1520,7 @@ def test_is_available(batch, p):
         is_available = annex.is_available
 
     fname = 'test-annex.dat'
-    key = annex.get_file_key(fname)
+    key = annex.get_content_annexinfo([fname]).popitem()[1]['key']
 
     # explicit is to verify data type etc
     assert is_available(key, key=True) is True
@@ -1538,7 +1549,7 @@ def test_is_available(batch, p):
 
     assert(len(urls) == 1)
     eq_(urls,
-        annex.whereis(annex.get_file_key(fname), key=True, output="full")
+        annex.whereis(key, key=True, output="full")
         .get(uuid, {}).get("urls"))
     annex.rm_url(fname, urls[0])
 
@@ -1795,29 +1806,6 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(nested), repo2)
     # and if not under git, should return None
     eq_(AnnexRepo.get_toppath(tempdir), None)
-
-
-@skip_if_adjusted_branch
-@with_tempfile
-@with_tempfile
-def test_AnnexRepo_add_submodule(source_path, path):
-    source = AnnexRepo(source_path, create=True)
-    (source.pathobj / 'test-annex.dat').write_text("content")
-    source.save('some')
-
-    top_repo = AnnexRepo(path, create=True)
-
-    top_repo.add_submodule('sub', name='sub', url=source_path)
-    top_repo.commit('submodule added')
-    eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
-        ['sub'])
-
-    assert_repo_status(top_repo, annex=True)
-    assert_repo_status(opj(path, 'sub'), annex=False)
-
-
-def test_AnnexRepo_update_submodule():
-    raise SkipTest("TODO")
 
 
 def test_AnnexRepo_get_submodules():
@@ -2112,7 +2100,7 @@ def test_is_special(path):
     ok_(ar.is_special_annex_remote("imspecial"))
 
     # With a mis-configured remote, give warning and return false.
-    ar.config.unset(f"remote.{DEFAULT_REMOTE}.url", where="local")
+    ar.config.unset(f"remote.{DEFAULT_REMOTE}.url", scope="local")
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
         cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
@@ -2599,3 +2587,39 @@ def test_done_deprecation():
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
         _ = AnnexJsonProtocol()
         warn_mock.assert_not_called()
+
+
+def test_generator_annex_json_protocol():
+
+    runner = Runner()
+    stdin_queue = Queue()
+
+    def json_object(count: int):
+        json_template = '{{"id": "some-id", "count": {count}}}'
+        return json_template.format(count=count).encode()
+
+    count = 123
+    stdin_queue.put(json_object(count=count))
+    for result in runner.run(cmd="cat", protocol=GeneratorAnnexJsonProtocol, stdin=stdin_queue):
+        assert_equal(
+            result,
+            {
+                "id": "some-id",
+                "count": count,
+            }
+        )
+        if count == 133:
+            break
+        count += 1
+        stdin_queue.put(json_object(count=count))
+
+
+def test_captured_exception():
+    class RaiseMock:
+        def add_(self, *args, **kwargs):
+            raise CommandError("RaiseMock.add_")
+
+    with patch("datalad.support.annexrepo.super") as repl_super:
+        repl_super.return_value = RaiseMock()
+        gen = AnnexRepo.add_(object(), [])
+        assert_raises(CommandError, gen.send, None)

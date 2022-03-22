@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -42,7 +42,7 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     eval_results,
 )
 from datalad.support.annexrepo import AnnexRepo
@@ -206,6 +206,7 @@ class Siblings(Interface):
     @eval_results
     def __call__(
             action='query',
+            *,
             dataset=None,
             name=None,
             url=None,
@@ -297,7 +298,7 @@ class Siblings(Interface):
 
         subds_pushurl = None
         for subds in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
             subds_repo = subds.repo
@@ -332,7 +333,7 @@ class Siblings(Interface):
             )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
-            default_result_renderer(res)
+            generic_result_renderer(res)
             return
         path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
@@ -460,7 +461,7 @@ def _configure_remote(
             repo.config.add(
                 fetchvar,
                 '+refs/heads/*:refs/remotes/{}/*'.format(name),
-                where='local')
+                scope='local')
 
         if pushurl:
             repo.set_remote_url(name, pushurl, push=True)
@@ -532,17 +533,17 @@ def _configure_remote(
             if depvar in ds.config:
                 # config vars are incremental, so make sure we start from
                 # scratch
-                ds.config.unset(depvar, where='local', reload=False)
+                ds.config.unset(depvar, scope='local', reload=False)
             for d in ensure_list(publish_depends):
                 lgr.info(
                     'Configure additional publication dependency on "%s"',
                     d)
-                ds.config.add(depvar, d, where='local', reload=False)
+                ds.config.add(depvar, d, scope='local', reload=False)
             ds.config.reload()
 
         if publish_by_default:
             if dfltvar in ds.config:
-                ds.config.unset(dfltvar, where='local', reload=False)
+                ds.config.unset(dfltvar, scope='local', reload=False)
             for refspec in ensure_list(publish_by_default):
                 lgr.info(
                     'Configure additional default publication refspec "%s"',

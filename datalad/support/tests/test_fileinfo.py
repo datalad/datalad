@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -9,6 +9,7 @@
 
 
 import os.path as op
+from pathlib import Path
 import datalad.utils as ut
 
 from datalad.tests.utils import (
@@ -18,12 +19,15 @@ from datalad.tests.utils import (
     assert_in,
     assert_not_in,
     assert_raises,
+    get_annexstatus,
     known_failure_githubci_win,
     slow,
     with_tempfile,
+    with_tree,
 )
 
 from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import NoSuchPathError
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
     assert_repo_status,
@@ -55,7 +59,7 @@ def test_get_content_info(path):
     # - git ls-files
     # - git annex findref HEAD
     # - git annex find --include '*'
-    for f, r in ds.repo.annexstatus().items():
+    for f, r in get_annexstatus(ds.repo).items():
         if f.match('*_untracked'):
             assert(r.get('gitshasum', None) is None)
         if f.match('*_deleted'):
@@ -113,7 +117,7 @@ def test_get_content_info(path):
                     assert_in(status[p]['type'], ('file', 'symlink'), p)
 
     # git annex status integrity
-    annexstatus = ds.repo.annexstatus()
+    annexstatus = get_annexstatus(ds.repo)
     for t in ('file',):
         for s in ('untracked', 'added', 'deleted', 'clean',
                   'ingit_clean', 'dropped_clean', 'modified',
@@ -312,3 +316,59 @@ def test_get_content_info_paths_empty_list(path):
 def test_status_paths_empty_list(path):
     ds = Dataset(path).create()
     assert_equal(ds.repo.status(paths=[]), {})
+
+
+@with_tree(tree=(('ingit.txt', 'ingit'),
+                 ('inannex.txt', 'inannex'),
+                 ('dir1', {'dropped': 'dropped'}),
+                 ('dir2', {'d21': 'd21', 'd22': 'd22'})))
+def test_get_file_annexinfo(path):
+    ds = Dataset(path).create(force=True)
+    ds.save('ingit.txt', to_git=True)
+    ds.save()
+    # have some content-less component for testing
+    ds.drop(ds.pathobj / 'dir1', check=False)
+
+    repo = ds.repo
+    # only handles a single file at a time
+    assert_raises(ValueError, repo.get_file_annexinfo, repo.pathobj / 'dir2')
+    # however, it only functionally matters that there is only a single file to
+    # report on not that the exact query path matches, the matching path is in
+    # the report
+    assert_equal(
+        repo.pathobj / 'dir1' / 'dropped',
+        repo.get_file_annexinfo(repo.pathobj / 'dir1')['path'])
+
+    # does not raise on a non-annex file, instead it returns no properties
+    assert_equal(repo.get_file_annexinfo('ingit.txt'), {})
+
+    # but does raise on path that doesn exist
+    assert_raises(NoSuchPathError, repo.get_file_annexinfo, 'nothere')
+
+    # check return properties for utility
+    props = repo.get_file_annexinfo('inannex.txt')
+    # to replace get_file_backend()
+    assert_equal(props['backend'], 'MD5E')
+    # to replace get_file_key()
+    assert_equal(props['key'], 'MD5E-s7--3b158c5b0a18c247ebad28c09fc3e180.txt')
+    # for size reporting
+    assert_equal(props['bytesize'], 7)
+    # all records have a pathobj
+    assert_equal(props['path'], repo.pathobj / 'inannex.txt')
+    # test if `eval_availability` has desired effect
+    assert_not_in('has_content', props)
+
+    # extended set of properties, after more expensive availability check
+    props = repo.get_file_annexinfo('inannex.txt', eval_availability=True)
+    # to replace file_has_content()
+    assert_equal(props['has_content'], True)
+    # to replace get_contentlocation()
+    assert_equal(
+        Path(props['objloc']).read_text(),
+        'inannex')
+
+    # make sure has_content is not always True
+    props = repo.get_file_annexinfo(
+        ds.pathobj / 'dir1' / 'dropped', eval_availability=True)
+    assert_equal(props['has_content'], False)
+    assert_not_in('objloc', props)

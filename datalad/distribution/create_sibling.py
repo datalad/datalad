@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -79,7 +79,7 @@ from datalad.support.network import (
     PathRI,
     RI,
 )
-from datalad.support.sshconnector import sh_quote
+from datalad.utils import quote_cmdlinearg as sh_quote
 from datalad.support.param import Parameter
 from datalad.utils import (
     make_tempfile,
@@ -343,7 +343,7 @@ def _create_dataset_sibling(
         annex_group=annex_group,
         annex_groupwanted=annex_groupwanted,
         inherit=inherit,
-        result_renderer=None,
+        result_renderer='disabled',
     )
 
     # check git version on remote end
@@ -551,13 +551,17 @@ class CreateSibling(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""limit processing to subdatasets that have been changed since
             a given state (by tag, branch, commit, etc). This can be used to
-            create siblings for recently added subdatasets."""),
+            create siblings for recently added subdatasets.
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point."""),
     )
 
     @staticmethod
     @datasetmethod(name='create_sibling')
     @eval_results
-    def __call__(sshurl, name=None, target_dir=None,
+    def __call__(sshurl,
+                 *,
+                 name=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None,
                  recursive=False,
@@ -589,6 +593,17 @@ class CreateSibling(Interface):
                     "package. Please install the Python package "
                     "`datalad_deprecated` to be able to deploy it."
                 )
+
+        # push uses '^' to annotate the previous pushed committish, and None for default
+        # behavior. '' was/is (to be deprecated) used in `publish` and 'create-sibling'.
+        # Alert user about the mistake
+        if since == '':
+            # deprecation was added prior 0.16.0
+            import warnings
+            warnings.warn("'since' should point to commitish or use '^'.",
+                          DeprecationWarning)
+            since = '^'
+
         #
         # nothing without a base dataset
         #
@@ -653,7 +668,7 @@ class CreateSibling(Interface):
                 "No sibling name given. Using %s'%s' as sibling name",
                 "URL hostname " if ssh_sibling else "",
                 name)
-        if since == '':
+        if since == '^':
             # consider creating siblings only since the point of
             # the last update
             # XXX here we assume one to one mapping of names from local branches
@@ -671,26 +686,18 @@ class CreateSibling(Interface):
                 for r in diff_dataset(
                     ds,
                     fr=since,
-                    to=None,
+                    to='HEAD',
                     # make explicit, but doesn't matter, no recursion in diff()
                     constant_refs=True,
-                    # contrain to the paths of all locally existing subdatasets
-                    path=[
-                        sds['path']
-                        for sds in ds.subdatasets(
-                            recursive=recursive,
-                            recursion_limit=recursion_limit,
-                            fulfilled=True,
-                            result_renderer=None)
-                    ],
                     # save cycles, we are only looking for datasets
                     annex=None,
                     untracked='no',
-                    # recursion was done faster by subdatasets()
-                    recursive=False,
+                    recursive=True,
                     # save cycles, we are only looking for datasets
                     eval_file_type=False,
+                    datasets_only=True,
                 )
+                # not installed subdatasets would be 'clean' so we would skip them
                 if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
             ]
             if not since:

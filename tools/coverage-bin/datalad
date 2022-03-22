@@ -11,7 +11,8 @@ curdatalad=$(which datalad)
 curdir=$(dirname $curdatalad)
 
 COVERAGE_RUN="-m coverage run"
-
+export COVERAGE_PROCESS_START=$PWD/../.coveragerc
+export PYTHONPATH="$PWD/../tools/coverage-bin/"
 export PATH=${PATH//$curdir:/}
 newdatalad=$(which datalad)
 newbin=$(which $bin)

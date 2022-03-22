@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -13,38 +13,37 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+import warnings
 
+from datalad.support.exceptions import CapturedException
+
+from ..distribution.dataset import (
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+    resolve_path,
+)
+# bound methods
+from ..distribution.siblings import Siblings
+from ..dochelpers import exc_str
 from ..interface.base import (
-    build_doc,
     Interface,
+    build_doc,
 )
 from ..interface.common_opts import (
+    publish_depends,
     recursion_flag,
     recursion_limit,
-    publish_depends,
 )
 from ..interface.utils import eval_results
-from ..support.param import Parameter
+from ..local.subdatasets import Subdatasets
 from ..support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from datalad.support.exceptions import CapturedException
-from ..utils import (
-    ensure_list,
-)
-from ..distribution.dataset import (
-    datasetmethod,
-    EnsureDataset,
-    require_dataset,
-    resolve_path,
-)
-
-# bound methods
-from ..distribution.siblings import Siblings
-from ..local.subdatasets import Subdatasets
-
+from ..support.param import Parameter
+from ..utils import ensure_list
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gitlab')
 
@@ -143,7 +142,7 @@ class CreateSiblingGitlab(Interface):
             doc="""name of the GitLab site to create a sibling at. Must match an
             existing python-gitlab configuration section with location and
             authentication settings (see
-            https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration).
+            https://python-gitlab.readthedocs.io/en/stable/cli-usage.html#configuration).
             By default the dataset configuration is consulted.
             """,
             constraints=EnsureNone() | EnsureStr()),
@@ -192,14 +191,17 @@ class CreateSiblingGitlab(Interface):
             site)""",
             constraints=EnsureStr() | EnsureNone()),
         publish_depends=publish_depends,
+        dry_run=Parameter(
+            args=("--dry-run",),
+            action="store_true",
+            doc="""if set, no repository will be created, only tests for
+            name collisions will be performed, and would-be repository names
+            are reported for all relevant datasets"""),
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
-            doc="""If this flag is set, no communication with GitLab is
-            performed, and no repositories will be created. Instead
-            would-be repository names and configurations are reported for all
-            relevant datasets
-            """),
+            doc="""Deprecated. Use the renamed
+            ``dry_run||--dry-run`` parameter""")
     )
 
     @staticmethod
@@ -207,6 +209,7 @@ class CreateSiblingGitlab(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             site=None,
             project=None,
             layout=None,
@@ -218,7 +221,16 @@ class CreateSiblingGitlab(Interface):
             access=None,
             publish_depends=None,
             description=None,
-            dryrun=False):
+            dryrun=False,
+            dry_run=False):
+        if dryrun and not dry_run:
+            # the old one is used, and not in agreement with the new one
+            warnings.warn(
+                "datalad-create-sibling-github's `dryrun` option is "
+                "deprecated and will be removed in a future release, "
+                "use the renamed `dry_run/--dry-run` option instead.",
+                DeprecationWarning)
+            dry_run = dryrun
         path = resolve_path(ensure_list(path), ds=dataset) \
             if path else None
 
@@ -241,7 +253,7 @@ class CreateSiblingGitlab(Interface):
             for r in _proc_dataset(
                     ds, ds,
                     site, project, name, layout, existing, access,
-                    dryrun, siteobjs, publish_depends, description):
+                    dry_run, siteobjs, publish_depends, description):
                 yield r
         # we need to find a subdataset when recursing, or when there is a path that
         # could point to one, we have to exclude the parent dataset in this test
@@ -251,24 +263,25 @@ class CreateSiblingGitlab(Interface):
             for subds in ds.subdatasets(
                     path=path,
                     # we can only operate on present datasets
-                    fulfilled=True,
+                    state='present',
                     recursive=recursive,
                     recursion_limit=recursion_limit,
                     contains=None,
                     bottomup=False,
                     result_xfm='datasets',
+                    result_renderer='disabled',
                     return_type='generator'):
                 for r in _proc_dataset(
                         ds, subds,
                         site, project, name, layout, existing, access,
-                        dryrun, siteobjs, publish_depends, description):
+                        dry_run, siteobjs, publish_depends, description):
                     yield r
 
         return
 
 
 def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
-                  access, dryrun, siteobjs, depends, description):
+                  access, dry_run, siteobjs, depends, description):
     # basic result setup
     res_kwargs = dict(
         action='create_sibling_gitlab',
@@ -319,19 +332,17 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # fastest possible
             get_annex_info=False,
             recursive=False,
+            return_type='generator',
             result_renderer='disabled')
     }
-    if existing == 'skip' and remotename in dremotes:
-        # we have a conflict of target remote and the
-        # set of existing remotes
+    if remotename in dremotes and existing not in ['replace', 'reconfigure']:
+        # we already know a sibling with this name
         yield dict(
             res_kwargs,
-            status='notneeded',
+            status='error' if existing == 'error' else 'notneeded',
+            message=('already has a configured sibling "%s"', remotename),
         )
         return
-    # TODO for existing == error, check against would be gitlab URL
-    # cannot be done in, needs an idea of the project path config
-    # and an API call to gitlab
 
     if layout is None:
         # figure out the layout of projects on the site
@@ -395,7 +406,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     res_kwargs['project'] = project
 
-    if dryrun:
+    if dry_run:
         # this is as far as we can get without talking to GitLab
         yield dict(
             res_kwargs,
@@ -502,7 +513,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
     # but respect any existing config
     ignore_var = 'remote.{}.annex-ignore'.format(remotename)
     if ignore_var not in ds.config:
-        ds.config.add(ignore_var, 'true', where='local')
+        ds.config.add(ignore_var, 'true', scope='local')
 
     for res in ds.siblings(
             'configure',

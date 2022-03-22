@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -167,6 +167,7 @@ class HTTPBaseAuthenticator(Authenticator):
         # we should use specified URL for this authentication first
         lgr.info("http session: Authenticating into session for %s", url)
         post_url = self.url if self.url else url
+        credential.set_context(auth_url=post_url)
         credentials = credential()
 
         # The whole thing relies on server first spitting out 401
@@ -303,6 +304,10 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
 @auto_repr
 class HTTPRequestsAuthenticator(HTTPBaseAuthenticator):
     """Base class for various authenticators using requests pre-crafted ones
+
+
+    Note, that current implementation assumes REQUESTS_FIELDS to be identical to
+    the keys of a `Credential` object's FIELDS.
     """
 
     REQUESTS_AUTHENTICATOR = None

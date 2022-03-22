@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test save command"""
 
+import logging
 import os
 import os.path as op
 
@@ -36,10 +37,11 @@ from datalad.tests.utils import (
     ok_,
     patch,
     SkipTest,
+    skip_if_adjusted_branch,
     skip_wo_symlink_capability,
+    swallow_logs,
     swallow_outputs,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 
@@ -64,10 +66,10 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'dir2': {'testindir3': 'someother3'}})
 
 
-@with_testrepos('.*git.*', flavors=['clone'])
+@with_tempfile()
 def test_save(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(annex=False)
 
     with open(op.join(path, "new_file.tst"), "w") as f:
         f.write("something")
@@ -408,7 +410,7 @@ def test_add_files(path):
         # special case 4: give the dir:
         if arg[0] == test_list_4:
             result = ds.save('dir', to_git=arg[1])
-            status = ds.repo.annexstatus(['dir'])
+            status = ds.repo.get_content_annexinfo(['dir'])
         else:
             result = ds.save(arg[0], to_git=arg[1])
             for a in ensure_list(arg[0]):
@@ -458,7 +460,7 @@ def test_add_subdataset(path, other):
     # now add, it should pick up the source URL
     ds.save('other')
     # and that is why, we can reobtain it from origin
-    ds.uninstall('other')
+    ds.drop('other', what='all', reckless='kill', recursive=True)
     ok_(not other_clone.is_installed())
     ds.get('other')
     ok_(other_clone.is_installed())
@@ -516,7 +518,7 @@ def test_gh1597(path):
     # must not come under annex management
     assert_not_in(
         'key',
-        ds.repo.annexstatus(paths=['.gitmodules']).popitem()[1])
+        ds.repo.get_content_annexinfo(paths=['.gitmodules']).popitem()[1])
 
 
 @with_tempfile(mkdir=True)
@@ -688,6 +690,63 @@ def test_path_arg_call(path):
         # a path, but we no longer do that
         #save(dataset=ds.path, path=[testfile.name], to_git=True)
         save(dataset=ds, path=[testfile.name], to_git=True)
+
+
+# one can't create these file names on FAT/NTFS systems
+@skip_if_adjusted_branch
+@with_tempfile
+def test_windows_incompatible_names(path):
+    ds = Dataset(path).create()
+    create_tree(path, {
+        'imgood': 'Look what a nice name I have',
+        'illegal:character.txt': 'strange choice of name',
+        'spaceending ': 'who does these things?',
+        'lookmumadot.': 'why would you do this?',
+        'COM1.txt': 'I am a serial port',
+        'dirs with spaces': {
+            'seriously?': 'you are stupid',
+            'why somuch?wrongstuff.': "I gave up"
+        },
+    })
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'error')
+    ds.save('.datalad/config')
+    res = ds.save(on_failure='ignore')
+    # check that none of the 6 problematic files was saved, but the good one was
+    assert_result_count(res, 6, status='impossible', action='save')
+    assert_result_count(res, 1, status='ok', action='save')
+
+    # check that the warning is emitted
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'warning')
+    ds.save('.datalad/config')
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.save()
+        cml.assert_logged(
+            "Some elements of your dataset are not compatible with Windows "
+            "systems. Disable this check by changing "
+            "datalad.save.windows-compat-warning or consider renaming the "
+            "following elements:")
+        assert_in("Elements using a reserved filename:", cml.out)
+        assert_in("Elements with illegal characters:", cml.out)
+        assert_in("Elements ending with a dot:", cml.out)
+        assert_in("Elements ending with a space:", cml.out)
+
+    # check that a setting of 'none' really does nothing
+    ds.repo.config.set('datalad.save.windows-compat-warning', 'none')
+    ds.save('.datalad/config')
+    create_tree(path, {
+        'more illegal:characters?.py': 'My arch nemesis uses Windows and I will'
+                                       'destroy them! Muahahaha'
+    })
+    with swallow_logs(new_level=logging.WARN) as cml:
+        res = ds.save()
+        # we shouldn't see warnings
+        assert_not_in(
+            "Some elements of your dataset are not compatible with Windows "
+            "systems. Disable this check by changing "
+            "datalad.save.windows-compat-warning or consider renaming the "
+            "following elements:", cml.out)
+        # make sure the file is saved successfully
+        assert_result_count(res, 1, status='ok', action='save')
 
 
 @with_tree(tree={
@@ -871,7 +930,7 @@ def test_save_diff_ignore_submodules_config(path):
     (subds.pathobj / "foo").write_text("foo")
     subds.save()
     ds.repo.config.set("diff.ignoreSubmodules", "all",
-                       where="local", reload=True)
+                       scope="local", reload=True)
     # Saving a subdataset doesn't fail when diff.ignoreSubmodules=all.
     ds.save()
     assert_repo_status(ds.path)

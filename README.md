@@ -6,7 +6,7 @@
                                                   Read me
 
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
-[![Travis tests status](https://travis-ci.com/datalad/datalad.png?branch=master)](https://travis-ci.com/datalad/datalad)
+[![Travis tests status](https://app.travis-ci.com/datalad/datalad.svg?branch=master)](https://app.travis-ci.com/datalad/datalad)
 [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
 [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
 [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
@@ -15,9 +15,11 @@
 [![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
-[![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
+[![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5624980.svg)](https://doi.org/10.5281/zenodo.5624980)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-34-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-39-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -70,6 +72,13 @@ On Debian-based systems, we recommend enabling [NeuroDebian], via which we
 provide recent releases of DataLad. Once enabled, just do:
 
     apt-get install datalad
+
+## Gentoo-based systems
+
+On Gentoo-based systems (i.e. all systems whose package manager can parse ebuilds as per the [Package Manager Specification]), we recommend [enabling the ::science overlay], via which we
+provide recent releases of DataLad. Once enabled, just run:
+
+    emerge datalad
 
 ## Other Linux'es via conda
 
@@ -128,7 +137,8 @@ Federal Ministry of Education and Research (BMBF 01GQ1411). Additional support
 is provided by the German federal state of Saxony-Anhalt and the European
 Regional Development Fund (ERDF), Project: Center for Behavioral Brain
 Sciences, Imaging Platform.  This work is further facilitated by the ReproNim
-project (NIH 1P41EB019936-01A1).
+project (NIH 1P41EB019936-01A1). Mac mini instance for development is provided
+by [MacStadium](https://www.macstadium.com/).
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
@@ -177,6 +187,13 @@ project (NIH 1P41EB019936-01A1).
     <td align="center"><a href="https://github.com/mikapfl"><img src="https://avatars.githubusercontent.com/u/7226087?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Mika Pflüger</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mikapfl" title="Code">💻</a></td>
     <td align="center"><a href="https://me.ypid.de/"><img src="https://avatars.githubusercontent.com/u/1301158?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Robin Schneider</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=ypid" title="Code">💻</a></td>
     <td align="center"><a href="https://orcid.org/0000-0003-4652-3758"><img src="https://avatars.githubusercontent.com/u/7570456?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Sin Kim</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=AKSoo" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/DisasterMo"><img src="https://avatars.githubusercontent.com/u/49207524?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Michael Burgardt</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=DisasterMo" title="Code">💻</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://remi-gau.github.io/"><img src="https://avatars.githubusercontent.com/u/6961185?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Remi Gau</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=Remi-Gau" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/mslw"><img src="https://avatars.githubusercontent.com/u/11985212?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Michał Szczepanik</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mslw" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/bpinsard"><img src="https://avatars.githubusercontent.com/u/1155388?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Basile</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bpinsard" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/taylols"><img src="https://avatars.githubusercontent.com/u/28018084?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Taylor Olson</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=taylols" title="Code">💻</a></td>
   </tr>
 </table>
 
@@ -185,10 +202,13 @@ project (NIH 1P41EB019936-01A1).
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
+[![macstadium](https://uploads-ssl.webflow.com/5ac3c046c82724970fc60918/5c019d917bba312af7553b49_MacStadium-developerlogo.png)](https://www.macstadium.com/)
 
 [Git]: https://git-scm.com
 [Git-annex]: http://git-annex.branchable.com
 [setup.py]: https://github.com/datalad/datalad/blob/master/setup.py
 [NeuroDebian]: http://neuro.debian.net
+[Package Manager Specification]: https://projects.gentoo.org/pms/latest/pms.html
+[enabling the ::science overlay]: https://github.com/gentoo/sci#manual-install-
 
 [DataLad Handbook: Installation]: http://handbook.datalad.org/en/latest/intro/installation.html

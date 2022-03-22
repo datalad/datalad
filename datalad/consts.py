@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -73,3 +73,11 @@ GITHUB_TOKENS_URL = 'https://github.com/settings/tokens'
 
 # format of git-annex adjusted branch names
 ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\(.*\)$')
+
+# Reserved file names on Windows machines
+RESERVED_NAMES_WIN = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3',
+                      'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1',
+                      'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8',
+                      'LPT9'}
+# Characters that can't be a part of a file name on Windows
+ILLEGAL_CHARS_WIN = "[<>:/\\|?*\"]|[\0-\31]"

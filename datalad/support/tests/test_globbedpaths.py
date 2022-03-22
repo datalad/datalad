@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -58,7 +58,7 @@ bOBSCURE_FILENAME = f"b{OBSCURE_FILENAME}.dat"
                  "2.dat": "",
                  "3.txt": "",
                  bOBSCURE_FILENAME: "",
-                 "subdir": {"1.txt": "", "2.txt": ""}})
+                 "subdir": {"1.txt": "", "2.txt": "", "subsub": {"3.dat": ""}}})
 def test_globbedpaths(path):
     dotdir = op.curdir + op.sep
 
@@ -74,7 +74,15 @@ def test_globbedpaths(path):
             ([dotdir + op.join("subdir", "*.txt")],
              {dotdir + op.join(*ps)
               for ps in [("subdir", "1.txt"), ("subdir", "2.txt")]}),
-            (["*.txt"], {"1.txt", "3.txt"})]:
+            (["*.txt"], {"1.txt", "3.txt"}),
+            ([op.join("subdir", "**")],
+             {op.join(*ps)
+              for ps in [("subdir" + op.sep,), ("subdir", "subsub"),
+                         ("subdir", "1.txt"), ("subdir", "2.txt"),
+                         ("subdir", "subsub", "3.dat")]}),
+            ([dotdir + op.join("**", "*.dat")],
+             {dotdir + op.join("2.dat"), dotdir + bOBSCURE_FILENAME,
+              dotdir + op.join("subdir", "subsub", "3.dat")})]:
         gp = GlobbedPaths(patterns, pwd=path)
         eq_(set(gp.expand()), expected)
         eq_(set(gp.expand(full=True)),
@@ -110,7 +118,7 @@ def test_globbedpaths(path):
     # We can the glob outputs.
     glob_results = {"z": "z",
                     "a": ["x", "d", "b"]}
-    with patch('glob.glob', glob_results.get):
+    with patch('glob.glob', lambda k, **kwargs: glob_results[k]):
         gp = GlobbedPaths(["z", "a"])
         eq_(gp.expand(), ["z", "b", "d", "x"])
 

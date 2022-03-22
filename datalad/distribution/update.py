@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -214,6 +214,7 @@ class Update(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             sibling=None,
             merge=False,
             how=None,
@@ -242,7 +243,7 @@ class Update(Interface):
         saw_subds = False
         for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
-                fulfilled=True,
+                state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',
@@ -418,26 +419,33 @@ class Update(Interface):
         # we need to save updated states only if merge was requested -- otherwise
         # it was a pure fetch
         if how_curr and recursive:
-            if path and not saw_subds:
-                lgr.warning(
-                    'path constraints did not match an installed subdataset: %s',
-                    path)
-            if refds in update_failures:
-                lgr.warning("Not saving because top-level dataset %s "
-                            "had an update failure in subdataset",
-                            refds.path)
-            else:
-                save_paths = [p for p in save_paths if p != refds.path]
-                if not save_paths:
-                    return
-                lgr.debug(
-                    'Subdatasets where updated state may need to be '
-                    'saved in the parent dataset: %s', save_paths)
-                for r in refds.save(
-                        path=save_paths,
-                        recursive=False,
-                        message='[DATALAD] Save updated subdatasets'):
-                    yield r
+            yield from _save_after_update(
+                refds, save_paths, update_failures, path, saw_subds)
+
+
+def _save_after_update(refds, tosave, update_failures, path_arg, saw_subds):
+    if path_arg and not saw_subds:
+        lgr.warning(
+            'path constraints did not match an installed subdataset: %s',
+            path_arg)
+    if refds in update_failures:
+        lgr.warning("Not saving because top-level dataset %s "
+                    "had an update failure in subdataset",
+                    refds.path)
+    else:
+        save_paths = [p for p in tosave if p != refds.path]
+        if not save_paths:
+            return
+        lgr.debug(
+            'Subdatasets where updated state may need to be '
+            'saved in the parent dataset: %s', save_paths)
+        for r in refds.save(
+                path=save_paths,
+                recursive=False,
+                message='[DATALAD] Save updated subdatasets',
+                return_type='generator',
+                result_renderer='disabled'):
+            yield r
 
 
 def _choose_update_target(repo, branch, remote, cfg_remote):

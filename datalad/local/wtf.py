@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -356,7 +356,7 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(*sorted(SECTION_CALLABLES) + ['*']) | EnsureNone(),
+            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES) + ['*']),
             doc="""section to include.  If not set - depends on flavor.
             '*' could be used to force all sections.
             [CMD: This option can be given multiple times. CMD]"""),
@@ -368,7 +368,7 @@ class WTF(Interface):
             Use [CMD: --section CMD][PY: `section` PY] to list other sections"""),
         decor=Parameter(
             args=("-D", "--decor"),
-            constraints=EnsureChoice('html_details') | EnsureNone(),
+            constraints=EnsureChoice('html_details', None),
             doc="""decoration around the rendering to facilitate embedding into
             issues etc, e.g. use 'html_details' for posting collapsible entry
             to GitHub issues."""),
@@ -382,7 +382,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
+    def __call__(*, dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict
