@@ -76,6 +76,35 @@ class AnnexCustomRemote(SpecialRemote):
                     yield url
         self.annex.debug("Processed %d URL(s) for key %s", nurls, key)
 
+    def send_progress(self, progress):
+        """Indicates the current progress of the transfer (in bytes).
+
+        May be repeated any number of times during the transfer process.
+
+        Too frequent updates are wasteful but bear in mind that this is used
+        both to display a progress meter for the user, and for
+        ``annex.stalldetection``. So, sending an update on each 1% of the file
+        may not be frequent enough, as it could appear to be a stall when
+        transferring a large file.
+
+        Parameters
+        ----------
+        progress : int
+            The current progress of the transfer in bytes.
+        """
+        # This method is called by AnnexSpecialRemoteProgressBar through an
+        # obscure process that involves multiple layers of abstractions for
+        # UIs, providers, downloaders, progressbars, which is only happening
+        # within the environment of a running special remote process though
+        # a combination of circumstances.
+        #
+        # The main purpose of this method is to have a place to leave this
+        # comment within the code base of the special remotes, in order to
+        # aid future souls having to sort this out.
+        # (and to avoid having complex code make direct calls to internals
+        # of this class, making things even more complex)
+        self.annex.progress(progress)
+
     # Protocol implementation
     def initremote(self):
         pass
