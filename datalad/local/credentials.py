@@ -195,6 +195,28 @@ class Credentials(Interface):
             constraints=EnsureStr() | EnsureNone()),
     )
 
+    _examples_ = [
+        dict(text="List known credentials",
+             code_py="credentials(action='query')",
+             code_cmd="datalad credentials query"),
+        dict(
+            text="Set a new credential mycred & input its secret interactively",
+            code_py="credentials(action='set', name='mycred')",
+            code_cmd="datalad credentials set mycred"),
+        dict(text="""Specify the 'type' property of a legacy credential to make it discoverable""",
+             code_py="""credentials(action='set', name='legacycred', spec={'type': 'user_password')""",
+             code_cmd="""datalad credentials set legacycred type='user_password'"""),
+        dict(text="Remove a credentials' type property",
+             code_py="""credentials(action='set', name='mycred', spec={'type': None})""",
+             code_cmd="datalad credentials set mycred :type"),
+        dict(text="Get all information on a specific credential",
+             code_py="credentials(action='query', name='mycred')",
+             code_cmd="datalad -f json_pp credentials get mycred"),
+        dict(text="""Interactively query for a secret and an additional property for a yet unknown credential (useful for further use by an application, will not be stored in the credential manager!)""",
+             code_py="credentials(action='get', prompt='Can I haz info plz?', name='newcred', spec={'newproperty': None)",
+             code_cmd="""datalad credentials --prompt 'can I haz info plz?' get newcred :newproperty"""),
+    ]
+
     @staticmethod
     @datasetmethod(name='credentials')
     @eval_results
