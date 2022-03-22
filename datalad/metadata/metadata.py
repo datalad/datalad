@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import (
     Dict,
     List,
+    Optional,
 )
 
 from datalad import cfg
@@ -1120,6 +1121,7 @@ def query_aggregated_metadata(reporton: str,
                               ds: Dataset,
                               aps: List[Dict],
                               recursive: bool = False,
+                              use_metadata: Optional[str] = None,
                               **kwargs):
     """Query legacy and NG-metadata stored in a dataset or its metadata store
 
@@ -1144,15 +1146,16 @@ def query_aggregated_metadata(reporton: str,
       Of result dictionaries.
     """
 
-    yield from legacy_query_aggregated_metadata(
-        reporton=reporton,
-        ds=ds,
-        aps=aps,
-        recursive=recursive,
-        **kwargs
-    )
+    if use_metadata in (None, "old"):
+        yield from legacy_query_aggregated_metadata(
+            reporton=reporton,
+            ds=ds,
+            aps=aps,
+            recursive=recursive,
+            **kwargs
+        )
 
-    if next_generation_metadata_available:
+    if use_metadata in (None, "new") and next_generation_metadata_available:
         yield from ng_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
