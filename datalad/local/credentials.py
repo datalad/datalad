@@ -173,7 +173,7 @@ class Credentials(Interface):
             credential properties. Properties are[CMD:  either CMD] given as
             name/value pairs[CMD:  or as a property name prefixed
             by a colon CMD].
-            Properties with [CMD: no CMD][PY: a `None` PY] value
+            Properties [CMD: prefixed with a colon CMD][PY: with a `None` value PY] 
             indicate a property to be deleted (action 'set'), or a
             property to be entered interactively, when no value is set
             yet, and a prompt text is given (action 'get').
