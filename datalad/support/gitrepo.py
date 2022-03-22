@@ -10,74 +10,74 @@
 
 """
 
-import re
+import logging
 import os
 import os.path as op
-
-import logging
-from collections import (
-    OrderedDict,
-)
-from collections.abc import (
-    Mapping,
-)
+import posixpath
+import re
+import warnings
+from collections import OrderedDict
+from collections.abc import Mapping
+from functools import wraps
 from itertools import chain
 from os import linesep
 from os.path import (
-    join as opj,
+    commonprefix,
+    curdir,
+    dirname,
     exists,
     isabs,
-    commonprefix,
-    relpath,
-    dirname,
-    curdir,
+)
+from os.path import join as opj
+from os.path import (
     pardir,
-    sep
+    relpath,
+    sep,
 )
 
-import posixpath
-from functools import wraps
-import warnings
-
-from datalad.log import log_progress
-from datalad.support.due import due, Doi
-
+import datalad.utils as ut
 from datalad import ssh_manager
 from datalad.cmd import (
-    GitWitlessRunner,
-    WitlessProtocol,
     BatchedCommand,
+    GitWitlessRunner,
     NoCapture,
     StdOutErrCapture,
+    WitlessProtocol,
 )
 from datalad.config import (
     parse_gitconfig_dump,
     write_config_section,
 )
-
 from datalad.consts import (
     ILLEGAL_CHARS_WIN,
-    RESERVED_NAMES_WIN
+    RESERVED_NAMES_WIN,
 )
-
-import datalad.utils as ut
+from datalad.core.local.repo import repo_from_path
+from datalad.dataset.gitrepo import GitRepo as CoreGitRepo
+from datalad.dataset.gitrepo import (
+    _get_dot_git,
+    path_based_str_repr,
+)
+from datalad.log import log_progress
+from datalad.support.due import (
+    Doi,
+    due,
+)
 from datalad.utils import (
     Path,
     PurePosixPath,
+    ensure_dir,
     ensure_list,
-    optional_args,
-    on_windows,
+    ensure_unicode,
+    generate_file_chunks,
     getpwd,
+    is_interactive,
+    on_windows,
+    optional_args,
     path_is_subpath,
     posix_relpath,
-    ensure_dir,
-    generate_file_chunks,
-    ensure_unicode,
-    is_interactive,
 )
 
-# imports from same module:
-from .external_versions import external_versions
 from .exceptions import (
     CapturedException,
     CommandError,
@@ -86,18 +86,14 @@ from .exceptions import (
     InvalidGitRepositoryError,
     NoSuchPathError,
 )
+# imports from same module:
+from .external_versions import external_versions
 from .network import (
     RI,
     PathRI,
-    is_ssh
+    is_ssh,
 )
 from .path import get_parent_paths
-from datalad.core.local.repo import repo_from_path
-from datalad.dataset.gitrepo import (
-    GitRepo as CoreGitRepo,
-    _get_dot_git,
-    path_based_str_repr,
-)
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -3721,7 +3717,11 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # make absolute
     src_dotgit = str(repo.dot_git)
     # move .git
-    from os import rename, listdir, rmdir
+    from os import (
+        listdir,
+        rename,
+        rmdir,
+    )
     ensure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
         rename(opj(src_dotgit, dot_git_entry),
