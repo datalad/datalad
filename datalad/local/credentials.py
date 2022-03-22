@@ -180,9 +180,10 @@ class Credentials(Interface):
             All property names are case-insensitive, must start with
             a letter or a digit, and may only contain '-' apart from
             these characters.
-            [PY: Property specifications should be given a as dictionary.
+            [PY: Property specifications should be given a as dictionary,
+            e.g., spec={'type': 'user_password'}.
             However, a CLI-like list of string arguments is also
-            supported PY]""",
+            supported, e.g., spec=['type=user_password'] PY]""",
             nargs='*',
             metavar='[name] [:]property[=value]'),
         prompt=Parameter(
