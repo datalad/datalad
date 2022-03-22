@@ -785,7 +785,6 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
 
 
 def _postproc_annexdrop_result(res, respath_by_status, ds, **kwargs):
-    # TODO this should extract any error messages and report them!
     res = annexjson2result(
         # annex reports are always about files
         res, ds, type='file', **kwargs)
