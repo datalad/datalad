@@ -169,7 +169,7 @@ class Credentials(Interface):
             constraints=EnsureStr() | EnsureNone()),
         spec=Parameter(
             args=("spec",),
-            doc="""specification of[CMD:  a credential name and CMD]
+            doc="""specification of[CMD: a credential name and CMD]
             credential properties. Properties are[CMD:  either CMD] given as
             name/value pairs[CMD:  or as a property name prefixed
             by a colon CMD].
