@@ -59,6 +59,7 @@ class Credentials(Interface):
 
     The command provides four basic actions:
 
+
     QUERY
 
     When executed without any property specification, all known credentials
@@ -73,15 +74,6 @@ class Credentials(Interface):
     used, for example, to discover all suitable credentials for a specific
     "realm", if credentials were annotated with such information.
 
-    GET
-
-    This is a read-only action that will never alter credential properties or
-    secrets. Given properties will amend/overwrite those already on record.
-    When properties with no value are given, and also no value for the
-    respective properties is on record yet, their value will be requested
-    interactively, if a ``prompt||--prompt`` text was provided too. This can be
-    used to ensure a complete credential record, comprising any number of
-    properties.
 
     SET
 
@@ -94,10 +86,26 @@ class Credentials(Interface):
 
     Only changed properties will be contained in the result record.
 
+    The appearance of the interactive secret entry can be configured with
+    the two settings `datalad.credentials.repeat-secret-entry` and
+    `datalad.credentials.hidden-secret-entry`.
+
+
     REMOVE
 
     This action will remove any secret and properties associated with a
     credential identified by its name.
+
+
+    GET (plumbing operation)
+
+    This is a *read-only* action that will never store (updates of) credential
+    properties or secrets. Given properties will amend/overwrite those already
+    on record.  When properties with no value are given, and also no value for
+    the respective properties is on record yet, their value will be requested
+    interactively, if a ``prompt||--prompt`` text was provided too. This can be
+    used to ensure a complete credential record, comprising any number of
+    properties.
 
 
     Details on credentials
@@ -148,7 +156,8 @@ class Credentials(Interface):
     DataLad credentials not configured via this command may not be fully
     discoverable (i.e., including all their properties). Discovery of
     such legacy credentials can be assisted by specifying a dedicated
-    'type' property    """
+    'type' property.
+    """
     result_renderer = 'tailored'
 
     _params_ = dict(
@@ -196,25 +205,29 @@ class Credentials(Interface):
     )
 
     _examples_ = [
-        dict(text="List known credentials",
-             code_py="credentials(action='query')",
-             code_cmd="datalad credentials query"),
+        dict(text="Report all discoverable credentials",
+             code_py="credentials()",
+             code_cmd="datalad credentials"),
         dict(
             text="Set a new credential mycred & input its secret interactively",
-            code_py="credentials(action='set', name='mycred')",
+            code_py="credentials('set', name='mycred')",
             code_cmd="datalad credentials set mycred"),
-        dict(text="""Specify the 'type' property of a legacy credential to make it discoverable""",
-             code_py="""credentials(action='set', name='legacycred', spec={'type': 'user_password')""",
-             code_cmd="""datalad credentials set legacycred type='user_password'"""),
-        dict(text="Remove a credentials' type property",
-             code_py="""credentials(action='set', name='mycred', spec={'type': None})""",
+        dict(text="Remove a credential's type property",
+             code_py="credentials('set', name='mycred', spec={'type': None})",
              code_cmd="datalad credentials set mycred :type"),
-        dict(text="Get all information on a specific credential",
-             code_py="credentials(action='query', name='mycred')",
-             code_cmd="datalad -f json_pp credentials get mycred"),
-        dict(text="""Interactively query for a secret and an additional property for a yet unknown credential (useful for further use by an application, will not be stored in the credential manager!)""",
-             code_py="credentials(action='get', prompt='Can I haz info plz?', name='newcred', spec={'newproperty': None)",
-             code_cmd="""datalad credentials --prompt 'can I haz info plz?' get newcred :newproperty"""),
+        dict(text="Get all information on a specific credential in a structured record",
+             code_py="credentials('get', name='mycred')",
+             code_cmd="datalad -f json credentials get mycred"),
+        dict(text="Upgrade a legacy credential by annotating it with a 'type' property",
+             code_py="credentials('set', name='legacycred', spec={'type': 'user_password')",
+             code_cmd="datalad credentials set legacycred type=user_password"),
+        dict(text="Obtain a (possibly yet undefined) credential with a minimum set of "
+                  "properties. All missing properties and secret will be "
+                  "prompted for, no information will be stored! "
+                  "This is mostly useful for ensuring availability of an "
+                  "appropriate credential in an application context",
+             code_py="credentials('get', prompt='Can I haz info plz?', name='newcred', spec={'newproperty': None})",
+             code_cmd="datalad credentials --prompt 'can I haz info plz?' get newcred :newproperty"),
     ]
 
     @staticmethod
