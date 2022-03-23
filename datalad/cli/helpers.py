@@ -187,25 +187,13 @@ class LogLevelAction(argparse.Action):
 
 
 def add_entrypoints_to_interface_groups(interface_groups):
-    lgr.debug("Loading entrypoints")
-    from pkg_resources import iter_entry_points  # delay expensive import
-    for ep in iter_entry_points('datalad.extensions'):
-        lgr.debug(
-            'Loading entrypoint %s from datalad.extensions',
-            ep.name)
-        try:
-            spec = ep.load()
-            if len(spec) < 2 or not spec[1]:
-                lgr.debug(
-                    'Extension does not provide a command suite: %s',
-                    ep.name)
-                continue
-            interface_groups.append((ep.name, spec[0], spec[1]))
-            lgr.debug('Loaded entrypoint %s', ep.name)
-        except Exception as e:
-            ce = CapturedException(e)
-            lgr.warning('Failed to load entrypoint %s: %s', ep.name, ce)
+    from datalad.core.utils import iter_entrypoints
+    for spec in iter_entrypoints('datalad.extensions', load=True):
+        if len(spec) < 2 or not spec[1]:
+            # entrypoint identity was logged by the iterator already
+            lgr.debug('Extension does not provide a command suite')
             continue
+        interface_groups.append((ep.name, spec[0], spec[1]))
 
 
 def get_commands_from_groups(groups):

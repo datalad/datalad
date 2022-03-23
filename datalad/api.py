@@ -43,32 +43,20 @@ if not datalad.in_librarymode():
 def _generate_extension_api():
     """Auto detect all available extensions and generate an API from them
     """
-    from importlib import import_module
-    from pkg_resources import iter_entry_points
+    from datalad.core.utils import (
+        iter_entrypoints,
+        import_interface,
+    )
     from .interface.base import get_api_name
-    from datalad.support.exceptions import CapturedException
 
     import logging
     lgr = logging.getLogger('datalad.api')
 
-    for entry_point in iter_entry_points('datalad.extensions'):
-        try:
-            lgr.debug(
-                'Loading entrypoint %s from datalad.extensions for API building',
-                entry_point.name)
-            grp_descr, interfaces = entry_point.load()
-            lgr.debug(
-                'Loaded entrypoint %s from datalad.extensions',
-                entry_point.name)
-        except Exception as e:
-            ce = CapturedException(e)
-            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, ce)
-            continue
-
+    for grp_descr, interfaces in iter_entrypoints(
+                'datalad.extensions', load=True):
         for intfspec in interfaces:
             # turn the interface spec into an instance
-            mod = import_module(intfspec[0])
-            intf = getattr(mod, intfspec[1])
+            intf = import_interface(intfspec[0], intfspec[1])
             api_name = get_api_name(intfspec)
             if api_name in globals():
                 lgr.debug(

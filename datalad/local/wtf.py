@@ -171,10 +171,10 @@ def _describe_configuration(cfg, sensitive):
 
 def _describe_extensions():
     infos = {}
-    from pkg_resources import iter_entry_points
+    from datalad.core.utils import iter_entrypoints
     from importlib import import_module
 
-    for e in iter_entry_points('datalad.extensions'):
+    for e in iter_entrypoints('datalad.extensions', load=False):
         info = {}
         infos[e.name] = info
         try:
@@ -208,10 +208,10 @@ def _describe_extensions():
 
 def _describe_metadata_elements(group):
     infos = {}
-    from pkg_resources import iter_entry_points
+    from datalad.core.utils import iter_entrypoints
     from importlib import import_module
 
-    for e in iter_entry_points(group):
+    for e in iter_entrypoints(group):
         info = {}
         infos['%s (%s)' % (e.name, str(e.dist))] = info
         try:

@@ -58,9 +58,11 @@ class Test(Interface):
     @staticmethod
     def __call__(module=None, *, verbose=False, nocapture=False, pdb=False, stop=False):
         if not module:
-            from pkg_resources import iter_entry_points
+            from datalad.core.utils import iter_entrypoints
             module = ['datalad']
-            module.extend(ep.module_name for ep in iter_entry_points('datalad.tests'))
+            module.extend(
+                ep.module_name
+                for ep in iter_entrypoints('datalad.tests', load=False))
         module = ensure_list(module)
         lgr.info('Starting test run for module(s): %s', module)
         for mod in module:

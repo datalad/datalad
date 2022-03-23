@@ -8,9 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test all extractors at a basic level"""
 
-from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
+from datalad.core.utils import iter_entrypoints
 from datalad.tests.utils import (
     assert_equal,
     assert_repo_status,
@@ -27,7 +27,8 @@ def check_api(annex, path):
     assert_repo_status(ds.path)
 
     processed_extractors, skipped_extractors = [], []
-    for extractor_ep in iter_entry_points('datalad.metadata.extractors'):
+    for extractor_ep in iter_entrypoints('datalad.metadata.extractors',
+                                         load=False):
         # we need to be able to query for metadata, even if there is none
         # from any extractor
         try:

@@ -146,13 +146,13 @@ def _get_procedure_implementation(name='*', ds=None):
                 yield m, n, f, h
 
     # 3. check extensions for procedure
+    from datalad.core.utils import iter_entrypoints
     # delay heavy import until here
     from pkg_resources import (
-        iter_entry_points,
         resource_filename,
         resource_isdir,
     )
-    for entry_point in iter_entry_points('datalad.extensions'):
+    for entry_point in iter_entrypoints('datalad.extensions', load=False):
         # use of '/' here is OK wrt to platform compatibility
         if resource_isdir(entry_point.module_name, 'resources/procedures'):
             for m, n in _get_file_match(
