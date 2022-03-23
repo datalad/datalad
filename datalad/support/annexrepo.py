@@ -60,7 +60,7 @@ from datalad.support.exceptions import CapturedException
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
-    auto_repr,
+    auto_repr_long,
     ensure_list,
     on_windows,
     Path,
@@ -3800,7 +3800,7 @@ class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
             lgr.info(line.strip())
 
 
-@auto_repr
+@auto_repr_long
 class BatchedAnnex(BatchedCommand):
     """Container for an annex process which would allow for persistent communication
     """

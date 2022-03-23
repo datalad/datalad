@@ -323,7 +323,7 @@ def shortened_repr(value, l=30):
     return value_repr
 
 
-def __auto_repr__(obj):
+def __auto_repr__(obj, shortened: bool = True):
     attr_names = tuple()
     if hasattr(obj, '__dict__'):
         attr_names += tuple(obj.__dict__.keys())
@@ -339,7 +339,8 @@ def __auto_repr__(obj):
         # such as of URL?
         #if value is None:
         #    continue
-        items.append("%s=%s" % (attr, shortened_repr(value)))
+        items.append("%s=%s" % (
+            attr, shortened_repr(value) if shortened else value))
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
 
@@ -353,6 +354,18 @@ def auto_repr(cls):
     """
 
     cls.__repr__ = __auto_repr__
+    return cls
+
+
+def auto_repr_long(cls):
+    """Decorator to add an unabbreviated automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+
+    cls.__repr__ = lambda obj: __auto_repr__(obj, False)
     return cls
 
 

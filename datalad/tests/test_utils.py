@@ -42,6 +42,7 @@ from datalad.utils import (
     all_same,
     any_re_search,
     auto_repr,
+    auto_repr_long,
     better_wraps,
     CMD_MAX_ARG,
     Path,
@@ -475,6 +476,23 @@ def test_auto_repr():
         "buga(a=1, b=<<[0, 1, 2, 3, 4++372 chars++ 99]>>, c=<WithoutReprClass>)"
     )
     assert_equal(buga().some(), "some")
+
+    @auto_repr_long
+    class luga:
+        def __init__(self):
+            self.a = 1
+            self.b = list(range(100))
+            self.c = WithoutReprClass()
+            self._c = "protect me"
+
+        def some(self):
+            return "some"
+
+    ok_startswith(
+        repr(luga()),
+        f"luga(a=1, b={list(range(100))}, c="
+    )
+    assert_equal(luga().some(), "some")
 
 
 def test_assure_iter():
