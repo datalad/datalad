@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
@@ -28,7 +29,183 @@ from datalad.support.constraints import (
 )
 from datalad.utils import on_windows
 
+lgr = logging.getLogger('datalad.interface.common_cfg')
 dirs = AppDirs("datalad", "datalad.org")
+
+
+class _NotGiven():
+    pass
+
+
+def register_config(
+        name,
+        title,
+        *,
+        default=_NotGiven,
+        default_fn=_NotGiven,
+        description=None,
+        # yes, we shadow type, this is OK
+        type=_NotGiven,
+        # for manual entry
+        dialog=None,
+        scope=_NotGiven,
+    ):
+    """Register a configuration item
+
+    This function can be used by DataLad extensions and other client
+    code to register configurations items and their documentation with
+    DataLad's configuration management. Specifically, these definitions
+    will be interpreted by and acted on by the `configuration` command,
+    and `ConfigManager.obtain()`.
+
+    At minimum, each item must be given a name, and a title. Optionally, any
+    configuration item can be given a default (or a callable to compute a
+    default lazily on access), a type-defining/validating callable (i.e.
+    `Constraint`), a (longer) description, a dialog type to enable manual
+    entry, and a configuration scope to store entered values in.
+
+    Parameters
+    ----------
+    name: str
+      Configuration item name, in most cases starting with the prefix
+      'datalad.' followed by at least a section name, and a variable
+      name, e.g. 'datalad.section.variable', following Git's syntax for
+      configuration items.
+    title: str
+      The briefest summary of the configuration item's purpose, typically
+      written in the style of a headline for a dialog UI, or that of an
+      explanatory inline comment just prior the item definitions.
+    default: optional
+      A default value that is already known at the time of registering the
+      configuration items. Can be of any type.
+    default_fn: callable, optional
+      A callable to compute a default value lazily on access. The can be
+      used, if the actual value is not yet known at the time of registering
+      the configuration item, or if the default is expensive to compute
+      and its evaluation need to be deferred to prevent slow startup
+      (configuration items are typically define as one of the first things
+      on import).
+    description: str, optional
+      A longer description to accompany the title, possibly with instructions
+      on how a sensible value can be determined, or with details on the
+      impact of a configuration switch.
+    type: callable, optional
+      A callable to perform arbitrary type conversion and validation of value
+      (or default values). If validation/conversion fails, the callable
+      must raise an arbitrary exception. The `str(callable)` is used as
+      a type description.
+    dialog: {'yesno', 'question'}
+      A type of UI dialog to use when manual value entry is attempted
+      (only in interactive sessions, and only when no default is defined.
+      `title` and `description` will be displayed in this dialog.
+    scope: {'override', 'global', 'local', 'branch'}, optional
+      If particular code requests the storage of (manually entered) values,
+      but defines no configuration scope, this default scope will be used.
+    """
+    kwargs = dict(
+        default=default,
+        default_fn=default_fn,
+        scope=scope,
+        type=type
+    )
+    if dialog is not None and not title:
+        raise ValueError("Configuration dialog must have a title")
+    doc_props = dict(title=title)
+    if description:
+        doc_props['text'] = description
+    # dialog is OK to be None, this is not just about UI, even if
+    # the key of the internal data structure seems to suggest that.
+    # it is also the source for annotating config listings
+    kwargs['ui'] = (dialog, doc_props)
+    definitions[name] = _ConfigDefinition(**kwargs)
+
+
+class _ConfigDefinitions(object):
+    """A container for configuration definitions
+
+    This class implements the parts of the dictionary interface
+    required to work as a drop-in replacement for the legacy
+    data structure used for configuration definitions prior
+    DataLad 0.16.
+
+    .. note::
+
+      This is an internal helper that may change at any time without
+      prior notice.
+    """
+    def __init__(self):
+        self._defs = {
+            k: _ConfigDefinition(**v) for k, v in _definitions.items()
+            if v is not _NotGiven
+        }
+
+    def get(self, *args):
+        return self._defs.get(*args)
+
+    def keys(self):
+        return self._defs.keys()
+
+    def items(self):
+        return self._defs.items()
+
+    def __setitem__(self, key, value):
+        self._defs.__setitem__(key, value)
+
+    def __getitem__(self, key):
+        return self._defs.__getitem__(key)
+
+    def __contains__(self, key):
+        return self._defs.__contains__(key)
+
+    def __iter__(self):
+        return self._defs.__iter__()
+
+
+class _ConfigDefinition(object):
+    """A single configuration definition
+
+    This class implements the parts of the dictionary interface
+    required to work as a drop-in replacement for the legacy
+    data structure used for a configuration definition prior
+    DataLad 0.16.
+
+    Moreover, it implement lazy evaluation of default values,
+    when a 'default_fn' property is given.
+
+    .. note::
+
+      This is an internal helper that may change at any time without
+      prior notice.
+    """
+    def __init__(self, **kwargs):
+        # just take it, no validation on ingestions for max speed
+        self._props = kwargs
+
+    def __getitem__(self, prop):
+        if prop == 'default' \
+                and 'default' not in self._props \
+                and 'default_fn' in self._props:
+            default = self._props["default_fn"]()
+            self._props['default'] = default
+            return default
+        return self._props[prop]
+
+    def get(self, prop, default=None):
+        try:
+            return self.__getitem__(prop)
+        except KeyError:
+            return default
+
+    def __contains__(self, prop):
+        if prop == 'default':
+            return 'default' in self._props or 'default_fn' in self._props
+        return self._props.__contains__(prop)
+
+    def __str__(self):
+        return self._props.__str__()
+
+    def __repr__(self):
+        return self._props.__repr__()
 
 
 def get_default_ssh():
@@ -56,7 +233,8 @@ substitutions in a series will be considered. However, following the first
 match all further substitutions in a series are processed, regardless whether
 intermediate expressions match or not."""
 
-definitions = {
+
+_definitions = {
     'datalad.clone.url-substitute.github': {
         'ui': ('question', {
                'title': 'GitHub URL substitution rule',
@@ -606,17 +784,4 @@ definitions = {
     }
 }
 
-
-def compute_cfg_defaults():
-    """Compute dynamic defaults for configuration options.
-
-    These are options that depend on things like $HOME that change under our
-    testing setup.
-    """
-    for key, value in definitions.items():
-        def_fn = value.get("default_fn")
-        if def_fn:
-            value['default'] = def_fn()
-
-
-compute_cfg_defaults()
+definitions = _ConfigDefinitions()
