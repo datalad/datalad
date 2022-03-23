@@ -233,6 +233,11 @@ def setup_package():
 	askPass =
 [datalad "log"]
 	exc = 1
+[annex "security"]
+	# from annex 6.20180626 file:/// and http://localhost access isn't
+	# allowed by default
+	allowed-url-schemes = http https file
+	allowed-http-addresses = all
 """
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
@@ -277,11 +282,6 @@ def setup_package():
         if ev in os.environ and not (os.environ[ev]):
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
-
-    # During tests we allow for "insecure" access to local file:// and
-    # http://localhost URLs since all of them either generated as tests
-    # fixtures or cloned from trusted sources
-    AnnexRepo._ALLOW_LOCAL_URLS = True
 
     DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
     if DATALAD_LOG_LEVEL is None:
