@@ -183,7 +183,7 @@ def setup_package():
     import tempfile
 
     from datalad import consts
-    from datalad.interface.common_cfg import compute_cfg_defaults
+    from datalad.interface.common_cfg import definitions as cfg_defs
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
     from datalad.tests import _TEMP_PATHS_GENERATED
@@ -265,7 +265,7 @@ def setup_package():
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
 
-    compute_cfg_defaults()
+    cfg_defs.compute_defaults()
     # datalad.locations.sockets has likely changed. Discard any cached values.
     ssh_manager._socket_dir = None
 
@@ -342,7 +342,7 @@ def setup_package():
 def teardown_package():
     import os
     from datalad import consts
-    from datalad.interface.common_cfg import compute_cfg_defaults
+    from datalad.interface.common_cfg import definitions as cfg_defs
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.cookies import cookies_db
     from datalad.support.external_versions import external_versions as ev
@@ -400,7 +400,7 @@ def teardown_package():
     # either way.
     cfg.reload(force=True)
 
-    compute_cfg_defaults()
+    cfg_defs.compute_defaults()
     ssh_manager._socket_dir = None
 
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']

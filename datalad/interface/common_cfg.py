@@ -56,7 +56,47 @@ substitutions in a series will be considered. However, following the first
 match all further substitutions in a series are processed, regardless whether
 intermediate expressions match or not."""
 
-definitions = {
+
+class ConfigDefinitions(object):
+    def __init__(self):
+        self._defs = _definitions
+        self.compute_defaults()
+
+    def compute_defaults(self):
+        """Compute dynamic defaults for configuration options.
+
+        These are options that depend on things like $HOME that change under
+        our testing setup.
+        """
+        for key, value in self._defs.items():
+            def_fn = value.get("default_fn")
+            if def_fn:
+                value['default'] = def_fn()
+
+    def get(self, *args):
+        return self._defs.get(*args)
+
+    def keys(self):
+        return self._defs.keys()
+
+    def items(self):
+        return self._defs.items()
+
+    def __setitem__(self, key, value):
+        # TODO add some validation on the inner structure of `value`
+        self._defs.__setitem__(key, value)
+
+    def __getitem__(self, key):
+        return self._defs.__getitem__(key)
+
+    def __contains__(self, key):
+        return self._defs.__contains__(key)
+
+    def __iter__(self):
+        return self._defs.__iter__()
+
+
+_definitions = {
     'datalad.clone.url-substitute.github': {
         'ui': ('question', {
                'title': 'GitHub URL substitution rule',
@@ -592,17 +632,4 @@ definitions = {
     }
 }
 
-
-def compute_cfg_defaults():
-    """Compute dynamic defaults for configuration options.
-
-    These are options that depend on things like $HOME that change under our
-    testing setup.
-    """
-    for key, value in definitions.items():
-        def_fn = value.get("default_fn")
-        if def_fn:
-            value['default'] = def_fn()
-
-
-compute_cfg_defaults()
+definitions = ConfigDefinitions()
