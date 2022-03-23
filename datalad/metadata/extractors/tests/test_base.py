@@ -8,9 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test all extractors at a basic level"""
 
-from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
+from datalad.support.entrypoints import iter_entrypoints
 from datalad.tests.utils import (
     assert_equal,
     assert_repo_status,
@@ -27,11 +27,11 @@ def check_api(annex, path):
     assert_repo_status(ds.path)
 
     processed_extractors, skipped_extractors = [], []
-    for extractor_ep in iter_entry_points('datalad.metadata.extractors'):
+    for ename, emod, eload in iter_entrypoints('datalad.metadata.extractors'):
         # we need to be able to query for metadata, even if there is none
         # from any extractor
         try:
-            extractor_cls = extractor_ep.load()
+            extractor_cls = eload()
         except Exception as exc:
             exc_ = str(exc)
             skipped_extractors += [exc_]
@@ -52,9 +52,9 @@ def check_api(annex, path):
         cm = dict(contentmeta)
         # datalad_core does provide some (not really) information about our
         # precious file
-        if extractor_ep.name == 'datalad_core':
+        if ename == 'datalad_core':
             assert 'file.dat' in cm
-        elif extractor_ep.name == 'annex':
+        elif ename == 'annex':
             if annex:
                 # verify correct key, which is the same for all files of 0 size
                 assert_equal(
@@ -64,7 +64,7 @@ def check_api(annex, path):
             else:
                 # no metadata on that file
                 assert not cm
-        processed_extractors.append(extractor_ep.name)
+        processed_extractors.append(ename)
     assert "datalad_core" in processed_extractors, \
         "Should have managed to find at least the core extractor extractor"
     if skipped_extractors:

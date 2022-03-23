@@ -473,8 +473,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
-    from pkg_resources import iter_entry_points  # delayed heavy import
-    extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
+    from datalad.support.entrypoints import iter_entrypoints
+    extractors = {
+        ename: eload
+        for ename, _, eload in iter_entrypoints('datalad.metadata.extractors')
+    }
 
     # we said that we want to fail, rather then just moan about less metadata
     # Do an early check if all extractors are available so not to wait hours
@@ -505,7 +508,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             update=1,
             increment=True)
         try:
-            extractor_cls = extractors[mtype_key].load()
+            extractor_cls = extractors[mtype_key]()
             extractor = extractor_cls(
                 ds,
                 paths=paths if extractor_cls.NEEDS_CONTENT else fullpathlist)
