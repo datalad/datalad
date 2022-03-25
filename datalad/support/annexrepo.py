@@ -1184,7 +1184,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                       stdin=stdin,
                                       merge_annex_branches=merge_annex_branches,
                                       **kwargs):
-                if tuple(json_object) == 1 and json_object.get('info', None):
+                if len(json_object) == 1 and json_object.get('info', None):
                     lgr.info(json_object['info'])
                 else:
                     json_objects_received = True
