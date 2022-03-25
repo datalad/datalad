@@ -117,6 +117,20 @@ definitions = {
         'type': bool,
         'default': False,
     },
+    'datalad.extensions.load': {
+        'ui': ('question', {
+               'title': 'DataLad extension packages to load',
+               'text': 'Indicate which extension packages should be loaded '
+                       'unconditionally on CLI startup or on importing '
+                       "'datalad.[core]api'. This enables the "
+                       'respective extensions to customize DataLad with '
+                       'functionality and configurability outside the '
+                       'scope of extension commands. For merely running '
+                       'extension commands it is not necessary to load them '
+                       'specifically'}),
+        'destination': 'global',
+        'default': None,
+    },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
                'title': 'NDA database server',

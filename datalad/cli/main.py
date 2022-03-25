@@ -73,6 +73,13 @@ def main(args=sys.argv):
         from .helpers import _fix_datalad_ri
         args = [_fix_datalad_ri(s) for s in args]
 
+    from datalad.support.entrypoints import load_extensions
+    # load extensions requested by configuration
+    # analog to what coreapi is doing for a Python session
+    # importantly, load them prior to parser construction, such
+    # that CLI tuning is also within reach for extensions
+    load_extensions()
+
     # PYTHON_ARGCOMPLETE_OK
     # TODO possibly construct a dedicated parser just for autocompletion
     # rather than lobotomizing the normal one
@@ -108,6 +115,9 @@ def main(args=sys.argv):
         )
         # enable overrides
         datalad.cfg.reload(force=True)
+        # try loading extensions again, in case the configuration
+        # added new ones to consider
+        load_extensions()
 
     if 'datalad.runtime.librarymode' in datalad.cfg:
         datalad.enable_librarymode()
@@ -127,13 +137,33 @@ def main(args=sys.argv):
         # matches exit code for InsufficientArgumentsError
         sys.exit(2)
 
+    _run(cmdlineargs)
+
+
+def _run(namespace):
+    """Execute a CLI operation
+
+    Depending on CLI debugging options the CLI operation is executed
+    in a debug harness or an exception handler.
+
+    Parameters
+    ----------
+    namespace: Namespace
+      Object returned by `ArgumentParser.parse_args()` with fully
+      populated and validated CLI command and arguments.
+
+    Raises
+    ------
+    SystemExit
+      When the CLI completed without error (exit 0).
+    """
     # execute the command, either with a debugger catching
     # a crash, or with a simplistic exception handler.
     # note that result rendering is happening in the
     # execution handler, when the command-generator is unwound
-    ret = _run_with_debugger(cmdlineargs) \
-        if cmdlineargs.common_debug or cmdlineargs.common_idebug \
-        else _run_with_exception_handler(cmdlineargs)
+    ret = _run_with_debugger(namespace) \
+        if namespace.common_debug or namespace.common_idebug \
+        else _run_with_exception_handler(namespace)
 
     # all good, not strictly needed, but makes internal testing easier
     sys.exit(0)
