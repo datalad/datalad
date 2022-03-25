@@ -3800,7 +3800,7 @@ class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
             lgr.info(line.strip())
 
 
-@auto_repr
+@auto_repr(short=False)
 class BatchedAnnex(BatchedCommand):
     """Container for an annex process which would allow for persistent communication
     """

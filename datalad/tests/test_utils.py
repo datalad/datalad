@@ -463,18 +463,33 @@ def test_auto_repr():
     class buga:
         def __init__(self):
             self.a = 1
-            self.b = list(range(100))
+            self.b = list(range(20))
             self.c = WithoutReprClass()
             self._c = "protect me"
 
         def some(self):
             return "some"
 
+    @auto_repr(short=False)
+    class buga_long(object):
+        def __init__(self):
+            self.a = 1
+            self.b = list(range(20))
+
+        def some(self):
+            return "some"
+
     assert_equal(
         repr(buga()),
-        "buga(a=1, b=<<[0, 1, 2, 3, 4++372 chars++ 99]>>, c=<WithoutReprClass>)"
+        "buga(a=1, b=<<[0, 1, 2, 3, 4++52 chars++ 19]>>, c=<WithoutReprClass>)"
     )
     assert_equal(buga().some(), "some")
+
+    assert_equal(
+        repr(buga_long()),
+        f"buga_long(a=1, b=[{', '.join(map(str, range(20)))}])"
+    )
+    assert_equal(buga_long().some(), "some")
 
 
 def test_assure_iter():

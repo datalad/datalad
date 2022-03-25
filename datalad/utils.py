@@ -304,58 +304,6 @@ def get_home_envvars(new_home):
     return {v: val for v, val in out.items() if v in os.environ}
 
 
-def shortened_repr(value, l=30):
-    try:
-        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
-            value_repr = repr(value)
-            if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s++%d chars++%s>>" % (
-                    value_repr[:l - 16],
-                    len(value_repr) - (l - 16 + 4),
-                    value_repr[-4:]
-                )
-            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
-                raise ValueError("I hate those useless long reprs")
-        else:
-            raise ValueError("gimme class")
-    except Exception as e:
-        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
-    return value_repr
-
-
-def __auto_repr__(obj):
-    attr_names = tuple()
-    if hasattr(obj, '__dict__'):
-        attr_names += tuple(obj.__dict__.keys())
-    if hasattr(obj, '__slots__'):
-        attr_names += tuple(obj.__slots__)
-
-    items = []
-    for attr in sorted(set(attr_names)):
-        if attr.startswith('_'):
-            continue
-        value = getattr(obj, attr)
-        # TODO:  should we add this feature to minimize some talktative reprs
-        # such as of URL?
-        #if value is None:
-        #    continue
-        items.append("%s=%s" % (attr, shortened_repr(value)))
-
-    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
-
-
-def auto_repr(cls):
-    """Decorator for a class to assign it an automagic quick and dirty __repr__
-
-    It uses public class attributes to prepare repr of a class
-
-    Original idea: http://stackoverflow.com/a/27799004/1265472
-    """
-
-    cls.__repr__ = __auto_repr__
-    return cls
-
-
 def _is_stream_tty(stream):
     try:
         # TODO: check on windows if hasattr check would work correctly and
@@ -1282,6 +1230,59 @@ def never_fail(f):
         return f
     else:
         return wrapped_func
+
+
+def shortened_repr(value, l=30):
+    try:
+        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
+            value_repr = repr(value)
+            if not value_repr.startswith('<') and len(value_repr) > l:
+                value_repr = "<<%s++%d chars++%s>>" % (
+                    value_repr[:l - 16],
+                    len(value_repr) - (l - 16 + 4),
+                    value_repr[-4:]
+                )
+            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
+                raise ValueError("I hate those useless long reprs")
+        else:
+            raise ValueError("gimme class")
+    except Exception as e:
+        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
+    return value_repr
+
+
+def __auto_repr__(obj, short=True):
+    attr_names = tuple()
+    if hasattr(obj, '__dict__'):
+        attr_names += tuple(obj.__dict__.keys())
+    if hasattr(obj, '__slots__'):
+        attr_names += tuple(obj.__slots__)
+
+    items = []
+    for attr in sorted(set(attr_names)):
+        if attr.startswith('_'):
+            continue
+        value = getattr(obj, attr)
+        # TODO:  should we add this feature to minimize some talktative reprs
+        # such as of URL?
+        #if value is None:
+        #    continue
+        items.append("%s=%s" % (attr, shortened_repr(value) if short else value))
+
+    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+
+
+@optional_args
+def auto_repr(cls, short=True):
+    """Decorator for a class to assign it an automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+
+    cls.__repr__ = lambda obj:__auto_repr__(obj, short=short)
+    return cls
 
 
 #
