@@ -143,11 +143,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     repository_versions = None
     _version_kludges = {}
 
-    # Class wide setting to allow insecure URLs. Used during testing, since
-    # git annex 6.20180626 those will by default be not allowed for security
-    # reasons
-    _ALLOW_LOCAL_URLS = False
-
     def __init__(self, path, runner=None,
                  backend=None, always_commit=True,
                  create=True, create_sanity_checks=True,
@@ -302,9 +297,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
-        if self._ALLOW_LOCAL_URLS:
-            self._allow_local_urls()
-
         # will be evaluated lazily
         self._n_auto_jobs = None
 
@@ -316,20 +308,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         # and thereby preventing it from being collected at all.
         self._finalizer = finalize(self, AnnexRepo._cleanup, self.path,
                                    self._batched)
-
-    def _allow_local_urls(self):
-        """Allow URL schemes and addresses which potentially could be harmful.
-
-        For now it is internal method used within tests only
-        """
-        # from annex 6.20180626 file:/// and http://localhost access isn't
-        # allowed by default
-        self.config.add(
-            'annex.security.allowed-url-schemes', 'http https file',
-            'local')
-        self.config.add(
-            'annex.security.allowed-http-addresses', 'all',
-            'local')
 
     def set_default_backend(self, backend, persistent=True, commit=True):
         """Set default backend
