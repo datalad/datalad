@@ -302,13 +302,20 @@ def test_status_symlinked_dir_within_repo(path):
     if ds.repo.git_annex_version < "8.20200522" or on_windows:
         # TODO: on windows even with a recent annex -- no CommandError is raised, TODO
         assert_result_count(call(), 0)
-    else:
+
+    elif ds.repo.git_annex_version < '10.20220127' or (
+            ds.repo.git_annex_version > '10.20220322' and not ds.config.getbool(
+                    section="annex", option="skipunknown", default=False)):
         # As of 2a8fdfc7d (Display a warning message when asked to operate on a
         # file inside a symlinked directory, 2020-05-11), git-annex will error.
-        #
-        # TODO: Consider providing better error handling in this case.
+        # However, there's an annex bug for a brief period, where it exits
+        # zero. Later on, it depends on how the reporting by annex looks like
+        # whether or not we fail or ignore that error. This in turn depends
+        # on the config queried in the condition.
         with assert_raises(CommandError):
             call()
+    else:
+        assert_result_count(call(), 0)
 
 
 @with_tempfile
