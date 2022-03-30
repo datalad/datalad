@@ -687,8 +687,10 @@ class CreateSibling(Interface):
                     ds,
                     fr=since,
                     to='HEAD',
-                    # make explicit, but doesn't matter, no recursion in diff()
-                    constant_refs=True,
+                    # w/o False we might not follow into new subdatasets
+                    # which do not have that remote yet setup,
+                    # see https://github.com/datalad/datalad/issues/6596
+                    constant_refs=False,
                     # save cycles, we are only looking for datasets
                     annex=None,
                     untracked='no',
