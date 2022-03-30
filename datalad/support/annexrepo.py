@@ -3311,12 +3311,23 @@ class AnnexRepo(GitRepo, RepoInterface):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
             if rec is None:
-                if init is not None:
+                # git didn't report on this path
+                if j.get('success', None) is False:
+                    # Annex reports error on that file. Create an error entry,
+                    # as we can't currently yield a prepared error result from
+                    # within here.
+                    rec = {'status': 'error', 'state': 'unknown'}
+                elif init is not None:
                     # init constraint knows nothing about this path -> skip
                     continue
-                rec = {}
+                else:
+                    rec = {}
             rec.update({'{}{}'.format(key_prefix, k): j[k]
-                       for k in j if k != 'file'})
+                       for k in j if k != 'file' and k != 'error_messages'})
+            # change annex' `error_messages` into singular to match result
+            # records:
+            if j.get('error-messages', None):
+                rec['error_message'] = '\n'.join(m.strip() for m in j['error-messages'])
             if 'bytesize' in rec:
                 # it makes sense to make this an int that one can calculate with
                 # with

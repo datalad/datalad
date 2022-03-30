@@ -2165,6 +2165,7 @@ def test_error_reporting(path):
             # whole thing, despite space, properly quotes backslash
             'file': 'gl\\orious BS',
             'note': 'not found',
+            'error-messages': ['File unknown to git'],
             'success': False}]
     )
 

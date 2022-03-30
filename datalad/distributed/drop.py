@@ -793,7 +793,7 @@ def _postproc_annexdrop_result(res, respath_by_status, ds, **kwargs):
     respath_by_status[success] = \
         respath_by_status.get(success, []) + [res['path']]
     if res["status"] == "error" and res["action"] == "drop":
-        msg = res["message"]
+        msg = res.get("message", None)
         if isinstance(msg, str) and "Use --force to" in msg:
             # Avoid confusing datalad-drop callers with git-annex-drop's
             # suggestion to use --force.
