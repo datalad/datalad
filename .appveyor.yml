@@ -275,6 +275,10 @@ init:
   # Temporary keys for localhost access in default place
   - cmd: ssh-keygen -f C:\Users\appveyor\.ssh\id_rsa -N ""
   - sh: ssh-keygen -f ~/.ssh/id_rsa -N ""
+  # Remove AppVeyor's known_hosts entries for gitlab, since they are matching
+  # `*` as the IP (see https://github.com/appveyor/ci/issues/3792)
+  - cmd: ssh-keygen -f C:\Users\appveyor\.ssh\known_hosts -R "gitlab.com"
+  - sh: ssh-keygen -f ~/.ssh/known_hosts -R "gitlab.com"
 
 
 install:
