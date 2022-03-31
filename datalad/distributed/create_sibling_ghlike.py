@@ -145,27 +145,30 @@ class _GitHubLike(object):
 
         self.api_url = url
         self._user_info = None
+        self._set_request_headers(
+            credential,
+            f'An access token is required for {url}' \
+            + f'. {token_info}' if token_info else '',
+            require_token,
+        )
 
-        if credential is None:
-            credential = urlparse(url).netloc
-
-        token_instructions = f'An access token is required for {url}'
-        if token_info:
-            token_instructions += f'. {token_info}'
+    def _set_request_headers(self, credential_name, auth_info, require_token):
+        if credential_name is None:
+            credential_name = urlparse(self.api_url).netloc
 
         try:
-            self.auth = Token(credential)(
-                instructions=token_instructions)['token']
+            self.auth = Token(credential_name)(
+                instructions=auth_info)['token']
         except Exception as e:
             lgr.debug('Token retrieval failed: %s', e)
             lgr.warning(
-                'Cannot determine authorization token for %s', credential)
+                'Cannot determine authorization token for %s', credential_name)
             if require_token:
                 raise ValueError(
                     f'Authorization required for {self.fullname}, '
-                    f'cannot find token for a credential {credential}.')
+                    f'cannot find token for a credential {credential_name}.')
             else:
-                lgr.warning("No token found for credential '%s'", credential)
+                lgr.warning("No token found for credential '%s'", credential_name)
                 self.auth = 'NO-TOKEN-AVAILABLE'
 
         self.request_headers = {
