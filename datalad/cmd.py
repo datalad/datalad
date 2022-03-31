@@ -264,7 +264,6 @@ class BatchedCommand(SafeDelCloseMixin):
             protocol=BatchedCommandProtocol,
             stdin=self.stdin_queue,
             cwd=self.path,
-            env=GitRunnerBase.get_git_environ_adjusted(),
             # This mimics the behavior of the old implementation w.r.t
             # timeouts when waiting for the closing process
             timeout=self.timeout or 11.0,
