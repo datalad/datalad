@@ -645,7 +645,12 @@ class SSHRemoteIO(IOBase):
         try:
             out = self._run(cmd, no_output=False, check=True)
         except RemoteCommandFailedError as e:
-            raise RIARemoteError(f"Could not read {file_path}") from e
+            # Currently we don't read stderr. All we know is, we couldn't read.
+            # Try narrowing it down by calling a subsequent exists()
+            if not self.exists(file_path):
+                raise FileNotFoundError(f"{str(file_path)} not found.") from e
+            else:
+                raise RuntimeError(f"Could not read {file_path}") from e
 
         return out
 
@@ -745,18 +750,38 @@ class HTTPRemoteIO(object):
         url = self.store_url + file_path.as_posix()
         try:
             content = download_url(url)
-        except DownloadError as e:
+
+            # NOTE re Exception handling:
+            # We reraise here to:
+            #   1. Unify exceptions across IO classes
+            #   2. Get cleaner user messages. ATM what we get from the
+            #   Downloaders are exceptions, that have their cause-chain baked
+            #   into their string rather than being e proper exception chain.
+            #   Hence, we can't generically extract the ultimate cause.
+            #   RemoteError will eventually pass the entire chain string to
+            #   annex. If we add our own exception here on top, this is what is
+            #   displayed first to the user, rather than being buried deep into
+            #   a hard to parse message.
+        except AccessDeniedError as exc:
+            raise PermissionError(f"Permission denied: '{url}'") from exc
+
+        except DownloadError as exc:
             # Note: This comes from the downloader. `check_response_status`
             # in downloaders/http.py does not currently use
             # `raise_from_status`, hence we don't get a proper HTTPError to
             # check for a 404 and thereby distinguish from connection issues.
             # When this is addressed in the downloader code, we need to
             # adjust here.
-            if "not found" in str(e):
+            if "not found" in str(exc):
                 # Raise uniform exception across IO classes:
-                raise FileNotFoundError(f"{url} not found.") from e
+                raise FileNotFoundError(f"{url} not found.") from exc
             else:
-                raise
+                # Note: There's AccessFailedError(DownloadError) as well.
+                # However, we can't really tell them meaningfully apart,
+                # since possible underlying HTTPErrors, etc. are baked into
+                # their strings. Hence, "Failed to access" is what we can
+                # tell here in either case.
+                raise RuntimeError(f"Failed to access {url}") from exc
         return content
 
 
@@ -897,73 +922,13 @@ class RIARemote(SpecialRemote):
         try:
             self.remote_dataset_tree_version = \
                 self._get_version_config(dataset_tree_version_file)
-            if self.remote_dataset_tree_version not in self.known_versions_dst:
-                # Note: In later versions, condition might change in order to
-                # deal with older versions.
-                raise UnknownLayoutVersion(
-                    "RIA store layout version unknown: %s" %
-                    self.remote_dataset_tree_version)
-
-        except (RemoteError, FileNotFoundError):
-            # Exception class depends on whether self.io is local or SSH.
-            # assume file doesn't exist
-            # TODO: Is there a possibility RemoteError has a different reason
-            #       and should be handled differently?
-            #       Don't think so ATM. -> Reconsider with new execution layer.
-
-            # Note: Error message needs entire URL not just the missing
-            #       path, since it could be due to invalid URL. Path isn't
-            #       telling if it's not clear what system we are looking at.
-            # Note: Case switch due to still supported configs as an
-            #       alternative to ria+ URLs. To be deprecated.
-            if self.ria_store_url:
-                target = self.ria_store_url
-            elif self.storage_host:
-                target = "ria+ssh://{}{}".format(
-                    self.storage_host,
-                    dataset_tree_version_file.parent)
-            else:
-                target = "ria+" + dataset_tree_version_file.parent.as_uri()
-
-            if not self.io.exists(dataset_tree_version_file.parent):
-                # unify exception to FileNotFoundError
-
-                raise FileNotFoundError(
-                    "Configured RIA store not found at %s " % target
-                )
-            else:
-                # Directory is there, but no version file. We don't know what
-                # that is. Treat the same way as if there was an unknown version
-                # on record.
-                raise NoLayoutVersion(
-                    "Configured RIA store lacks a 'ria-layout-version' file at"
-                    " %s" % target
-                )
-
-        except AccessFailedError as exc:
-            # Downloader failed to access the store. Note, that the case of a
-            # 404 on the config file's URL is already handled as a
-            # FileNotFoundError (as raised by HTTPRemoteIO.read_file). Hence,
-            # if we get here there's a broader issue connecting to that
-            # store and it probably doesn't make sense to keep sending
-            # requests by treating it as a read-only store.
-
-            # RemoteError currently has `__cause__` put into its __str__
-            # unconditionally and this is what `annexremote` will put into a
-            # message to annex. Hence, cut off the ties here rather than
-            # raising "from exc" and provide a message that can be parsed by
-            # a regular user.
-            # TODO: How to deal with that needs to be reconsidered with now
-            # supported logging from within special remotes.
-            url = self.ria_store_url[4:] + dataset_tree_version_file.as_posix()
-            raise RIARemoteError(f"RIA store unavailable: Failed to access "
-                                 f"{url}")
-        except AccessDeniedError as exc:
-            # As with AccessFailedError above, reword error since message
-            # will be user-facing:
-            url = self.ria_store_url[4:] + dataset_tree_version_file.as_posix()
-            raise RIARemoteError(f"RIA store unavailable: Access denied to"
-                                 f" {url}")
+        except Exception as exc:
+            raise RIARemoteError("RIA store unavailable.") from exc
+        if self.remote_dataset_tree_version not in self.known_versions_dst:
+            # Note: In later versions, condition might change in order to
+            # deal with older versions.
+            raise UnknownLayoutVersion(f"RIA store layout version unknown: "
+                                       f"{self.remote_dataset_tree_version}")
 
     def verify_ds_in_store(self):
         """Check whether the dataset exists in store and reports a layout
@@ -981,45 +946,11 @@ class RIARemote(SpecialRemote):
         try:
             self.remote_object_tree_version =\
                 self._get_version_config(object_tree_version_file)
-            if self.remote_object_tree_version not in self.known_versions_objt:
-                raise UnknownLayoutVersion
-        except (RemoteError, FileNotFoundError) as e:
-            # Exception class depends on whether self.io is local or SSH.
-            # assume file doesn't exist
-            # TODO: Is there a possibility RemoteError has a different reason
-            #       and should be handled differently?
-            #       Don't think so ATM. -> Reconsider with new execution layer.
-            if not self.io.exists(object_tree_version_file.parent):
-                # unify exception
-                raise e
-            else:
-                raise NoLayoutVersion from e
-
-        except AccessFailedError as exc:
-            # Downloader failed to access the store. Note, that the case of a
-            # 404 on the config file's URL is already handled as a
-            # FileNotFoundError (as raised by HTTPRemoteIO.read_file). Hence,
-            # if we get here there's a broader issue connecting to that
-            # store and it probably doesn't make sense to keep sending
-            # requests by treating it as a read-only store.
-
-            # RemoteError currently has `__cause__` put into its __str__
-            # unconditionally and this is what `annexremote` will put into a
-            # message to annex. Hence, cut off the ties here rather than
-            # raising "from exc" and provide a message that can be parsed by
-            # a regular user.
-            # TODO: How to deal with that needs to be reconsidered with now
-            # supported logging from within special remotes.
-
-            url = self.ria_store_url[4:] + object_tree_version_file.as_posix()
-            raise RIARemoteError(f"Dataset unavailable from RIA store: "
-                                 f"Failed to access {url}.")
-        except AccessDeniedError as exc:
-            # As with AccessFailedError above, reword error since message
-            # will be user-facing:
-            url = self.ria_store_url[4:] + object_tree_version_file.as_posix()
-            raise RIARemoteError(f"Dataset unavailable from RIA store: "
-                                 f" Access denied to {url}.")
+        except Exception as e:
+            raise RIARemoteError("Dataset unavailable from RIA store.")
+        if self.remote_object_tree_version not in self.known_versions_objt:
+            raise UnknownLayoutVersion(f"RIA dataset layout version unknown: "
+                                       f"{self.remote_object_tree_version}")
 
     def _load_cfg(self, gitdir, name):
         # Whether or not to force writing to the remote. Currently used to
@@ -1125,7 +1056,27 @@ class RIARemote(SpecialRemote):
         """ Get version and config flags from remote file
         """
 
-        file_content = self.io.read_file(path).strip().split('|')
+        if self.ria_store_url:
+            target_ri = self.ria_store_url[4:] + path.as_posix()
+        elif self.storage_host:
+            target_ri = "ssh://{}{}".format(self.storage_host, path.as_posix())
+        else:
+            target_ri = path.as_uri()
+
+        try:
+            file_content = self.io.read_file(path).strip().split('|')
+
+        # Note, that we enhance the reporting here, as the IO classes don't
+        # uniformly operate on that kind of RI (which is more informative
+        # as it includes the store base address including the access
+        # method).
+        except FileNotFoundError as exc:
+            raise NoLayoutVersion(f"{target_ri} not found.") from exc
+        except PermissionError as exc:
+            raise PermissionError(f"Permission denied: {target_ri}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Failed to access {target_ri}") from exc
+
         if not (1 <= len(file_content) <= 2):
             self.message("invalid version file {}".format(path),
                          type='info')
