@@ -34,7 +34,7 @@ class RemoteError(_RemoteError):
             exc_cause = format_exception_with_cause(exc_cause)
         if exc_str and exc_cause:
             # with have the full picture
-            msg = f'{exc_str} caused by {exc_cause}'
+            msg = f'{exc_str} -caused by- {exc_cause}'
         elif exc_str and not exc_cause:
             # only a custom message
             msg = exc_str
