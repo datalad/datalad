@@ -52,7 +52,7 @@ def _generate_extension_api():
     import logging
     lgr = logging.getLogger('datalad.api')
 
-    for _, _, (grp_descr, interfaces) in iter_entrypoints(
+    for ename, _, (grp_descr, interfaces) in iter_entrypoints(
             'datalad.extensions', load=True):
         for intfspec in interfaces:
             # turn the interface spec into an instance
@@ -62,7 +62,7 @@ def _generate_extension_api():
                 lgr.debug(
                     'Command %s from extension %s is replacing a previously loaded implementation',
                     api_name,
-                    entry_point.name)
+                    ename)
             globals()[api_name] = intf.__call__
 
 
