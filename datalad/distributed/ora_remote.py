@@ -701,6 +701,7 @@ class HTTPRemoteIO(object):
     # approach.
 
     def __init__(self, url, buffer_size=DEFAULT_BUFFER_SIZE):
+        from datalad.downloaders.providers import Providers
         if not url.startswith("http"):
             raise RIARemoteError("Expected HTTP URL, but got {}".format(url))
 
@@ -708,6 +709,7 @@ class HTTPRemoteIO(object):
 
         # make sure default is used when None was passed, too.
         self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
+        self._providers = Providers.from_config_files()
 
     def checkpresent(self, key_path):
         # Note, that we need the path with hash dirs, since we don't have access
@@ -720,8 +722,7 @@ class HTTPRemoteIO(object):
         # to annexremote.dirhash from within IO classes
 
         url = self.store_url + str(key_path)
-        from datalad.support.network import download_url
-        download_url(url, filename, overwrite=True)
+        self._providers.download(url, path=filename, overwrite=True)
 
     def exists(self, path):
         # use same signature as in SSH and Local IO, although validity is
