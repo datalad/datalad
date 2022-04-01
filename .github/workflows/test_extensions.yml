@@ -13,6 +13,7 @@ jobs:
         extension: [
             datalad-neuroimaging,
             datalad-container,
+            datalad-metalad,
             datalad-crawler,
             datalad-deprecated,
         ]
