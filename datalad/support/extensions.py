@@ -15,7 +15,7 @@ from datalad.interface.common_cfg import (
     definitions as _definitions,
 )
 
-__all__ = ['register_config']
+__all__ = ['register_config', 'has_config']
 
 lgr = logging.getLogger('datalad.support.extensions')
 
@@ -33,7 +33,6 @@ def register_config(
         dialog=None,
         scope=_NotGiven,
     ):
-    t
     """Register a configuration item
 
     This function can be used by DataLad extensions and other client
@@ -85,6 +84,11 @@ def register_config(
     scope: {'override', 'global', 'local', 'branch'}, optional
       If particular code requests the storage of (manually entered) values,
       but defines no configuration scope, this default scope will be used.
+
+    Raises
+    ------
+    ValueError
+      For missing required, or invalid configuration properties.
     """
     kwargs = dict(
         default=default,
@@ -92,6 +96,7 @@ def register_config(
         scope=scope,
         type=type
     )
+    kwargs = {k: v for k, v in kwargs.items() if v is not _NotGiven}
     if dialog is not None and not title:
         raise ValueError("Configuration dialog must have a title")
     doc_props = dict(title=title)
@@ -102,3 +107,19 @@ def register_config(
     # it is also the source for annotating config listings
     kwargs['ui'] = (dialog, doc_props)
     _definitions[name] = _ConfigDefinition(**kwargs)
+
+
+def has_config(name):
+    """Returns whether a configuration item is registered under the given name
+
+    Parameters
+    ----------
+
+    name: str
+      Configuration item name
+
+    Returns
+    -------
+    bool
+    """
+    return name in _definitions

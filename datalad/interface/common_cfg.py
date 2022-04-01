@@ -135,7 +135,7 @@ class _ConfigDefinition(Mapping):
         return self._props.__iter__()
 
     def __len__(self):
-        return self._defs.__len__()
+        return self._props.__len__()
 
     def update(self, *args, **kwargs):
         self._props.update(*args, **kwargs)
