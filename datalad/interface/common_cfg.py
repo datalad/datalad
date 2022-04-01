@@ -82,8 +82,8 @@ def register_config(
       A callable to compute a default value lazily on access. The can be
       used, if the actual value is not yet known at the time of registering
       the configuration item, or if the default is expensive to compute
-      and its evaluation need to be deferred to prevent slow startup
-      (configuration items are typically define as one of the first things
+      and its evaluation needs to be deferred to prevent slow startup
+      (configuration items are typically defined as one of the first things
       on import).
     description: str, optional
       A longer description to accompany the title, possibly with instructions
