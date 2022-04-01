@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 from datalad.utils import unlink
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.interface.results import get_status_dict
 
 import logging
 lgr = logging.getLogger('datalad.distributed.export_to_figshare')
@@ -274,9 +275,14 @@ class ExportToFigshare(Interface):
             )
 
         if dataset.repo.dirty:
-            raise RuntimeError(
-                "Paranoid authors of DataLad refuse to proceed in a dirty repository"
-            )
+            yield get_status_dict(
+                'export_to_figshare',
+                ds=dataset,
+                status='impossible',
+                message=(
+                    'clean dataset required to export; '
+                    'use `datalad status` to inspect unsaved changes'))
+            return
         if filename is None:
             filename = dataset.path
         lgr.info(
