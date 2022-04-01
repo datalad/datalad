@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections.abc import Mapping
 import logging
 from os import environ
 from os.path import expanduser
@@ -37,7 +38,7 @@ class _NotGiven():
     pass
 
 
-class _ConfigDefinitions(object):
+class _ConfigDefinitions(Mapping):
     """A container for configuration definitions
 
     This class implements the parts of the dictionary interface
@@ -77,8 +78,11 @@ class _ConfigDefinitions(object):
     def __iter__(self):
         return self._defs.__iter__()
 
+    def __len__(self):
+        return self._defs.__len__()
 
-class _ConfigDefinition(object):
+
+class _ConfigDefinition(Mapping):
     """A single configuration definition
 
     This class implements the parts of the dictionary interface
@@ -107,6 +111,9 @@ class _ConfigDefinition(object):
             return default
         return self._props[prop]
 
+    def __setitem__(self, key, val):
+        self._props.__setitem__(key, val)
+
     def get(self, prop, default=None):
         try:
             return self.__getitem__(prop)
@@ -123,6 +130,15 @@ class _ConfigDefinition(object):
 
     def __repr__(self):
         return self._props.__repr__()
+
+    def __iter__(self):
+        return self._props.__iter__()
+
+    def __len__(self):
+        return self._defs.__len__()
+
+    def update(self, *args, **kwargs):
+        self._props.update(*args, **kwargs)
 
 
 def get_default_ssh():
