@@ -300,15 +300,27 @@ def test_status_symlinked_dir_within_repo(path):
                          on_failure="ignore", result_renderer='disabled')
 
     if ds.repo.git_annex_version < "8.20200522" or on_windows:
-        # TODO: on windows even with a recent annex -- no CommandError is raised, TODO
+        # TODO: on windows even with a recent annex -- no CommandError is
+        # raised, TODO
         assert_result_count(call(), 0)
-    else:
+    elif ds.repo.git_annex_version < '10.20220127':
         # As of 2a8fdfc7d (Display a warning message when asked to operate on a
         # file inside a symlinked directory, 2020-05-11), git-annex will error.
-        #
-        # TODO: Consider providing better error handling in this case.
         with assert_raises(CommandError):
             call()
+    elif '10.20220127' <= ds.repo.git_annex_version < '10.20220322':
+        # No error on annex' side since 10.20220127;
+        # However, we'd now get something like this:
+        # > git annex find bar/f
+        # error: pathspec 'bar/f' did not match any file(s) known to git
+        # Did you forget to 'git add'?
+        #
+        # But exists zero until 10.20220322!
+        assert_result_count(call(), 0)
+    else:
+        res = call()
+        assert_result_count(res, 1, status='error', state='unknown',
+                            path=str(bar_f))
 
 
 @with_tempfile

@@ -57,6 +57,10 @@ from datalad.runner.utils import (
 # must not be loads, because this one would log, and we need to log ourselves
 from datalad.support.json_py import json_loads
 from datalad.support.exceptions import CapturedException
+from datalad.support.annex_utils import (
+    _fake_json_for_non_existing,
+    _get_non_existing_from_annex_output,
+)
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
@@ -1047,15 +1051,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
         except CommandError as e:
             # Note: Workaround for not existing files as long as annex doesn't
-            # report it within JSON response:
+            # report it within JSON.
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
-            not_existing = [
-                # cut the file path from the middle, no useful delimiter
-                # need to deal with spaces too!
-                line[11:-10] for line in e.stderr.splitlines()
-                if line.startswith('git-annex:') and
-                line.endswith(' not found')
-            ]
+            not_existing = _get_non_existing_from_annex_output(e.stderr)
             if not_existing:
                 if out is None:
                     # we create the error reporting herein. If all files were
@@ -1063,13 +1061,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # anything
                     out = {'stdout_json': []}
                 out['stdout_json'].extend(
-                    {
-                        "command": args[0],
-                        "file": f,
-                        "note": "not found",
-                        "success": False,
-                    }
-                    for f in not_existing
+                    _fake_json_for_non_existing(not_existing, args[0])
                 )
 
             # Note: insert additional code here to analyse failure and possibly
@@ -1100,6 +1092,23 @@ class AnnexRepo(GitRepo, RepoInterface):
             #        "Running %s resulted in stderr output: %s",
             #        args, shorten(e.stderr)
             #    )
+
+        # git-annex fails to non-zero exit when reporting an error on
+        # non-existing paths in some versions and/or commands.
+        # Hence, check for it on non-failure, too. This became apparent with
+        # annex 10.20220127, but was a somewhat "hidden" issue for longer.
+        #
+        # Note, that this may become unnecessary after annex'
+        # ce91f10132805d11448896304821b0aa9c6d9845 (Feb 28, 2022)
+        # "fix annex.skipunknown false error propagation"
+        if 'stderr' in out:
+            not_existing = _get_non_existing_from_annex_output(out['stderr'])
+            if not_existing:
+                if out is None:
+                    out = {'stdout_json': []}
+                out['stdout_json'].extend(
+                    _fake_json_for_non_existing(not_existing, args[0])
+                )
 
         json_objects = out.pop('stdout_json')
 
@@ -2353,12 +2362,17 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 json_objects = _call_cmd(cmd, files)
 
+        # json_objects can contain entries w/o a "whereis" field. Unknown to
+        # git paths in particular are returned in such records. Code below is
+        # only concerned with actual whereis results.
+        whereis_json_objects = [o for o in json_objects if "whereis" in
+                                o.keys()]
 
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
                 if j.get('success') else []
-                for j in json_objects
+                for j in whereis_json_objects
             ]
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
@@ -2371,7 +2385,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else str(Path(PurePosixPath(j['file'])))
                 if on_windows else j['file']
                 : self._whereis_json_to_dict(j)
-                for j in json_objects
+                for j in whereis_json_objects
                 if not j.get('key', '').endswith('.this-is-a-test-key')
             }
 
@@ -3297,12 +3311,23 @@ class AnnexRepo(GitRepo, RepoInterface):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
             if rec is None:
-                if init is not None:
+                # git didn't report on this path
+                if j.get('success', None) is False:
+                    # Annex reports error on that file. Create an error entry,
+                    # as we can't currently yield a prepared error result from
+                    # within here.
+                    rec = {'status': 'error', 'state': 'unknown'}
+                elif init is not None:
                     # init constraint knows nothing about this path -> skip
                     continue
-                rec = {}
+                else:
+                    rec = {}
             rec.update({'{}{}'.format(key_prefix, k): j[k]
-                       for k in j if k != 'file'})
+                       for k in j if k != 'file' and k != 'error_messages'})
+            # change annex' `error_messages` into singular to match result
+            # records:
+            if j.get('error-messages', None):
+                rec['error_message'] = '\n'.join(m.strip() for m in j['error-messages'])
             if 'bytesize' in rec:
                 # it makes sense to make this an int that one can calculate with
                 # with

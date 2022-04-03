@@ -643,6 +643,8 @@ def test_partial_unlocked(path):
     ds.save()
     assert_repo_status(ds.path)
     # but now a change in the attributes
+    if '10.20220127' <= ds.repo.git_annex_version < '10.20220322':
+        raise SkipTest("annex bug https://git-annex.branchable.com/bugs/Change_to_annex.largefiles_leaves_repo_modified/")
     ds.unlock('culprit.txt')
     ds.repo.set_gitattributes([
         ('*', {'annex.largefiles': 'nothing'})])

@@ -77,7 +77,7 @@ def test_drop_file_content(path, outside_path):
             type='file',
             status='error',
             action='drop',
-            message='not found',
+            error_message='File unknown to git',
             path=str(ds.pathobj / rp),
             refds=ds.path,
         )

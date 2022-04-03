@@ -1397,6 +1397,22 @@ def test_annex_copy_to(src, origin, clone):
             # That is not how annex behaves
             # http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             # for non-existing files output goes into stderr
+            #
+            # stderr output depends on config+version of annex, though:
+            if not dl_cfg.getbool(
+                    section="annex", option="skipunknown",
+                    # git-annex switched default for this config:
+                    default=bool(
+                        external_versions['cmd:annex'] < '10.20220127')):
+
+                stderr = "error: pathspec 'nonex1' did not match any file(s) " \
+                         "known to git\n" \
+                         "error: pathspec 'nonex2' did not match any file(s) " \
+                         "known to git\n"
+            else:
+                stderr = "git-annex: nonex1 not found\n" \
+                         "git-annex: nonex2 not found\n"
+
             raise CommandError(
                 "Failed to run ...",
                 stdout_json=[
@@ -1405,9 +1421,7 @@ def test_annex_copy_to(src, origin, clone):
                     {"command":"copy","note":"checking target ...",
                      "success":True, "key":"akey2", "file":"existed"},
                 ],
-                stderr=
-                    'git-annex: nonex1 not found\n'
-                    'git-annex: nonex2 not found\n'
+                stderr=stderr
             )
         else:
             return orig_run(command, **kwargs)
@@ -2151,6 +2165,7 @@ def test_error_reporting(path):
             # whole thing, despite space, properly quotes backslash
             'file': 'gl\\orious BS',
             'note': 'not found',
+            'error-messages': ['File unknown to git'],
             'success': False}]
     )
 
@@ -2178,15 +2193,26 @@ def test_annexjson_protocol(path):
     if logging.getLogger('datalad.annex').getEffectiveLevel() > 8:
         eq_(res['stderr'], '')
 
+    # Note: git-annex-find <non-existent-path> does not error with all annex
+    # versions. Fixed in annex commit
+    # ce91f10132805d11448896304821b0aa9c6d9845 (Feb 28, 2022).
+    if '10.20220127' < external_versions['cmd:annex'] < '10.20220322':
+        raise SkipTest("zero-exit annex-find bug")
+
     # now the same, but with a forced error
     with assert_raises(CommandError) as e:
-        res = ar._call_annex(
-            ['find', '.', 'error', '--json'],
-            protocol=AnnexJsonProtocol)
+        ar._call_annex(['find', '.', 'error', '--json'],
+                       protocol=AnnexJsonProtocol)
     # normal operation is not impaired
     eq_(e.exception.kwargs['stdout_json'], orig_j)
-    # we get a clue what went wrong
-    assert_in('error not found', e.exception.stderr)
+    # we get a clue what went wrong,
+    # but reporting depends on config + version (default changed):
+    msg = "pathspec 'error' did not match" if not dl_cfg.getbool(
+        section="annex", option="skipunknown",
+        # git-annex switched default for this config:
+        default=bool(external_versions['cmd:annex'] < '10.20220127')) else \
+        "error not found"
+    assert_in(msg, e.exception.stderr)
     # there should be no errors reported in an individual records
     # hence also no pointless statement in the str()
     assert_not_in('errors from JSON records', str(e.exception))
