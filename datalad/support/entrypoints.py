@@ -63,3 +63,31 @@ def iter_entrypoints(group, load=False):
                 ep.name, group, ce)
             continue
     lgr.debug("Done processing entrypoints")
+
+
+def load_extensions():
+    """Load entrypoint for any configured extension package
+
+    Log a warning in case a requested extension is not available, or if
+    a requested extension fails on load.
+
+    Extensions to load are taken from the 'datalad.extensions.load'
+    configuration item.
+    """
+    from datalad import cfg
+    load_extensions = cfg.get('datalad.extensions.load', get_all=True)
+    if load_extensions:
+        from datalad.utils import ensure_list
+        exts = {
+            ename: eload
+            for ename, _, eload in iter_entrypoints('datalad.extensions')
+        }
+        for el in ensure_list(load_extensions):
+            if el not in exts:
+                lgr.warning('Requested extension %r is not available', el)
+                continue
+            try:
+                exts[el]()
+            except Exception as e:
+                ce = CapturedException(e)
+                lgr.warning('Could not load extension %r: %s', el, ce)

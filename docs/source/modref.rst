@@ -116,6 +116,7 @@ Support functionality
    support.gitrepo
    support.annexrepo
    support.archives
+   support.extensions
    customremotes.base
    customremotes.archives
 

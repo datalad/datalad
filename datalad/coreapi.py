@@ -18,6 +18,14 @@ def _generate_func_api():
     """
     from importlib import import_module
 
+    # load extensions requested by configuration
+    import datalad
+    if datalad.get_apimode() == 'python':
+        # only do this in Python API mode, because the CLI main
+        # will have done this already
+        from datalad.support.entrypoints import load_extensions
+        load_extensions()
+
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name
 

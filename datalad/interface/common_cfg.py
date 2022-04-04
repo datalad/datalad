@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections.abc import Mapping
+import logging
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
@@ -28,7 +30,115 @@ from datalad.support.constraints import (
 )
 from datalad.utils import on_windows
 
+lgr = logging.getLogger('datalad.interface.common_cfg')
 dirs = AppDirs("datalad", "datalad.org")
+
+
+class _NotGiven():
+    pass
+
+
+class _ConfigDefinitions(Mapping):
+    """A container for configuration definitions
+
+    This class implements the parts of the dictionary interface
+    required to work as a drop-in replacement for the legacy
+    data structure used for configuration definitions prior
+    DataLad 0.16.
+
+    .. note::
+
+      This is an internal helper that may change at any time without
+      prior notice.
+    """
+    def __init__(self):
+        self._defs = {
+            k: _ConfigDefinition(**v) for k, v in _definitions.items()
+            if v is not _NotGiven
+        }
+
+    def get(self, *args):
+        return self._defs.get(*args)
+
+    def keys(self):
+        return self._defs.keys()
+
+    def items(self):
+        return self._defs.items()
+
+    def __setitem__(self, key, value):
+        self._defs.__setitem__(key, value)
+
+    def __getitem__(self, key):
+        return self._defs.__getitem__(key)
+
+    def __contains__(self, key):
+        return self._defs.__contains__(key)
+
+    def __iter__(self):
+        return self._defs.__iter__()
+
+    def __len__(self):
+        return self._defs.__len__()
+
+
+class _ConfigDefinition(Mapping):
+    """A single configuration definition
+
+    This class implements the parts of the dictionary interface
+    required to work as a drop-in replacement for the legacy
+    data structure used for a configuration definition prior
+    DataLad 0.16.
+
+    Moreover, it implement lazy evaluation of default values,
+    when a 'default_fn' property is given.
+
+    .. note::
+
+      This is an internal helper that may change at any time without
+      prior notice.
+    """
+    def __init__(self, **kwargs):
+        # just take it, no validation on ingestions for max speed
+        self._props = kwargs
+
+    def __getitem__(self, prop):
+        if prop == 'default' \
+                and 'default' not in self._props \
+                and 'default_fn' in self._props:
+            default = self._props["default_fn"]()
+            self._props['default'] = default
+            return default
+        return self._props[prop]
+
+    def __setitem__(self, key, val):
+        self._props.__setitem__(key, val)
+
+    def get(self, prop, default=None):
+        try:
+            return self.__getitem__(prop)
+        except KeyError:
+            return default
+
+    def __contains__(self, prop):
+        if prop == 'default':
+            return 'default' in self._props or 'default_fn' in self._props
+        return self._props.__contains__(prop)
+
+    def __str__(self):
+        return self._props.__str__()
+
+    def __repr__(self):
+        return self._props.__repr__()
+
+    def __iter__(self):
+        return self._props.__iter__()
+
+    def __len__(self):
+        return self._props.__len__()
+
+    def update(self, *args, **kwargs):
+        self._props.update(*args, **kwargs)
 
 
 def get_default_ssh():
@@ -56,7 +166,8 @@ substitutions in a series will be considered. However, following the first
 match all further substitutions in a series are processed, regardless whether
 intermediate expressions match or not."""
 
-definitions = {
+
+_definitions = {
     'datalad.clone.url-substitute.github': {
         'ui': ('question', {
                'title': 'GitHub URL substitution rule',
@@ -116,6 +227,20 @@ definitions = {
                        'credentials/provider configs.'}),
         'type': bool,
         'default': False,
+    },
+    'datalad.extensions.load': {
+        'ui': ('question', {
+               'title': 'DataLad extension packages to load',
+               'text': 'Indicate which extension packages should be loaded '
+                       'unconditionally on CLI startup or on importing '
+                       "'datalad.[core]api'. This enables the "
+                       'respective extensions to customize DataLad with '
+                       'functionality and configurability outside the '
+                       'scope of extension commands. For merely running '
+                       'extension commands it is not necessary to load them '
+                       'specifically'}),
+        'destination': 'global',
+        'default': None,
     },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
@@ -592,17 +717,4 @@ definitions = {
     }
 }
 
-
-def compute_cfg_defaults():
-    """Compute dynamic defaults for configuration options.
-
-    These are options that depend on things like $HOME that change under our
-    testing setup.
-    """
-    for key, value in definitions.items():
-        def_fn = value.get("default_fn")
-        if def_fn:
-            value['default'] = def_fn()
-
-
-compute_cfg_defaults()
+definitions = _ConfigDefinitions()
