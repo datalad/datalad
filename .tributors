@@ -150,7 +150,8 @@
         "email": "mika.pflueger@pik-potsdam.de",
         "orcid": "0000-0002-7814-8916",
         "affiliation": "Potsdam Institute for Climate Impact Research",
-        "blog": "https://github.com/mikapfl"
+        "blog": "https://github.com/mikapfl",
+        "bio": "Research Software Engineer at Potsdam Institute for Climate Impact Research"
     },
     "mattcieslak": {
         "name": "Matt Cieslak",
