@@ -1167,7 +1167,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         list(dict)
           List of parsed result records.
         """
-        protocol_class = GeneratorAnnexJsonProtocol
+        protocol_class = GeneratorAnnexJsonNoStderrProtocol
 
         args = args[:] + ['--json', '--json-error-messages']
         if progress:
@@ -3855,6 +3855,31 @@ class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
 
     def add_to_output(self, json_object):
         self.send_result(json_object)
+
+
+class GeneratorAnnexJsonNoStderrProtocol(GeneratorMixIn, AnnexJsonProtocol):
+    def __init__(self,
+                 done_future=None,
+                 total_nbytes=None):
+        GeneratorMixIn.__init__(self)
+        AnnexJsonProtocol.__init__(self, done_future, total_nbytes)
+        self.stderr_output = bytearray()
+
+    def pipe_data_received(self, fd, data):
+        if fd == 2:
+            self.stderr_output += data
+            # let the base class decide what to do with it
+        super().pipe_data_received(fd, data)
+
+    def add_to_output(self, json_object):
+        self.send_result(json_object)
+
+    def process_exited(self):
+        super().process_exited()
+        if self.stderr_output:
+            raise CommandError(
+                msg="Unexpected stderr output",
+                stderr=self.stderr_output)
 
 
 class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):

@@ -50,6 +50,8 @@ from datalad.consts import (
     DATALAD_SPECIAL_REMOTES_UUIDS,
     WEB_SPECIAL_REMOTE_UUID,
 )
+from datalad.runner.gitrunner import GitWitlessRunner
+from datalad.support.annexrepo import GeneratorAnnexJsonNoStderrProtocol
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
 
@@ -2649,3 +2651,26 @@ def test_captured_exception():
         repl_super.return_value = RaiseMock()
         gen = AnnexRepo.add_(object(), [])
         assert_raises(CommandError, gen.send, None)
+
+
+@known_failure_windows
+def test_stderr_rejecting_protocol_trigger():
+    result_generator = GitWitlessRunner().run(
+        "echo ssss >&2",
+        protocol=GeneratorAnnexJsonNoStderrProtocol)
+
+    try:
+        tuple(result_generator)
+    except CommandError as e:
+        assert_in(b"ssss", e.stderr)
+        return
+    assert_true(False)
+
+
+@known_failure_windows
+def test_stderr_rejecting_protocol_ignore():
+
+    result_generator = GitWitlessRunner().run(
+        ['echo', '{"status": "ok"}'],
+        protocol=GeneratorAnnexJsonNoStderrProtocol)
+    assert_equal(tuple(result_generator), ({"status": "ok"},))
