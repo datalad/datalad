@@ -2653,7 +2653,7 @@ def test_captured_exception():
         assert_raises(CommandError, gen.send, None)
 
 
-@known_failure_windows
+@skip_if_on_windows
 def test_stderr_rejecting_protocol_trigger():
     result_generator = GitWitlessRunner().run(
         "echo ssss >&2",
@@ -2667,7 +2667,7 @@ def test_stderr_rejecting_protocol_trigger():
     assert_true(False)
 
 
-@known_failure_windows
+@skip_if_on_windows
 def test_stderr_rejecting_protocol_ignore():
 
     result_generator = GitWitlessRunner().run(
