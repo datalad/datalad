@@ -2662,7 +2662,7 @@ def test_stderr_rejecting_protocol_trigger():
     try:
         tuple(result_generator)
     except CommandError as e:
-        assert_in(b"ssss", e.stderr)
+        assert_in("ssss", e.stderr)
         return
     assert_true(False)
 

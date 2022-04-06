@@ -3857,7 +3857,7 @@ class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
         self.send_result(json_object)
 
 
-class GeneratorAnnexJsonNoStderrProtocol(GeneratorMixIn, AnnexJsonProtocol):
+class GeneratorAnnexJsonNoStderrProtocol(GeneratorAnnexJsonProtocol):
     def __init__(self,
                  done_future=None,
                  total_nbytes=None):
@@ -3871,15 +3871,12 @@ class GeneratorAnnexJsonNoStderrProtocol(GeneratorMixIn, AnnexJsonProtocol):
             # let the base class decide what to do with it
         super().pipe_data_received(fd, data)
 
-    def add_to_output(self, json_object):
-        self.send_result(json_object)
-
     def process_exited(self):
         super().process_exited()
         if self.stderr_output:
             raise CommandError(
                 msg="Unexpected stderr output",
-                stderr=self.stderr_output)
+                stderr=self.stderr_output.decode())
 
 
 class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
