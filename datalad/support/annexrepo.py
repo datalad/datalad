@@ -1194,23 +1194,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Note: Workaround for not existing files as long as annex doesn't
             # report it within JSON response:
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
-            not_existing = [
-                # cut the file path from the middle, no useful delimiter
-                # need to deal with spaces too!
-                line[11:-10] for line in e.stderr.splitlines()
-                if line.startswith('git-annex:') and
-                line.endswith(' not found')
-            ]
-
-            yield from (
-                {
-                    "command": args[0],
-                    "file": f,
-                    "note": "not found",
-                    "success": False,
-                }
-                for f in not_existing
-            )
+            not_existing = _get_non_existing_from_annex_output(e.stderr)
+            yield from _fake_json_for_non_existing(not_existing, args[0])
 
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
