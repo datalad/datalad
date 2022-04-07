@@ -731,6 +731,7 @@ def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
     # but just issue a warning for the top level dataset which has no super,
     # so cannot inherit anything - use case is to fixup/establish the full
     # hierarchy on the remote site
+    ds.save(recursive=True)  # so we have committed hierarchy for create_sibling
     with swallow_logs(logging.WARNING) as cml:
         out = ds.create_sibling(
             None, name=remote, existing="reconfigure", inherit=True,
