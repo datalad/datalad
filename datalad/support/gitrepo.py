@@ -3429,8 +3429,6 @@ class GitRepo(CoreGitRepo):
             self.config.reload()
             # need to include .gitmodules in what needs saving
             f = self.pathobj.joinpath('.gitmodules')
-            # add/modify 'status' for it in-place and thus need to adjust
-            # status_state as well
             status_state['modified_or_untracked'][f] = \
                 status_state['modified'][f] = \
                 dict(type='file', state='modified')
