@@ -10,72 +10,74 @@
 
 """
 
-import re
+import logging
 import os
 import os.path as op
-
-import logging
-from collections import (
-    OrderedDict,
-)
-from collections.abc import (
-    Mapping,
-)
+import posixpath
+import re
+import warnings
+from collections import OrderedDict
+from collections.abc import Mapping
+from functools import wraps
+from itertools import chain
 from os import linesep
 from os.path import (
-    join as opj,
+    commonprefix,
+    curdir,
+    dirname,
     exists,
     isabs,
-    commonprefix,
-    relpath,
-    dirname,
-    curdir,
+)
+from os.path import join as opj
+from os.path import (
     pardir,
-    sep
+    relpath,
+    sep,
 )
 
-import posixpath
-from functools import wraps
-import warnings
-
-from datalad.log import log_progress
-from datalad.support.due import due, Doi
-
+import datalad.utils as ut
 from datalad import ssh_manager
 from datalad.cmd import (
-    GitWitlessRunner,
-    WitlessProtocol,
     BatchedCommand,
+    GitWitlessRunner,
     NoCapture,
     StdOutErrCapture,
+    WitlessProtocol,
 )
 from datalad.config import (
     parse_gitconfig_dump,
     write_config_section,
 )
-
 from datalad.consts import (
     ILLEGAL_CHARS_WIN,
-    RESERVED_NAMES_WIN
+    RESERVED_NAMES_WIN,
 )
-
-import datalad.utils as ut
+from datalad.core.local.repo import repo_from_path
+from datalad.dataset.gitrepo import GitRepo as CoreGitRepo
+from datalad.dataset.gitrepo import (
+    _get_dot_git,
+    path_based_str_repr,
+)
+from datalad.log import log_progress
+from datalad.support.due import (
+    Doi,
+    due,
+)
 from datalad.utils import (
     Path,
     PurePosixPath,
-    ensure_list,
-    optional_args,
-    on_windows,
-    getpwd,
-    posix_relpath,
     ensure_dir,
-    generate_file_chunks,
+    ensure_list,
     ensure_unicode,
+    generate_file_chunks,
+    getpwd,
     is_interactive,
+    on_windows,
+    optional_args,
+    path_is_subpath,
+    posix_relpath,
 )
 
-# imports from same module:
-from .external_versions import external_versions
 from .exceptions import (
     CapturedException,
     CommandError,
@@ -84,18 +86,14 @@ from .exceptions import (
     InvalidGitRepositoryError,
     NoSuchPathError,
 )
+# imports from same module:
+from .external_versions import external_versions
 from .network import (
     RI,
     PathRI,
-    is_ssh
+    is_ssh,
 )
 from .path import get_parent_paths
-from datalad.core.local.repo import repo_from_path
-from datalad.dataset.gitrepo import (
-    GitRepo as CoreGitRepo,
-    _get_dot_git,
-    path_based_str_repr,
-)
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -1292,7 +1290,7 @@ class GitRepo(CoreGitRepo):
 
         Parameters
         ----------
-        files: str
+        files: list of str
           list of paths to remove
         recursive: False
           whether to allow recursive removal from subdirectories
@@ -3225,10 +3223,6 @@ class GitRepo(CoreGitRepo):
             # we want to be able to add items down the line
             # make sure to detach from prev. owner
             status = _status.copy()
-        status = OrderedDict(
-            (k, v) for k, v in status.items()
-            if v.get('state', None) != 'clean'
-        )
         return status
 
     def get_staged_paths(self):
@@ -3245,14 +3239,14 @@ class GitRepo(CoreGitRepo):
             lgr.debug(CapturedException(e))
             return []
 
-    def _save_post(self, message, status, partial_commit, amend=False,
+    def _save_post(self, message, files, partial_commit, amend=False,
                    allow_empty=False):
         # helper to commit changes reported in status
 
         # TODO remove pathobj stringification when commit() can
         # handle it
         to_commit = [str(f.relative_to(self.pathobj))
-                     for f, props in status.items()] \
+                     for f in files] \
                     if partial_commit else None
         if not partial_commit or to_commit or allow_empty or \
                 (amend and message):
@@ -3313,9 +3307,37 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
-        status = self._save_pre(paths, _status, **kwargs)
+        status = self._save_pre(paths, _status, **kwargs) or {}
         amend = kwargs.get('amend', False)
-        if not status and not (message and amend):
+
+        # Sort status into status by state with explicit list of states
+        # (excluding clean we do not care about) we expect to be present
+        # and which we know of (unless None), and modified_or_untracked hybrid
+        # since it is used below
+        status_state = {
+            k: {}
+            for k in (None,  # not cared of explicitly here
+                      'added',  # not cared of explicitly here
+                      # 'clean'  # not even wanted since nothing to do about those
+                      'deleted',
+                      'modified',
+                      'untracked',
+                      'modified_or_untracked',  # hybrid group created here
+                      )}
+        for f, props in status.items():
+            state = props.get('state', None)
+            if state == 'clean':
+                # we don't care about clean
+                continue
+            status_state[state][f] = props
+            # The hybrid one to retain the same order as in original status
+            if state in ('modified', 'untracked'):
+                status_state['modified_or_untracked'][f] = props
+        del status  # to ensure it is no longer used
+
+        # TODO: check on those None's -- may be those are also "nothing to worry about"
+        # and we could just return?
+        if not any(status_state.values()) and not (message and amend):
             # all clean, nothing todo
             lgr.debug('Nothing to save in %r, exiting early', self)
             return
@@ -3334,16 +3356,14 @@ class GitRepo(CoreGitRepo):
             # TODO remove pathobj stringification when delete() can
             # handle it
             str(f.relative_to(self.pathobj))
-            for f, props in status.items()
-            if props.get('state', None) == 'deleted' and
+            for f, props in status_state['deleted'].items()
             # staged deletions have a gitshasum reported for them
             # those should not be processed as git rm will error
             # due to them being properly gone already
-            not props.get('gitshasum', None)]
+            if not props.get('gitshasum', None)]
         vanished_subds = any(
-            props.get('type', None) == 'dataset' and
-            props.get('state', None) == 'deleted'
-            for f, props in status.items())
+            props.get('type', None) == 'dataset'
+            for props in status_state['deleted'].values())
         if to_remove:
             for r in self.remove(
                     to_remove,
@@ -3361,17 +3381,17 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-        # TODO this additional query should not be, base on status as given
+        # TODO this additional query should not be, based on status as given
         # if anyhow possible, however, when paths are given, status may
         # not contain all required information. In case of path=None AND
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
         submodule_change = False
-        untracked_dirs = [f.relative_to(self.pathobj)
-                          for f, props in status.items()
-                          if props.get('state', None) == 'untracked' and
-                          props.get('type', None) == 'directory']
+        untracked_dirs = [
+            f.relative_to(self.pathobj)
+            for f, props in status_state['untracked'].items()
+            if props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
             to_add_submodules = [
@@ -3391,9 +3411,8 @@ class GitRepo(CoreGitRepo):
                     yield r
         to_stage_submodules = {
             f: props
-            for f, props in status.items()
-            if props.get('state', None) in ('modified', 'untracked')
-            and props.get('type', None) == 'dataset'}
+            for f, props in status_state['modified_or_untracked'].items()
+            if props.get('type', None) == 'dataset'}
         if to_stage_submodules:
             lgr.debug(
                 '%i submodule path(s) to stage in %r %s',
@@ -3409,8 +3428,10 @@ class GitRepo(CoreGitRepo):
             # the config has changed too
             self.config.reload()
             # need to include .gitmodules in what needs saving
-            status[self.pathobj.joinpath('.gitmodules')] = dict(
-                type='file', state='modified')
+            f = self.pathobj.joinpath('.gitmodules')
+            status_state['modified_or_untracked'][f] = \
+                status_state['modified'][f] = \
+                dict(type='file', state='modified')
             if hasattr(self, 'uuid') and not kwargs.get('git', False):
                 # we cannot simply hook into the coming add-call
                 # as this would go to annex, so make a dedicted git-add
@@ -3426,9 +3447,8 @@ class GitRepo(CoreGitRepo):
             # TODO remove pathobj stringification when add() can
             # handle it
             str(f.relative_to(self.pathobj)): props
-            for f, props in status.items()
-            if (props.get('state', None) in ('modified', 'untracked') and
-                not (f in to_add_submodules or f in to_stage_submodules))}
+            for f, props in status_state['modified_or_untracked'].items()
+            if not (f in to_add_submodules or f in to_stage_submodules)}
         if to_add:
             compat_config = \
                 self.config.obtain("datalad.save.windows-compat-warning")
@@ -3460,11 +3480,28 @@ class GitRepo(CoreGitRepo):
                         logger=lgr)
 
 
+        # https://github.com/datalad/datalad/issues/6558
+        # file could have become a directory. Unfortunately git
+        # would then mistakenly refuse to commit if that old path is also
+        # given to commit, so we better filter it out
+        if status_state['deleted'] and status_state['added']:
+            # check if any "deleted" is a directory now. Then for those
+            # there should be some other path under that directory in 'added'
+            for f in [_ for _ in status_state['deleted'] if _.is_dir()]:
+                # this could potentially be expensive if lots of files become
+                # directories, but it is unlikely to happen often
+                # Note: PurePath.is_relative_to was added in 3.9 and seems slowish
+                # path_is_subpath faster, also if comparing to "in f.parents"
+                f_str = str(f)
+                if any(path_is_subpath(str(f2), f_str) for f2 in status_state['added']):
+                    status_state['deleted'].pop(f)  # do not bother giving it to commit below in _save_post
+
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though
         # possibly different message). If an empty commit was okay before, it's
         # okay now.
-        self._save_post(message, status, need_partial_commit, amend=amend,
+        status_state.pop('modified_or_untracked')  # pop the hybrid state
+        self._save_post(message, chain(*status_state.values()), need_partial_commit, amend=amend,
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
@@ -3678,7 +3715,11 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # make absolute
     src_dotgit = str(repo.dot_git)
     # move .git
-    from os import rename, listdir, rmdir
+    from os import (
+        listdir,
+        rename,
+        rmdir,
+    )
     ensure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
         rename(opj(src_dotgit, dot_git_entry),

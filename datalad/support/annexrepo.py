@@ -3440,7 +3440,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     if 'error-messages' in r else None,
                     logger=lgr)
 
-    def _save_post(self, message, status, partial_commit,
+    def _save_post(self, message, files, partial_commit,
                    amend=False, allow_empty=False):
 
         if amend and self.is_managed_branch() and \
@@ -3456,7 +3456,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
-            message, status, partial_commit, amend,
+            message, files, partial_commit, amend,
             allow_empty=allow_empty or adjust_amend)
         # then sync potential managed branches
         self.localsync(managed_only=True)
