@@ -732,7 +732,7 @@ def _drop_allkeys(ds, repo, force=False, jobs=None):
         cmd.extend(['--jobs', str(jobs)])
 
     try:
-        yield from repo._call_annex_records(cmd)
+        yield from repo._call_annex_records_items_(cmd)
     except CommandError as e:
         # pick up the results captured so far and yield them
         # the error will be amongst them
@@ -765,7 +765,7 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
     try:
         yield from (
             _postproc_annexdrop_result(res, respath_by_status, ds)
-            for res in repo._call_annex_records(cmd, files=paths)
+            for res in repo._call_annex_records_items_(cmd, files=paths)
         )
     except CommandError as e:
         # pick up the results captured so far and yield them
@@ -785,7 +785,6 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
 
 
 def _postproc_annexdrop_result(res, respath_by_status, ds, **kwargs):
-    # TODO this should extract any error messages and report them!
     res = annexjson2result(
         # annex reports are always about files
         res, ds, type='file', **kwargs)

@@ -1143,6 +1143,78 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return return_objects
 
+    def _call_annex_records_items_(self,
+                                   args,
+                                   files=None,
+                                   jobs=None,
+                                   git_options=None,
+                                   stdin=None,
+                                   merge_annex_branches=True,
+                                   progress=False,
+                                   **kwargs):
+        """Yielding git-annex command execution with JSON result processing
+
+        `_call_annex()` is used for git-annex command execution, using
+        GeneratorAnnexJsonProtocol. This means _call_annex() will yield
+        results as soon as they are available.
+
+        For a description of the parameters and raised exceptions, please
+        refer to _call_annex_records().
+
+        Returns
+        -------
+        Generator(something)
+        list(dict)
+          List of parsed result records.
+        """
+        protocol_class = GeneratorAnnexJsonNoStderrProtocol
+
+        args = args[:] + ['--json', '--json-error-messages']
+        if progress:
+            args += ['--json-progress']
+
+        json_objects_received = False
+        try:
+            for json_object in self._call_annex(
+                                      args,
+                                      files=files,
+                                      jobs=jobs,
+                                      protocol=protocol_class,
+                                      git_options=git_options,
+                                      stdin=stdin,
+                                      merge_annex_branches=merge_annex_branches,
+                                      **kwargs):
+                if len(json_object) == 1 and json_object.get('info', None):
+                    lgr.info(json_object['info'])
+                else:
+                    json_objects_received = True
+                    yield json_object
+
+        except CommandError as e:
+            # Note: Workaround for not existing files as long as annex doesn't
+            # report it within JSON response:
+            # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+            not_existing = _get_non_existing_from_annex_output(e.stderr)
+            yield from _fake_json_for_non_existing(not_existing, args[0])
+
+            # Note: insert additional code here to analyse failure and possibly
+            # raise a custom exception
+
+            # if we didn't raise before, just depend on whether or not we seem
+            # to have some json to return. It should contain information on
+            # failure in keys 'success' and 'note'
+            # TODO: This is not entirely true. 'annex status' may return empty,
+            # while there was a 'fatal:...' in stderr, which should be a
+            # failure/exception
+            # Or if we had empty stdout but there was stderr
+            if json_objects_received is False and e.stderr:
+                raise e
+
+        # In contrast to _call_annex_records, this method does not warn about
+        # additional non-JSON data on stdout, nor does is raise a RuntimeError
+        # if only non-JSON data was received on stdout.
+        return
+
     def call_annex_records(self, args, files=None):
         """Call annex with `--json*` to request structured result records
 
@@ -3783,6 +3855,28 @@ class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
 
     def add_to_output(self, json_object):
         self.send_result(json_object)
+
+
+class GeneratorAnnexJsonNoStderrProtocol(GeneratorAnnexJsonProtocol):
+    def __init__(self,
+                 done_future=None,
+                 total_nbytes=None):
+        GeneratorMixIn.__init__(self)
+        AnnexJsonProtocol.__init__(self, done_future, total_nbytes)
+        self.stderr_output = bytearray()
+
+    def pipe_data_received(self, fd, data):
+        if fd == 2:
+            self.stderr_output += data
+            # let the base class decide what to do with it
+        super().pipe_data_received(fd, data)
+
+    def process_exited(self):
+        super().process_exited()
+        if self.stderr_output:
+            raise CommandError(
+                msg="Unexpected stderr output",
+                stderr=self.stderr_output.decode())
 
 
 class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
