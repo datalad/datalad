@@ -32,6 +32,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     SkipTest,
     assert_dict_equal,
     assert_false,
@@ -485,9 +486,39 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
         sshurl=sshurl,
         recursive=True,
         existing='skip')
-    # verify that it created the sub and sub/sub
+    # verify that it created the immediate subdataset
+    ok_(Dataset(_path_(target_path, 'brandnew2')).is_installed())
+    # but not the subs since they were not saved, thus even push would not operate
+    # on them yet, so no reason for us to create them until subdatasets are saved
+    ok_(not Dataset(_path_(target_path, 'brandnew2/sub')).is_installed())
+
+    source.save(recursive=True)
+
+    # and if repeated now -- will create those sub/sub
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl=sshurl,
+        recursive=True,
+        existing='skip')
+    # verify that it created the immediate subdataset
     ok_(Dataset(_path_(target_path, 'brandnew2/sub')).is_installed())
     ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub')).is_installed())
+
+    # now we will try with --since while creating even deeper nested one, and ensuring
+    # it is created -- see https://github.com/datalad/datalad/issues/6596
+    brandnewsubsub.create('sub')
+    source.save(recursive=True)
+    # and now we create a sibling for the new subdataset only
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl=sshurl,
+        recursive=True,
+        existing='skip',
+        since=f'{DEFAULT_REMOTE}/{DEFAULT_BRANCH}')
+    # verify that it created the sub and sub/sub
+    ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub/sub')).is_installed())
 
     # we installed without web ui - no hooks should be created/enabled
     assert_postupdate_hooks(_path_(target_path, 'brandnew'), installed=False)
@@ -700,6 +731,7 @@ def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
     # but just issue a warning for the top level dataset which has no super,
     # so cannot inherit anything - use case is to fixup/establish the full
     # hierarchy on the remote site
+    ds.save(recursive=True)  # so we have committed hierarchy for create_sibling
     with swallow_logs(logging.WARNING) as cml:
         out = ds.create_sibling(
             None, name=remote, existing="reconfigure", inherit=True,
