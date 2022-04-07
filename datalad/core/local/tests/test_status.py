@@ -303,13 +303,13 @@ def test_status_symlinked_dir_within_repo(path):
         # TODO: on windows even with a recent annex -- no CommandError is
         # raised, TODO
         assert_result_count(call(), 0)
-    elif ds.repo.git_annex_version < '10.20220127':
+    elif ds.repo.git_annex_version < '10.20220222':
         # As of 2a8fdfc7d (Display a warning message when asked to operate on a
         # file inside a symlinked directory, 2020-05-11), git-annex will error.
         with assert_raises(CommandError):
             call()
-    elif '10.20220127' <= ds.repo.git_annex_version < '10.20220322':
-        # No error on annex' side since 10.20220127;
+    elif '10.20220222' <= ds.repo.git_annex_version < '10.20220322':
+        # No error on annex' side since 10.20220222;
         # However, we'd now get something like this:
         # > git annex find bar/f
         # error: pathspec 'bar/f' did not match any file(s) known to git

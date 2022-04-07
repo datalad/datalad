@@ -49,7 +49,7 @@ def _get_non_existing_from_annex_output(output):
 
     # Output largely depends on annex config annex.skipunknown
     # (see https://github.com/datalad/datalad/pull/6510#issuecomment-1054499339)
-    # and git-annex' default of annex.skipunknown changed as of 10.20220127.
+    # and git-annex' default of annex.skipunknown changed as of 10.20220222.
     # However, that appears to not be true for all commands. annex-add would
     # still report in the "git-annex: ... not found" fashion rather than
     # "error:  ... did not match any file(s) known to git". Depends on

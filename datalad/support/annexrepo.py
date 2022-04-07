@@ -1096,7 +1096,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # git-annex fails to non-zero exit when reporting an error on
         # non-existing paths in some versions and/or commands.
         # Hence, check for it on non-failure, too. This became apparent with
-        # annex 10.20220127, but was a somewhat "hidden" issue for longer.
+        # annex 10.20220222, but was a somewhat "hidden" issue for longer.
         #
         # Note, that this may become unnecessary after annex'
         # ce91f10132805d11448896304821b0aa9c6d9845 (Feb 28, 2022)

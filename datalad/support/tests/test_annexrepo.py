@@ -1403,7 +1403,7 @@ def test_annex_copy_to(src, origin, clone):
                     section="annex", option="skipunknown",
                     # git-annex switched default for this config:
                     default=bool(
-                        external_versions['cmd:annex'] < '10.20220127')):
+                        external_versions['cmd:annex'] < '10.20220222')):
 
                 stderr = "error: pathspec 'nonex1' did not match any file(s) " \
                          "known to git\n" \
@@ -2196,7 +2196,7 @@ def test_annexjson_protocol(path):
     # Note: git-annex-find <non-existent-path> does not error with all annex
     # versions. Fixed in annex commit
     # ce91f10132805d11448896304821b0aa9c6d9845 (Feb 28, 2022).
-    if '10.20220127' < external_versions['cmd:annex'] < '10.20220322':
+    if '10.20220222' < external_versions['cmd:annex'] < '10.20220322':
         raise SkipTest("zero-exit annex-find bug")
 
     # now the same, but with a forced error
@@ -2210,7 +2210,7 @@ def test_annexjson_protocol(path):
     msg = "pathspec 'error' did not match" if not dl_cfg.getbool(
         section="annex", option="skipunknown",
         # git-annex switched default for this config:
-        default=bool(external_versions['cmd:annex'] < '10.20220127')) else \
+        default=bool(external_versions['cmd:annex'] < '10.20220222')) else \
         "error not found"
     assert_in(msg, e.exception.stderr)
     # there should be no errors reported in an individual records
