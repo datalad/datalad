@@ -45,6 +45,7 @@ from datalad.support.exceptions import CommandError
 from datalad.utils import (
     Path,
     ensure_list,
+    todo_interface_for_extensions,
 )
 
 from datalad.distribution.dataset import (
@@ -401,18 +402,19 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         yield (cur_ds, ds_res)
 
 
+@todo_interface_for_extensions
 def _transfer_data(repo, ds, target, content, data, force, jobs, res_kwargs,
                    got_path_arg):
-        yield from _push_data(
-            ds,
-            target,
-            content,
-            data,
-            force,
-            jobs,
-            res_kwargs.copy(),
-            got_path_arg=got_path_arg,
-        )
+    yield from _push_data(
+        ds,
+        target,
+        content,
+        data,
+        force,
+        jobs,
+        res_kwargs.copy(),
+        got_path_arg=got_path_arg,
+    )
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
