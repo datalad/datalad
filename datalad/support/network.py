@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -55,23 +55,7 @@ from datalad.support.exceptions import CapturedException
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
-# Change introduced in 3.7: Moved from RFC 2396 to RFC 3986 for quoting URL
-# strings. "~" is now included in the set of reserved characters.
-# For consistency we will provide urlquote
-if sys.version_info >= (3, 7):
-    from urllib.parse import quote as urlquote
-else:
-    from urllib.parse import quote as _urlquote
-
-    def urlquote(url, safe='/', **kwargs):
-        safe += '~'
-        return _urlquote(url, safe=safe, **kwargs)
-
-    urlquote.__doc__ = _urlquote.__doc__ + """
-
-This DataLad version of the function assumes ~ to be a safe character to be
-consistent with Python >= 3.7
-"""
+from urllib.parse import quote as urlquote
 
 
 def is_windows_path(path):
@@ -419,14 +403,25 @@ class RI(object):
            uninitialized RI object of appropriate class with _str
            set to string representation if was provided
 
+        Raises
+        ------
+        ValueError
+          Whenever the RI type cannot be determined.
         """
         if cls is RI and ri is not None:
             # RI class was used as a factory
-            cls = _guess_ri_cls(ri)
+            try:
+                cls = _guess_ri_cls(ri)
+            except Exception as e:
+                # when anything goes wrong here, ensure a homogeneous
+                # exception with a regular error
+                raise ValueError(
+                    f"Could not determine resource identifier type for {ri!r}"
+                ) from e
 
         if cls is RI:
-            # should we fail or just pretend we are nothing??? ;-) XXX
-            raise ValueError("Could not deduce RI type for %r" % (ri,))
+            raise ValueError(
+                f"Could not determine resource identifier type for {ri!r}")
 
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str

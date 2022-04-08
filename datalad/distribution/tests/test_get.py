@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -77,8 +77,6 @@ def _make_dataset_hierarchy(path):
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
-# AssertionError since does get extra record {'cost': 400, 'name': 'bang', 'url': 'youredead', 'from_config': True},
-@known_failure_githubci_win
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -252,8 +250,10 @@ def test_get_single_file(path):
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
-    eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    annexprops = ds.repo.get_file_annexinfo('test-annex.dat',
+                                            eval_availability=True)
+    eq_(result[0]['annexkey'], annexprops['key'])
+    ok_(annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)
@@ -373,8 +373,6 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
-@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
@@ -554,11 +552,11 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     ds = install(
         path, source=src,
         result_xfm='datasets', return_type='item-or-list')
-    eq_(len(ds.subdatasets(fulfilled=True)), 0)
+    eq_(len(ds.subdatasets(state='present')), 0)
 
     with chpwd(ds.path):
         results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
-    eq_(len(ds.subdatasets(fulfilled=True, recursive=True)), 2)
+    eq_(len(ds.subdatasets(state='present', recursive=True)), 2)
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)
@@ -686,14 +684,14 @@ def test_get_subdataset_direct_fetch(path):
     # Tweak the configuration of s0 to make the direct fetch fail.
     # Disallow direct oid fetch (default).
     s0.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
-                       where="local")
+                       scope="local")
     # Configure the fetcher to avoid v2, which allows fetching unadvertised
     # objects regardless of the value of uploadpack.allowAnySHA1InWant.
-    s0.repo.config.set("protocol.version", "0", where="local")
+    s0.repo.config.set("protocol.version", "0", scope="local")
 
     # Configure s1 to succeed with direct fetch.
     s1.repo.config.set("uploadpack.allowAnySHA1InWant", "true",
-                       where="local")
+                       scope="local")
 
     clone = install(
         str(path / "clone"),
@@ -713,7 +711,7 @@ def test_get_relays_command_errors(path):
     ds.save()
     ds.drop("foo", check=False)
     assert_result_count(
-        ds.get("foo", on_failure="ignore", result_renderer=None),
+        ds.get("foo", on_failure="ignore", result_renderer='disabled'),
         1, action="get", type="file", status="error")
 
 
@@ -732,7 +730,6 @@ def test_missing_path_handling(path):
 
     with \
             patch("datalad.distribution.get._get_targetpaths") as get_target_path, \
-            patch("datalad.distribution.get.Interface.get_refds_path") as get_refds_path, \
             patch("datalad.distribution.get.require_dataset") as require_dataset, \
             patch("datalad.distribution.get._install_targetpath") as _install_targetpath, \
             patch("datalad.distribution.get.Subdatasets") as subdatasets:
@@ -740,7 +737,6 @@ def test_missing_path_handling(path):
         get_target_path.return_value = [{
             "status": "error"
         }]
-        get_refds_path.return_value = None
         require_dataset.return_value = refds
         _install_targetpath.return_value = [{
             "status": "notneeded",
@@ -757,6 +753,7 @@ def test_missing_path_handling(path):
         ds.get("foo")
 
 
+@slow  # started to >~30sec. https://github.com/datalad/datalad/issues/6412
 @known_failure_windows  # create-sibling-ria + ORA not fit for windows
 @with_tempfile
 @with_tempfile
@@ -778,12 +775,13 @@ def test_source_candidate_subdataset(store1, store2, intermediate,
     ds.create("sub2", force=True)
     ds.save(recursive=True)
     ria_url_1 = "ria+" + get_local_file_url(store1, compatibility='git')
-    ds.create_sibling_ria(ria_url_1, "firststore", recursive=True)
+    ds.create_sibling_ria(ria_url_1, "firststore", recursive=True,
+                          new_store_ok=True)
     ds.push(".", to="firststore", recursive=True)
     superds = Dataset(super).create()
     superds.clone(source=ria_url_1 + "#" + ds.id, path="intermediate")
     ria_url_2 = "ria+" + get_local_file_url(store2, compatibility='git')
-    superds.create_sibling_ria(ria_url_2, "secondstore")
+    superds.create_sibling_ria(ria_url_2, "secondstore", new_store_ok=True)
     superds.push(".", to="secondstore")
 
     cloneds = install(clone, source=ria_url_2 + "#" + superds.id)

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -26,7 +26,6 @@ import gzip
 import stat
 import string
 import warnings
-import wrapt
 
 import os.path as op
 
@@ -87,9 +86,6 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
-on_msys_tainted_paths = on_windows \
-                        and 'MSYS_NO_PATHCONV' not in os.environ \
-                        and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 
 
 # Takes ~200msec, so should not be called at import time
@@ -154,33 +150,119 @@ lgr.debug(
 #
 
 # `getargspec` has been deprecated in Python 3.
-if hasattr(inspect, "getfullargspec"):
-    ArgSpecFake = collections.namedtuple(
-        "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
-
-    def getargspec(func):
-        return ArgSpecFake(*inspect.getfullargspec(func)[:4])
-else:
-    getargspec = inspect.getargspec
+ArgSpecFake = collections.namedtuple(
+    "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
 
 
-def get_func_kwargs_doc(func):
-    """ Provides args for a function
+# adding cache here somehow does break it -- even 'datalad wtf' does not run
+# @lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
+def getargspec(func, *, include_kwonlyargs=False):
+    """Compat shim for getargspec deprecated in python 3.
+
+    The main difference from inspect.getargspec (and inspect.getfullargspec
+    for that matter) is that by using inspect.signature we are providing
+    correct args/defaults for functools.wraps'ed functions.
+
+    `include_kwonlyargs` option was added to centralize getting all args,
+    even the ones which are kwonly (follow the ``*,``).
+
+    For internal use and not advised for use in 3rd party code.
+    Please use inspect.signature directly.
+    """
+    # We use signature, and not getfullargspec, because only signature properly
+    # "passes" args from a functools.wraps decorated function.
+    # Note: getfullargspec works Ok on wrapt-decorated functions
+    f_sign = inspect.signature(func)
+    # Loop through parameters and compose argspec
+    args4 = [[], None, None, {}]
+    # Collect all kwonlyargs into a dedicated dict - name: default
+    kwonlyargs = {}
+    # shortcuts
+    args, defaults = args4[0], args4[3]
+    P = inspect.Parameter
+
+    for p_name, p in f_sign.parameters.items():
+        if p.kind in (P.POSITIONAL_ONLY, P.POSITIONAL_OR_KEYWORD):
+            assert not kwonlyargs  # yoh: must not come after kwonlyarg
+            args.append(p_name)
+            if p.default is not P.empty:
+                defaults[p_name] = p.default
+        elif p.kind == P.VAR_POSITIONAL:
+            args4[1] = p_name
+        elif p.kind == P.VAR_KEYWORD:
+            args4[2] = p_name
+        elif p.kind == P.KEYWORD_ONLY:
+            assert p.default is not P.empty
+            kwonlyargs[p_name] = p.default
+
+    if kwonlyargs:
+        if not include_kwonlyargs:
+            raise ValueError(
+                'Function has keyword-only parameters or annotations, either use '
+                'inspect.signature() API which can support them, or provide include_kwonlyargs=True '
+                'to this function'
+            )
+        else:
+            args.extend(list(kwonlyargs))
+            defaults.update(kwonlyargs)
+
+    # harmonize defaults to how original getargspec returned them -- just a tuple
+    args4[3] = None if not defaults else tuple(defaults.values())
+    return ArgSpecFake(*args4)
+
+
+# Definitions to be (re)used in the next function
+_SIG_P = inspect.Parameter
+_SIG_KIND_SELECTORS = {
+    'pos_only': {_SIG_P.POSITIONAL_ONLY,},
+    'pos_any': {_SIG_P.POSITIONAL_ONLY, _SIG_P.POSITIONAL_OR_KEYWORD},
+    'kw_any': {_SIG_P.POSITIONAL_OR_KEYWORD, _SIG_P.KEYWORD_ONLY},
+    'kw_only': {_SIG_P.KEYWORD_ONLY,},
+}
+_SIG_KIND_SELECTORS['any'] = set().union(*_SIG_KIND_SELECTORS.values())
+
+
+@lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
+def get_sig_param_names(f, kinds: tuple) -> tuple:
+    """A helper to selectively return parameters from inspect.signature.
+
+    inspect.signature is the ultimate way for introspecting callables.  But
+    its interface is not so convenient for a quick selection of parameters
+    (AKA arguments) of desired type or combinations of such.  This helper
+    should make it easier to retrieve desired collections of parameters.
+
+    Since often it is desired to get information about multiple specific types
+    of parameters, `kinds` is a list, so in a single invocation of `signature`
+    and looping through the results we can obtain all information.
 
     Parameters
     ----------
-    func: str
-      name of the function from which args are being requested
+    f: callable
+    kinds: tuple with values from {'pos_any', 'pos_only', 'kw_any', 'kw_only', 'any'}
+      Is a list of what kinds of args to return in result (tuple). Each element
+      should be one of: 'any_pos' - positional or keyword which could be used
+      positionally. 'kw_only' - keyword only (cannot be used positionally) arguments,
+      'any_kw` - any keyword (could be a positional which could be used as a keyword),
+      `any` -- any type from the above.
 
     Returns
     -------
-    list
-      of the args that a function takes in
+    tuple:
+      Each element is a list of parameters (names only) of that "kind".
     """
-    return getargspec(func)[0]
+    selectors = []
+    for kind in kinds:
+        if kind not in _SIG_KIND_SELECTORS:
+            raise ValueError(f"Unknown 'kind' {kind}. Known are: {', '.join(_SIG_KIND_SELECTORS)}")
+        selectors.append(_SIG_KIND_SELECTORS[kind])
 
-    # TODO: format error message with descriptions of args
-    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
+    out = [[] for _ in kinds]
+    for p_name, p in inspect.signature(f).parameters.items():
+        for i, selector in enumerate(selectors):
+            if p.kind in selector:
+                out[i].append(p_name)
+
+    return tuple(out)
 
 
 def any_re_search(regexes, value):
@@ -207,10 +289,10 @@ def get_home_envvars(new_home):
 
     Parameters
     ----------
-    new_home: str
+    new_home: str or Path
       New home path, in native to OS "schema"
     """
-    environ = os.environ
+    new_home = str(new_home)
     out = {'HOME': new_home}
     if on_windows:
         # requires special handling, since it has a number of relevant variables
@@ -218,59 +300,8 @@ def get_home_envvars(new_home):
         # since python 3.8: https://bugs.python.org/issue36264
         out['USERPROFILE'] = new_home
         out['HOMEDRIVE'], out['HOMEPATH'] = splitdrive(new_home)
+
     return {v: val for v, val in out.items() if v in os.environ}
-
-
-def shortened_repr(value, l=30):
-    try:
-        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
-            value_repr = repr(value)
-            if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s++%d chars++%s>>" % (
-                    value_repr[:l - 16],
-                    len(value_repr) - (l - 16 + 4),
-                    value_repr[-4:]
-                )
-            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
-                raise ValueError("I hate those useless long reprs")
-        else:
-            raise ValueError("gimme class")
-    except Exception as e:
-        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
-    return value_repr
-
-
-def __auto_repr__(obj):
-    attr_names = tuple()
-    if hasattr(obj, '__dict__'):
-        attr_names += tuple(obj.__dict__.keys())
-    if hasattr(obj, '__slots__'):
-        attr_names += tuple(obj.__slots__)
-
-    items = []
-    for attr in sorted(set(attr_names)):
-        if attr.startswith('_'):
-            continue
-        value = getattr(obj, attr)
-        # TODO:  should we add this feature to minimize some talktative reprs
-        # such as of URL?
-        #if value is None:
-        #    continue
-        items.append("%s=%s" % (attr, shortened_repr(value)))
-
-    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
-
-
-def auto_repr(cls):
-    """Decorator for a class to assign it an automagic quick and dirty __repr__
-
-    It uses public class attributes to prepare repr of a class
-
-    Original idea: http://stackoverflow.com/a/27799004/1265472
-    """
-
-    cls.__repr__ = __auto_repr__
-    return cls
 
 
 def _is_stream_tty(stream):
@@ -441,6 +472,8 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
 
     Parameters
     ----------
+    path: Path or str
+       Path to remove
     chmod_files : string or bool, optional
        Whether to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
@@ -461,6 +494,10 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     #        to do it on case by case
     # Check for open files
     assert_no_open_files(path)
+
+    # TODO the whole thing should be reimplemented with pathlib, but for now
+    # at least accept Path
+    path = str(path)
 
     if children_only:
         if not isdir(path):
@@ -1026,20 +1063,12 @@ def saved_generator(gen):
 #
 # Decorators
 #
-def better_wraps(to_be_wrapped):
-    """Decorator to replace `functools.wraps`
 
-    This is based on `wrapt` instead of `functools` and in opposition to `wraps`
-    preserves the correct signature of the decorated function.
-    It is written with the intention to replace the use of `wraps` without any
-    need to rewrite the actual decorators.
-    """
-
-    @wrapt.decorator(adapter=to_be_wrapped)
-    def intermediator(to_be_wrapper, instance, args, kwargs):
-        return to_be_wrapper(*args, **kwargs)
-
-    return intermediator
+# Originally better_wraps was created to provide `wrapt`-based, instead of
+# `functools.wraps` implementation to preserve the correct signature of the
+# decorated function. By using inspect.signature in our getargspec, which
+# works fine on `functools.wraps`ed functions, we mediated this necessity.
+better_wraps = wraps
 
 
 # Borrowed from pandas
@@ -1122,15 +1151,14 @@ def collect_method_callstats(func):
       - .repo is expensive since does all kinds of checks.
       - .config is expensive transitively since it calls .repo each time
 
-
     TODO:
-    - fancy one could look through the stack for the same id(self) to see if
-      that location is already in memo.  That would hint to the cases where object
-      is not passed into underlying functions, causing them to redo the same work
-      over and over again
-    - ATM might flood with all "1 lines" calls which are not that informative.
-      The underlying possibly suboptimal use might be coming from their callers.
-      It might or not relate to the previous TODO
+      - fancy one could look through the stack for the same id(self) to see if
+        that location is already in memo.  That would hint to the cases where object
+        is not passed into underlying functions, causing them to redo the same work
+        over and over again
+      - ATM might flood with all "1 lines" calls which are not that informative.
+        The underlying possibly suboptimal use might be coming from their callers.
+        It might or not relate to the previous TODO
     """
     from collections import defaultdict
     import traceback
@@ -1202,6 +1230,59 @@ def never_fail(f):
         return f
     else:
         return wrapped_func
+
+
+def shortened_repr(value, l=30):
+    try:
+        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
+            value_repr = repr(value)
+            if not value_repr.startswith('<') and len(value_repr) > l:
+                value_repr = "<<%s++%d chars++%s>>" % (
+                    value_repr[:l - 16],
+                    len(value_repr) - (l - 16 + 4),
+                    value_repr[-4:]
+                )
+            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
+                raise ValueError("I hate those useless long reprs")
+        else:
+            raise ValueError("gimme class")
+    except Exception as e:
+        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
+    return value_repr
+
+
+def __auto_repr__(obj, short=True):
+    attr_names = tuple()
+    if hasattr(obj, '__dict__'):
+        attr_names += tuple(obj.__dict__.keys())
+    if hasattr(obj, '__slots__'):
+        attr_names += tuple(obj.__slots__)
+
+    items = []
+    for attr in sorted(set(attr_names)):
+        if attr.startswith('_'):
+            continue
+        value = getattr(obj, attr)
+        # TODO:  should we add this feature to minimize some talktative reprs
+        # such as of URL?
+        #if value is None:
+        #    continue
+        items.append("%s=%s" % (attr, shortened_repr(value) if short else value))
+
+    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+
+
+@optional_args
+def auto_repr(cls, short=True):
+    """Decorator for a class to assign it an automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+
+    cls.__repr__ = lambda obj:__auto_repr__(obj, short=short)
+    return cls
 
 
 #
@@ -1474,36 +1555,21 @@ def disable_logger(logger=None):
         [h.removeFilter(filter_) for h in logger.handlers]
 
 
+@contextmanager
+def lock_if_required(lock_required, lock):
+    """ Acquired and released the provided lock if indicated by a flag"""
+    if lock_required:
+        lock.acquire()
+    try:
+        yield lock
+    finally:
+        if lock_required:
+            lock.release()
+
+
 #
 # Additional handlers
 #
-_sys_excepthook = sys.excepthook  # Just in case we ever need original one
-
-
-def setup_exceptionhook(ipython=False):
-    """Overloads default sys.excepthook with our exceptionhook handler.
-
-       If interactive, our exceptionhook handler will invoke
-       pdb.post_mortem; if not interactive, then invokes default handler.
-    """
-
-    def _datalad_pdb_excepthook(type, value, tb):
-        import traceback
-        traceback.print_exception(type, value, tb)
-        print()
-        if is_interactive():
-            import pdb
-            pdb.post_mortem(tb)
-
-    if ipython:
-        from IPython.core import ultratb
-        sys.excepthook = ultratb.FormattedTB(mode='Verbose',
-                                             # color_scheme='Linux',
-                                             call_pdb=is_interactive())
-    else:
-        sys.excepthook = _datalad_pdb_excepthook
-
-
 def ensure_dir(*args):
     """Make sure directory exists.
 
@@ -2624,3 +2690,59 @@ def check_symlink_capability(path, target):
             path.unlink()
         if target.exists():
             target.unlink()
+
+
+def obtain_write_permission(path):
+    """Obtains write permission for `path` and returns previous mode if a
+    change was actually made.
+
+    Parameters
+    ----------
+    path: Path
+      path to try to obtain write permission for
+
+    Returns
+    -------
+    int or None
+      previous mode of `path` as return by stat().st_mode if a change in
+      permission was actually necessary, `None` otherwise.
+    """
+
+    mode = path.stat().st_mode
+    # only IWRITE works on Windows, in principle
+    if not mode & stat.S_IWRITE:
+        path.chmod(mode | stat.S_IWRITE)
+        return mode
+    else:
+        return None
+
+
+@contextmanager
+def ensure_write_permission(path):
+    """Context manager to get write permission on `path` and
+    restore original mode afterwards.
+
+    Parameters
+    ----------
+    path: Path
+      path to the target file
+
+    Raises
+    ------
+    PermissionError
+       if write permission could not be obtained
+    """
+
+    restore = None
+    try:
+        restore = obtain_write_permission(path)
+        yield
+    finally:
+        if restore is not None:
+            try:
+                path.chmod(restore)
+            except FileNotFoundError:
+                # If `path` was deleted within the context block, there's
+                # nothing to do. Don't test exists(), though - asking for
+                # forgiveness to save a call.
+                pass

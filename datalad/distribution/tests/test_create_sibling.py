@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -32,6 +32,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     SkipTest,
     assert_dict_equal,
     assert_false,
@@ -114,7 +115,7 @@ def assert_postupdate_hooks(path, installed=True, flat=False):
         datasets = glob(opj(path, '*'))
     else:
         ds = Dataset(path)
-        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, fulfilled=True)
+        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, state='present')
     for ds_ in datasets:
         ds_ = Dataset(ds_)
         hook_path = opj(ds_.path, '.git', 'hooks', 'post-update')
@@ -406,7 +407,22 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             # hence we must not publish the base dataset on its own without recursion,
             # if we want to have this mechanism do its job
             #push(to=remote_name)  # no recursion
-            assert_create_sshwebserver(
+            out1 = assert_create_sshwebserver(
+                name=remote_name,
+                sshurl=sshurl,
+                target_dir=target_dir_tpl,
+                recursive=True,
+                existing='skip',
+                ui=have_webui(),
+                since='^'
+            )
+            assert_postupdate_hooks(target_path_, installed=have_webui(), flat=flat)
+            assert_result_count(out1, 1, status='ok', sibling_name=remote_name)
+
+            # ensure that nothing is created since since is used.
+            # Also cover deprecation for since='' support.  Takes just 60ms or so.
+            # TODO: change or remove when removing since='' deprecation support
+            out2 = assert_create_sshwebserver(
                 name=remote_name,
                 sshurl=sshurl,
                 target_dir=target_dir_tpl,
@@ -415,7 +431,8 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
                 ui=have_webui(),
                 since=''
             )
-            assert_postupdate_hooks(target_path_, installed=have_webui(), flat=flat)
+            assert_result_count(out2, 1, status='notneeded', sibling_name=remote_name)
+
         # so it was created on remote correctly and wasn't just skipped
         assert(Dataset(_path_(target_path_, ('prefix-' if flat else '') + sub3_name)).is_installed())
         push(dataset=source, to=remote_name, recursive=True, since='^') # just a smoke test
@@ -469,9 +486,39 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
         sshurl=sshurl,
         recursive=True,
         existing='skip')
-    # verify that it created the sub and sub/sub
+    # verify that it created the immediate subdataset
+    ok_(Dataset(_path_(target_path, 'brandnew2')).is_installed())
+    # but not the subs since they were not saved, thus even push would not operate
+    # on them yet, so no reason for us to create them until subdatasets are saved
+    ok_(not Dataset(_path_(target_path, 'brandnew2/sub')).is_installed())
+
+    source.save(recursive=True)
+
+    # and if repeated now -- will create those sub/sub
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl=sshurl,
+        recursive=True,
+        existing='skip')
+    # verify that it created the immediate subdataset
     ok_(Dataset(_path_(target_path, 'brandnew2/sub')).is_installed())
     ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub')).is_installed())
+
+    # now we will try with --since while creating even deeper nested one, and ensuring
+    # it is created -- see https://github.com/datalad/datalad/issues/6596
+    brandnewsubsub.create('sub')
+    source.save(recursive=True)
+    # and now we create a sibling for the new subdataset only
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl=sshurl,
+        recursive=True,
+        existing='skip',
+        since=f'{DEFAULT_REMOTE}/{DEFAULT_BRANCH}')
+    # verify that it created the sub and sub/sub
+    ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub/sub')).is_installed())
 
     # we installed without web ui - no hooks should be created/enabled
     assert_postupdate_hooks(_path_(target_path, 'brandnew'), installed=False)
@@ -536,15 +583,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
-    try:
-        res = ds.create_sibling(url, ui=have_webui())
-    except UnicodeDecodeError:
-        if sys.version_info < (3, 7):
-            # observed test failing on ubuntu 18.04 with python 3.6
-            # (reproduced in conda env locally with python 3.6.10 when LANG=C
-            # We will just skip this tricky one
-            raise SkipTest("Known failure")
-        raise
+    res = ds.create_sibling(url, ui=have_webui())
     assert_in_results(res, action="create_sibling", sibling_name=sibname)
     published = ds.push(to=sibname, data='anything')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
@@ -692,6 +731,7 @@ def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
     # but just issue a warning for the top level dataset which has no super,
     # so cannot inherit anything - use case is to fixup/establish the full
     # hierarchy on the remote site
+    ds.save(recursive=True)  # so we have committed hierarchy for create_sibling
     with swallow_logs(logging.WARNING) as cml:
         out = ds.create_sibling(
             None, name=remote, existing="reconfigure", inherit=True,

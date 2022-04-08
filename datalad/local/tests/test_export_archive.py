@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -46,7 +46,8 @@ _dataset_template = {
 @with_tree(_dataset_template)
 def test_failure(path):
     # non-existing dataset
-    assert_raises(ValueError, export_archive, Dataset('nowhere'))
+    with assert_raises(ValueError):
+        export_archive(dataset=Dataset('nowhere'))
 
 
 @with_tree(_dataset_template)

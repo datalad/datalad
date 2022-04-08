@@ -26,7 +26,6 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_true,
     DEFAULT_REMOTE,
-    known_failure_windows,
     skip_if_no_network,
     with_tempfile
 )
@@ -154,7 +153,6 @@ def test_get_cached_dataset(cache_dir):
             assert_is(ds, ds2)
 
 
-@known_failure_windows
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 def test_cached_dataset(cache_dir):
@@ -256,7 +254,6 @@ def test_cached_dataset(cache_dir):
         assert_not_equal(first_repopath, second_repopath)
 
 
-@known_failure_windows
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 def test_cached_url(cache_dir):

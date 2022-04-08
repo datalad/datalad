@@ -150,7 +150,8 @@
         "email": "mika.pflueger@pik-potsdam.de",
         "orcid": "0000-0002-7814-8916",
         "affiliation": "Potsdam Institute for Climate Impact Research",
-        "blog": "https://github.com/mikapfl"
+        "blog": "https://github.com/mikapfl",
+        "bio": "Research Software Engineer at Potsdam Institute for Climate Impact Research"
     },
     "mattcieslak": {
         "name": "Matt Cieslak",
@@ -166,5 +167,32 @@
     "AKSoo": {
         "name": "Sin Kim",
         "blog": "https://orcid.org/0000-0003-4652-3758"
+    },
+    "DisasterMo": {
+        "name": "Michael Burgardt",
+        "email": "michael.burgardt@gmail.com",
+        "blog": "https://github.com/DisasterMo"
+    },
+    "Remi-Gau": {
+        "name": "Remi Gau",
+        "email": "remi.gau@tuebingen.mpg.de",
+        "bio": "Neuroimaging (high-res & laminar fMRI) and multisensory.\r\n\r\nToo much matlab and presentation and not enough R and python",
+        "blog": "https://remi-gau.github.io/",
+        "orcid": "0000-0002-1535-9767",
+        "affiliation": "Université catholique de Louvain"
+    },
+    "mslw": {
+        "name": "Michał Szczepanik",
+        "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich",
+        "blog": "https://github.com/mslw"
+    },
+    "bpinsard": {
+        "name": "Basile",
+        "blog": "https://github.com/bpinsard"
+    },
+    "taylols": {
+        "name": "Taylor Olson",
+        "email": "to.overlake@gmail.com",
+        "blog": "https://github.com/taylols"
     }
 }

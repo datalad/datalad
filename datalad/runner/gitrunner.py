@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -13,11 +13,14 @@ import logging
 import os
 import os.path as op
 
-from .runner import WitlessRunner
-from .utils import (
-    borrowdoc,
-    generate_file_chunks,
+from datalad.dochelpers import borrowdoc
+from datalad.utils import generate_file_chunks
+
+from .runner import (
+    GeneratorMixIn,
+    WitlessRunner,
 )
+
 
 lgr = logging.getLogger('datalad.runner.gitrunner')
 
@@ -133,9 +136,41 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
             copy=False,
         )
 
-    def run_on_filelist_chunks(self, cmd, files, protocol=None,
-                               cwd=None, env=None, **kwargs):
-        """Run a git-style command multiple times if `files` is too long
+    def _get_chunked_results(self,
+                             cmd,
+                             files,
+                             protocol=None,
+                             cwd=None,
+                             env=None,
+                             **kwargs):
+
+        assert isinstance(cmd, list)
+
+        file_chunks = generate_file_chunks(files, cmd)
+        for i, file_chunk in enumerate(file_chunks):
+            # do not pollute with message when there only ever is a single chunk
+            if len(file_chunk) < len(files):
+                lgr.debug(
+                    'Process file list chunk %i (length %i)', i, len(file_chunk))
+
+            yield self.run(
+                cmd=cmd + ['--'] + file_chunk,
+                protocol=protocol,
+                cwd=cwd,
+                env=env,
+                **kwargs)
+
+    def run_on_filelist_chunks(self,
+                                cmd,
+                                files,
+                                protocol=None,
+                                cwd=None,
+                                env=None,
+                                **kwargs):
+        """
+        Run a git-style command multiple times if `files` is too long,
+        using a non-generator protocol, i.e. a protocol that is not
+        derived from `datalad.runner.protocol.GeneratorMixIn`.
 
         Parameters
         ----------
@@ -177,24 +212,57 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
         FileNotFoundError
           When a given executable does not exist.
         """
-        assert isinstance(cmd, list)
-        file_chunks = generate_file_chunks(files, cmd)
+
+        assert not issubclass(protocol, GeneratorMixIn), \
+            "cannot use GitWitlessRunner.run_on_filelist_chunks() " \
+            "with a protocol that inherits GeneratorMixIn, use " \
+            "GitWitlessRunner.run_on_filelist_chunks_items_() instead"
 
         results = None
-        for i, file_chunk in enumerate(file_chunks):
-            # do not pollute with message when there only ever is a single chunk
-            if len(file_chunk) < len(files):
-                lgr.debug('Process file list chunk %i (length %i)',
-                          i, len(file_chunk))
-            res = self.run(
-                cmd + ['--'] + file_chunk,
-                protocol=protocol,
-                cwd=cwd,
-                env=env,
-                **kwargs)
+        for res in self._get_chunked_results(cmd=cmd,
+                                             files=files,
+                                             protocol=protocol,
+                                             cwd=cwd,
+                                             env=env,
+                                             **kwargs):
             if results is None:
                 results = res
             else:
                 for k, v in res.items():
                     results[k] += v
         return results
+
+    def run_on_filelist_chunks_items_(self,
+                                      cmd,
+                                      files,
+                                      protocol=None,
+                                      cwd=None,
+                                      env=None,
+                                      **kwargs):
+        """
+        Run a git-style command multiple times if `files` is too long,
+        using a generator protocol, i.e. a protocol that is
+        derived from `datalad.runner.protocol.GeneratorMixIn`.
+
+        Parameters
+        ----------
+        see GitWitlessRunner.run_on_filelist_chunks() for a definition
+        of parameters
+
+        Returns
+        -------
+        Generator that yields output of the cmd
+        """
+
+        assert issubclass(protocol, GeneratorMixIn), \
+            "cannot use GitWitlessRunner.run_on_filelist_chunks_items_() " \
+            "with a protocol that does not inherits GeneratorMixIn, use " \
+            "GitWitlessRunner.run_on_filelist_chunks() instead"
+
+        for chunk_generator in self._get_chunked_results(cmd=cmd,
+                                                         files=files,
+                                                         protocol=protocol,
+                                                         cwd=cwd,
+                                                         env=env,
+                                                         **kwargs):
+            yield from chunk_generator

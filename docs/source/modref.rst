@@ -28,14 +28,17 @@ Dataset operations
    api.create_sibling
    api.create_sibling_github
    api.create_sibling_gitlab
+   api.create_sibling_gogs
+   api.create_sibling_gitea
+   api.create_sibling_gin
    api.drop
    api.get
    api.install
    api.push
    api.remove
    api.save
+   api.status
    api.update
-   api.uninstall
    api.unlock
 
 Metadata handling
@@ -70,7 +73,6 @@ Plumbing commands
 .. autosummary::
    :toctree: generated
 
-   api.annotate_paths
    api.clean
    api.clone
    api.copy_file
@@ -93,6 +95,7 @@ Miscellaneous commands
    api.add_readme
    api.addurls
    api.check_dates
+   api.configuration
    api.export_archive
    api.export_to_figshare
    api.no_annex
@@ -113,7 +116,7 @@ Support functionality
    support.gitrepo
    support.annexrepo
    support.archives
-   customremotes.main
+   support.extensions
    customremotes.base
    customremotes.archives
 
@@ -137,6 +140,15 @@ Test infrastructure
    tests.utils_testrepos
    tests.heavyoutput
 
+Command interface
+=================
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   interface.base
+
 Command line interface infrastructure
 =====================================
 
@@ -144,6 +156,7 @@ Command line interface infrastructure
 .. autosummary::
    :toctree: generated
 
-   cmdline.main
-   cmdline.helpers
-   cmdline.common_args
+   cli.exec
+   cli.main
+   cli.parser
+   cli.renderer

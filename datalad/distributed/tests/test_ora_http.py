@@ -39,7 +39,6 @@ from datalad.customremotes.ria_utils import (
 #       different layouts via those requests is up to the server side, which we
 #       don't test here.
 
-@known_failure_windows  # see gh-4469
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile
@@ -104,7 +103,6 @@ def test_read_access(store_path, store_url, ds_path):
 
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     files = [Path('one.txt'), Path('subdir') / 'two']
     store_path = Path(store_path)
@@ -154,12 +152,11 @@ def test_read_access(store_path, store_url, ds_path):
 
     ds.drop('.')
     res = ds.get('.')
-    assert_equal(len(res), 2)
-    assert_result_count(res, 2, status='ok', type='file', action='get',
+    assert_equal(len(res), 4)
+    assert_result_count(res, 4, status='ok', type='file', action='get',
                         message="from ora-remote...")
 
     # try whether the reported access URL is correct
     one_url = ds.repo.whereis('one.txt', output='full'
         )[store_uuid]['urls'].pop()
     assert_status('ok', ds.download_url(urls=[one_url], path=str(ds.pathobj / 'dummy')))
-

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -351,8 +351,8 @@ class S3Downloader(BaseDownloader):
                 url_filepath, version_id=params.get('versionId', None)
             )
         except S3ResponseError as e:
-            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
-                                % (url_filepath, url, e))
+            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s"
+                                % (url_filepath, url)) from e
         if key is None:
             raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
 

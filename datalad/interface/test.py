@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -56,11 +56,12 @@ class Test(Interface):
     )
 
     @staticmethod
-    def __call__(module=None, verbose=False, nocapture=False, pdb=False, stop=False):
+    def __call__(module=None, *, verbose=False, nocapture=False, pdb=False, stop=False):
         if not module:
-            from pkg_resources import iter_entry_points
+            from datalad.support.entrypoints import iter_entrypoints
             module = ['datalad']
-            module.extend(ep.module_name for ep in iter_entry_points('datalad.tests'))
+            module.extend(
+                module for _, module, _ in iter_entrypoints('datalad.tests'))
         module = ensure_list(module)
         lgr.info('Starting test run for module(s): %s', module)
         for mod in module:

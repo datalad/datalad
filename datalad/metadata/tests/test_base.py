@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -125,13 +125,13 @@ def test_aggregation(path):
         assert_equal(list(query_aggregated_metadata('all', ds, [])), [])
     assert_re_in('.*Found no aggregated metadata.*update', cml.out)
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
-                  where='dataset')
+                  scope='branch')
     subds = ds.create('sub', force=True)
     subds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
-                     where='dataset')
+                     scope='branch')
     subsubds = subds.create('subsub', force=True)
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
-                        where='dataset')
+                        scope='branch')
     ds.save(recursive=True)
     assert_repo_status(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including

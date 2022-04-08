@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -350,7 +350,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             ds.config.set(
                 '{}.active'.format(section_name),
                 'true',
-                reload=False, force=True, where='local',
+                reload=False, force=True, scope='local',
             )
             ds.config.set(
                 '{}.url'.format(section_name),
@@ -359,7 +359,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 # like ds.repo.update_submodule() would do (does not
                 # accept a URL)
                 res['source']['giturl'],
-                reload=True, force=True, where='local',
+                reload=True, force=True, scope='local',
             )
         yield res
 
@@ -373,7 +373,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
     if cand_cfg:
         # get a handle on the configuration that is specified in the
         # dataset itself (local and dataset)
-        super_cfg = ConfigManager(dataset=ds, source='dataset-local')
+        super_cfg = ConfigManager(dataset=ds, source='branch-local')
         need_reload = False
         for rec in cand_cfg:
             # check whether any of this configuration originated from the
@@ -387,7 +387,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                       'datalad.get.subdataset-source-candidate-{}'.format(
                           rec['name'])):
                 if c in super_cfg.keys() and c not in subds.config.keys():
-                    subds.config.set(c, super_cfg.get(c), where='local',
+                    subds.config.set(c, super_cfg.get(c), scope='local',
                                      reload=False)
                     need_reload = True
                     break
@@ -608,11 +608,12 @@ def _install_targetpath(
         return
     if recursion_limit == 'existing':
         for res in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 path=target_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                return_type='generator'):
+                return_type='generator',
+                result_renderer='disabled'):
             res.update(
                 contains=[Path(res['path'])],
                 action='get',
@@ -839,6 +840,7 @@ class Get(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             source=None,
             dataset=None,
             recursive=False,
@@ -848,17 +850,17 @@ class Get(Interface):
             reckless=None,
             jobs='auto',
     ):
-        refds_path = Interface.get_refds_path(dataset)
         if not (dataset or path):
             raise InsufficientArgumentsError(
                 "Neither dataset nor target path(s) provided")
-        if dataset and not path:
-            # act on the whole dataset if nothing else was specified
-            path = refds_path
-
         # we have to have a single dataset to operate on
         refds = require_dataset(
             dataset, check_installed=True, purpose='get content of %s' % shortened_repr(path))
+        # some functions downstream expect a str
+        refds_path = refds.path
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = refds_path
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not

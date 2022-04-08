@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -28,6 +28,14 @@ example_payload = {
     'one.txt': 'content1',
     'subdir': {
         'two': 'content2',
+    },
+}
+
+
+example_payload2 = {
+    'three.txt': 'content3',
+    'subdir': {
+        'four': 'content4',
     },
 }
 
@@ -70,7 +78,10 @@ def setup_archive_remote(repo, archive_path):
 
 
 def populate_dataset(ds):
-    create_tree(ds.path, example_payload)
+    # create 2 commits
+    for pl in [example_payload, example_payload2]:
+        create_tree(ds.path, pl)
+        ds.save()
 
 
 def check_not_generatorfunction(func):

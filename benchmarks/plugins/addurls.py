@@ -29,7 +29,7 @@ class addurls1(SuprocBenchmarks):
                 **get_tempfile_kwargs({}, prefix='bm_addurls1')))
 
         self.ds = dl.create(self.temp / "ds")
-        self.ds.config.set('annex.security.allowed-url-schemes', 'file', where='local')
+        self.ds.config.set('annex.security.allowed-url-schemes', 'file', scope='local')
 
         # populate list.csv and files
         srcpath = PurePosixPath(self.temp)
@@ -57,7 +57,8 @@ class addurls1(SuprocBenchmarks):
     def time_addurls(self, exclude_autometa):
         lgr.warning("CSV: " + self.listfile.read_text())
         ret = dl.addurls(
-            self.ds, str(self.listfile), '{url}', '{filename}',
+            str(self.listfile), '{url}', '{filename}',
+            dataset=self.ds,
             exclude_autometa=exclude_autometa
         )
         assert not any(r['status'] == 'error' for r in ret)

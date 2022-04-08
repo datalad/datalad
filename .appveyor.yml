@@ -41,8 +41,10 @@
 #     will run until the file is removed (or 60 min have passed)
 #
 #   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
-#     environment to debug in a Python 3.8 session (should generally match the
+#     environment to debug in a Python 3.9 session (should generally match the
 #     respective CI run configuration).
+#
+#   - Workers have vim installed for convenient text editing in the command shell
 
 
 # do not make repository clone cheap: interfers with versioneer
@@ -64,9 +66,15 @@ environment:
     # is a need for debugging
 
     # Ubuntu core tests
-    - ID: Ubu20
-      # ~35min
-      DTS: datalad
+    - ID: Ubu20core
+      # ~30min
+      DTS: >
+          datalad.cli
+          datalad.core
+          datalad.customremotes
+          datalad.dataset
+          datalad.distributed
+          datalad.distribution
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
@@ -75,7 +83,7 @@ environment:
     # Windows core tests
     - ID: WinP39core
       # ~35 min
-      DTS: datalad.core datalad.runner
+      DTS: datalad.core datalad.dataset datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       # Python version specification is non-standard on windows
       PY: 39-x64
@@ -85,8 +93,8 @@ environment:
       # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
     - ID: MacP38core
-      # ~25min
-      DTS: datalad.core datalad.runner
+      # ~40min
+      DTS: datalad.core datalad.dataset datalad.runner datalad.support
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       # does not give a functional installation
@@ -97,50 +105,65 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Additional test runs
-    - ID: WinP39a1
-      # ~45min
+    - ID: Ubu20a1
+      # ~30min
       DTS: >
-          datalad.cmdline
-          datalad.customremotes
-          datalad.distribution
           datalad.downloaders
           datalad.interface
+          datalad.local
+          datalad.metadata
+          datalad.runner
+          datalad.support
+          datalad.tests
+          datalad.ui
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+    - ID: WinP39a1
+      # ~40min
+      DTS: >
+          datalad.cli
+          datalad.customremotes
+          datalad.distribution
+          datalad.distributed
+          datalad.downloaders
+          datalad.interface
+          datalad.tests
       # TODO: datalad.metadata (this is completely non-functional on Windows,
       #       either tests only, or actual code too)
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
     - ID: WinP39a2
-      # ~50min
+      # ~45min
       DTS: >
           datalad.local
-          datalad.distributed
           datalad.support
-          datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
 
     - ID: MacP38a1
-      # ~45min
+      # ~40min
       DTS: >
-          datalad.cmdline
+          datalad.cli
           datalad.customremotes
           datalad.distribution
           datalad.downloaders
           datalad.interface
+          datalad.tests
+          datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
     - ID: MacP38a2
-      # ~35min
+      # ~40min
       DTS: >
           datalad.local
           datalad.distributed
-          datalad.support
-          datalad.tests
-          datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       INSTALL_GITANNEX: git-annex
@@ -148,17 +171,33 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Test alternative Python versions
-    - ID: Ubu20P36
-      PY: 3.6
-      DTS: datalad
+    - ID: Ubu20P37a
+      # ~35min
+      PY: 3.7
+      DTS: >
+          datalad.cli
+          datalad.core
+          datalad.customremotes
+          datalad.dataset
+          datalad.distributed
+          datalad.distribution
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
-    - ID: Ubu20P37
+    - ID: Ubu20P37b
+      # ~25min
       PY: 3.7
-      DTS: datalad
+      DTS: >
+          datalad.downloaders
+          datalad.interface
+          datalad.local
+          datalad.metadata
+          datalad.runner
+          datalad.support
+          datalad.tests
+          datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
@@ -218,6 +257,11 @@ init:
   # Identity setup
   - git config --global user.email "test@appveyor.land"
   - git config --global user.name "Appveyor Almighty"
+  # globally setting filter.annex.process (needs git-annex 8.20211117) to reduce git-add runtime
+  # https://git-annex.branchable.com/bugs/Windows__58___substantial_per-file_cost_for___96__add__96__/
+  - cmd: git config --system filter.annex.process "git-annex filter-process"
+  # might also bring a slight speed-up on Mac, but Ubuntu git-annex is currently too old
+  #- sh: sudo git config --system filter.annex.process "git-annex filter-process"
   # Scratch space
   - cmd: md C:\DLTMP
   # we place the "unix" one into the user's HOME to avoid git-annex issues on MacOSX
@@ -231,6 +275,10 @@ init:
   # Temporary keys for localhost access in default place
   - cmd: ssh-keygen -f C:\Users\appveyor\.ssh\id_rsa -N ""
   - sh: ssh-keygen -f ~/.ssh/id_rsa -N ""
+  # Remove AppVeyor's known_hosts entries for gitlab, since they are matching
+  # `*` as the IP (see https://github.com/appveyor/ci/issues/3792)
+  - cmd: ssh-keygen -f C:\Users\appveyor\.ssh\known_hosts -R "gitlab.com"
+  - sh: ssh-keygen -f ~/.ssh/known_hosts -R "gitlab.com"
 
 
 install:
@@ -249,6 +297,8 @@ install:
   - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
   # Workaround on older/buggy debian/ubuntus having outdated certificate
   - sh: tools/ci/debians_disable_outdated_ssl_cert
+  # Deploy test root CA for internal HTTPS test server
+  - sh: tools/ci/deploy_datalad-rootca
   # deploy the datalad installer, override version via DATALAD_INSTALLER_VERSION
   - cmd:
       IF DEFINED DATALAD_INSTALLER_VERSION (
@@ -272,8 +322,10 @@ install:
 
 
 build_script:
-  - python -m pip install ".[tests]"
-  - python -m pip install ".[devel-utils]"
+  #- python -m pip install ".[tests]"
+  #- python -m pip install ".[devel-utils]"
+  # make comprehensive approach used by travis setup
+  - pip install -r requirements-devel.txt
 
 
 #after_build:
@@ -294,11 +346,12 @@ test_script:
   - sh: mkdir __testhome__
   - cd __testhome__
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
-  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
-  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+  - cmd: python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - sh: PATH=$PWD/../tools/coverage-bin:$PATH python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
 
 
 after_test:
+  - sh: python -m coverage combine -a /tmp/.coverage-entrypoints-*;
   - python -m coverage xml
   - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
   - cmd: .\codecov.exe -f "coverage.xml"

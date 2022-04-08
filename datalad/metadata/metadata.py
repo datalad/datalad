@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -21,10 +21,13 @@ from collections import (
 )
 
 from datalad import cfg
-from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import _minimal_annotate_paths
 from datalad.interface.base import Interface
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
 from datalad.interface.base import build_doc
 from datalad.metadata.definitions import version as vocabulary_version
 from datalad.support.collections import ReadOnlyDict, _val2hashable
@@ -65,6 +68,7 @@ from datalad.consts import (
     OLDMETADATA_FILENAME,
 )
 from datalad.log import log_progress
+from datalad.core.local.status import get_paths_by_ds
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -469,8 +473,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
-    from pkg_resources import iter_entry_points  # delayed heavy import
-    extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
+    from datalad.support.entrypoints import iter_entrypoints
+    extractors = {
+        ename: eload
+        for ename, _, eload in iter_entrypoints('datalad.metadata.extractors')
+    }
 
     # we said that we want to fail, rather then just moan about less metadata
     # Do an early check if all extractors are available so not to wait hours
@@ -501,7 +508,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             update=1,
             increment=True)
         try:
-            extractor_cls = extractors[mtype_key].load()
+            extractor_cls = extractors[mtype_key]()
             extractor = extractor_cls(
                 ds,
                 paths=paths if extractor_cls.NEEDS_CONTENT else fullpathlist)
@@ -878,12 +885,14 @@ class Metadata(Interface):
     @eval_results
     def __call__(
             path=None,
+            *,
             dataset=None,
             get_aggregates=False,
             reporton='all',
             recursive=False):
         # prep results
-        refds_path = Interface.get_refds_path(dataset)
+        refds_path = dataset if dataset is None \
+            else require_dataset(dataset).path
         res_kwargs = dict(action='metadata', logger=lgr)
         if refds_path:
             res_kwargs['refds'] = refds_path
@@ -938,24 +947,17 @@ class Metadata(Interface):
             # error generation happens during annotation
             path = op.curdir
 
+        paths_by_ds, errors = get_paths_by_ds(
+            require_dataset(dataset),
+            dataset,
+            paths=ensure_list(path),
+            subdsroot_mode='super')
         content_by_ds = OrderedDict()
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                path=path,
-                # MIH: we are querying the aggregated metadata anyways, and that
-                # mechanism has its own, faster way to go down the hierarchy
-                #recursive=recursive,
-                #recursion_limit=recursion_limit,
+        for ap in _minimal_annotate_paths(
+                paths_by_ds,
+                errors,
                 action='metadata',
-                # uninstalled subdatasets could be queried via aggregated metadata
-                # -> no 'error'
-                unavailable_path_status='',
-                nondataset_path_status='error',
-                # we need to know when to look into aggregated data
-                force_subds_discovery=True,
-                force_parentds_discovery=True,
-                return_type='generator',
-                on_failure='ignore'):
+                refds=refds_path):
             if ap.get('status', None):
                 # this is done
                 yield ap
@@ -1007,7 +1009,7 @@ class Metadata(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         if res['status'] != 'ok' or not res.get('action', None) == 'metadata':
-            # logging complained about this already
+            generic_result_renderer(res)
             return
         # list the path, available metadata keys, and tags
         path = op.relpath(res['path'],

@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -162,7 +162,9 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
     dest_ds = Dataset(workdir / 'dest').create()
     # no special remotes
     eq_(dest_ds.repo.get_special_remotes(), {})
-    copy_file([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
+    # must call with a dataset to get change saved, in order for drop
+    # below to work properly without getting in reckless mode
+    dest_ds.copy_file([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
     # we have an special remote in the destination dataset now
     assert_in_results(
         dest_ds.repo.get_special_remotes().values(),
@@ -174,7 +176,9 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
 
     # now replace file in dest with a different content at the same path
-    copy_file([src_ds.pathobj / 'myfile2.txt', dest_ds.pathobj / 'myfile1.txt'])
+    # must call with a dataset to get change saved, in order for drop
+    dest_ds.copy_file([src_ds.pathobj / 'myfile2.txt',
+                       dest_ds.pathobj / 'myfile1.txt'])
     dest_ds.drop('myfile1.txt')
     dest_ds.repo.get('myfile1.txt', remote='datalad')
     # no gets the "same path" but yields different content
@@ -246,7 +250,7 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
     # nested datasets
     eq_(*[
         sorted(
-            r for r in d.status(result_xfm='relpaths', result_renderer=None)
+            r for r in d.status(result_xfm='relpaths', result_renderer='disabled')
             # filter out subdataset entry in dest_ds
             if r not in ('lvl2', '.gitmodules'))
         for d in (src_ds, dest_ds)
@@ -299,7 +303,7 @@ def test_copy_file_specs_from(srcdir, destdir):
                  (r_srcabs, r_srcdestabs_str)):
         eq_(*[
             sorted(
-                r for r in d.status(result_xfm='relpaths', result_renderer=None))
+                r for r in d.status(result_xfm='relpaths', result_renderer='disabled'))
             for d in (a, b)
         ])
 
@@ -368,3 +372,28 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
     badobj = dest.pathobj / '.git' / 'objects' / 'i-do-not-exist'
     dest.copy_file([sub.pathobj / '.git' / 'config', badobj])
     ok_(badobj.exists())
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_copy_file_nourl(serv_path, orig_path, tst_path):
+    """Tests availability transfer to normal git-annex remote"""
+    # prep source dataset that will have the file content
+    srv_ds = Dataset(serv_path).create()
+    (srv_ds.pathobj / 'myfile.dat').write_text('I am content')
+    (srv_ds.pathobj / 'noavail.dat').write_text('null')
+    srv_ds.save()
+    srv_ds.drop('noavail.dat', check=False)
+    # make an empty superdataset, with the test dataset as a subdataset
+    orig_ds = Dataset(orig_path).create()
+    orig_ds.clone(source=serv_path, path='serv')
+    assert_repo_status(orig_ds.path)
+    # now copy the test file into the superdataset
+    no_avail_file = orig_ds.pathobj / 'serv' / 'noavail.dat'
+    assert_in_results(
+        orig_ds.copy_file(no_avail_file, on_failure='ignore'),
+        status='impossible',
+        message='no known location of file content',
+        path=str(no_avail_file),
+    )

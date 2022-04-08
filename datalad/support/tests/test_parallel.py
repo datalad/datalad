@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -136,7 +136,6 @@ def test_creatsubdatasets(topds_path, n=2):
 
 
 @known_failure_osx  # https://github.com/datalad/datalad/issues/5309
-@skip_if(not ProducerConsumer._can_use_threads, msg="Test relies on having parallel execution")
 def test_gracefull_death():
 
     def assert_provides_and_raises(pc, exception, target=None):
@@ -230,7 +229,6 @@ def test_gracefull_death():
 
 
 # it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
-@skip_if(not ProducerConsumer._can_use_threads, msg="Known to be buggy/stall")
 def test_stalling(kill=False):
     import concurrent.futures
     from datalad.cmd import WitlessRunner
