@@ -1,8 +1,12 @@
 datalad (0.16.1-1) unstable; urgency=medium
 
   * Fresh upstream release
-  * debian/patches -- refreshed, CPed 0001* removed, patches for python <3.7
-    removed
+  * debian/patches -- refreshed, removed CPed 0001* and for python <3.7
+  * debian/control - dependencies updated:
+    - python 3.6 support was dropped
+    - no wrapt or github packages needed
+    - platformdirs is used instead of unmaintained appdirs
+    - importlib-metadata needed for any python before 3.10
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 08 Apr 2022 16:18:43 -0400
 
