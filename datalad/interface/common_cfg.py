@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,18 +12,146 @@
 
 __docformat__ = 'restructuredtext'
 
-from appdirs import AppDirs
+from collections.abc import Mapping
+import logging
 from os import environ
-from os.path import join as opj, expanduser
-from datalad.support.constraints import EnsureBool
-from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureListOf
-from datalad.support.constraints import EnsureStr
+from os.path import expanduser
+from os.path import join as opj
+
+from platformdirs import AppDirs
+
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureInt,
+    EnsureListOf,
+    EnsureNone,
+    EnsureStr,
+)
 from datalad.utils import on_windows
 
+lgr = logging.getLogger('datalad.interface.common_cfg')
 dirs = AppDirs("datalad", "datalad.org")
+
+
+class _NotGiven():
+    pass
+
+
+class _ConfigDefinitions(Mapping):
+    """A container for configuration definitions
+
+    This class implements the parts of the dictionary interface
+    required to work as a drop-in replacement for the legacy
+    data structure used for configuration definitions prior
+    DataLad 0.16.
+
+    .. note::
+
+      This is an internal helper that may change at any time without
+      prior notice.
+    """
+    def __init__(self):
+        self._defs = {
+            k: _ConfigDefinition(**v) for k, v in _definitions.items()
+            if v is not _NotGiven
+        }
+
+    def get(self, *args):
+        return self._defs.get(*args)
+
+    def keys(self):
+        return self._defs.keys()
+
+    def items(self):
+        return self._defs.items()
+
+    def __setitem__(self, key, value):
+        self._defs.__setitem__(key, value)
+
+    def __getitem__(self, key):
+        return self._defs.__getitem__(key)
+
+    def __contains__(self, key):
+        return self._defs.__contains__(key)
+
+    def __iter__(self):
+        return self._defs.__iter__()
+
+    def __len__(self):
+        return self._defs.__len__()
+
+
+class _ConfigDefinition(Mapping):
+    """A single configuration definition
+
+    This class implements the parts of the dictionary interface
+    required to work as a drop-in replacement for the legacy
+    data structure used for a configuration definition prior
+    DataLad 0.16.
+
+    Moreover, it implement lazy evaluation of default values,
+    when a 'default_fn' property is given.
+
+    .. note::
+
+      This is an internal helper that may change at any time without
+      prior notice.
+    """
+    def __init__(self, **kwargs):
+        # just take it, no validation on ingestions for max speed
+        self._props = kwargs
+
+    def __getitem__(self, prop):
+        if prop == 'default' \
+                and 'default' not in self._props \
+                and 'default_fn' in self._props:
+            default = self._props["default_fn"]()
+            self._props['default'] = default
+            return default
+        return self._props[prop]
+
+    def __setitem__(self, key, val):
+        self._props.__setitem__(key, val)
+
+    def get(self, prop, default=None):
+        try:
+            return self.__getitem__(prop)
+        except KeyError:
+            return default
+
+    def __contains__(self, prop):
+        if prop == 'default':
+            return 'default' in self._props or 'default_fn' in self._props
+        return self._props.__contains__(prop)
+
+    def __str__(self):
+        return self._props.__str__()
+
+    def __repr__(self):
+        return self._props.__repr__()
+
+    def __iter__(self):
+        return self._props.__iter__()
+
+    def __len__(self):
+        return self._props.__len__()
+
+    def update(self, *args, **kwargs):
+        self._props.update(*args, **kwargs)
+
+
+def get_default_ssh():
+    from datalad.utils import on_windows
+    from pathlib import Path
+
+    if on_windows:
+        windows_openssh_path = \
+            environ.get("WINDIR", r"C:\Windows") + r"\System32\OpenSSH\ssh.exe"
+        if Path(windows_openssh_path).exists():
+            return windows_openssh_path
+    return "ssh"
+
 
 subst_rule_docs = """\
 A substitution specification is a string with a match and substitution
@@ -38,7 +166,8 @@ substitutions in a series will be considered. However, following the first
 match all further substitutions in a series are processed, regardless whether
 intermediate expressions match or not."""
 
-definitions = {
+
+_definitions = {
     'datalad.clone.url-substitute.github': {
         'ui': ('question', {
                'title': 'GitHub URL substitution rule',
@@ -78,7 +207,7 @@ definitions = {
                'title': 'Crawler download caching',
                'text': 'Should the crawler cache downloaded files?'}),
         'destination': 'local',
-        'type': bool,
+        'type': EnsureBool(),
     },
     # this is actually used in downloaders, but kept cfg name original
     'datalad.credentials.force-ask': {
@@ -86,8 +215,32 @@ definitions = {
                'title': 'Force (re-)entry of credentials',
                'text': 'Should DataLad prompt for credential (re-)entry? This '
                        'can be used to update previously stored credentials.'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.credentials.githelper.noninteractive':{
+        'ui': ('yesno', {
+               'title': 'Non-interactive mode for git-credential helper',
+               'text': 'Should git-credential-datalad operate in '
+                       'non-interactive mode? This would mean to not ask for '
+                       'user confirmation when storing new '
+                       'credentials/provider configs.'}),
         'type': bool,
         'default': False,
+    },
+    'datalad.extensions.load': {
+        'ui': ('question', {
+               'title': 'DataLad extension packages to load',
+               'text': 'Indicate which extension packages should be loaded '
+                       'unconditionally on CLI startup or on importing '
+                       "'datalad.[core]api'. This enables the "
+                       'respective extensions to customize DataLad with '
+                       'functionality and configurability outside the '
+                       'scope of extension commands. For merely running '
+                       'extension commands it is not necessary to load them '
+                       'specifically'}),
+        'destination': 'global',
+        'default': None,
     },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
@@ -322,6 +475,24 @@ definitions = {
         'default': not on_windows,
         'type': EnsureBool(),
     },
+    'datalad.ssh.try-use-annex-bundled-git': {
+        'ui': ('question', {
+               'title': "Whether to attempt adjusting the PATH in a remote "
+                        "shell to include Git binaries located in a detected "
+                        "git-annex bundle",
+               'text': "If enabled, this will be a 'best-effort' attempt that "
+                       "only supports remote hosts with a Bourne shell and "
+                       "the `which` command available. The remote PATH must "
+                       "already contain a git-annex installation. "
+                       "If git-annex is not found, or the detected git-annex "
+                       "does not have a bundled Git installation, detection "
+                       "failure will not result in an error, but only slow "
+                       "remote execution by one-time sensing overhead per "
+                       "each opened connection."}),
+        'destination': 'global',
+        'default': False,
+        'type': EnsureBool(),
+    },
     'datalad.annex.retry': {
         'ui': ('question',
                {'title': 'Value for annex.retry to use for git-annex calls',
@@ -398,6 +569,24 @@ definitions = {
                'text': 'Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores).'}),
         'type': EnsureInt(),
         'default': 1,
+    },
+    'datalad.runtime.max-batched': {
+        'ui': ('question', {
+            'title': 'Maximum number of batched commands to run in parallel',
+            'text': 'Automatic cleanup of batched commands will try to keep at most this many commands running.'}),
+        'type': EnsureInt(),
+        'default': 20,
+    },
+    'datalad.runtime.max-inactive-age': {
+        'ui': ('question', {
+            'title': 'Maximum time (in seconds) a batched command can be'
+                     ' inactive before it is eligible for cleanup',
+            'text': 'Automatic cleanup of batched commands will consider an'
+                    ' inactive command eligible for cleanup if more than this'
+                    ' many seconds have transpired since the command\'s last'
+                    ' activity.'}),
+        'type': EnsureInt(),
+        'default': 60,
     },
     'datalad.runtime.max-jobs': {
         'ui': ('question', {
@@ -501,19 +690,31 @@ definitions = {
         'default': True,
         'type': EnsureBool(),
     },
+    'datalad.save.windows-compat-warning': {
+        'ui': ('question', {
+            'title': 'Action when Windows-incompatible file names are saved',
+            'text': "Certain characters or names can make file names "
+                    "incompatible with Windows. If such files are saved "
+                    "'warning' will alert users with a log message, 'error' "
+                    "will yield an 'impossible' result, and 'none' will "
+                    "ignore the incompatibility."}),
+        'type': EnsureChoice('warning', 'error', 'none'),
+        'default': 'warning',
+
+    },
+    'datalad.ssh.executable': {
+        'ui': ('question', {
+            'title': "Name of ssh executable for 'datalad sshrun'",
+            'text': "Specifies the name of the ssh-client executable that"
+                    "datalad will use. This might be an absolute "
+                    "path. On Windows systems it is currently by default set "
+                    "to point to the ssh executable of OpenSSH for Windows, "
+                    "if OpenSSH for Windows is installed. On other systems it "
+                    "defaults to 'ssh'."}),
+        'destination': 'global',
+        'type': EnsureStr(),
+        'default_fn': get_default_ssh,
+    }
 }
 
-
-def compute_cfg_defaults():
-    """Compute dynamic defaults for configuration options.
-
-    These are options that depend on things like $HOME that change under our
-    testing setup.
-    """
-    for key, value in definitions.items():
-        def_fn = value.get("default_fn")
-        if def_fn:
-            value['default'] = def_fn()
-
-
-compute_cfg_defaults()
+definitions = _ConfigDefinitions()

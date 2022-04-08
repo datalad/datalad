@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -123,8 +123,10 @@ def test_update_simple(origin, src_path, dst_path):
     assert_in("update.txt",
               dest.repo.get_files(dest.repo.get_active_branch()))
     # it's known to annex, but has no content yet:
-    dest.repo.get_file_key("update.txt")  # raises if unknown
-    eq_([False], dest.repo.file_has_content(["update.txt"]))
+    annexprops = dest.repo.get_file_annexinfo("update.txt",
+                                              eval_availability=True)
+    annexprops['key']  # blows if unknown
+    eq_(False, annexprops['has_content'])
 
     # check subdataset path constraints, baseline (parent + 2 subds)
     assert_result_count(dest.update(recursive=True),
@@ -273,8 +275,10 @@ def test_update_fetch_all(path):
     assert_in("first.txt",
               ds.repo.get_files(ds.repo.get_active_branch()))
     # it's known to annex, but has no content yet:
-    ds.repo.get_file_key("first.txt")  # raises if unknown
-    eq_([False], ds.repo.file_has_content(["first.txt"]))
+    annexprops = ds.repo.get_file_annexinfo(
+        "first.txt", eval_availability=True)
+    annexprops['key']  # blows if unknown
+    eq_(False, annexprops['has_content'])
 
 
 @with_tempfile(mkdir=True)
@@ -367,7 +371,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_(exists(opj(ds.path, sname)))
 
     # remove from origin
-    origin.remove(sname)
+    origin.remove(sname, reckless='availability')
     assert_result_count(ds.update(merge=True),
                         1, action='update', status='ok', type='dataset')
     # gone locally, wasn't checked out
@@ -407,9 +411,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_(Dataset(opj(ds.path, sname)).is_installed())
 
     # now remove the now disconnected subdataset for further tests
-    # not using a bound method, not giving a parentds, should
-    # not be needed to get a clean dataset
-    remove(op.join(ds.path, sname), check=False)
+    remove(dataset=op.join(ds.path, sname), check=False)
     assert_repo_status(ds.path)
 
     # new separate subdataset, not within the origin dataset
@@ -773,11 +775,11 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     ds_src_s1.repo.checkout(DEFAULT_BRANCH)
     # This is the default, but just in case:
     ds_src_s1.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
-                              where="local")
+                              scope="local")
     # Configure the fetcher to use v0 because Git defaults to v2 as of
     # v2.26.0, which allows fetching unadvertised objects regardless
     # of the value of uploadpack.allowAnySHA1InWant.
-    ds_clone_s1.repo.config.set("protocol.version", "0", where="local")
+    ds_clone_s1.repo.config.set("protocol.version", "0", scope="local")
     res = ds_clone.update(merge=True, recursive=True, follow="parentds",
                           on_failure="ignore")
     # The fetch with the explicit ref fails because it isn't advertised.

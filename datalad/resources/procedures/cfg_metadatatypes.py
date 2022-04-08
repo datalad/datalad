@@ -28,10 +28,11 @@ for nt in sys.argv[2:]:
     ds.config.add(
         'datalad.metadata.nativetype',
         nt,
-        where='dataset',
+        scope='branch',
         reload=False)
 
 ds.save(
     path=op.join(ds.path, DATASET_CONFIG_FILE),
     message="Configure metadata type(s)",
+    result_renderer='disabled'
 )

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -165,7 +165,9 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     @eval_results
-    def __call__(path=None, message=None, dataset=None,
+    def __call__(path=None,
+                 *,
+                 message=None, dataset=None,
                  version_tag=None,
                  recursive=False, recursion_limit=None,
                  updated=False,
@@ -234,6 +236,10 @@ class Save(Interface):
                 on_failure='ignore',
                 # for save without recursion only commit matters
                 eval_subdataset_state='full' if recursive else 'commit',
+                return_type='generator',
+                # this could be, but for now only 'error' results are handled
+                # below
+                #on_failure='ignore',
                 result_renderer='disabled'):
             if s['status'] == 'error':
                 # Downstream code can't do anything with these. Let the caller
@@ -307,7 +313,7 @@ class Save(Interface):
                         # calls
                         paths=None,
                         # prevent whining of GitRepo
-                        git=True if not hasattr(ds.repo, 'annexstatus')
+                        git=True if not hasattr(ds.repo, 'uuid')
                         else to_git,
                         # we are supplying the full status already, do not
                         # detect anything else
@@ -395,4 +401,3 @@ class Save(Interface):
 
 def _log_filter_save_dataset(res):
     return res.get('type') == 'dataset' and res.get('action') == 'save'
-

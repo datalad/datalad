@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuration &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="datalad.cmdline.common_args" href="generated/datalad.cmdline.common_args.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> DataLad
+            <img src="_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modref.html">Python module reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#global-user-configuration">Global user configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#local-repository-configuration">Local repository configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sticky-dataset-configuration">Sticky dataset configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#miscellaneous-configuration">Miscellaneous configuration</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="configuration">
+<span id="id1"></span><h1>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline"></a></h1>
+<p>DataLad uses the same configuration mechanism and syntax as Git itself.
+Consequently, datalad can be configured using the <strong class="command">git config</strong>
+command. Both a <em>global</em> user configuration (typically at
+<code class="file docutils literal notranslate"><span class="pre">~/.gitconfig</span></code>), and a <em>local</em> repository-specific configuration
+(<code class="file docutils literal notranslate"><span class="pre">.git/config</span></code>) are inspected.</p>
+<p>In addition, datalad supports a persistent dataset-specific configuration.
+This configuration is stored at <code class="file docutils literal notranslate"><span class="pre">.datalad/config</span></code> in any dataset.  As it
+is part of a dataset, settings stored there will also be in effect for any
+consumer of such a dataset. Both <em>global</em> and <em>local</em> settings on a particular
+machine always override configuration shipped with a dataset.</p>
+<p>All datalad-specific configuration variables are prefixed with <code class="docutils literal notranslate"><span class="pre">datalad.</span></code>.</p>
+<p>It is possible to override or amend the configuration using environment
+variables. Any variable with a name that starts with <code class="docutils literal notranslate"><span class="pre">DATALAD_</span></code> will
+be available as the corresponding <code class="docutils literal notranslate"><span class="pre">datalad.</span></code> configuration variable,
+replacing any <code class="docutils literal notranslate"><span class="pre">__</span></code> (two underscores) with a hyphen, then any <code class="docutils literal notranslate"><span class="pre">_</span></code>
+(single underscore) with a dot, and finally converting all letters to
+lower case. Values from environment variables take precedence over
+configuration file settings.</p>
+<p>In addition, the <code class="docutils literal notranslate"><span class="pre">DATALAD_CONFIG_OVERRIDES_JSON</span></code> environment variable can
+be set to a JSON record with configuration values.  This is
+particularly useful for options that aren’t accessible through the
+naming scheme described above (e.g., an option name that includes an
+underscore).</p>
+<p>The following sections provide a (non-exhaustive) list of settings honored
+by datalad. They are categorized according to the scope they are typically
+associated with.</p>
+<section id="global-user-configuration">
+<h2>Global user configuration<a class="headerlink" href="#global-user-configuration" title="Permalink to this headline"></a></h2>
+<dl class="glossary">
+<dt id="term-datalad.clone.url-substitute.github">datalad.clone.url-substitute.github<a class="headerlink" href="#term-datalad.clone.url-substitute.github" title="Permalink to this term"></a></dt><dd><p>GitHub URL substitution rule:
+Mangling for GitHub-related URL. A substitution specification is a string with a match and substitution
+expression, each following Python’s regular expression syntax. Both expressions
+are concatenated to a single string with an arbitrary delimiter character. The
+delimiter is defined by prefixing the string with the delimiter. Prefix and
+delimiter are stripped from the expressions (Example:
+“,^http://(.*)$,https://1”).  This setting can be defined multiple times.
+Substitutions will be applied incrementally, in order of their definition. The
+first substitution in such a series must match, otherwise no further
+substitutions in a series will be considered. However, following the first
+match all further substitutions in a series are processed, regardless whether
+intermediate expressions match or not.
+Default: (‘,https?://github.com/([^/]+)/(.*)$,\1###\2’, ‘,[/\\]+,-’, ‘,\s+|(%2520)+|(%20)+,_’, ‘,([^#]+)###(.*),https://github.com/\1/\2’)</p>
+</dd>
+<dt id="term-datalad.clone.url-substitute.osf">datalad.clone.url-substitute.osf<a class="headerlink" href="#term-datalad.clone.url-substitute.osf" title="Permalink to this term"></a></dt><dd><p>Open Science Framework URL substitution rule:
+Mangling for OSF-related URLs. A substitution specification is a string with a match and substitution
+expression, each following Python’s regular expression syntax. Both expressions
+are concatenated to a single string with an arbitrary delimiter character. The
+delimiter is defined by prefixing the string with the delimiter. Prefix and
+delimiter are stripped from the expressions (Example:
+“,^http://(.*)$,https://1”).  This setting can be defined multiple times.
+Substitutions will be applied incrementally, in order of their definition. The
+first substitution in such a series must match, otherwise no further
+substitutions in a series will be considered. However, following the first
+match all further substitutions in a series are processed, regardless whether
+intermediate expressions match or not.
+Default: (‘,^https://osf.io/([^/]+)[/]*$,osf://\1’,)</p>
+</dd>
+<dt id="term-datalad.externals.nda.dbserver">datalad.externals.nda.dbserver<a class="headerlink" href="#term-datalad.externals.nda.dbserver" title="Permalink to this term"></a></dt><dd><p>NDA database server:
+Hostname of the database server
+Default: <a class="reference external" href="https://nda.nih.gov/DataManager/dataManager">https://nda.nih.gov/DataManager/dataManager</a></p>
+</dd>
+<dt id="term-datalad.locations.cache">datalad.locations.cache<a class="headerlink" href="#term-datalad.locations.cache" title="Permalink to this term"></a></dt><dd><p>Cache directory:
+Where should datalad cache files?
+Default: ~/.cache/datalad</p>
+</dd>
+<dt id="term-datalad.locations.default-dataset">datalad.locations.default-dataset<a class="headerlink" href="#term-datalad.locations.default-dataset" title="Permalink to this term"></a></dt><dd><p>Default dataset path:
+Where should datalad should look for (or install) a default dataset?
+Default: ~/datalad</p>
+</dd>
+<dt id="term-datalad.locations.extra-procedures">datalad.locations.extra-procedures<a class="headerlink" href="#term-datalad.locations.extra-procedures" title="Permalink to this term"></a></dt><dd><p>Extra procedure directory:
+Where should datalad search for some additional procedures?</p>
+</dd>
+<dt id="term-datalad.locations.locks">datalad.locations.locks<a class="headerlink" href="#term-datalad.locations.locks" title="Permalink to this term"></a></dt><dd><p>Lockfile directory:
+Where should datalad store lock files?
+Default: ~/.cache/datalad/locks</p>
+</dd>
+<dt id="term-datalad.locations.sockets">datalad.locations.sockets<a class="headerlink" href="#term-datalad.locations.sockets" title="Permalink to this term"></a></dt><dd><p>Socket directory:
+Where should datalad store socket files?
+Default: ~/.cache/datalad/sockets</p>
+</dd>
+<dt id="term-datalad.locations.system-procedures">datalad.locations.system-procedures<a class="headerlink" href="#term-datalad.locations.system-procedures" title="Permalink to this term"></a></dt><dd><p>System procedure directory:
+Where should datalad search for system procedures?
+Default: /etc/xdg/datalad/procedures</p>
+</dd>
+<dt id="term-datalad.locations.user-procedures">datalad.locations.user-procedures<a class="headerlink" href="#term-datalad.locations.user-procedures" title="Permalink to this term"></a></dt><dd><p>User procedure directory:
+Where should datalad search for user procedures?
+Default: ~/.config/datalad/procedures</p>
+</dd>
+<dt id="term-datalad.ssh.identityfile">datalad.ssh.identityfile<a class="headerlink" href="#term-datalad.ssh.identityfile" title="Permalink to this term"></a></dt><dd><p>If set, pass this file as ssh’s -i option.:
+Default: None</p>
+</dd>
+<dt id="term-datalad.ssh.multiplex-connections">datalad.ssh.multiplex-connections<a class="headerlink" href="#term-datalad.ssh.multiplex-connections" title="Permalink to this term"></a></dt><dd><p>Whether to use a single shared connection for multiple SSH processes aiming at the same target.:
+Default: True</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.cache">datalad.tests.cache<a class="headerlink" href="#term-datalad.tests.cache" title="Permalink to this term"></a></dt><dd><p>Cache directory for tests:
+Where should datalad cache test files?
+Default: ~/.cache/datalad/tests</p>
+</dd>
+</dl>
+</section>
+<section id="local-repository-configuration">
+<h2>Local repository configuration<a class="headerlink" href="#local-repository-configuration" title="Permalink to this headline"></a></h2>
+<dl class="glossary">
+<dt id="term-datalad.crawl.cache">datalad.crawl.cache<a class="headerlink" href="#term-datalad.crawl.cache" title="Permalink to this term"></a></dt><dd><p>Crawler download caching:
+Should the crawler cache downloaded files?</p>
+<p>[bool]</p>
+</dd>
+<dt id="term-datalad.fake-dates">datalad.fake-dates<a class="headerlink" href="#term-datalad.fake-dates" title="Permalink to this term"></a></dt><dd><p>Fake (anonymize) dates:
+Should the dates in the logs be faked?
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+</dl>
+</section>
+<section id="sticky-dataset-configuration">
+<h2>Sticky dataset configuration<a class="headerlink" href="#sticky-dataset-configuration" title="Permalink to this headline"></a></h2>
+<dl class="glossary simple">
+<dt id="term-datalad.locations.dataset-procedures">datalad.locations.dataset-procedures<a class="headerlink" href="#term-datalad.locations.dataset-procedures" title="Permalink to this term"></a></dt><dd><p>Dataset procedure directory:
+Where should datalad search for dataset procedures (relative to a dataset root)?
+Default: .datalad/procedures</p>
+</dd>
+</dl>
+</section>
+<section id="miscellaneous-configuration">
+<h2>Miscellaneous configuration<a class="headerlink" href="#miscellaneous-configuration" title="Permalink to this headline"></a></h2>
+<dl class="glossary">
+<dt id="term-datalad.annex.retry">datalad.annex.retry<a class="headerlink" href="#term-datalad.annex.retry" title="Permalink to this term"></a></dt><dd><p>Value for annex.retry to use for git-annex calls:
+On transfer failure, annex.retry (sans “datalad.”) controls the number of times that git-annex retries. DataLad will call git-annex with annex.retry set to the value here unless the annex.retry is explicitly configured
+Default: 3</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.credentials.force-ask">datalad.credentials.force-ask<a class="headerlink" href="#term-datalad.credentials.force-ask" title="Permalink to this term"></a></dt><dd><p>Force (re-)entry of credentials:
+Should DataLad prompt for credential (re-)entry? This can be used to update previously stored credentials.
+Default: False</p>
+<p>[bool]</p>
+</dd>
+<dt id="term-datalad.exc.str.tblimit">datalad.exc.str.tblimit<a class="headerlink" href="#term-datalad.exc.str.tblimit" title="Permalink to this term"></a></dt><dd><p>This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.:</p>
+</dd>
+<dt id="term-datalad.fake-dates-start">datalad.fake-dates-start<a class="headerlink" href="#term-datalad.fake-dates-start" title="Permalink to this term"></a></dt><dd><p>Initial fake date:
+When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time). The value must be positive.
+Default: 1112911993</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.github.token-note">datalad.github.token-note<a class="headerlink" href="#term-datalad.github.token-note" title="Permalink to this term"></a></dt><dd><p>Github token note:
+Description for a Personal access token to generate.
+Default: DataLad</p>
+</dd>
+<dt id="term-datalad.install.inherit-local-origin">datalad.install.inherit-local-origin<a class="headerlink" href="#term-datalad.install.inherit-local-origin" title="Permalink to this term"></a></dt><dd><p>Inherit local origin of dataset source:
+If enabled, a local ‘origin’ remote of a local dataset clone source is configured as an ‘origin-2’ remote to make its annex automatically available. The process is repeated recursively for any further qualifying ‘origin’ dataset thereof.Note that if clone.defaultRemoteName is configured to use a name other than ‘origin’, that name will be used instead.
+Default: True</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.log.level">datalad.log.level<a class="headerlink" href="#term-datalad.log.level" title="Permalink to this term"></a></dt><dd><p>Used for control the verbosity of logs printed to stdout while running datalad commands/debugging:</p>
+</dd>
+<dt id="term-datalad.log.name">datalad.log.name<a class="headerlink" href="#term-datalad.log.name" title="Permalink to this term"></a></dt><dd><p>Include name of the log target in the log line:</p>
+</dd>
+<dt id="term-datalad.log.names">datalad.log.names<a class="headerlink" href="#term-datalad.log.names" title="Permalink to this term"></a></dt><dd><p>Which names (,-separated) to print log lines for:</p>
+</dd>
+<dt id="term-datalad.log.namesre">datalad.log.namesre<a class="headerlink" href="#term-datalad.log.namesre" title="Permalink to this term"></a></dt><dd><p>Regular expression for which names to print log lines for:</p>
+</dd>
+<dt id="term-datalad.log.outputs">datalad.log.outputs<a class="headerlink" href="#term-datalad.log.outputs" title="Permalink to this term"></a></dt><dd><p>Whether to log stdout and stderr for executed commands:
+When enabled, setting the log level to 5 should catch all execution output, though some output may be logged at higher levels
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.log.result-level">datalad.log.result-level<a class="headerlink" href="#term-datalad.log.result-level" title="Permalink to this term"></a></dt><dd><p>Log level for command result messages:
+If ‘match-status’, it will log ‘impossible’ results as a warning, ‘error’ results as errors, and everything else as ‘debug’. Otherwise the indicated log-level will be used for all such messages
+Default: debug</p>
+<p>[value must be one of [CMD: (‘debug’, ‘info’, ‘warning’, ‘error’, ‘match-status’) CMD][PY: (‘debug’, ‘info’, ‘warning’, ‘error’, ‘match-status’) PY]]</p>
+</dd>
+<dt id="term-datalad.log.timestamp">datalad.log.timestamp<a class="headerlink" href="#term-datalad.log.timestamp" title="Permalink to this term"></a></dt><dd><p>Used to add timestamp to datalad logs:
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.log.traceback">datalad.log.traceback<a class="headerlink" href="#term-datalad.log.traceback" title="Permalink to this term"></a></dt><dd><p>Runs TraceBack function with collide set to True, if this flag is set to “collide”. This replaces any common prefix between current traceback log and previous invocation with “…”:</p>
+</dd>
+<dt id="term-datalad.metadata.create-aggregate-annex-limit">datalad.metadata.create-aggregate-annex-limit<a class="headerlink" href="#term-datalad.metadata.create-aggregate-annex-limit" title="Permalink to this term"></a></dt><dd><p>Limit configuration annexing aggregated metadata in new dataset:
+Git-annex large files expression (see <a class="reference external" href="https://git-annex.branchable.com/tips/largefiles">https://git-annex.branchable.com/tips/largefiles</a>; given expression will be wrapped in parentheses)
+Default: anything</p>
+</dd>
+<dt id="term-datalad.metadata.maxfieldsize">datalad.metadata.maxfieldsize<a class="headerlink" href="#term-datalad.metadata.maxfieldsize" title="Permalink to this term"></a></dt><dd><p>Maximum metadata field size:
+Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio
+Default: 100000</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.metadata.nativetype">datalad.metadata.nativetype<a class="headerlink" href="#term-datalad.metadata.nativetype" title="Permalink to this term"></a></dt><dd><p>Native dataset metadata scheme:
+Set this label to engage a particular metadata extraction parser</p>
+</dd>
+<dt id="term-datalad.metadata.store-aggregate-content">datalad.metadata.store-aggregate-content<a class="headerlink" href="#term-datalad.metadata.store-aggregate-content" title="Permalink to this term"></a></dt><dd><p>Aggregated content metadata storage:
+If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery
+Default: True</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.repo.backend">datalad.repo.backend<a class="headerlink" href="#term-datalad.repo.backend" title="Permalink to this term"></a></dt><dd><p>git-annex backend:
+Backend to use when creating git-annex repositories
+Default: MD5E</p>
+</dd>
+<dt id="term-datalad.repo.direct">datalad.repo.direct<a class="headerlink" href="#term-datalad.repo.direct" title="Permalink to this term"></a></dt><dd><p>Direct Mode for git-annex repositories:
+Set this flag to create annex repositories in direct mode by default
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.repo.version">datalad.repo.version<a class="headerlink" href="#term-datalad.repo.version" title="Permalink to this term"></a></dt><dd><p>git-annex repository version:
+Specifies the repository version for git-annex to be used by default
+Default: 8</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.runtime.max-annex-jobs">datalad.runtime.max-annex-jobs<a class="headerlink" href="#term-datalad.runtime.max-annex-jobs" title="Permalink to this term"></a></dt><dd><p>Maximum number of git-annex jobs to request when “jobs” option set to “auto” (default):
+Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores).
+Default: 1</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.runtime.max-batched">datalad.runtime.max-batched<a class="headerlink" href="#term-datalad.runtime.max-batched" title="Permalink to this term"></a></dt><dd><p>Maximum number of batched commands to run in parallel:
+Automatic cleanup of batched commands will try to keep at most this many commands running.
+Default: 20</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.runtime.max-inactive-age">datalad.runtime.max-inactive-age<a class="headerlink" href="#term-datalad.runtime.max-inactive-age" title="Permalink to this term"></a></dt><dd><p>Maximum time (in seconds) a batched command can be inactive before it is eligible for cleanup:
+Automatic cleanup of batched commands will consider an inactive command eligible for cleanup if more than this many seconds have transpired since the command’s last activity.
+Default: 60</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.runtime.max-jobs">datalad.runtime.max-jobs<a class="headerlink" href="#term-datalad.runtime.max-jobs" title="Permalink to this term"></a></dt><dd><p>Maximum number of jobs DataLad can run in “parallel”:
+Set this value to enable parallel multi-threaded DataLad jobs that may speed up certain operations, in particular operation across multiple datasets (e.g., install multiple subdatasets, etc).
+Default: 1</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.runtime.raiseonerror">datalad.runtime.raiseonerror<a class="headerlink" href="#term-datalad.runtime.raiseonerror" title="Permalink to this term"></a></dt><dd><p>Error behavior:
+Set this flag to cause DataLad to raise an exception on errors that would have otherwise just get logged
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.runtime.report-status">datalad.runtime.report-status<a class="headerlink" href="#term-datalad.runtime.report-status" title="Permalink to this term"></a></dt><dd><p>Command line result reporting behavior:
+If set (to other than ‘all’), constrains command result report to records matching the given status. ‘success’ is a synonym for ‘ok’ OR ‘notneeded’, ‘failure’ stands for ‘impossible’ OR ‘error’
+Default: None</p>
+<p>[value must be one of [CMD: (‘all’, ‘success’, ‘failure’, ‘ok’, ‘notneeded’, ‘impossible’, ‘error’) CMD][PY: (‘all’, ‘success’, ‘failure’, ‘ok’, ‘notneeded’, ‘impossible’, ‘error’) PY]]</p>
+</dd>
+<dt id="term-datalad.runtime.stalled-external">datalad.runtime.stalled-external<a class="headerlink" href="#term-datalad.runtime.stalled-external" title="Permalink to this term"></a></dt><dd><p>Behavior for handing external processes:
+What to do with external processes if they do not finish in some minimal reasonable time. If “abandon”, datalad would proceed without waiting for external process to exit. ATM applies only to batched git-annex processes. Should be changed with caution.
+Default: wait</p>
+<p>[value must be one of [CMD: (‘wait’, ‘abandon’) CMD][PY: (‘wait’, ‘abandon’) PY]]</p>
+</dd>
+<dt id="term-datalad.save.no-message">datalad.save.no-message<a class="headerlink" href="#term-datalad.save.no-message" title="Permalink to this term"></a></dt><dd><p>Commit message handling:
+When no commit message was provided: attempt to obtain one interactively (interactive); or use a generic commit message (generic). NOTE: The interactive option is experimental. The behavior may change in backwards-incompatible ways.
+Default: generic</p>
+<p>[value must be one of [CMD: (‘interactive’, ‘generic’) CMD][PY: (‘interactive’, ‘generic’) PY]]</p>
+</dd>
+<dt id="term-datalad.search.default-mode">datalad.search.default-mode<a class="headerlink" href="#term-datalad.search.default-mode" title="Permalink to this term"></a></dt><dd><p>Default search mode:
+Label of the mode to be used by default
+Default: egrep</p>
+<p>[value must be one of [CMD: (‘egrep’, ‘textblob’, ‘autofield’) CMD][PY: (‘egrep’, ‘textblob’, ‘autofield’) PY]]</p>
+</dd>
+<dt id="term-datalad.search.index-default-documenttype">datalad.search.index-default-documenttype<a class="headerlink" href="#term-datalad.search.index-default-documenttype" title="Permalink to this term"></a></dt><dd><p>Type of search index documents:
+Labels of document types to include in a default search index
+Default: datasets</p>
+<p>[value must be one of [CMD: (‘all’, ‘datasets’, ‘files’) CMD][PY: (‘all’, ‘datasets’, ‘files’) PY]]</p>
+</dd>
+<dt id="term-datalad.search.indexercachesize">datalad.search.indexercachesize<a class="headerlink" href="#term-datalad.search.indexercachesize" title="Permalink to this term"></a></dt><dd><p>Maximum cache size for search index (per process):
+Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)
+Default: 256</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+<dt id="term-datalad.tests.dataladremote">datalad.tests.dataladremote<a class="headerlink" href="#term-datalad.tests.dataladremote" title="Permalink to this term"></a></dt><dd><p>Binary flag to specify whether each annex repository should get datalad special remote in every test repository:</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.knownfailures.probe">datalad.tests.knownfailures.probe<a class="headerlink" href="#term-datalad.tests.knownfailures.probe" title="Permalink to this term"></a></dt><dd><p>Probes tests that are known to fail on whether or not they are actually still failing:
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.knownfailures.skip">datalad.tests.knownfailures.skip<a class="headerlink" href="#term-datalad.tests.knownfailures.skip" title="Permalink to this term"></a></dt><dd><p>Skips tests that are known to currently fail:
+Default: True</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.nonetwork">datalad.tests.nonetwork<a class="headerlink" href="#term-datalad.tests.nonetwork" title="Permalink to this term"></a></dt><dd><p>Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc:</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.nonlo">datalad.tests.nonlo<a class="headerlink" href="#term-datalad.tests.nonlo" title="Permalink to this term"></a></dt><dd><p>Specifies network interfaces to bring down/up for testing. Currently used by travis.:</p>
+</dd>
+<dt id="term-datalad.tests.noteardown">datalad.tests.noteardown<a class="headerlink" href="#term-datalad.tests.noteardown" title="Permalink to this term"></a></dt><dd><p>Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set:</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.runcmdline">datalad.tests.runcmdline<a class="headerlink" href="#term-datalad.tests.runcmdline" title="Permalink to this term"></a></dt><dd><p>Binary flag to specify if shell testing using shunit2 to be carried out:</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.setup.testrepos">datalad.tests.setup.testrepos<a class="headerlink" href="#term-datalad.tests.setup.testrepos" title="Permalink to this term"></a></dt><dd><p>Pre-creates repositories for &#64;with_testrepos within setup_package:
+Default: False</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.ssh">datalad.tests.ssh<a class="headerlink" href="#term-datalad.tests.ssh" title="Permalink to this term"></a></dt><dd><p>Skips SSH tests if this flag is <strong>not</strong> set:</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.temp.dir">datalad.tests.temp.dir<a class="headerlink" href="#term-datalad.tests.temp.dir" title="Permalink to this term"></a></dt><dd><p>Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc:
+Default: None</p>
+<p>[value must be a string]</p>
+</dd>
+<dt id="term-datalad.tests.temp.fs">datalad.tests.temp.fs<a class="headerlink" href="#term-datalad.tests.temp.fs" title="Permalink to this term"></a></dt><dd><p>Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation:</p>
+</dd>
+<dt id="term-datalad.tests.temp.fssize">datalad.tests.temp.fssize<a class="headerlink" href="#term-datalad.tests.temp.fssize" title="Permalink to this term"></a></dt><dd><p>Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation:</p>
+</dd>
+<dt id="term-datalad.tests.temp.keep">datalad.tests.temp.keep<a class="headerlink" href="#term-datalad.tests.temp.keep" title="Permalink to this term"></a></dt><dd><p>Function rmtemp will not remove temporary file/directory created for testing if this flag is set:</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.tests.ui.backend">datalad.tests.ui.backend<a class="headerlink" href="#term-datalad.tests.ui.backend" title="Permalink to this term"></a></dt><dd><p>Tests UI backend:
+Which UI backend to use
+Default: tests-noninteractive</p>
+</dd>
+<dt id="term-datalad.tests.usecassette">datalad.tests.usecassette<a class="headerlink" href="#term-datalad.tests.usecassette" title="Permalink to this term"></a></dt><dd><p>Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes:</p>
+</dd>
+<dt id="term-datalad.ui.color">datalad.ui.color<a class="headerlink" href="#term-datalad.ui.color" title="Permalink to this term"></a></dt><dd><p>Colored terminal output:
+Enable or disable ANSI color codes in outputs; “on” overrides NO_COLOR environment variable
+Default: auto</p>
+<p>[value must be one of [CMD: (‘on’, ‘off’, ‘auto’) CMD][PY: (‘on’, ‘off’, ‘auto’) PY]]</p>
+</dd>
+<dt id="term-datalad.ui.progressbar">datalad.ui.progressbar<a class="headerlink" href="#term-datalad.ui.progressbar" title="Permalink to this term"></a></dt><dd><p>UI progress bars:
+Default backend for progress reporting
+Default: None</p>
+<p>[value must be one of [CMD: (‘tqdm’, ‘tqdm-ipython’, ‘log’, ‘none’) CMD][PY: (‘tqdm’, ‘tqdm-ipython’, ‘log’, ‘none’) PY]]</p>
+</dd>
+<dt id="term-datalad.ui.suppress-similar-results">datalad.ui.suppress-similar-results<a class="headerlink" href="#term-datalad.ui.suppress-similar-results" title="Permalink to this term"></a></dt><dd><p>Suppress rendering of similar repetitive results:
+If enabled, after a certain number of subsequent results that are identical regarding key properties, such as ‘status’, ‘action’, and ‘type’, additional similar results are not rendered by the common result renderer anymore. Instead, a count of suppressed results is displayed. If disabled, or when not running in an interactive terminal, all results are rendered.
+Default: True</p>
+<p>[value must be convertible to type bool]</p>
+</dd>
+<dt id="term-datalad.ui.suppress-similar-results-threshold">datalad.ui.suppress-similar-results-threshold<a class="headerlink" href="#term-datalad.ui.suppress-similar-results-threshold" title="Permalink to this term"></a></dt><dd><p>Threshold for suppressing similar repetitive results:
+Minimum number of similar results to occur before suppression is considered. See ‘datalad.ui.suppress-similar-results’ for more information.
+Default: 10</p>
+<p>[value must be convertible to type ‘int’]</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="generated/datalad.cmdline.common_args.html" class="btn btn-neutral float-left" title="datalad.cmdline.common_args" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

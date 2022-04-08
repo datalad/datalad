@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -10,64 +10,74 @@
 
 """
 
-import re
+import logging
 import os
 import os.path as op
-
-import logging
-from collections import (
-    OrderedDict,
-)
+import posixpath
+import re
+import warnings
+from collections import OrderedDict
+from collections.abc import Mapping
+from functools import wraps
+from itertools import chain
 from os import linesep
 from os.path import (
-    join as opj,
+    commonprefix,
+    curdir,
+    dirname,
     exists,
     isabs,
-    commonprefix,
-    relpath,
-    dirname,
-    curdir,
+)
+from os.path import join as opj
+from os.path import (
     pardir,
-    sep
+    relpath,
+    sep,
 )
 
-import posixpath
-from functools import wraps
-import warnings
-
-from datalad.log import log_progress
-from datalad.support.due import due, Doi
-
+import datalad.utils as ut
 from datalad import ssh_manager
 from datalad.cmd import (
-    GitWitlessRunner,
-    WitlessProtocol,
     BatchedCommand,
+    GitWitlessRunner,
     NoCapture,
     StdOutErrCapture,
+    WitlessProtocol,
 )
 from datalad.config import (
     parse_gitconfig_dump,
     write_config_section,
 )
-
-import datalad.utils as ut
+from datalad.consts import (
+    ILLEGAL_CHARS_WIN,
+    RESERVED_NAMES_WIN,
+)
+from datalad.core.local.repo import repo_from_path
+from datalad.dataset.gitrepo import GitRepo as CoreGitRepo
+from datalad.dataset.gitrepo import (
+    _get_dot_git,
+    path_based_str_repr,
+)
+from datalad.log import log_progress
+from datalad.support.due import (
+    Doi,
+    due,
+)
 from datalad.utils import (
     Path,
     PurePosixPath,
-    ensure_list,
-    optional_args,
-    on_windows,
-    getpwd,
-    posix_relpath,
     ensure_dir,
-    generate_file_chunks,
+    ensure_list,
     ensure_unicode,
+    generate_file_chunks,
+    getpwd,
     is_interactive,
+    on_windows,
+    optional_args,
+    path_is_subpath,
+    posix_relpath,
 )
 
-# imports from same module:
-from .external_versions import external_versions
 from .exceptions import (
     CapturedException,
     CommandError,
@@ -76,18 +86,14 @@ from .exceptions import (
     InvalidGitRepositoryError,
     NoSuchPathError,
 )
+# imports from same module:
+from .external_versions import external_versions
 from .network import (
     RI,
     PathRI,
-    is_ssh
+    is_ssh,
 )
 from .path import get_parent_paths
-from datalad.core.local.repo import repo_from_path
-from datalad.dataset.gitrepo import (
-    GitRepo as CoreGitRepo,
-    _get_dot_git,
-    path_based_str_repr,
-)
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -97,6 +103,7 @@ _pardirsep = pardir + sep
 lgr = logging.getLogger('datalad.gitrepo')
 
 
+# outside the repo base classes only used in ConfigManager
 def to_options(split_single_char_options=True, **kwargs):
     """Transform keyword arguments into a list of cmdline options
 
@@ -906,16 +913,16 @@ class GitRepo(CoreGitRepo):
 
     @property
     def bare(self):
-        if self.config.getbool("core", "bare") and \
-                self.pathobj == self.dot_git:
-            return True
-        elif not self.config.getbool("core", "bare") and \
-                not self.pathobj == self.dot_git:
-            return False
-        else:
-            raise InvalidGitRepositoryError("GitRepo contains inconsistent hints"
-                                            " on whether or not it is a bare "
-                                            "repository.")
+        """Returns a bool indicating whether the repository is bare
+
+        Importantly, this is not reporting the configuration value
+        of 'core.bare', in order to be usable at a stage where a
+        Repo instance is not yet equipped with a ConfigManager.
+        Instead, it is testing whether the repository path and its
+        "dot_git" are identical. The value of 'core.bare' can be query
+        from the ConfigManager in a fully initialized instance.
+        """
+        return self.pathobj == self.dot_git
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
@@ -928,9 +935,10 @@ class GitRepo(CoreGitRepo):
         ----------
         url : str
         path : str
-        clone_options : dict
-          Key/value pairs of arbitrary options that will be passed on to the
-          underlying call to `git-clone`.
+        clone_options : dict or list
+          Arbitrary options that will be passed on to the underlying call to
+          `git-clone`. This may be a list of plain options or key-value pairs
+          that will be converted to a list of plain options with `to_options`.
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
@@ -984,19 +992,20 @@ class GitRepo(CoreGitRepo):
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
 
-        cmd_base = cls._git_cmd_prefix + ['clone', '--progress']
+        cmd = cls._git_cmd_prefix + ['clone', '--progress']
+        if clone_options:
+            if isinstance(clone_options, Mapping):
+                clone_options = to_options(**clone_options)
+            cmd.extend(clone_options)
+        cmd.extend([url, path])
+
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
-                res = GitWitlessRunner().run(
-                        cmd_base + [url, path] \
-                        + (to_options(**clone_options)
-                           if clone_options else []),
-                        protocol=GitProgress,
-                )
+                res = GitWitlessRunner().run(cmd, protocol=GitProgress)
                 # fish out non-critical warnings by git-clone
                 # (empty repo clone, etc.), all other content is logged
                 # by the progress helper to 'debug'
@@ -1281,7 +1290,7 @@ class GitRepo(CoreGitRepo):
 
         Parameters
         ----------
-        files: str
+        files: list of str
           list of paths to remove
         recursive: False
           whether to allow recursive removal from subdirectories
@@ -1473,7 +1482,7 @@ class GitRepo(CoreGitRepo):
         return [
             str(r.relative_to(self.pathobj))
             for r in self.get_content_info(
-                paths=None, ref=None, untracked='no', eval_file_type=False)
+                paths=None, ref=None, untracked='no')
         ]
 
     def format_commit(self, fmt, commitish=None):
@@ -1800,7 +1809,7 @@ class GitRepo(CoreGitRepo):
         return [
             str(p.relative_to(self.pathobj))
             for p in self.get_content_info(
-                paths=None, ref=branch, untracked='no', eval_file_type=False)
+                paths=None, ref=branch, untracked='no')
             ]
 
     def add_remote(self, name, url, options=None):
@@ -2154,7 +2163,7 @@ class GitRepo(CoreGitRepo):
         """
 
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
-        self.config.set(var, url, where='local', reload=True)
+        self.config.set(var, url, scope='local', reload=True)
 
     def get_branch_commits_(self, branch=None, limit=None, stop=None):
         """Return commit hexshas for a branch
@@ -2243,12 +2252,8 @@ class GitRepo(CoreGitRepo):
         if bool(stdout.strip()):
             # The quick `git status`-based check can give a different answer
             # than `datalad status` for submodules on an adjusted branch.
-            #
-            # TODO: This is almost a self.status() call. Add an eval_file_type
-            # parameter to self.status() and use it here?
             st = self.diffstatus(fr="HEAD" if self.get_hexsha() else None,
-                                 to=None, untracked="normal",
-                                 eval_file_type=False)
+                                 to=None, untracked="normal")
             return any(r.get("state") != "clean" for r in st.values())
         return False
 
@@ -2343,8 +2348,7 @@ class GitRepo(CoreGitRepo):
         for path, props in self.get_content_info(
                 paths=paths,
                 ref=None,
-                untracked='no',
-                eval_file_type=False).items():
+                untracked='no').items():
             if props.get('type', None) != 'dataset':
                 # make sure this method never talks about non-dataset
                 # content
@@ -2373,207 +2377,6 @@ class GitRepo(CoreGitRepo):
         if sorted_:
             xs = sorted(xs, key=lambda x: x["path"])
         return list(xs)
-
-    def add_submodule(self, path, name=None, url=None, branch=None):
-        """Add a new submodule to the repository.
-
-        This will alter the index as well as the .gitmodules file, but will not
-        create a new commit.  If the submodule already exists, no matter if the
-        configuration differs from the one provided, the existing submodule
-        is considered as already added and no further action is performed.
-
-        NOTE: This method does not work with submodules that use git-annex adjusted
-              branches. Use Repo.save() instead.
-
-        Parameters
-        ----------
-        path : str
-          repository-relative path at which the submodule should be located, and
-          which will be created as required during the repository initialization.
-        name : str or None
-          name/identifier for the submodule. If `None`, the `path` will be used
-          as name.
-        url : str or None
-          git-clone compatible URL. If `None`, the repository is assumed to
-          exist, and the url of the first remote is taken instead. This is
-          useful if you want to make an existing repository a submodule of
-          another one.
-        branch : str or None
-          name of branch to be checked out in the submodule. The given branch
-          must exist in the remote repository, and will be checked out locally
-          as a tracking branch. If `None`, remote HEAD will be checked out.
-        """
-        warnings.warn(
-            'GitRepo.add_submodule() is deprecated and will be removed in '
-            'a future release. Use the Dataset method save() instead.',
-            DeprecationWarning
-        )
-
-        if name is None:
-            name = Path(path).as_posix()
-        cmd = ['submodule', 'add', '--name', name]
-        if branch is not None:
-            cmd += ['-b', branch]
-        if url is None:
-            # repo must already exist locally
-            subm = repo_from_path(op.join(self.path, path))
-            # check that it has a commit, and refuse
-            # to operate on it otherwise, or we would get a bastard
-            # submodule that cripples git operations
-            if not subm.get_hexsha():
-                raise InvalidGitRepositoryError(
-                    'cannot add subdataset {} with no commits'.format(subm))
-            # make an attempt to configure a submodule source URL based on the
-            # discovered remote configuration
-            remote, branch = subm.get_tracking_branch()
-            url = subm.get_remote_url(remote) if remote else None
-
-        if url is None:
-            # had no luck with a remote URL
-            if not isabs(path):
-                # need to recode into a relative path "URL" in POSIX
-                # style, even on windows
-                url = posixpath.join(curdir, posix_relpath(path))
-            else:
-                url = path
-        cmd += [url, Path(path).as_posix()]
-        self.call_git(cmd)
-        # record dataset ID if possible for comprehesive metadata on
-        # dataset components within the dataset itself
-        subm_id = GitRepo(op.join(self.path, path)).config.get(
-            'datalad.dataset.id', None)
-        if subm_id:
-            self.call_git(
-                ['config', '--file', '.gitmodules', '--replace-all',
-                 'submodule.{}.datalad-id'.format(name), subm_id])
-        # ensure supported setup
-        _fixup_submodule_dotgit_setup(self, path)
-        # TODO: return value
-
-    def deinit_submodule(self, path, **kwargs):
-        """Deinit a submodule
-
-        Parameters
-        ----------
-        path: str
-            path to the submodule; relative to `self.path`
-        kwargs:
-            see `__init__`
-        """
-        warnings.warn(
-            'GitRepo.deinit_submodule() is deprecated and will be removed in '
-            'a future release. Use call_git() instead.',
-            DeprecationWarning
-        )
-
-        self.call_git(['submodule', 'deinit'] + to_options(**kwargs),
-                      files=[path])
-        # TODO: return value
-
-    def update_submodule(self, path, mode='checkout', init=False):
-        """Update a registered submodule.
-
-        This will make the submodule match what the superproject expects by
-        cloning missing submodules and updating the working tree of the
-        submodules. The "updating" can be done in several ways depending
-        on the value of submodule.<name>.update configuration variable, or
-        the `mode` argument.
-
-        Parameters
-        ----------
-        path : str
-          Identifies which submodule to operate on by it's repository-relative
-          path.
-        mode : {checkout, rebase, merge}
-          Update procedure to perform. 'checkout': the commit recorded in the
-          superproject will be checked out in the submodule on a detached HEAD;
-          'rebase': the current branch of the submodule will be rebased onto
-          the commit recorded in the superproject; 'merge': the commit recorded
-          in the superproject will be merged into the current branch in the
-          submodule.
-        init : bool
-          If True, initialize all submodules for which "git submodule init" has
-          not been called so far before updating.
-          Primarily provided for internal purposes and should not be used directly
-          since would result in not so annex-friendly .git symlinks/references
-          instead of full featured .git/ directories in the submodules
-        """
-        warnings.warn(
-            'GitRepo.update_submodule() is deprecated and will be removed in '
-            'a future release. Use the dataset method update() instead.',
-            DeprecationWarning
-        )
-        if GitRepo.is_valid_repo(self.pathobj / path):
-            subrepo = GitRepo(self.pathobj / path, create=False)
-            subbranch = subrepo.get_active_branch() if subrepo else None
-            try:
-                subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
-            except ValueError:
-                if subrepo.commit_exists("HEAD"):
-                    # Not what we thought it was. Reraise.
-                    raise
-                else:
-                    raise ValueError(
-                        "Cannot add submodule that has an unborn branch "
-                        "checked out: {}"
-                        .format(subrepo.path))
-
-        else:
-            subrepo = None
-            subbranch = None
-            subbranch_hexsha = None
-
-        cmd = ['submodule', 'update', '--%s' % mode]
-        if init:
-            cmd.append('--init')
-            subgitpath = opj(self.path, path, '.git')
-            if not exists(subgitpath):
-                # TODO:  wouldn't with --init we get all those symlink'ed .git/?
-                # At least let's warn
-                lgr.warning(
-                    "Do not use update_submodule with init=True to avoid git creating "
-                    "symlinked .git/ directories in submodules"
-                )
-            #  yoh: I thought I saw one recently but thought it was some kind of
-            #  an artifact from running submodule update --init manually at
-            #  some point, but looking at this code now I worry that it was not
-        self.call_git(cmd, files=[path])
-
-        if not init:
-            return
-
-        # track branch originally cloned, only if we had a valid repo at the start
-        updated_subbranch = subrepo.get_active_branch() if subrepo else None
-        if subbranch and not updated_subbranch:
-            # got into 'detached' mode
-            # trace if current state is a predecessor of the branch_hexsha
-            lgr.debug(
-                "Detected detached HEAD after updating submodule %s which was "
-                "in %s branch before", self.path, subbranch)
-            detached_hexsha = subrepo.get_hexsha()
-            if subrepo.get_merge_base(
-                    [subbranch_hexsha, detached_hexsha]) == detached_hexsha:
-                # TODO: config option?
-                # in all likely event it is of the same branch since
-                # it is an ancestor -- so we could update that original branch
-                # to point to the state desired by the submodule, and update
-                # HEAD to point to that location
-                lgr.info(
-                    "Submodule HEAD got detached. Resetting branch %s to point "
-                    "to %s. Original location was %s",
-                    subbranch, detached_hexsha[:8], subbranch_hexsha[:8]
-                )
-                branch_ref = 'refs/heads/%s' % subbranch
-                subrepo.update_ref(branch_ref, detached_hexsha)
-                assert(subrepo.get_hexsha(subbranch) == detached_hexsha)
-                subrepo.update_ref('HEAD', branch_ref, symbolic=True)
-                assert(subrepo.get_active_branch() == subbranch)
-            else:
-                lgr.warning(
-                    "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
-                    subrepo.path, subbranch, detached_hexsha[:8]
-                )
-        # TODO: return value
 
     def update_ref(self, ref, value, oldvalue=None, symbolic=False):
         """Update the object name stored in a ref "safely".
@@ -2847,7 +2650,7 @@ class GitRepo(CoreGitRepo):
                 f.write('{}\n'.format(attrline))
 
     def get_content_info(self, paths=None, ref=None, untracked='all',
-                         eval_file_type=True):
+                         eval_file_type=None):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2875,11 +2678,9 @@ class GitRepo(CoreGitRepo):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        eval_file_type : bool
-          If True, inspect file type of untracked files, and report annex
-          symlink pointers as type 'file'. This convenience comes with a
-          cost; disable to get faster performance if this information
-          is not needed.
+        eval_file_type :
+          THIS FUNCTIONALITY IS NO LONGER SUPPORTED.
+          Setting this flag has no effect.
 
         Returns
         -------
@@ -2891,13 +2692,6 @@ class GitRepo(CoreGitRepo):
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
-
-            Note that the reported type will not always match the type of
-            content committed to Git, rather it will reflect the nature
-            of the content minus platform/mode-specifics. For example,
-            a symlink to a locked annexed file on Unix will have a type
-            'file', reported, while a symlink to a file in Git or directory
-            will be of type 'symlink'.
 
           `gitshasum`
             SHASUM of the item as tracked by Git, or None, if not
@@ -2911,6 +2705,10 @@ class GitRepo(CoreGitRepo):
           repository)
         """
         lgr.debug('%s.get_content_info(...)', self)
+        if eval_file_type is not None:
+            warnings.warn(
+                "GitRepo.get_content_info(eval_file_type=) no longer supported",
+                DeprecationWarning)
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
@@ -2919,7 +2717,8 @@ class GitRepo(CoreGitRepo):
             # and Git always reports POSIX paths
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
-            paths = [ut.PurePosixPath(p) for p in paths]
+            # note: will be list-ified below
+            paths = map(ut.PurePosixPath,  paths)
         elif paths is not None:
             return info
 
@@ -2976,52 +2775,16 @@ class GitRepo(CoreGitRepo):
             raise
         lgr.debug('Done query repo: %s', cmd)
 
-        if not eval_file_type:
-            _get_link_target = None
-        elif ref:
-            def _read_symlink_target_from_catfile(lines):
-                # it is always the second line, all checks done upfront
-                header = lines.readline()
-                if header.rstrip().endswith('missing'):
-                    # something we do not know about, should not happen
-                    # in real use, but guard against to avoid stalling
-                    return ''
-                return lines.readline().rstrip()
-
-            _get_link_target = BatchedCommand(
-                ['git', 'cat-file', '--batch'],
-                path=self.path,
-                output_proc=_read_symlink_target_from_catfile,
-            )
-        else:
-            def try_readlink(path):
-                try:
-                    return os.readlink(path)
-                except OSError:
-                    # readlink will fail if the symlink reported by ls-files is
-                    # not in the working tree (it could be removed or
-                    # unlocked). Fall back to a slower method.
-                    return str(Path(path).resolve())
-
-            _get_link_target = try_readlink
-
-        try:
-            self._get_content_info_line_helper(
-                ref,
-                info,
-                stdout.split('\0'),
-                props_re,
-                _get_link_target)
-        finally:
-            if ref and _get_link_target:
-                # cancel batch process
-                _get_link_target.close()
+        self._get_content_info_line_helper(
+            ref,
+            info,
+            stdout.split('\0'),
+            props_re)
 
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
-    def _get_content_info_line_helper(self, ref, info, lines,
-                                      props_re, get_link_target):
+    def _get_content_info_line_helper(self, ref, info, lines, props_re):
         """Internal helper of get_content_info() to parse Git output"""
         mode_type_map = {
             '100644': 'file',
@@ -3055,20 +2818,6 @@ class GitRepo(CoreGitRepo):
                 inf['gitshasum'] = props.group('sha')
                 inf['type'] = mode_type_map.get(
                     props.group('type'), props.group('type'))
-                if get_link_target and inf['type'] == 'symlink' and \
-                        ((ref is None and '.git/annex/objects' in \
-                          ut.Path(
-                            get_link_target(str(self.pathobj / path))
-                          ).as_posix()) or \
-                         (ref and \
-                          '.git/annex/objects' in get_link_target(
-                              u'{}:{}'.format(
-                                  ref, str(path))))
-                        ):
-                    # report annex symlink pointers as file, their
-                    # symlink-nature is a technicality that is dependent
-                    # on the particular mode annex is in
-                    inf['type'] = 'file'
 
                 if ref and inf['type'] == 'file':
                     inf['bytesize'] = int(props.group('size'))
@@ -3176,14 +2925,21 @@ class GitRepo(CoreGitRepo):
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   eval_submodule_state='full', eval_file_type=True,
+                   eval_submodule_state='full', eval_file_type=None,
                    _cache=None):
         """Like diff(), but reports the status of 'clean' content too.
 
         It supports an additional submodule evaluation state 'global'.
         If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
-        it can."""
+        it can.
+
+        The eval_file_type parameter is ignored.
+        """
+        if eval_file_type is not None:
+            warnings.warn(
+                "GitRepo.diffstatus(eval_file_type=) no longer supported",
+                DeprecationWarning)
 
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
@@ -3195,7 +2951,7 @@ class GitRepo(CoreGitRepo):
         if paths:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
-            paths = [ut.Path(p) for p in paths]
+            paths = map(ut.Path, paths)
             paths = [
                 p.relative_to(self.pathobj) if p.is_absolute() else p
                 for p in paths
@@ -3212,8 +2968,7 @@ class GitRepo(CoreGitRepo):
                 to_state = _cache[key]
             else:
                 to_state = self.get_content_info(
-                    paths=paths, ref=None, untracked=untracked,
-                    eval_file_type=eval_file_type)
+                    paths=paths, ref=None, untracked=untracked)
                 _cache[key] = to_state
             # we want Git to tell us what it considers modified and avoid
             # reimplementing logic ourselves
@@ -3221,10 +2976,15 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 modified = _cache[key]
             else:
+                # from Git 2.31.0 onwards ls-files has --deduplicate
+                # by for backward compatibility keep doing deduplication here
                 modified = set(
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self.call_git_items_(
-                        ['ls-files', '-z', '-m'],
+                        # we must also look for deleted files, for the logic
+                        # below to work. Only from Git 2.31.0 would they be
+                        # included with `-m` alone
+                        ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
                         files=[str(p) for p in paths] if paths else None,
                         sep='\0',
@@ -3236,8 +2996,7 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 to_state = _cache[key]
             else:
-                to_state = self.get_content_info(
-                    paths=paths, ref=to, eval_file_type=eval_file_type)
+                to_state = self.get_content_info(paths=paths, ref=to)
                 _cache[key] = to_state
             # we do not need worktree modification detection in this case
             modified = None
@@ -3247,8 +3006,7 @@ class GitRepo(CoreGitRepo):
             from_state = _cache[key]
         else:
             if fr:
-                from_state = self.get_content_info(
-                    paths=paths, ref=fr, eval_file_type=eval_file_type)
+                from_state = self.get_content_info(paths=paths, ref=fr)
             else:
                 # no ref means from nothing
                 from_state = {}
@@ -3339,7 +3097,6 @@ class GitRepo(CoreGitRepo):
                 paths=None,
                 untracked=untracked,
                 eval_submodule_state='global',
-                eval_file_type=False,
                 _cache=_cache) if st['state'] == 'clean' else 'modified'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
@@ -3466,10 +3223,6 @@ class GitRepo(CoreGitRepo):
             # we want to be able to add items down the line
             # make sure to detach from prev. owner
             status = _status.copy()
-        status = OrderedDict(
-            (k, v) for k, v in status.items()
-            if v.get('state', None) != 'clean'
-        )
         return status
 
     def get_staged_paths(self):
@@ -3486,14 +3239,14 @@ class GitRepo(CoreGitRepo):
             lgr.debug(CapturedException(e))
             return []
 
-    def _save_post(self, message, status, partial_commit, amend=False,
+    def _save_post(self, message, files, partial_commit, amend=False,
                    allow_empty=False):
         # helper to commit changes reported in status
 
         # TODO remove pathobj stringification when commit() can
         # handle it
         to_commit = [str(f.relative_to(self.pathobj))
-                     for f, props in status.items()] \
+                     for f in files] \
                     if partial_commit else None
         if not partial_commit or to_commit or allow_empty or \
                 (amend and message):
@@ -3554,9 +3307,37 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
-        status = self._save_pre(paths, _status, **kwargs)
+        status = self._save_pre(paths, _status, **kwargs) or {}
         amend = kwargs.get('amend', False)
-        if not status and not (message and amend):
+
+        # Sort status into status by state with explicit list of states
+        # (excluding clean we do not care about) we expect to be present
+        # and which we know of (unless None), and modified_or_untracked hybrid
+        # since it is used below
+        status_state = {
+            k: {}
+            for k in (None,  # not cared of explicitly here
+                      'added',  # not cared of explicitly here
+                      # 'clean'  # not even wanted since nothing to do about those
+                      'deleted',
+                      'modified',
+                      'untracked',
+                      'modified_or_untracked',  # hybrid group created here
+                      )}
+        for f, props in status.items():
+            state = props.get('state', None)
+            if state == 'clean':
+                # we don't care about clean
+                continue
+            status_state[state][f] = props
+            # The hybrid one to retain the same order as in original status
+            if state in ('modified', 'untracked'):
+                status_state['modified_or_untracked'][f] = props
+        del status  # to ensure it is no longer used
+
+        # TODO: check on those None's -- may be those are also "nothing to worry about"
+        # and we could just return?
+        if not any(status_state.values()) and not (message and amend):
             # all clean, nothing todo
             lgr.debug('Nothing to save in %r, exiting early', self)
             return
@@ -3575,16 +3356,14 @@ class GitRepo(CoreGitRepo):
             # TODO remove pathobj stringification when delete() can
             # handle it
             str(f.relative_to(self.pathobj))
-            for f, props in status.items()
-            if props.get('state', None) == 'deleted' and
+            for f, props in status_state['deleted'].items()
             # staged deletions have a gitshasum reported for them
             # those should not be processed as git rm will error
             # due to them being properly gone already
-            not props.get('gitshasum', None)]
+            if not props.get('gitshasum', None)]
         vanished_subds = any(
-            props.get('type', None) == 'dataset' and
-            props.get('state', None) == 'deleted'
-            for f, props in status.items())
+            props.get('type', None) == 'dataset'
+            for props in status_state['deleted'].values())
         if to_remove:
             for r in self.remove(
                     to_remove,
@@ -3602,17 +3381,17 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-        # TODO this additional query should not be, base on status as given
+        # TODO this additional query should not be, based on status as given
         # if anyhow possible, however, when paths are given, status may
         # not contain all required information. In case of path=None AND
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
         submodule_change = False
-        untracked_dirs = [f.relative_to(self.pathobj)
-                          for f, props in status.items()
-                          if props.get('state', None) == 'untracked' and
-                          props.get('type', None) == 'directory']
+        untracked_dirs = [
+            f.relative_to(self.pathobj)
+            for f, props in status_state['untracked'].items()
+            if props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
             to_add_submodules = [
@@ -3632,9 +3411,8 @@ class GitRepo(CoreGitRepo):
                     yield r
         to_stage_submodules = {
             f: props
-            for f, props in status.items()
-            if props.get('state', None) in ('modified', 'untracked')
-            and props.get('type', None) == 'dataset'}
+            for f, props in status_state['modified_or_untracked'].items()
+            if props.get('type', None) == 'dataset'}
         if to_stage_submodules:
             lgr.debug(
                 '%i submodule path(s) to stage in %r %s',
@@ -3650,9 +3428,11 @@ class GitRepo(CoreGitRepo):
             # the config has changed too
             self.config.reload()
             # need to include .gitmodules in what needs saving
-            status[self.pathobj.joinpath('.gitmodules')] = dict(
-                type='file', state='modified')
-            if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
+            f = self.pathobj.joinpath('.gitmodules')
+            status_state['modified_or_untracked'][f] = \
+                status_state['modified'][f] = \
+                dict(type='file', state='modified')
+            if hasattr(self, 'uuid') and not kwargs.get('git', False):
                 # we cannot simply hook into the coming add-call
                 # as this would go to annex, so make a dedicted git-add
                 # call to ensure .gitmodules is not annexed
@@ -3667,29 +3447,121 @@ class GitRepo(CoreGitRepo):
             # TODO remove pathobj stringification when add() can
             # handle it
             str(f.relative_to(self.pathobj)): props
-            for f, props in status.items()
-            if (props.get('state', None) in ('modified', 'untracked') and
-                not (f in to_add_submodules or f in to_stage_submodules))}
+            for f, props in status_state['modified_or_untracked'].items()
+            if not (f in to_add_submodules or f in to_stage_submodules)}
         if to_add:
+            compat_config = \
+                self.config.obtain("datalad.save.windows-compat-warning")
+            to_add, problems = self._check_for_win_compat(to_add, compat_config)
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
-            for r in self._save_add(
-                    to_add,
-                    git_opts=None,
-                    **{k: kwargs[k] for k in kwargs
-                       if k in (('git',) if hasattr(self, 'annexstatus')
-                                else tuple())}):
-                yield r
+
+            if to_add:
+                yield from self._save_add(
+                        to_add,
+                        git_opts=None,
+                        **{k: kwargs[k] for k in kwargs
+                           if k in (('git',) if hasattr(self, 'uuid')
+                                    else tuple())})
+            if problems:
+                from datalad.interface.results import get_status_dict
+                msg = \
+                    'Incompatible name for Windows systems; disable with ' \
+                    'datalad.save.windows-compat-warning.',
+                for path in problems:
+                    yield get_status_dict(
+                        action='save',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(path)),
+                        status='impossible',
+                        message=msg,
+                        logger=lgr)
+
+
+        # https://github.com/datalad/datalad/issues/6558
+        # file could have become a directory. Unfortunately git
+        # would then mistakenly refuse to commit if that old path is also
+        # given to commit, so we better filter it out
+        if status_state['deleted'] and status_state['added']:
+            # check if any "deleted" is a directory now. Then for those
+            # there should be some other path under that directory in 'added'
+            for f in [_ for _ in status_state['deleted'] if _.is_dir()]:
+                # this could potentially be expensive if lots of files become
+                # directories, but it is unlikely to happen often
+                # Note: PurePath.is_relative_to was added in 3.9 and seems slowish
+                # path_is_subpath faster, also if comparing to "in f.parents"
+                f_str = str(f)
+                if any(path_is_subpath(str(f2), f_str) for f2 in status_state['added']):
+                    status_state['deleted'].pop(f)  # do not bother giving it to commit below in _save_post
 
         # Note, that allow_empty is always ok when we amend. Required when we
         # amend an empty commit while the amendment is empty, too (though
         # possibly different message). If an empty commit was okay before, it's
         # okay now.
-        self._save_post(message, status, need_partial_commit, amend=amend,
+        status_state.pop('modified_or_untracked')  # pop the hybrid state
+        self._save_post(message, chain(*status_state.values()), need_partial_commit, amend=amend,
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
+
+    def _check_for_win_compat(self, files, config):
+        """Check file names for illegal characters or reserved names on Windows
+
+        In the case that a non-Windows-compatible file is detected, warn users
+        about potential interoperability issues.
+
+        Parameters
+        ----------
+        files
+          list of files to add
+        config
+          value of self.config.obtain("datalad.save.windows-compat-warning"),
+          used to choose appropriate behavior. "none" performs no check,
+          "warning" warns in case of incompatibilities, and "error" results in
+          an error result in case of incompatibilities
+        """
+        # don't perform any check when the configuration is set to 'none'
+        if config == 'none':
+            return files, None
+
+        from collections import defaultdict
+        problems = defaultdict(list)
+        for file in files:
+            for part in Path(file).parts:
+                # check every component of the path for incompatibilities
+                if Path(part).stem.upper() in RESERVED_NAMES_WIN:
+                    problems['Elements using a reserved filename:'].append(part)
+                    problems['paths'].append(file)
+                if re.search(ILLEGAL_CHARS_WIN, part):
+                    problems['Elements with illegal characters:'].append(part)
+                    problems['paths'].append(file)
+                if part.endswith('.'):
+                    problems['Elements ending with a dot:'].append(part)
+                    problems['paths'].append(file)
+                if part.endswith(' '):
+                    problems['Elements ending with a space:'].append(part)
+                    problems['paths'].append(file)
+        if not problems:
+            return files, None
+        msg = \
+            "Some elements of your dataset are not compatible with " \
+            "Windows systems. Disable this check by changing " \
+            "datalad.save.windows-compat-warning or consider renaming " \
+            "the following elements: "
+        for k, v in problems.items():
+            # use the key as an explanation, and report filenames only once
+            msg += f"\n{k} {[*{*v}]}" if k != 'paths' else ''
+        if config == 'warning':
+            lgr.warning(msg)
+            return files, None
+
+        elif config == 'error':
+            # take the problematic files out of to_add
+            for path in [*{*problems['paths']}]:
+                files.pop(path)
+            return files, [*{*problems['paths']}]
 
     def _save_add(self, files, git_opts=None):
         """Simple helper to add files in save()"""
@@ -3733,6 +3605,11 @@ class GitRepo(CoreGitRepo):
         Parameters
         ----------
         paths : list(Path)
+
+        Yields
+        ------
+        dict
+          Result records
         """
         from datalad.interface.results import get_status_dict
 
@@ -3807,11 +3684,9 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-# TODO
-# remove submodule: nope, this is just deinit_submodule + remove
-# status?
 
-
+# used in in the get command and GitRepo.add_submodule(), the
+# latter is not used outside the tests
 def _fixup_submodule_dotgit_setup(ds, relativepath):
     """Implementation of our current of .git in a subdataset
 
@@ -3833,17 +3708,45 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # submodule, if we keep that, any git command will fail
     # after we move .git
     # Ben: Shouldn't we re-setup a possible worktree afterwards?
-    repo.config.unset('core.worktree', where='local')
+    repo.config.unset('core.worktree', scope='local')
     # what we have here is some kind of reference, remove and
     # replace by the target
     os.remove(subds_dotgit)
     # make absolute
     src_dotgit = str(repo.dot_git)
     # move .git
-    from os import rename, listdir, rmdir
+    from os import (
+        listdir,
+        rename,
+        rmdir,
+    )
     ensure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
         rename(opj(src_dotgit, dot_git_entry),
                opj(subds_dotgit, dot_git_entry))
     assert not listdir(src_dotgit)
     rmdir(src_dotgit)
+
+
+# try retro-fitting GitRepo with deprecated functionality
+# must be done last in this file
+try:
+    from datalad_deprecated.gitrepo import DeprecatedGitRepoMethods
+    for symbol in dir(DeprecatedGitRepoMethods):
+        if symbol.startswith('__'):
+            # ignore Python internals
+            continue
+        if hasattr(GitRepo, symbol):
+            lgr.debug(
+                'Not retro-fitted GitRepo with deprecated %s, '
+                'name-space conflict', symbol)
+            # do not override existing symbols
+            continue
+        # assign deprecated symbol to GitRepo
+        setattr(GitRepo, symbol, getattr(DeprecatedGitRepoMethods, symbol))
+        lgr.debug('Retro-fitted GitRepo with deprecated %s', symbol)
+except ImportError as e:
+    ce = CapturedException(e)
+    lgr.debug(
+        'Not retro-fitting GitRepo with deprecated symbols, '
+        'datalad-deprecated package not found')

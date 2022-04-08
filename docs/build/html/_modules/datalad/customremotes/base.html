@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.customremotes.base &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> DataLad
+            <img src="../../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>datalad.customremotes.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for datalad.customremotes.base</h1><div class="highlight"><pre>
+<span></span><span class="c1"># emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-</span>
+<span class="c1"># vi: set ft=python sts=4 ts=4 sw=4 et:</span>
+<span class="c1">### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="c1">#</span>
+<span class="c1">#   See COPYING file distributed along with the datalad package for the</span>
+<span class="c1">#   copyright and license terms.</span>
+<span class="c1">#</span>
+<span class="c1">### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="sd">&quot;&quot;&quot;Base classes to custom git-annex remotes (e.g. extraction from archives)&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">absolute_import</span>
+
+<span class="n">__docformat__</span> <span class="o">=</span> <span class="s1">&#39;restructuredtext&#39;</span>
+
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">Counter</span>
+
+<span class="n">lgr</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;datalad.customremotes&#39;</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">annexremote</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RemoteError</span><span class="p">,</span>
+    <span class="n">UnsupportedRequest</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">datalad.customremotes</span> <span class="kn">import</span> <span class="n">SpecialRemote</span>
+
+<span class="kn">from</span> <span class="nn">datalad.ui</span> <span class="kn">import</span> <span class="n">ui</span>
+
+<span class="n">URI_PREFIX</span> <span class="o">=</span> <span class="s2">&quot;dl&quot;</span>
+
+
+<div class="viewcode-block" id="AnnexCustomRemote"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote">[docs]</a><span class="k">class</span> <span class="nc">AnnexCustomRemote</span><span class="p">(</span><span class="n">SpecialRemote</span><span class="p">):</span>
+    <span class="c1"># default properties</span>
+    <span class="n">COST</span> <span class="o">=</span> <span class="mi">100</span>
+    <span class="n">AVAILABILITY</span> <span class="o">=</span> <span class="s2">&quot;LOCAL&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">annex</span><span class="p">):</span>  <span class="c1"># , availability=DEFAULT_AVAILABILITY):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">annex</span><span class="p">)</span>
+        <span class="c1"># TODO self.info = {}, self.configs = {}</span>
+
+        <span class="c1"># instruct annex backend UI to use this remote</span>
+        <span class="k">if</span> <span class="n">ui</span><span class="o">.</span><span class="n">backend</span> <span class="o">==</span> <span class="s1">&#39;annex&#39;</span><span class="p">:</span>
+            <span class="n">ui</span><span class="o">.</span><span class="n">set_specialremote</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="c1"># OPT: a counter to increment upon successful encounter of the scheme</span>
+        <span class="c1"># (ATM only in gen_URLS but later could also be used in other</span>
+        <span class="c1"># requests).  This would allow to consider schemes in order of</span>
+        <span class="c1"># decreasing success instead of arbitrary hardcoded order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheme_hits</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">({</span><span class="n">s</span><span class="p">:</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_SCHEMES</span><span class="p">})</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_get_custom_scheme</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">prefix</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Helper to generate custom datalad URL prefixes</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># prefix which will be used in all URLs supported by this custom remote</span>
+        <span class="c1"># https://tools.ietf.org/html/rfc2718 dictates &quot;URL Schemes&quot; standard</span>
+        <span class="c1"># 2.1.2 suggests that we do use // since all of our URLs will define</span>
+        <span class="c1"># some hierarchical structure.  But actually since we might encode</span>
+        <span class="c1"># additional information (such as size) into the URL, it will not be</span>
+        <span class="c1"># strictly conforming it. Thus we will not use //</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">+</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">URI_PREFIX</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span>  <span class="c1"># if .PREFIX else &#39;&#39;)</span>
+
+    <span class="c1"># Helper methods</span>
+<div class="viewcode-block" id="AnnexCustomRemote.gen_URLS"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.gen_URLS">[docs]</a>    <span class="k">def</span> <span class="nf">gen_URLS</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Yield URL(s) associated with a key, and keep stats on protocols.&quot;&quot;&quot;</span>
+        <span class="n">nurls</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">scheme</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheme_hits</span><span class="o">.</span><span class="n">most_common</span><span class="p">():</span>
+            <span class="n">scheme_</span> <span class="o">=</span> <span class="n">scheme</span> <span class="o">+</span> <span class="s2">&quot;:&quot;</span>
+            <span class="n">scheme_urls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">annex</span><span class="o">.</span><span class="n">geturls</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">scheme_</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">scheme_urls</span><span class="p">:</span>
+                <span class="c1"># note: generator would cease to exist thus not asking</span>
+                <span class="c1"># for URLs for other schemes if this scheme is good enough</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_scheme_hits</span><span class="p">[</span><span class="n">scheme</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">scheme_urls</span><span class="p">:</span>
+                    <span class="n">nurls</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">yield</span> <span class="n">url</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">annex</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processed </span><span class="si">%d</span><span class="s2"> URL(s) for key </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">nurls</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span></div>
+
+    <span class="c1"># Protocol implementation</span>
+<div class="viewcode-block" id="AnnexCustomRemote.initremote"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.initremote">[docs]</a>    <span class="k">def</span> <span class="nf">initremote</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="AnnexCustomRemote.prepare"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.prepare">[docs]</a>    <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="AnnexCustomRemote.transfer_store"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.transfer_store">[docs]</a>    <span class="k">def</span> <span class="nf">transfer_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">local_file</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">UnsupportedRequest</span><span class="p">(</span><span class="s1">&#39;This special remote cannot store content&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AnnexCustomRemote.remove"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.remove">[docs]</a>    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="s2">&quot;Removal of content from urls is not possible&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AnnexCustomRemote.whereis"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.whereis">[docs]</a>    <span class="k">def</span> <span class="nf">whereis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="c1"># All that information is stored in annex itself,</span>
+        <span class="c1"># we can&#39;t complement anything</span>
+        <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="AnnexCustomRemote.getcost"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.getcost">[docs]</a>    <span class="k">def</span> <span class="nf">getcost</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">COST</span></div>
+
+<div class="viewcode-block" id="AnnexCustomRemote.getavailability"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote.getavailability">[docs]</a>    <span class="k">def</span> <span class="nf">getavailability</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">AVAILABILITY</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span></div></div>
+
+
+<span class="c1"># this function only has anecdotal value and is not used anywhere</span>
+<div class="viewcode-block" id="generate_uuids"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.generate_uuids">[docs]</a><span class="k">def</span> <span class="nf">generate_uuids</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Generate UUIDs for our remotes. Even though quick, for</span>
+<span class="sd">    consistency pre-generated and recorded in consts.py&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">uuid</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">remote</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid5</span><span class="p">(</span>
+            <span class="n">uuid</span><span class="o">.</span><span class="n">NAMESPACE_URL</span><span class="p">,</span>
+            <span class="s1">&#39;http://datalad.org/specialremotes/</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">remote</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">remote</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;datalad&#39;</span><span class="p">,</span> <span class="s1">&#39;datalad-archives&#39;</span><span class="p">}</span>
+    <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="init_datalad_remote"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.init_datalad_remote">[docs]</a><span class="k">def</span> <span class="nf">init_datalad_remote</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">remote</span><span class="p">,</span> <span class="n">encryption</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">autoenable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="n">opts</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="sd">&quot;&quot;&quot;Initialize datalad special remote&quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">datalad.consts</span> <span class="kn">import</span> <span class="n">DATALAD_SPECIAL_REMOTES_UUIDS</span>
+    <span class="n">lgr</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Initiating special remote </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">remote</span><span class="p">)</span>
+    <span class="n">remote_opts</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s1">&#39;encryption=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">encryption</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
+        <span class="s1">&#39;type=external&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;autoenable=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">autoenable</span><span class="p">))</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
+        <span class="s1">&#39;externaltype=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">remote</span>
+    <span class="p">]</span>
+    <span class="c1"># use unique uuid for our remotes</span>
+    <span class="c1"># This should help with merges of disconnected repos etc</span>
+    <span class="c1"># ATM only datalad/datalad-archives is expected,</span>
+    <span class="c1"># so on purpose getitem</span>
+    <span class="n">remote_opts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;uuid=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">DATALAD_SPECIAL_REMOTES_UUIDS</span><span class="p">[</span><span class="n">remote</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">repo</span><span class="o">.</span><span class="n">init_remote</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span> <span class="n">remote_opts</span> <span class="o">+</span> <span class="n">opts</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ensure_datalad_remote"><a class="viewcode-back" href="../../../generated/datalad.customremotes.base.html#datalad.customremotes.base.ensure_datalad_remote">[docs]</a><span class="k">def</span> <span class="nf">ensure_datalad_remote</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                          <span class="n">encryption</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">autoenable</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Initialize and enable datalad special remote if it isn&#39;t already.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    repo : AnnexRepo</span>
+<span class="sd">    remote : str, optional</span>
+<span class="sd">        Special remote name. This should be one of the values in</span>
+<span class="sd">        datalad.consts.DATALAD_SPECIAL_REMOTES_UUIDS and defaults to</span>
+<span class="sd">        datalad.consts.DATALAD_SPECIAL_REMOTE.</span>
+<span class="sd">    encryption, autoenable : optional</span>
+<span class="sd">        Passed to `init_datalad_remote`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">datalad.consts</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">DATALAD_SPECIAL_REMOTE</span><span class="p">,</span>
+        <span class="n">DATALAD_SPECIAL_REMOTES_UUIDS</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">remote</span> <span class="o">=</span> <span class="n">remote</span> <span class="ow">or</span> <span class="n">DATALAD_SPECIAL_REMOTE</span>
+
+    <span class="n">uuid</span> <span class="o">=</span> <span class="n">DATALAD_SPECIAL_REMOTES_UUIDS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">remote</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">uuid</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="si">{}</span><span class="s2">&#39; is not a known datalad special remote: </span><span class="si">{}</span><span class="s2">&quot;</span>
+                         <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span>
+                                 <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">DATALAD_SPECIAL_REMOTES_UUIDS</span><span class="p">)))</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">repo</span><span class="o">.</span><span class="n">get_special_remotes</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">uuid</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+        <span class="n">init_datalad_remote</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">remote</span><span class="p">,</span>
+                            <span class="n">encryption</span><span class="o">=</span><span class="n">encryption</span><span class="p">,</span> <span class="n">autoenable</span><span class="o">=</span><span class="n">autoenable</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">repo</span><span class="o">.</span><span class="n">is_special_annex_remote</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">check_if_known</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;datalad special remote &#39;</span><span class="si">%s</span><span class="s2">&#39; is already enabled&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;datalad special remote &#39;</span><span class="si">%s</span><span class="s2">&#39; found. Enabling&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="n">repo</span><span class="o">.</span><span class="n">enable_remote</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

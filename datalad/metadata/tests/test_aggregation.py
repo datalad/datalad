@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -81,7 +81,7 @@ def test_basic_aggregate(path):
     assert_repo_status(base.path)
     direct_meta = base.metadata(recursive=True, return_type='list')
     # loose the deepest dataset
-    sub.uninstall('subsub', check=False)
+    sub.drop('subsub', what='all', reckless='kill', recursive=True)
     # no we should eb able to reaggregate metadata, and loose nothing
     # because we can aggregate aggregated metadata of subsub from sub
     base.aggregate_metadata(recursive=True, update_mode='all')
@@ -91,7 +91,7 @@ def test_basic_aggregate(path):
         print(d['path'], a['path'])
         assert_dict_equal(d, a)
     # no we can throw away the subdataset tree, and loose no metadata
-    base.uninstall('sub', recursive=True, check=False)
+    base.drop('sub', what='all', reckless='kill', recursive=True)
     assert(not sub.is_installed())
     assert_repo_status(base.path)
     # same result for aggregate query than for (saved) direct query
@@ -138,13 +138,6 @@ def test_aggregate_query(path):
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
     eq_({'homepage': 'http://top.example.com'}, res[0]['metadata'])
-    # when no reference dataset is given the command will report the
-    # aggregated metadata as it is recorded in the dataset that is the
-    # closest parent on disk
-    ds.create('sub', force=True)
-    res = metadata(opj(path, 'sub', 'deep', 'some'), reporton='datasets')
-    assert_result_count(res, 1)
-    eq_({'homepage': 'http://sub.example.com'}, res[0]['metadata'])
     # when a reference dataset is given, it will be used as the metadata
     # provider
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -9,26 +9,30 @@
 """
 """
 
-from collections import namedtuple
-
 import json
+import logging
+import os
+import re
 import threading
+import warnings
+from collections import namedtuple
 from fasteners import InterProcessLock
-from functools import lru_cache
-import datalad
-from datalad.consts import (
-    DATASET_CONFIG_FILE,
+from functools import (
+    lru_cache,
+    wraps,
 )
-from datalad.cmd import (
-    GitWitlessRunner,
+from pathlib import Path
+
+
+import datalad
+from datalad.consts import DATASET_CONFIG_FILE
+from datalad.runner import (
+    CommandError,
+    GitRunner,
+    KillOutput,
     StdOutErrCapture,
 )
 
-import re
-import os
-from pathlib import Path
-
-import logging
 lgr = logging.getLogger('datalad.config')
 
 # git-config key syntax with a section and a subsection
@@ -44,15 +48,18 @@ cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
 
-_where_reload_doc = """
-        where : {'dataset', 'local', 'global', 'override'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
+_scope_reload_doc = """
+        scope : {'branch', 'local', 'global', 'override'}, optional
+          Indicator which configuration file to modify. 'branch' indicates the
           persistent configuration in .datalad/config of a dataset; 'local'
           the configuration of a dataset's Git repository in .git/config;
           'global' refers to the general configuration that is not specific to
           a single repository (usually in $USER/.gitconfig); 'override'
           limits the modification to the ConfigManager instance, and the
           assigned value overrides any setting from any other source.
+          Note: 'dataset' is being DEPRECATED in favor of 'branch'.
+        where: {'branch', 'local', 'global', 'override'}, optional
+          DEPRECATED, use 'scope'.
         reload : bool
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
@@ -68,15 +75,38 @@ _stat_result = namedtuple('_stat_result', 'st_ino st_size st_ctime st_mtime')
 @lru_cache()
 def get_git_version(runner=None):
     """Return version of available git"""
-    runner = runner or GitWitlessRunner()
+    runner = runner or GitRunner()
     return runner.run('git version'.split(),
                       protocol=StdOutErrCapture)['stdout'].split()[2]
 
 
-def _where_reload(obj):
+def _scope_reload(obj):
     """Helper decorator to simplify providing repetitive docstring"""
-    obj.__doc__ = obj.__doc__ % _where_reload_doc
+    obj.__doc__ = obj.__doc__ % _scope_reload_doc
     return obj
+
+
+#
+# TODO: remove when deprecated 'where' is removed. Some time >= 0.17
+#
+def _where_to_scope(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if 'where' in kwargs:
+            if 'scope' in kwargs:
+                raise ValueError("Do not specify both 'scope' and DEPRECATED 'where'")
+            kwargs = kwargs.copy()
+            where = kwargs.pop('where')
+            if where == 'dataset':
+                warnings.warn("'where=\"dataset\"' is deprecated, use 'scope=\"branch\"' instead",
+                              DeprecationWarning)
+                where = 'branch'
+            else:
+                warnings.warn("'where' is deprecated, use 'scope' instead",
+                              DeprecationWarning)
+            kwargs['scope'] = where
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
@@ -107,9 +137,11 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     --------
     dict, set
       Configuration items are returned as key/value pairs in a dictionary.
-      The second tuple-item will be a set of path objects comprising all
-      source files, if origin information was included in the dump
-      (--show-origin). An empty set is returned otherwise.
+      The second tuple-item will be a set of identifiers comprising all
+      source files/blobs, if origin information was included
+      in the dump (--show-origin). An empty set is returned otherwise.
+      For actual files a Path object is included in the set, for a git-blob
+      a Git blob ID prefixed with 'blob:' is reported.
     """
     dct = {}
     fileset = set()
@@ -128,6 +160,10 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
                 break
             if line.startswith('command line:'):
                 # no origin that we could as a pathobj
+                break
+            if line.startswith('blob:'):
+                # take verbatim to allow distinguishing files from blobs
+                fileset.add(line)
                 break
             # try getting key/value pair from the present chunk
             k, v = _gitcfg_rec_to_keyvalue(line)
@@ -254,15 +290,18 @@ class ConfigManager(object):
       this dataset's configuration file (which will be created on demand)
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
-    source : {'any', 'local', 'dataset', 'dataset-local'}, optional
-      Which sources of configuration setting to consider. If 'dataset',
+    source : {'any', 'local', 'branch', 'branch-local'}, optional
+      Which sources of configuration setting to consider. If 'branch',
       configuration items are only read from a dataset's persistent
-      configuration file, if any is present (the one in ``.datalad/config``, not
+      configuration file in current branch, if any is present
+      (the one in ``.datalad/config``, not
       ``.git/config``); if 'local', any non-committed source is considered
       (local and global configuration in Git config's terminology);
-      if 'dataset-local', persistent dataset configuration and local, but
-      not global or system configuration are considered; if 'any'
+      if 'branch-local', persistent configuration in current dataset branch
+      and local, but not global or system configuration are considered; if 'any'
       all possible sources of configuration are considered.
+      Note: 'dataset' and 'dataset-local' are deprecated in favor of 'branch'
+      and 'branch-local'.
     """
 
     _checked_git_identity = False
@@ -275,7 +314,15 @@ class ConfigManager(object):
     _run_lock = threading.Lock()
 
     def __init__(self, dataset=None, overrides=None, source='any'):
-        if source not in ('any', 'local', 'dataset', 'dataset-local'):
+        # TODO: remove along with the removal of deprecated 'where'
+        if source in ('dataset', 'dataset-local'):
+            source_new = source.replace('dataset', 'branch')
+            warnings.warn("'source=\"%s\"' is deprecated, use 'source=\"%s\"' instead"
+                          % (source, source_new),
+                          DeprecationWarning)
+            source = source_new
+
+        if source not in ('any', 'local', 'branch', 'branch-local'):
             raise ValueError(
                 'Unknown ConfigManager(source=) setting: {}'.format(source))
         store = dict(
@@ -292,7 +339,7 @@ class ConfigManager(object):
             # populated with info from git
             git=store,
             # only populated with info from committed dataset config
-            dataset=store.copy(),
+            branch=store.copy(),
         )
         # merged representation (the only one that existed pre datalad 0.14)
         # will be built on initial reload
@@ -302,6 +349,7 @@ class ConfigManager(object):
         self._repo_pathobj = None
         if dataset:
             if hasattr(dataset, 'dot_git'):
+                # `dataset` is actually a Repo instance
                 self._repo_dot_git = dataset.dot_git
                 self._repo_pathobj = dataset.pathobj
             elif dataset.repo:
@@ -318,9 +366,9 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            if source in ('dataset', 'dataset-local'):
+            if source in ('branch', 'branch-local'):
                 raise ValueError(
-                    'ConfigManager configured to read dataset only, '
+                    'ConfigManager configured to read from a branch of a dataset only, '
                     'but no dataset given')
             # The caller didn't specify a repository. Unset the git directory
             # when calling 'git config' to prevent a repository in the current
@@ -332,6 +380,7 @@ class ConfigManager(object):
         self._runner = None
         if dataset is not None:
             if hasattr(dataset, '_git_runner'):
+                # `dataset` is actually a Repo instance
                 self._runner = dataset._git_runner
             elif dataset.repo:
                 self._runner = dataset.repo._git_runner
@@ -340,7 +389,7 @@ class ConfigManager(object):
                 # to pick up the right config files
                 run_kwargs['cwd'] = dataset.path
         if self._runner is None:
-            self._runner = GitWitlessRunner(**run_kwargs)
+            self._runner = GitRunner(**run_kwargs)
 
         self.reload(force=True)
 
@@ -378,19 +427,40 @@ class ConfigManager(object):
 
         # figure out what needs to be reloaded at all
         to_run = {}
-        # committed dataset config
-        dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE \
-            if self._repo_pathobj else None
-        if (self._src_mode != 'local' and
-                dataset_cfgfile and
-                dataset_cfgfile.exists()) and (
-                force or self._need_reload(self._stores['dataset'])):
-            to_run['dataset'] = run_args + ['--file', str(dataset_cfgfile)]
+        # committed branch config
+        # well, actually not necessarily committed
 
-        if self._src_mode != 'dataset' and (
+        if self._src_mode != 'local' and self._repo_pathobj:
+            # we have to read the branch config from this existing repo
+            if self._repo_dot_git == self._repo_pathobj:
+                # this is a bare repo, we go with the default HEAD,
+                # if it has a config
+                try:
+                    # will blow if absent
+                    self._runner.run([
+                        'git', 'cat-file', '-e', 'HEAD:.datalad/config'],
+                        protocol=KillOutput)
+                    to_run['branch'] = run_args + [
+                        '--blob', 'HEAD:.datalad/config']
+                except CommandError:
+                    # all good, just no branch config
+                    pass
+            else:
+                # non-bare repo
+                # we could use the same strategy as for bare repos, and rely
+                # on the committed config, however, for now we must pay off
+                # the sins of the past and work with the file at hand
+                dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE
+                if dataset_cfgfile.exists() and (
+                        force or self._need_reload(self._stores['branch'])):
+                    # we have the file and are forced or encourages to (re)load
+                    to_run['branch'] = run_args + [
+                        '--file', str(dataset_cfgfile)]
+
+        if self._src_mode != 'branch' and (
                 force or self._need_reload(self._stores['git'])):
             to_run['git'] = run_args + ['--local'] \
-                if self._src_mode == 'dataset-local' \
+                if self._src_mode == 'branch-local' \
                 else run_args
 
         # reload everything that was found todo
@@ -401,14 +471,14 @@ class ConfigManager(object):
         # always update the merged representation, even if we did not reload
         # anything from a file. ENV or overrides could change independently
         # start with the commit dataset config
-        merged = self._stores['dataset']['cfg'].copy()
+        merged = self._stores['branch']['cfg'].copy()
         # local config always takes precedence
         merged.update(self._stores['git']['cfg'])
         # superimpose overrides
         merged.update(self.overrides)
         # override with environment variables, unless we only want to read the
         # dataset's commit config
-        if self._src_mode != 'dataset':
+        if self._src_mode != 'branch':
             _update_from_env(merged)
         self._merged_store = merged
 
@@ -439,20 +509,32 @@ class ConfigManager(object):
         store['stats'] = self._get_stats(store)
         return store
 
-    @staticmethod
-    def _get_stats(store):
+    def _get_stats(self, store):
         stats = {}
         for f in store['files']:
-            if f.exists:
-                stat = f.stat()
-                stats[f] = _stat_result(stat.st_ino, stat.st_size, stat.st_ctime, stat.st_mtime)
+            if isinstance(f, Path):
+                if f.exists():
+                    stat = f.stat()
+                    stats[f] = _stat_result(
+                        stat.st_ino,
+                        stat.st_size,
+                        stat.st_ctime,
+                        stat.st_mtime)
+                else:
+                    stats[f] = None
+            elif f.startswith('blob:'):
+                # we record the specific shasum of the blob
+                stats[f] = self._runner.run(
+                    ['git', 'rev-parse', f[5:]],
+                    protocol=StdOutErrCapture)['stdout'].strip()
             else:
                 stats[f] = None
         return stats
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
-               store=False, where=None, reload=True, **kwargs):
+               store=False, scope=None, reload=True, **kwargs):
         """
         Convenience method to obtain settings interactively, if needed
 
@@ -487,6 +569,7 @@ class ConfigManager(object):
         # could theoretically import all kind of weird things for type
         # conversion
         from datalad.interface.common_cfg import definitions as cfg_defs
+
         # fetch what we know about this variable
         cdef = cfg_defs.get(var, {})
         # type conversion setup
@@ -545,9 +628,9 @@ class ConfigManager(object):
 
         # configure storage destination, if needed
         if store:
-            if where is None and 'destination' in cdef:
-                where = cdef['destination']
-            if where is None:
+            if scope is None and 'destination' in cdef:
+                scope = cdef['destination']
+            if scope is None:
                 raise ValueError(
                     "request to store configuration item '{}', but no "
                     "storage destination specified".format(var))
@@ -581,13 +664,13 @@ class ConfigManager(object):
             # anyway
             # needs string conversion nevertheless, because default could come
             # in as something else
-            self.add(var, '{}'.format(_value), where=where, reload=reload)
+            self.add(var, '{}'.format(_value), scope=scope, reload=reload)
         return value
 
     def __repr__(self):
         # give full list of all tracked config files, plus overrides
         return "ConfigManager({}{})".format(
-            [str(p) for p in self._stores['dataset']['files'].union(
+            [str(p) for p in self._stores['branch']['files'].union(
                 self._stores['git']['files'])],
             ', overrides={!r}'.format(self.overrides) if self.overrides else '',
         )
@@ -641,21 +724,27 @@ class ConfigManager(object):
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
 
-        If `source` is 'dataset', only the committed configuration is queried,
+        If `source` is 'branch', only the committed configuration is queried,
         overrides are applied. In the case of 'local', the committed
         configuration is ignored, but overrides and configuration from
         environment variables are applied as usual.
         """
-        if source not in ('dataset', 'local'):
-            raise ValueError("source must be 'dataset' or 'local'")
+        # TODO: remove along with the removal of deprecated 'where'
         if source == 'dataset':
+            warnings.warn("'source=\"%s\"' is deprecated, use 'source=\"%s\"' instead"
+                          % (source, 'branch'),
+                          DeprecationWarning)
+            source = 'branch'
+        if source not in ('branch', 'local'):
+            raise ValueError("source must be 'branch' or 'local'")
+        if source == 'branch':
             return self.overrides.get(
                 key,
-                self._stores['dataset']['cfg'].get(
+                self._stores['branch']['cfg'].get(
                     key,
                     default))
         else:
-            if key not in self._stores['dataset']['cfg']:
+            if key not in self._stores['branch']['cfg']:
                 # the key is not in the committed config, hence we can
                 # just report based on the merged representation
                 return self.get(key, default)
@@ -668,7 +757,7 @@ class ConfigManager(object):
                     key,
                     self.overrides.get(
                         key,
-                        self._stores['local']['cfg'].get(
+                        self._stores['git']['cfg'].get(
                             key,
                             default)))
 
@@ -770,8 +859,8 @@ class ConfigManager(object):
     #
     # Modify configuration (proxy respective git-config call)
     #
-    @_where_reload
-    def _run(self, args, where=None, reload=False, **kwargs):
+    @_scope_reload
+    def _run(self, args, scope=None, reload=False, **kwargs):
         """Centralized helper to run "git config" calls
 
         Parameters
@@ -782,8 +871,8 @@ class ConfigManager(object):
         **kwargs
           Keywords arguments for Runner's call
         """
-        if where:
-            args = self._get_location_args(where) + args
+        if scope:
+            args = self._get_location_args(scope) + args
         if '-l' in args:
             # we are just reading, no need to reload, no need to lock
             out = self._runner.run(self._config_cmd + args, **kwargs)
@@ -810,29 +899,30 @@ class ConfigManager(object):
             self.reload()
         return out['stdout'], out['stderr']
 
-    def _get_location_args(self, where, args=None):
+    def _get_location_args(self, scope, args=None):
         if args is None:
             args = []
-        cfg_labels = ('dataset', 'local', 'global', 'override')
-        if where not in cfg_labels:
+        cfg_labels = ('branch', 'local', 'global', 'override')
+        if scope not in cfg_labels:
             raise ValueError(
                 "unknown configuration label '{}' (not in {})".format(
-                    where, cfg_labels))
-        if where == 'dataset':
+                    scope, cfg_labels))
+        if scope == 'branch':
             if not self._repo_pathobj:
                 raise ValueError(
                     'ConfigManager cannot store configuration to dataset, '
                     'none specified')
             dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE
             args.extend(['--file', str(dataset_cfgfile)])
-        elif where == 'global':
+        elif scope == 'global':
             args.append('--global')
-        elif where == 'local':
+        elif scope == 'local':
             args.append('--local')
         return args
 
-    @_where_reload
-    def add(self, var, value, where='dataset', reload=True):
+    @_scope_reload
+    @_where_to_scope
+    def add(self, var, value, scope='branch', reload=True):
         """Add a configuration variable and value
 
         Parameters
@@ -843,7 +933,7 @@ class ConfigManager(object):
         value : str
           Variable value
         %s"""
-        if where == 'override':
+        if scope == 'override':
             from datalad.utils import ensure_list
             val = ensure_list(self.overrides.pop(var, None))
             val.append(value)
@@ -852,11 +942,12 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--add', var, value], where=where, reload=reload,
+        self._run(['--add', var, value], scope=scope, reload=reload,
                   protocol=StdOutErrCapture)
 
-    @_where_reload
-    def set(self, var, value, where='dataset', reload=True, force=False):
+    @_scope_reload
+    @_where_to_scope
+    def set(self, var, value, scope='branch', reload=True, force=False):
         """Set a variable to a value.
 
         In opposition to `add`, this replaces the value of `var` if there is
@@ -874,7 +965,7 @@ class ConfigManager(object):
           given `value`. Otherwise raise if multiple entries for `var` exist
           already
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides[var] = value
             if reload:
                 self.reload(force=True)
@@ -883,10 +974,11 @@ class ConfigManager(object):
         from datalad.support.gitrepo import to_options
 
         self._run(to_options(replace_all=force) + [var, value],
-                  where=where, reload=reload, protocol=StdOutErrCapture)
+                  scope=scope, reload=reload, protocol=StdOutErrCapture)
 
-    @_where_reload
-    def rename_section(self, old, new, where='dataset', reload=True):
+    @_scope_reload
+    @_where_to_scope
+    def rename_section(self, old, new, scope='branch', reload=True):
         """Rename a configuration section
 
         Parameters
@@ -896,7 +988,7 @@ class ConfigManager(object):
         new : str
           Name of the section to rename to.
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides = {
                 (new + k[len(old):]) if k.startswith(old + '.') else k: v
                 for k, v in self.overrides.items()
@@ -905,10 +997,11 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--rename-section', old, new], where=where, reload=reload)
+        self._run(['--rename-section', old, new], scope=scope, reload=reload)
 
-    @_where_reload
-    def remove_section(self, sec, where='dataset', reload=True):
+    @_scope_reload
+    @_where_to_scope
+    def remove_section(self, sec, scope='branch', reload=True):
         """Rename a configuration section
 
         Parameters
@@ -916,7 +1009,7 @@ class ConfigManager(object):
         sec : str
           Name of the section to remove.
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides = {
                 k: v
                 for k, v in self.overrides.items()
@@ -926,10 +1019,11 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--remove-section', sec], where=where, reload=reload)
+        self._run(['--remove-section', sec], scope=scope, reload=reload)
 
-    @_where_reload
-    def unset(self, var, where='dataset', reload=True):
+    @_scope_reload
+    @_where_to_scope
+    def unset(self, var, scope='branch', reload=True):
         """Remove all occurrences of a variable
 
         Parameters
@@ -937,14 +1031,14 @@ class ConfigManager(object):
         var : str
           Name of the variable to remove
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides.pop(var, None)
             if reload:
                 self.reload(force=True)
             return
 
         # use unset all as it is simpler for now
-        self._run(['--unset-all', var], where=where, reload=reload)
+        self._run(['--unset-all', var], scope=scope, reload=reload)
 
 
 def rewrite_url(cfg, url):

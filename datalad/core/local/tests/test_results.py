@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -16,11 +16,11 @@ from datalad.tests.utils import (
     swallow_outputs,
 )
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
 )
 
 
-def test_default_result_renderer():
+def test_generic_result_renderer():
     # a bunch of bad cases of results
     testcases = [
         # an empty result will surface
@@ -51,6 +51,6 @@ def test_default_result_renderer():
         ])
     for result, contenttests in testcases:
         with swallow_outputs() as cmo:
-            default_result_renderer(result)
+            generic_result_renderer(result)
             for ctest in contenttests:
                 assert_in(ctest, cmo.out)

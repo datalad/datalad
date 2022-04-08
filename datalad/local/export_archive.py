@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -71,7 +71,11 @@ class ExportArchive(Interface):
     @staticmethod
     @datasetmethod(name='export_archive')
     @eval_results
-    def __call__(dataset, filename=None, archivetype='tar', compression='gz',
+    def __call__(filename=None,
+                 *,
+                 dataset=None,
+                 archivetype='tar',
+                 compression='gz',
                  missing_content='error'):
         import os
         import tarfile

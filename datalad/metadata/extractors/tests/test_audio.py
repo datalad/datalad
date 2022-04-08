@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -48,7 +48,7 @@ target = {
 @with_tempfile(mkdir=True)
 def test_audio(path):
     ds = Dataset(path).create()
-    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'audio', scope='branch')
     copy(
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'audio.mp3'),
         path)

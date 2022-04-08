@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 from datalad.utils import unlink
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.interface.results import get_status_dict
 
 import logging
 lgr = logging.getLogger('datalad.distributed.export_to_figshare')
@@ -247,7 +248,11 @@ class ExportToFigshare(Interface):
     @staticmethod
     @datasetmethod(name='export_to_figshare')
     @eval_results
-    def __call__(dataset, filename=None, missing_content='error', no_annex=False,
+    # TODO*: yet another former plugin with dataset first -- do we need that???
+    def __call__(filename=None,
+                 *,
+                 dataset=None,
+                 missing_content='error', no_annex=False,
                  # TODO: support working with projects and articles within them
                  # project_id=None,
                  article_id=None):
@@ -270,9 +275,14 @@ class ExportToFigshare(Interface):
             )
 
         if dataset.repo.dirty:
-            raise RuntimeError(
-                "Paranoid authors of DataLad refuse to proceed in a dirty repository"
-            )
+            yield get_status_dict(
+                'export_to_figshare',
+                ds=dataset,
+                status='impossible',
+                message=(
+                    'clean dataset required to export; '
+                    'use `datalad status` to inspect unsaved changes'))
+            return
         if filename is None:
             filename = dataset.path
         lgr.info(
@@ -282,7 +292,7 @@ class ExportToFigshare(Interface):
         )
         archive_out = next(
             export_archive(
-                dataset,
+                dataset=dataset,
                 filename=filename,
                 archivetype='zip',
                 missing_content=missing_content,
@@ -335,7 +345,7 @@ class ExportToFigshare(Interface):
             lgr.info("'Registering' %s within annex", fname)
             repo = dataset.repo
             repo.add(fname, git=False)
-            key = repo.get_file_key(fname)
+            key = repo.get_file_annexinfo(fname)['key']
             lgr.info("Adding URL %(download_url)s for it", file_info)
             repo.call_annex([
                 "registerurl", '-c', 'annex.alwayscommit=false',

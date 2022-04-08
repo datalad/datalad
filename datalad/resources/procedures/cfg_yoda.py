@@ -88,4 +88,5 @@ ds.repo.set_gitattributes(
 ds.save(
     path=to_modify,
     message="Apply YODA dataset setup",
+    result_renderer='disabled'
 )

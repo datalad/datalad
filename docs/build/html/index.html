@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataLad — data management and publication multitool &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Change log" href="changelog.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="#" class="icon icon-home"> DataLad
+            <img src="_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+      <li>DataLad — data management and publication multitool</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-data-management-and-publication-multitool">
+<h1>DataLad — data management and publication multitool<a class="headerlink" href="#datalad-data-management-and-publication-multitool" title="Permalink to this headline"></a></h1>
+<p>Welcome to DataLad’s <strong>technical documentation</strong>. Information here is targeting
+software developers and is focused on the Python API and <a class="reference internal" href="glossary.html#term-CLI"><span class="xref std std-term">CLI</span></a>, as well
+as software design, employed technologies, and key features.  Comprehensive
+<strong>user documentation</strong> with information on installation, basic operation,
+support, and (advanced) use case descriptions is available in the <a class="reference external" href="http://handbook.datalad.org">DataLad
+handbook</a>.</p>
+<section id="content">
+<h2>Content<a class="headerlink" href="#content" title="Permalink to this headline"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+</ul>
+</div>
+<section id="concepts-and-technologies">
+<h3>Concepts and technologies<a class="headerlink" href="#concepts-and-technologies" title="Permalink to this headline"></a></h3>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="background.html">Background and motivation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="background.html#vision">Vision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="background.html#technological-foundation-git-annex">Technological foundation: git-annex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="background.html#objective">Objective</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="related.html">Delineation from related solutions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="related.html#data-catalogs">Data catalogs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="related.html#data-delivery-management-middleware">Data delivery/management middleware</a></li>
+<li class="toctree-l2"><a class="reference internal" href="related.html#git-git-annex-datalad">Git/Git-annex/DataLad</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="basics.html">Basic principles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="basics.html#datasets">Datasets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basics.html#basic-command-line-usage">Basic command line usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basics.html#api-principles">API principles</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="credentials.html">Credentials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html#integration-with-git">Integration with Git</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="metadata.html">Metadata</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="metadata.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata.html#supported-metadata-sources">Supported metadata sources</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata.html#metadata-aggregation-and-query">Metadata aggregation and query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata.html#internal-metadata-representation">Internal metadata representation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata.html#vocabulary">Vocabulary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization and extension of functionality</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="customization.html#using-an-extension">Using an extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="customization.html#writing-your-own-extensions">Writing your own extensions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="design/index.html">Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="design/application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+</div>
+</section>
+<section id="commands-and-api">
+<h3>Commands and API<a class="headerlink" href="#commands-and-api" title="Permalink to this headline"></a></h3>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cmdline.html">Command line reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdline.html#extended-set-of-functionality">Extended set of functionality</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modref.html">Python module reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modref.html#support-functionality">Support functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="config.html#global-user-configuration">Global user configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html#local-repository-configuration">Local repository configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html#sticky-dataset-configuration">Sticky dataset configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html#miscellaneous-configuration">Miscellaneous configuration</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="extension-packages">
+<h3>Extension packages<a class="headerlink" href="#extension-packages" title="Permalink to this headline"></a></h3>
+<p>DataLad can be customized and additional functionality can be integrated via
+extensions.  Each extension provides its own documentation:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/crawler">Crawling web resources and automated data distributions</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/neuroimaging">Neuroimaging data and workflows</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/container">Containerized computational environments</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/metalad">Advanced metadata tooling with JSON-LD reporting and additional metadata extractors</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/ukbiobank">Resources for working with the UKBiobank as a DataLad dataset</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/osf">Deposit and retrieve DataLad datasets via the Open Science Framework</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/deprecated">Functionality that has been phased out of the core package</a></p></li>
+<li><p><a class="reference external" href="http://docs.datalad.org/projects/mihextras">Special interest functionality or drafts of future additions to DataLad proper</a></p></li>
+</ul>
+</section>
+<section id="indices-and-tables">
+<h3>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline"></a></h3>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="changelog.html" class="btn btn-neutral float-right" title="Change log" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

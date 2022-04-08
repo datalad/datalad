@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -62,7 +62,6 @@ def _test_bare_git_version_1(host, dspath, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
@@ -83,10 +82,7 @@ def _test_bare_git_version_1(host, dspath, store):
     create_store(io, store, '1')
     # set up the dataset location, too.
     # Note: Dataset layout version 1 (dirhash lower):
-    create_ds_in_store(io, store, ds.id, '1', '1')
-    # Avoid triggering a git-annex safety check. See gh-5253.
-    assert objdir.is_absolute()
-    io.remove_dir(objdir)
+    create_ds_in_store(io, store, ds.id, '1', '1', init_obj_tree=False)
 
     # Now, let's have the bare repo as a git remote and use it with annex
     git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
@@ -170,7 +166,6 @@ def _test_bare_git_version_2(host, dspath, store):
     store = Path(store)
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
-    ds.save()
 
     bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
@@ -229,8 +224,8 @@ def _test_bare_git_version_2(host, dspath, store):
                         error_message='** Based on the location log, one.txt\n'
                                       '** was expected to be present, '
                                       'but its content is missing.')
-    assert_result_count(fsck_res, 1, status='ok')
-    eq_(len(fsck_res), 2)
+    assert_result_count(fsck_res, 3, status='ok')
+    eq_(len(fsck_res), 4)
     eq_(len(ds.repo.whereis('one.txt')), 1)
 
 
@@ -268,7 +263,6 @@ def test_bare_git_version_2():
 #
 #     ds = create(origin)
 #     populate_dataset(ds)
-#     ds.save()
 #     assert_repo_status(ds.path)
 #
 #     # add the ria remote:

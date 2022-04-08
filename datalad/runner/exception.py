@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -10,6 +10,11 @@
 """
 
 import logging
+from typing import (
+    Dict,
+    List,
+)
+
 
 lgr = logging.getLogger('datalad.runner.exception')
 
@@ -18,7 +23,7 @@ class CommandError(RuntimeError):
     """Thrown if a command call fails.
 
     Note: Subclasses should override `to_str` rather than `__str__` because
-    `to_str` is called directly in datalad.cmdline.main.
+    `to_str` is called directly in datalad.cli.main.
     """
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
@@ -33,7 +38,7 @@ class CommandError(RuntimeError):
         self.kwargs = kwargs
 
     def to_str(self, include_output=True):
-        from .utils import (
+        from datalad.utils import (
             ensure_unicode,
             join_cmdline,
         )
@@ -76,7 +81,7 @@ class CommandError(RuntimeError):
         return self.to_str()
 
 
-def _format_json_error_messages(recs):
+def _format_json_error_messages(recs: List[Dict]):
     # there could be many, condense
     msgs = {}
     for r in recs:

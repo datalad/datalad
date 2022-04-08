@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -161,7 +161,7 @@ class ExternalVersions(object):
     }
     _INTERESTING = (
         'annexremote',
-        'appdirs',
+        'platformdirs',
         'boto',
         'exifread',
         'git',
@@ -176,7 +176,6 @@ class ExternalVersions(object):
         'cmd:7z',
         'requests',
         'scrapy',
-        'wrapt',
     )
 
     def __init__(self):

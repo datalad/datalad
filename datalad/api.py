@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
+import datalad
 from datalad.coreapi import *
 
 
@@ -35,44 +36,33 @@ def _command_summary():
     return "\n".join(get_cmd_summaries(grp_short_descriptions, groups))
 
 
-__doc__ += "\n\n{}".format(_command_summary())
+if not datalad.in_librarymode():
+    __doc__ += "\n\n{}".format(_command_summary())
 
 
 def _generate_extension_api():
     """Auto detect all available extensions and generate an API from them
     """
-    from importlib import import_module
-    from pkg_resources import iter_entry_points
-    from .interface.base import get_api_name
-    from datalad.support.exceptions import CapturedException
+    from datalad.support.entrypoints import iter_entrypoints
+    from datalad.interface.base import (
+        get_api_name,
+        load_interface,
+    )
 
     import logging
     lgr = logging.getLogger('datalad.api')
 
-    for entry_point in iter_entry_points('datalad.extensions'):
-        try:
-            lgr.debug(
-                'Loading entrypoint %s from datalad.extensions for API building',
-                entry_point.name)
-            grp_descr, interfaces = entry_point.load()
-            lgr.debug(
-                'Loaded entrypoint %s from datalad.extensions',
-                entry_point.name)
-        except Exception as e:
-            ce = CapturedException(e)
-            lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, ce)
-            continue
-
+    for ename, _, (grp_descr, interfaces) in iter_entrypoints(
+            'datalad.extensions', load=True):
         for intfspec in interfaces:
             # turn the interface spec into an instance
-            mod = import_module(intfspec[0])
-            intf = getattr(mod, intfspec[1])
+            intf = load_interface(intfspec[:2])
             api_name = get_api_name(intfspec)
             if api_name in globals():
                 lgr.debug(
                     'Command %s from extension %s is replacing a previously loaded implementation',
                     api_name,
-                    entry_point.name)
+                    ename)
             globals()[api_name] = intf.__call__
 
 

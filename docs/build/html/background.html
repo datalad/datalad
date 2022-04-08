@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Background and motivation &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Delineation from related solutions" href="related.html" />
+    <link rel="prev" title="Publications" href="publications.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> DataLad
+            <img src="_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Background and motivation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#vision">Vision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#technological-foundation-git-annex">Technological foundation: git-annex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#objective">Objective</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Background and motivation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="background-and-motivation">
+<h1>Background and motivation<a class="headerlink" href="#background-and-motivation" title="Permalink to this headline"></a></h1>
+<section id="vision">
+<h2>Vision<a class="headerlink" href="#vision" title="Permalink to this headline"></a></h2>
+<p>Data is at the core of science, and unobstructed access promotes scientific
+discovery through collaboration between data producers and consumers.  The last
+years have seen dramatic improvements in availability of data resources for
+collaborative research, and new data providers are becoming available all the
+time.</p>
+<p>However, despite the increased availability of data, their accessibility is far
+from being optimal. Potential consumers of these public datasets have to
+manually browse various disconnected warehouses with heterogeneous interfaces.
+Once obtained, data is disconnected from its origin and data versioning is
+often ad-hoc or completely absent. If data consumers can be reliably informed
+about data updates at all, review of changes is difficult, and re-deployment is
+tedious and error-prone. This leads to wasteful friction caused by outdated or
+faulty data.</p>
+<p>The vision for this project is to transform the state of data-sharing and
+collaborative work by providing uniform access to available datasets –
+independent of hosting solutions or authentication schemes – with reliable
+versioning and versatile deployment logistics. This is achieved by means of a
+<a class="reference internal" href="glossary.html#term-dataset"><span class="xref std std-term">dataset</span></a> handle, a lightweight representation of a dataset
+that is capable of tracking the identity and location of a dataset’s content as
+well as carry meta-data. Together with associated software tools, scientists
+are able to obtain, use, extend, and share datasets (or parts thereof) in a
+way that is traceable back to the original data producer and is therefore
+capable of establishing a strong connection between data consumers and the
+evolution of a dataset by future extension or error correction.</p>
+<p>Moreover, DataLad aims to provide all tools necessary to create and publish
+<em>data distributions</em> — an analog to software distributions or app-stores
+that provide logistics middleware for software deployment. Scientific
+communities can use these tools to gather, curate, and make publicly available
+specialized collections of datasets for specific research topics or data
+modalities. All of this is possible by leveraging existing data sharing
+platforms and institutional resources without the need for funding extra
+infrastructure of duplicate storage. Specifically, this project aims to provide
+a comprehensive, extensible data distribution for neuroscientific datasets that
+is kept up-to-date by an automated service.</p>
+</section>
+<section id="technological-foundation-git-annex">
+<h2>Technological foundation: git-annex<a class="headerlink" href="#technological-foundation-git-annex" title="Permalink to this headline"></a></h2>
+<p>The outlined task is not unique to the problem of data-sharing in science.
+Logistical challenges such as delivering data, long-term storage and archiving,
+identity tracking, and synchronization between multiple sites are rather
+common. Consequently, solutions have been developed in other contexts that can
+be adapted to benefit scientific data-sharing.</p>
+<p>The closest match is the software tool <a class="reference external" href="http://git-annex.branchable.com">git-annex</a>. It combines the features of
+the distributed version control system (dVCS) <a class="reference external" href="https://git-scm.com">Git</a> — a technology that has
+revolutionized collaborative software development – with versatile data access
+and delivery logistics. Git-annex was originally developed to address use cases
+such as managing a collection of family pictures at home. With git-annex, any
+family member can obtain an individual copy of such a picture library — the
+<a class="reference internal" href="glossary.html#term-annex"><span class="xref std std-term">annex</span></a>. The annex in this example is essentially an image repository
+that presents individual pictures to users as files in a single directory
+structure, even though the actual image file contents may be distributed across
+multiple locations, including a home-server, cloud-storage, or even off-line
+media such as external hard-drives.</p>
+<p>Git-annex provides functionality to obtain file contents upon request and can
+prompt users to make particular storage devices available when needed (e.g. a
+backup hard-drive kept in a fire-proof compartment). Git-annex can also remove
+files from a local copy of that image repository, for example to free up space
+on a laptop, while ensuring a configurable level of data redundancy across all
+known storage locations. Lastly, git-annex is able to synchronize the content
+of multiple distributed copies of this image repository, for example in order
+to incorporate images added with the git-annex on the laptop of another family
+member. It is important to note that git-annex is agnostic of the actual file
+types and is not limited to images.</p>
+<p>We believe that the approach to data logistics taken by git-annex and the
+functionality it is currently providing are an ideal middleware for scientific
+data-sharing. Its data repository model <a class="reference internal" href="glossary.html#term-annex"><span class="xref std std-term">annex</span></a> readily provides the
+majority of principal features needed for a dataset handle such as history
+recording, identity tracking, and item-based resource locators. Consequently,
+instead of a from-scratch development, required features, such as dedicated
+support for existing data-sharing portals and dataset meta-information, can be
+added to a working solution that is already in production for several years.
+As a result, DataLad focuses on the expansion of git-annex’s functionality and
+the development of tools that build atop Git and git-annex and enable the
+creation, management, use, and publication of dataset handles and collections
+thereof.</p>
+</section>
+<section id="objective">
+<h2>Objective<a class="headerlink" href="#objective" title="Permalink to this headline"></a></h2>
+<p>Building atop git-annex, DataLad aims to provide a single, uniform interface to
+access data from various data-sharing initiatives and data providers, and
+functionality to create, deliver, update, and share datasets for individuals
+and portal maintainers. As a command-line tool, it provides an abstraction
+layer for the underlying Git-based middleware implementing the actual data
+logistics, and serves as a foundation for other future user front-ends, such
+as a web-interface.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="publications.html" class="btn btn-neutral float-left" title="Publications" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="related.html" class="btn btn-neutral float-right" title="Delineation from related solutions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

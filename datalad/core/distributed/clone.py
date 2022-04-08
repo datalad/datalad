@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -9,6 +9,7 @@
 """Plumbing command for dataset installation"""
 
 
+from argparse import REMAINDER
 import logging
 import re
 from os.path import expanduser
@@ -213,7 +214,7 @@ class Clone(Interface):
             metavar='SOURCE',
             doc="""URL, DataLad resource identifier, local path or instance of
             dataset to be cloned""",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureStr()),
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -221,6 +222,18 @@ class Clone(Interface):
             doc="""path to clone into.  If no `path` is provided a
             destination path will be derived from a source URL
             similar to :command:`git clone`"""),
+        git_clone_opts=Parameter(
+            args=("git_clone_opts",),
+            metavar='GIT CLONE OPTIONS',
+            nargs=REMAINDER,
+            doc="""[PY: A list of command line arguments PY][CMD: Options CMD]
+            to pass to :command:`git clone`. [CMD: Any argument specified after
+            SOURCE and the optional PATH will be passed to git-clone. CMD] Note
+            that not all options will lead to viable results. For example
+            '--single-branch' will not result in a functional annex repository
+            because both a regular branch and the git-annex branch are
+            required. Note that a version in a RIA URL takes precedence over
+            '--branch'."""),
         description=location_description,
         reckless=reckless_opt,
     )
@@ -231,9 +244,12 @@ class Clone(Interface):
     def __call__(
             source,
             path=None,
+            git_clone_opts=None,
+            *,
             dataset=None,
             description=None,
-            reckless=None):
+            reckless=None,
+        ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
@@ -325,6 +341,7 @@ class Clone(Interface):
                 description,
                 result_props,
                 cfg=None if ds is None else ds.config,
+                clone_opts=git_clone_opts,
                 ):
             if r['status'] in ['error', 'impossible']:
                 clone_failure = True
@@ -350,6 +367,7 @@ class Clone(Interface):
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
+                    result_renderer='disabled',
                     on_failure='ignore'):
                 actually_saved_subds = actually_saved_subds or (
                         r['action'] == 'save' and
@@ -377,7 +395,9 @@ class Clone(Interface):
                      source]
                 )
                 yield from ds.save('.gitmodules',
-                                   amend=True, to_git=True)
+                                   amend=True, to_git=True,
+                                   result_renderer='disabled',
+                                   return_type='generator')
             else:
                 # We didn't really commit. Just call `subdatasets`
                 # in that case to have the modification included in the
@@ -460,7 +480,8 @@ def clone_dataset(
         description=None,
         result_props=None,
         cfg=None,
-        checkout_gitsha=None):
+        checkout_gitsha=None,
+        clone_opts=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -489,6 +510,10 @@ def clone_dataset(
       did not obtain the commit object. Should the checkout of the target commit
       cause a detached HEAD, the previously active branch will be reset to the
       target commit.
+    clone_opts : list of str, optional
+      Options passed to git-clone. Note that for RIA URLs, the version is
+      translated to a --branch argument, and that will take precedence over a
+      --branch argument included in this value.
 
     Yields
     ------
@@ -578,6 +603,7 @@ def clone_dataset(
         label='Clone attempt',
         unit=' Candidate locations',
     )
+    clone_opts = clone_opts or []
     error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
     for cand in candidate_sources:
         log_progress(
@@ -587,17 +613,18 @@ def clone_dataset(
             update=1,
             increment=True)
 
-        clone_opts = {}
-
         if cand.get('version', None):
-            clone_opts['branch'] = cand['version']
+            opts = clone_opts + ["--branch=" + cand['version']]
+        else:
+            opts = clone_opts
+
         try:
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
             # doesn't make it happen seamlessly
             GitRepo.clone(
                 path=str(dest_path),
                 url=cand['giturl'],
-                clone_options=clone_opts,
+                clone_options=opts,
                 create=True)
 
         except CommandError as e:
@@ -744,7 +771,7 @@ def clone_dataset(
         # known to later clones of subdatasets via get()
         destds.config.set(
             'datalad.clone.reckless', reckless,
-            where='local',
+            scope='local',
             reload=True)
     else:
         # We would still want to reload configuration to ensure that any of the
@@ -876,7 +903,7 @@ def postclone_preannex_cfg_ria(ds, remote="origin"):
     # store could also hold simple standard annexes w/o an intended ORA remote.
     # This needs the introduction of a new version label in RIA datasets, making
     # the following call conditional.
-    ds.config.set(f'remote.{remote}.annex-ignore', 'true', where='local')
+    ds.config.set(f'remote.{remote}.annex-ignore', 'true', scope='local')
 
 
 def postclonecfg_ria(ds, props, remote="origin"):
@@ -965,7 +992,7 @@ def postclonecfg_ria(ds, props, remote="origin"):
         # placeholder, this should make things work with any store setup we
         # support (paths, ports, ...)
         ria_store_url + '#{id}',
-        where='local')
+        scope='local')
 
     # setup publication dependency, if a corresponding special remote exists
     # and was enabled (there could be RIA stores that actually only have repos)
@@ -1109,7 +1136,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
         ds.config.set(
-            'annex.hardlink', 'true', where='local', reload=True)
+            'annex.hardlink', 'true', scope='local', reload=True)
 
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
@@ -1141,7 +1168,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
         # we don't want annex copy-to <remote>
         ds.config.set(
             f'remote.{remote}.annex-ignore', 'true',
-            where='local')
+            scope='local')
 
         ds.repo.set_remote_dead('here')
 
@@ -1420,7 +1447,8 @@ def decode_source_spec(spec, cfg=None):
     # scheme.
     spec = cfg.rewrite_url(spec)
     # common starting point is a RI instance, support for accepting an RI
-    # instance is kept for backward-compatibility reasons
+    # instance is kept for backward-compatibility reasons.
+    # this conversion will raise ValueError for any unrecognized RI
     source_ri = RI(spec) if not isinstance(spec, RI) else spec
 
     # scenario switch, each case must set 'giturl' at the very minimum

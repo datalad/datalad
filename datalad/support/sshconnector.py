@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -53,7 +53,7 @@ lgr = logging.getLogger('datalad.support.sshconnector')
 
 
 def get_connection_hash(hostname, port='', username='', identity_file='',
-                        bundled='', force_ip=False):
+                        bundled=None, force_ip=False):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
@@ -63,7 +63,19 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
 
     Identity file corresponds to a file that will be passed via ssh's -i
     option.
+
+    All parameters correspond to the respective properties of an SSH
+    connection, except for `bundled`, which is unused.
+
+    .. deprecated:: 0.16
+       The ``bundled`` argument is ignored.
     """
+    if bundled is not None:
+        import warnings
+        warnings.warn(
+            "The `bundled` argument of `get_connection_hash()` is ignored. "
+            "It will be removed in a future release.",
+            DeprecationWarning)
     # returning only first 8 characters to minimize our chance
     # of hitting a limit on the max path length for the Unix socket.
     # Collisions would be very unlikely even if we used less than 8.
@@ -71,13 +83,12 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{identity_file}{username}{bundled}{force_ip}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}{force_ip}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
             identity_file=identity_file,
             username=username,
-            bundled=bundled,
             force_ip=force_ip or ''
         ).encode('utf-8')).hexdigest()[:8]
 
@@ -87,7 +98,7 @@ class BaseSSHConnection(object):
     """Representation of an SSH connection.
     """
     def __init__(self, sshri, identity_file=None,
-                 use_remote_annex_bundle=True, force_ip=False):
+                 use_remote_annex_bundle=None, force_ip=False):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -99,14 +110,23 @@ class BaseSSHConnection(object):
           or another resource identifier that can be converted into an SSHRI.
         identity_file : str or None
           Value to pass to ssh's -i option.
-        use_remote_annex_bundle : bool
-          If set, look for a git-annex installation on the remote and
-          prefer its binaries in the search path (i.e. prefer a bundled
-          Git over a system package).
+        use_remote_annex_bundle : bool, optional
+          If enabled, look for a git-annex installation on the remote and
+          prefer its Git binaries in the search path (i.e. prefer a bundled
+          Git over a system package). See also the configuration setting
+          datalad.ssh.try-use-annex-bundled-git
         force_ip : {False, 4, 6}
            Force the use of IPv4 or IPv6 addresses with -4 or -6.
+
+        .. versionchanged:: 0.16
+           The default for `use_remote_annex_bundle` changed from `True`
+           to `None`. Instead of attempting to use a potentially available
+           git-annex bundle on the remote host by default, this behavior
+           is now conditional on the `datalad.ssh.try-use-annex-bundled-git`
+           (off by default).
         """
         self._runner = None
+        self._ssh_executable = None
 
         from datalad.support.network import SSHRI, is_ssh
         if not is_ssh(sshri):
@@ -131,13 +151,55 @@ class BaseSSHConnection(object):
         self._remote_props = {}
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
+        """Executes a command on the remote.
+
+        It is the callers responsibility to properly quote commands
+        for remote execution (e.g. filename with spaces of other special
+        characters).
+
+        Parameters
+        ----------
+        cmd: str
+          command to run on the remote
+        options : list of str, optional
+          Additional options to pass to the `-o` flag of `ssh`. Note: Many
+          (probably most) of the available configuration options should not be
+          set here because they can critically change the properties of the
+          connection. This exists to allow options like SendEnv to be set.
+
+        Returns
+        -------
+        tuple of str
+          stdout, stderr of the command run.
+        """
         raise NotImplementedError
 
     def open(self):
+        """Opens the connection.
+
+        Returns
+        -------
+        bool
+          To return True if connection establishes a control socket successfully.
+          Return False otherwise
+        """
+
         raise NotImplementedError
 
     def close(self):
+        """Closes the connection.
+        """
+
         raise NotImplementedError
+
+    @property
+    def ssh_executable(self):
+        """determine which ssh client executable should be used.
+        """
+        if not self._ssh_executable:
+            from datalad import cfg
+            self._ssh_executable = cfg.obtain("datalad.ssh.executable")
+        return self._ssh_executable
 
     @property
     def runner(self):
@@ -146,8 +208,10 @@ class BaseSSHConnection(object):
         return self._runner
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
+        from datalad import cfg
         # locate annex and set the bundled vs. system Git machinery in motion
-        if self._use_remote_annex_bundle:
+        if self._use_remote_annex_bundle \
+                or cfg.obtain('datalad.ssh.try-use-annex-bundled-git'):
             remote_annex_installdir = self.get_annex_installdir()
             if remote_annex_installdir:
                 # make sure to use the bundled git version if any exists
@@ -326,51 +390,10 @@ class NoMultiplexSSHConnection(BaseSSHConnection):
     The connection is opened for execution of a single process, and closed
     as soon as the process end.
     """
-    def __init__(self, sshri, **kwargs):
-        """Create a connection handler
-
-        The actual opening of the connection is performed on-demand.
-
-        Parameters
-        ----------
-        sshri: SSHRI
-          SSH resource identifier (contains all connection-relevant info),
-          or another resource identifier that can be converted into an SSHRI.
-        **kwargs
-          Pass on to BaseSSHConnection
-        """
-        super().__init__(sshri, **kwargs)
-        self._ssh_open_args += [
-            # we presently do not support any interactive authentication
-            # at the time of process execution
-            '-o', 'PasswordAuthentication=no',
-            '-o', 'KbdInteractiveAuthentication=no',
-        ]
-
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
-        """Executes a command on the remote.
 
-        It is the callers responsibility to properly quote commands
-        for remote execution (e.g. filename with spaces of other special
-        characters). Use the `sh_quote()` from the module for this purpose.
-
-        Parameters
-        ----------
-        cmd: str
-          command to run on the remote
-        options : list of str, optional
-          Additional options to pass to the `-o` flag of `ssh`. Note: Many
-          (probably most) of the available configuration options should not be
-          set here because they can critically change the properties of the
-          connection. This exists to allow options like SendEnv to be set.
-
-        Returns
-        -------
-        tuple of str
-          stdout, stderr of the command run.
-        """
         # there is no dedicated "open" step, put all args together
-        ssh_cmd = ["ssh"] + self._ssh_open_args + self._ssh_args
+        ssh_cmd = [self.ssh_executable] + self._ssh_open_args + self._ssh_args
         return self._exec_ssh(
             ssh_cmd,
             cmd,
@@ -430,27 +453,6 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ]
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
-        """Executes a command on the remote.
-
-        It is the callers responsibility to properly quote commands
-        for remote execution (e.g. filename with spaces of other special
-        characters). Use the `sh_quote()` from the module for this purpose.
-
-        Parameters
-        ----------
-        cmd: str
-          command to run on the remote
-        options : list of str, optional
-          Additional options to pass to the `-o` flag of `ssh`. Note: Many
-          (probably most) of the available configuration options should not be
-          set here because they can critically change the properties of the
-          connection. This exists to allow options like SendEnv to be set.
-
-        Returns
-        -------
-        tuple of str
-          stdout, stderr of the command run.
-        """
 
         # XXX: check for open socket once
         #      and provide roll back if fails to run and was not explicitly
@@ -464,13 +466,19 @@ class MultiplexSSHConnection(BaseSSHConnection):
         # by itself
         self.open()
 
-        ssh_cmd = ["ssh"] + self._ssh_args
+        ssh_cmd = [self.ssh_executable] + self._ssh_args
         return self._exec_ssh(
             ssh_cmd,
             cmd,
             options=options,
             stdin=stdin,
             log_output=log_output)
+
+    def _assemble_multiplex_ssh_cmd(self, additional_arguments):
+        return [self.ssh_executable] \
+               + additional_arguments \
+               + self._ssh_args \
+               + [self.sshri.as_str()]
 
     def is_open(self):
         if not self.ctrl_path.exists():
@@ -481,7 +489,8 @@ class MultiplexSSHConnection(BaseSSHConnection):
             )
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(["-O", "check"])
+
         lgr.debug("Checking %s by calling %s", self, cmd)
         try:
             # expect_stderr since ssh would announce to stderr
@@ -535,11 +544,13 @@ class MultiplexSSHConnection(BaseSSHConnection):
             return False
 
         # create ssh control master command
-        cmd = ["ssh"] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(self._ssh_open_args)
 
         # start control master:
         lgr.debug("Opening %s by calling %s", self, cmd)
-        proc = Popen(cmd)
+        # The following call is exempt from bandit's security checks because
+        # we/the user control the content of 'cmd'.
+        proc = Popen(cmd)  # nosec
         stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
 
         # wait till the command exits, connection is conclusively
@@ -558,13 +569,11 @@ class MultiplexSSHConnection(BaseSSHConnection):
         return True
 
     def close(self):
-        """Closes the connection.
-        """
         if not self._opened_by_us:
             lgr.debug("Not closing %s since was not opened by itself", self)
             return
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
+        cmd = self._assemble_multiplex_ssh_cmd(["-O", "stop"])
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, protocol=StdOutErrCapture)
@@ -589,19 +598,31 @@ class BaseSSHManager(object):
 
     assure_initialized = ensure_initialized
 
-    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+    def get_connection(self, url, use_remote_annex_bundle=None, force_ip=False):
         """Get an SSH connection handler
 
         Parameters
         ----------
         url: str
           ssh url
+        use_remote_annex_bundle : bool, optional
+          If enabled, look for a git-annex installation on the remote and
+          prefer its Git binaries in the search path (i.e. prefer a bundled
+          Git over a system package). See also the configuration setting
+          datalad.ssh.try-use-annex-bundled-git
         force_ip : {False, 4, 6}
           Force the use of IPv4 or IPv6 addresses.
 
         Returns
         -------
         BaseSSHConnection
+
+        .. versionchanged:: 0.16
+           The default for `use_remote_annex_bundle` changed from `True`
+           to `None`. Instead of attempting to use a potentially available
+           git-annex bundle on the remote host by default, this behavior
+           is now conditional on the `datalad.ssh.try-use-annex-bundled-git`
+           (off by default).
         """
         raise NotImplementedError
 
@@ -643,20 +664,7 @@ class NoMultiplexSSHManager(BaseSSHManager):
     """Does not "manage" and just returns a new connection
     """
 
-    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
-        """Get a singleton, representing a shared ssh connection to `url`
-
-        Parameters
-        ----------
-        url: str
-          ssh url
-        force_ip : {False, 4, 6}
-          Force the use of IPv4 or IPv6 addresses.
-
-        Returns
-        -------
-        SSHConnection
-        """
+    def get_connection(self, url, use_remote_annex_bundle=None, force_ip=False):
         sshri, identity_file = self._prep_connection_args(url)
 
         return NoMultiplexSSHConnection(
@@ -732,20 +740,8 @@ class MultiplexSSHManager(BaseSSHManager):
                 len(self._prev_connections))
     assure_initialized = ensure_initialized
 
-    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
-        """Get a singleton, representing a shared ssh connection to `url`
+    def get_connection(self, url, use_remote_annex_bundle=None, force_ip=False):
 
-        Parameters
-        ----------
-        url: str
-          ssh url
-        force_ip : {False, 4, 6}
-          Force the use of IPv4 or IPv6 addresses.
-
-        Returns
-        -------
-        SSHConnection
-        """
         sshri, identity_file = self._prep_connection_args(url)
 
         conhash = get_connection_hash(
@@ -753,7 +749,6 @@ class MultiplexSSHManager(BaseSSHManager):
             port=sshri.port,
             identity_file=identity_file or "",
             username=sshri.username,
-            bundled=use_remote_annex_bundle,
             force_ip=force_ip,
         )
         # determine control master:

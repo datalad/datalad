@@ -34,7 +34,8 @@ def no_annex(ds):
         lgr.info("Creating and committing a .noannex file")
         noannex_file.touch()
         ds.save(noannex_file,
-                message="Added .noannex to prevent accidental initialization of git-annex")
+                message="Added .noannex to prevent accidental initialization of git-annex",
+                result_renderer='disabled')
 
 
 if __name__ == '__main__':

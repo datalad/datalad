@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -30,9 +30,9 @@ from ..utils import (
     unlink,
 )
 from .credentials import (
-    CREDENTIAL_TYPES,
     CompositeCredential,
 )
+from datalad.downloaders import CREDENTIAL_TYPES
 from ..support.exceptions import (
     AccessDeniedError,
     AccessPermissionExpiredError,
@@ -47,8 +47,6 @@ from ..support.locking import (
     try_lock,
     try_lock_informatively,
 )
-
-from ..support.network import RI
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -114,10 +112,6 @@ class BaseDownloader(object, metaclass=ABCMeta):
         self.credential = credential
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
-        self._lock = InterProcessLock(
-            op.join(cfg.obtain('datalad.locations.locks'),
-                    'downloader-auth.lck')
-        )
 
     def access(self, method, url, allow_old_session=True, **kwargs):
         """Generic decorator to manage access to the URL via some method
@@ -143,6 +137,12 @@ class BaseDownloader(object, metaclass=ABCMeta):
             needs_authentication = authenticator.requires_authentication
         else:
             needs_authentication = self.credential
+
+        # TODO: not sure yet, where is/are the right spot(s) to pass the URL:
+        if hasattr(self.credential, 'set_context'):
+            lgr.debug("set credential context as %s", url)
+            self.credential.set_context(auth_url=url)
+
         attempt, incomplete_attempt = 0, 0
         result = None
         credential_was_refreshed = False
@@ -155,10 +155,18 @@ class BaseDownloader(object, metaclass=ABCMeta):
             msg_types = ''
             supported_auth_types = []
             used_old_session = False
+            # Lock must be instantiated here, within each thread to avoid problems
+            # when used in our parallel.ProducerConsumer
+            # see https://github.com/datalad/datalad/issues/6483
+            interp_lock = InterProcessLock(
+                op.join(cfg.obtain('datalad.locations.locks'),
+                        'downloader-auth.lck')
+            )
+
             try:
                 # Try to lock since it might desire to ask for credentials, but still allow to time out at 5 minutes
                 # while providing informative message on what other process might be holding it.
-                with try_lock_informatively(self._lock, purpose="establish download session", proceed_unlocked=False):
+                with try_lock_informatively(interp_lock, purpose="establish download session", proceed_unlocked=False):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -193,7 +201,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # in case of parallel downloaders, one would succeed to get the
                 # lock, ask user if necessary and other processes would just wait
                 # got it to return back
-                with try_lock(self._lock) as got_lock:
+                with try_lock(interp_lock) as got_lock:
                     if got_lock:
                         if isinstance(e, AccessPermissionExpiredError) \
                                 and not credential_was_refreshed \
@@ -293,7 +301,6 @@ class BaseDownloader(object, metaclass=ABCMeta):
             break
         return provider
 
-
     def _enter_credentials(
             self, url, denied_msg,
             auth_types=[], new_provider=True):
@@ -338,6 +345,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 raise DownloadError(
                     "Failed to download from %s given available credentials"
                     % url)
+
+        lgr.debug("set credential context as %s", url)
+        self.credential.set_context(auth_url=url)
 
     @staticmethod
     def _get_temp_download_filename(filepath):
@@ -622,7 +632,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         bytes
           content
         """
-        lgr.info("Fetching %r", url)
+        lgr.debug("Fetching %r", url)
         # Do not return headers, just content
         out = self.access(self._fetch, url, **kwargs)
         return out[0]

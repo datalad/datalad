@@ -11,6 +11,7 @@ include datalad/_version.py
 
 graft _datalad_build_support
 graft benchmarks
+graft datalad
 graft docs
 graft tools
 

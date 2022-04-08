@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -95,8 +95,8 @@ def test_create_raises(path, outside_path):
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
-    ds.uninstall(obscure_ds, check=False)
-    assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    ds.drop(obscure_ds, what='all', reckless='kill', recursive=True)
+    assert_in(obscure_ds, ds.subdatasets(state='absent', result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
         ds.create(obscure_ds, **raw),
@@ -138,7 +138,7 @@ def test_create_force_subds(path):
         subds.create(force=True, **raw),
         status="ok")
     # ... even if it is uninstalled.
-    subds.uninstall()
+    subds.drop(what='all', reckless='kill', recursive=True)
     ok_(not subds.is_installed())
     assert_in_results(
         subds.create(force=True, **raw),
@@ -531,3 +531,12 @@ def check_create_initopts_form(form, path):
 def test_create_initopts_form():
     yield check_create_initopts_form, "dict"
     yield check_create_initopts_form, "list"
+
+
+@with_tempfile
+def test_bad_cfg_proc(path):
+    ds = Dataset(path)
+    # check if error is raised for incorrect cfg_proc
+    assert_raises(ValueError, ds.create, path=path, cfg_proc='unknown')
+    # verify that no directory got created prior to the error
+    assert not op.isdir(path)

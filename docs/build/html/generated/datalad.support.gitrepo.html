@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.support.gitrepo &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.support.annexrepo" href="datalad.support.annexrepo.html" />
+    <link rel="prev" title="datalad.version" href="datalad.version.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="datalad.cmd.html">datalad.cmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.consts.html">datalad.consts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.log.html">datalad.log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.utils.html">datalad.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.version.html">datalad.version</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.support.gitrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.annexrepo.html">datalad.support.annexrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.archives.html">datalad.support.archives</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.base.html">datalad.customremotes.base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.archives.html">datalad.customremotes.archives</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.support.gitrepo</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.support.gitrepo">
+<span id="datalad-support-gitrepo"></span><h1>datalad.support.gitrepo<a class="headerlink" href="#module-datalad.support.gitrepo" title="Permalink to this headline"></a></h1>
+<p>Internal low-level interface to Git repositories</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">FetchInfo</span></span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#FetchInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></p>
+<p>dict that carries results of a fetch operation of a single head</p>
+<p>Reduced variant of GitPython’s RemoteProgress class</p>
+<dl class="simple">
+<dt>Original copyright:</dt><dd><p>Copyright (C) 2008, 2009 Michael Trier and contributors</p>
+</dd>
+<dt>Original license:</dt><dd><p>BSD 3-Clause “New” or “Revised” License</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.ERROR">
+<span class="sig-name descname"><span class="pre">ERROR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">128</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.ERROR" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.FAST_FORWARD">
+<span class="sig-name descname"><span class="pre">FAST_FORWARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">64</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.FAST_FORWARD" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.FORCED_UPDATE">
+<span class="sig-name descname"><span class="pre">FORCED_UPDATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">32</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.FORCED_UPDATE" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.HEAD_UPTODATE">
+<span class="sig-name descname"><span class="pre">HEAD_UPTODATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.HEAD_UPTODATE" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.NEW_HEAD">
+<span class="sig-name descname"><span class="pre">NEW_HEAD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.NEW_HEAD" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.NEW_TAG">
+<span class="sig-name descname"><span class="pre">NEW_TAG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.NEW_TAG" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.REJECTED">
+<span class="sig-name descname"><span class="pre">REJECTED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">16</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.REJECTED" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.FetchInfo.TAG_UPDATE">
+<span class="sig-name descname"><span class="pre">TAG_UPDATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8</span></em><a class="headerlink" href="#datalad.support.gitrepo.FetchInfo.TAG_UPDATE" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">GitProgress</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitProgress"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitProgress" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.runner.protocol.WitlessProtocol</span></code></p>
+<p>Reduced variant of GitPython’s RemoteProgress class</p>
+<dl class="simple">
+<dt>Original copyright:</dt><dd><p>Copyright (C) 2008, 2009 Michael Trier and contributors</p>
+</dd>
+<dt>Original license:</dt><dd><p>BSD 3-Clause “New” or “Revised” License</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.BEGIN">
+<span class="sig-name descname"><span class="pre">BEGIN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.BEGIN" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.CHECKING_OUT">
+<span class="sig-name descname"><span class="pre">CHECKING_OUT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">256</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.CHECKING_OUT" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.COMPRESSING">
+<span class="sig-name descname"><span class="pre">COMPRESSING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.COMPRESSING" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.COUNTING">
+<span class="sig-name descname"><span class="pre">COUNTING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.COUNTING" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.DONE_TOKEN">
+<span class="sig-name descname"><span class="pre">DONE_TOKEN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'done.'</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.DONE_TOKEN" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.END">
+<span class="sig-name descname"><span class="pre">END</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.END" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.ENUMERATING">
+<span class="sig-name descname"><span class="pre">ENUMERATING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">512</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.ENUMERATING" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.FINDING_SOURCES">
+<span class="sig-name descname"><span class="pre">FINDING_SOURCES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">128</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.FINDING_SOURCES" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.OP_MASK">
+<span class="sig-name descname"><span class="pre">OP_MASK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-4</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.OP_MASK" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.RECEIVING">
+<span class="sig-name descname"><span class="pre">RECEIVING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">32</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.RECEIVING" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.RESOLVING">
+<span class="sig-name descname"><span class="pre">RESOLVING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">64</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.RESOLVING" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.STAGE_MASK">
+<span class="sig-name descname"><span class="pre">STAGE_MASK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.STAGE_MASK" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.TOKEN_SEPARATOR">
+<span class="sig-name descname"><span class="pre">TOKEN_SEPARATOR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">',</span> <span class="pre">'</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.TOKEN_SEPARATOR" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.WRITING">
+<span class="sig-name descname"><span class="pre">WRITING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">16</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.WRITING" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.connection_made">
+<span class="sig-name descname"><span class="pre">connection_made</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transport</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitProgress.connection_made"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.connection_made" title="Permalink to this definition"></a></dt>
+<dd><p>Called when a connection is made.</p>
+<p>The argument is the transport representing the pipe connection.
+To receive data, wait for data_received() calls.
+When the connection is closed, connection_lost() is called.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.pipe_data_received">
+<span class="sig-name descname"><span class="pre">pipe_data_received</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">byts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitProgress.pipe_data_received"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.pipe_data_received" title="Permalink to this definition"></a></dt>
+<dd><p>Called when the subprocess writes data into stdout/stderr pipe.</p>
+<p>fd is int file descriptor.
+data is bytes object.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.proc_err">
+<span class="sig-name descname"><span class="pre">proc_err</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.proc_err" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.process_exited">
+<span class="sig-name descname"><span class="pre">process_exited</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitProgress.process_exited"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.process_exited" title="Permalink to this definition"></a></dt>
+<dd><p>Called when subprocess has exited.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.re_op_absolute">
+<span class="sig-name descname"><span class="pre">re_op_absolute</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">re.compile('(remote:</span> <span class="pre">)?([\\w\\s]+):\\s+()(\\d+)()(.*)')</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.re_op_absolute" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitProgress.re_op_relative">
+<span class="sig-name descname"><span class="pre">re_op_relative</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">re.compile('(remote:</span> <span class="pre">)?([\\w\\s]+):\\s+(\\d+)%</span> <span class="pre">\\((\\d+)/(\\d+)\\)(.*)')</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitProgress.re_op_relative" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">GitRepo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.dataset.gitrepo.GitRepo</span></code></p>
+<p>Representation of a git repository</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.GIT_MIN_VERSION">
+<span class="sig-name descname"><span class="pre">GIT_MIN_VERSION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'2.19.1'</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.GIT_MIN_VERSION" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.add">
+<span class="sig-name descname"><span class="pre">add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.add"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.add" title="Permalink to this definition"></a></dt>
+<dd><p>Adds file(s) to the repository.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>files</strong> (<em>list</em>) – list of paths to add</p></li>
+<li><p><strong>git</strong> (<em>bool</em>) – somewhat ugly construction to be compatible with AnnexRepo.add();
+has to be always true.</p></li>
+<li><p><strong>update</strong> (<em>bool</em>) – <dl>
+<dt>–update option for git-add. From git’s manpage:</dt><dd><p>Update the index just where it already has an entry matching
+&lt;pathspec&gt;. This removes as well as modifies index entries to match
+the working tree, but adds no new files.</p>
+<p>If no &lt;pathspec&gt; is given when –update option is used, all tracked
+files in the entire working tree are updated (old versions of Git
+used to limit the update to the current directory and its
+subdirectories).</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Of status dicts.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.add_">
+<span class="sig-name descname"><span class="pre">add_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.add_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.add_" title="Permalink to this definition"></a></dt>
+<dd><p>Like <cite>add</cite>, but returns a generator</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.add_fake_dates">
+<span class="sig-name descname"><span class="pre">add_fake_dates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">env</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.add_fake_dates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.add_fake_dates" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.add_remote">
+<span class="sig-name descname"><span class="pre">add_remote</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.add_remote"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.add_remote" title="Permalink to this definition"></a></dt>
+<dd><p>Register remote pointing to a url</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.bare">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">bare</span></span><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.bare" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.checkout">
+<span class="sig-name descname"><span class="pre">checkout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.checkout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.checkout" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.cherry_pick">
+<span class="sig-name descname"><span class="pre">cherry_pick</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">commit</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.cherry_pick"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.cherry_pick" title="Permalink to this definition"></a></dt>
+<dd><p>Cherry pick <cite>commit</cite> to the current branch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>commit</strong> (<em>str</em>) – A single commit.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.clone">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">clone</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clone_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.clone"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.clone" title="Permalink to this definition"></a></dt>
+<dd><p>Clone url into path</p>
+<p>Provides workarounds for known issues (e.g.
+<a class="reference external" href="https://github.com/datalad/datalad/issues/785">https://github.com/datalad/datalad/issues/785</a>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>url</strong> (<em>str</em>) – </p></li>
+<li><p><strong>path</strong> (<em>str</em>) – </p></li>
+<li><p><strong>clone_options</strong> (<em>dict</em><em> or </em><em>list</em>) – Arbitrary options that will be passed on to the underlying call to
+<cite>git-clone</cite>. This may be a list of plain options or key-value pairs
+that will be converted to a list of plain options with <cite>to_options</cite>.</p></li>
+<li><p><strong>expect_fail</strong> (<em>bool</em>) – Whether expect that command might fail, so error should be logged then
+at DEBUG level instead of ERROR</p></li>
+<li><p><strong>kwargs</strong> – Passed to the Repo class constructor.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.commit">
+<span class="sig-name descname"><span class="pre">commit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_datalad_msg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">careless</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">files</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.commit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.commit" title="Permalink to this definition"></a></dt>
+<dd><p>Commit changes to git.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>msg</strong> (<em>str</em><em>, </em><em>optional</em>) – commit-message</p></li>
+<li><p><strong>options</strong> (<em>list of str</em><em>, </em><em>optional</em>) – cmdline options for git-commit</p></li>
+<li><p><strong>_datalad_msg</strong> (<em>bool</em><em>, </em><em>optional</em>) – To signal that commit is automated commit by datalad, so
+it would carry the [DATALAD] prefix</p></li>
+<li><p><strong>careless</strong> (<em>bool</em><em>, </em><em>optional</em>) – if False, raise when there’s nothing actually committed;
+if True, don’t care</p></li>
+<li><p><strong>files</strong> (<em>list of str</em><em>, </em><em>optional</em>) – path(s) to commit</p></li>
+<li><p><strong>date</strong> (<em>str</em><em>, </em><em>optional</em>) – Date in one of the formats git understands</p></li>
+<li><p><strong>index_file</strong> (<em>str</em><em>, </em><em>optional</em>) – An alternative index to use</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.commit_exists">
+<span class="sig-name descname"><span class="pre">commit_exists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">commitish</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.commit_exists"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.commit_exists" title="Permalink to this definition"></a></dt>
+<dd><p>Does <cite>commitish</cite> exist in the repo?</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>commitish</strong> (<em>str</em>) – A commit or an object that can be dereferenced to one.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.config">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">config</span></span><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.config" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.configure_fake_dates">
+<span class="sig-name descname"><span class="pre">configure_fake_dates</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.configure_fake_dates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.configure_fake_dates" title="Permalink to this definition"></a></dt>
+<dd><p>Configure repository to use fake dates.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.count_objects">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">count_objects</span></span><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.count_objects" title="Permalink to this definition"></a></dt>
+<dd><p>return dictionary with count, size(in KiB) information of git objects</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.describe">
+<span class="sig-name descname"><span class="pre">describe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">commitish</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.describe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.describe" title="Permalink to this definition"></a></dt>
+<dd><p>Quick and dirty implementation to call git-describe</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>kwargs</strong> – transformed to cmdline options for git-describe;
+see __init__ for description of the transformation</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.diff">
+<span class="sig-name descname"><span class="pre">diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">untracked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_submodule_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'full'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.diff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.diff" title="Permalink to this definition"></a></dt>
+<dd><p>Like status(), but reports changes between to arbitrary revisions</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fr</strong> (<em>str</em><em> or </em><em>None</em>) – Revision specification (anything that Git understands). Passing
+<cite>None</cite> considers anything in the target state as new.</p></li>
+<li><p><strong>to</strong> (<em>str</em><em> or </em><em>None</em>) – Revision specification (anything that Git understands), or None
+to compare to the state of the work tree.</p></li>
+<li><p><strong>paths</strong> (<em>list</em><em> or </em><em>None</em>) – If given, limits the query to the specified paths. To query all
+paths specify <cite>None</cite>, not an empty list.</p></li>
+<li><p><strong>untracked</strong> (<em>{'no'</em><em>, </em><em>'normal'</em><em>, </em><em>'all'}</em>) – If and how untracked content is reported when <cite>to</cite> is None:
+‘no’: no untracked files are reported; ‘normal’: untracked files
+and entire untracked directories are reported as such; ‘all’: report
+individual files even in fully untracked directories.</p></li>
+<li><p><strong>eval_submodule_state</strong> (<em>{'full'</em><em>, </em><em>'commit'</em><em>, </em><em>'no'}</em>) – If ‘full’ (the default), the state of a submodule is evaluated by
+considering all modifications, with the treatment of untracked files
+determined by <cite>untracked</cite>. If ‘commit’, the modification check is
+restricted to comparing the submodule’s HEAD commit to the one
+recorded in the superdataset. If ‘no’, the state of the subdataset is
+not evaluated.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Each content item has an entry under a pathlib <cite>Path</cite> object instance
+pointing to its absolute path inside the repository (this path is
+guaranteed to be underneath <cite>Repo.path</cite>).
+Each value is a dictionary with properties:</p>
+<dl class="simple">
+<dt><cite>type</cite></dt><dd><p>Can be ‘file’, ‘symlink’, ‘dataset’, ‘directory’</p>
+</dd>
+<dt><cite>state</cite></dt><dd><p>Can be ‘added’, ‘untracked’, ‘clean’, ‘deleted’, ‘modified’.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.diffstatus">
+<span class="sig-name descname"><span class="pre">diffstatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">untracked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_submodule_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'full'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_file_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.diffstatus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.diffstatus" title="Permalink to this definition"></a></dt>
+<dd><p>Like diff(), but reports the status of ‘clean’ content too.</p>
+<p>It supports an additional submodule evaluation state ‘global’.
+If given, it will return a single ‘modified’
+(vs. ‘clean’) state label for the entire repository, as soon as
+it can.</p>
+<p>The eval_file_type parameter is ignored.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.dirty">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dirty</span></span><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.dirty" title="Permalink to this definition"></a></dt>
+<dd><p>Is the repository dirty?</p>
+<p>Note: This provides a quick answer when you simply want to know if
+there are any untracked changes or modifications in this repository or
+its submodules. For finer-grained control and more detailed reporting,
+use status() instead.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.fake_dates_enabled">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fake_dates_enabled</span></span><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.fake_dates_enabled" title="Permalink to this definition"></a></dt>
+<dd><p>Is the repository configured to use fake dates?</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.fetch">
+<span class="sig-name descname"><span class="pre">fetch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">remote</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refspec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.fetch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.fetch" title="Permalink to this definition"></a></dt>
+<dd><p>Fetches changes from a remote (or all remotes).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>remote</strong> (<em>str</em><em>, </em><em>optional</em>) – name of the remote to fetch from. If no remote is given and
+<cite>all_</cite> is not set, the tracking branch is fetched.</p></li>
+<li><p><strong>refspec</strong> (<em>str</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – refspec(s) to fetch.</p></li>
+<li><p><strong>all</strong> (<em>bool</em><em>, </em><em>optional</em>) – fetch all remotes (and all of their branches).
+Fails if <cite>remote</cite> was given.</p></li>
+<li><p><strong>git_options</strong> (<em>list</em><em>, </em><em>optional</em>) – Additional command line options for git-fetch.</p></li>
+<li><p><strong>kwargs</strong> – Deprecated. GitPython-style keyword argument for git-fetch.
+Will be appended to any git_options.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.fetch_">
+<span class="sig-name descname"><span class="pre">fetch_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">remote</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refspec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.fetch_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.fetch_" title="Permalink to this definition"></a></dt>
+<dd><p>Like <cite>fetch</cite>, but returns a generator</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.format_commit">
+<span class="sig-name descname"><span class="pre">format_commit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fmt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commitish</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.format_commit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.format_commit" title="Permalink to this definition"></a></dt>
+<dd><p>Return <cite>git show</cite> output for <cite>commitish</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fmt</strong> (<em>str</em>) – A format string accepted by <cite>git show</cite>.</p></li>
+<li><p><strong>commitish</strong> (<em>str</em><em>, </em><em>optional</em>) – Any commit identifier (defaults to “HEAD”).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str or, if there are not commits yet, None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.gc">
+<span class="sig-name descname"><span class="pre">gc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">allow_background</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.gc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.gc" title="Permalink to this definition"></a></dt>
+<dd><p>Perform house keeping (garbage collection, repacking)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_active_branch">
+<span class="sig-name descname"><span class="pre">get_active_branch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_active_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_active_branch" title="Permalink to this definition"></a></dt>
+<dd><p>Get the name of the active branch</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Returns None if there is no active branch, i.e. detached HEAD,
+and the branch name otherwise.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_branch_commits_">
+<span class="sig-name descname"><span class="pre">get_branch_commits_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_branch_commits_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_branch_commits_" title="Permalink to this definition"></a></dt>
+<dd><p>Return commit hexshas for a branch</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branch</strong> (<em>str</em><em>, </em><em>optional</em>) – If not provided, assumes current branch</p></li>
+<li><p><strong>limit</strong> (<em>None</em><em> | </em><em>'left-only'</em><em>, </em><em>optional</em>) – Limit which commits to report.  If None – all commits (merged or not),
+if ‘left-only’ – only the commits from the left side of the tree upon
+merges</p></li>
+<li><p><strong>stop</strong> (<em>str</em><em>, </em><em>optional</em>) – hexsha of the commit at which stop reporting (matched one is not
+reported either)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Yields</dt>
+<dd class="field-even"><p><em>str</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_branches">
+<span class="sig-name descname"><span class="pre">get_branches</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_branches"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_branches" title="Permalink to this definition"></a></dt>
+<dd><p>Get all branches of the repo.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Names of all branches of this repository.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_commit_date">
+<span class="sig-name descname"><span class="pre">get_commit_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'authored'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_commit_date"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_commit_date" title="Permalink to this definition"></a></dt>
+<dd><p>Get the date stamp of the last commit (in a branch or head otherwise)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>date</strong> (<em>{'authored'</em><em>, </em><em>'committed'}</em>) – Which date to return.  “authored” will be the date shown by “git show”
+and the one possibly specified via –date to <cite>git commit</cite></p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>None if no commit</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_content_info">
+<span class="sig-name descname"><span class="pre">get_content_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">untracked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_file_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_content_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_content_info" title="Permalink to this definition"></a></dt>
+<dd><p>Get identifier and type information from repository content.</p>
+<p>This is simplified front-end for <cite>git ls-files/tree</cite>.</p>
+<p>Both commands differ in their behavior when queried about subdataset
+paths. ls-files will not report anything, ls-tree will report on the
+subdataset record. This function uniformly follows the behavior of
+ls-tree (report on the respective subdataset mount).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<em>list</em><em>(</em><em>pathlib.PurePath</em><em>) or </em><em>None</em>) – Specific paths, relative to the resolved repository root, to query
+info for. Paths must be normed to match the reporting done by Git,
+i.e. no parent dir components (ala “some/../this”).
+If <cite>None</cite>, info is reported for all content.</p></li>
+<li><p><strong>ref</strong> (<em>gitref</em><em> or </em><em>None</em>) – If given, content information is retrieved for this Git reference
+(via ls-tree), otherwise content information is produced for the
+present work tree (via ls-files). With a given reference, the
+reported content properties also contain a ‘bytesize’ record,
+stating the size of a file in bytes.</p></li>
+<li><p><strong>untracked</strong> (<em>{'no'</em><em>, </em><em>'normal'</em><em>, </em><em>'all'}</em>) – If and how untracked content is reported when no <cite>ref</cite> was given:
+‘no’: no untracked files are reported; ‘normal’: untracked files
+and entire untracked directories are reported as such; ‘all’: report
+individual files even in fully untracked directories.</p></li>
+<li><p><strong>eval_file_type</strong> – THIS FUNCTIONALITY IS NO LONGER SUPPORTED.
+Setting this flag has no effect.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Each content item has an entry under a pathlib <cite>Path</cite> object instance
+pointing to its absolute path inside the repository (this path is
+guaranteed to be underneath <cite>Repo.path</cite>).
+Each value is a dictionary with properties:</p>
+<dl class="simple">
+<dt><cite>type</cite></dt><dd><p>Can be ‘file’, ‘symlink’, ‘dataset’, ‘directory’</p>
+</dd>
+<dt><cite>gitshasum</cite></dt><dd><p>SHASUM of the item as tracked by Git, or None, if not
+tracked. This could be different from the SHASUM of the file
+in the worktree, if it was modified.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>ValueError</strong> – In case of an invalid Git reference (e.g. ‘HEAD’ in an empty
+    repository)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_corresponding_branch">
+<span class="sig-name descname"><span class="pre">get_corresponding_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_corresponding_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_corresponding_branch" title="Permalink to this definition"></a></dt>
+<dd><p>Always returns None, a plain GitRepo has no managed branches</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_files">
+<span class="sig-name descname"><span class="pre">get_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_files" title="Permalink to this definition"></a></dt>
+<dd><p>Get a list of files in git.</p>
+<p>Lists the files in the (remote) branch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>branch</strong> (<em>str</em>) – Name of the branch to query. Default: active branch.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>list of files.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_git_attributes">
+<span class="sig-name descname"><span class="pre">get_git_attributes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_git_attributes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_git_attributes" title="Permalink to this definition"></a></dt>
+<dd><p>Query gitattributes which apply to top level directory</p>
+<p>It is a thin compatibility/shortcut wrapper around more versatile
+get_gitattributes which operates on a list of paths and returns
+a dictionary per each path</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>a dictionary with attribute name and value items relevant for the
+top (‘.’) directory of the repository, and thus most likely the
+default ones (if not overwritten with more rules) for all files within
+repo.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_git_dir">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_git_dir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">repo</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_git_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_git_dir" title="Permalink to this definition"></a></dt>
+<dd><p>figure out a repo’s gitdir</p>
+<p>‘.git’ might be a  directory, a symlink or a file</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method is likely to get deprecated, please use GitRepo.dot_git instead!
+That one’s not static, but it’s cheaper and you should avoid
+not having an instance of a repo you’re working on anyway.
+Note, that the property in opposition to this method returns an absolute path.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>repo</strong> (<em>path</em><em> or </em><em>Repo instance</em>) – currently expected to be the repos base dir</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>relative path to the repo’s git dir; So, default would be “.git”</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_gitattributes">
+<span class="sig-name descname"><span class="pre">get_gitattributes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_gitattributes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_gitattributes" title="Permalink to this definition"></a></dt>
+<dd><p>Query gitattributes for one or more paths</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>path</em><em> or </em><em>list</em>) – Path(s) to query. Paths may be relative or absolute.</p></li>
+<li><p><strong>index_only</strong> (<em>bool</em>) – Flag whether to consider only gitattribute setting that are reflected
+in the repository index, not just in the work tree content.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Each key is a queried path (always relative to the repository root),
+each value is a dictionary with attribute
+name and value items. Attribute values are either True or False,
+for set and unset attributes, or are the literal attribute value.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_hexsha">
+<span class="sig-name descname"><span class="pre">get_hexsha</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">commitish</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">short</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_hexsha"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_hexsha" title="Permalink to this definition"></a></dt>
+<dd><p>Return a hexsha for a given commitish.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>commitish</strong> (<em>str</em><em>, </em><em>optional</em>) – Any identifier that refers to a commit (defaults to “HEAD”).</p></li>
+<li><p><strong>short</strong> (<em>bool</em><em>, </em><em>optional</em>) – Return the abbreviated form of the hexsha.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str or, if no commitish was given and there are no commits yet, None.</p>
+</dd>
+<dt class="field-odd">Raises</dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If a commitish was given, but no corresponding commit could be
+    determined.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_indexed_files">
+<span class="sig-name descname"><span class="pre">get_indexed_files</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_indexed_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_indexed_files" title="Permalink to this definition"></a></dt>
+<dd><p>Get a list of files in git’s index</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>list of paths rooting in git’s base dir</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_last_commit_hexsha">
+<span class="sig-name descname"><span class="pre">get_last_commit_hexsha</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_last_commit_hexsha"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_last_commit_hexsha" title="Permalink to this definition"></a></dt>
+<dd><p>Return the hash of the last commit the modified any of the given
+paths</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_merge_base">
+<span class="sig-name descname"><span class="pre">get_merge_base</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">commitishes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_merge_base"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_merge_base" title="Permalink to this definition"></a></dt>
+<dd><p>Get a merge base hexsha</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>commitishes</strong> (<em>str</em><em> or </em><em>list of str</em>) – List of commitishes (branches, hexshas, etc) to determine the merge
+base of. If a single value provided, returns merge_base with the
+current branch.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>If no merge-base for given commits, or specified treeish doesn’t
+exist, None returned</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_remote_branches">
+<span class="sig-name descname"><span class="pre">get_remote_branches</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_remote_branches"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_remote_branches" title="Permalink to this definition"></a></dt>
+<dd><p>Get all branches of all remotes of the repo.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Names of all remote branches.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_remote_url">
+<span class="sig-name descname"><span class="pre">get_remote_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">push</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_remote_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_remote_url" title="Permalink to this definition"></a></dt>
+<dd><p>Get the url of a remote.</p>
+<p>Reads the configuration of remote <cite>name</cite> and returns its url or None,
+if there is no url configured.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – name of the remote</p></li>
+<li><p><strong>push</strong> (<em>bool</em>) – if True, get the pushurl instead of the fetch url.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_remotes">
+<span class="sig-name descname"><span class="pre">get_remotes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">with_urls_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_remotes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_remotes" title="Permalink to this definition"></a></dt>
+<dd><p>Get known remotes of the repository</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>with_urls_only</strong> (<em>bool</em><em>, </em><em>optional</em>) – return only remotes which have urls</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>remotes</strong> – List of names of the remotes</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_revisions">
+<span class="sig-name descname"><span class="pre">get_revisions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">revrange</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_revisions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_revisions" title="Permalink to this definition"></a></dt>
+<dd><p>Return list of revisions in <cite>revrange</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>revrange</strong> (<em>str</em><em> or </em><em>list of str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Revisions or revision ranges to walk. If None, revision defaults to
+HEAD unless a revision-modifying option like <cite>–all</cite> or
+<cite>–branches</cite> is included in <cite>options</cite>.</p></li>
+<li><p><strong>fmt</strong> (<em>string</em><em>, </em><em>optional</em>) – Format accepted by <cite>–format</cite> option of <cite>git log</cite>. This should not
+contain new lines because the output is split on new lines.</p></li>
+<li><p><strong>options</strong> (<em>list of str</em><em>, </em><em>optional</em>) – Options to pass to <cite>git log</cite>.  This should not include <cite>–format</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>List of revisions (str), formatted according to <cite>fmt</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_staged_paths">
+<span class="sig-name descname"><span class="pre">get_staged_paths</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_staged_paths"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_staged_paths" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a list of any stage repository path(s)</p>
+<p>This is a rather fast call, as it will not depend on what is going on
+in the worktree.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_submodules">
+<span class="sig-name descname"><span class="pre">get_submodules</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sorted_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_submodules"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_submodules" title="Permalink to this definition"></a></dt>
+<dd><p>Return list of submodules.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sorted</strong> (<em>bool</em><em>, </em><em>optional</em>) – Sort submodules by path name.</p></li>
+<li><p><strong>paths</strong> (<em>list</em><em>(</em><em>pathlib.PurePath</em><em>)</em><em>, </em><em>optional</em>) – Restrict submodules to those under <cite>paths</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>List of submodule namedtuples if <cite>compat</cite> is true or otherwise a list</p></li>
+<li><p>of dictionaries as returned by <cite>get_submodules_</cite>.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_submodules_">
+<span class="sig-name descname"><span class="pre">get_submodules_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_submodules_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_submodules_" title="Permalink to this definition"></a></dt>
+<dd><p>Yield submodules in this repository.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>paths</strong> (<em>list</em><em>(</em><em>pathlib.PurePath</em><em>)</em><em>, </em><em>optional</em>) – Restrict submodules to those under <cite>paths</cite>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><em>A generator that yields a dictionary with information for each</em></p></li>
+<li><p><em>submodule.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_tags">
+<span class="sig-name descname"><span class="pre">get_tags</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_tags"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_tags" title="Permalink to this definition"></a></dt>
+<dd><p>Get list of tags</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>output</strong> (<em>str</em><em>, </em><em>optional</em>) – If given, limit the return value to a list of values matching that
+particular key of the tag properties.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Each item is a dictionary with information on a tag. At present
+this includes ‘hexsha’, and ‘name’, where the latter is the string
+label of the tag, and the former the hexsha of the object the tag
+is attached to. The list is sorted by the creator date (committer
+date for lightweight tags and tagger date for annotated tags), with
+the most recent commit being the last element.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_toppath">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_toppath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">follow_up</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_toppath"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_toppath" title="Permalink to this definition"></a></dt>
+<dd><p>Return top-level of a repository given the path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>follow_up</strong> (<em>bool</em>) – If path has symlinks – they get resolved by git.  If follow_up is
+True, we will follow original path up until we hit the same resolved
+path.  If no such path found, resolved one would be returned.</p></li>
+<li><p><strong>git_options</strong> (<em>list of str</em>) – options to be passed to the git rev-parse call</p></li>
+<li><p><strong>repository.</strong> (<em>Return None if no parent directory contains a git</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.get_tracking_branch">
+<span class="sig-name descname"><span class="pre">get_tracking_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.get_tracking_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.get_tracking_branch" title="Permalink to this definition"></a></dt>
+<dd><p>Get the tracking branch for <cite>branch</cite> if there is any.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branch</strong> (<em>str</em>) – local branch to look up. If none is given, active branch is used.</p></li>
+<li><p><strong>remote_only</strong> (<em>bool</em>) – Don’t return a value if the upstream remote is set to “.” (meaning
+this repository).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(remote or None, refspec or None) of the tracking branch</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.git_version">
+<span class="sig-name descname"><span class="pre">git_version</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.git_version" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.is_ancestor">
+<span class="sig-name descname"><span class="pre">is_ancestor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reva</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">revb</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.is_ancestor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.is_ancestor" title="Permalink to this definition"></a></dt>
+<dd><p>Is <cite>reva</cite> an ancestor of <cite>revb</cite>?</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reva</strong> (<em>str</em>) – Revisions.</p></li>
+<li><p><strong>revb</strong> (<em>str</em>) – Revisions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.is_valid_git">
+<span class="sig-name descname"><span class="pre">is_valid_git</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.is_valid_git"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.is_valid_git" title="Permalink to this definition"></a></dt>
+<dd><p>Returns whether the underlying repository appears to be still valid</p>
+<p>Note, that this almost identical to the classmethod is_valid_repo().
+However, if we are testing an existing instance, we can save Path object
+creations. Since this testing is done a lot, this is relevant. Creation
+of the Path objects in is_valid_repo() takes nearly half the time of the
+entire function.</p>
+<p>Also note, that this method is bound to an instance but still
+class-dependent, meaning that a subclass cannot simply overwrite it.
+This is particularly important for the call from within __init__(),
+which in turn is called by the subclasses’ __init__. Using an overwrite
+would lead to the wrong thing being called.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.is_valid_repo">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_valid_repo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.is_valid_repo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.is_valid_repo" title="Permalink to this definition"></a></dt>
+<dd><p>Returns if a given path points to a git repository</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.is_with_annex">
+<span class="sig-name descname"><span class="pre">is_with_annex</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.is_with_annex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.is_with_annex" title="Permalink to this definition"></a></dt>
+<dd><p>Report if GitRepo (assumed) has (remotes with) a git-annex branch</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.merge">
+<span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_unrelated</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.merge" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.precommit">
+<span class="sig-name descname"><span class="pre">precommit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.precommit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.precommit" title="Permalink to this definition"></a></dt>
+<dd><p>Perform pre-commit maintenance tasks</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.push">
+<span class="sig-name descname"><span class="pre">push</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">remote</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refspec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_remotes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.push"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.push" title="Permalink to this definition"></a></dt>
+<dd><p>Push changes to a remote (or all remotes).</p>
+<p>If remote and refspec are specified, and remote has
+<cite>remote.{remote}.datalad-push-default-first</cite> configuration variable
+set (e.g. by <cite>create-sibling-github</cite>), we will first push the first
+refspec separately to possibly ensure that the first refspec is chosen
+by remote as the “default branch”.
+See <a class="reference external" href="https://github.com/datalad/datalad/issues/4997">https://github.com/datalad/datalad/issues/4997</a>
+Upon successful push if this variable was set in the local git config,
+we unset it, so subsequent pushes would proceed normally.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>remote</strong> (<em>str</em><em>, </em><em>optional</em>) – name of the remote to push to. If no remote is given and
+<cite>all_</cite> is not set, the tracking branch is pushed.</p></li>
+<li><p><strong>refspec</strong> (<em>str</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – refspec(s) to push.</p></li>
+<li><p><strong>all</strong> (<em>bool</em><em>, </em><em>optional</em>) – push to all remotes. Fails if <cite>remote</cite> was given.</p></li>
+<li><p><strong>git_options</strong> (<em>list</em><em>, </em><em>optional</em>) – Additional command line options for git-push.</p></li>
+<li><p><strong>kwargs</strong> – Deprecated. GitPython-style keyword argument for git-push.
+Will be appended to any git_options.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.push_">
+<span class="sig-name descname"><span class="pre">push_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">remote</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refspec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.push_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.push_" title="Permalink to this definition"></a></dt>
+<dd><p>Like <cite>push</cite>, but returns a generator</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.remove">
+<span class="sig-name descname"><span class="pre">remove</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.remove"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.remove" title="Permalink to this definition"></a></dt>
+<dd><p>Remove files.</p>
+<p>Calls git-rm.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>files</strong> (<em>str</em>) – list of paths to remove</p></li>
+<li><p><strong>recursive</strong> (<em>False</em>) – whether to allow recursive removal from subdirectories</p></li>
+<li><p><strong>kwargs</strong> – see <cite>__init__</cite></p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>list of successfully removed files.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.remove_branch">
+<span class="sig-name descname"><span class="pre">remove_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branch</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.remove_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.remove_branch" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.remove_remote">
+<span class="sig-name descname"><span class="pre">remove_remote</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.remove_remote"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.remove_remote" title="Permalink to this definition"></a></dt>
+<dd><p>Remove existing remote</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_status</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.save" title="Permalink to this definition"></a></dt>
+<dd><p>Save dataset content.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message</strong> (<em>str</em><em> or </em><em>None</em>) – A message to accompany the changeset in the log. If None,
+a default message is used.</p></li>
+<li><p><strong>paths</strong> (<em>list</em><em> or </em><em>None</em>) – Any content with path matching any of the paths given in this
+list will be saved. Matching will be performed against the
+dataset status (GitRepo.status()), or a custom status provided
+via <cite>_status</cite>. If no paths are provided, ALL non-clean paths
+present in the repo status or <cite>_status</cite> will be saved.</p></li>
+<li><p><strong>_status</strong> (<em>dict</em><em> or </em><em>None</em>) – If None, Repo.status() will be queried for the given <cite>ds</cite>. If
+a dict is given, its content will be used as a constraint.
+For example, to save only modified content, but no untracked
+content, set <cite>paths</cite> to None and provide a <cite>_status</cite> that has
+no entries for untracked content.</p></li>
+<li><p><strong>**kwargs</strong> – <p>Additional arguments that are passed to underlying Repo methods.
+Supported:</p>
+<ul>
+<li><p>git : bool (passed to Repo.add()</p></li>
+<li><p>eval_submodule_state : {‘full’, ‘commit’, ‘no’}
+passed to Repo.status()</p></li>
+<li><p>untracked : {‘no’, ‘normal’, ‘all’} - passed to Repo.status()</p></li>
+<li><p>amend : bool (passed to GitRepo.commit)</p></li>
+</ul>
+</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.save_">
+<span class="sig-name descname"><span class="pre">save_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_status</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.save_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.save_" title="Permalink to this definition"></a></dt>
+<dd><p>Like <cite>save()</cite> but working as a generator.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.set_gitattributes">
+<span class="sig-name descname"><span class="pre">set_gitattributes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrfile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.gitattributes'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'a'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.set_gitattributes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.set_gitattributes" title="Permalink to this definition"></a></dt>
+<dd><p>Set gitattributes</p>
+<p>By default appends additional lines to <cite>attrfile</cite>. Note, that later
+lines in <cite>attrfile</cite> overrule earlier ones, which may or may not be
+what you want. Set <cite>mode</cite> to ‘w’ to replace the entire file by
+what you provided in <cite>attrs</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>attrs</strong> (<em>list</em>) – Each item is a 2-tuple, where the first element is a path pattern,
+and the second element is a dictionary with attribute key/value
+pairs. The attribute dictionary must use the same semantics as those
+returned by <cite>get_gitattributes()</cite>. Path patterns can use absolute paths,
+in which case they will be normalized relative to the directory
+that contains the target .gitattributes file (see <cite>attrfile</cite>).</p></li>
+<li><p><strong>attrfile</strong> (<em>path</em>) – Path relative to the repository root of the .gitattributes file the
+attributes shall be set in.</p></li>
+<li><p><strong>mode</strong> (<em>str</em>) – ‘a’ to append .gitattributes, ‘w’ to replace it</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.set_remote_url">
+<span class="sig-name descname"><span class="pre">set_remote_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">push</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.set_remote_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.set_remote_url" title="Permalink to this definition"></a></dt>
+<dd><p>Set the URL a remote is pointing to</p>
+<p>Sets the URL of the remote <cite>name</cite>. Requires the remote to already exist.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – name of the remote</p></li>
+<li><p><strong>url</strong> (<em>str</em>) – </p></li>
+<li><p><strong>push</strong> (<em>bool</em>) – if True, set the push URL, otherwise the fetch URL</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.status">
+<span class="sig-name descname"><span class="pre">status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">untracked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_submodule_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'full'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.status" title="Permalink to this definition"></a></dt>
+<dd><p>Simplified <cite>git status</cite> equivalent.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<em>list</em><em> or </em><em>None</em>) – If given, limits the query to the specified paths. To query all
+paths specify <cite>None</cite>, not an empty list. If a query path points
+into a subdataset, a report is made on the subdataset record
+within the queried dataset only (no recursion).</p></li>
+<li><p><strong>untracked</strong> (<em>{'no'</em><em>, </em><em>'normal'</em><em>, </em><em>'all'}</em>) – If and how untracked content is reported:
+‘no’: no untracked files are reported; ‘normal’: untracked files
+and entire untracked directories are reported as such; ‘all’: report
+individual files even in fully untracked directories.</p></li>
+<li><p><strong>eval_submodule_state</strong> (<em>{'full'</em><em>, </em><em>'commit'</em><em>, </em><em>'no'}</em>) – If ‘full’ (the default), the state of a submodule is evaluated by
+considering all modifications, with the treatment of untracked files
+determined by <cite>untracked</cite>. If ‘commit’, the modification check is
+restricted to comparing the submodule’s HEAD commit to the one
+recorded in the superdataset. If ‘no’, the state of the subdataset is
+not evaluated.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Each content item has an entry under a pathlib <cite>Path</cite> object instance
+pointing to its absolute path inside the repository (this path is
+guaranteed to be underneath <cite>Repo.path</cite>).
+Each value is a dictionary with properties:</p>
+<dl class="simple">
+<dt><cite>type</cite></dt><dd><p>Can be ‘file’, ‘symlink’, ‘dataset’, ‘directory’</p>
+</dd>
+<dt><cite>state</cite></dt><dd><p>Can be ‘added’, ‘untracked’, ‘clean’, ‘deleted’, ‘modified’.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.tag">
+<span class="sig-name descname"><span class="pre">tag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.tag"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.tag" title="Permalink to this definition"></a></dt>
+<dd><p>Tag a commit</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tag</strong> (<em>str</em>) – Custom tag label. Must be a valid tag name.</p></li>
+<li><p><strong>message</strong> (<em>str</em><em>, </em><em>optional</em>) – If provided, adds [‘-m’, &lt;message&gt;] to the list of <cite>git tag</cite>
+arguments.</p></li>
+<li><p><strong>commit</strong> (<em>str</em><em>, </em><em>optional</em>) – If provided, will be appended as last argument to the <cite>git tag</cite> call,
+and can be used to identify the commit that shall be tagged, if
+not HEAD.</p></li>
+<li><p><strong>options</strong> (<em>list</em><em>, </em><em>optional</em>) – Additional command options, inserted prior a potential <cite>commit</cite>
+argument.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.untracked_files">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">untracked_files</span></span><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.untracked_files" title="Permalink to this definition"></a></dt>
+<dd><p>Legacy interface, do not use! Use the status() method instead.</p>
+<p>Despite its name, it also reports on untracked datasets, and
+yields their names with trailing path separators.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.update_ref">
+<span class="sig-name descname"><span class="pre">update_ref</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">oldvalue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symbolic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.update_ref"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.update_ref" title="Permalink to this definition"></a></dt>
+<dd><p>Update the object name stored in a ref “safely”.</p>
+<p>Just a shim for <cite>git update-ref</cite> call if not symbolic, and
+<cite>git symbolic-ref</cite> if symbolic</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ref</strong> (<em>str</em>) – Reference, such as <cite>ref/heads/BRANCHNAME</cite> or HEAD.</p></li>
+<li><p><strong>value</strong> (<em>str</em>) – Value to update to, e.g. hexsha of a commit when updating for a
+branch ref, or branch ref if updating HEAD</p></li>
+<li><p><strong>oldvalue</strong> (<em>str</em>) – Value to update from. Safeguard to be verified by git. This is only
+valid if <cite>symbolic</cite> is not True.</p></li>
+<li><p><strong>symbolic</strong> (<em>None</em>) – To instruct if ref is symbolic, e.g. should be used in case of
+ref=HEAD</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.GitRepo.update_remote">
+<span class="sig-name descname"><span class="pre">update_remote</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#GitRepo.update_remote"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.GitRepo.update_remote" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">PushInfo</span></span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#PushInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.PushInfo" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></p>
+<p>dict that carries results of a push operation of a single head</p>
+<p>Reduced variant of GitPython’s RemoteProgress class</p>
+<dl class="simple">
+<dt>Original copyright:</dt><dd><p>Copyright (C) 2008, 2009 Michael Trier and contributors</p>
+</dd>
+<dt>Original license:</dt><dd><p>BSD 3-Clause “New” or “Revised” License</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.DELETED">
+<span class="sig-name descname"><span class="pre">DELETED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">64</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.DELETED" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.ERROR">
+<span class="sig-name descname"><span class="pre">ERROR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1024</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.ERROR" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.FAST_FORWARD">
+<span class="sig-name descname"><span class="pre">FAST_FORWARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">256</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.FAST_FORWARD" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.FORCED_UPDATE">
+<span class="sig-name descname"><span class="pre">FORCED_UPDATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">128</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.FORCED_UPDATE" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.NEW_HEAD">
+<span class="sig-name descname"><span class="pre">NEW_HEAD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.NEW_HEAD" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.NEW_TAG">
+<span class="sig-name descname"><span class="pre">NEW_TAG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.NEW_TAG" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.NO_MATCH">
+<span class="sig-name descname"><span class="pre">NO_MATCH</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.NO_MATCH" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.REJECTED">
+<span class="sig-name descname"><span class="pre">REJECTED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.REJECTED" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.REMOTE_FAILURE">
+<span class="sig-name descname"><span class="pre">REMOTE_FAILURE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">32</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.REMOTE_FAILURE" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.REMOTE_REJECTED">
+<span class="sig-name descname"><span class="pre">REMOTE_REJECTED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">16</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.REMOTE_REJECTED" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.PushInfo.UP_TO_DATE">
+<span class="sig-name descname"><span class="pre">UP_TO_DATE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">512</span></em><a class="headerlink" href="#datalad.support.gitrepo.PushInfo.UP_TO_DATE" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.StdOutCaptureWithGitProgress">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">StdOutCaptureWithGitProgress</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#StdOutCaptureWithGitProgress"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.StdOutCaptureWithGitProgress" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#datalad.support.gitrepo.GitProgress" title="datalad.support.gitrepo.GitProgress"><code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.support.gitrepo.GitProgress</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.StdOutCaptureWithGitProgress.proc_out">
+<span class="sig-name descname"><span class="pre">proc_out</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#datalad.support.gitrepo.StdOutCaptureWithGitProgress.proc_out" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.normalize_path">
+<span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">normalize_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#normalize_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.normalize_path" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to provide unified path conversion for a single file</p>
+<p>Unlike normalize_paths, intended to be used for functions dealing with a
+single filename at a time</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is intended to be used within the repository classes and therefore
+returns a class method!</p>
+<p>The decorated function is expected to take a path at
+first positional argument (after ‘self’). Additionally the class <cite>func</cite>
+is a member of, is expected to have an attribute ‘path’.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.normalize_paths">
+<span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">normalize_paths</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_return_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">map_filenames_back</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">serialize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#normalize_paths"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.normalize_paths" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to provide unified path conversions.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is intended to be used within the repository classes and therefore
+returns a class method!</p>
+<p>The decorated function is expected to take a path or a list of paths at
+first positional argument (after ‘self’). Additionally the class <cite>func</cite>
+is a member of, is expected to have an attribute ‘path’.</p>
+<p>Accepts either a list of paths or a single path in a str. Passes a list
+to decorated function either way, but would return based on the value of
+match_return_type and possibly input argument.</p>
+<p>If a call to the wrapped function includes normalize_path and it is False
+no normalization happens for that function call (used for calls to wrapped
+functions within wrapped functions, while possible CWD is within a
+repository)</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>match_return_type</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, and a single string was passed in, it would return the first
+element of the output (after verifying that it is a list of length 1).
+It makes easier to work with single files input.</p></li>
+<li><p><strong>map_filenames_back</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True and returned value is a dictionary, it assumes to carry entries
+one per file, and then filenames are mapped back to as provided from the
+normalized (from the root of the repo) paths</p></li>
+<li><p><strong>serialize</strong> (<em>bool</em><em>, </em><em>optional</em>) – Loop through files giving only a single one to the function one at a time.
+This allows to simplify implementation and interface to annex commands
+which do not take multiple args in the same call (e.g. checkpresentkey)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.support.gitrepo.to_options">
+<span class="sig-prename descclassname"><span class="pre">datalad.support.gitrepo.</span></span><span class="sig-name descname"><span class="pre">to_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">split_single_char_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/gitrepo.html#to_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.gitrepo.to_options" title="Permalink to this definition"></a></dt>
+<dd><p>Transform keyword arguments into a list of cmdline options</p>
+<p>Imported from GitPython.</p>
+<dl class="simple">
+<dt>Original copyright:</dt><dd><p>Copyright (C) 2008, 2009 Michael Trier and contributors</p>
+</dd>
+<dt>Original license:</dt><dd><p>BSD 3-Clause “New” or “Revised” License</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>split_single_char_options</strong> (<em>bool</em>) – </p></li>
+<li><p><strong>kwargs</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.version.html" class="btn btn-neutral float-left" title="datalad.version" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.support.annexrepo.html" class="btn btn-neutral float-right" title="datalad.support.annexrepo" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

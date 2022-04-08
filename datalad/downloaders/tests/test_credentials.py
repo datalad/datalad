@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     with_testsui,
 )
 from datalad.support.external_versions import external_versions
+from datalad.api import Dataset
 from datalad.support.keyring_ import (
     Keyring,
     MemoryKeyring,
@@ -29,6 +30,7 @@ from datalad.support.keyring_ import (
 from ..credentials import (
     AWS_S3,
     CompositeCredential,
+    GitCredential,
     UserPassword,
 )
 from datalad import cfg as dlcfg
@@ -194,3 +196,112 @@ def test_delete_not_crashing(path):
         raise AssertionError("keyring still has our key")
     except AssertionError:
         pass
+
+
+@with_tempfile
+def test_gitcredential_read(path):
+
+    matching_url = "https://example.datalad.org"
+    non_matching_url = "http://some.other.org"
+    ds = Dataset(path).create()
+
+    # Set configs so git-credential does provide something,
+    # using an inline helper:
+
+    # Simple inline credential helper to provide a password to read.
+    # Strangely seems to pass on windows. Probably depends on what git is
+    # passing this definition to (git-bash).
+    cred_helper = \
+        "!f() { test \"$1\" = get && echo \"password=apassword\"; }; f"
+
+    ds.config.add(f"credential.{matching_url}.username", "auser",
+                  where="local")
+    ds.config.add(f"credential.{matching_url}.helper", cred_helper,
+                  where="local")
+
+    # we can get those credentials when the context is right:
+    cred = GitCredential("some", auth_url=matching_url,
+                         dataset=ds)
+
+    assert_true(cred.is_known)
+    assert_equal(cred.get('user'), 'auser')
+    assert_equal(cred.get('password'), 'apassword')
+
+    # env var overrules
+    import datalad
+    try:
+        with patch.dict('os.environ', {'DATALAD_CREDENTIAL_some_user': 'new'}):
+            datalad.cfg.reload()
+            assert_true(cred.is_known)
+            assert_equal(cred.get('user'), 'new')
+            assert_equal(cred.get('password'), 'apassword')
+            with patch.dict('os.environ',
+                            {'DATALAD_CREDENTIAL_some_password': 'pwd'}):
+                datalad.cfg.reload()
+                assert_true(cred.is_known)
+                assert_equal(cred.get('user'), 'new')
+                assert_equal(cred.get('password'), 'pwd')
+    finally:
+        datalad.cfg.reload()
+
+    # different context
+    cred = GitCredential("some", auth_url=non_matching_url,
+                         dataset=ds)
+    # unknown since git-credential config doesn't match
+    assert_false(cred.is_known)
+
+    # however, w/ env vars still works:
+    try:
+        with patch.dict('os.environ',
+                        {'DATALAD_CREDENTIAL_some_user': 'user3'}):
+            datalad.cfg.reload()
+            assert_false(cred.is_known)  # no pwd yet
+            assert_equal(cred.get('user'), 'user3')
+            assert_equal(cred.get('password'), None)
+            with patch.dict('os.environ',
+                            {'DATALAD_CREDENTIAL_some_password': 'pass3'}):
+                datalad.cfg.reload()
+                assert_true(cred.is_known)
+                assert_equal(cred.get('user'), 'user3')
+                assert_equal(cred.get('password'), 'pass3')
+        # without the env vars unknown yet again:
+        assert_false(cred.is_known)
+    finally:
+        datalad.cfg.reload()
+
+
+@with_tempfile
+def test_gitcredential(path):
+
+    # Note, that credential labels are irrelevant in context of the to be tested
+    # Object here.
+
+    matching_url = "https://example.datalad.org"
+    non_matching_url = "http://some.other.org"
+    ds = Dataset(path).create()
+    # use git native credential store
+    ds.config.add("credential.helper", "store", where='local')
+
+    # store credentials
+    cred = GitCredential("cred_label", auth_url=matching_url, dataset=ds)
+    cred.set(user="dl-user", password="dl-pwd")
+
+    # read it again
+    cred2 = GitCredential("whatever", auth_url=matching_url, dataset=ds)
+    assert_equal(cred2.get("user"), "dl-user")
+    assert_equal(cred2.get("password"), "dl-pwd")
+    # but doesn't deliver w/o matching url
+    cred3 = GitCredential("whatever", auth_url=non_matching_url, dataset=ds)
+    assert_equal(cred3.get("user"), None)
+    assert_equal(cred3.get("password"), None)
+
+    # delete it
+    cred2.delete()
+
+    # not there anymore
+    cred4 = GitCredential("yet_another", auth_url=matching_url, dataset=ds)
+    assert_equal(cred4.get("user"), None)
+    assert_equal(cred4.get("password"), None)
+
+    # delete non-existing
+    cred2.delete()

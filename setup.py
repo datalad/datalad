@@ -6,11 +6,9 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import (
-    dirname,
-    join as opj,
-)
 import sys
+from os.path import dirname
+from os.path import join as opj
 
 # This is needed for versioneer to be importable when building with PEP 517.
 # See <https://github.com/warner/python-versioneer/issues/193> and links
@@ -18,39 +16,31 @@ import sys
 sys.path.append(dirname(__file__))
 
 import versioneer
-
 from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
-    # no longer needed, all scenario docs are in the handbook now
-    # keeping the original examples here only to be able to execute them
-    # as part of the tests
-    #BuildRSTExamplesFromScripts,
     BuildSchema,
-    findsome,
     datalad_setup,
 )
 
-
 requires = {
     'core': [
-        'appdirs',
+        'platformdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
-        'importlib-metadata; python_version < "3.8"',
+        'importlib-metadata; python_version < "3.10"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
         'packaging',
         'patool>=1.7',
         'tqdm',
-        'wrapt',
         'annexremote',
     ],
     'downloaders': [
         'boto',
-        'keyring>=8.0', 'keyrings.alt',
+        'keyring>=20.0', 'keyrings.alt',
         'msgpack',
         'requests>=1.2',
     ],
@@ -58,7 +48,6 @@ requires = {
         'requests_ftp',
     ],
     'publish': [
-        'PyGithub',          # nice to have
         'python-gitlab',     # required for create-sibling-gitlab
     ],
     'misc': [
@@ -96,8 +85,8 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx>=2, !=4.0.0',
-        'sphinx-rtd-theme',
+        'sphinx>=4.3.0',
+        'sphinx-rtd-theme>=0.5.1"',
     ],
     'devel-utils': [
         'asv',        # benchmarks
@@ -139,10 +128,11 @@ setup_kwargs = {}
 # a bit of a dance needed, as on windows the situation is different
 entry_points = {
     'console_scripts': [
-        'datalad=datalad.cmdline.main:main',
+        'datalad=datalad.cli.main:main',
         'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
         'git-annex-remote-datalad=datalad.customremotes.datalad:main',
         'git-annex-remote-ora=datalad.distributed.ora_remote:main',
+        'git-credential-datalad=datalad.local.gitcredential_datalad:git_credential_datalad',
     ],
     'datalad.metadata.extractors': [
         'annex=datalad.metadata.extractors.annex:MetadataExtractor',
@@ -191,7 +181,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     project_urls={'Homepage': 'https://www.datalad.org',
                   'Developer docs': 'https://docs.datalad.org/en/stable',
                   'User handbook': 'https://handbook.datalad.org',
@@ -199,13 +189,6 @@ datalad_setup(
                   'Bug Tracker': 'https://github.com/datalad/datalad/issues'},
     extras_require=requires,
     cmdclass=cmdclass,
-    package_data={
-        'datalad':
-            findsome('resources',
-                     {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
-            findsome(opj('downloaders', 'configs'), {'cfg'}) +
-            findsome(opj('distribution', 'tests'), {'yaml'}) +
-            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
-    },
+    include_package_data=True,
     **setup_kwargs
 )

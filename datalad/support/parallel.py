@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -115,10 +115,6 @@ class ProducerConsumer:
     codebase `addurls.py`, `get.py`, `save.py`, etc.
     """
 
-    # We cannot use threads with asyncio WitlessRunner inside until
-    # 3.8.0 release (v3.8.0b2~37 to be exact)
-    # See https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
-    _can_use_threads = sys.version_info >= (3, 8, 0, 'final')
     # Users should not specify -J100 and then just come complaining without
     # being informed that they are out of luck
     _alerted_already = False
@@ -245,8 +241,13 @@ class ProducerConsumer:
         else:
             self.total += 1
 
-    def __iter__(self):
-        jobs = self.jobs
+    @classmethod
+    def get_effective_jobs(cls, jobs):
+        """Return actual number of jobs to be used.
+
+        It will account for configuration variable ('datalad.runtime.max-jobs') and possible
+        other requirements (such as version of Python).
+        """
         if jobs in (None, "auto"):
             from datalad import cfg
             # ATM there is no "auto" for this operation, so in both auto and None
@@ -254,22 +255,14 @@ class ProducerConsumer:
             # "auto" could be for some auto-scaling based on a single future time
             # to complete, scaling up/down. Ten config variable could accept "auto" as well
             jobs = cfg.obtain('datalad.runtime.max-jobs')
-        if jobs >= 1 and not self._can_use_threads:
-            # if we have arrived with jobs=1 and older python, we will not
-            # even alert that we are running serially.  The fact is that
-            # ProducerConsumer with jobs=1 does parallel run of the producer
-            # so in principle already partially parallelized.
-            if jobs > 1:
-                (lgr.debug if ProducerConsumer._alerted_already else lgr.warning)(
-                    "Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
-                    "Will run serially", jobs)
-                ProducerConsumer._alerted_already = True
-            jobs = 0
-        self._jobs = jobs
-        if jobs == 0:
+        return jobs
+
+    def __iter__(self):
+        self._jobs = self.get_effective_jobs(self.jobs)
+        if self._jobs == 0:
             yield from self._iter_serial()
         else:
-            yield from self._iter_threads(jobs)
+            yield from self._iter_threads(self._jobs)
 
     def _iter_serial(self):
         # depchecker is not consulted, serial execution

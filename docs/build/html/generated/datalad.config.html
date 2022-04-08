@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.config &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.tests.utils" href="datalad.tests.utils.html" />
+    <link rel="prev" title="datalad.customremotes.archives" href="datalad.customremotes.archives.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.config</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.config">
+<span id="datalad-config"></span><h1>datalad.config<a class="headerlink" href="#module-datalad.config" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">ConfigManager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overrides</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'any'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Thin wrapper around <cite>git-config</cite> with support for a dataset configuration.</p>
+<p>The general idea is to have an object that is primarily used to read/query
+configuration option.  Upon creation, current configuration is read via one
+(or max two, in the case of the presence of dataset-specific configuration)
+calls to <cite>git config</cite>.  If this class is initialized with a Dataset
+instance, it supports reading and writing configuration from
+<code class="docutils literal notranslate"><span class="pre">.datalad/config</span></code> inside a dataset too. This file is committed to Git and
+hence useful to ship certain configuration items with a dataset.</p>
+<p>The API aims to provide the most significant read-access API of a
+dictionary, the Python ConfigParser, and GitPython’s config parser
+implementations.</p>
+<p>This class is presently not capable of efficiently writing multiple
+configurations items at once.  Instead, each modification results in a
+dedicated call to <cite>git config</cite>. This author thinks this is OK, as he
+cannot think of a situation where a large number of items need to be
+written during normal operation.</p>
+<p>Each instance carries a public <cite>overrides</cite> attribute. This dictionary
+contains variables that override any setting read from a file. The overrides
+are persistent across reloads.</p>
+<p>Any DATALAD_* environment variable is also presented as a configuration
+item. Settings read from environment variables are not stored in any of the
+configuration files, but are read dynamically from the environment at each
+<cite>reload()</cite> call. Their values take precedence over any specification in
+configuration files, and even overrides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<a class="reference internal" href="datalad.api.Dataset.html#datalad.api.Dataset" title="datalad.api.Dataset"><em>Dataset</em></a><em>, </em><em>optional</em>) – If provided, all <cite>git config</cite> calls are executed in this dataset’s
+directory. Moreover, any modifications are, by default, directed to
+this dataset’s configuration file (which will be created on demand)</p></li>
+<li><p><strong>overrides</strong> (<em>dict</em><em>, </em><em>optional</em>) – Variable overrides, see general class documentation for details.</p></li>
+<li><p><strong>source</strong> (<em>{'any'</em><em>, </em><em>'local'</em><em>, </em><em>'dataset'</em><em>, </em><em>'dataset-local'}</em><em>, </em><em>optional</em>) – Which sources of configuration setting to consider. If ‘dataset’,
+configuration items are only read from a dataset’s persistent
+configuration file, if any is present (the one in <code class="docutils literal notranslate"><span class="pre">.datalad/config</span></code>, not
+<code class="docutils literal notranslate"><span class="pre">.git/config</span></code>); if ‘local’, any non-committed source is considered
+(local and global configuration in Git config’s terminology);
+if ‘dataset-local’, persistent dataset configuration and local, but
+not global or system configuration are considered; if ‘any’
+all possible sources of configuration are considered.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.add">
+<span class="sig-name descname"><span class="pre">add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dataset'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.add"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.add" title="Permalink to this definition"></a></dt>
+<dd><p>Add a configuration variable and value</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>var</strong> (<em>str</em>) – Variable name including any section like <cite>git config</cite> expects them, e.g.
+‘core.editor’</p></li>
+<li><p><strong>value</strong> (<em>str</em>) – Variable value</p></li>
+<li><p><strong>where</strong> (<em>{'dataset'</em><em>, </em><em>'local'</em><em>, </em><em>'global'</em><em>, </em><em>'override'}</em><em>, </em><em>optional</em>) – Indicator which configuration file to modify. ‘dataset’ indicates the
+persistent configuration in .datalad/config of a dataset; ‘local’
+the configuration of a dataset’s Git repository in .git/config;
+‘global’ refers to the general configuration that is not specific to
+a single repository (usually in $USER/.gitconfig); ‘override’
+limits the modification to the ConfigManager instance, and the
+assigned value overrides any setting from any other source.</p></li>
+<li><p><strong>reload</strong> (<em>bool</em>) – Flag whether to reload the configuration from file(s) after
+modification. This can be disable to make multiple sequential
+modifications slightly more efficient.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">k</span></span></em><span class="optional">[</span>, <em class="sig-param"><span class="n"><span class="pre">d</span></span></em><span class="optional">]</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">D[k]</span> <span class="pre">if</span> <span class="pre">k</span> <span class="pre">in</span> <span class="pre">D,</span> <span class="pre">else</span> <span class="pre">d.</span>&#160; <span class="pre">d</span> <span class="pre">defaults</span> <span class="pre">to</span> <span class="pre">None.</span></span></span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.get" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>default</strong> (<em>optional</em>) – Value to return when key is not present. <cite>None</cite> by default.</p></li>
+<li><p><strong>get_all</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, return all values of multiple identical configuration keys.
+By default only the last specified value is returned.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.get_from_source">
+<span class="sig-name descname"><span class="pre">get_from_source</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.get_from_source"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.get_from_source" title="Permalink to this definition"></a></dt>
+<dd><p>Like get(), but a source can be specific.</p>
+<p>If <cite>source</cite> is ‘dataset’, only the committed configuration is queried,
+overrides are applied. In the case of ‘local’, the committed
+configuration is ignored, but overrides and configuration from
+environment variables are applied as usual.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.get_value">
+<span class="sig-name descname"><span class="pre">get_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">option</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.get_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.get_value" title="Permalink to this definition"></a></dt>
+<dd><p>Like <cite>get()</cite>, but with an optional default value</p>
+<p>If the default is not None, the given default value will be returned in
+case the option did not exist. This behavior imitates GitPython’s
+config parser.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.getbool">
+<span class="sig-name descname"><span class="pre">getbool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">option</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.getbool"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.getbool" title="Permalink to this definition"></a></dt>
+<dd><p>A convenience method which coerces the option value to a bool</p>
+<p>Values “on”, “yes”, “true” and any int!=0 are considered True
+Values which evaluate to bool False, “off”, “no”, “false” are considered
+False
+TypeError is raised for other values.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.getfloat">
+<span class="sig-name descname"><span class="pre">getfloat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">option</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.getfloat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.getfloat" title="Permalink to this definition"></a></dt>
+<dd><p>A convenience method which coerces the option value to a float</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.getint">
+<span class="sig-name descname"><span class="pre">getint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">option</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.getint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.getint" title="Permalink to this definition"></a></dt>
+<dd><p>A convenience method which coerces the option value to an integer</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.has_option">
+<span class="sig-name descname"><span class="pre">has_option</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">option</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.has_option"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.has_option" title="Permalink to this definition"></a></dt>
+<dd><p>If the given section exists, and contains the given option</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.has_section">
+<span class="sig-name descname"><span class="pre">has_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.has_section"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.has_section" title="Permalink to this definition"></a></dt>
+<dd><p>Indicates whether a section is present in the configuration</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.items">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.items" title="Permalink to this definition"></a></dt>
+<dd><p>Return a list of (name, value) pairs for each option</p>
+<p>Optionally limited to a given section.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.keys">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.keys" title="Permalink to this definition"></a></dt>
+<dd><p>Returns list of configuration item names</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.obtain">
+<span class="sig-name descname"><span class="pre">obtain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dialog_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">valtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">store</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.obtain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.obtain" title="Permalink to this definition"></a></dt>
+<dd><p>Convenience method to obtain settings interactively, if needed</p>
+<p>A UI will be used to ask for user input in interactive sessions.
+Questions to ask, and additional explanations can be passed directly
+as arguments, or retrieved from a list of pre-configured items.</p>
+<p>Additionally, this method allows for type conversion and storage
+of obtained settings. Both aspects can also be pre-configured.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>var</strong> (<em>str</em>) – Variable name including any section like <cite>git config</cite> expects them,
+e.g. ‘core.editor’</p></li>
+<li><p><strong>default</strong> (<em>any type</em>) – In interactive sessions and if <cite>store</cite> is True, this default value
+will be presented to the user for confirmation (or modification).
+In all other cases, this value will be silently assigned unless
+there is an existing configuration setting.</p></li>
+<li><p><strong>dialog_type</strong> (<em>{'question'</em><em>, </em><em>'yesno'</em><em>, </em><em>None}</em>) – Which dialog type to use in interactive sessions. If <cite>None</cite>,
+pre-configured UI options are used.</p></li>
+<li><p><strong>store</strong> (<em>bool</em>) – Whether to store the obtained value (or default)</p></li>
+<li><p><strong>where</strong> (<em>{'dataset'</em><em>, </em><em>'local'</em><em>, </em><em>'global'</em><em>, </em><em>'override'}</em><em>, </em><em>optional</em>) – Indicator which configuration file to modify. ‘dataset’ indicates the
+persistent configuration in .datalad/config of a dataset; ‘local’
+the configuration of a dataset’s Git repository in .git/config;
+‘global’ refers to the general configuration that is not specific to
+a single repository (usually in $USER/.gitconfig); ‘override’
+limits the modification to the ConfigManager instance, and the
+assigned value overrides any setting from any other source.</p></li>
+<li><p><strong>reload</strong> (<em>bool</em>) – Flag whether to reload the configuration from file(s) after
+modification. This can be disable to make multiple sequential
+modifications slightly more efficient.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments for the UI function call, such as a question
+<cite>text</cite>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.options">
+<span class="sig-name descname"><span class="pre">options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">section</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.options" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a list of options available in the specified section.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.reload">
+<span class="sig-name descname"><span class="pre">reload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.reload"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.reload" title="Permalink to this definition"></a></dt>
+<dd><p>Reload all configuration items from the configured sources</p>
+<p>If <cite>force</cite> is False, all files configuration was previously read from
+are checked for differences in the modification times. If no difference
+is found for any file no reload is performed. This mechanism will not
+detect newly created global configuration files, use <cite>force</cite> in this case.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.remove_section">
+<span class="sig-name descname"><span class="pre">remove_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sec</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dataset'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.remove_section"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.remove_section" title="Permalink to this definition"></a></dt>
+<dd><p>Rename a configuration section</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sec</strong> (<em>str</em>) – Name of the section to remove.</p></li>
+<li><p><strong>where</strong> (<em>{'dataset'</em><em>, </em><em>'local'</em><em>, </em><em>'global'</em><em>, </em><em>'override'}</em><em>, </em><em>optional</em>) – Indicator which configuration file to modify. ‘dataset’ indicates the
+persistent configuration in .datalad/config of a dataset; ‘local’
+the configuration of a dataset’s Git repository in .git/config;
+‘global’ refers to the general configuration that is not specific to
+a single repository (usually in $USER/.gitconfig); ‘override’
+limits the modification to the ConfigManager instance, and the
+assigned value overrides any setting from any other source.</p></li>
+<li><p><strong>reload</strong> (<em>bool</em>) – Flag whether to reload the configuration from file(s) after
+modification. This can be disable to make multiple sequential
+modifications slightly more efficient.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.rename_section">
+<span class="sig-name descname"><span class="pre">rename_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dataset'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.rename_section"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.rename_section" title="Permalink to this definition"></a></dt>
+<dd><p>Rename a configuration section</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>old</strong> (<em>str</em>) – Name of the section to rename.</p></li>
+<li><p><strong>new</strong> (<em>str</em>) – Name of the section to rename to.</p></li>
+<li><p><strong>where</strong> (<em>{'dataset'</em><em>, </em><em>'local'</em><em>, </em><em>'global'</em><em>, </em><em>'override'}</em><em>, </em><em>optional</em>) – Indicator which configuration file to modify. ‘dataset’ indicates the
+persistent configuration in .datalad/config of a dataset; ‘local’
+the configuration of a dataset’s Git repository in .git/config;
+‘global’ refers to the general configuration that is not specific to
+a single repository (usually in $USER/.gitconfig); ‘override’
+limits the modification to the ConfigManager instance, and the
+assigned value overrides any setting from any other source.</p></li>
+<li><p><strong>reload</strong> (<em>bool</em>) – Flag whether to reload the configuration from file(s) after
+modification. This can be disable to make multiple sequential
+modifications slightly more efficient.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.rewrite_url">
+<span class="sig-name descname"><span class="pre">rewrite_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#datalad.config.ConfigManager.rewrite_url" title="Permalink to this definition"></a></dt>
+<dd><p>Any matching ‘url.&lt;base&gt;.insteadOf’ configuration is applied</p>
+<p>Any URL that starts with such a configuration will be rewritten
+to start, instead, with &lt;base&gt;. When more than one insteadOf
+strings match a given URL, the longest match is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cfg</strong> (<a class="reference internal" href="#datalad.config.ConfigManager" title="datalad.config.ConfigManager"><em>ConfigManager</em></a><em> or </em><em>dict</em>) – dict-like with configuration variable name/value-pairs.</p></li>
+<li><p><strong>url</strong> (<em>str</em>) – URL to be rewritten, if matching configuration is found.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Rewritten or unmodified URL.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.sections">
+<span class="sig-name descname"><span class="pre">sections</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.sections"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.sections" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a list of the sections available</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.set">
+<span class="sig-name descname"><span class="pre">set</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dataset'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.set"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.set" title="Permalink to this definition"></a></dt>
+<dd><p>Set a variable to a value.</p>
+<p>In opposition to <cite>add</cite>, this replaces the value of <cite>var</cite> if there is
+one already.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>var</strong> (<em>str</em>) – Variable name including any section like <cite>git config</cite> expects them, e.g.
+‘core.editor’</p></li>
+<li><p><strong>value</strong> (<em>str</em>) – Variable value</p></li>
+<li><p><strong>force</strong> (<em>bool</em>) – if set, replaces all occurrences of <cite>var</cite> by a single one with the
+given <cite>value</cite>. Otherwise raise if multiple entries for <cite>var</cite> exist
+already</p></li>
+<li><p><strong>where</strong> (<em>{'dataset'</em><em>, </em><em>'local'</em><em>, </em><em>'global'</em><em>, </em><em>'override'}</em><em>, </em><em>optional</em>) – Indicator which configuration file to modify. ‘dataset’ indicates the
+persistent configuration in .datalad/config of a dataset; ‘local’
+the configuration of a dataset’s Git repository in .git/config;
+‘global’ refers to the general configuration that is not specific to
+a single repository (usually in $USER/.gitconfig); ‘override’
+limits the modification to the ConfigManager instance, and the
+assigned value overrides any setting from any other source.</p></li>
+<li><p><strong>reload</strong> (<em>bool</em>) – Flag whether to reload the configuration from file(s) after
+modification. This can be disable to make multiple sequential
+modifications slightly more efficient.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.config.ConfigManager.unset">
+<span class="sig-name descname"><span class="pre">unset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dataset'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#ConfigManager.unset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.ConfigManager.unset" title="Permalink to this definition"></a></dt>
+<dd><p>Remove all occurrences of a variable</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>var</strong> (<em>str</em>) – Name of the variable to remove</p></li>
+<li><p><strong>where</strong> (<em>{'dataset'</em><em>, </em><em>'local'</em><em>, </em><em>'global'</em><em>, </em><em>'override'}</em><em>, </em><em>optional</em>) – Indicator which configuration file to modify. ‘dataset’ indicates the
+persistent configuration in .datalad/config of a dataset; ‘local’
+the configuration of a dataset’s Git repository in .git/config;
+‘global’ refers to the general configuration that is not specific to
+a single repository (usually in $USER/.gitconfig); ‘override’
+limits the modification to the ConfigManager instance, and the
+assigned value overrides any setting from any other source.</p></li>
+<li><p><strong>reload</strong> (<em>bool</em>) – Flag whether to reload the configuration from file(s) after
+modification. This can be disable to make multiple sequential
+modifications slightly more efficient.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.config.anything2bool">
+<span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">anything2bool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#anything2bool"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.anything2bool" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.config.get_git_version">
+<span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">get_git_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">runner</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#get_git_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.get_git_version" title="Permalink to this definition"></a></dt>
+<dd><p>Return version of available git</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.config.parse_gitconfig_dump">
+<span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">parse_gitconfig_dump</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dump</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cwd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multi_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#parse_gitconfig_dump"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.parse_gitconfig_dump" title="Permalink to this definition"></a></dt>
+<dd><p>Parse a dump-string from <cite>git config -z –list</cite></p>
+<p>This parser has limited support for discarding unrelated output
+that may contaminate the given dump. It does so performing a
+relatively strict matching of configuration key syntax, and discarding
+lines in the output that are not valid git-config keys.</p>
+<p>There is also built-in support for parsing outputs generated
+with –show-origin (see return value).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dump</strong> (<em>str</em>) – Null-byte separated output</p></li>
+<li><p><strong>cwd</strong> (<em>path-like</em><em>, </em><em>optional</em>) – Use this absolute path to convert relative paths for origin reports
+into absolute paths. By default, the process working directory
+PWD is used.</p></li>
+<li><p><strong>multi_value</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, report values from multiple specifications of the
+same key as a tuple of values assigned to this key. Otherwise,
+the last configuration is reported.</p></li>
+<li><p><strong>Returns</strong> – </p></li>
+<li><p><strong>--------</strong> – </p></li>
+<li><p><strong>dict</strong> – Configuration items are returned as key/value pairs in a dictionary.
+The second tuple-item will be a set of path objects comprising all
+source files, if origin information was included in the dump
+(–show-origin). An empty set is returned otherwise.</p></li>
+<li><p><strong>set</strong> – Configuration items are returned as key/value pairs in a dictionary.
+The second tuple-item will be a set of path objects comprising all
+source files, if origin information was included in the dump
+(–show-origin). An empty set is returned otherwise.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.config.quote_config">
+<span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">quote_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#quote_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.quote_config" title="Permalink to this definition"></a></dt>
+<dd><p>Helper to perform minimal quoting of config keys/value parts</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>v</strong> (<em>str</em>) – To-be-quoted string</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.config.rewrite_url">
+<span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">rewrite_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cfg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#rewrite_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.rewrite_url" title="Permalink to this definition"></a></dt>
+<dd><p>Any matching ‘url.&lt;base&gt;.insteadOf’ configuration is applied</p>
+<p>Any URL that starts with such a configuration will be rewritten
+to start, instead, with &lt;base&gt;. When more than one insteadOf
+strings match a given URL, the longest match is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cfg</strong> (<a class="reference internal" href="#datalad.config.ConfigManager" title="datalad.config.ConfigManager"><em>ConfigManager</em></a><em> or </em><em>dict</em>) – dict-like with configuration variable name/value-pairs.</p></li>
+<li><p><strong>url</strong> (<em>str</em>) – URL to be rewritten, if matching configuration is found.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Rewritten or unmodified URL.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.config.write_config_section">
+<span class="sig-prename descclassname"><span class="pre">datalad.config.</span></span><span class="sig-name descname"><span class="pre">write_config_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fobj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suite</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">props</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/config.html#write_config_section"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.config.write_config_section" title="Permalink to this definition"></a></dt>
+<dd><p>Write a config section with (multiple) settings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fobj</strong> (<a class="reference internal" href="datalad.utils.html#datalad.utils.File" title="datalad.utils.File"><em>File</em></a>) – Opened target file</p></li>
+<li><p><strong>suite</strong> (<em>str</em>) – First item of the section name, e.g. ‘submodule’, or
+‘datalad’</p></li>
+<li><p><strong>name</strong> (<em>str</em>) – Remainder of the section name</p></li>
+<li><p><strong>props</strong> (<em>dict</em>) – Keys are configuration setting names within the section
+context (i.e. not duplicating <cite>suite</cite> and/or <cite>name</cite>, values
+are configuration setting values.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.customremotes.archives.html" class="btn btn-neutral float-left" title="datalad.customremotes.archives" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.tests.utils.html" class="btn btn-neutral float-right" title="datalad.tests.utils" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

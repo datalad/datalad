@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.customremotes.archives &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.config" href="datalad.config.html" />
+    <link rel="prev" title="datalad.customremotes.base" href="datalad.customremotes.base.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="datalad.cmd.html">datalad.cmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.consts.html">datalad.consts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.log.html">datalad.log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.utils.html">datalad.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.version.html">datalad.version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.gitrepo.html">datalad.support.gitrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.annexrepo.html">datalad.support.annexrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.archives.html">datalad.support.archives</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.base.html">datalad.customremotes.base</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.customremotes.archives</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.customremotes.archives</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.customremotes.archives">
+<span id="datalad-customremotes-archives"></span><h1>datalad.customremotes.archives<a class="headerlink" href="#module-datalad.customremotes.archives" title="Permalink to this headline"></a></h1>
+<p>Custom remote to get the load from archives present under annex</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.customremotes.archives.</span></span><span class="sig-name descname"><span class="pre">ArchiveAnnexCustomRemote</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">annex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistent_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="datalad.customremotes.base.html#datalad.customremotes.base.AnnexCustomRemote" title="datalad.customremotes.base.AnnexCustomRemote"><code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.customremotes.base.AnnexCustomRemote</span></code></a></p>
+<p>Special custom remote allowing to obtain files from archives</p>
+<p>Archives must be under annex’ed themselves.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.AVAILABILITY">
+<span class="sig-name descname"><span class="pre">AVAILABILITY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'local'</span></em><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.AVAILABILITY" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.COST">
+<span class="sig-name descname"><span class="pre">COST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">500</span></em><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.COST" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.CUSTOM_REMOTE_NAME">
+<span class="sig-name descname"><span class="pre">CUSTOM_REMOTE_NAME</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'archive'</span></em><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.CUSTOM_REMOTE_NAME" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.SUPPORTED_SCHEMES">
+<span class="sig-name descname"><span class="pre">SUPPORTED_SCHEMES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">('dl+archive',)</span></em><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.SUPPORTED_SCHEMES" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.URL_PREFIX">
+<span class="sig-name descname"><span class="pre">URL_PREFIX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dl+archive:'</span></em><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.URL_PREFIX" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.URL_SCHEME">
+<span class="sig-name descname"><span class="pre">URL_SCHEME</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dl+archive'</span></em><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.URL_SCHEME" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.cache">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cache</span></span><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.cache" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.checkpresent">
+<span class="sig-name descname"><span class="pre">checkpresent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.checkpresent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.checkpresent" title="Permalink to this definition"></a></dt>
+<dd><p>Requests the remote to check if a key is present in it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>key</strong> (<em>str</em>) – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>True if the key is present in the remote.
+False if the key is not present.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RemoteError</strong> – If the presence of the key couldn’t be determined, eg. in case of connection error.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.checkurl">
+<span class="sig-name descname"><span class="pre">checkurl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.checkurl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.checkurl" title="Permalink to this definition"></a></dt>
+<dd><p>Asks the remote to check if the url’s content can currently be downloaded (without downloading it).
+The remote can optionally provide additional information about the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>url</strong> (<em>str</em>) – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>True if the url’s content can currently be downloaded and no additional information can be provided.
+False if it can’t currently be downloaded.</p>
+<p>In order to provide additional information, a list of dictionaries can be returned.
+The dictionaries can have 3 keys: {‘url’: str, ‘size’: int, ‘filename’: str}. All of them are optional.</p>
+<p>If there is only one file to be downloaded, we could return:
+[{‘size’: 512, ‘filename’:’example_file.txt’}]</p>
+<p>Other examples:
+{‘url’:”<a class="reference external" href="https://example.com">https://example.com</a>”, ‘size’:512, ‘filename’:”example_file.txt”}
+[{‘url’:”Url1”, ‘size’:512, ‘filename’:”Filename1”}, {‘url’:”Url2”, ‘filename’:”Filename2”}]</p>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Union(bool, List(Dict))</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.claimurl">
+<span class="sig-name descname"><span class="pre">claimurl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.claimurl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.claimurl" title="Permalink to this definition"></a></dt>
+<dd><p>Asks the remote if it wishes to claim responsibility for downloading an url.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>url</strong> (<em>str</em>) – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>True if it wants to claim this url.
+False if it doesn’t.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.get_contentlocation">
+<span class="sig-name descname"><span class="pre">get_contentlocation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">absolute</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.get_contentlocation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.get_contentlocation" title="Permalink to this definition"></a></dt>
+<dd><p>Return (relative to top or absolute) path to the file containing the key</p>
+<p>This is a wrapper around AnnexRepo.get_contentlocation which provides
+caching of the result (we are asking the location for the same archive
+key often)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.get_file_url">
+<span class="sig-name descname"><span class="pre">get_file_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">archive_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">archive_key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.get_file_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.get_file_url" title="Permalink to this definition"></a></dt>
+<dd><p>Given archive (file or a key) and a file – compose URL for access</p>
+<p class="rubric">Examples</p>
+<dl class="simple">
+<dt>dl+archive:SHA256E-s176–69…3e.tar.gz#path=1/d2/2d&amp;size=123</dt><dd><p>when size of file within archive was known to be 123</p>
+</dd>
+<dt>dl+archive:SHA256E-s176–69…3e.tar.gz#path=1/d2/2d</dt><dd><p>when size of file within archive was not provided</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>size</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of the file.  If not provided, will simply be empty</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.remove">
+<span class="sig-name descname"><span class="pre">remove</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.remove"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.remove" title="Permalink to this definition"></a></dt>
+<dd><p>Requests the remote to remove a key’s contents.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>key</strong> (<em>str</em>) – </p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RemoteError</strong> – If the key couldn’t be deleted from the remote.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.stop" title="Permalink to this definition"></a></dt>
+<dd><p>Stop communication with annex</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.transfer_retrieve">
+<span class="sig-name descname"><span class="pre">transfer_retrieve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.transfer_retrieve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.transfer_retrieve" title="Permalink to this definition"></a></dt>
+<dd><p>Get the file identified by <cite>key</cite> from the remote and store it in <cite>local_file</cite>.</p>
+<p>While the transfer is running, the remote can repeatedly call
+annex.progress(size) to indicate the number of bytes already stored.
+This will influence the progress shown to the user.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>key</strong> (<em>str</em>) – The Key to get from the remote.</p></li>
+<li><p><strong>local_file</strong> (<em>str</em>) – Path where to store the file.
+Note that in some cases, local_file may contain whitespace.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RemoteError</strong> – If the file could not be received from the remote.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.ArchiveAnnexCustomRemote.whereis">
+<span class="sig-name descname"><span class="pre">whereis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#ArchiveAnnexCustomRemote.whereis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.ArchiveAnnexCustomRemote.whereis" title="Permalink to this definition"></a></dt>
+<dd><p>Asks the remote to provide additional information about ways to access the
+content of a key stored in it, such as eg, public urls. This will be displayed
+to the user by eg, git annex whereis.
+Note that users expect git annex whereis to run fast, without eg, network access.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>key</strong> (<em>str</em>) – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Information about the location of the key, eg. public urls.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.link_file_load">
+<span class="sig-prename descclassname"><span class="pre">datalad.customremotes.archives.</span></span><span class="sig-name descname"><span class="pre">link_file_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dry_run</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#link_file_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.link_file_load" title="Permalink to this definition"></a></dt>
+<dd><p>Just a little helper to hardlink files’s load</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.customremotes.archives.main">
+<span class="sig-prename descclassname"><span class="pre">datalad.customremotes.archives.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/customremotes/archives.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.customremotes.archives.main" title="Permalink to this definition"></a></dt>
+<dd><p>cmdline entry point</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.customremotes.base.html" class="btn btn-neutral float-left" title="datalad.customremotes.base" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.config.html" class="btn btn-neutral float-right" title="datalad.config" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

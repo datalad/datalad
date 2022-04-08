@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -41,6 +41,8 @@ from datalad.distribution.dataset import (
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
+    RIARemoteError,
+    RemoteCommandFailedError,
     SSHRemoteIO,
 )
 from datalad.utils import (
@@ -148,11 +150,11 @@ class CreateSiblingRia(Interface):
             args=("url",),
             metavar="ria+<ssh|file|http(s)>://<host>[/path]",
             doc="""URL identifying the target RIA store and access protocol. If
-            [CMD: --push-url CMD][PY: push_url PY] is given in addition, this is
+            ``push_url||--push-url`` is given in addition, this is
             used for read access only. Otherwise it will be used for write
             access too and to create the repository sibling in the RIA store.
             Note, that HTTP(S) currently is valid for consumption only thus
-            requiring to provide [CMD: --push-url CMD][PY: push_url PY].
+            requiring to provide ``push_url||--push-url``.
             """,
             constraints=EnsureStr() | EnsureNone()),
         push_url=Parameter(
@@ -220,8 +222,7 @@ class CreateSiblingRia(Interface):
             installation is required on the target host."""),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice(
-                'skip', 'error', 'reconfigure') | EnsureNone(),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', None),
             metavar='MODE',
             doc="""Action to perform, if a (storage) sibling is already
             configured under the given name and/or a target already exists.
@@ -229,13 +230,18 @@ class CreateSiblingRia(Interface):
             repository be forcefully re-initialized, and the sibling
             (re-)configured ('reconfigure'), or the command be instructed to
             fail ('error').""", ),
+        new_store_ok=Parameter(
+            args=("--new-store-ok",),
+            action='store_true',
+            doc="""When set, a new store will be created, if necessary. Otherwise, a sibling
+            will only be created if the url points to an existing RIA store.""",
+        ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         trust_level=Parameter(
             args=("--trust-level",),
             metavar="TRUST-LEVEL",
-            constraints=EnsureChoice(
-                'trust', 'semitrust', 'untrust') | EnsureNone(),
+            constraints=EnsureChoice('trust', 'semitrust', 'untrust', None),
             doc="""specify a trust level for the storage sibling. If not
             specified, the default git-annex trust level is used. 'trust'
             should be used with care (see the git-annex-trust man page).""",),
@@ -252,6 +258,7 @@ class CreateSiblingRia(Interface):
     @eval_results
     def __call__(url,
                  name,
+                 *,  # note that `name` is required but not posarg in CLI
                  dataset=None,
                  storage_name=None,
                  alias=None,
@@ -260,6 +267,7 @@ class CreateSiblingRia(Interface):
                  group=None,
                  storage_sibling=True,
                  existing='error',
+                 new_store_ok=False,
                  trust_level=None,
                  recursive=False,
                  recursion_limit=None,
@@ -347,7 +355,8 @@ class CreateSiblingRia(Interface):
             # even if we have to fail, let's report all conflicting siblings
             # in subdatasets
             failed = False
-            for r in ds.siblings(result_renderer=None,
+            for r in ds.siblings(result_renderer='disabled',
+                                 return_type='generator',
                                  recursive=recursive,
                                  recursion_limit=recursion_limit):
                 log_progress(
@@ -394,7 +403,29 @@ class CreateSiblingRia(Interface):
         #       - more generally consider store creation a dedicated command or
         #         option
 
-        create_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
+        io = SSHRemoteIO(ssh_host) if ssh_host else LocalIO()
+        try:
+            # determine the existence of a store by trying to read its layout.
+            # Because this raises a FileNotFound error if non-existent, we need
+            # to catch it
+            io.read_file(Path(base_path) / 'ria-layout-version')
+        except (FileNotFoundError, RIARemoteError, RemoteCommandFailedError) as e:
+            if not new_store_ok:
+                # we're instructed to only act in case of an existing RIA store
+                res = get_status_dict(
+                    status='error',
+                    message="No store found at '{}'. Forgot "
+                            "--new-store-ok ?".format(
+                        Path(base_path)),
+                    **res_kwargs)
+                yield res
+                return
+
+        log_progress(
+            lgr.info, 'create-sibling-ria',
+            'Creating a new RIA store at %s', Path(base_path),
+        )
+        create_store(io,
                      Path(base_path),
                      '1')
 
@@ -418,9 +449,11 @@ class CreateSiblingRia(Interface):
             # recursion when querying for them and _no_recursion with the
             # actual call. Theoretically this can be parallelized.
 
-            for subds in ds.subdatasets(fulfilled=True,
+            for subds in ds.subdatasets(state='present',
                                         recursive=True,
                                         recursion_limit=recursion_limit,
+                                        return_type='generator',
+                                        result_renderer='disabled',
                                         result_xfm='datasets'):
                 yield from _create_sibling_ria(
                     subds,
@@ -492,7 +525,11 @@ def _create_sibling_ria(
     # determine layout locations; go for a v1 store-level layout
     repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
 
-    ds_siblings = [r['name'] for r in ds.siblings(result_renderer=None)]
+    ds_siblings = [
+        r['name'] for r in ds.siblings(
+            result_renderer='disabled',
+            return_type='generator')
+    ]
     # Figure whether we are supposed to skip this very dataset
     if existing == 'skip' and (
             name in ds_siblings or (
@@ -560,7 +597,8 @@ def _create_sibling_ria(
             " and '{}'".format(storage_name) if storage_name else '',
         ))
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
-                       base_path, ds.id, '2', '1', alias)
+                       base_path, ds.id, '2', '1', alias,
+                       init_obj_tree=storage_sibling is not False)
     if storage_sibling:
         # we are using the main `name`, if the only thing we are creating
         # is the storage sibling
@@ -674,7 +712,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            gr.config.add("datalad.ora-remote.uuid", uuid, where='local')
+            gr.config.add("datalad.ora-remote.uuid", uuid, scope='local')
 
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
@@ -702,8 +740,8 @@ def _create_sibling_ria(
     ds.config.set(
         "remote.{}.annex-ignore".format(name),
         value="true",
-        where="local")
-    ds.siblings(
+        scope="local")
+    yield from ds.siblings(
         'configure',
         name=name,
         url=str(repo_path) if url.startswith("ria+file") else git_url,
@@ -711,7 +749,8 @@ def _create_sibling_ria(
         recursive=False,
         # Note, that this should be None if storage_sibling was not set
         publish_depends=storage_name,
-        result_renderer=None,
+        result_renderer='disabled',
+        return_type='generator',
         # Note, that otherwise a subsequent publish will report
         # "notneeded".
         fetch=True

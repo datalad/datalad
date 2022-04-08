@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -22,6 +22,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
     assert_repo_status,
+    get_annexstatus,
     get_convoluted_situation,
     slow,
 )
@@ -92,7 +93,7 @@ def test_save_to_git(path):
     ds.repo.save(paths=['file_ingit'], git=True)
     ds.repo.save(paths=['file_inannex'])
     assert_repo_status(ds.repo)
-    for f, p in ds.repo.annexstatus().items():
+    for f, p in get_annexstatus(ds.repo).items():
         eq_(p['state'], 'clean')
         if f.match('*ingit'):
             assert_not_in('key', p, f)

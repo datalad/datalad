@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.cmdline.helpers &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> DataLad
+            <img src="../../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>datalad.cmdline.helpers</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for datalad.cmdline.helpers</h1><div class="highlight"><pre>
+<span></span><span class="c1"># emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-</span>
+<span class="c1"># ex: set sts=4 ts=4 sw=4 et:</span>
+<span class="c1"># ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="c1">#</span>
+<span class="c1">#   See COPYING file distributed along with the datalad package for the</span>
+<span class="c1">#   copyright and license terms.</span>
+<span class="c1">#</span>
+<span class="c1"># ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__docformat__</span> <span class="o">=</span> <span class="s1">&#39;restructuredtext&#39;</span>
+
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">gzip</span>
+<span class="kn">import</span> <span class="nn">textwrap</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">NamedTemporaryFile</span>
+<span class="kn">from</span> <span class="nn">textwrap</span> <span class="kn">import</span> <span class="n">wrap</span>
+
+<span class="kn">from</span> <span class="nn">datalad</span> <span class="kn">import</span> <span class="n">__version__</span>
+<span class="kn">from</span> <span class="nn">..cmd</span> <span class="kn">import</span> <span class="n">WitlessRunner</span> <span class="k">as</span> <span class="n">Runner</span>
+<span class="kn">from</span> <span class="nn">..interface.common_opts</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">eval_defaults</span><span class="p">,</span>
+    <span class="n">eval_params</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">..log</span> <span class="kn">import</span> <span class="n">is_interactive</span>
+<span class="kn">from</span> <span class="nn">datalad.support.exceptions</span> <span class="kn">import</span> <span class="n">CapturedException</span>
+<span class="kn">from</span> <span class="nn">..ui.utils</span> <span class="kn">import</span> <span class="n">get_console_width</span>
+<span class="kn">from</span> <span class="nn">..utils</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ensure_unicode</span><span class="p">,</span>
+    <span class="n">getpwd</span><span class="p">,</span>
+    <span class="n">unlink</span><span class="p">,</span>
+    <span class="n">get_suggestions_msg</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">platformdirs</span> <span class="kn">import</span> <span class="n">AppDirs</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span> <span class="k">as</span> <span class="n">opj</span>
+
+<span class="n">dirs</span> <span class="o">=</span> <span class="n">AppDirs</span><span class="p">(</span><span class="s2">&quot;datalad&quot;</span><span class="p">,</span> <span class="s2">&quot;datalad.org&quot;</span><span class="p">)</span>
+
+
+<span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span>
+<span class="n">lgr</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;datalad.cmdline&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="HelpAction"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.HelpAction">[docs]</a><span class="k">class</span> <span class="nc">HelpAction</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># Lets use the manpage on mature systems but only for subcommands --</span>
+        <span class="c1"># --help should behave similar to how git does it:</span>
+        <span class="c1"># regular --help for &quot;git&quot; but man pages for specific commands.</span>
+        <span class="c1"># It is important since we do discover all subcommands from entry</span>
+        <span class="c1"># points at run time and thus any static manpage would like be out of</span>
+        <span class="c1"># date</span>
+        <span class="n">interactive</span> <span class="o">=</span> <span class="n">is_interactive</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">interactive</span> \
+                <span class="ow">and</span> <span class="n">option_string</span> <span class="o">==</span> <span class="s1">&#39;--help&#39;</span> \
+                <span class="ow">and</span> <span class="s1">&#39; &#39;</span> <span class="ow">in</span> <span class="n">parser</span><span class="o">.</span><span class="n">prog</span><span class="p">:</span>  <span class="c1"># subcommand</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">import</span> <span class="nn">subprocess</span>
+                <span class="c1"># get the datalad manpage to use</span>
+                <span class="n">manfile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;MANPATH&#39;</span><span class="p">,</span> <span class="s1">&#39;/usr/share/man&#39;</span><span class="p">)</span> \
+                    <span class="o">+</span> <span class="s1">&#39;/man1/</span><span class="si">{0}</span><span class="s1">.1.gz&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">prog</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">))</span>
+                <span class="c1"># extract version field from the manpage</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">manfile</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;manfile is not found&quot;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">manfile</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">man_th</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span> <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;.TH&quot;</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">man_version</span> <span class="o">=</span> <span class="n">man_th</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39; &#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot; &#39;</span><span class="se">\&quot;\t\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+
+                <span class="c1"># don&#39;t show manpage if man_version not equal to current datalad_version</span>
+                <span class="k">if</span> <span class="n">__version__</span> <span class="o">!=</span> <span class="n">man_version</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span>
+                <span class="n">subprocess</span><span class="o">.</span><span class="n">check_call</span><span class="p">(</span>
+                    <span class="s1">&#39;man </span><span class="si">%s</span><span class="s1"> 2&gt; /dev/null&#39;</span> <span class="o">%</span> <span class="n">manfile</span><span class="p">,</span>
+                    <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">ce</span> <span class="o">=</span> <span class="n">CapturedException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Did not use manpage since </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">ce</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">option_string</span> <span class="o">==</span> <span class="s1">&#39;-h&#39;</span><span class="p">:</span>
+            <span class="n">usage</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">format_usage</span><span class="p">()</span>
+            <span class="n">ucomps</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span>
+                <span class="sa">r</span><span class="s1">&#39;(?P&lt;pre&gt;.*){(?P&lt;cmds&gt;.*)}(?P&lt;post&gt;....*)&#39;</span><span class="p">,</span>
+                <span class="n">usage</span><span class="p">,</span>
+                <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ucomps</span><span class="p">:</span>
+                <span class="n">ucomps</span> <span class="o">=</span> <span class="n">ucomps</span><span class="o">.</span><span class="n">groupdict</span><span class="p">()</span>
+                <span class="n">indent_level</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ucomps</span><span class="p">[</span><span class="s1">&#39;post&#39;</span><span class="p">])</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">ucomps</span><span class="p">[</span><span class="s1">&#39;post&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lstrip</span><span class="p">())</span>
+                <span class="n">usage</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{pre}</span><span class="s1">{{</span><span class="si">{cmds}</span><span class="s1">}}</span><span class="si">{post}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">pre</span><span class="o">=</span><span class="n">ucomps</span><span class="p">[</span><span class="s1">&#39;pre&#39;</span><span class="p">],</span>
+                    <span class="n">cmds</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">wrap</span><span class="p">(</span>
+                        <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ucomps</span><span class="p">[</span><span class="s1">&#39;cmds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">))),</span>
+                        <span class="n">break_on_hyphens</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="n">subsequent_indent</span><span class="o">=</span><span class="s1">&#39; &#39;</span> <span class="o">*</span> <span class="n">indent_level</span><span class="p">)),</span>
+                    <span class="n">post</span><span class="o">=</span><span class="n">ucomps</span><span class="p">[</span><span class="s1">&#39;post&#39;</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="n">helpstr</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">usage</span><span class="p">,</span>
+                <span class="s2">&quot;Use &#39;--help&#39; to get more comprehensive information.&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">helpstr</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">format_help</span><span class="p">()</span>
+        <span class="c1"># better for help2man</span>
+        <span class="c1"># for main command -- should be different sections. And since we are in</span>
+        <span class="c1"># heavy output massaging mode...</span>
+        <span class="k">if</span> <span class="s2">&quot;essential commands&quot;</span> <span class="ow">in</span> <span class="n">helpstr</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+            <span class="n">opt_args_str</span> <span class="o">=</span> <span class="s1">&#39;*Global options*&#39;</span>
+            <span class="n">pos_args_str</span> <span class="o">=</span> <span class="s1">&#39;*Commands*&#39;</span>
+            <span class="c1"># tune up usage -- default one is way too heavy</span>
+            <span class="n">helpstr</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^[uU]sage: .*?\n\s*\n&#39;</span><span class="p">,</span>
+                             <span class="s1">&#39;Usage: datalad [global-opts] command [command-opts]</span><span class="se">\n\n</span><span class="s1">&#39;</span><span class="p">,</span>
+                             <span class="n">helpstr</span><span class="p">,</span>
+                             <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+            <span class="c1"># and altogether remove sections with long list of commands</span>
+            <span class="n">helpstr</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;positional arguments:\s*\n\s*{.*}\n&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">helpstr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">opt_args_str</span> <span class="o">=</span> <span class="s2">&quot;*Options*&quot;</span>
+            <span class="n">pos_args_str</span> <span class="o">=</span> <span class="s2">&quot;*Arguments*&quot;</span>
+        <span class="n">helpstr</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;optional arguments:&#39;</span><span class="p">,</span> <span class="n">opt_args_str</span><span class="p">,</span> <span class="n">helpstr</span><span class="p">)</span>
+        <span class="n">helpstr</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;positional arguments:&#39;</span><span class="p">,</span> <span class="n">pos_args_str</span><span class="p">,</span> <span class="n">helpstr</span><span class="p">)</span>
+        <span class="c1"># usage is on the same line</span>
+        <span class="n">helpstr</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^usage:&#39;</span><span class="p">,</span> <span class="s1">&#39;Usage:&#39;</span><span class="p">,</span> <span class="n">helpstr</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">interactive</span> <span class="ow">and</span> <span class="n">option_string</span> <span class="o">==</span> <span class="s1">&#39;--help&#39;</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">pydoc</span>
+            <span class="n">pydoc</span><span class="o">.</span><span class="n">pager</span><span class="p">(</span><span class="n">helpstr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">helpstr</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LogLevelAction"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.LogLevelAction">[docs]</a><span class="k">class</span> <span class="nc">LogLevelAction</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">..log</span> <span class="kn">import</span> <span class="n">LoggerHelper</span>
+        <span class="n">LoggerHelper</span><span class="p">()</span><span class="o">.</span><span class="n">set_level</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ArgumentParserDisableAbbrev"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.ArgumentParserDisableAbbrev">[docs]</a><span class="k">class</span> <span class="nc">ArgumentParserDisableAbbrev</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">):</span>
+    <span class="c1"># Don&#39;t accept abbreviations for long options. This kludge was originally</span>
+    <span class="c1"># added at a time when our minimum required Python version was below 3.5,</span>
+    <span class="c1"># preventing us from using allow_abbrev=False. Now our minimum Python</span>
+    <span class="c1"># version is high enough, but we still can&#39;t use allow_abbrev=False because</span>
+    <span class="c1"># it suffers from the problem described in 6b3f2fffe (BF: cmdline: Restore</span>
+    <span class="c1"># handling of short options, 2018-07-23).</span>
+    <span class="c1">#</span>
+    <span class="c1"># Modified from the solution posted at</span>
+    <span class="c1"># https://bugs.python.org/issue14910#msg204678</span>
+    <span class="k">def</span> <span class="nf">_get_option_tuples</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option_string</span><span class="p">):</span>
+        <span class="n">chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix_chars</span>
+        <span class="k">if</span> <span class="n">option_string</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">chars</span> <span class="ow">and</span> <span class="n">option_string</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">chars</span><span class="p">:</span>
+            <span class="c1"># option_string is a long flag. Disable abbreviation.</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">ArgumentParserDisableAbbrev</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">_get_option_tuples</span><span class="p">(</span>
+            <span class="n">option_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="parser_add_version_opt"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.parser_add_version_opt">[docs]</a><span class="k">def</span> <span class="nf">parser_add_version_opt</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">mod_name</span><span class="p">,</span> <span class="n">include_name</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">delay</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Setup --version option</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    parser:</span>
+<span class="sd">    mod_name: str, optional</span>
+<span class="sd">    include_name: bool, optional</span>
+<span class="sd">    delay: bool, optional</span>
+<span class="sd">      If set to True, no action is taken immediately, and rather</span>
+<span class="sd">      we assign the function which would print the version. Necessary for</span>
+<span class="sd">      early pre-parsing of the cmdline</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">print_version</span><span class="p">():</span>
+        <span class="n">mod</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mod_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">version</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s1">&#39;__version__&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Let&#39;s use the standard Python mechanism if underlying module</span>
+            <span class="c1"># did not provide __version__</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">import</span> <span class="nn">pkg_resources</span>
+                <span class="n">version</span> <span class="o">=</span> <span class="n">pkg_resources</span><span class="o">.</span><span class="n">get_distribution</span><span class="p">(</span><span class="n">mod_name</span><span class="p">)</span><span class="o">.</span><span class="n">version</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="n">version</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+        <span class="k">if</span> <span class="n">include_name</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">mod_name</span><span class="p">,</span> <span class="n">version</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">class</span> <span class="nc">versionAction</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+        <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">delay</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">print_version</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">print_version</span><span class="p">()</span>
+
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--version&quot;</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="n">versionAction</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">&quot;show the program&#39;s version&quot;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">mod_name</span>
+            <span class="k">else</span> <span class="s2">&quot;show the module and its version which provides the command&quot;</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="parser_add_common_opt"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.parser_add_common_opt">[docs]</a><span class="k">def</span> <span class="nf">parser_add_common_opt</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">common_args</span>
+    <span class="n">opt_tmpl</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">common_args</span><span class="p">,</span> <span class="n">opt</span><span class="p">)</span>
+    <span class="n">opt_kwargs</span> <span class="o">=</span> <span class="n">opt_tmpl</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">opt_kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">names</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="o">*</span><span class="n">opt_tmpl</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">**</span><span class="n">opt_kwargs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="o">*</span><span class="n">names</span><span class="p">,</span> <span class="o">**</span><span class="n">opt_kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="parser_add_common_options"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.parser_add_common_options">[docs]</a><span class="k">def</span> <span class="nf">parser_add_common_options</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser_add_common_opt</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s1">&#39;log_level&#39;</span><span class="p">)</span>
+    <span class="n">parser_add_common_opt</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s1">&#39;change_path&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Passing &#39;version&#39; to parser_add_common_options &quot;</span>
+                      <span class="s2">&quot;no longer has an effect &quot;</span>
+                      <span class="s2">&quot;and will be removed in a future release.&quot;</span><span class="p">,</span>
+                      <span class="ne">DeprecationWarning</span><span class="p">)</span>
+    <span class="n">parser_add_version_opt</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s1">&#39;datalad&#39;</span><span class="p">,</span> <span class="n">include_name</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">delay</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">__debug__</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+            <span class="s1">&#39;--dbg&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;common_debug&#39;</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s2">&quot;enter Python debugger when uncaught exception happens&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+            <span class="s1">&#39;--idbg&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;common_idebug&#39;</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s2">&quot;enter IPython debugger when uncaught exception happens&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;append&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;cfg_overrides&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;KEY=VALUE&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;configuration variable setting. Overrides any configuration</span>
+<span class="s2">        read from a file, but is potentially overridden itself by configuration</span>
+<span class="s2">        variables in the process environment.&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="c1"># CLI analog of eval_params.result_renderer but with `&lt;template&gt;` handling</span>
+    <span class="c1"># and a different default: in Python API we have None as default and do not render</span>
+    <span class="c1"># the results but return them.  In CLI we default to &quot;default&quot; renderer</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="c1"># this should really have --result-renderer for homogeneity with the</span>
+        <span class="c1"># Python API, but adding it in addition makes the help output</span>
+        <span class="c1"># monsterous</span>
+        <span class="s1">&#39;-f&#39;</span><span class="p">,</span> <span class="s1">&#39;--output-format&#39;</span><span class="p">,</span> <span class="c1"># &#39;--result-renderer&#39;,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;common_result_renderer&#39;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s1">&#39;tailored&#39;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">ensure_unicode</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;{generic,json,json_pp,tailored,disabled,&#39;&lt;template&gt;&#39;}&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="n">eval_params</span><span class="p">[</span><span class="s1">&#39;result_renderer&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_doc</span> <span class="o">+</span> <span class="s2">&quot; [Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;]&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--report-status&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;common_report_status&#39;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">,</span> <span class="s1">&#39;failure&#39;</span><span class="p">,</span> <span class="s1">&#39;ok&#39;</span><span class="p">,</span> <span class="s1">&#39;notneeded&#39;</span><span class="p">,</span> <span class="s1">&#39;impossible&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">],</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;constrain command result report to records matching the given</span>
+<span class="s2">        status. &#39;success&#39; is a synonym for &#39;ok&#39; OR &#39;notneeded&#39;, &#39;failure&#39; stands</span>
+<span class="s2">        for &#39;impossible&#39; OR &#39;error&#39;.&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--report-type&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;common_report_type&#39;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="s1">&#39;file&#39;</span><span class="p">],</span>
+        <span class="n">action</span><span class="o">=</span><span class="s1">&#39;append&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;constrain command result report to records matching the given</span>
+<span class="s2">        type. Can be given more than once to match multiple types.&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="c1"># CLI analog of eval_params.on_failure. TODO: dedup</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--on-failure&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;common_on_failure&#39;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">eval_defaults</span><span class="p">[</span><span class="s1">&#39;on_failure&#39;</span><span class="p">],</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="s1">&#39;continue&#39;</span><span class="p">,</span> <span class="s1">&#39;stop&#39;</span><span class="p">],</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;when an operation fails: &#39;ignore&#39; and continue with remaining</span>
+<span class="s2">        operations, the error is logged but does not lead to a non-zero exit code</span>
+<span class="s2">        of the command; &#39;continue&#39; works like &#39;ignore&#39;, but an error causes a</span>
+<span class="s2">        non-zero exit code; &#39;stop&#39; halts on first failure and yields non-zero exit</span>
+<span class="s2">        code. A failure is any result with status &#39;impossible&#39; or &#39;error&#39;.</span>
+<span class="s2">        [Default: &#39;</span><span class="si">%(default)s</span><span class="s2">&#39;]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--cmd&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;syntactical helper that can be used to end the list of global</span>
+<span class="s2">        command line options before the subcommand label. Options taking</span>
+<span class="s2">        an arbitrary number of arguments may require to be followed by a single</span>
+<span class="s2">        --cmd in order to enable identification of the subcommand.&quot;&quot;&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="strip_arg_from_argv"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.strip_arg_from_argv">[docs]</a><span class="k">def</span> <span class="nf">strip_arg_from_argv</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">opt_names</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Strip an originally listed option (with its value) from the list cmdline args</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Yarik doesn&#39;t know better</span>
+    <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span>
+    <span class="c1"># remove present opt_names</span>
+    <span class="n">args_clean</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">skip</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">skip</span><span class="p">:</span>
+            <span class="c1"># we skip only one as instructed</span>
+            <span class="n">skip</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">arg</span> <span class="ow">in</span> <span class="n">opt_names</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">args</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">value</span><span class="p">):</span>
+            <span class="n">args_clean</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># we need to skip this one and next one</span>
+            <span class="n">skip</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">args_clean</span></div>
+
+
+<div class="viewcode-block" id="get_repo_instance"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.get_repo_instance">[docs]</a><span class="k">def</span> <span class="nf">get_repo_instance</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">curdir</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns an instance of appropriate datalad repository for path.</span>
+<span class="sd">    Check whether a certain path is inside a known type of repository and</span>
+<span class="sd">    returns an instance representing it. May also check for a certain type</span>
+<span class="sd">    instead of detecting the type of repository.</span>
+
+<span class="sd">    .. deprecated:: 0.16</span>
+<span class="sd">       Use the pattern `Dataset(get_dataset_root(path)).repo` instead. This</span>
+<span class="sd">       function will be removed in a future release.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path: str</span>
+<span class="sd">      path to check; default: current working directory</span>
+<span class="sd">    class_: class</span>
+<span class="sd">      if given, check whether path is inside a repository, that can be</span>
+<span class="sd">      represented as an instance of the passed class.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError, in case cwd is not inside a known repository.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;get_repo_instance() was deprecated in 0.16. &quot;</span>
+                  <span class="s2">&quot;It will be removed in a future release.&quot;</span><span class="p">,</span>
+                  <span class="ne">DeprecationWarning</span><span class="p">)</span>
+
+    <span class="kn">from</span> <span class="nn">datalad.utils</span> <span class="kn">import</span> <span class="n">get_dataset_root</span>
+    <span class="kn">from</span> <span class="nn">datalad.distribution.dataset</span> <span class="kn">import</span> <span class="n">Dataset</span>
+    <span class="kn">from</span> <span class="nn">datalad.support.annexrepo</span> <span class="kn">import</span> <span class="n">AnnexRepo</span>
+    <span class="kn">from</span> <span class="nn">datalad.support.gitrepo</span> <span class="kn">import</span> <span class="n">GitRepo</span>
+
+    <span class="k">if</span> <span class="n">class_</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">class_</span> <span class="o">==</span> <span class="n">AnnexRepo</span><span class="p">:</span>
+            <span class="n">type_</span> <span class="o">=</span> <span class="s2">&quot;annex&quot;</span>
+        <span class="k">elif</span> <span class="n">class_</span> <span class="o">==</span> <span class="n">GitRepo</span><span class="p">:</span>
+            <span class="n">type_</span> <span class="o">=</span> <span class="s2">&quot;git&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Unknown class </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">class_</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="n">dsroot</span> <span class="o">=</span> <span class="n">get_dataset_root</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">dsroot</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">s repository found at </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">dsroot</span><span class="p">)</span><span class="o">.</span><span class="n">repo</span></div>
+
+
+<span class="c1">#</span>
+<span class="c1"># Some logic modules extracted from main.py to de-spagetify</span>
+<span class="c1">#</span>
+
+<span class="k">def</span> <span class="nf">_maybe_get_single_subparser</span><span class="p">(</span><span class="n">cmdlineargs</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">interface_groups</span><span class="p">,</span>
+                                <span class="n">return_subparsers</span><span class="p">,</span> <span class="n">completing</span><span class="p">,</span> <span class="n">help_ignore_extensions</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Performs early analysis of the cmdline</span>
+
+<span class="sd">    Looks at the first unparsed argument and if a known command, would return_subparsers</span>
+<span class="sd">    is False, would return only that one.</span>
+
+<span class="sd">    For the analysis to be complete etc, would also load commands from entrypoints etc</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None or str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Before doing anything additional and possibly expensive see may be that</span>
+    <span class="c1"># we have got the command already</span>
+    <span class="n">need_single_subparser</span> <span class="o">=</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">return_subparsers</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">fail_handler</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">:</span> <span class="kc">True</span><span class="p">)</span> \
+        <span class="k">if</span> <span class="n">return_subparsers</span> <span class="k">else</span> <span class="n">fail_with_short_help</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">parsed_args</span><span class="p">,</span> <span class="n">unparsed_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">_parse_known_args</span><span class="p">(</span>
+            <span class="n">cmdlineargs</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">())</span>
+        <span class="c1"># before anything handle possible datalad --version</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">unparsed_args</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">parsed_args</span><span class="p">,</span> <span class="s1">&#39;version&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="n">parsed_args</span><span class="o">.</span><span class="n">version</span><span class="p">()</span>  <span class="c1"># will exit with 0</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">completing</span> <span class="ow">or</span> <span class="n">unparsed_args</span><span class="p">):</span>
+            <span class="n">fail_handler</span><span class="p">(</span>
+                <span class="n">parser</span><span class="p">,</span>
+                <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;too few arguments, run with --help or visit https://handbook.datalad.org&quot;</span><span class="p">,</span>
+                <span class="n">exit_code</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Command line args 1st pass for DataLad </span><span class="si">%s</span><span class="s2">. Parsed: </span><span class="si">%s</span><span class="s2"> Unparsed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                  <span class="n">__version__</span><span class="p">,</span> <span class="n">parsed_args</span><span class="p">,</span> <span class="n">unparsed_args</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">ce</span> <span class="o">=</span> <span class="n">CapturedException</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Early parsing failed with </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">ce</span><span class="p">)</span>
+        <span class="n">need_single_subparser</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">unparsed_args</span> <span class="o">=</span> <span class="n">cmdlineargs</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>  <span class="c1"># referenced before assignment otherwise</span>
+    <span class="c1"># First unparsed could be either unknown option to top level &quot;datalad&quot;</span>
+    <span class="c1"># or a command. Among unknown could be --help/--help-np which would</span>
+    <span class="c1"># need to be dealt with</span>
+    <span class="n">unparsed_arg</span> <span class="o">=</span> <span class="n">unparsed_args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">unparsed_args</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">need_single_subparser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> \
+            <span class="ow">or</span> <span class="n">unparsed_arg</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;--help&#39;</span><span class="p">,</span> <span class="s1">&#39;--help-np&#39;</span><span class="p">,</span> <span class="s1">&#39;-h&#39;</span><span class="p">):</span>
+        <span class="n">need_single_subparser</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">help_ignore_extensions</span><span class="p">:</span>
+            <span class="n">add_entrypoints_to_interface_groups</span><span class="p">(</span><span class="n">interface_groups</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">completing</span> <span class="ow">and</span> <span class="n">unparsed_arg</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">):</span>  <span class="c1"># unknown option</span>
+        <span class="n">fail_with_short_help</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span>
+                             <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;unrecognized argument </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">unparsed_arg</span><span class="p">,</span>
+                             <span class="n">exit_code</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="c1"># if we could get a list of options known to parser,</span>
+        <span class="c1"># we could suggest them</span>
+        <span class="c1"># known=get_all_options(parser), provided=unparsed_arg)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># the command to handle</span>
+        <span class="n">known_commands</span> <span class="o">=</span> <span class="n">get_commands_from_groups</span><span class="p">(</span><span class="n">interface_groups</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unparsed_arg</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">known_commands</span><span class="p">:</span>
+            <span class="c1"># need to load all the extensions and try again</span>
+            <span class="n">add_entrypoints_to_interface_groups</span><span class="p">(</span><span class="n">interface_groups</span><span class="p">)</span>
+            <span class="n">known_commands</span> <span class="o">=</span> <span class="n">get_commands_from_groups</span><span class="p">(</span><span class="n">interface_groups</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">unparsed_arg</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">known_commands</span><span class="p">:</span>
+            <span class="c1"># check if might be coming from known extensions</span>
+            <span class="kn">from</span> <span class="nn">..interface</span> <span class="kn">import</span> <span class="p">(</span>
+                <span class="n">_known_extension_commands</span><span class="p">,</span>
+                <span class="n">_deprecated_commands</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">extension_commands</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">c</span><span class="p">:</span> <span class="n">e</span>
+                <span class="k">for</span> <span class="n">e</span><span class="p">,</span> <span class="n">commands</span> <span class="ow">in</span> <span class="n">_known_extension_commands</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">commands</span>
+            <span class="p">}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">unparsed_arg</span> <span class="ow">in</span> <span class="n">extension_commands</span><span class="p">:</span>
+                <span class="n">hint</span> <span class="o">=</span> <span class="s2">&quot;Command </span><span class="si">%s</span><span class="s2"> is provided by (not installed) extension </span><span class="si">%s</span><span class="s2">.&quot;</span> \
+                       <span class="o">%</span> <span class="p">(</span><span class="n">unparsed_arg</span><span class="p">,</span> <span class="n">extension_commands</span><span class="p">[</span><span class="n">unparsed_arg</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">unparsed_arg</span> <span class="ow">in</span> <span class="n">_deprecated_commands</span><span class="p">:</span>
+                <span class="n">hint_cmd</span> <span class="o">=</span> <span class="n">_deprecated_commands</span><span class="p">[</span><span class="n">unparsed_arg</span><span class="p">]</span>
+                <span class="n">hint</span> <span class="o">=</span> <span class="s2">&quot;Command </span><span class="si">%r</span><span class="s2"> was deprecated&quot;</span> <span class="o">%</span> <span class="n">unparsed_arg</span>
+                <span class="n">hint</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">&quot; in favor of </span><span class="si">%r</span><span class="s2"> command.&quot;</span> <span class="o">%</span> <span class="n">hint_cmd</span><span class="p">)</span> <span class="k">if</span> <span class="n">hint_cmd</span> <span class="k">else</span> <span class="s1">&#39;.&#39;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">completing</span><span class="p">:</span>
+                <span class="n">fail_with_short_help</span><span class="p">(</span>
+                    <span class="n">parser</span><span class="p">,</span>
+                    <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">,</span>
+                    <span class="n">provided</span><span class="o">=</span><span class="n">unparsed_arg</span><span class="p">,</span>
+                    <span class="n">known</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">known_commands</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">extension_commands</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="p">)</span>
+        <span class="k">if</span> <span class="n">need_single_subparser</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">need_single_subparser</span> <span class="o">=</span> <span class="n">unparsed_arg</span>
+    <span class="k">return</span> <span class="n">need_single_subparser</span>
+
+
+<span class="k">def</span> <span class="nf">_maybe_get_interface_subparser</span><span class="p">(</span><span class="n">_intfspec</span><span class="p">,</span> <span class="n">subparsers</span><span class="p">,</span> <span class="n">cmd_name</span><span class="p">,</span> <span class="n">formatter_class</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span>
+                                   <span class="n">grp_short_descriptions</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Given an interface spec, add a subparser to subparsers under cmd_name</span>
+
+<span class="sd">    That subparser is also gets added to the grp_short_descriptions</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">..interface.base</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">alter_interface_docs_for_cmdline</span><span class="p">,</span>
+        <span class="n">get_cmd_doc</span><span class="p">,</span>
+        <span class="n">get_cmd_ex</span><span class="p">,</span>
+        <span class="n">load_interface</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_intf</span> <span class="o">=</span> <span class="n">load_interface</span><span class="p">(</span><span class="n">_intfspec</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">_intf</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># failed to load</span>
+        <span class="k">return</span>
+    <span class="c1"># deal with optional parser args</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">_intf</span><span class="p">,</span> <span class="s1">&#39;parser_args&#39;</span><span class="p">):</span>
+        <span class="n">parser_args</span> <span class="o">=</span> <span class="n">_intf</span><span class="o">.</span><span class="n">parser_args</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">parser_args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">formatter_class</span><span class="o">=</span><span class="n">formatter_class</span><span class="p">)</span>
+        <span class="c1"># use class description, if no explicit description is available</span>
+        <span class="n">intf_doc</span> <span class="o">=</span> <span class="n">get_cmd_doc</span><span class="p">(</span><span class="n">_intf</span><span class="p">)</span>
+        <span class="n">parser_args</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alter_interface_docs_for_cmdline</span><span class="p">(</span>
+            <span class="n">intf_doc</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">_intf</span><span class="p">,</span> <span class="s1">&#39;_examples_&#39;</span><span class="p">):</span>
+            <span class="n">intf_ex</span> <span class="o">=</span> <span class="n">alter_interface_docs_for_cmdline</span><span class="p">(</span><span class="n">get_cmd_ex</span><span class="p">(</span><span class="n">_intf</span><span class="p">))</span>
+            <span class="n">parser_args</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">intf_ex</span>
+    <span class="n">subparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="n">cmd_name</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">parser_args</span><span class="p">)</span>
+    <span class="c1"># our own custom help for all commands</span>
+    <span class="n">parser_add_common_opt</span><span class="p">(</span><span class="n">subparser</span><span class="p">,</span> <span class="s1">&#39;help&#39;</span><span class="p">)</span>
+    <span class="c1"># let module configure the parser</span>
+    <span class="n">_intf</span><span class="o">.</span><span class="n">setup_parser</span><span class="p">(</span><span class="n">subparser</span><span class="p">)</span>
+    <span class="c1"># and we would add custom handler for --version</span>
+    <span class="n">parser_add_version_opt</span><span class="p">(</span><span class="n">subparser</span><span class="p">,</span> <span class="n">_intf</span><span class="o">.</span><span class="vm">__module__</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="n">include_name</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># logger for command</span>
+    <span class="c1"># configure &#39;run&#39; function for this command</span>
+    <span class="n">plumbing_args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">func</span><span class="o">=</span><span class="n">_intf</span><span class="o">.</span><span class="n">call_from_parser</span><span class="p">,</span>
+        <span class="n">logger</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">_intf</span><span class="o">.</span><span class="vm">__module__</span><span class="p">),</span>
+        <span class="n">subparser</span><span class="o">=</span><span class="n">subparser</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">_intf</span><span class="p">,</span> <span class="s1">&#39;result_renderer_cmdline&#39;</span><span class="p">):</span>
+        <span class="n">plumbing_args</span><span class="p">[</span><span class="s1">&#39;result_renderer&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_intf</span><span class="o">.</span><span class="n">result_renderer_cmdline</span>
+    <span class="n">subparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="o">**</span><span class="n">plumbing_args</span><span class="p">)</span>
+    <span class="c1"># store short description for later</span>
+    <span class="n">sdescr</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_intf</span><span class="p">,</span> <span class="s1">&#39;short_description&#39;</span><span class="p">,</span>
+                     <span class="n">parser_args</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">grp_short_descriptions</span><span class="p">[</span><span class="n">group_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">cmd_name</span><span class="p">,</span> <span class="n">sdescr</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">subparser</span>
+
+
+<div class="viewcode-block" id="add_entrypoints_to_interface_groups"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.add_entrypoints_to_interface_groups">[docs]</a><span class="k">def</span> <span class="nf">add_entrypoints_to_interface_groups</span><span class="p">(</span><span class="n">interface_groups</span><span class="p">):</span>
+    <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading entrypoints&quot;</span><span class="p">)</span>
+    <span class="kn">from</span> <span class="nn">pkg_resources</span> <span class="kn">import</span> <span class="n">iter_entry_points</span>  <span class="c1"># delay expensive import</span>
+    <span class="k">for</span> <span class="n">ep</span> <span class="ow">in</span> <span class="n">iter_entry_points</span><span class="p">(</span><span class="s1">&#39;datalad.extensions&#39;</span><span class="p">):</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s1">&#39;Loading entrypoint </span><span class="si">%s</span><span class="s1"> from datalad.extensions for docs building&#39;</span><span class="p">,</span>
+            <span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">spec</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s1">&#39;Extension does not provide a command suite: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span>
+                    <span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">interface_groups</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Loaded entrypoint </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">ce</span> <span class="o">=</span> <span class="n">CapturedException</span><span class="p">(</span><span class="n">ce</span><span class="p">)</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Failed to load entrypoint </span><span class="si">%s</span><span class="s1">: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ce</span><span class="p">)</span>
+            <span class="k">continue</span></div>
+
+
+<div class="viewcode-block" id="get_commands_from_groups"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.get_commands_from_groups">[docs]</a><span class="k">def</span> <span class="nf">get_commands_from_groups</span><span class="p">(</span><span class="n">groups</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get a dictionary of command: interface_spec&quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">..interface.base</span> <span class="kn">import</span> <span class="n">get_cmdline_command_name</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">get_cmdline_command_name</span><span class="p">(</span><span class="n">_intfspec</span><span class="p">):</span> <span class="n">_intfspec</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_interfaces</span> <span class="ow">in</span> <span class="n">groups</span>
+        <span class="k">for</span> <span class="n">_intfspec</span> <span class="ow">in</span> <span class="n">_interfaces</span>
+    <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="fail_with_short_help"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.fail_with_short_help">[docs]</a><span class="k">def</span> <span class="nf">fail_with_short_help</span><span class="p">(</span><span class="n">parser</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                         <span class="n">msg</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                         <span class="n">known</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">provided</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                         <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                         <span class="n">exit_code</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                         <span class="n">what</span><span class="o">=</span><span class="s2">&quot;command&quot;</span><span class="p">,</span>
+                         <span class="n">out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Generic helper to fail</span>
+<span class="sd">    with short help possibly hinting on what was intended if `known`</span>
+<span class="sd">    were provided</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">out</span> <span class="ow">or</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span>
+    <span class="k">if</span> <span class="n">msg</span><span class="p">:</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;error: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">msg</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">known</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parser</span><span class="p">:</span>
+            <span class="n">parser_add_common_opt</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s1">&#39;help&#39;</span><span class="p">)</span>
+            <span class="c1"># just to appear in print_usage also consistent with --help output</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;command [command-opts]&quot;</span><span class="p">)</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">print_usage</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">out</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+            <span class="s2">&quot;datalad: Unknown </span><span class="si">%s</span><span class="s2"> </span><span class="si">%r</span><span class="s2">.  See &#39;datalad --help&#39;.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">what</span><span class="p">,</span> <span class="n">provided</span><span class="p">,))</span>
+        <span class="k">if</span> <span class="n">provided</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">known</span><span class="p">:</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">get_suggestions_msg</span><span class="p">(</span><span class="n">provided</span><span class="p">,</span> <span class="n">known</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">hint</span><span class="p">:</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;Hint: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">hint</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="n">exit_code</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_fix_datalad_ri</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Fixup argument if it was a DataLadRI and had leading / removed</span>
+
+<span class="sd">    See gh-2643</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;//&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">s</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;/&#39;</span><span class="p">)):</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Changing </span><span class="si">%s</span><span class="s2"> back to /</span><span class="si">%s</span><span class="s2"> as it was probably changed by MINGW/MSYS, &quot;</span>
+            <span class="s2">&quot;see http://www.mingw.org/wiki/Posix_path_conversion&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="n">s</span>
+    <span class="k">return</span> <span class="n">s</span>
+
+
+<div class="viewcode-block" id="get_description_with_cmd_summary"><a class="viewcode-back" href="../../../generated/datalad.cmdline.helpers.html#datalad.cmdline.helpers.get_description_with_cmd_summary">[docs]</a><span class="k">def</span> <span class="nf">get_description_with_cmd_summary</span><span class="p">(</span><span class="n">grp_short_descriptions</span><span class="p">,</span> <span class="n">interface_groups</span><span class="p">,</span>
+                                     <span class="n">parser_description</span><span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">..interface.base</span> <span class="kn">import</span> <span class="n">dedent_docstring</span>
+    <span class="kn">from</span> <span class="nn">..interface.base</span> <span class="kn">import</span> <span class="n">get_cmd_summaries</span>
+    <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Generating detailed description for the parser&quot;</span><span class="p">)</span>
+
+    <span class="n">console_width</span> <span class="o">=</span> <span class="n">get_console_width</span><span class="p">()</span>
+    <span class="n">cmd_summary</span> <span class="o">=</span> <span class="n">get_cmd_summaries</span><span class="p">(</span><span class="n">grp_short_descriptions</span><span class="p">,</span> <span class="n">interface_groups</span><span class="p">,</span>
+                                    <span class="n">width</span><span class="o">=</span><span class="n">console_width</span><span class="p">)</span>
+    <span class="c1"># we need one last formal section to not have the trailed be</span>
+    <span class="c1"># confused with the last command group</span>
+    <span class="n">cmd_summary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">*General information*</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">detailed_description</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="si">%s</span><span class="se">\n\n</span><span class="si">%s</span><span class="s1">&#39;</span> \
+                           <span class="o">%</span> <span class="p">(</span><span class="n">parser_description</span><span class="p">,</span>
+                              <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cmd_summary</span><span class="p">),</span>
+                              <span class="n">textwrap</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">dedent_docstring</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">    Detailed usage information for individual commands is</span>
+<span class="s2">    available via command-specific --help, i.e.:</span>
+<span class="s2">    datalad &lt;command&gt; --help&quot;&quot;&quot;</span><span class="p">),</span>
+                                            <span class="n">console_width</span> <span class="o">-</span> <span class="mi">5</span><span class="p">,</span>
+                                            <span class="n">initial_indent</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+                                            <span class="n">subsequent_indent</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">detailed_description</span></div>
+
+
+<span class="k">def</span> <span class="nf">_parse_overrides_from_cmdline</span><span class="p">(</span><span class="n">cmdlineargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;parse config overrides provided in command line</span>
+
+<span class="sd">    Might exit(3) the entire process if value is not assigned&quot;&quot;&quot;</span>
+    <span class="c1"># this expression is deliberately loose as gitconfig offers</span>
+    <span class="c1"># quite some flexibility -- this is just meant to catch stupid</span>
+    <span class="c1"># errors: we need a section, a variable, and a value at minimum</span>
+    <span class="c1"># otherwise we break our own config parsing helpers</span>
+    <span class="c1"># https://github.com/datalad/datalad/issues/3451</span>
+    <span class="n">noassign_expr</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[^\s]+\.[^\s]+=[\S]+&#39;</span><span class="p">)</span>
+    <span class="n">noassign</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">o</span>
+        <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">cmdlineargs</span><span class="o">.</span><span class="n">cfg_overrides</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">noassign_expr</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">o</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="n">noassign</span><span class="p">:</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Configuration override without section/variable &quot;</span>
+            <span class="s2">&quot;or value assignment (must be &#39;section.variable=value&#39;): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">noassign</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">overrides</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">cmdlineargs</span><span class="o">.</span><span class="n">cfg_overrides</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">overrides</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

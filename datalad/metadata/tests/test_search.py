@@ -1,6 +1,6 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -150,7 +150,10 @@ def _check_mocked_install(default_dspath, mock_install):
     assert_equal(
         list(gen), [report
                     for report in _mocked_search_results])
-    mock_install.assert_called_once_with(default_dspath, source='///')
+    mock_install.assert_called_once_with(
+        default_dspath,
+        source='///',
+        result_renderer='disabled')
 
 
 @with_tempfile
@@ -175,8 +178,8 @@ def test_within_ds_file_search(path):
     for m in ('egrep', 'textblob', 'autofield'):
         ds.config.add(
             'datalad.search.index-{}-documenttype'.format(m), 'all',
-            where='dataset')
-    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
+            scope='branch')
+    ds.config.add('datalad.metadata.nativetype', 'audio', scope='branch')
     makedirs(opj(path, 'stim'))
     for src, dst in (
             ('audio.mp3', opj('stim', 'stim1.mp3')),):

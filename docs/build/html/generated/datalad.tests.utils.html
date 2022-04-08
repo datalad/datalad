@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.tests.utils &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.tests.utils_testrepos" href="datalad.tests.utils_testrepos.html" />
+    <link rel="prev" title="datalad.config" href="datalad.config.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.tests.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.tests.utils_testrepos.html">datalad.tests.utils_testrepos</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.tests.heavyoutput.html">datalad.tests.heavyoutput</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.tests.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.tests.utils">
+<span id="datalad-tests-utils"></span><h1>datalad.tests.utils<a class="headerlink" href="#module-datalad.tests.utils" title="Permalink to this headline"></a></h1>
+<p>Miscellaneous utilities to assist with testing</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.tests.utils.HTTPPath">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">HTTPPath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ssl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#HTTPPath"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.HTTPPath" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Serve the content of a path via an HTTP URL.</p>
+<p>This class can be used as a context manager, in which case it returns the
+URL.</p>
+<p>Alternatively, the <cite>start</cite> and <cite>stop</cite> methods can be called directly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – Directory with content to serve.</p></li>
+<li><p><strong>use_ssl</strong> (<em>bool</em>) – </p></li>
+<li><p><strong>auth</strong> (<em>tuple</em>) – Username, password</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.tests.utils.HTTPPath.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#HTTPPath.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.HTTPPath.start" title="Permalink to this definition"></a></dt>
+<dd><p>Start serving <cite>path</cite> via HTTP.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.tests.utils.HTTPPath.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#HTTPPath.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.HTTPPath.stop" title="Permalink to this definition"></a></dt>
+<dd><p>Stop serving <cite>path</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.tests.utils.SilentHTTPHandler">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">SilentHTTPHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#SilentHTTPHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.SilentHTTPHandler" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">http.server.SimpleHTTPRequestHandler</span></code></p>
+<p>A little adapter to silence the handler</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.tests.utils.SilentHTTPHandler.log_message">
+<span class="sig-name descname"><span class="pre">log_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">format</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#SilentHTTPHandler.log_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.SilentHTTPHandler.log_message" title="Permalink to this definition"></a></dt>
+<dd><p>Log an arbitrary message.</p>
+<p>This is used by all other logging functions.  Override
+it if you have specific logging wishes.</p>
+<p>The first argument, FORMAT, is a format string for the
+message to be logged.  If the format string contains
+any % escapes requiring parameters, they should be
+specified as subsequent arguments (it’s just like
+printf!).</p>
+<p>The client ip and current date/time are prefixed to
+every message.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_cwd_unchanged">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_cwd_unchanged</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ok_to_chdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_cwd_unchanged"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_cwd_unchanged" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to test whether the current working directory remains unchanged</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>ok_to_chdir</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, allow to chdir, so this decorator would not then raise exception
+if chdir’ed but only return to original directory</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_dict_equal">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_dict_equal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_dict_equal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_dict_equal" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_in_results">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_in_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_in_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_in_results" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that the particular combination of keys and values is found in
+one of the results</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_is_generator">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_is_generator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gen</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#datalad.tests.utils.assert_is_generator" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_message">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_message" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that each status dict in the results has a message</p>
+<p>This only tests the message template string, and not a formatted message
+with args expanded.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_no_errors_logged">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_no_errors_logged</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_re</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_no_errors_logged"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_no_errors_logged" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator around function to assert that no errors logged during its execution</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_not_in_results">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_not_in_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_not_in_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_not_in_results" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that the particular combination of keys and values is not in any
+of the results</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_re_in">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_re_in</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">regex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_re_in"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_re_in" title="Permalink to this definition"></a></dt>
+<dd><p>Assert that container (list, str, etc) contains entry matching the regex</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_repo_status">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_repo_status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">untracked_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'normal'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_repo_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_repo_status" title="Permalink to this definition"></a></dt>
+<dd><p>Compare a repo status against (optional) exceptions.</p>
+<p>Anything file/directory that is not explicitly indicated must have
+state ‘clean’, i.e. no modifications and recorded in Git.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em> or </em><em>Repo</em>) – in case of a str: path to the repository’s base dir;
+Note, that passing a Repo instance prevents detecting annex. This might
+be useful in case of a non-initialized annex, a GitRepo is pointing to.</p></li>
+<li><p><strong>annex</strong> (<em>bool</em><em> or </em><em>None</em>) – explicitly set to True or False to indicate, that an annex is (not)
+expected; set to None to autodetect, whether there is an annex.
+Default: None.</p></li>
+<li><p><strong>untracked_mode</strong> (<em>{'no'</em><em>, </em><em>'normal'</em><em>, </em><em>'all'}</em>) – If and how untracked content is reported. The specification of untracked
+files that are OK to be found must match this mode. See <cite>Repo.status()</cite></p></li>
+<li><p><strong>**kwargs</strong> – Files/directories that are OK to not be in ‘clean’ state. Each argument
+must be one of ‘added’, ‘untracked’, ‘deleted’, ‘modified’ and each
+value must be a list of filenames (relative to the root of the
+repository, in POSIX convention).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_result_count">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_result_count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_result_count"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_result_count" title="Permalink to this definition"></a></dt>
+<dd><p>Verify specific number of results (matching criteria, if any)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_result_values_cond">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_result_values_cond</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prop</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cond</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_result_values_cond"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_result_values_cond" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that the values of all results for a given key in the status dicts
+fulfill condition <cite>cond</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results</strong> – </p></li>
+<li><p><strong>prop</strong> (<em>str</em>) – </p></li>
+<li><p><strong>cond</strong> (<em>callable</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_result_values_equal">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_result_values_equal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prop</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_result_values_equal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_result_values_equal" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that the values of all results for a given key in the status dicts
+match the given sequence</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_status">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_status" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that each status dict in the results has a given status label</p>
+<p><cite>label</cite> can be a sequence, in which case status must be one of the items
+in this sequence.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.assert_str_equal">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">assert_str_equal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#assert_str_equal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.assert_str_equal" title="Permalink to this definition"></a></dt>
+<dd><p>Helper to compare two lines</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.check_not_generatorfunction">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">check_not_generatorfunction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#check_not_generatorfunction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.check_not_generatorfunction" title="Permalink to this definition"></a></dt>
+<dd><p>Internal helper to verify that we are not decorating generator tests</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.clone_url">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">clone_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#clone_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.clone_url" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.get_convoluted_situation">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">get_convoluted_situation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">repocls=&lt;class</span> <span class="pre">'datalad.support.annexrepo.AnnexRepo'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#get_convoluted_situation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.get_convoluted_situation" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.get_datasets_topdir">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">get_datasets_topdir</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#get_datasets_topdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.get_datasets_topdir" title="Permalink to this definition"></a></dt>
+<dd><p>Delayed parsing so it could be monkey patched etc</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.get_deeply_nested_structure">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">get_deeply_nested_structure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#get_deeply_nested_structure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.get_deeply_nested_structure" title="Permalink to this definition"></a></dt>
+<dd><p>Here is what this does (assuming UNIX, locked):
+|  .
+|  ├── directory_untracked
+|  │  └── link2dir -&gt; ../subdir
+|  ├── OBSCURE_FILENAME_file_modified
+|  ├── link2dir -&gt; subdir
+|  ├── link2subdsdir -&gt; subds_modified/subdir
+|  ├── link2subdsroot -&gt; subds_modified
+|  ├── subdir
+|  │   ├── annexed_file.txt -&gt; ../.git/annex/objects/…
+|  │   ├── file_modified
+|  │   ├── git_file.txt
+|  │   └── link2annex_files.txt -&gt; annexed_file.txt
+|  └── subds_modified
+|      ├── link2superdsdir -&gt; ../subdir
+|      ├── subdir
+|      │   └── annexed_file.txt -&gt; ../.git/annex/objects/…
+|      └── subds_lvl1_modified
+|          └── OBSCURE_FILENAME_directory_untracked
+|              └── untracked_file</p>
+<p>When a system has no symlink support, the link2… components are not
+included.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.get_most_obscure_supported_name">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">get_most_obscure_supported_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_candidates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#get_most_obscure_supported_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.get_most_obscure_supported_name" title="Permalink to this definition"></a></dt>
+<dd><p>Return the most obscure filename that the filesystem would support under TEMPDIR</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>return_candidates</strong> (<em>bool</em><em>, </em><em>optional</em>) – if True, return a tuple of (good, candidates) where candidates are “partially”
+sorted from trickiest considered</p></li>
+<li><p><strong>TODO</strong> (<em>we might want to use it as a function where we would provide tdir</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.get_mtimes_and_digests">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">get_mtimes_and_digests</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#get_mtimes_and_digests"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.get_mtimes_and_digests" title="Permalink to this definition"></a></dt>
+<dd><p>Return digests (md5) and mtimes for all the files under target_path</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.get_ssh_port">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">get_ssh_port</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">host</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#get_ssh_port"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.get_ssh_port" title="Permalink to this definition"></a></dt>
+<dd><p>Get port of <cite>host</cite> in ssh_config.</p>
+<p>Our tests depend on the host being defined in ssh_config, including its
+port. This method can be used by tests that want to check handling of an
+explicitly specified</p>
+<p>Note that if <cite>host</cite> does not match a host in ssh_config, the default value
+of 22 is returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>host</strong> (<em>str</em>) – </p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>port (int)</p>
+</dd>
+<dt class="field-odd">Raises</dt>
+<dd class="field-odd"><p><strong>SkipTest if port cannot be found.</strong> – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.has_symlink_capability">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">has_symlink_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#has_symlink_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.has_symlink_capability" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ignore_nose_capturing_stdout">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ignore_nose_capturing_stdout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ignore_nose_capturing_stdout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ignore_nose_capturing_stdout" title="Permalink to this definition"></a></dt>
+<dd><p>DEPRECATED and will be removed soon.  Does nothing!</p>
+<p>Originally was intended as a decorator workaround for nose’s behaviour
+with redirecting sys.stdout, but now we monkey patch nose now so no test
+should no longer be skipped.</p>
+<p>See issue reported here:
+<a class="reference external" href="https://code.google.com/p/python-nose/issues/detail?id=243&amp;can=1&amp;sort=-id&amp;colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary">https://code.google.com/p/python-nose/issues/detail?id=243&amp;can=1&amp;sort=-id&amp;colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary</a></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.integration">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">integration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#integration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.integration" title="Permalink to this definition"></a></dt>
+<dd><p>Mark test as an “integration” test which generally is not needed to be run</p>
+<p>Generally tend to be slower.
+Should be used in combination with &#64;slow and &#64;turtle if that is the case.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.known_failure">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">known_failure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#known_failure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.known_failure" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator marking a test as known to fail</p>
+<p>This combines <cite>probe_known_failure</cite> and <cite>skip_known_failure</cite> giving the
+skipping precedence over the probing.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.known_failure_direct_mode">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">known_failure_direct_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#known_failure_direct_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.known_failure_direct_mode" title="Permalink to this definition"></a></dt>
+<dd><p>DEPRECATED.  Stop using.  Does nothing</p>
+<p>Test decorator marking a test as known to fail in a direct mode test run</p>
+<p>If datalad.repo.direct is set to True behaves like <cite>known_failure</cite>.
+Otherwise the original (undecorated) function is returned.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.known_failure_githubci_osx">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">known_failure_githubci_osx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#known_failure_githubci_osx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.known_failure_githubci_osx" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator for a known test failure on Github’s macOS CI</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.known_failure_githubci_win">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">known_failure_githubci_win</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#known_failure_githubci_win"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.known_failure_githubci_win" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator for a known test failure on Github’s Windows CI</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.known_failure_osx">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">known_failure_osx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#known_failure_osx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.known_failure_osx" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator for a known test failure on macOS</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.known_failure_windows">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">known_failure_windows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#known_failure_windows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.known_failure_windows" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator marking a test as known to fail on windows</p>
+<p>On Windows behaves like <cite>known_failure</cite>.
+Otherwise the original (undecorated) function is returned.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.maybe_adjust_repo">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">maybe_adjust_repo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">repo</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#maybe_adjust_repo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.maybe_adjust_repo" title="Permalink to this definition"></a></dt>
+<dd><p>Put repo into an adjusted branch if it is not already.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.nok_startswith">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">nok_startswith</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#nok_startswith"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.nok_startswith" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_annex_get">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_annex_get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">network</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_annex_get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_annex_get" title="Permalink to this definition"></a></dt>
+<dd><p>Helper to run .get decorated checking for correct operation</p>
+<p>get passes through stderr from the ar to the user, which pollutes
+screen while running tests</p>
+<p>Note: Currently not true anymore, since usage of –json disables
+progressbars</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_archives_caches">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_archives_caches</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">repopath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_archives_caches"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_archives_caches" title="Permalink to this definition"></a></dt>
+<dd><p>Given a path to repository verify number of archives</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>repopath</strong> (<em>str</em>) – Path to the repository</p></li>
+<li><p><strong>n</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of archives directories to expect</p></li>
+<li><p><strong>persistent</strong> (<em>bool</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – If None – both persistent and not count.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_broken_symlink">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_broken_symlink</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_broken_symlink"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_broken_symlink" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_clean_git">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_clean_git</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_modified</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">untracked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_clean_git"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_clean_git" title="Permalink to this definition"></a></dt>
+<dd><p>Obsolete test helper. Use assert_repo_status() instead.</p>
+<p>Still maps a few common cases to the new helper, to ease transition
+in extensions.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_endswith">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_endswith</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suffix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_endswith"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_endswith" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_exists">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_exists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_exists"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_exists" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_file_has_content">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_file_has_content</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">strip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">re_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">decompress</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_file_has_content"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_file_has_content" title="Permalink to this definition"></a></dt>
+<dd><p>Verify that file exists and has expected content</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_file_under_git">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_file_under_git</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annexed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_file_under_git"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_file_under_git" title="Permalink to this definition"></a></dt>
+<dd><p>Test if file is present and under git/annex control</p>
+<p>If relative path provided, then test from current directory</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_generator">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_generator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gen</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_generator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_generator" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_git_config_not_empty">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_git_config_not_empty</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ar</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_git_config_not_empty"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_git_config_not_empty" title="Permalink to this definition"></a></dt>
+<dd><p>Helper to verify that nothing rewritten the config file</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_good_symlink">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_good_symlink</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_good_symlink"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_good_symlink" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_startswith">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_startswith</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_startswith"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_startswith" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.ok_symlink">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">ok_symlink</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#ok_symlink"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.ok_symlink" title="Permalink to this definition"></a></dt>
+<dd><p>Checks whether path is either a working or broken symlink</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.patch_config">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">patch_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vars</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#patch_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.patch_config" title="Permalink to this definition"></a></dt>
+<dd><p>Patch our config with custom settings. Returns mock.patch cm</p>
+<p>Only the merged configuration from all sources (global, local, dataset)
+will be patched. Source-constrained patches (e.g. only committed dataset
+configuration) are not supported.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.probe_known_failure">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">probe_known_failure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#probe_known_failure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.probe_known_failure" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator allowing the test to pass when it fails and vice versa</p>
+<p>Setting config datalad.tests.knownfailures.probe to True tests, whether or
+not the test is still failing. If it’s not, an AssertionError is raised in
+order to indicate that the reason for failure seems to be gone.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.put_file_under_git">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">put_file_under_git</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annexed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#put_file_under_git"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.put_file_under_git" title="Permalink to this definition"></a></dt>
+<dd><p>Place file under git/annex and return used Repo</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.run_under_dir">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">run_under_dir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#run_under_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.run_under_dir" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to run tests under another directory</p>
+<p>It is somewhat ugly since we can’t really chdir
+back to a directory which had a symlink in its path.
+So using this decorator has potential to move entire
+testing run under the dereferenced directory name – sideeffect.</p>
+<p>The only way would be to instruct testing framework (i.e. nose
+in our case ATM) to run a test by creating a new process with
+a new cwd</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.serve_path_via_http">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">serve_path_via_http</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tfunc</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">targs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ssl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#serve_path_via_http"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.serve_path_via_http" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator which serves content of a directory via http url</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – Directory with content to serve.</p></li>
+<li><p><strong>use_ssl</strong> (<em>bool</em>) – Flag whether to set up SSL encryption and return a HTTPS
+URL. This require a valid certificate setup (which is tested
+for proper function) or it will cause a SkipTest to be raised.</p></li>
+<li><p><strong>auth</strong> (<em>tuple</em><em> or </em><em>None</em>) – If a (username, password) tuple is given, the server access will
+be protected via HTTP basic auth.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.set_annex_version">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">set_annex_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">version</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#set_annex_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.set_annex_version" title="Permalink to this definition"></a></dt>
+<dd><p>Override the git-annex version.</p>
+<p>This temporarily masks the git-annex version present in external_versions
+and make AnnexRepo forget its cached version information.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.set_date">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">set_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timestamp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#set_date"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.set_date" title="Permalink to this definition"></a></dt>
+<dd><p>Temporarily override environment variables for git/git-annex dates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>timestamp</strong> (<em>int</em>) – Unix timestamp.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_httpretty_on_problematic_pythons">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_httpretty_on_problematic_pythons</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_httpretty_on_problematic_pythons"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_httpretty_on_problematic_pythons" title="Permalink to this definition"></a></dt>
+<dd><p>As discovered some httpretty bug causes a side-effect
+on other tests on some Pythons.  So we skip the test if such
+problematic combination detected</p>
+<p>References
+<a class="reference external" href="https://travis-ci.org/datalad/datalad/jobs/94464988">https://travis-ci.org/datalad/datalad/jobs/94464988</a>
+<a class="reference external" href="http://stackoverflow.com/a/29603206/1265472">http://stackoverflow.com/a/29603206/1265472</a></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cond</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'raise'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if" title="Permalink to this definition"></a></dt>
+<dd><p>Skip test for specific condition</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cond</strong> (<em>bool</em>) – condition on which to skip</p></li>
+<li><p><strong>msg</strong> (<em>str</em>) – message to print if skipping</p></li>
+<li><p><strong>method</strong> (<em>str</em>) – either ‘raise’ or ‘pass’. Whether to skip by raising <cite>SkipTest</cite> or by
+just proceeding and simply not calling the decorated function.
+This is particularly meant to be used, when decorating single assertions
+in a test with method=’pass’ in order to not skip the entire test, but
+just that assertion.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_adjusted_branch">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_adjusted_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_adjusted_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_adjusted_branch" title="Permalink to this definition"></a></dt>
+<dd><p>Skip test if adjusted branch is used by default on TMPDIR file system.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_no_module">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_no_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_no_module"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_no_module" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_no_network">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_no_network</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_no_network"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_no_network" title="Permalink to this definition"></a></dt>
+<dd><p>Skip test completely in NONETWORK settings</p>
+<p>If not used as a decorator, and just a function, could be used at the module level</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_on_windows">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_on_windows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_on_windows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_on_windows" title="Permalink to this definition"></a></dt>
+<dd><p>Skip test completely under Windows</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_root">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_root</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_root"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_root" title="Permalink to this definition"></a></dt>
+<dd><p>Skip test if uid == 0.</p>
+<p>Note that on Windows (or anywhere else <cite>os.geteuid</cite> is not available) the
+test is _not_ skipped.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_scrapy_without_selector">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_scrapy_without_selector</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_scrapy_without_selector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_scrapy_without_selector" title="Permalink to this definition"></a></dt>
+<dd><p>A little helper to skip some tests which require recent scrapy</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_if_url_is_not_available">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_if_url_is_not_available</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_if_url_is_not_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_if_url_is_not_available" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_known_failure">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_known_failure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'raise'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_known_failure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_known_failure" title="Permalink to this definition"></a></dt>
+<dd><p>Test decorator allowing to skip a test that is known to fail</p>
+<p>Setting config datalad.tests.knownfailures.skip to a bool enables/disables
+skipping.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_nomultiplex_ssh">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_nomultiplex_ssh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_nomultiplex_ssh"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_nomultiplex_ssh" title="Permalink to this definition"></a></dt>
+<dd><p>Skips SSH tests if default connection/manager does not support multiplexing</p>
+<p>e.g. currently on windows or if set via datalad.ssh.multiplex-connections config variable</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_ssh">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_ssh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_ssh"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_ssh" title="Permalink to this definition"></a></dt>
+<dd><p>Skips SSH tests if on windows or if environment variable
+DATALAD_TESTS_SSH was not set</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.skip_wo_symlink_capability">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">skip_wo_symlink_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#skip_wo_symlink_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.skip_wo_symlink_capability" title="Permalink to this definition"></a></dt>
+<dd><p>Skip test when environment does not support symlinks</p>
+<p>Perform a behavioral test instead of top-down logic, as on
+windows this could be on or off on a case-by-case basis.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.slow">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">slow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#slow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.slow" title="Permalink to this definition"></a></dt>
+<dd><p>Mark test as a slow, although not necessarily integration or usecase test</p>
+<p>Rule of thumb cut-off to mark as slow is 10 sec</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.turtle">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">turtle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#turtle"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.turtle" title="Permalink to this definition"></a></dt>
+<dd><p>Mark test as very slow, meaning to not run it on Travis due to its
+time limit</p>
+<p>Rule of thumb cut-off to mark as turtle is 2 minutes</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.usecase">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">usecase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#usecase"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.usecase" title="Permalink to this definition"></a></dt>
+<dd><p>Mark test as a usecase user ran into and which (typically) caused bug report
+to be filed/troubleshooted</p>
+<p>Should be used in combination with &#64;slow and &#64;turtle if slow.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_fake_cookies_db">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_fake_cookies_db</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cookies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_fake_cookies_db"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_fake_cookies_db" title="Permalink to this definition"></a></dt>
+<dd><p>mock original cookies db with a fake one for the duration of the test</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_memory_keyring">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_memory_keyring</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_memory_keyring"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_memory_keyring" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to use non-persistant MemoryKeyring instance</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_parametric_batch">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_parametric_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_parametric_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_parametric_batch" title="Permalink to this definition"></a></dt>
+<dd><p>Helper to run parametric test with possible combinations of batch and direct</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_sameas_remote">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_sameas_remote</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoenabled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_sameas_remote"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_sameas_remote" title="Permalink to this definition"></a></dt>
+<dd><p>Provide a repository with a git-annex sameas remote configured.</p>
+<p>The repository will have two special remotes: r_dir (type=directory) and
+r_rsync (type=rsync). The rsync remote will be configured with
+–sameas=r_dir, and autoenabled if <cite>autoenabled</cite> is true.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_tempfile">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_tempfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">tkwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_tempfile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_tempfile" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator function to provide a temporary file name and remove it at the end</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>set</strong> (<em>To change the used directory without providing keyword argument 'dir'</em>) – </p></li>
+<li><p><strong>DATALAD_TESTS_TEMP_DIR.</strong> – </p></li>
+<li><p><strong>mkdir</strong> (<em>bool</em><em>, </em><em>optional</em><em> (</em><em>default: False</em><em>)</em>) – If True, temporary directory created using tempfile.mkdtemp()</p></li>
+<li><p><strong>content</strong> (<em>str</em><em> or </em><em>bytes</em><em>, </em><em>optional</em>) – Content to be stored in the file created</p></li>
+<li><p><strong>wrapped</strong> (<em>function</em><em>, </em><em>optional</em>) – If set, function name used to prefix temporary file name</p></li>
+<li><p><strong>**tkwargs</strong> – All other arguments are passed into the call to tempfile.mk{,d}temp(),
+and resultant temporary filename is passed as the first argument into
+the function t.  If no ‘prefix’ argument is provided, it will be
+constructed using module and function names (‘.’ replaced with
+‘_’).</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@with_tempfile</span>
+<span class="k">def</span> <span class="nf">test_write</span><span class="p">(</span><span class="n">tfile</span><span class="p">):</span>
+    <span class="nb">open</span><span class="p">(</span><span class="n">tfile</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;silly test&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_testrepos">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_testrepos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.*'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flavors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_testrepos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_testrepos" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to provide a local/remote test repository</p>
+<p>All tests under datalad/tests/testrepos are stored in two-level hierarchy,
+where top-level name describes nature/identifier of the test repository,
+and there could be multiple instances (e.g. generated differently) of the
+same “content”</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>regex</strong> (<em>string</em><em>, </em><em>optional</em>) – Regex to select which test repos to use</p></li>
+<li><p><strong>flavors</strong> (<em>{'auto'</em><em>, </em><em>'local'</em><em>, </em><em>'local-url'</em><em>, </em><em>'clone'</em><em>, </em><em>'network'</em><em>, </em><em>'network-clone'}</em><em> or </em><em>list of thereof</em><em>, </em><em>optional</em>) – What URIs to provide.  E.g. ‘local’ would just provide path to the
+repository, while ‘network’ would provide url of the remote location
+available on Internet containing the test repository.  ‘clone’ would
+clone repository first to a temporary location. ‘network-clone’ would
+first clone from the network location. ‘auto’ would include the list of
+appropriate ones (e.g., no ‘network*’ flavors if network tests are
+“forbidden”).</p></li>
+<li><p><strong>count</strong> (<em>int</em><em>, </em><em>optional</em>) – If specified, only up to that number of repositories to test with</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">datalad.tests.utils</span> <span class="kn">import</span> <span class="n">with_testrepos</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nd">@with_testrepos</span><span class="p">(</span><span class="s1">&#39;basic_annex&#39;</span><span class="p">)</span>
+<span class="gp">... </span><span class="k">def</span> <span class="nf">test_write</span><span class="p">(</span><span class="n">repo</span><span class="p">):</span>
+<span class="gp">... </span>   <span class="k">assert</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="s1">&#39;.git&#39;</span><span class="p">,</span> <span class="s1">&#39;annex&#39;</span><span class="p">)))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_testsui">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_testsui</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">responses</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_testsui"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_testsui" title="Permalink to this definition"></a></dt>
+<dd><p>Switch main UI to be ‘tests’ UI and possibly provide answers to be used</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.with_tree">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">with_tree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">archives_leading_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delete</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">tkwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#with_tree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.with_tree" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.tests.utils.without_http_proxy">
+<span class="sig-prename descclassname"><span class="pre">datalad.tests.utils.</span></span><span class="sig-name descname"><span class="pre">without_http_proxy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tfunc</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/tests/utils.html#without_http_proxy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.tests.utils.without_http_proxy" title="Permalink to this definition"></a></dt>
+<dd><p>Decorator to remove http*_proxy env variables for the duration of the test</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.config.html" class="btn btn-neutral float-left" title="datalad.config" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.tests.utils_testrepos.html" class="btn btn-neutral float-right" title="datalad.tests.utils_testrepos" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
