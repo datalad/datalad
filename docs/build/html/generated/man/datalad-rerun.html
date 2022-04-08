@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad rerun &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad run-procedure" href="datalad-run-procedure.html" />
+    <link rel="prev" title="datalad update" href="datalad-update.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad rerun: Re-execute previous datalad-run commands</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-run-procedure.html">datalad run-procedure: Run prepared procedures (DataLad scripts) on a dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad rerun</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-rerun">
+<span id="man-datalad-rerun"></span><h1>datalad rerun<a class="headerlink" href="#datalad-rerun" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">rerun</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">since</span> <span class="n">SINCE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">d</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">b</span> <span class="n">NAME</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">m</span> <span class="n">MESSAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">onto</span> <span class="n">base</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">script</span> <span class="n">FILE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">report</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">assume</span><span class="o">-</span><span class="n">ready</span>
+    <span class="p">{</span><span class="n">inputs</span><span class="o">|</span><span class="n">outputs</span><span class="o">|</span><span class="n">both</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">explicit</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">J</span> <span class="n">NJOBS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span>
+    <span class="p">[</span><span class="n">REVISION</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Re-execute previous <cite>datalad run</cite> commands.</p>
+<p>This will unlock any dataset content that is on record to have
+been modified by the command in the specified revision.  It will
+then re-execute the command in the recorded path (if it was inside
+the dataset). Afterwards, all modifications will be saved.</p>
+<p><em>Report mode</em></p>
+<p>When called with –report, this command reports information about what
+would be re-executed as a series of records. There will be a record
+for each revision in the specified revision range. Each of these will
+have one of the following “rerun_action” values:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>run: the revision has a recorded command that would be re-executed</p></li>
+<li><p>skip-or-pick: the revision does not have a recorded command and would
+be either skipped or cherry picked</p></li>
+<li><p>merge: the revision is a merge commit and a corresponding merge would
+be made</p></li>
+</ul>
+</div></blockquote>
+<p>The decision to skip rather than cherry pick a revision is based on whether
+the revision would be reachable from HEAD at the time of execution.</p>
+<p>In addition, when a starting point other than HEAD is specified, there is a
+rerun_action value “checkout”, in which case the record includes
+information about the revision the would be checked out before rerunning
+any commands.</p>
+<dl class="simple">
+<dt>NOTE</dt><dd><p>Currently the “onto” feature only sets the working tree of the current
+dataset to a previous state. The working trees of any subdatasets remain
+unchanged.</p>
+</dd>
+</dl>
+<p><em>Examples</em></p>
+<p>Re-execute the command from the previous commit:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">rerun</span>
+</pre></div>
+</div>
+<p>Re-execute any commands in the last five commits:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">rerun</span> <span class="o">--</span><span class="n">since</span><span class="o">=</span><span class="n">HEAD</span><span class="o">~</span><span class="mi">5</span>
+</pre></div>
+</div>
+<p>Do the same as above, but re-execute the commands on top of HEAD~5 in
+a detached state:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">rerun</span> <span class="o">--</span><span class="n">onto</span><span class="o">=</span> <span class="o">--</span><span class="n">since</span><span class="o">=</span><span class="n">HEAD</span><span class="o">~</span><span class="mi">5</span>
+</pre></div>
+</div>
+<p>Re-execute all previous commands and compare the old and new results:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="c1"># on master branch</span>
+<span class="o">%</span> <span class="n">datalad</span> <span class="n">rerun</span> <span class="o">--</span><span class="n">branch</span><span class="o">=</span><span class="n">verify</span> <span class="o">--</span><span class="n">since</span><span class="o">=</span>
+<span class="o">%</span> <span class="c1"># now on verify branch</span>
+<span class="o">%</span> <span class="n">datalad</span> <span class="n">diff</span> <span class="o">--</span><span class="n">revision</span><span class="o">=</span><span class="n">master</span><span class="o">..</span>
+<span class="o">%</span> <span class="n">git</span> <span class="n">log</span> <span class="o">--</span><span class="n">oneline</span> <span class="o">--</span><span class="n">left</span><span class="o">-</span><span class="n">right</span> <span class="o">--</span><span class="n">cherry</span><span class="o">-</span><span class="n">pick</span> <span class="n">master</span><span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="revision">
+<h3>REVISION<a class="headerlink" href="#revision" title="Permalink to this headline"></a></h3>
+<p>rerun command(s) in REVISION. By default, the command from this commit will be executed, but –since can be used to construct a revision range. The default value is like “HEAD” but resolves to the main branch when on an adjusted branch. Constraints: value must be a string</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="since-since">
+<h3><strong>-\-since</strong> <em>SINCE</em><a class="headerlink" href="#since-since" title="Permalink to this headline"></a></h3>
+<p>If SINCE is a commit-ish, the commands from all commits that are reachable from <cite>revision</cite> but not SINCE will be re-executed (in other words, the commands in git log SINCE..REVISION). If SINCE is an empty string, it is set to the parent of the first commit that contains a recorded command (i.e., all commands in git log REVISION will be re-executed). Constraints: value must be a string</p>
+</section>
+<section id="d-dataset-dataset-dataset">
+<h3><strong>-d</strong> <em>DATASET</em>, <strong>-\-dataset</strong> <em>DATASET</em><a class="headerlink" href="#d-dataset-dataset-dataset" title="Permalink to this headline"></a></h3>
+<p>specify the dataset from which to rerun a recorded command. If no dataset is given, an attempt is made to identify the dataset based on the current working directory. If a dataset is given, the command will be executed in the root directory of this dataset. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="b-name-branch-name">
+<h3><strong>-b</strong> NAME, <strong>-\-branch</strong> NAME<a class="headerlink" href="#b-name-branch-name" title="Permalink to this headline"></a></h3>
+<p>create and checkout this branch before rerunning the commands. Constraints: value must be a string</p>
+</section>
+<section id="m-message-message-message">
+<h3><strong>-m</strong> MESSAGE, <strong>-\-message</strong> MESSAGE<a class="headerlink" href="#m-message-message-message" title="Permalink to this headline"></a></h3>
+<p>use MESSAGE for the reran commit rather than the recorded commit message. In the case of a multi-commit rerun, all the reran commits will have this message. Constraints: value must be a string</p>
+</section>
+<section id="onto-base">
+<h3><strong>-\-onto</strong> base<a class="headerlink" href="#onto-base" title="Permalink to this headline"></a></h3>
+<p>start point for rerunning the commands. If not specified, commands are executed at HEAD. This option can be used to specify an alternative start point, which will be checked out with the branch name specified by –branch or in a detached state otherwise. As a special case, an empty value for this option means the parent of the first run commit in the specified revision list. Constraints: value must be a string</p>
+</section>
+<section id="script-file">
+<h3><strong>-\-script</strong> FILE<a class="headerlink" href="#script-file" title="Permalink to this headline"></a></h3>
+<p>extract the commands into FILE rather than rerunning. Use - to write to stdout instead. This option implies –report. Constraints: value must be a string</p>
+</section>
+<section id="report">
+<h3><strong>-\-report</strong><a class="headerlink" href="#report" title="Permalink to this headline"></a></h3>
+<p>Don’t actually re-execute anything, just display what would be done. Note: If you give this option, you most likely want to set –output-format to ‘json’ or ‘json_pp’.</p>
+</section>
+<section id="assume-ready-inputs-outputs-both">
+<h3><strong>-\-assume-ready</strong> {inputs|outputs|both}<a class="headerlink" href="#assume-ready-inputs-outputs-both" title="Permalink to this headline"></a></h3>
+<p>Assume that inputs do not need to be retrieved and/or outputs do not need to unlocked or removed before running the command. This option allows you to avoid the expense of these preparation steps if you know that they are unnecessary. Note that this option also affects any additional outputs that are automatically inferred based on inspecting changed files in the run commit. Constraints: value must be one of (‘inputs’, ‘outputs’, ‘both’)</p>
+</section>
+<section id="explicit">
+<h3><strong>-\-explicit</strong><a class="headerlink" href="#explicit" title="Permalink to this headline"></a></h3>
+<p>Consider the specification of inputs and outputs in the run record to be explicit. Don’t warn if the repository is dirty, and only save modifications to the outputs from the original record. Note that when several run commits are specified, this applies to every one. Care should also be taken when using –onto because checking out a new HEAD can easily fail when the working tree has modifications.</p>
+</section>
+<section id="j-njobs-jobs-njobs">
+<h3><strong>-J</strong> NJOBS, <strong>-\-jobs</strong> NJOBS<a class="headerlink" href="#j-njobs-jobs-njobs" title="Permalink to this headline"></a></h3>
+<p>how many parallel jobs (where possible) to use. “auto” corresponds to the number defined by ‘datalad.runtime.max-annex-jobs’ configuration item NOTE: This option can only parallelize input retrieval (get) and output recording (save). DataLad does NOT parallelize your scripts for you. Constraints: value must be convertible to type ‘int’, or value must be one of (‘auto’,)</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-update.html" class="btn btn-neutral float-left" title="datalad update" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-run-procedure.html" class="btn btn-neutral float-right" title="datalad run-procedure" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

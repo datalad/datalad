@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.cmdline.helpers &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.cmdline.common_args" href="datalad.cmdline.common_args.html" />
+    <link rel="prev" title="datalad.cmdline.main" href="datalad.cmdline.main.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="datalad.cmdline.main.html">datalad.cmdline.main</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.cmdline.helpers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.cmdline.common_args.html">datalad.cmdline.common_args</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.cmdline.helpers</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.cmdline.helpers">
+<span id="datalad-cmdline-helpers"></span><h1>datalad.cmdline.helpers<a class="headerlink" href="#module-datalad.cmdline.helpers" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.ArgumentParserDisableAbbrev">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">ArgumentParserDisableAbbrev</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prog=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">usage=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epilog=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parents=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formatter_class=&lt;class</span> <span class="pre">'argparse.HelpFormatter'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix_chars='-'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fromfile_prefix_chars=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">argument_default=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conflict_handler='error'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_help=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_abbrev=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exit_on_error=True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#ArgumentParserDisableAbbrev"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.ArgumentParserDisableAbbrev" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.HelpAction">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">HelpAction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">option_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">const</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">choices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">help</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metavar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#HelpAction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.HelpAction" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">argparse.Action</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.LogLevelAction">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">LogLevelAction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">option_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">const</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">choices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">help</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metavar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#LogLevelAction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.LogLevelAction" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">argparse.Action</span></code></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.add_entrypoints_to_interface_groups">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">add_entrypoints_to_interface_groups</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interface_groups</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#add_entrypoints_to_interface_groups"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.add_entrypoints_to_interface_groups" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.fail_with_short_help">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">fail_with_short_help</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parser</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">known</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provided</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exit_code</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">what</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'command'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#fail_with_short_help"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.fail_with_short_help" title="Permalink to this definition"></a></dt>
+<dd><p>Generic helper to fail
+with short help possibly hinting on what was intended if <cite>known</cite>
+were provided</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.get_commands_from_groups">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">get_commands_from_groups</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">groups</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#get_commands_from_groups"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.get_commands_from_groups" title="Permalink to this definition"></a></dt>
+<dd><p>Get a dictionary of command: interface_spec</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.get_description_with_cmd_summary">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">get_description_with_cmd_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grp_short_descriptions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interface_groups</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parser_description</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#get_description_with_cmd_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.get_description_with_cmd_summary" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.get_repo_instance">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">get_repo_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#get_repo_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.get_repo_instance" title="Permalink to this definition"></a></dt>
+<dd><p>Returns an instance of appropriate datalad repository for path.
+Check whether a certain path is inside a known type of repository and
+returns an instance representing it. May also check for a certain type
+instead of detecting the type of repository.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 0.16: </span>Use the pattern <cite>Dataset(get_dataset_root(path)).repo</cite> instead. This
+function will be removed in a future release.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – path to check; default: current working directory</p></li>
+<li><p><strong>class</strong> (<em>class</em>) – if given, check whether path is inside a repository, that can be
+represented as an instance of the passed class.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RuntimeError</strong><strong>, </strong><strong>in case cwd is not inside a known repository.</strong> – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.parser_add_common_opt">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">parser_add_common_opt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#parser_add_common_opt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.parser_add_common_opt" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.parser_add_common_options">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">parser_add_common_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#parser_add_common_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.parser_add_common_options" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.parser_add_version_opt">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">parser_add_version_opt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delay</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#parser_add_version_opt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.parser_add_version_opt" title="Permalink to this definition"></a></dt>
+<dd><p>Setup –version option</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parser</strong> – </p></li>
+<li><p><strong>mod_name</strong> (<em>str</em><em>, </em><em>optional</em>) – </p></li>
+<li><p><strong>include_name</strong> (<em>bool</em><em>, </em><em>optional</em>) – </p></li>
+<li><p><strong>delay</strong> (<em>bool</em><em>, </em><em>optional</em>) – If set to True, no action is taken immediately, and rather
+we assign the function which would print the version. Necessary for
+early pre-parsing of the cmdline</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmdline.helpers.strip_arg_from_argv">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmdline.helpers.</span></span><span class="sig-name descname"><span class="pre">strip_arg_from_argv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt_names</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmdline/helpers.html#strip_arg_from_argv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmdline.helpers.strip_arg_from_argv" title="Permalink to this definition"></a></dt>
+<dd><p>Strip an originally listed option (with its value) from the list cmdline args</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.cmdline.main.html" class="btn btn-neutral float-left" title="datalad.cmdline.main" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.cmdline.common_args.html" class="btn btn-neutral float-right" title="datalad.cmdline.common_args" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

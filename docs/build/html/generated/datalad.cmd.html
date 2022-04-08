@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.cmd &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.consts" href="datalad.consts.html" />
+    <link rel="prev" title="datalad.api.wtf" href="datalad.api.wtf.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.cmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.consts.html">datalad.consts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.log.html">datalad.log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.utils.html">datalad.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.version.html">datalad.version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.gitrepo.html">datalad.support.gitrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.annexrepo.html">datalad.support.annexrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.archives.html">datalad.support.archives</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.base.html">datalad.customremotes.base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.archives.html">datalad.customremotes.archives</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.cmd</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.cmd">
+<span id="datalad-cmd"></span><h1>datalad.cmd<a class="headerlink" href="#module-datalad.cmd" title="Permalink to this headline"></a></h1>
+<p>Class the starts a subprocess and keeps it around to communicate with it
+via stdin. For each instruction send over stdin, a response is read and
+returned. The response structure is determined by “output_proc”</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmd.</span></span><span class="sig-name descname"><span class="pre">BatchedCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_proc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exception_on_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#datalad.cmd.SafeDelCloseMixin" title="datalad.cmd.SafeDelCloseMixin"><code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.cmd.SafeDelCloseMixin</span></code></a></p>
+<p>Container for a running subprocess. Supports communication with the
+subprocess via stdin and stdout.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.clean_inactive">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">clean_inactive</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.clean_inactive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.clean_inactive" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">return_stderr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.close" title="Permalink to this definition"></a></dt>
+<dd><p>Close communication and wait for process to terminate. If the “timeout”
+parameter to the constructor was not None, and if the configuration
+setting “datalad.runtime.stalled-external” is set to “abandon”,
+the method will return latest after “timeout” seconds. If the subprocess
+did not exit within this time, the attribute “wait_timed_out” will
+be set to “True”.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>return_stderr</strong> (<em>bool</em>) – if set to “True”, the call will return all collected stderr content
+as string. In addition, if return_stderr is True and the log level
+is 5 or lower, and the configuration setting “datalad.log.outputs”
+evaluates to “True”, the content of stderr will be logged.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>stderr output if return_stderr is True, None otherwise</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.get_one_line">
+<span class="sig-name descname"><span class="pre">get_one_line</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.get_one_line"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.get_one_line" title="Permalink to this definition"></a></dt>
+<dd><p>Get a single stdout line from the generator.</p>
+<p>If timeout was specified, and exception_on_timeout is False,
+and if a timeout occurs, return None. Otherwise return the
+str that was read from the generator.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.get_requested_error_output">
+<span class="sig-name descname"><span class="pre">get_requested_error_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">return_stderr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.get_requested_error_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.get_requested_error_output" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.get_timeout_exception">
+<span class="sig-name descname"><span class="pre">get_timeout_exception</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">subprocess.TimeoutExpired</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.get_timeout_exception"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.get_timeout_exception" title="Permalink to this definition"></a></dt>
+<dd><p>Get a process timeout exception if timeout exceptions should
+be generated for a process that continues longer than timeout
+seconds after self.close() was initiated.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.proc1">
+<span class="sig-name descname"><span class="pre">proc1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">single_command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.proc1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.proc1" title="Permalink to this definition"></a></dt>
+<dd><p>Simulate the old interface. This method is used only once in
+AnnexRepo.get_metadata()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.process_request">
+<span class="sig-name descname"><span class="pre">process_request</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.process_request"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.process_request" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommand.process_running">
+<span class="sig-name descname"><span class="pre">process_running</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommand.process_running"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommand.process_running" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommandProtocol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmd.</span></span><span class="sig-name descname"><span class="pre">BatchedCommandProtocol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batched_command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#datalad.cmd.BatchedCommand" title="datalad.cmd.BatchedCommand"><span class="pre">datalad.cmd.BatchedCommand</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">done_future</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_proc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommandProtocol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommandProtocol" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.runner.protocol.GeneratorMixIn</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">datalad.runner.coreprotocols.StdOutErrCapture</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommandProtocol.pipe_connection_lost">
+<span class="sig-name descname"><span class="pre">pipe_connection_lost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Exception</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommandProtocol.pipe_connection_lost"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommandProtocol.pipe_connection_lost" title="Permalink to this definition"></a></dt>
+<dd><p>Called when a file descriptor associated with the child process is
+closed.</p>
+<p>fd is the int file descriptor that was closed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommandProtocol.pipe_data_received">
+<span class="sig-name descname"><span class="pre">pipe_data_received</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommandProtocol.pipe_data_received"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommandProtocol.pipe_data_received" title="Permalink to this definition"></a></dt>
+<dd><p>Called when the subprocess writes data into stdout/stderr pipe.</p>
+<p>fd is int file descriptor.
+data is bytes object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.BatchedCommandProtocol.timeout">
+<span class="sig-name descname"><span class="pre">timeout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/datalad/cmd.html#BatchedCommandProtocol.timeout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.BatchedCommandProtocol.timeout" title="Permalink to this definition"></a></dt>
+<dd><p>Called if the timeout parameter to WitlessRunner.run()
+is not <cite>None</cite> and a process file descriptor could not
+be read (stdout or stderr) or not be written (stdin)
+within the specified time in seconds, or if waiting for
+a subprocess to exit takes longer than the specified time.</p>
+<p>stdin timeouts are only caught when the type of the <cite>stdin</cite>-
+parameter to WitlessRunner.run() is either a <cite>Queue</cite>,
+a <cite>str</cite>, or <cite>bytes</cite>. <cite>Stdout</cite> or <cite>stderr</cite> timeouts
+are only caught of proc_out and proc_err are
+not None in the protocol class. Process wait timeouts are
+always caught if <cite>timeout</cite> is not <cite>None</cite>. In this case the
+<cite>fd</cite>-argument will be <cite>None</cite>.</p>
+<dl class="simple">
+<dt>fd:</dt><dd><p>The file descriptor that timed out or <cite>None</cite> if no
+progress was made at all, i.e. no stdin element was
+enqueued and no output was read from either stdout
+or stderr.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>If the callback returns <cite>True</cite>, the file descriptor
+(if any was given) will be closed and no longer monitored.
+If the return values is anything else than <cite>True</cite>,
+the file-descriptor will be monitored further
+and additional timeouts might occur indefinitely.
+If <cite>None</cite> was given, i.e. a process runtime-timeout
+was detected, and <cite>True</cite> is returned, the process
+will be terminated.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmd.ReadlineEmulator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmd.</span></span><span class="sig-name descname"><span class="pre">ReadlineEmulator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batched_command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#datalad.cmd.BatchedCommand" title="datalad.cmd.BatchedCommand"><span class="pre">datalad.cmd.BatchedCommand</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#ReadlineEmulator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.ReadlineEmulator" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>This class implements readline() on the basis of an instance of
+BatchedCommand. Its purpose is to emulate stdout’s for output_procs,
+This allows us to provide a BatchedCommand API that is identical
+to the old version, but with an implementation that is based on the
+threaded runner.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.cmd.ReadlineEmulator.readline">
+<span class="sig-name descname"><span class="pre">readline</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#ReadlineEmulator.readline"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.ReadlineEmulator.readline" title="Permalink to this definition"></a></dt>
+<dd><p>Read from the stdout provider until we have a line or None (which
+indicates some error).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.cmd.SafeDelCloseMixin">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.cmd.</span></span><span class="sig-name descname"><span class="pre">SafeDelCloseMixin</span></span><a class="reference internal" href="../_modules/datalad/cmd.html#SafeDelCloseMixin"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.SafeDelCloseMixin" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A helper class to use where __del__ would call .close() which might
+fail if “too late in GC game”</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.cmd.readline_rstripped">
+<span class="sig-prename descclassname"><span class="pre">datalad.cmd.</span></span><span class="sig-name descname"><span class="pre">readline_rstripped</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stdout</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/cmd.html#readline_rstripped"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.cmd.readline_rstripped" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.api.wtf.html" class="btn btn-neutral float-left" title="datalad.api.wtf" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.consts.html" class="btn btn-neutral float-right" title="datalad.consts" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

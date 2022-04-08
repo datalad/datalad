@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -14,21 +14,14 @@ __docformat__ = 'restructuredtext'
 
 import inspect
 import logging
-import os
-import wrapt
 import sys
-import re
+from functools import wraps
 from time import time
-from os import curdir
-from os import pardir
 from os import listdir
-import os.path as op
 from os.path import join as opj
 from os.path import isdir
 from os.path import relpath
 from os.path import sep
-from os.path import split as psplit
-from itertools import chain
 
 import json
 
@@ -55,7 +48,6 @@ import datalad.support.ansi_colors as ac
 from datalad.interface.base import default_logchannels
 from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
-from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
 from datalad.core.local.resulthooks import (
     get_jsonhooks_from_config,
@@ -64,12 +56,6 @@ from datalad.core.local.resulthooks import (
 )
 
 lgr = logging.getLogger('datalad.interface.utils')
-
-
-def cls2cmdlinename(cls):
-    "Return the cmdline command name from an Interface class"
-    r = re.compile(r'([a-z0-9])([A-Z])')
-    return r.sub('\\1-\\2', cls.__name__).lower()
 
 
 # TODO remove
@@ -140,46 +126,6 @@ def get_tree_roots(paths):
         subs = [p for p in paths if p.startswith(s)]
         roots[s.rstrip(sep)] = subs
     return roots
-
-
-# TODO remove
-# only `remove` and `uninstall` use this, the uses path `path_is_subpath`
-def path_is_under(values, path=None):
-    """Whether a given path is a subdirectory of any of the given test values
-
-    Parameters
-    ----------
-    values : sequence or dict
-      Paths to be tested against. This can be a dictionary in which case
-      all values from all keys will be tested against.
-    path : path or None
-      Test path. If None is given, the process' working directory is
-      used.
-
-    Returns
-    -------
-    bool
-    """
-    if path is None:
-        from datalad.utils import getpwd
-        path = getpwd()
-    if isinstance(values, dict):
-        values = chain(*values.values())
-    path_drive, _ = op.splitdrive(path)
-    for p in values:
-        p_drive, _ = op.splitdrive(p)
-        # need to protect against unsupported use of relpath() with
-        # abspaths on windows from different drives (gh-3724)
-        if path_drive != p_drive:
-            # different drives, enough evidence for "not under"
-            continue
-        rpath = relpath(p, start=path)
-        if rpath == curdir \
-                or rpath == pardir \
-                or set(psplit(rpath)) == {pardir}:
-            # first match is enough
-            return True
-    return False
 
 
 # TODO(OPT)? YOH: from a cursory review seems like possibly an expensive function
@@ -281,7 +227,7 @@ def get_result_filter(fx):
     return _fx
 
 
-def eval_results(func):
+def eval_results(wrapped):
     """Decorator for return value evaluation of datalad commands.
 
     Note, this decorator is only compatible with commands that return
@@ -295,14 +241,14 @@ def eval_results(func):
     This decorator implements common functionality for result rendering/output,
     error detection/handling, and logging.
 
-    Result rendering/output can be triggered via the
-    `datalad.api.result-renderer` configuration variable, or the
-    `result_renderer` keyword argument of each decorated command. Supported
-    modes are: 'default' (one line per result with action, status, path,
-    and an optional message); 'json' (one object per result, like git-annex),
-    'json_pp' (like 'json', but pretty-printed spanning multiple lines),
-    'tailored' custom output formatting provided by each command
-    class (if any).
+    Result rendering/output configured via the `result_renderer` keyword
+    argument of each decorated command. Supported modes are: 'generic' (a
+    generic renderer producing one line per result with key info like action,
+    status, path, and an optional message); 'json' (a complete JSON line
+    serialization of the full result record), 'json_pp' (like 'json', but
+    pretty-printed spanning multiple lines), 'tailored' custom output
+    formatting provided by each command class (if any), or 'disabled' for
+    no result rendering.
 
     Error detection works by inspecting the `status` item of all result
     dictionaries. Any occurrence of a status other than 'ok' or 'notneeded'
@@ -322,14 +268,9 @@ def eval_results(func):
       i.e. a datalad command definition
     """
 
-    @wrapt.decorator
-    def eval_func(wrapped, instance, args, kwargs):
-        lgr.log(2, "Entered eval_func for %s", func)
-        # for result filters
-        # we need to produce a dict with argname/argvalue pairs for all args
-        # incl. defaults and args given as positionals
-        allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
-
+    @wraps(wrapped)
+    def eval_func(*args, **kwargs):
+        lgr.log(2, "Entered eval_func for %s", wrapped)
         # determine the command class associated with `wrapped`
         wrapped_class = get_wrapped_class(wrapped)
 
@@ -342,12 +283,14 @@ def eval_results(func):
                 p_name,
                 # otherwise determine the command class and pull any
                 # default set in that class
-                getattr(
-                    wrapped_class,
-                    p_name,
-                    # or the common default
-                    eval_defaults[p_name]))
+                getattr(wrapped_class, p_name))
             for p_name in eval_params}
+
+        # for result filters
+        # we need to produce a dict with argname/argvalue pairs for all args
+        # incl. defaults and args given as positionals
+        allkwargs = get_allargs_as_kwargs(wrapped, args,
+                                          {**kwargs, **common_params})
 
         # short cuts and configured setup for common options
         return_type = common_params['return_type']
@@ -358,9 +301,16 @@ def eval_results(func):
             # use verbatim, if not a known label
             common_params['result_xfm'])
         result_renderer = common_params['result_renderer']
-        # TODO remove this conditional branch entirely, done outside
-        if not result_renderer:
-            result_renderer = dlcfg.get('datalad.api.result-renderer', None)
+
+        if result_renderer == 'tailored' and not hasattr(wrapped_class,
+                                                         'custom_result_renderer'):
+            # a tailored result renderer is requested, but the class
+            # does not provide any, fall back to the generic one
+            result_renderer = 'generic'
+        if result_renderer == 'default':
+            # standardize on the new name 'generic' to avoid more complex
+            # checking below
+            result_renderer = 'generic'
         # look for potential override of logging behavior
         result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
 
@@ -368,9 +318,17 @@ def eval_results(func):
         # .is_installed and .config can be costly, so ensure we do
         # it only once. See https://github.com/datalad/datalad/issues/3575
         dataset_arg = allkwargs.get('dataset', None)
-        from datalad.distribution.dataset import Dataset
-        ds = dataset_arg if isinstance(dataset_arg, Dataset) \
-            else Dataset(dataset_arg) if dataset_arg else None
+        ds = None
+        if dataset_arg is not None:
+            from datalad.distribution.dataset import Dataset
+            if isinstance(dataset_arg, Dataset):
+                ds = dataset_arg
+            else:
+                try:
+                    ds = Dataset(dataset_arg)
+                except ValueError:
+                    pass
+
         # look for hooks
         hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 
@@ -386,11 +344,14 @@ def eval_results(func):
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
-            do_custom_result_summary = result_renderer in ('tailored', 'default') \
-                                       and hasattr(wrapped_class, 'custom_result_summary_renderer')
-            pass_summary = do_custom_result_summary and \
-                           getattr(wrapped_class,
-                                   'custom_result_summary_renderer_pass_summary', None)
+            do_custom_result_summary = result_renderer in (
+                'tailored', 'generic', 'default') and hasattr(
+                    wrapped_class,
+                    'custom_result_summary_renderer')
+            pass_summary = do_custom_result_summary \
+                and getattr(wrapped_class,
+                            'custom_result_summary_renderer_pass_summary',
+                            None)
 
             # process main results
             for r in _process_results(
@@ -451,9 +412,11 @@ def eval_results(func):
                 else:
                     summary_args = (results,)
                 wrapped_class.custom_result_summary_renderer(*summary_args)
-            elif result_renderer == 'default' and action_summary and \
-                    sum(sum(s.values()) for s in action_summary.values()) > 1:
-                # give a summary in default mode, when there was more than one
+            elif result_renderer in ('generic', 'default') \
+                    and action_summary \
+                    and sum(sum(s.values())
+                            for s in action_summary.values()) > 1:
+                # give a summary in generic mode, when there was more than one
                 # action performed
                 render_action_summary(action_summary)
 
@@ -467,9 +430,9 @@ def eval_results(func):
             lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
             return generator_func(*args, **kwargs)
         else:
-            @wrapt.decorator
-            def return_func(wrapped_, instance_, args_, kwargs_):
-                results = wrapped_(*args_, **kwargs_)
+            @wraps(generator_func)
+            def return_func(*args_, **kwargs_):
+                results = generator_func(*args_, **kwargs_)
                 if inspect.isgenerator(results):
                     # unwind generator if there is one, this actually runs
                     # any processing
@@ -481,14 +444,14 @@ def eval_results(func):
                     return results
 
             lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
-            return return_func(generator_func)(*args, **kwargs)
+            return return_func(*args, **kwargs)
 
-    ret = eval_func(func)
+    ret = eval_func
     ret._eval_results = True
     return ret
 
 
-def default_result_renderer(res):
+def generic_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res.get('path', None)
         if path and res.get('refds'):
@@ -517,6 +480,10 @@ def default_result_renderer(res):
                 if isinstance(res['error_message'], tuple) else res[
                     'error_message']), ac.RED)
             if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+
+
+# keep for legacy compatibility
+default_result_renderer = generic_result_renderer
 
 
 def render_action_summary(action_summary):
@@ -561,14 +528,12 @@ def _process_results(
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
 
-    # used to track repeated messages in the default renderer
+    # used to track repeated messages in the generic renderer
     last_result = None
+    # the timestamp of the last renderer result
     last_result_ts = None
-    # which result dict keys to inspect for changes to discover repetitions
-    # of similar messages
-    repetition_keys = set(('action', 'status', 'type', 'refds'))
     # counter for detected repetitions
-    result_repetitions = 0
+    last_result_reps = 0
     # how many repetitions to show, before suppression kicks in
     render_n_repetitions = \
         dlcfg.obtain('datalad.ui.suppress-similar-results-threshold') \
@@ -628,47 +593,21 @@ def _process_results(
                 res_lgr(msg)
 
         ## output rendering
-        # TODO RF this in a simple callable that gets passed into this function
         if result_renderer is None or result_renderer == 'disabled':
             pass
-        elif result_renderer == 'default':
-            trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
-            if res.get('status', None) != 'notneeded' \
-                    and trimmed_result == last_result:
-                # this is a similar report, suppress if too many, but count it
-                result_repetitions += 1
-                if result_repetitions < render_n_repetitions:
-                    default_result_renderer(res)
-                else:
-                    last_result_ts = _display_suppressed_message(
-                        result_repetitions, render_n_repetitions, last_result_ts)
-            else:
-                # this one is new, first report on any prev. suppressed results
-                # by number, and then render this fresh one
-                last_result_ts = _display_suppressed_message(
-                    result_repetitions, render_n_repetitions, last_result_ts,
-                    final=True)
-                default_result_renderer(res)
-                result_repetitions = 0
-            last_result = trimmed_result
+        elif result_renderer == 'generic':
+            last_result_reps, last_result, last_result_ts = \
+                _render_result_generic(
+                    res, render_n_repetitions,
+                    last_result_reps, last_result, last_result_ts)
         elif result_renderer in ('json', 'json_pp'):
-            ui.message(json.dumps(
-                {k: v for k, v in res.items()
-                 if k not in ('logger')},
-                sort_keys=True,
-                indent=2 if result_renderer.endswith('_pp') else None,
-                default=str))
-        elif result_renderer in ('tailored', 'default'):
-            if hasattr(cmd_class, 'custom_result_renderer'):
-                cmd_class.custom_result_renderer(res, **allkwargs)
+            _render_result_json(res, result_renderer.endswith('_pp'))
+        elif result_renderer == 'tailored':
+            cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
-            try:
-                result_renderer(res, **allkwargs)
-            except Exception as e:
-                lgr.warning('Result rendering failed for: %s [%s]',
-                            res, CapturedException(e))
+            _render_result_customcall(res, result_renderer, allkwargs)
         else:
-            raise ValueError('unknown result renderer "{}"'.format(result_renderer))
+            raise ValueError(f'unknown result renderer "{result_renderer}"')
 
         ## error handling
         # looks for error status, and report at the end via
@@ -683,7 +622,53 @@ def _process_results(
         yield res
     # make sure to report on any issues that we had suppressed
     _display_suppressed_message(
-        result_repetitions, render_n_repetitions, last_result_ts, final=True)
+        last_result_reps, render_n_repetitions, last_result_ts, final=True)
+
+
+def _render_result_generic(
+        res, render_n_repetitions,
+        # status vars
+        last_result_reps, last_result, last_result_ts):
+    # which result dict keys to inspect for changes to discover repetitions
+    # of similar messages
+    repetition_keys = set(('action', 'status', 'type', 'refds'))
+
+    trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
+    if res.get('status', None) != 'notneeded' \
+            and trimmed_result == last_result:
+        # this is a similar report, suppress if too many, but count it
+        last_result_reps += 1
+        if last_result_reps < render_n_repetitions:
+            generic_result_renderer(res)
+        else:
+            last_result_ts = _display_suppressed_message(
+                last_result_reps, render_n_repetitions, last_result_ts)
+    else:
+        # this one is new, first report on any prev. suppressed results
+        # by number, and then render this fresh one
+        last_result_ts = _display_suppressed_message(
+            last_result_reps, render_n_repetitions, last_result_ts,
+            final=True)
+        generic_result_renderer(res)
+        last_result_reps = 0
+    return last_result_reps, trimmed_result, last_result_ts
+
+
+def _render_result_json(res, prettyprint):
+    ui.message(json.dumps(
+        {k: v for k, v in res.items()
+         if k not in ('logger')},
+        sort_keys=True,
+        indent=2 if prettyprint else None,
+        default=str))
+
+
+def _render_result_customcall(res, result_renderer, allkwargs):
+    try:
+        result_renderer(res, **allkwargs)
+    except Exception as e:
+        lgr.warning('Result rendering failed for: %s [%s]',
+                    res, CapturedException(e))
 
 
 def keep_result(res, rfilter, **kwargs):

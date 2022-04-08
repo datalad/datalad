@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
+import sys
 from functools import partial
 from collections import OrderedDict
 
@@ -171,18 +172,18 @@ def _describe_configuration(cfg, sensitive):
 
 def _describe_extensions():
     infos = {}
-    from pkg_resources import iter_entry_points
+    from datalad.support.entrypoints import iter_entrypoints
     from importlib import import_module
 
-    for e in iter_entry_points('datalad.extensions'):
+    for ename, emod, eload in iter_entrypoints('datalad.extensions'):
         info = {}
-        infos[e.name] = info
+        infos[ename] = info
         try:
-            ext = e.load()
+            ext = eload()
             info['load_error'] = None
             info['description'] = ext[0]
-            info['module'] = e.module_name
-            mod = import_module(e.module_name, package='datalad')
+            info['module'] = emod
+            mod = import_module(emod, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
         except Exception as e:
             ce = CapturedException(e)
@@ -208,18 +209,28 @@ def _describe_extensions():
 
 def _describe_metadata_elements(group):
     infos = {}
-    from pkg_resources import iter_entry_points
+    from datalad.support.entrypoints import iter_entrypoints
     from importlib import import_module
+    if sys.version_info < (3, 10):
+        # 3.10 is when it was no longer provisional
+        from importlib_metadata import distribution
+    else:
+        from importlib.metadata import distribution
 
-    for e in iter_entry_points(group):
+
+    for ename, emod, eload in iter_entrypoints(group):
         info = {}
-        infos['%s (%s)' % (e.name, str(e.dist))] = info
+        infos[f'{ename}'] = info
         try:
-            info['module'] = e.module_name
-            info['distribution'] = str(e.dist)
-            mod = import_module(e.module_name, package='datalad')
-            info['version'] = getattr(mod, '__version__', None)
-            e.load()
+            info['module'] = emod
+            dist = distribution(emod.split('.', maxsplit=1)[0])
+            info['distribution'] = f'{dist.name} {dist.version}'
+            mod = import_module(emod, package='datalad')
+            version = getattr(mod, '__version__', None)
+            if version:
+                # no not clutter the report with no version
+                info['version'] = version
+            eload()
             info['load_error'] = None
         except Exception as e:
             ce = CapturedException(e)
@@ -356,7 +367,7 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(*sorted(SECTION_CALLABLES) + ['*']) | EnsureNone(),
+            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES) + ['*']),
             doc="""section to include.  If not set - depends on flavor.
             '*' could be used to force all sections.
             [CMD: This option can be given multiple times. CMD]"""),
@@ -368,7 +379,7 @@ class WTF(Interface):
             Use [CMD: --section CMD][PY: `section` PY] to list other sections"""),
         decor=Parameter(
             args=("-D", "--decor"),
-            constraints=EnsureChoice('html_details') | EnsureNone(),
+            constraints=EnsureChoice('html_details', None),
             doc="""decoration around the rendering to facilitate embedding into
             issues etc, e.g. use 'html_details' for posting collapsible entry
             to GitHub issues."""),
@@ -382,7 +393,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
+    def __call__(*, dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -76,7 +76,9 @@ class SSHRun(Interface):
     )
 
     @staticmethod
-    def __call__(login, cmd, port=None, ipv4=False, ipv6=False, options=None,
+    def __call__(login, cmd,
+                 *,
+                 port=None, ipv4=False, ipv6=False, options=None,
                  no_stdin=False):
         lgr.debug("sshrun invoked: login=%r, cmd=%r, port=%r, options=%r, "
                   "ipv4=%r, ipv6=%r, no_stdin=%r",

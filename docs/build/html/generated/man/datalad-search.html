@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad search &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad metadata" href="datalad-metadata.html" />
+    <link rel="prev" title="datalad run-procedure" href="datalad-run-procedure.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad search: Query metadata of a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-metadata.html">datalad metadata: Report known metadata on particular datasets or files</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-aggregate-metadata.html">datalad aggregate-metadata: Assemble metadata from datasets for later query</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-extract-metadata.html">datalad extract-metadata: Run metadata extractor on a dataset or file</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad search</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-search">
+<span id="man-datalad-search"></span><h1>datalad search<a class="headerlink" href="#datalad-search" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">search</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">d</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">reindex</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="nb">max</span><span class="o">-</span><span class="n">nresults</span> <span class="n">MAX_NRESULTS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">mode</span>
+    <span class="p">{</span><span class="n">egrep</span><span class="p">,</span><span class="n">textblob</span><span class="p">,</span><span class="n">autofield</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">full</span><span class="o">-</span><span class="n">record</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">show</span><span class="o">-</span><span class="n">keys</span>
+    <span class="p">{</span><span class="n">name</span><span class="p">,</span><span class="n">short</span><span class="p">,</span><span class="n">full</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">show</span><span class="o">-</span><span class="n">query</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span> <span class="p">[</span><span class="n">QUERY</span> <span class="o">...</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Search dataset metadata</p>
+<p>DataLad can search metadata extracted from a dataset and/or aggregated into
+a superdataset (see the <cite>aggregate-metadata</cite> command). This makes it
+possible to discover datasets, or individual files in a dataset even when
+they are not available locally.</p>
+<p>Ultimately DataLad metadata are a graph of linked data structures. However,
+this command does not (yet) support queries that can exploit all
+information stored in the metadata. At the moment the following search
+modes are implemented that represent different trade-offs between the
+expressiveness of a query and the computational and storage resources
+required to execute a query.</p>
+<ul class="simple">
+<li><p>egrep (default)</p></li>
+<li><p>egrepcs [case-sensitive egrep]</p></li>
+<li><p>textblob</p></li>
+<li><p>autofield</p></li>
+</ul>
+<p>An alternative default mode can be configured by tuning the
+configuration variable ‘datalad.search.default-mode’:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">datalad</span> <span class="s2">&quot;search&quot;</span><span class="p">]</span>
+  <span class="n">default</span><span class="o">-</span><span class="n">mode</span> <span class="o">=</span> <span class="n">egrepcs</span>
+</pre></div>
+</div>
+<p>Each search mode has its own default configuration for what kind of
+documents to query. The respective default can be changed via configuration
+variables:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">datalad</span> <span class="s2">&quot;search&quot;</span><span class="p">]</span>
+  <span class="n">index</span><span class="o">-&lt;</span><span class="n">mode_name</span><span class="o">&gt;-</span><span class="n">documenttype</span> <span class="o">=</span> <span class="p">(</span><span class="nb">all</span><span class="o">|</span><span class="n">datasets</span><span class="o">|</span><span class="n">files</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><em>Mode: egrep/egrepcs</em></p>
+<p>These search modes are largely ignorant of the metadata structure, and
+simply perform matching of a search pattern against a flat
+string-representation of metadata. This is advantageous when the query is
+simple and the metadata structure is irrelevant, or precisely known.
+Moreover, it does not require a search index, hence results can be reported
+without an initial latency for building a search index when the underlying
+metadata has changed (e.g. due to a dataset update). By default, these
+search modes only consider datasets and do not investigate records for
+individual files for speed reasons. Search results are reported in the
+order in which they were discovered.</p>
+<p>Queries can make use of Python regular expression syntax
+(<a class="reference external" href="https://docs.python.org/3/library/re.html">https://docs.python.org/3/library/re.html</a>). In EGREP mode, matching is
+case-insensitive when the query does not contain upper case characters, but
+is case-sensitive when it does. In <cite>egrepcs</cite> mode, matching is always
+case-sensitive. Expressions will match anywhere in a metadata string, not
+only at the start.</p>
+<p>When multiple queries are given, all queries have to match for a search hit
+(AND behavior).</p>
+<p>It is possible to search individual metadata key/value items by prefixing
+the query with a metadata key name, separated by a colon (‘:’). The key
+name can also be a regular expression to match multiple keys. A query match
+happens when any value of an item with a matching key name matches the query
+(OR behavior). See examples for more information.</p>
+<p>Examples:</p>
+<blockquote>
+<div><p>Query for (what happens to be) an author:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="n">haxby</span>
+</pre></div>
+</div>
+<p>Queries are case-INsensitive when the query contains no upper case characters,
+and can be regular expressions. Use EGREPCS mode when it is desired
+to perform a case-sensitive lowercase match:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">egrepcs</span> <span class="n">halchenko</span><span class="o">.*</span><span class="n">haxby</span>
+</pre></div>
+</div>
+<p>This search mode performs NO analysis of the metadata content.  Therefore
+queries can easily fail to match. For example, the above query implicitly
+assumes that authors are listed in alphabetical order.  If that is the
+case (which may or may not be true), the following query would yield NO
+hits:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="n">Haxby</span><span class="o">.*</span><span class="n">Halchenko</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">textblob</span></code> search mode represents an alternative that is more
+robust in such cases.</p>
+<p>For more complex queries multiple query expressions can be provided that
+all have to match to be considered a hit (AND behavior). This query
+discovers all files (non-default behavior) that match ‘bids.type=T1w’
+AND ‘nifti1.qform_code=scanner’:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="o">-</span><span class="n">c</span> <span class="n">datalad</span><span class="o">.</span><span class="n">search</span><span class="o">.</span><span class="n">index</span><span class="o">-</span><span class="n">egrep</span><span class="o">-</span><span class="n">documenttype</span><span class="o">=</span><span class="nb">all</span> <span class="n">search</span> <span class="n">bids</span><span class="o">.</span><span class="n">type</span><span class="p">:</span><span class="n">T1w</span> <span class="n">nifti1</span><span class="o">.</span><span class="n">qform_code</span><span class="p">:</span><span class="n">scanner</span>
+</pre></div>
+</div>
+<p>Key name selectors can also be expressions, which can be used to select
+multiple keys or construct “fuzzy” queries. In such cases a query matches
+when any item with a matching key matches the query (OR behavior).
+However, multiple queries are always evaluated using an AND conjunction.
+The following query extends the example above to match any files that
+have either ‘nifti1.qform_code=scanner’ or ‘nifti1.sform_code=scanner’:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="o">-</span><span class="n">c</span> <span class="n">datalad</span><span class="o">.</span><span class="n">search</span><span class="o">.</span><span class="n">index</span><span class="o">-</span><span class="n">egrep</span><span class="o">-</span><span class="n">documenttype</span><span class="o">=</span><span class="nb">all</span> <span class="n">search</span> <span class="n">bids</span><span class="o">.</span><span class="n">type</span><span class="p">:</span><span class="n">T1w</span> <span class="n">nifti1</span><span class="o">.</span><span class="p">(</span><span class="n">q</span><span class="o">|</span><span class="n">s</span><span class="p">)</span><span class="n">form_code</span><span class="p">:</span><span class="n">scanner</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><em>Mode: textblob</em></p>
+<p>This search mode is very similar to the <code class="docutils literal notranslate"><span class="pre">egrep</span></code> mode, but with a few key
+differences. A search index is built from the string-representation of
+metadata records. By default, only datasets are included in this index, hence
+the indexing is usually completed within a few seconds, even for hundreds
+of datasets. This mode uses its own query language (not regular expressions)
+that is similar to other search engines. It supports logical conjunctions
+and fuzzy search terms. More information on this is available from the Whoosh
+project (search engine implementation):</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Description of the Whoosh query language:
+<a class="reference external" href="http://whoosh.readthedocs.io/en/latest/querylang.html">http://whoosh.readthedocs.io/en/latest/querylang.html</a>)</p></li>
+<li><p>Description of a number of query language customizations that are
+enabled in DataLad, such as, fuzzy term matching:
+<a class="reference external" href="http://whoosh.readthedocs.io/en/latest/parsing.html#common-customizations">http://whoosh.readthedocs.io/en/latest/parsing.html#common-customizations</a></p></li>
+</ul>
+</div></blockquote>
+<p>Importantly, search hits are scored and reported in order of descending
+relevance, hence limiting the number of search results is more meaningful
+than in the ‘egrep’ mode and can also reduce the query duration.</p>
+<p>Examples:</p>
+<blockquote>
+<div><p>Search for (what happens to be) two authors, regardless of the order in
+which those names appear in the metadata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">textblob</span> <span class="n">halchenko</span> <span class="n">haxby</span>
+</pre></div>
+</div>
+<p>Fuzzy search when you only have an approximate idea what you are looking
+for or how it is spelled:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">textblob</span> <span class="n">haxbi</span><span class="o">~</span>
+</pre></div>
+</div>
+<p>Very fuzzy search, when you are basically only confident about the first
+two characters and how it sounds approximately (or more precisely: allow
+for three edits and require matching of the first two characters):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">textblob</span> <span class="n">haksbi</span><span class="o">~</span><span class="mi">3</span><span class="o">/</span><span class="mi">2</span>
+</pre></div>
+</div>
+<p>Combine fuzzy search with logical constructs:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">textblob</span> <span class="s1">&#39;haxbi~ AND (hanke OR halchenko)&#39;</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><em>Mode: autofield</em></p>
+<p>This mode is similar to the ‘textblob’ mode, but builds a vastly more
+detailed search index that represents individual metadata variables as
+individual fields. By default, this search index includes records for
+datasets and individual fields, hence it can grow very quickly into
+a huge structure that can easily take an hour or more to build and require
+more than a GB of storage. However, limiting it to documents on datasets
+(see above) retains the enhanced expressiveness of queries while
+dramatically reducing the resource demands.</p>
+<p>Examples:</p>
+<blockquote>
+<div><p>List names of search index fields (auto-discovered from the set of
+indexed datasets) which either have a field starting with “age” or
+“gender”:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">autofield</span> <span class="o">--</span><span class="n">show</span><span class="o">-</span><span class="n">keys</span> <span class="n">name</span> <span class="s1">&#39;\.age&#39;</span> <span class="s1">&#39;\.gender&#39;</span>
+</pre></div>
+</div>
+<p>Fuzzy search for datasets with an author that is specified in a particular
+metadata field:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">autofield</span> <span class="n">bids</span><span class="o">.</span><span class="n">author</span><span class="p">:</span><span class="n">haxbi</span><span class="o">~</span> <span class="nb">type</span><span class="p">:</span><span class="n">dataset</span>
+</pre></div>
+</div>
+<p>Search for individual files that carry a particular description
+prefix in their ‘nifti1’ metadata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">search</span> <span class="o">--</span><span class="n">mode</span> <span class="n">autofield</span> <span class="n">nifti1</span><span class="o">.</span><span class="n">description</span><span class="p">:</span><span class="n">FSL</span><span class="o">*</span> <span class="nb">type</span><span class="p">:</span><span class="n">file</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><em>Reporting</em></p>
+<p>Search hits are returned as standard DataLad results. On the command line
+the ‘–output-format’ (or ‘-f’) option can be used to tweak results for
+further processing.</p>
+<p>Examples:</p>
+<blockquote>
+<div><p>Format search hits as a JSON stream (one hit per line):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="o">-</span><span class="n">f</span> <span class="n">json</span> <span class="n">search</span> <span class="n">haxby</span>
+</pre></div>
+</div>
+<p>Custom formatting: which terms matched the query of particular
+results. Useful for investigating fuzzy search results:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ datalad -f &#39;{path}: {query_matched}&#39; search --mode autofield bids.author:haxbi~
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="query">
+<h3>QUERY<a class="headerlink" href="#query" title="Permalink to this headline"></a></h3>
+<p>query string, supported syntax and features depends on the selected search mode (see documentation).</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="d-dataset-dataset-dataset">
+<h3><strong>-d</strong> <em>DATASET</em>, <strong>-\-dataset</strong> <em>DATASET</em><a class="headerlink" href="#d-dataset-dataset-dataset" title="Permalink to this headline"></a></h3>
+<p>specify the dataset to perform the query operation on. If no dataset is given, an attempt is made to identify the dataset based on the current working directory and/or the PATH given. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="reindex">
+<h3><strong>-\-reindex</strong><a class="headerlink" href="#reindex" title="Permalink to this headline"></a></h3>
+<p>force rebuilding the search index, even if no change in the dataset’s state has been detected, for example, when the index documenttype configuration has changed.</p>
+</section>
+<section id="max-nresults-max-nresults">
+<h3><strong>-\-max-nresults</strong> <em>MAX_NRESULTS</em><a class="headerlink" href="#max-nresults-max-nresults" title="Permalink to this headline"></a></h3>
+<p>maxmimum number of search results to report. Setting this to 0 will report all search matches. Depending on the mode this can search substantially slower. If not specified, a mode-specific default setting will be used. Constraints: value must be convertible to type ‘int’</p>
+</section>
+<section id="mode-egrep-textblob-autofield">
+<h3><strong>-\-mode</strong> {egrep,textblob,autofield}<a class="headerlink" href="#mode-egrep-textblob-autofield" title="Permalink to this headline"></a></h3>
+<p>Mode of search index structure and content. See section SEARCH MODES for details.</p>
+</section>
+<section id="full-record-f">
+<h3><strong>-\-full-record</strong>, <strong>-f</strong><a class="headerlink" href="#full-record-f" title="Permalink to this headline"></a></h3>
+<p>If set, return the full metadata record for each search hit. Depending on the search mode this might require additional queries. By default, only data that is available to the respective search modes is returned. This always includes essential information, such as the path and the type.</p>
+</section>
+<section id="show-keys-name-short-full">
+<h3><strong>-\-show-keys</strong> {name,short,full}<a class="headerlink" href="#show-keys-name-short-full" title="Permalink to this headline"></a></h3>
+<p>if given, a list of known search keys is shown. If ‘name’ - only the name is printed one per line. If ‘short’ or ‘full’, statistics (in how many datasets, and how many unique values) are printed. ‘short’ truncates the listing of unique values. QUERY, if provided, is regular expressions any of which keys should contain. No other action is performed (except for reindexing), even if other arguments are given. Each key is accompanied by a term definition in parenthesis (TODO). In most cases a definition is given in the form of a URL. If an ontology definition for a term is known, this URL can resolve to a webpage that provides a comprehensive definition of the term. However, for speed reasons term resolution is solely done on information contained in a local dataset’s metadata, and definition URLs might be outdated or point to no longer existing resources.</p>
+</section>
+<section id="show-query">
+<h3><strong>-\-show-query</strong><a class="headerlink" href="#show-query" title="Permalink to this headline"></a></h3>
+<p>if given, the formal query that was generated from the given query string is shown, but not actually executed. This is mostly useful for debugging purposes.</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-run-procedure.html" class="btn btn-neutral float-left" title="datalad run-procedure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-metadata.html" class="btn btn-neutral float-right" title="datalad metadata" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

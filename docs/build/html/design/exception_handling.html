@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exception handling &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Credential management" href="credentials.html" />
+    <link rel="prev" title="Miscellaneous patterns" href="miscpatterns.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Exception handling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#catching-exceptions">Catching exceptions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#messaging-about-an-exception">Messaging about an exception</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>Exception handling</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="exception-handling">
+<span id="chap-design-exception-handling"></span><h1>Exception handling<a class="headerlink" href="#exception-handling" title="Permalink to this headline"></a></h1>
+<div class="topic">
+<p class="topic-title">Specification scope and status</p>
+<p>This specification describes the current implementation target.</p>
+</div>
+<section id="catching-exceptions">
+<h2>Catching exceptions<a class="headerlink" href="#catching-exceptions" title="Permalink to this headline"></a></h2>
+<p>Whenever we catch an exception in an <code class="docutils literal notranslate"><span class="pre">except</span></code> clause, the following rules
+apply:</p>
+<ul>
+<li><p>unless we (re-)raise, the first line instantiates a
+<code class="xref py py-class docutils literal notranslate"><span class="pre">CapturedException</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="n">ce</span> <span class="o">=</span> <span class="n">CapturedException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>First, this ensures a low-level (8) log entry including the traceback of that
+exception. The depth of the included traceback can be limited by setting the
+<code class="docutils literal notranslate"><span class="pre">datalad.exc.str.tb_limit</span></code> config accordingly.</p>
+<p>Second, it deletes the frame stack references of the exception and keeps
+textual information only, in order to avoid circular references, where an
+object (whose method raised the exception) isn’t going to be picked by the
+garbage collection. This can be particularly troublesome if that object holds
+a reference to a subprocess for example. However, it’s not easy to see in what
+situation this would really be needed and we never need anything other than
+the textual information about what happened. Making the reference cleaning a
+general rule is easiest to write, maintain and review.</p>
+</li>
+<li><p>if we raise, neither a log entry nor such a
+<code class="xref py py-class docutils literal notranslate"><span class="pre">CapturedException</span></code> instance is to be
+created.
+Eventually, there will be a spot where that (re-)raised exception is caught.
+This then is the right place to log it. That log entry will have the
+traceback, there’s no need to leave a trace by means of log messages!</p></li>
+<li><p>if we raise, but do not simply reraise that exact same exception, in order to
+change the exception class and/or its message, <code class="docutils literal notranslate"><span class="pre">raise</span> <span class="pre">from</span></code> must be used!:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">except</span> <span class="n">SomeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="n">NewError</span><span class="p">(</span><span class="s2">&quot;new message&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+</pre></div>
+</div>
+<p>This ensures that the original exception is properly registered as the cause
+for the exception via its <code class="docutils literal notranslate"><span class="pre">__cause__</span></code> attribute. Hence, the original
+exception’s traceback will be part of the later on logged traceback of the new
+exception.</p>
+</li>
+</ul>
+</section>
+<section id="messaging-about-an-exception">
+<h2>Messaging about an exception<a class="headerlink" href="#messaging-about-an-exception" title="Permalink to this headline"></a></h2>
+<p>In addition to the auto-generated low-level log entry there might be a need to
+create a higher-level log, a user message or a (result) dictionary that includes
+information from that exception. While such messaging may use anything the
+(captured) exception provides, please consider that “technical” details about an
+exception are already auto-logged and generally not incredibly meaningful for
+users.</p>
+<p>For message creation <code class="xref py py-class docutils literal notranslate"><span class="pre">CapturedException</span></code>
+comes with a couple of <code class="docutils literal notranslate"><span class="pre">format_*</span></code> helper methods, its <code class="docutils literal notranslate"><span class="pre">__str__</span></code> provides a
+short representation of the form <code class="docutils literal notranslate"><span class="pre">ExceptionClass(message)</span></code> and its
+<code class="docutils literal notranslate"><span class="pre">__repr__</span></code> the log form with a traceback tht is used for the auto-generated
+log.</p>
+<p>For result dictionaries <code class="xref py py-class docutils literal notranslate"><span class="pre">CapturedException</span></code>
+can be assigned to the field <code class="docutils literal notranslate"><span class="pre">exception</span></code>. Currently, <code class="docutils literal notranslate"><span class="pre">get_status_dict</span></code> will
+consider this field and create an additional field with a traceback string.
+Hence, whether putting a captured exception into that field actually has an
+effect depends on whether <code class="docutils literal notranslate"><span class="pre">get_status_dict</span></code> is subsequently used with that
+dictionary. In the future such functionality may move into result renderers
+instead, leaving the decision of what to do with the passed
+<code class="xref py py-class docutils literal notranslate"><span class="pre">CapturedException</span></code> to them. Therefore, even
+if of no immediate effect, enhancing the result dicts accordingly makes sense
+already, since it may be useful when using datalad via its python interface
+already and provide instant benefits whenever the result rendering gets such an
+upgrade.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="miscpatterns.html" class="btn btn-neutral float-left" title="Miscellaneous patterns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="credentials.html" class="btn btn-neutral float-right" title="Credential management" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad install &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad no-annex" href="datalad-no-annex.html" />
+    <link rel="prev" title="datalad get" href="datalad-get.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad-add-readme.html">datalad add-readme: Add information on DataLad dataset to a README</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-addurls.html">datalad addurls: Update dataset content from a list of URLs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-copy-file.html">datalad copy-file: Copy file identity and availability from one dataset to another</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-drop.html">datalad drop: Drop datasets or dataset components</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-get.html">datalad get: Obtain any dataset content</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad install: Install a dataset from a (remote) source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-no-annex.html">datalad no-annex: Configure a dataset to never put file content into an annex</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-remove.html">datalad remove: Unlink components from a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-subdatasets.html">datalad subdatasets: Query and manipulate subdataset records of a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-unlock.html">datalad unlock: Make dataset file content editable</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad install</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-install">
+<span id="man-datalad-install"></span><h1>datalad install<a class="headerlink" href="#datalad-install" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">install</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">s</span> <span class="n">SOURCE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">d</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">g</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">DESCRIPTION</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">r</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">R</span> <span class="n">LEVELS</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">reckless</span> <span class="p">[</span><span class="n">auto</span><span class="o">|</span><span class="n">ephemeral</span><span class="o">|</span><span class="n">shared</span><span class="o">-...</span><span class="p">]]</span> <span class="p">[</span><span class="o">-</span><span class="n">J</span> <span class="n">NJOBS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">branch</span>
+    <span class="n">BRANCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span> <span class="p">[</span><span class="n">PATH</span> <span class="o">...</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Install a dataset from a (remote) source.</p>
+<p>This command creates a local sibling of an existing dataset from a
+(remote) location identified via a URL or path. Optional recursion into
+potential subdatasets, and download of all referenced data is supported.
+The new dataset can be optionally registered in an existing
+superdataset by identifying it via the DATASET argument (the new
+dataset’s path needs to be located within the superdataset for that).</p>
+<p>It is recommended to provide a brief description to label the dataset’s
+nature <em>and</em> location, e.g. “Michael’s music on black laptop”. This helps
+humans to identify data locations in distributed scenarios.  By default an
+identifier comprised of user and machine name, plus path will be generated.</p>
+<p>When only partial dataset content shall be obtained, it is recommended to
+use this command without the <cite>get-data</cite> flag, followed by a
+<cite>get</cite> operation to obtain the desired data.</p>
+<dl class="simple">
+<dt>NOTE</dt><dd><p>Power-user info: This command uses git clone, and
+git annex init to prepare the dataset. Registering to a
+superdataset is performed via a git submodule add operation
+in the discovered superdataset.</p>
+</dd>
+</dl>
+<p><em>Examples</em></p>
+<p>Install a dataset from Github into the current directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">install</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">datalad</span><span class="o">-</span><span class="n">datasets</span><span class="o">/</span><span class="n">longnow</span><span class="o">-</span><span class="n">podcasts</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+<p>Install a dataset as a subdataset into the current dataset:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">install</span> <span class="o">-</span><span class="n">d</span> <span class="o">.</span> \
+  <span class="o">--</span><span class="n">source</span><span class="o">=</span><span class="s1">&#39;https://github.com/datalad-datasets/longnow-podcasts.git&#39;</span>
+</pre></div>
+</div>
+<p>Install a dataset, and get all content right away:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">install</span> <span class="o">--</span><span class="n">get</span><span class="o">-</span><span class="n">data</span> \
+  <span class="o">-</span><span class="n">s</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">datalad</span><span class="o">-</span><span class="n">datasets</span><span class="o">/</span><span class="n">longnow</span><span class="o">-</span><span class="n">podcasts</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+<p>Install a dataset with all its subdatasets:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">%</span> <span class="n">datalad</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> \
+  <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">datalad</span><span class="o">-</span><span class="n">datasets</span><span class="o">/</span><span class="n">longnow</span><span class="o">-</span><span class="n">podcasts</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="path">
+<h3>PATH<a class="headerlink" href="#path" title="Permalink to this headline"></a></h3>
+<p>path/name of the installation target. If no PATH is provided a destination path will be derived from a source URL similar to git clone.</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="s-source-source-source">
+<h3><strong>-s</strong> SOURCE, <strong>-\-source</strong> SOURCE<a class="headerlink" href="#s-source-source-source" title="Permalink to this headline"></a></h3>
+<p>URL or local path of the installation source. Constraints: value must be a string</p>
+</section>
+<section id="d-dataset-dataset-dataset">
+<h3><strong>-d</strong> <em>DATASET</em>, <strong>-\-dataset</strong> <em>DATASET</em><a class="headerlink" href="#d-dataset-dataset-dataset" title="Permalink to this headline"></a></h3>
+<p>specify the dataset to perform the install operation on. If no dataset is given, an attempt is made to identify the dataset in a parent directory of the current working directory and/or the PATH given. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="g-get-data">
+<h3><strong>-g</strong>, <strong>-\-get-data</strong><a class="headerlink" href="#g-get-data" title="Permalink to this headline"></a></h3>
+<p>if given, obtain all data content too.</p>
+</section>
+<section id="d-description-description-description">
+<h3><strong>-D</strong> <em>DESCRIPTION</em>, <strong>-\-description</strong> <em>DESCRIPTION</em><a class="headerlink" href="#d-description-description-description" title="Permalink to this headline"></a></h3>
+<p>short description to use for a dataset location. Its primary purpose is to help humans to identify a dataset copy (e.g., “mike’s dataset on lab server”). Note that when a dataset is published, this information becomes available on the remote side. Constraints: value must be a string</p>
+</section>
+<section id="r-recursive">
+<h3><strong>-r</strong>, <strong>-\-recursive</strong><a class="headerlink" href="#r-recursive" title="Permalink to this headline"></a></h3>
+<p>if set, recurse into potential subdatasets.</p>
+</section>
+<section id="r-levels-recursion-limit-levels">
+<h3><strong>-R</strong> LEVELS, <strong>-\-recursion-limit</strong> LEVELS<a class="headerlink" href="#r-levels-recursion-limit-levels" title="Permalink to this headline"></a></h3>
+<p>limit recursion into subdatasets to the given number of levels. Constraints: value must be convertible to type ‘int’</p>
+</section>
+<section id="reckless-auto-ephemeral-shared">
+<h3><strong>-\-reckless</strong> [auto|ephemeral|shared-…]<a class="headerlink" href="#reckless-auto-ephemeral-shared" title="Permalink to this headline"></a></h3>
+<p>Obtain a dataset or subdatset and set it up in a potentially unsafe way for performance, or access reasons. Use with care, any dataset is marked as ‘untrusted’. The reckless mode is stored in a dataset’s local configuration under ‘datalad.clone.reckless’, and will be inherited to any of its subdatasets. Supported modes are: [‘auto’]: hard-link files between local clones. In-place modification in any clone will alter original annex content. [‘ephemeral’]: symlink annex to origin’s annex and discard local availability info via git- annex-dead ‘here’. Shares an annex between origin and clone w/o git-annex being aware of it. In case of a change in origin you need to update the clone before you’re able to save new content on your end. Alternative to ‘auto’ when hardlinks are not an option, or number of consumed inodes needs to be minimized. Note that this mode can only be used with clones from non-bare repositories or a RIA store! Otherwise two different annex object tree structures (dirhashmixed vs dirhashlower) will be used simultaneously, and annex keys using the respective other structure will be inaccessible. [‘shared-&lt;mode&gt;’]: set up repository and annex permission to enable multi-user access. This disables the standard write protection of annex’ed files. &lt;mode&gt; can be any value support by ‘git init –shared=’, such as ‘group’, or ‘all’. Constraints: value must be one of (True, False, ‘auto’, ‘ephemeral’), or value must start with ‘shared-’</p>
+</section>
+<section id="j-njobs-jobs-njobs">
+<h3><strong>-J</strong> NJOBS, <strong>-\-jobs</strong> NJOBS<a class="headerlink" href="#j-njobs-jobs-njobs" title="Permalink to this headline"></a></h3>
+<p>how many parallel jobs (where possible) to use. “auto” corresponds to the number defined by ‘datalad.runtime.max-annex-jobs’ configuration item NOTE: This option can only parallelize input retrieval (get) and output recording (save). DataLad does NOT parallelize your scripts for you. Constraints: value must be convertible to type ‘int’, or value must be one of (‘auto’,) [Default: ‘auto’]</p>
+</section>
+<section id="branch-branch">
+<h3><strong>-\-branch</strong> <em>BRANCH</em><a class="headerlink" href="#branch-branch" title="Permalink to this headline"></a></h3>
+<p>Clone source at this branch or tag. This option applies only to the top-level dataset not any subdatasets that may be cloned when installing recursively. Note that if the source is a RIA URL with a version, it takes precedence over this option. Constraints: value must be a string</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-get.html" class="btn btn-neutral float-left" title="datalad get" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-no-annex.html" class="btn btn-neutral float-right" title="datalad no-annex" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

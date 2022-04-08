@@ -1,6 +1,6 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # -*- coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -11,9 +11,12 @@
 
 """
 
+from functools import wraps
+import inspect
 import os
 import os.path as op
 import shutil
+import stat
 import sys
 import time
 import logging
@@ -45,14 +48,16 @@ from datalad.utils import (
     create_tree,
     disable_logger,
     dlabspath,
+    ensure_write_permission,
     expandpath,
     file_basename,
     find_files,
     generate_chunks,
+    getargspec,
     get_dataset_root,
-    get_func_kwargs_doc,
     get_open_files,
     get_path_prefix,
+    get_sig_param_names,
     get_timestamp_suffix,
     get_trace,
     getpwd, chpwd,
@@ -68,12 +73,12 @@ from datalad.utils import (
     md5sum,
     never_fail,
     not_supported_on_windows,
+    obtain_write_permission,
     on_windows,
     partition,
     path_is_subpath,
     path_startswith,
     rotree,
-    setup_exceptionhook,
     split_cmdline,
     swallow_logs,
     swallow_outputs,
@@ -113,6 +118,7 @@ from .utils import (
     skip_if,
     skip_if_no_module,
     skip_if_on_windows,
+    skip_if_root,
     skip_known_failure,
     SkipTest,
     skip_wo_symlink_capability,
@@ -122,16 +128,7 @@ from .utils import (
 from datalad import cfg as dl_cfg
 
 
-def test_get_func_kwargs_doc():
-    def some_func(arg1, kwarg1=None, kwarg2="bu"):
-        return
-    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
-
-
 def test_better_wraps():
-    from functools import wraps
-    from datalad.utils import getargspec
-
     def wraps_decorator(func):
         @wraps(func)
         def  _wrap_wraps_decorator(*args, **kwargs):
@@ -155,9 +152,78 @@ def test_better_wraps():
         return "function2"
 
     eq_("function1", function1(1, 2, 3))
-    eq_(getargspec(function1)[0], [])
+    # getargspec shim now can handle @wraps'ed functions just fine
+    eq_(getargspec(function1)[0], ['a', 'b', 'c'])
     eq_("function2", function2(1, 2, 3))
     eq_(getargspec(function2)[0], ['a', 'b', 'c'])
+
+
+def test_getargspec():
+
+    def eq_argspec(f, expected, has_kwonlyargs=False):
+        """A helper to centralize testing of getargspec on original and wrapped function
+
+        has_kwonlyargs is to instruct if function has kwonly args so we do not try to compare
+        to inspect.get*spec functions, which would barf ValueError if attempted to run on a
+        function with kwonlys. And also we pass it as include_kwonlyargs to our getargspec
+        """
+        # so we know that our expected is correct
+        if not has_kwonlyargs:
+            # if False - we test function with kwonlys - inspect.getargspec would barf
+            eq_(inspect.getargspec(f), expected)
+            # and getfullargspec[:4] wouldn't provide a full picture
+            eq_(inspect.getfullargspec(f)[:4], expected)
+        else:
+            assert_raises(ValueError, inspect.getargspec, f)
+            inspect.getfullargspec(f)  # doesn't barf
+        eq_(getargspec(f, include_kwonlyargs=has_kwonlyargs), expected)
+
+        # and lets try on a wrapped one -- only ours can do the right thing
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):  # pragma: no cover
+                return f(*args, **kwargs)
+            return wrapper
+        fw = decorator(f)
+        if has_kwonlyargs:
+            # We barf ValueError similarly to inspect.getargspec, unless explicitly requested
+            # to include kwonlyargs
+            assert_raises(ValueError, getargspec, fw)
+        eq_(getargspec(fw, include_kwonlyargs=has_kwonlyargs), expected)
+
+    def f0():  # pragma: no cover
+        pass
+
+    yield eq_argspec, f0, ([], None, None, None)
+
+    def f1(a1, kw1=None, kw0=1):  # pragma: no cover
+        pass
+
+    yield eq_argspec, f1, (['a1', 'kw1', 'kw0'], None, None, (None, 1))
+
+    # Having *a already makes keyword args to be kwonlyargs, in that
+    # inspect.get*spec would barf
+    def f1_args(a1, *a, kw1=None, kw0=1, **kw):  # pragma: no cover
+        pass
+
+    yield eq_argspec, f1_args, (['a1', 'kw1', 'kw0'], 'a', 'kw', (None, 1)), True
+
+    def f1_star(a1, *, kw1=None, kw0=1):  # pragma: no cover
+        pass
+
+    assert_raises(ValueError, getargspec, f1_star)
+    yield eq_argspec, f1_star, (['a1', 'kw1', 'kw0'], None, None, (None, 1)), True
+
+
+def test_get_sig_param_names():
+    def f(a1, kw1=None, *args, kw2=None, **kwargs):
+        pass  # pragma: no cover
+
+    # note: `a1` could be used either positionally or via keyword, so is listed in kw_any
+    assert_equal(get_sig_param_names(f, ('kw_only', 'kw_any')), (['kw2'], ['a1', 'kw1', 'kw2']))
+    assert_equal(get_sig_param_names(f, ('any',)), (['a1', 'kw1', 'kw2'],))
+    assert_equal(get_sig_param_names(f, tuple()), ())
+    assert_raises(ValueError, get_sig_param_names, f, ('mumba',))
 
 
 @with_tempfile(mkdir=True)
@@ -280,51 +346,6 @@ def test_disable_logger():
         assert_raises(AssertionError, cml.assert_logged, "log sth at bottom level")
 
 
-def _check_setup_exceptionhook(interactive):
-    old_exceptionhook = sys.excepthook
-
-    post_mortem_tb = []
-
-    def our_post_mortem(tb):
-        post_mortem_tb.append(tb)
-
-    with patch('sys.excepthook'), \
-            patch('datalad.utils.is_interactive', lambda: interactive), \
-            patch('pdb.post_mortem', our_post_mortem):
-        setup_exceptionhook()
-        our_exceptionhook = sys.excepthook
-        ok_(old_exceptionhook != our_exceptionhook)
-        with swallow_logs() as cml, swallow_outputs() as cmo:
-            # we need to call our_exceptionhook explicitly b/c nose
-            # swallows all Exceptions and hook never gets executed
-            try:
-                raise RuntimeError
-            except Exception as e:  # RuntimeError:
-                type_, value_, tb_ = sys.exc_info()
-            our_exceptionhook(type_, value_, tb_)
-            # Happens under tox environment but not in manually crafted
-            # ones -- not yet sure what it is about but --dbg does work
-            # with python3 so lettting it skip for now
-            raise SkipTest(
-                "TODO: Not clear why in PY3 calls cleanup if we try to "
-                "access the beast"
-            )
-            #assert_in('Traceback (most recent call last)', cmo.err)
-            #assert_in('in _check_setup_exceptionhook', cmo.err)
-            #if interactive:
-            #    assert_equal(post_mortem_tb[0], tb_)
-            #else:
-            #    assert_equal(post_mortem_tb, [])
-            #    # assert_in('We cannot setup exception hook', cml.out)
-
-    eq_(old_exceptionhook, sys.excepthook)
-
-
-def test_setup_exceptionhook():
-    for tval in [True, False]:
-        yield _check_setup_exceptionhook, tval
-
-
 def test_md5sum():
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(__file__)
@@ -442,18 +463,33 @@ def test_auto_repr():
     class buga:
         def __init__(self):
             self.a = 1
-            self.b = list(range(100))
+            self.b = list(range(20))
             self.c = WithoutReprClass()
             self._c = "protect me"
 
         def some(self):
             return "some"
 
+    @auto_repr(short=False)
+    class buga_long(object):
+        def __init__(self):
+            self.a = 1
+            self.b = list(range(20))
+
+        def some(self):
+            return "some"
+
     assert_equal(
         repr(buga()),
-        "buga(a=1, b=<<[0, 1, 2, 3, 4++372 chars++ 99]>>, c=<WithoutReprClass>)"
+        "buga(a=1, b=<<[0, 1, 2, 3, 4++52 chars++ 19]>>, c=<WithoutReprClass>)"
     )
     assert_equal(buga().some(), "some")
+
+    assert_equal(
+        repr(buga_long()),
+        f"buga_long(a=1, b=[{', '.join(map(str, range(20)))}])"
+    )
+    assert_equal(buga_long().some(), "some")
 
 
 def test_assure_iter():
@@ -668,7 +704,7 @@ def test_all_same():
         yield 'a'
         yield 'a'
         yield 'b'
-        raise ValueError("Should not get here since on b should return")
+        raise ValueError("Should not get here since on b should return")  # pragma: no cover
 
     ok_(not all_same(never_get_to_not_needed()))
 
@@ -1326,3 +1362,77 @@ def test_splitjoin_cmdline():
         eq_(join_cmdline(['abc', 'def']), '"abc" "def"')
     else:
         eq_(join_cmdline(['abc', 'def']), 'abc def')
+
+
+@skip_if_root
+@with_tempfile
+def test_obtain_write_permission(path):
+    path = Path(path)
+
+    # there's nothing at path yet:
+    assert_raises(FileNotFoundError, obtain_write_permission, path)
+
+    # Revoke write permission
+    path.write_text("something")
+    path.chmod(path.stat().st_mode & ~stat.S_IWRITE)
+    assert_raises(PermissionError, path.write_text, "different thing")
+
+    # Obtain and try again:
+    obtain_write_permission(path)
+    path.write_text("different thing")
+
+    # Already having permission is no issue:
+    obtain_write_permission(path)
+    path.write_text("yet another thing")
+
+
+@skip_if_root
+@with_tempfile(mkdir=True)
+def test_ensure_write_permission(path):
+
+    # This is testing the usecase of write protected directories needed for
+    # messing with an annex object tree (as done by the ORA special remote).
+    # However, that doesn't work on Windows since we can't revoke write
+    # permissions for the owner of a directory (at least on VFAT - may be
+    # true for NTFS as well - don't know).
+    # Hence, on windows/crippledFS only test on a file.
+
+    dir_ = Path(path)
+    if not on_windows and has_symlink_capability:
+        # set up write-protected dir containing a file
+        file_ = dir_ / "somefile"
+        file_.write_text("whatever")
+        dir_.chmod(dir_.stat().st_mode & ~stat.S_IWRITE)
+        assert_raises(PermissionError, file_.unlink)
+
+        # contextmanager lets us do it and restores permissions afterwards:
+        mode_before = dir_.stat().st_mode
+        with ensure_write_permission(dir_):
+            file_.unlink()
+
+        mode_after = dir_.stat().st_mode
+        assert_equal(mode_before, mode_after)
+        assert_raises(PermissionError, file_.write_text, "new file can't be "
+                                                         "written")
+
+        assert_raises(FileNotFoundError, ensure_write_permission(dir_ /
+                      "non" / "existent").__enter__)
+
+        # deletion within context doesn't let mode restoration fail:
+        with ensure_write_permission(dir_):
+            dir_.rmdir()
+
+        dir_.mkdir()  # recreate, since next block is executed unconditionally
+
+    # set up write-protected file:
+    file2 = dir_ / "protected.txt"
+    file2.write_text("unchangeable")
+    file2.chmod(file2.stat().st_mode & ~stat.S_IWRITE)
+    assert_raises(PermissionError, file2.write_text, "modification")
+
+    # within context we can:
+    with ensure_write_permission(file2):
+        file2.write_text("modification")
+
+    # mode is restored afterwards:
+    assert_raises(PermissionError, file2.write_text, "modification2")

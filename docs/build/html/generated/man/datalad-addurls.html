@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad addurls &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad copy-file" href="datalad-copy-file.html" />
+    <link rel="prev" title="datalad add-readme" href="datalad-add-readme.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad-add-readme.html">datalad add-readme: Add information on DataLad dataset to a README</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad addurls: Update dataset content from a list of URLs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-copy-file.html">datalad copy-file: Copy file identity and availability from one dataset to another</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-drop.html">datalad drop: Drop datasets or dataset components</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-get.html">datalad get: Obtain any dataset content</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-install.html">datalad install: Install a dataset from a (remote) source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-no-annex.html">datalad no-annex: Configure a dataset to never put file content into an annex</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-remove.html">datalad remove: Unlink components from a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-subdatasets.html">datalad subdatasets: Query and manipulate subdataset records of a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-unlock.html">datalad unlock: Make dataset file content editable</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad addurls</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-addurls">
+<span id="man-datalad-addurls"></span><h1>datalad addurls<a class="headerlink" href="#datalad-addurls" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">addurls</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">d</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">t</span> <span class="n">TYPE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">x</span> <span class="n">REGEXP</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">m</span> <span class="n">FORMAT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">key</span> <span class="n">FORMAT</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">message</span> <span class="n">MESSAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">n</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">fast</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">ifexists</span> <span class="p">{</span><span class="n">overwrite</span><span class="o">|</span><span class="n">skip</span><span class="p">}]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">missing</span><span class="o">-</span><span class="n">value</span> <span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">nosave</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="o">-</span><span class="n">urls</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">PROC</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">-</span><span class="n">J</span> <span class="n">NJOBS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">drop</span><span class="o">-</span><span class="n">after</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">on</span><span class="o">-</span><span class="n">collision</span>
+    <span class="p">{</span><span class="n">error</span><span class="o">|</span><span class="n">error</span><span class="o">-</span><span class="k">if</span><span class="o">-</span><span class="n">different</span><span class="o">|</span><span class="n">take</span><span class="o">-</span><span class="n">first</span><span class="o">|</span><span class="n">take</span><span class="o">-</span><span class="n">last</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span>
+    <span class="n">URL</span><span class="o">-</span><span class="n">FILE</span> <span class="n">URL</span><span class="o">-</span><span class="n">FORMAT</span> <span class="n">FILENAME</span><span class="o">-</span><span class="n">FORMAT</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Create and update a dataset from a list of URLs.</p>
+<p><em>Format specification</em></p>
+<p>Several arguments take format strings.  These are similar to normal Python
+format strings where the names from <cite>URL-FILE</cite> (column names for a comma-
+or tab-separated file or properties for JSON) are available as
+placeholders. If <cite>URL-FILE</cite> is a CSV or TSV file, a positional index can
+also be used (i.e., “{0}” for the first column). Note that a placeholder
+cannot contain a ‘:’ or ‘!’.</p>
+<p>In addition, the <cite>FILENAME-FORMAT</cite> arguments has a few special
+placeholders.</p>
+<blockquote>
+<div><ul>
+<li><p>_repindex</p>
+<p>The constructed file names must be unique across all fields rows.  To
+avoid collisions, the special placeholder “_repindex” can be added to
+the formatter.  Its value will start at 0 and increment every time a
+file name repeats.</p>
+</li>
+<li><p>_url_hostname, _urlN, _url_basename*</p>
+<p>Various parts of the formatted URL are available.  Take
+“<a class="reference external" href="http://datalad.org/asciicast/seamless_nested_repos.sh">http://datalad.org/asciicast/seamless_nested_repos.sh</a>” as an example.</p>
+<p>“datalad.org” is stored as “_url_hostname”.  Components of the URL’s
+path can be referenced as “_urlN”.  “_url0” and “_url1” would map to
+“asciicast” and “seamless_nested_repos.sh”, respectively.  The final
+part of the path is also available as “_url_basename”.</p>
+<p>This name is broken down further.  “_url_basename_root” and
+“_url_basename_ext” provide access to the root name and extension.
+These values are similar to the result of os.path.splitext, but, in the
+case of multiple periods, the extension is identified using the same
+length heuristic that git-annex uses.  As a result, the extension of
+“file.tar.gz” would be “.tar.gz”, not “.gz”.  In addition, the fields
+“_url_basename_root_py” and “_url_basename_ext_py” provide access to
+the result of os.path.splitext.</p>
+</li>
+<li><p>_url_filename*</p>
+<p>These are similar to _url_basename* fields, but they are obtained with
+a server request.  This is useful if the file name is set in the
+Content-Disposition header.</p>
+</li>
+</ul>
+</div></blockquote>
+<p><em>Examples</em></p>
+<p>Consider a file “avatars.csv” that contains:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">who</span><span class="p">,</span><span class="n">ext</span><span class="p">,</span><span class="n">link</span>
+<span class="n">neurodebian</span><span class="p">,</span><span class="n">png</span><span class="p">,</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">avatars3</span><span class="o">.</span><span class="n">githubusercontent</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">u</span><span class="o">/</span><span class="mi">260793</span>
+<span class="n">datalad</span><span class="p">,</span><span class="n">png</span><span class="p">,</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">avatars1</span><span class="o">.</span><span class="n">githubusercontent</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">u</span><span class="o">/</span><span class="mi">8927200</span>
+</pre></div>
+</div>
+<p>To download each link into a file name composed of the ‘who’ and ‘ext’
+fields, we could run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ datalad addurls -d avatar_ds --fast avatars.csv &#39;{link}&#39; &#39;{who}.{ext}&#39;
+</pre></div>
+</div>
+<p>The <cite>-d avatar_ds</cite> is used to create a new dataset in “$PWD/avatar_ds”.</p>
+<p>If we were already in a dataset and wanted to create a new subdataset in an
+“avatars” subdirectory, we could use “//” in the <cite>FILENAME-FORMAT</cite>
+argument:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ datalad addurls --fast avatars.csv &#39;{link}&#39; &#39;avatars//{who}.{ext}&#39;
+</pre></div>
+</div>
+<p>If the information is represented as JSON lines instead of comma separated
+values or a JSON array, you can use a utility like jq to transform the JSON
+lines into an array that addurls accepts:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ... | jq --slurp . | datalad addurls - &#39;{link}&#39; &#39;{who}.{ext}&#39;
+</pre></div>
+</div>
+<p>NOTE</p>
+<blockquote>
+<div><p>For users familiar with ‘git annex addurl’: A large part of this
+plugin’s functionality can be viewed as transforming data from
+<cite>URL-FILE</cite> into a “url filename” format that fed to ‘git annex addurl
+–batch –with-files’.</p>
+</div></blockquote>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="url-file">
+<h3>URL-FILE<a class="headerlink" href="#url-file" title="Permalink to this headline"></a></h3>
+<p>A file that contains URLs or information that can be used to construct URLs. Depending on the value of –input-type, this should be a comma- or tab-separated file (with a header as the first row) or a JSON file (structured as a list of objects with string values). If ‘-’, read from standard input, taking the content as JSON when –input-type is at its default value of ‘ext’.</p>
+</section>
+<section id="url-format">
+<h3>URL-FORMAT<a class="headerlink" href="#url-format" title="Permalink to this headline"></a></h3>
+<p>A format string that specifies the URL for each entry. See the ‘Format Specification’ section above.</p>
+</section>
+<section id="filename-format">
+<h3>FILENAME-FORMAT<a class="headerlink" href="#filename-format" title="Permalink to this headline"></a></h3>
+<p>Like <cite>URL-FORMAT</cite>, but this format string specifies the file to which the URL’s content will be downloaded. The name should be a relative path and will be taken as relative to the top-level dataset, regardless of whether it is specified via –dataset or inferred. The file name may contain directories. The separator “//” can be used to indicate that the left-side directory should be created as a new subdataset. See the ‘Format Specification’ section above.</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="d-dataset-dataset-dataset">
+<h3><strong>-d</strong> <em>DATASET</em>, <strong>-\-dataset</strong> <em>DATASET</em><a class="headerlink" href="#d-dataset-dataset-dataset" title="Permalink to this headline"></a></h3>
+<p>Add the URLs to this dataset (or possibly subdatasets of this dataset). An empty or non-existent directory is passed to create a new dataset. New subdatasets can be specified with <cite>FILENAME-FORMAT</cite>. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="t-type-input-type-type">
+<h3><strong>-t</strong> TYPE, <strong>-\-input-type</strong> TYPE<a class="headerlink" href="#t-type-input-type-type" title="Permalink to this headline"></a></h3>
+<p>Whether <cite>URL-FILE</cite> should be considered a CSV file, TSV file, or JSON file. The default value, “ext”, means to consider <cite>URL-FILE</cite> as a JSON file if it ends with “.json” or a TSV file if it ends with “.tsv”. Otherwise, treat it as a CSV file. Constraints: value must be one of (‘ext’, ‘csv’, ‘tsv’, ‘json’) [Default: ‘ext’]</p>
+</section>
+<section id="x-regexp-exclude-autometa-regexp">
+<h3><strong>-x</strong> REGEXP, <strong>-\-exclude-autometa</strong> REGEXP<a class="headerlink" href="#x-regexp-exclude-autometa-regexp" title="Permalink to this headline"></a></h3>
+<p>By default, metadata field=value pairs are constructed with each column in <cite>URL- FILE</cite>, excluding any single column that is specified via <cite>URL-FORMAT</cite>. This argument can be used to exclude columns that match a regular expression. If set to ‘*’ or an empty string, automatic metadata extraction is disabled completely. This argument does not affect metadata set explicitly with –meta.</p>
+</section>
+<section id="m-format-meta-format">
+<h3><strong>-m</strong> FORMAT, <strong>-\-meta</strong> FORMAT<a class="headerlink" href="#m-format-meta-format" title="Permalink to this headline"></a></h3>
+<p>A format string that specifies metadata. It should be structured as “&lt;field&gt;=&lt;value&gt;”. As an example, “location={3}” would mean that the value for the “location” metadata field should be set the value of the fourth column. This option can be given multiple times.</p>
+</section>
+<section id="key-format">
+<h3><strong>-\-key</strong> FORMAT<a class="headerlink" href="#key-format" title="Permalink to this headline"></a></h3>
+<p>A format string that specifies an annex key for the file content. In this case, the file is not downloaded; instead the key is used to create the file without content. The value should be structured as “[et:]&lt;input backend&gt;[-s&lt;bytes&gt;]–&lt;hash&gt;”. The optional “et:” prefix, which requires git- annex 8.20201116 or later, signals to toggle extension state of the input backend (i.e., MD5 vs MD5E). As an example, “et:MD5-s{size}–{md5sum}” would use the ‘md5sum’ and ‘size’ columns to construct the key, migrating the key from MD5 to MD5E, with an extension based on the file name. Note: If the <em>input</em> backend itself is an annex extension backend (i.e., a backend with a trailing “E”), the key’s extension will not be updated to match the extension of the corresponding file name. Thus, unless the input keys and file names are generated from git- annex, it is recommended to avoid using extension backends as input. If an extension is desired, use the plain variant as input and prepend “et:” so that git-annex will migrate from the plain backend to the extension variant.</p>
+</section>
+<section id="message-message">
+<h3><strong>-\-message</strong> MESSAGE<a class="headerlink" href="#message-message" title="Permalink to this headline"></a></h3>
+<p>Use this message when committing the URL additions. Constraints: value must be NONE, or value must be a string</p>
+</section>
+<section id="n-dry-run">
+<h3><strong>-n</strong>, <strong>-\-dry-run</strong><a class="headerlink" href="#n-dry-run" title="Permalink to this headline"></a></h3>
+<p>Report which URLs would be downloaded to which files and then exit.</p>
+</section>
+<section id="fast">
+<h3><strong>-\-fast</strong><a class="headerlink" href="#fast" title="Permalink to this headline"></a></h3>
+<p>If True, add the URLs, but don’t download their content. Underneath, this passes the –fast flag to <cite>git annex addurl</cite>.</p>
+</section>
+<section id="ifexists-overwrite-skip">
+<h3><strong>-\-ifexists</strong> {overwrite|skip}<a class="headerlink" href="#ifexists-overwrite-skip" title="Permalink to this headline"></a></h3>
+<p>What to do if a constructed file name already exists. The default behavior is to proceed with the <cite>git annex addurl</cite>, which will fail if the file size has changed. If set to ‘overwrite’, remove the old file before adding the new one. If set to ‘skip’, do not add the new file. Constraints: value must be one of (‘overwrite’, ‘skip’)</p>
+</section>
+<section id="missing-value-value">
+<h3><strong>-\-missing-value</strong> VALUE<a class="headerlink" href="#missing-value-value" title="Permalink to this headline"></a></h3>
+<p>When an empty string is encountered, use this value instead. Constraints: value must be NONE, or value must be a string</p>
+</section>
+<section id="nosave">
+<h3><strong>-\-nosave</strong><a class="headerlink" href="#nosave" title="Permalink to this headline"></a></h3>
+<p>by default all modifications to a dataset are immediately saved. Giving this option will disable this behavior.</p>
+</section>
+<section id="version-urls">
+<h3><strong>-\-version-urls</strong><a class="headerlink" href="#version-urls" title="Permalink to this headline"></a></h3>
+<p>Try to add a version ID to the URL. This currently only has an effect on HTTP URLs for AWS S3 buckets. s3:// URL versioning is not yet supported, but any URL that already contains a “versionId=” parameter will be used as is.</p>
+</section>
+<section id="c-proc-cfg-proc-proc">
+<h3><strong>-c</strong> PROC, <strong>-\-cfg-proc</strong> PROC<a class="headerlink" href="#c-proc-cfg-proc-proc" title="Permalink to this headline"></a></h3>
+<p>Pass this –cfg_proc value when calling CREATE to make datasets.</p>
+</section>
+<section id="j-njobs-jobs-njobs">
+<h3><strong>-J</strong> NJOBS, <strong>-\-jobs</strong> NJOBS<a class="headerlink" href="#j-njobs-jobs-njobs" title="Permalink to this headline"></a></h3>
+<p>how many parallel jobs (where possible) to use. “auto” corresponds to the number defined by ‘datalad.runtime.max-annex-jobs’ configuration item. Constraints: value must be convertible to type ‘int’, or value must be one of (‘auto’,)</p>
+</section>
+<section id="drop-after">
+<h3><strong>-\-drop-after</strong><a class="headerlink" href="#drop-after" title="Permalink to this headline"></a></h3>
+<p>drop files after adding to annex.</p>
+</section>
+<section id="on-collision-error-error-if-different-take-first-take-last">
+<h3><strong>-\-on-collision</strong> {error|error-if-different|take-first|take-last}<a class="headerlink" href="#on-collision-error-error-if-different-take-first-take-last" title="Permalink to this headline"></a></h3>
+<p>What to do when more than one row produces the same file name. By default an error is triggered. “error-if-different” suppresses that error if rows for a given file name collision have the same URL and metadata. “take-first” or “take- last” indicate to instead take the first row or last row from each set of colliding rows. Constraints: value must be one of (‘error’, ‘error-if- different’, ‘take-first’, ‘take-last’) [Default: ‘error’]</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-add-readme.html" class="btn btn-neutral float-left" title="datalad add-readme" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-copy-file.html" class="btn btn-neutral float-right" title="datalad copy-file" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

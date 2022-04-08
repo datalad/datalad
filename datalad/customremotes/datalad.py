@@ -11,164 +11,115 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-lgr = logging.getLogger('datalad.customremotes.datalad')
+from urllib.parse import urlparse
 
-from .base import AnnexCustomRemote
-
-from ..downloaders.providers import Providers
-from ..support.exceptions import (
+from datalad.downloaders.providers import Providers
+from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
-from .main import main as super_main
+from datalad.utils import unique
+
+from datalad.customremotes import RemoteError
+from datalad.customremotes.base import AnnexCustomRemote
+from datalad.customremotes.main import main as super_main
+
+lgr = logging.getLogger('datalad.customremotes.datalad')
 
 
 class DataladAnnexCustomRemote(AnnexCustomRemote):
-    """Special custom remote allowing to obtain files from archives
-
-     Archives should also be under annex control.
+    """git-annex special-remote frontend for DataLad's downloader facility
     """
 
     SUPPORTED_SCHEMES = ('http', 'https', 's3', 'shub')
 
-    AVAILABILITY = "global"
-
-    def __init__(self, **kwargs):
-        super(DataladAnnexCustomRemote, self).__init__(**kwargs)
-        # annex requests load by KEY not but URL which it originally asked
-        # about.  So for a key we might get back multiple URLs and as a
-        # heuristic let's use the most recently asked one
+    def __init__(self, annex, **kwargs):
+        super().__init__(annex)
 
         self._providers = Providers.from_config_files()
 
-    #
-    # Helper methods
+    def transfer_retrieve(self, key, file):
+        urls = []
+        error_causes = []
+        # TODO: priorities etc depending on previous experience or settings
+        for url in self.gen_URLS(key):
+            urls.append(url)
+            try:
+                downloaded_path = self._providers.download(
+                    url, path=file, overwrite=True
+                )
+                assert(downloaded_path == file)
+                return
+            except Exception as exc:
+                ce = CapturedException(exc)
+                cause = getattr(exc, '__cause__', None)
+                debug_msg = f"Failed to download {url} for key {key}: {ce}"
+                if cause:
+                    debug_msg += f' [{cause}]'
+                self.message(debug_msg)
+                error_causes.append(cause)
 
-    # Protocol implementation
-    def req_CHECKURL(self, url):
-        """
+        error_msg = f"Failed to download from any of {len(urls)} locations"
+        if error_causes:
+            error_msg += f' {unique(error_causes)}'
+        raise RemoteError(error_msg)
 
-        Replies
-
-        CHECKURL-CONTENTS Size|UNKNOWN Filename
-            Indicates that the requested url has been verified to exist.
-            The Size is the size in bytes, or use "UNKNOWN" if the size could
-            not be determined.
-            The Filename can be empty (in which case a default is used), or can
-            specify a filename that is suggested to be used for this url.
-        CHECKURL-MULTI Url Size|UNKNOWN Filename ...
-            Indicates that the requested url has been verified to exist, and
-            contains multiple files, which can each be accessed using their own
-            url.
-            Note that since a list is returned, neither the Url nor the Filename
-            can contain spaces.
-        CHECKURL-FAILURE
-            Indicates that the requested url could not be accessed.
-        """
-
+    def checkurl(self, url):
         try:
             status = self._providers.get_status(url)
-            size = str(status.size) if status.size is not None else 'UNKNOWN'
-            resp = ["CHECKURL-CONTENTS", size] \
-                + ([status.filename] if status.filename else [])
+            props = dict(filename=status.filename, url=url)
+            if status.size is not None:
+                props['size'] = status.size
+            return [props]
         except Exception as exc:
             ce = CapturedException(exc)
-            self.debug("Failed to check url %s: %s" % (url, ce))
-            resp = ["CHECKURL-FAILURE"]
-        self.send(*resp)
+            self.message("Failed to check url %s: %s" % (url, ce))
+            return False
 
-    def req_CHECKPRESENT(self, key):
-        """Check if copy is available
-
-        Replies
-
-        CHECKPRESENT-SUCCESS Key
-            Indicates that a key has been positively verified to be present in
-            the remote.
-        CHECKPRESENT-FAILURE Key
-            Indicates that a key has been positively verified to not be present
-            in the remote.
-        CHECKPRESENT-UNKNOWN Key ErrorMsg
-            Indicates that it is not currently possible to verify if the key is
-            present in the remote. (Perhaps the remote cannot be contacted.)
-        """
-        lgr.debug("VERIFYING key %s", key)
+    def checkpresent(self, key):
         resp = None
         for url in self.gen_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
                 status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
-                    resp = "CHECKPRESENT-SUCCESS"
-                    break
-                # TODO:  for CHECKPRESENT-FAILURE we somehow need to figure out that
-                # we can connect to that server but that specific url is N/A,
-                # probably check the connection etc
+                    return True
+                # TODO:  for CHECKPRESENT-FAILURE we somehow need to figure out
+                # that we can connect to that server but that specific url is
+                # N/A, probably check the connection etc
             except TargetFileAbsent as exc:
                 ce = CapturedException(exc)
-                self.debug("Target url %s file seems to be missing: %s" % (url, ce))
+                self.message(
+                    "Target url %s file seems to be missing: %s" % (url, ce))
                 if not resp:
-                    # if it is already marked as UNKNOWN -- let it stay that way
-                    # but if not -- we might as well say that we can no longer access it
-                    resp = "CHECKPRESENT-FAILURE"
+                    # if it is already marked as UNKNOWN -- let it stay that
+                    # way but if not -- we might as well say that we can no
+                    # longer access it
+                    return False
             except Exception as exc:
                 ce = CapturedException(exc)
-                resp = "CHECKPRESENT-UNKNOWN"
-                self.debug("Failed to check status of url %s: %s" % (url, ce))
+                self.message(
+                    "Failed to check status of url %s: %s" % (url, ce))
         if resp is None:
-            resp = "CHECKPRESENT-UNKNOWN"
-        self.send(resp, key)
+            raise RemoteError(f'Could not determine presence of key {key}')
+        else:
+            return False
 
-    def req_REMOVE(self, key):
-        """
-        REMOVE-SUCCESS Key
-            Indicates the key has been removed from the remote. May be returned
-            if the remote didn't have the key at the point removal was requested
-        REMOVE-FAILURE Key ErrorMsg
-            Indicates that the key was unable to be removed from the remote.
-        """
-        self.send("REMOVE-FAILURE", key,
-                  "Removal of content from urls is not possible")
-
-    def req_WHEREIS(self, key):
-        """
-        WHEREIS-SUCCESS String
-            Indicates a location of a key. Typically an url, the string can be anything
-            that it makes sense to display to the user about content stored in the special
-            remote.
-        WHEREIS-FAILURE
-            Indicates that no location is known for a key.
-        """
-        # All that information is stored in annex itself, we can't complement anything
-        self.send("WHEREIS-FAILURE")
-
-    def _transfer(self, cmd, key, path):
-
-        # TODO: We might want that one to be a generator so we do not bother requesting
-        # all possible urls at once from annex.
-        urls = []
-
-        # TODO: priorities etc depending on previous experience or settings
-
-        for url in self.gen_URLS(key):
-            urls.append(url)
-            try:
-                downloaded_path = self._providers.download(
-                    url, path=path, overwrite=True
-                )
-                lgr.info("Successfully downloaded %s into %s", url, downloaded_path)
-                self.send('TRANSFER-SUCCESS', cmd, key)
-                return
-            except Exception as exc:
-                ce = CapturedException(exc)
-                self.debug("Failed to download url %s for key %s: %s"
-                           % (url, key, ce))
-
-        raise RuntimeError(
-            "Failed to download from any of %d locations" % len(urls)
-        )
+    def claimurl(self, url):
+        scheme = urlparse(url).scheme
+        if scheme in self.SUPPORTED_SCHEMES:
+            return True
+        else:
+            return False
 
 
 def main():
     """cmdline entry point"""
-    super_main(backend="datalad")
+    super_main(
+        cls=DataladAnnexCustomRemote,
+        remote_name='datalad',
+        description=\
+        "download content from various URLs (http{,s}, s3, etc) possibly "
+        "requiring authentication or custom access mechanisms using "
+        "DataLad's downloaders",
+    )

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Standard parameters &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Positional vs Keyword parameters" href="pos_vs_kw_parameters.html" />
+    <link rel="prev" title="BatchedCommand and BatchedAnnex" href="batched_command.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>Standard parameters</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="standard-parameters">
+<span id="chap-standard-parameters"></span><h1>Standard parameters<a class="headerlink" href="#standard-parameters" title="Permalink to this headline"></a></h1>
+<div class="topic">
+<p class="topic-title">Specification scope and status</p>
+<p>This specification partially describes the current implementation, and partially is a proposal, subject to review and further discussion.</p>
+</div>
+<p>Several “standard parameters” are used in various DataLad commands.
+Those standard parameters have an identical meaning across the commands they are used in.
+Commands should ensure that they use those “standard parameters” where applicable and do not deviate from the common names nor the common meaning.</p>
+<p>Currently used standard parameters are listed below, as well as suggestions on how to harmonize currently deviating standard parameters.
+Deviations from the agreed upon list should be harmonized.
+The parameters are listed in their command-line form, but similar names and descriptions apply to their Python form.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">-d</span></code>/<code class="docutils literal notranslate"><span class="pre">--dataset</span></code></dt><dd><p>A pointer to the dataset that a given command should operate on</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--dry-run</span></code></dt><dd><p>Display details about the command execution without actually running the command.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-f</span></code>/<code class="docutils literal notranslate"><span class="pre">--force</span></code></dt><dd><p>Enforce the execution of a command, even when certain security checks would normally prevent this</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-J</span></code>/<code class="docutils literal notranslate"><span class="pre">--jobs</span></code></dt><dd><p>Number of parallel jobs to use.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-m</span></code>/<code class="docutils literal notranslate"><span class="pre">--message</span></code></dt><dd><p>A commit message to attach to the saved change of a command execution.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-r</span></code>/<code class="docutils literal notranslate"><span class="pre">--recursive</span></code></dt><dd><p>Perform an operation recursively across subdatasets</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-R</span></code>/<code class="docutils literal notranslate"><span class="pre">--recursion-limit</span></code></dt><dd><p>Limit recursion to a given amount of subdataset levels</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-s</span></code>/<code class="docutils literal notranslate"><span class="pre">--sibling-name</span></code> [SUGGESTION]</dt><dd><p>The identifier for a dataset sibling (remote)</p>
+</dd>
+</dl>
+<p>Certain standard parameters will have their own design document.
+Please refer to those documents for more in-depth information.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="batched_command.html" class="btn btn-neutral float-left" title="BatchedCommand and BatchedAnnex" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pos_vs_kw_parameters.html" class="btn btn-neutral float-right" title="Positional vs Keyword parameters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

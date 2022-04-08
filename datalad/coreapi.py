@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -17,6 +17,14 @@ def _generate_func_api():
        API from them
     """
     from importlib import import_module
+
+    # load extensions requested by configuration
+    import datalad
+    if datalad.get_apimode() == 'python':
+        # only do this in Python API mode, because the CLI main
+        # will have done this already
+        from datalad.support.entrypoints import load_extensions
+        load_extensions()
 
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name

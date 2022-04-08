@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad create-sibling-ria &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad export-archive" href="datalad-export-archive.html" />
+    <link rel="prev" title="datalad create-sibling-gin" href="datalad-create-sibling-gin.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad-siblings.html">datalad siblings: Query and manipulate sibling configuration of a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling.html">datalad create-sibling: Create a sibling on an SSH-accessible machine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-github.html">datalad create-sibling-github: Create a sibling on GitHub</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gitlab.html">datalad create-sibling-gitlab: Create a sibling on GitLab</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gogs.html">datalad create-sibling-gogs: Create a sibling on GOGS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gitea.html">datalad create-sibling-gitea: Create a sibling on Gitea</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gin.html">datalad create-sibling-gin: Create a sibling on GIN (with content hosting)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad create-sibling-ria: Create a sibling in a RIA store</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-archive.html">datalad export-archive: Export dataset content as a TAR/ZIP archive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-archive-ora.html">datalad export-archive-ora: Export a local dataset annex for the ORA remote</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-to-figshare.html">datalad export-to-figshare: Export dataset content as a ZIP archive to figshare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-update.html">datalad update: Obtain and incorporate updates from dataset siblings</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad create-sibling-ria</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-create-sibling-ria">
+<span id="man-datalad-create-sibling-ria"></span><h1>datalad create-sibling-ria<a class="headerlink" href="#datalad-create-sibling-ria" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">create</span><span class="o">-</span><span class="n">sibling</span><span class="o">-</span><span class="n">ria</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="o">-</span><span class="n">s</span> <span class="n">NAME</span> <span class="p">[</span><span class="o">-</span><span class="n">d</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">storage</span><span class="o">-</span><span class="n">name</span> <span class="n">NAME</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">alias</span> <span class="n">ALIAS</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">post</span><span class="o">-</span><span class="n">update</span><span class="o">-</span><span class="n">hook</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">shared</span>
+    <span class="p">{</span><span class="n">false</span><span class="o">|</span><span class="n">true</span><span class="o">|</span><span class="n">umask</span><span class="o">|</span><span class="n">group</span><span class="o">|</span><span class="nb">all</span><span class="o">|</span><span class="n">world</span><span class="o">|</span><span class="n">everybody</span><span class="o">|</span><span class="mi">0</span><span class="n">xxx</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">group</span>
+    <span class="n">GROUP</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">storage</span><span class="o">-</span><span class="n">sibling</span> <span class="n">MODE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">existing</span> <span class="n">MODE</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">new</span><span class="o">-</span><span class="n">store</span><span class="o">-</span><span class="n">ok</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">trust</span><span class="o">-</span><span class="n">level</span> <span class="n">TRUST</span><span class="o">-</span><span class="n">LEVEL</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">r</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">R</span> <span class="n">LEVELS</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">no</span><span class="o">-</span><span class="n">storage</span><span class="o">-</span><span class="n">sibling</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">push</span><span class="o">-</span><span class="n">url</span>
+    <span class="n">ria</span><span class="o">+&lt;</span><span class="n">ssh</span><span class="o">|</span><span class="n">file</span><span class="o">&gt;</span><span class="p">:</span><span class="o">//&lt;</span><span class="n">host</span><span class="o">&gt;</span><span class="p">[</span><span class="o">/</span><span class="n">path</span><span class="p">]]</span> <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span>
+    <span class="n">ria</span><span class="o">+&lt;</span><span class="n">ssh</span><span class="o">|</span><span class="n">file</span><span class="o">|</span><span class="n">https</span><span class="o">&gt;</span><span class="p">:</span><span class="o">//&lt;</span><span class="n">host</span><span class="o">&gt;</span><span class="p">[</span><span class="o">/</span><span class="n">path</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Creates a sibling to a dataset in a RIA store</p>
+<p>Communication with a dataset in a RIA store is implemented via two
+siblings. A regular Git remote (repository sibling) and a git-annex
+special remote for data transfer (storage sibling) – with the former
+having a publication dependency on the latter. By default, the name of the
+storage sibling is derived from the repository sibling’s name by appending
+“-storage”.</p>
+<p>The store’s base path is expected to not exist, be an empty directory,
+or a valid RIA store.</p>
+<section id="ria-store-layout">
+<h3>RIA store layout<a class="headerlink" href="#ria-store-layout" title="Permalink to this headline"></a></h3>
+<p>A RIA store is a directory tree with a dedicated subdirectory for each
+dataset in the store. The subdirectory name is constructed from the
+DataLad dataset ID, e.g. ‘124/68afe-59ec-11ea-93d7-f0d5bf7b5561’, where
+the first three characters of the ID are used for an intermediate
+subdirectory in order to mitigate files system limitations for stores
+containing a large number of datasets.</p>
+<p>Each dataset subdirectory contains a standard bare Git repository for
+the dataset.</p>
+<p>In addition, a subdirectory ‘annex’ hold a standard Git-annex object
+store. However, instead of using the ‘dirhashlower’ naming scheme for
+the object directories, like Git-annex would do, a ‘dirhashmixed’
+layout is used – the same as for non-bare Git repositories or regular
+DataLad datasets.</p>
+<p>Optionally, there can be a further subdirectory ‘archives’ with
+(compressed) 7z archives of annex objects. The storage remote is able to
+pull annex objects from these archives, if it cannot find in the regular
+annex object store. This feature can be useful for storing large
+collections of rarely changing data on systems that limit the number of
+files that can be stored.</p>
+<p>Each dataset directory also contains a ‘ria-layout-version’ file that
+identifies the data organization (as, for example, described above).</p>
+<p>Lastly, there is a global ‘ria-layout-version’ file at the store’s
+base path that identifies where dataset subdirectories themselves are
+located. At present, this file must contain a single line stating the
+version (currently “1”). This line MUST end with a newline character.</p>
+<p>It is possible to define an alias for an individual dataset in a store by
+placing a symlink to the dataset location into an ‘alias/’ directory
+in the root of the store. This enables dataset access via URLs of format:
+‘ria+&lt;protocol&gt;://&lt;storelocation&gt;#~&lt;aliasname&gt;’.</p>
+</section>
+<section id="error-logging">
+<h3>Error logging<a class="headerlink" href="#error-logging" title="Permalink to this headline"></a></h3>
+<p>To enable error logging at the remote end, append a pipe symbol and an “l”
+to the version number in ria-layout-version (like so ‘1|ln’).</p>
+<p>Error logging will create files in an “error_log” directory whenever the
+git-annex special remote (storage sibling) raises an exception, storing the
+Python traceback of it. The logfiles are named according to the scheme
+‘&lt;dataset id&gt;.&lt;annex uuid of the remote&gt;.log’ showing “who” ran into this
+issue with which dataset. Because logging can potentially leak personal
+data (like local file paths for example), it can be disabled client-side
+by setting the configuration variable
+“annex.ora-remote.&lt;storage-sibling-name&gt;.ignore-remote-config”.</p>
+</section>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="ria-ssh-file-http-s-host-path">
+<h3>ria+&lt;ssh|file|http(s)&gt;://&lt;host&gt;[/path]<a class="headerlink" href="#ria-ssh-file-http-s-host-path" title="Permalink to this headline"></a></h3>
+<p>URL identifying the target RIA store and access protocol. If <code class="docutils literal notranslate"><span class="pre">--push-url</span></code> is given in addition, this is used for read access only. Otherwise it will be used for write access too and to create the repository sibling in the RIA store. Note, that HTTP(S) currently is valid for consumption only thus requiring to provide <code class="docutils literal notranslate"><span class="pre">--push-url</span></code>. Constraints: value must be a string</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="s-name-name-name">
+<h3><strong>-s</strong> NAME, <strong>-\-name</strong> NAME<a class="headerlink" href="#s-name-name-name" title="Permalink to this headline"></a></h3>
+<p>Name of the sibling. With RECURSIVE, the same name will be used to label all the subdatasets’ siblings. Constraints: value must be a string</p>
+</section>
+<section id="d-dataset-dataset-dataset">
+<h3><strong>-d</strong> <em>DATASET</em>, <strong>-\-dataset</strong> <em>DATASET</em><a class="headerlink" href="#d-dataset-dataset-dataset" title="Permalink to this headline"></a></h3>
+<p>specify the dataset to process. If no dataset is given, an attempt is made to identify the dataset based on the current working directory. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="storage-name-name">
+<h3><strong>-\-storage-name</strong> NAME<a class="headerlink" href="#storage-name-name" title="Permalink to this headline"></a></h3>
+<p>Name of the storage sibling (git-annex special remote). Must not be identical to the sibling name. If not specified, defaults to the sibling name plus ‘-storage’ suffix. If only a storage sibling is created, this setting is ignored, and the primary sibling name is used. Constraints: value must be a string</p>
+</section>
+<section id="alias-alias">
+<h3><strong>-\-alias</strong> ALIAS<a class="headerlink" href="#alias-alias" title="Permalink to this headline"></a></h3>
+<p>Alias for the dataset in the RIA store. Add the necessary symlink so that this dataset can be cloned from the RIA store using the given ALIAS instead of its ID. With <cite>recursive=True</cite>, only the top dataset will be aliased. Constraints: value must be a string</p>
+</section>
+<section id="post-update-hook">
+<h3><strong>-\-post-update-hook</strong><a class="headerlink" href="#post-update-hook" title="Permalink to this headline"></a></h3>
+<p>Enable git’s default post-update-hook for the created sibling.</p>
+</section>
+<section id="shared-false-true-umask-group-all-world-everybody-0xxx">
+<h3><strong>-\-shared</strong> {false|true|umask|group|all|world|everybody|0xxx}<a class="headerlink" href="#shared-false-true-umask-group-all-world-everybody-0xxx" title="Permalink to this headline"></a></h3>
+<p>If given, configures the permissions in the RIA store for multi-users access. Possible values for this option are identical to those of <cite>git init –shared</cite> and are described in its documentation. Constraints: value must be a string, or value must be convertible to type bool</p>
+</section>
+<section id="group-group">
+<h3><strong>-\-group</strong> GROUP<a class="headerlink" href="#group-group" title="Permalink to this headline"></a></h3>
+<p>Filesystem group for the repository. Specifying the group is crucial when –shared=group. Constraints: value must be a string</p>
+</section>
+<section id="storage-sibling-mode">
+<h3><strong>-\-storage-sibling</strong> MODE<a class="headerlink" href="#storage-sibling-mode" title="Permalink to this headline"></a></h3>
+<p>By default, an ORA storage sibling and a Git repository sibling are created (on). Alternatively, creation of the storage sibling can be disabled (off), or a storage sibling created only and no Git sibling (only). In the latter mode, no Git installation is required on the target host. Constraints: value must be one of (‘only’,), or value must be convertible to type bool [Default: True]</p>
+</section>
+<section id="existing-mode">
+<h3><strong>-\-existing</strong> MODE<a class="headerlink" href="#existing-mode" title="Permalink to this headline"></a></h3>
+<p>Action to perform, if a (storage) sibling is already configured under the given name and/or a target already exists. In this case, a dataset can be skipped (‘skip’), an existing target repository be forcefully re-initialized, and the sibling (re-)configured (‘reconfigure’), or the command be instructed to fail (‘error’). Constraints: value must be one of (‘skip’, ‘error’, ‘reconfigure’) [Default: ‘error’]</p>
+</section>
+<section id="new-store-ok">
+<h3><strong>-\-new-store-ok</strong><a class="headerlink" href="#new-store-ok" title="Permalink to this headline"></a></h3>
+<p>When set, a new store will be created, if necessary. Otherwise, a sibling will only be created if the url points to an existing RIA store.</p>
+</section>
+<section id="trust-level-trust-level">
+<h3><strong>-\-trust-level</strong> TRUST-LEVEL<a class="headerlink" href="#trust-level-trust-level" title="Permalink to this headline"></a></h3>
+<p>specify a trust level for the storage sibling. If not specified, the default git-annex trust level is used. ‘trust’ should be used with care (see the git- annex-trust man page). Constraints: value must be one of (‘trust’, ‘semitrust’, ‘untrust’)</p>
+</section>
+<section id="r-recursive">
+<h3><strong>-r</strong>, <strong>-\-recursive</strong><a class="headerlink" href="#r-recursive" title="Permalink to this headline"></a></h3>
+<p>if set, recurse into potential subdatasets.</p>
+</section>
+<section id="r-levels-recursion-limit-levels">
+<h3><strong>-R</strong> LEVELS, <strong>-\-recursion-limit</strong> LEVELS<a class="headerlink" href="#r-levels-recursion-limit-levels" title="Permalink to this headline"></a></h3>
+<p>limit recursion into subdatasets to the given number of levels. Constraints: value must be convertible to type ‘int’</p>
+</section>
+<section id="no-storage-sibling">
+<h3><strong>-\-no-storage-sibling</strong><a class="headerlink" href="#no-storage-sibling" title="Permalink to this headline"></a></h3>
+<p>This option is deprecated. Use ‘–storage-sibling off’ instead.</p>
+</section>
+<section id="push-url-ria-ssh-file-host-path">
+<h3><strong>-\-push-url</strong> ria+&lt;ssh|file&gt;://&lt;host&gt;[/path]<a class="headerlink" href="#push-url-ria-ssh-file-host-path" title="Permalink to this headline"></a></h3>
+<p>URL identifying the target RIA store and access protocol for write access to the storage sibling. If given this will also be used for creation of the repository sibling in the RIA store. Constraints: value must be a string</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-create-sibling-gin.html" class="btn btn-neutral float-left" title="datalad create-sibling-gin" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-export-archive.html" class="btn btn-neutral float-right" title="datalad export-archive" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

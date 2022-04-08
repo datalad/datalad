@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -60,7 +60,10 @@ class AddReadme(Interface):
     @staticmethod
     @datasetmethod(name='add_readme')
     @eval_results
-    def __call__(dataset, filename='README.md', existing='skip'):
+    def __call__(filename='README.md',
+                 *,
+                 dataset=None,
+                 existing='skip'):
         from os.path import lexists
         from os.path import join as opj
         from io import open
@@ -85,7 +88,11 @@ class AddReadme(Interface):
 
         # unlock, file could be annexed
         if lexists(fpath):
-            dataset.unlock(fpath)
+            yield from dataset.unlock(
+                fpath,
+                return_type='generator',
+                result_renderer='disabled'
+            )
         if not lexists(fpath):
             # if we have an annex repo, shall the README go to Git or annex?
 
@@ -95,15 +102,20 @@ class AddReadme(Interface):
                 # configure the README to go into Git
                 dataset.repo.set_gitattributes(
                     [(filename, {'annex.largefiles': 'nothing'})])
-                dataset.save(
+                yield from dataset.save(
                     path='.gitattributes',
                     message="[DATALAD] Configure README to be in Git",
-                    to_git=True
+                    to_git=True,
+                    return_type='generator',
+                    result_renderer='disabled'
                 )
 
         # get any metadata on the dataset itself
         dsinfo = dataset.metadata(
-            '.', reporton='datasets', return_type='item-or-list',
+            '.',
+            reporton='datasets',
+            return_type='item-or-list',
+            result_renderer='disabled',
             on_failure='ignore')
         meta = {}
         if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
@@ -229,9 +241,11 @@ files by whom, and when.
                 type='file',
                 action='add_readme')
 
-        for r in dataset.save(
+        yield from dataset.save(
                 fpath,
                 message='[DATALAD] added README',
                 result_filter=None,
-                result_xfm=None):
-            yield r
+                result_xfm=None,
+                return_type='generator',
+                result_renderer='disabled'
+        )

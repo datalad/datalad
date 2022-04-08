@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,7 +12,6 @@
 from glob import glob
 from logging import getLogger
 
-import os
 import re
 from os.path import dirname, abspath, join as pathjoin
 from urllib.parse import urlparse
@@ -32,12 +31,15 @@ from .http import (
 from .s3 import S3Authenticator, S3Downloader
 from .shub import SHubDownloader
 from configparser import ConfigParser as SafeConfigParserWithIncludes
-from ..support.external_versions import external_versions
-from ..support.network import RI
-from ..support import path
-from ..utils import auto_repr
-from ..utils import ensure_list_from_str
-from ..utils import get_dataset_root
+from datalad.support.external_versions import external_versions
+from datalad.support.network import RI
+from datalad.support import path
+from datalad.utils import (
+    auto_repr,
+    ensure_list_from_str,
+    get_dataset_root,
+    Path,
+)
 
 from ..interface.common_cfg import dirs
 
@@ -59,7 +61,7 @@ AUTHENTICATION_TYPES = {
     'none': NoneAuthenticator,
 }
 
-from .credentials import CREDENTIAL_TYPES
+from datalad.downloaders import CREDENTIAL_TYPES
 
 
 @auto_repr
@@ -156,6 +158,23 @@ class Providers(object):
 
     _DEFAULT_PROVIDERS = None
     _DS_ROOT = None
+    _CONFIG_TEMPLATE = """\
+# Provider configuration file created to initially access
+# {url}
+
+[provider:{name}]
+url_re = {url_re}
+authentication_type = {authentication_type}
+# Note that you might need to specify additional fields specific to the
+# authenticator.  Fow now "look into the docs/source" of {authenticator_class}
+# {authentication_type}_
+credential = {credential_name}
+
+[credential:{credential_name}]
+# If known, specify URL or email to how/where to request credentials
+# url = ???
+type = {credential_type}
+"""
 
     def __init__(self, providers=None):
         """
@@ -261,6 +280,8 @@ class Providers(object):
                     raise ValueError("Unknown credential %s. Known are: %s"
                                      % (provider.credential, ", ".join(credentials.keys())))
                 provider.credential = credentials[provider.credential]
+                # TODO: Is this the right place to pass dataset to credential?
+                provider.credential.set_context(dataset=cls._DS_ROOT)
 
         providers = Providers(list(providers.values()))
 
@@ -363,10 +384,74 @@ class Providers(object):
                   scheme, provider)
         return provider
 
-    def enter_new(self, url=None, auth_types=[]):
+    def _store_new(self, url=None, authentication_type=None,
+                   authenticator_class=None, url_re=None, name=None,
+                   credential_name=None, credential_type=None, level='user'):
+        """Stores a provider and credential config and reloads afterwards.
+
+        Note
+        ----
+        non-interactive version of `enter_new`.
+        For now non-public, pending further refactoring
+
+        Parameters
+        ----------
+        level: str
+          Where to store the config. Choices: 'user' (default), 'ds', 'site'
+
+        Returns
+        -------
+        Provider
+          The stored `Provider` as reported by reload
+        """
+
+        # We don't ask user for confirmation, so for this non-interactive
+        # routine require everything to be explicitly specified.
+        if any(not a for a in [url, authentication_type, authenticator_class,
+                               url_re, name, credential_name, credential_type]):
+            raise ValueError("All arguments must be specified")
+
+        if level not in ['user', 'ds', 'site']:
+            raise ValueError("'level' must be one of 'user', 'ds', 'site'")
+
+        providers_dir = Path(self._get_providers_dirs()[level])
+        if not providers_dir.exists():
+            providers_dir.mkdir(parents=True, exist_ok=True)
+        filepath = providers_dir / f"{name}.cfg"
+        cfg = self._CONFIG_TEMPLATE.format(**locals())
+        filepath.write_bytes(cfg.encode('utf-8'))
+        self.reload()
+        return self.get_provider(url)
+
+    def enter_new(self, url=None, auth_types=[], url_re=None, name=None,
+                  credential_name=None, credential_type=None):
+        # TODO: level/location!
+        """Create new provider and credential config
+
+        If interactive, this will ask the user to enter the details (or confirm
+        default choices). A dedicated config file is written at
+        <user_config_dir>/providers/<name>.cfg
+
+        Parameters:
+        -----------
+        url: str or RI
+          URL this config is created for
+        auth_types: list
+          List of authentication types to choose from. First entry becomes
+          default. See datalad.downloaders.providers.AUTHENTICATION_TYPES
+        url_re: str
+          regular expression; Once created, this config will be used for any
+          matching URL; defaults to `url`
+        name: str
+          name for the provider; needs to be unique per user
+        credential_name: str
+          name for the credential; defaults to the provider's name
+        credential_type: str
+          credential type to use (key for datalad.downloaders.CREDENTIAL_TYPES)
+        """
+
         from datalad.ui import ui
-        name = None
-        if url:
+        if url and not name:
             ri = RI(url)
             for f in ('hostname', 'name'):
                 try:
@@ -398,7 +483,10 @@ class Providers(object):
             else:
                 break
 
-        url_re = re.escape(url) if url else None
+        if not credential_name:
+            credential_name = name
+        if not url_re:
+            url_re = re.escape(url) if url else None
         while True:
             url_re = ui.question(
                 title="New provider regular expression",
@@ -439,42 +527,30 @@ class Providers(object):
             title="Credential",
             text="What type of credential should be used?",
             choices=sorted(CREDENTIAL_TYPES),
-            default=getattr(authenticator_class, 'DEFAULT_CREDENTIAL_TYPE')
+            default=credential_type or getattr(authenticator_class,
+                                               'DEFAULT_CREDENTIAL_TYPE')
         )
 
-        # Just create a configuration file and reload the thing
-        if not path.lexists(providers_user_dir):
-            os.makedirs(providers_user_dir)
-        cfg = """\
-# Provider configuration file created to initially access
-# {url}
-
-[provider:{name}]
-url_re = {url_re}
-authentication_type = {authentication_type}
-# Note that you might need to specify additional fields specific to the
-# authenticator.  Fow now "look into the docs/source" of {authenticator_class}
-# {authentication_type}_
-credential = {name}
-
-[credential:{name}]
-# If known, specify URL or email to how/where to request credentials
-# url = ???
-type = {credential_type}
-""".format(**locals())
+        cfg = self._CONFIG_TEMPLATE.format(**locals())
         if ui.yesno(
             title="Save provider configuration file",
             text="Following configuration will be written to %s:\n%s"
                 % (filename, cfg),
             default='yes'
         ):
-            with open(filename, 'wb') as f:
-                f.write(cfg.encode('utf-8'))
+            # Just create a configuration file and reload the thing
+            return self._store_new(url=url,
+                                   authentication_type=authentication_type,
+                                   authenticator_class=authenticator_class,
+                                   url_re=url_re,
+                                   name=name,
+                                   credential_name=credential_name,
+                                   credential_type=credential_type,
+                                   level='user'
+                                   )
         else:
             return None
-        self.reload()
-        # XXX see above note about possibly multiple matches etc
-        return self.get_provider(url)
+
 
     # TODO: avoid duplication somehow ;)
     # Sugarings to get easier access to downloaders

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -18,7 +18,7 @@ from datalad.cmd import (
     StdOutCapture,
     WitlessRunner,
 )
-from datalad.cmdline.main import main
+from datalad.cli.main import main
 
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_ssh
@@ -77,8 +77,9 @@ def test_ssh_option():
     # back an empty value, assume that isn't configured, and skip the test.
     with patch.dict('os.environ', {"LC_DATALAD_HACK": 'hackbert'}):
         with swallow_outputs() as cmo:
-            main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
-                  "datalad-test", "echo $LC_DATALAD_HACK"])
+            with assert_raises(SystemExit):
+                main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
+                      "datalad-test", "echo $LC_DATALAD_HACK"])
             out = cmo.out.strip()
             if not out:
                 raise SkipTest(

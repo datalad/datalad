@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -67,6 +67,10 @@ class Keyring(object):
     # proxy few methods of interest explicitly, to be rebound to the module's
     def get(self, name, field):
         # consult environment, might be provided there and should take precedence
+        # NOTE: This env var specification is outdated and not advertised
+        # anymmore, but needs to be supported. For example, it is used with and
+        # was advertised for
+        # https://github.com/datalad-datasets/human-connectome-project-openaccess
         env_var = ('DATALAD_%s_%s' % (name, field)).replace('-', '_')
         lgr.log(5, 'Credentials lookup attempt via env var %s', env_var)
         if env_var in os.environ:
@@ -80,9 +84,10 @@ class Keyring(object):
         if field is None:
             raise NotImplementedError("Deletion of all fields associated with a name")
         try:
-            return self.__keyring.delete_password(self._get_service_name(name), field)
+            return self._keyring.delete_password(self._get_service_name(name), field)
         except self.__keyring_mod.errors.PasswordDeleteError as exc:
-            if 'not found' in str(exc):
+            exc_str = str(exc).lower()
+            if 'not found' in exc_str or 'no such password' in exc_str:
                 return
             raise
 

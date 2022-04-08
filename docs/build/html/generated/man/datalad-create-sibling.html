@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad create-sibling &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad create-sibling-github" href="datalad-create-sibling-github.html" />
+    <link rel="prev" title="datalad siblings" href="datalad-siblings.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad-siblings.html">datalad siblings: Query and manipulate sibling configuration of a dataset</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad create-sibling: Create a sibling on an SSH-accessible machine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-github.html">datalad create-sibling-github: Create a sibling on GitHub</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gitlab.html">datalad create-sibling-gitlab: Create a sibling on GitLab</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gogs.html">datalad create-sibling-gogs: Create a sibling on GOGS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gitea.html">datalad create-sibling-gitea: Create a sibling on Gitea</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gin.html">datalad create-sibling-gin: Create a sibling on GIN (with content hosting)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-ria.html">datalad create-sibling-ria: Create a sibling in a RIA store</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-archive.html">datalad export-archive: Export dataset content as a TAR/ZIP archive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-archive-ora.html">datalad export-archive-ora: Export a local dataset annex for the ORA remote</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-to-figshare.html">datalad export-to-figshare: Export dataset content as a ZIP archive to figshare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-update.html">datalad update: Obtain and incorporate updates from dataset siblings</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad create-sibling</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-create-sibling">
+<span id="man-datalad-create-sibling"></span><h1>datalad create-sibling<a class="headerlink" href="#datalad-create-sibling" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">create</span><span class="o">-</span><span class="n">sibling</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">s</span> <span class="p">[</span><span class="n">NAME</span><span class="p">]]</span> <span class="p">[</span><span class="o">--</span><span class="n">target</span><span class="o">-</span><span class="nb">dir</span> <span class="n">PATH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">target</span><span class="o">-</span><span class="n">url</span> <span class="n">URL</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">target</span><span class="o">-</span><span class="n">pushurl</span> <span class="n">URL</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">dataset</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">r</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">R</span> <span class="n">LEVELS</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">existing</span> <span class="n">MODE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">shared</span>
+    <span class="p">{</span><span class="n">false</span><span class="o">|</span><span class="n">true</span><span class="o">|</span><span class="n">umask</span><span class="o">|</span><span class="n">group</span><span class="o">|</span><span class="nb">all</span><span class="o">|</span><span class="n">world</span><span class="o">|</span><span class="n">everybody</span><span class="o">|</span><span class="mi">0</span><span class="n">xxx</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">group</span>
+    <span class="n">GROUP</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">ui</span> <span class="p">{</span><span class="n">false</span><span class="o">|</span><span class="n">true</span><span class="o">|</span><span class="n">html_filename</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="k">as</span><span class="o">-</span><span class="n">common</span><span class="o">-</span><span class="n">datasrc</span>
+    <span class="n">NAME</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">publish</span><span class="o">-</span><span class="n">by</span><span class="o">-</span><span class="n">default</span> <span class="n">REFSPEC</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">publish</span><span class="o">-</span><span class="n">depends</span>
+    <span class="n">SIBLINGNAME</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">annex</span><span class="o">-</span><span class="n">wanted</span> <span class="n">EXPR</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">annex</span><span class="o">-</span><span class="n">group</span> <span class="n">EXPR</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">annex</span><span class="o">-</span><span class="n">groupwanted</span> <span class="n">EXPR</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">inherit</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">since</span> <span class="n">SINCE</span><span class="p">]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span> <span class="p">[</span><span class="n">SSHURL</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Create a dataset sibling on a UNIX-like Shell (local or SSH)-accessible machine</p>
+<p>Given a local dataset, and a path or SSH login information this command
+creates a remote dataset repository and configures it as a dataset sibling
+to be used as a publication target (see PUBLISH command).</p>
+<p>Various properties of the remote sibling can be configured (e.g. name
+location on the server, read and write access URLs, and access
+permissions.</p>
+<p>Optionally, a basic web-viewer for DataLad datasets can be installed
+at the remote location.</p>
+<p>This command supports recursive processing of dataset hierarchies, creating
+a remote sibling for each dataset in the hierarchy. By default, remote
+siblings are created in hierarchical structure that reflects the
+organization on the local file system. However, a simple templating
+mechanism is provided to produce a flat list of datasets (see
+–target-dir).</p>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="sshurl">
+<h3>SSHURL<a class="headerlink" href="#sshurl" title="Permalink to this headline"></a></h3>
+<p>Login information for the target server. This can be given as a URL (<a class="reference external" href="ssh://host/path">ssh://host/path</a>), SSH-style (<a class="reference external" href="mailto:user&#37;&#52;&#48;host">user<span>&#64;</span>host</a>:path) or just a local path. Unless overridden, this also serves the future dataset’s access URL and path on the server. Constraints: value must be a string</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="s-name-name-name">
+<h3><strong>-s</strong> [NAME], <strong>-\-name</strong> [NAME]<a class="headerlink" href="#s-name-name-name" title="Permalink to this headline"></a></h3>
+<p>sibling name to create for this publication target. If RECURSIVE is set, the same name will be used to label all the subdatasets’ siblings. When creating a target dataset fails, no sibling is added. Constraints: value must be a string</p>
+</section>
+<section id="target-dir-path">
+<h3><strong>-\-target-dir</strong> PATH<a class="headerlink" href="#target-dir-path" title="Permalink to this headline"></a></h3>
+<p>path to the directory <em>on the server</em> where the dataset shall be created. By default this is set to the URL (or local path) specified via SSHURL. If a relative path is provided here, it is interpreted as being relative to the user’s home directory on the server (or relative to SSHURL, when that is a local path). Additional features are relevant for recursive processing of datasets with subdatasets. By default, the local dataset structure is replicated on the server. However, it is possible to provide a template for generating different target directory names for all (sub)datasets. Templates can contain certain placeholder that are substituted for each (sub)dataset. For example: “/mydirectory/dataset%RELNAME”. Supported placeholders: %RELNAME - the name of the datasets, with any slashes replaced by dashes. Constraints: value must be a string</p>
+</section>
+<section id="target-url-url">
+<h3><strong>-\-target-url</strong> URL<a class="headerlink" href="#target-url-url" title="Permalink to this headline"></a></h3>
+<p>“public” access URL of the to-be-created target dataset(s) (default: SSHURL). Accessibility of this URL determines the access permissions of potential consumers of the dataset. As with <cite>target_dir</cite>, templates (same set of placeholders) are supported. Also, if specified, it is provided as the annex description. Constraints: value must be a string</p>
+</section>
+<section id="target-pushurl-url">
+<h3><strong>-\-target-pushurl</strong> URL<a class="headerlink" href="#target-pushurl-url" title="Permalink to this headline"></a></h3>
+<p>In case the TARGET_URL cannot be used to publish to the dataset, this option specifies an alternative URL for this purpose. As with <cite>target_url</cite>, templates (same set of placeholders) are supported. Constraints: value must be a string</p>
+</section>
+<section id="dataset-dataset-d-dataset">
+<h3><strong>-\-dataset</strong> <em>DATASET</em>, <strong>-d</strong> <em>DATASET</em><a class="headerlink" href="#dataset-dataset-d-dataset" title="Permalink to this headline"></a></h3>
+<p>specify the dataset to create the publication target for. If no dataset is given, an attempt is made to identify the dataset based on the current working directory. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="r-recursive">
+<h3><strong>-r</strong>, <strong>-\-recursive</strong><a class="headerlink" href="#r-recursive" title="Permalink to this headline"></a></h3>
+<p>if set, recurse into potential subdatasets.</p>
+</section>
+<section id="r-levels-recursion-limit-levels">
+<h3><strong>-R</strong> LEVELS, <strong>-\-recursion-limit</strong> LEVELS<a class="headerlink" href="#r-levels-recursion-limit-levels" title="Permalink to this headline"></a></h3>
+<p>limit recursion into subdatasets to the given number of levels. Constraints: value must be convertible to type ‘int’</p>
+</section>
+<section id="existing-mode">
+<h3><strong>-\-existing</strong> MODE<a class="headerlink" href="#existing-mode" title="Permalink to this headline"></a></h3>
+<p>action to perform, if a sibling is already configured under the given name and/or a target (non-empty) directory already exists. In this case, a dataset can be skipped (‘skip’), the sibling configuration be updated (‘reconfigure’), or process interrupts with error (‘error’). DANGER ZONE: If ‘replace’ is used, an existing target directory will be forcefully removed, re-initialized, and the sibling (re-)configured (thus implies ‘reconfigure’). REPLACE could lead to data loss, so use with care. To minimize possibility of data loss, in interactive mode DataLad will ask for confirmation, but it would raise an exception in non- interactive mode. Constraints: value must be one of (‘skip’, ‘error’, ‘reconfigure’, ‘replace’) [Default: ‘error’]</p>
+</section>
+<section id="shared-false-true-umask-group-all-world-everybody-0xxx">
+<h3><strong>-\-shared</strong> {false|true|umask|group|all|world|everybody|0xxx}<a class="headerlink" href="#shared-false-true-umask-group-all-world-everybody-0xxx" title="Permalink to this headline"></a></h3>
+<p>if given, configures the access permissions on the server for multi-users (this could include access by a webserver!). Possible values for this option are identical to those of <cite>git init –shared</cite> and are described in its documentation. Constraints: value must be a string, or value must be convertible to type bool</p>
+</section>
+<section id="group-group">
+<h3><strong>-\-group</strong> GROUP<a class="headerlink" href="#group-group" title="Permalink to this headline"></a></h3>
+<p>Filesystem group for the repository. Specifying the group is particularly important when –shared=group. Constraints: value must be a string</p>
+</section>
+<section id="ui-false-true-html-filename">
+<h3><strong>-\-ui</strong> {false|true|html_filename}<a class="headerlink" href="#ui-false-true-html-filename" title="Permalink to this headline"></a></h3>
+<p>publish a web interface for the dataset with an optional user-specified name for the html at publication target. defaults to <cite>index.html</cite> at dataset root. Constraints: value must be convertible to type bool, or value must be a string [Default: False]</p>
+</section>
+<section id="as-common-datasrc-name">
+<h3><strong>-\-as-common-datasrc</strong> NAME<a class="headerlink" href="#as-common-datasrc-name" title="Permalink to this headline"></a></h3>
+<p>configure the created sibling as a common data source of the dataset that can be automatically used by all consumers of the dataset (technical: git-annex auto- enabled special remote).</p>
+</section>
+<section id="publish-by-default-refspec">
+<h3><strong>-\-publish-by-default</strong> REFSPEC<a class="headerlink" href="#publish-by-default-refspec" title="Permalink to this headline"></a></h3>
+<p>add a refspec to be published to this sibling by default if nothing specified. Constraints: value must be a string</p>
+</section>
+<section id="publish-depends-siblingname">
+<h3><strong>-\-publish-depends</strong> SIBLINGNAME<a class="headerlink" href="#publish-depends-siblingname" title="Permalink to this headline"></a></h3>
+<p>add a dependency such that the given existing sibling is always published prior to the new sibling. This equals setting a configuration item ‘remote.SIBLINGNAME.datalad-publish-depends’. This option can be given more than once to configure multiple dependencies. Constraints: value must be a string</p>
+</section>
+<section id="annex-wanted-expr">
+<h3><strong>-\-annex-wanted</strong> EXPR<a class="headerlink" href="#annex-wanted-expr" title="Permalink to this headline"></a></h3>
+<p>expression to specify ‘wanted’ content for the repository/sibling. See <a class="reference external" href="https://git-annex.branchable.com/git-annex-wanted/">https://git-annex.branchable.com/git-annex-wanted/</a> for more information. Constraints: value must be a string</p>
+</section>
+<section id="annex-group-expr">
+<h3><strong>-\-annex-group</strong> EXPR<a class="headerlink" href="#annex-group-expr" title="Permalink to this headline"></a></h3>
+<p>expression to specify a group for the repository. See <a class="reference external" href="https://git">https://git</a>- annex.branchable.com/git-annex-group/ for more information. Constraints: value must be a string</p>
+</section>
+<section id="annex-groupwanted-expr">
+<h3><strong>-\-annex-groupwanted</strong> EXPR<a class="headerlink" href="#annex-groupwanted-expr" title="Permalink to this headline"></a></h3>
+<p>expression for the groupwanted. Makes sense only if –annex-wanted=”groupwanted” and annex-group is given too. See <a class="reference external" href="https://git-annex.branchable.com/git-annex">https://git-annex.branchable.com/git-annex</a>- groupwanted/ for more information. Constraints: value must be a string</p>
+</section>
+<section id="inherit">
+<h3><strong>-\-inherit</strong><a class="headerlink" href="#inherit" title="Permalink to this headline"></a></h3>
+<p>if sibling is missing, inherit settings (git config, git annex wanted/group/groupwanted) from its super-dataset.</p>
+</section>
+<section id="since-since">
+<h3><strong>-\-since</strong> <em>SINCE</em><a class="headerlink" href="#since-since" title="Permalink to this headline"></a></h3>
+<p>limit processing to subdatasets that have been changed since a given state (by tag, branch, commit, etc). This can be used to create siblings for recently added subdatasets. Constraints: value must be a string</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-siblings.html" class="btn btn-neutral float-left" title="datalad siblings" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-create-sibling-github.html" class="btn btn-neutral float-right" title="datalad create-sibling-github" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

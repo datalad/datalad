@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.support.archives &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> DataLad
+            <img src="../../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>datalad.support.archives</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for datalad.support.archives</h1><div class="highlight"><pre>
+<span></span><span class="c1"># emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-</span>
+<span class="c1"># ex: set sts=4 ts=4 sw=4 et:</span>
+<span class="c1"># ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="c1">#</span>
+<span class="c1">#   See COPYING file distributed along with the datalad package for the</span>
+<span class="c1">#   copyright and license terms.</span>
+<span class="c1">#</span>
+<span class="c1"># ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="sd">&quot;&quot;&quot;Various handlers/functionality for different types of files (e.g. for archives)</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">string</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">datalad.support.path</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">join</span> <span class="k">as</span> <span class="n">opj</span><span class="p">,</span>
+    <span class="n">exists</span><span class="p">,</span>
+    <span class="n">abspath</span><span class="p">,</span>
+    <span class="n">isabs</span><span class="p">,</span>
+    <span class="n">normpath</span><span class="p">,</span>
+    <span class="n">relpath</span><span class="p">,</span>
+    <span class="n">pardir</span><span class="p">,</span>
+    <span class="n">isdir</span><span class="p">,</span>
+    <span class="n">sep</span> <span class="k">as</span> <span class="n">opsep</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">datalad.support.locking</span> <span class="kn">import</span> <span class="n">lock_if_check_fails</span>
+<span class="kn">from</span> <span class="nn">datalad.support.external_versions</span> <span class="kn">import</span> <span class="n">external_versions</span>
+<span class="kn">from</span> <span class="nn">datalad.consts</span> <span class="kn">import</span> <span class="n">ARCHIVES_TEMP_DIR</span>
+<span class="kn">from</span> <span class="nn">datalad.utils</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">any_re_search</span><span class="p">,</span>
+    <span class="n">ensure_bytes</span><span class="p">,</span>
+    <span class="n">ensure_unicode</span><span class="p">,</span>
+    <span class="n">unlink</span><span class="p">,</span>
+    <span class="n">rmtemp</span><span class="p">,</span>
+    <span class="n">rmtree</span><span class="p">,</span>
+    <span class="n">get_tempfile_kwargs</span><span class="p">,</span>
+    <span class="n">on_windows</span><span class="p">,</span>
+    <span class="n">Path</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">datalad</span> <span class="kn">import</span> <span class="n">cfg</span>
+<span class="kn">from</span> <span class="nn">datalad.config</span> <span class="kn">import</span> <span class="n">anything2bool</span>
+
+<span class="c1"># fall back on patool, if requested, or 7z is not found</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">obtain</span><span class="p">(</span><span class="s1">&#39;datalad.runtime.use-patool&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+               <span class="n">valtype</span><span class="o">=</span><span class="n">anything2bool</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="n">external_versions</span><span class="p">[</span><span class="s1">&#39;cmd:7z&#39;</span><span class="p">]):</span>
+    <span class="kn">from</span> <span class="nn">datalad.support.archive_utils_patool</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">decompress_file</span> <span class="k">as</span> <span class="n">_decompress_file</span><span class="p">,</span>
+        <span class="c1"># other code expects this to be here</span>
+        <span class="n">compress_files</span>
+    <span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">datalad.support.archive_utils_7z</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">decompress_file</span> <span class="k">as</span> <span class="n">_decompress_file</span><span class="p">,</span>
+        <span class="c1"># other code expects this to be here</span>
+        <span class="n">compress_files</span>
+    <span class="p">)</span>
+
+<span class="n">lgr</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;datalad.support.archives&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="decompress_file"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.decompress_file">[docs]</a><span class="k">def</span> <span class="nf">decompress_file</span><span class="p">(</span><span class="n">archive</span><span class="p">,</span> <span class="n">dir_</span><span class="p">,</span> <span class="n">leading_directories</span><span class="o">=</span><span class="s1">&#39;strip&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Decompress `archive` into a directory `dir_`</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    archive: str</span>
+<span class="sd">    dir_: str</span>
+<span class="sd">    leading_directories: {&#39;strip&#39;, None}</span>
+<span class="sd">      If `strip`, and archive contains a single leading directory under which</span>
+<span class="sd">      all content is stored, all the content will be moved one directory up</span>
+<span class="sd">      and that leading directory will be removed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">dir_</span><span class="p">):</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Creating directory </span><span class="si">%s</span><span class="s2"> to extract archive into&quot;</span><span class="p">,</span> <span class="n">dir_</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dir_</span><span class="p">)</span>
+
+    <span class="n">_decompress_file</span><span class="p">(</span><span class="n">archive</span><span class="p">,</span> <span class="n">dir_</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">leading_directories</span> <span class="o">==</span> <span class="s1">&#39;strip&#39;</span><span class="p">:</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">files</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">dir_</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">dirs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># move all the content under dirs[0] up 1 level</span>
+            <span class="n">widow_dir</span> <span class="o">=</span> <span class="n">opj</span><span class="p">(</span><span class="n">dir_</span><span class="p">,</span> <span class="n">dirs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Moving content within </span><span class="si">%s</span><span class="s2"> upstairs&quot;</span><span class="p">,</span> <span class="n">widow_dir</span><span class="p">)</span>
+            <span class="n">subdir</span><span class="p">,</span> <span class="n">subdirs_</span><span class="p">,</span> <span class="n">files_</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">dir_</span><span class="p">,</span> <span class="n">dirs</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">subdirs_</span> <span class="o">+</span> <span class="n">files_</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">subdir</span><span class="p">,</span> <span class="n">f</span><span class="p">),</span> <span class="n">opj</span><span class="p">(</span><span class="n">dir_</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span>
+            <span class="c1"># NFS might hold it victim so use rmtree so it tries a few times</span>
+            <span class="n">rmtree</span><span class="p">(</span><span class="n">widow_dir</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">leading_directories</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">pass</span>   <span class="c1"># really do nothing</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Not supported </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">leading_directories</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_get_cached_filename</span><span class="p">(</span><span class="n">archive</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A helper to generate a filename which has original filename and additional suffix</span>
+<span class="sd">    which wouldn&#39;t collide across files with the same name from different locations</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#return &quot;%s_%s&quot; % (basename(archive), hashlib.md5(archive).hexdigest()[:5])</span>
+    <span class="c1"># per se there is no reason to maintain any long original name here.</span>
+    <span class="n">archive_cached</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">md5</span><span class="p">(</span><span class="n">ensure_bytes</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">archive</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">())))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">10</span><span class="p">]</span>
+    <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cached directory for archive </span><span class="si">%s</span><span class="s2"> is </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">archive</span><span class="p">,</span> <span class="n">archive_cached</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">archive_cached</span>
+
+
+<span class="k">def</span> <span class="nf">_get_random_id</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">chars</span><span class="o">=</span><span class="n">string</span><span class="o">.</span><span class="n">ascii_uppercase</span> <span class="o">+</span> <span class="n">string</span><span class="o">.</span><span class="n">digits</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Return a random ID composed from digits and uppercase letters</span>
+
+<span class="sd">    upper-case so we are tolerant to unlikely collisions on dummy FSs</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">chars</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">size</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="ArchivesCache"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ArchivesCache">[docs]</a><span class="k">class</span> <span class="nc">ArchivesCache</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Cache to maintain extracted archives</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    toppath : str</span>
+<span class="sd">      Top directory under .git/ of which temp directory would be created.</span>
+<span class="sd">      If not provided -- random tempdir is used</span>
+<span class="sd">    persistent : bool, optional</span>
+<span class="sd">      Passed over into generated ExtractedArchives</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># TODO: make caching persistent across sessions/runs, with cleanup</span>
+    <span class="c1"># IDEA: extract under .git/annex/tmp so later on annex unused could clean it</span>
+    <span class="c1">#       all up</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">toppath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">persistent</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_toppath</span> <span class="o">=</span> <span class="n">toppath</span>
+        <span class="k">if</span> <span class="n">toppath</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">opj</span><span class="p">(</span><span class="n">toppath</span><span class="p">,</span> <span class="n">ARCHIVES_TEMP_DIR</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">persistent</span><span class="p">:</span>
+                <span class="n">tempsuffix</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="n">_get_random_id</span><span class="p">()</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;For non-persistent archives using </span><span class="si">%s</span><span class="s2"> suffix for path </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                          <span class="n">tempsuffix</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                <span class="n">path</span> <span class="o">+=</span> <span class="n">tempsuffix</span>
+            <span class="c1"># TODO: begging for a race condition</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Initiating clean cache for the archives under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                          <span class="n">path</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_made_path</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                    <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cache initialized&quot;</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">lgr</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to initialize cached under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                    <span class="k">raise</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Not initiating existing cache for the archives under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">path</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_made_path</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">persistent</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> cannot be persistent, because no toppath was provided&quot;</span>
+                    <span class="o">%</span> <span class="bp">self</span><span class="p">)</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="o">**</span><span class="n">get_tempfile_kwargs</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_made_path</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">persistent</span> <span class="o">=</span> <span class="n">persistent</span>
+        <span class="c1"># TODO?  ensure that it is absent or we should allow for it to persist a bit?</span>
+        <span class="c1">#if exists(path):</span>
+        <span class="c1">#    self._clean_cache()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># TODO: begging for a race condition</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Initiating clean cache for the archives under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_made_path</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cache initialized&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to initialize cached under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                <span class="k">raise</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Not initiating existing cache for the archives under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_made_path</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_path</span>
+
+<div class="viewcode-block" id="ArchivesCache.clean"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ArchivesCache.clean">[docs]</a>    <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">aname</span><span class="p">,</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">a</span><span class="o">.</span><span class="n">clean</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">)</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="p">[</span><span class="n">aname</span><span class="p">]</span>
+        <span class="c1"># Probably we should not rely on _made_path and not bother if persistent removing it</span>
+        <span class="c1"># if ((not self.persistent) or force) and self._made_path:</span>
+        <span class="c1">#     lgr.debug(&quot;Removing the entire archives cache under %s&quot;, self.path)</span>
+        <span class="c1">#     rmtemp(self.path)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">persistent</span><span class="p">)</span> <span class="ow">or</span> <span class="n">force</span><span class="p">:</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Removing the entire archives cache under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">rmtemp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_get_normalized_archive_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">archive</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return full path to archive</span>
+
+<span class="sd">        So we have consistent operation from different subdirs,</span>
+<span class="sd">        while referencing archives from the topdir</span>
+
+<span class="sd">        TODO: why do we need it???</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">isabs</span><span class="p">(</span><span class="n">archive</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_toppath</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">normpath</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toppath</span><span class="p">,</span> <span class="n">archive</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">relpath</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_toppath</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">pardir</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> points outside of the topdir </span><span class="si">%s</span><span class="s2">&quot;</span>
+                                   <span class="o">%</span> <span class="p">(</span><span class="n">archive</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_toppath</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">isdir</span><span class="p">(</span><span class="n">out</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;got a directory here... bleh&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">out</span>
+        <span class="k">return</span> <span class="n">archive</span>
+
+<div class="viewcode-block" id="ArchivesCache.get_archive"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ArchivesCache.get_archive">[docs]</a>    <span class="k">def</span> <span class="nf">get_archive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">archive</span><span class="p">):</span>
+        <span class="n">archive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_normalized_archive_path</span><span class="p">(</span><span class="n">archive</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">archive</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="p">[</span><span class="n">archive</span><span class="p">]</span> <span class="o">=</span> \
+                <span class="n">ExtractedArchive</span><span class="p">(</span><span class="n">archive</span><span class="p">,</span>
+                                 <span class="n">opj</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">_get_cached_filename</span><span class="p">(</span><span class="n">archive</span><span class="p">)),</span>
+                                 <span class="n">persistent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">persistent</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="p">[</span><span class="n">archive</span><span class="p">]</span></div>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">archive</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_archive</span><span class="p">(</span><span class="n">archive</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__delitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">archive</span><span class="p">):</span>
+        <span class="n">archive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_normalized_archive_path</span><span class="p">(</span><span class="n">archive</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="p">[</span><span class="n">archive</span><span class="p">]</span><span class="o">.</span><span class="n">clean</span><span class="p">()</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archives</span><span class="p">[</span><span class="n">archive</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># we can at least try</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">persistent</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">clean</span><span class="p">()</span>
+        <span class="k">except</span><span class="p">:</span>  <span class="c1"># MIH: IOError?</span>
+            <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="ExtractedArchive"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive">[docs]</a><span class="k">class</span> <span class="nc">ExtractedArchive</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Container for the extracted archive</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># suffix to use for a stamp so we could guarantee that extracted archive is</span>
+    <span class="n">STAMP_SUFFIX</span> <span class="o">=</span> <span class="s1">&#39;.stamp&#39;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">archive</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">persistent</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="o">=</span> <span class="n">archive</span>
+        <span class="c1"># TODO: bad location for extracted archive -- use tempfile</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mktemp</span><span class="p">(</span><span class="o">**</span><span class="n">get_tempfile_kwargs</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="n">_get_cached_filename</span><span class="p">(</span><span class="n">archive</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">persistent</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Directory </span><span class="si">%s</span><span class="s2"> already exists whenever it should not &quot;</span>
+                               <span class="s2">&quot;persist&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_persistent</span> <span class="o">=</span> <span class="n">persistent</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_path</span> <span class="o">=</span> <span class="n">path</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">(</span><span class="si">%r</span><span class="s2">, path=</span><span class="si">%r</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ExtractedArchive.clean"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive.clean">[docs]</a>    <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="c1"># would interfere with tests</span>
+        <span class="c1"># if os.environ.get(&#39;DATALAD_TESTS_TEMP_KEEP&#39;):</span>
+        <span class="c1">#     lgr.info(&quot;As instructed, not cleaning up the cache under %s&quot;</span>
+        <span class="c1">#              % self._path)</span>
+        <span class="c1">#     return</span>
+
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_path</span><span class="p">,</span> <span class="s1">&#39;cache&#39;</span><span class="p">),</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stamp_path</span><span class="p">,</span> <span class="s1">&#39;stamp file&#39;</span><span class="p">)</span>
+        <span class="p">]:</span>
+            <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_persistent</span><span class="p">)</span> <span class="ow">or</span> <span class="n">force</span><span class="p">:</span>
+                    <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cleaning up the </span><span class="si">%s</span><span class="s2"> for </span><span class="si">%s</span><span class="s2"> under </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                    <span class="c1"># TODO:  we must be careful here -- to not modify permissions of files</span>
+                    <span class="c1">#        only of directories</span>
+                    <span class="p">(</span><span class="n">rmtree</span> <span class="k">if</span> <span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="n">unlink</span><span class="p">)(</span><span class="n">path</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Given an archive -- return full path to it within cache (extracted)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_path</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">stamp_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_path</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">STAMP_SUFFIX</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_extracted</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span> <span class="ow">and</span> <span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stamp_path</span><span class="p">)</span> \
+            <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">stat</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stamp_path</span><span class="p">)</span><span class="o">.</span><span class="n">st_mtime</span> <span class="o">&gt;=</span> <span class="n">os</span><span class="o">.</span><span class="n">stat</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">st_mtime</span>
+
+<div class="viewcode-block" id="ExtractedArchive.assure_extracted"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive.assure_extracted">[docs]</a>    <span class="k">def</span> <span class="nf">assure_extracted</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return path to the extracted `archive`.  Extract archive if necessary</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span>
+
+        <span class="k">with</span> <span class="n">lock_if_check_fails</span><span class="p">(</span>
+            <span class="n">check</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">is_extracted</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="p">,)),</span>
+            <span class="n">lock_path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span>
+            <span class="n">operation</span><span class="o">=</span><span class="s2">&quot;extract&quot;</span>
+        <span class="p">)</span> <span class="k">as</span> <span class="p">(</span><span class="n">check</span><span class="p">,</span> <span class="n">lock</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">lock</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="ow">not</span> <span class="n">check</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_extract_archive</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">path</span></div>
+
+    <span class="k">def</span> <span class="nf">_extract_archive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="c1"># we need to extract the archive</span>
+        <span class="c1"># TODO: extract to _tmp and then move in a single command so we</span>
+        <span class="c1"># don&#39;t end up picking up broken pieces</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Extracting </span><span class="si">{self._archive}</span><span class="s2"> under </span><span class="si">{path}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="nb">locals</span><span class="p">()))</span>
+        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Previous extracted (but probably not fully) cached archive &quot;</span>
+                <span class="s2">&quot;found. Removing </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">path</span><span class="p">)</span>
+            <span class="n">rmtree</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        <span class="c1"># remove old stamp</span>
+        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stamp_path</span><span class="p">):</span>
+            <span class="n">rmtree</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stamp_path</span><span class="p">)</span>
+        <span class="n">decompress_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">leading_directories</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># TODO: must optional since we might to use this content, move it</span>
+        <span class="c1"># into the tree etc</span>
+        <span class="c1"># lgr.debug(&quot;Adjusting permissions to R/O for the extracted content&quot;)</span>
+        <span class="c1"># rotree(path)</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        <span class="c1"># create a stamp</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stamp_path</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">ensure_bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="p">))</span>
+        <span class="c1"># assert that stamp mtime is not older than archive&#39;s directory</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_extracted</span><span class="p">)</span>
+
+    <span class="c1"># TODO: remove?</span>
+    <span class="c1">#def has_file_ready(self, afile):</span>
+    <span class="c1">#    lgr.debug(u&quot;Checking file {afile} from archive {archive}&quot;.format(**locals()))</span>
+    <span class="c1">#    return exists(self.get_extracted_filename(afile))</span>
+
+<div class="viewcode-block" id="ExtractedArchive.get_extracted_filename"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive.get_extracted_filename">[docs]</a>    <span class="k">def</span> <span class="nf">get_extracted_filename</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">afile</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return full path to the `afile` within extracted `archive`</span>
+
+<span class="sd">        It does not actually extract any archive</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">opj</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">afile</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ExtractedArchive.get_extracted_files"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive.get_extracted_files">[docs]</a>    <span class="k">def</span> <span class="nf">get_extracted_files</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Generator to provide filenames which are available under extracted archive</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">assure_extracted</span><span class="p">()</span>
+        <span class="n">path_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">root</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>  <span class="c1"># TEMP</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">ensure_unicode</span><span class="p">(</span><span class="n">opj</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="p">)[</span><span class="n">path_len</span><span class="p">:])</span></div>
+
+<div class="viewcode-block" id="ExtractedArchive.get_leading_directory"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive.get_leading_directory">[docs]</a>    <span class="k">def</span> <span class="nf">get_leading_directory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">consider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return leading directory of the content within archive</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        depth: int or None, optional</span>
+<span class="sd">          Maximal depth of leading directories to consider.  If None - no upper</span>
+<span class="sd">          limit</span>
+<span class="sd">        consider : list of str, optional</span>
+<span class="sd">          Regular expressions for file/directory names to be considered (before</span>
+<span class="sd">          exclude). Applied to the entire relative path to the file as in the archive</span>
+<span class="sd">        exclude: list of str, optional</span>
+<span class="sd">          Regular expressions for file/directory names to be excluded from consideration.</span>
+<span class="sd">          Applied to the entire relative path to the file as in the archive</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str or None:</span>
+<span class="sd">          If there is no single leading directory -- None returned</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">leading</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># returns only files, so no need to check if a dir or not</span>
+        <span class="k">for</span> <span class="n">fpath</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_extracted_files</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">consider</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">any_re_search</span><span class="p">(</span><span class="n">consider</span><span class="p">,</span> <span class="n">fpath</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">exclude</span> <span class="ow">and</span> <span class="n">any_re_search</span><span class="p">(</span><span class="n">exclude</span><span class="p">,</span> <span class="n">fpath</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="n">lpath</span> <span class="o">=</span> <span class="n">fpath</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">opsep</span><span class="p">)</span>
+            <span class="n">dpath</span> <span class="o">=</span> <span class="n">lpath</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># directory path components</span>
+            <span class="k">if</span> <span class="n">leading</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">leading</span> <span class="o">=</span> <span class="n">dpath</span> <span class="k">if</span> <span class="n">depth</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">dpath</span><span class="p">[:</span><span class="n">depth</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">dpath</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">leading</span><span class="p">)]</span> <span class="o">!=</span> <span class="n">leading</span><span class="p">:</span>
+                    <span class="c1"># find smallest common path</span>
+                    <span class="n">leading_</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="c1"># TODO: there might be more efficient pythonic way</span>
+                    <span class="k">for</span> <span class="n">d1</span><span class="p">,</span> <span class="n">d2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">leading</span><span class="p">,</span> <span class="n">dpath</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">d1</span> <span class="o">!=</span> <span class="n">d2</span><span class="p">:</span>
+                            <span class="k">break</span>
+                        <span class="n">leading_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d1</span><span class="p">)</span>
+                    <span class="n">leading</span> <span class="o">=</span> <span class="n">leading_</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">leading</span><span class="p">):</span>
+                <span class="c1"># no common leading - ready to exit</span>
+                <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">leading</span> <span class="k">if</span> <span class="n">leading</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">opj</span><span class="p">(</span><span class="o">*</span><span class="n">leading</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ExtractedArchive.get_extracted_file"><a class="viewcode-back" href="../../../generated/datalad.support.archives.html#datalad.support.archives.ExtractedArchive.get_extracted_file">[docs]</a>    <span class="k">def</span> <span class="nf">get_extracted_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">afile</span><span class="p">):</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">u</span><span class="s2">&quot;Requested file </span><span class="si">{afile}</span><span class="s2"> from archive </span><span class="si">{self._archive}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="nb">locals</span><span class="p">()))</span>
+        <span class="c1"># TODO: That could be a good place to provide &quot;compatibility&quot; layer if</span>
+        <span class="c1"># filenames within archive are too obscure for local file system.</span>
+        <span class="c1"># We could somehow adjust them while extracting and here channel back</span>
+        <span class="c1"># &quot;fixed&quot; up names since they are only to point to the load</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assure_extracted</span><span class="p">()</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_extracted_filename</span><span class="p">(</span><span class="n">afile</span><span class="p">)</span>
+        <span class="c1"># TODO: make robust</span>
+        <span class="n">lgr</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Verifying that </span><span class="si">%s</span><span class="s2"> exists&quot;</span><span class="p">,</span> <span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        <span class="k">assert</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> must exist&quot;</span> <span class="o">%</span> <span class="n">path</span>
+        <span class="k">return</span> <span class="n">path</span></div>
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_persistent</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">clean</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># MIH: IOError?</span>
+            <span class="k">pass</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

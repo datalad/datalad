@@ -1,4 +1,4 @@
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -68,11 +68,11 @@ def test_get_subdatasets(origpath, path):
     ds.create(dots)
     # mitigate https://github.com/datalad/datalad/issues/4267
     ds.save()
-    eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths'), [
         'sub dataset1'
     ])
     ds.get('sub dataset1')
-    eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths'), [
         _p('sub dataset1/2'),
         _p('sub dataset1/sub sub dataset1'),
         _p('sub dataset1/subm 1'),
@@ -159,7 +159,7 @@ def test_get_subdatasets(origpath, path):
         _p('sub dataset1'),
         dots,
     ])
-    eq_(ds.subdatasets(recursive=True, fulfilled=True, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, state='present', result_xfm='relpaths'), [
         _p('sub dataset1'),
         _p('sub dataset1/sub sub dataset1'),
         dots,
@@ -205,6 +205,8 @@ def test_get_subdatasets(origpath, path):
                       ('expansion', '<{refds_relname}>')])
     assert_status('ok', res)
     for r in res:
+        if r.get('action') != 'subdataset':
+            continue
         eq_(r['gitmodule_mike'], 'slow')
         eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
     # plain query again to see if it got into the files
@@ -289,7 +291,7 @@ def test_state(path):
     assert_result_count(
         ds.subdatasets(), 1, path=sub.path, state='present')
     # uninstall the subdataset
-    ds.uninstall('sub')
+    ds.drop('sub', what='all', reckless='kill', recursive=True)
     # normal 'gone' is "absent"
     assert_false(sub.is_installed())
     assert_result_count(
@@ -322,7 +324,7 @@ def test_parent_on_unborn_branch(path):
     subrepo = GitRepo(opj(path, "sub"), create=True)
     subrepo.commit(msg="c", options=["--allow-empty"])
 
-    ds.repo.add_submodule(path="sub")
+    ds.repo.save(path="sub")
     eq_(ds.subdatasets(result_xfm='relpaths'),
         ["sub"])
 
@@ -346,7 +348,7 @@ def test_name_starts_with_hyphen(origpath, path):
         ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
 
     # uninstall
-    ds_clone.uninstall('-clone')
+    ds_clone.drop('-clone', what='all', reckless='kill', recursive=True)
     assert_false(dash_clone.is_installed())
     assert_result_count(
         ds_clone.subdatasets(), 1, path=dash_clone.path, state='absent')

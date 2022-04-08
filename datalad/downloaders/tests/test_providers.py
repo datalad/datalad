@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -122,7 +122,7 @@ url_re = https?://crcns\\.org/.*
 authentication_type = none
 """}},
    '.git': { "HEAD" : ""}})
-@patch.multiple("appdirs.AppDirs", site_config_dir=None, user_config_dir=None)
+@patch.multiple("platformdirs.AppDirs", site_config_dir=None, user_config_dir=None)
 def test_Providers_from_config__files(sysdir, userdir, dsdir):
     """Test configuration file precedence
 
@@ -146,14 +146,14 @@ def test_Providers_from_config__files(sysdir, userdir, dsdir):
 
         # Test that the system defaults take precedence over the dataset
         # defaults (we're still within the dsdir)
-        with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=None):
+        with patch.multiple("platformdirs.AppDirs", site_config_dir=sysdir, user_config_dir=None):
             providers = Providers.from_config_files(reload=True)
             provider = providers.get_provider('https://crcns.org/data....')
             assert_equal(provider.name, 'syscrcns')
 
         # Test that the user defaults take precedence over the system
         # defaults
-        with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=userdir):
+        with patch.multiple("platformdirs.AppDirs", site_config_dir=sysdir, user_config_dir=userdir):
             providers = Providers.from_config_files(reload=True)
             provider = providers.get_provider('https://crcns.org/data....')
             assert_equal(provider.name, 'usercrcns')
@@ -161,7 +161,7 @@ def test_Providers_from_config__files(sysdir, userdir, dsdir):
 
 @with_tempfile(mkdir=True)
 def test_providers_enter_new(path):
-    with patch.multiple("appdirs.AppDirs", site_config_dir=None,
+    with patch.multiple("platformdirs.AppDirs", site_config_dir=None,
                         user_config_dir=path):
         providers_dir = op.join(path, "providers")
         providers = Providers.from_config_files(reload=True)

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad export-archive-ora &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="datalad export-to-figshare" href="datalad-export-to-figshare.html" />
+    <link rel="prev" title="datalad export-archive" href="datalad-export-archive.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../cmdline.html">Command line reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#main-command">Main command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cmdline.html#core-commands">Core commands</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../cmdline.html#extended-set-of-functionality">Extended set of functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../cmdline.html#dataset-siblings-and-3rd-party-platform-support">Dataset siblings and 3rd-party platform support</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad-siblings.html">datalad siblings: Query and manipulate sibling configuration of a dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling.html">datalad create-sibling: Create a sibling on an SSH-accessible machine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-github.html">datalad create-sibling-github: Create a sibling on GitHub</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gitlab.html">datalad create-sibling-gitlab: Create a sibling on GitLab</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gogs.html">datalad create-sibling-gogs: Create a sibling on GOGS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gitea.html">datalad create-sibling-gitea: Create a sibling on Gitea</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-gin.html">datalad create-sibling-gin: Create a sibling on GIN (with content hosting)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-create-sibling-ria.html">datalad create-sibling-ria: Create a sibling in a RIA store</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-archive.html">datalad export-archive: Export dataset content as a TAR/ZIP archive</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad export-archive-ora: Export a local dataset annex for the ORA remote</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-export-to-figshare.html">datalad export-to-figshare: Export dataset content as a ZIP archive to figshare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad-update.html">datalad update: Obtain and incorporate updates from dataset siblings</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#helpers-and-support-utilities">Helpers and support utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../cmdline.html#deprecated-commands">Deprecated commands</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../cmdline.html">Command line reference</a> &raquo;</li>
+      <li>datalad export-archive-ora</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-export-archive-ora">
+<span id="man-datalad-export-archive-ora"></span><h1>datalad export-archive-ora<a class="headerlink" href="#datalad-export-archive-ora" title="Permalink to this headline"></a></h1>
+<section id="synopsis">
+<h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span> <span class="n">export</span><span class="o">-</span><span class="n">archive</span><span class="o">-</span><span class="n">ora</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">d</span> <span class="n">DATASET</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="k">for</span> <span class="n">LABEL</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">annex</span><span class="o">-</span><span class="n">wanted</span> <span class="n">FILTERS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="kn">from</span> <span class="nn">FROM</span>
+    <span class="p">[</span><span class="n">FROM</span> <span class="o">...</span><span class="p">]]</span> <span class="p">[</span><span class="o">--</span><span class="n">missing</span><span class="o">-</span><span class="n">content</span> <span class="p">{</span><span class="n">error</span><span class="o">|</span><span class="k">continue</span><span class="o">|</span><span class="n">ignore</span><span class="p">}]</span>
+    <span class="p">[</span><span class="o">--</span><span class="n">version</span><span class="p">]</span> <span class="n">TARGET</span> <span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Permalink to this headline"></a></h2>
+<p>Export an archive of a local annex object store for the ORA remote.</p>
+<p>Keys in the local annex object store are reorganized in a temporary
+directory (using links to avoid storage duplication) to use the
+‘hashdirlower’ setup used by git-annex for bare repositories and
+the directory-type special remote. This alternative object store is
+then moved into a 7zip archive that is suitable for use in a
+ORA remote dataset store. Placing such an archive into:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">dataset</span> <span class="n">location</span><span class="o">&gt;/</span><span class="n">archives</span><span class="o">/</span><span class="n">archive</span><span class="mf">.7</span><span class="n">z</span>
+</pre></div>
+</div>
+<p>Enables the ORA special remote to locate and retrieve all keys contained
+in the archive.</p>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this headline"></a></h2>
+<section id="target">
+<h3>TARGET<a class="headerlink" href="#target" title="Permalink to this headline"></a></h3>
+<p>if an existing directory, an ‘archive.7z’ is placed into it, otherwise this is the path to the target archive. Constraints: value must be a string</p>
+</section>
+<section id="id1">
+<h3>…<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h3>
+<p>list of options for 7z to replace the default ‘-mx0’ to generate an uncompressed archive.</p>
+</section>
+<section id="h-help-help-np">
+<h3><strong>-h</strong>, <strong>-\-help</strong>, <strong>-\-help-np</strong><a class="headerlink" href="#h-help-help-np" title="Permalink to this headline"></a></h3>
+<p>show this help message. –help-np forcefully disables the use of a pager for displaying the help message</p>
+</section>
+<section id="d-dataset-dataset-dataset">
+<h3><strong>-d</strong> <em>DATASET</em>, <strong>-\-dataset</strong> <em>DATASET</em><a class="headerlink" href="#d-dataset-dataset-dataset" title="Permalink to this headline"></a></h3>
+<p>specify the dataset to process. If no dataset is given, an attempt is made to identify the dataset based on the current working directory. Constraints: Value must be a Dataset or a valid identifier of a Dataset (e.g. a path)</p>
+</section>
+<section id="for-label">
+<h3><strong>-\-for</strong> LABEL<a class="headerlink" href="#for-label" title="Permalink to this headline"></a></h3>
+<p>name of the target sibling, wanted/preferred settings will be used to filter the files added to the archives. Constraints: value must be a string</p>
+</section>
+<section id="annex-wanted-filters">
+<h3><strong>-\-annex-wanted</strong> FILTERS<a class="headerlink" href="#annex-wanted-filters" title="Permalink to this headline"></a></h3>
+<p>git-annex-preferred-content expression for git-annex find to filter files. Should start with ‘or’ or ‘and’ when used in combination with <cite>–for</cite>.</p>
+</section>
+<section id="from-from-from">
+<h3><strong>-\-from</strong> FROM [FROM …]<a class="headerlink" href="#from-from-from" title="Permalink to this headline"></a></h3>
+<p>one or multiple tree-ish from which to select files.</p>
+</section>
+<section id="missing-content-error-continue-ignore">
+<h3><strong>-\-missing-content</strong> {error|continue|ignore}<a class="headerlink" href="#missing-content-error-continue-ignore" title="Permalink to this headline"></a></h3>
+<p>By default, any discovered file with missing content will result in an error and the export is aborted. Setting this to ‘continue’ will issue warnings instead of failing on error. The value ‘ignore’ will only inform about problem at the ‘debug’ log level. The latter two can be helpful when generating a TAR archive from a dataset where some file content is not available locally. Constraints: value must be one of (‘error’, ‘continue’, ‘ignore’) [Default: ‘error’]</p>
+</section>
+<section id="version">
+<h3><strong>-\-version</strong><a class="headerlink" href="#version" title="Permalink to this headline"></a></h3>
+<p>show the module and its version which provides the command</p>
+</section>
+</section>
+<section id="authors">
+<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline"></a></h2>
+<p>datalad is developed by The DataLad Team and Contributors &lt;<a class="reference external" href="mailto:team&#37;&#52;&#48;datalad&#46;org">team<span>&#64;</span>datalad<span>&#46;</span>org</a>&gt;.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad-export-archive.html" class="btn btn-neutral float-left" title="datalad export-archive" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad-export-to-figshare.html" class="btn btn-neutral float-right" title="datalad export-to-figshare" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

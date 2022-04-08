@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic principles &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Credentials" href="credentials.html" />
+    <link rel="prev" title="Delineation from related solutions" href="related.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> DataLad
+            <img src="_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic principles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#datasets">Datasets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#types-of-ids-used-in-datasets">Types of IDs used in datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dataset-nesting">Dataset nesting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dataset-collections">Dataset collections</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-command-line-usage">Basic command line usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#api-principles">API principles</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#downloading-datalad-s-default-superdataset">Downloading DataLad’s default superdataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#downloading-datasets-via-http">Downloading datasets via http</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#downloading-datasets-via-ssh">Downloading datasets via ssh</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#commands-install-vs-get">Commands <cite>install</cite> vs <cite>get</cite></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Basic principles</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="basic-principles">
+<span id="chap-basic-principles"></span><h1>Basic principles<a class="headerlink" href="#basic-principles" title="Permalink to this headline"></a></h1>
+<p>DataLad is designed to be used both as a command-line tool, and as a Python
+module. The sections <a class="reference internal" href="cmdline.html#chap-cmdline"><span class="std std-ref">Command line reference</span></a> and <a class="reference internal" href="modref.html#chap-modref"><span class="std std-ref">Python module reference</span></a> provide
+detailed description of the commands and functions of the two interfaces.  This
+section presents common concepts.  Although examples will frequently be
+presented using command line interface commands, all functionality with
+identically named functions and options are available through Python API as
+well.</p>
+<section id="datasets">
+<h2>Datasets<a class="headerlink" href="#datasets" title="Permalink to this headline"></a></h2>
+<p>A DataLad <a class="reference internal" href="glossary.html#term-dataset"><span class="xref std std-term">dataset</span></a> is a Git repository that may or may not have a data
+<a class="reference internal" href="glossary.html#term-annex"><span class="xref std std-term">annex</span></a> that is used to manage data referenced in a dataset. In practice,
+most DataLad datasets will come with an annex.</p>
+<section id="types-of-ids-used-in-datasets">
+<h3>Types of IDs used in datasets<a class="headerlink" href="#types-of-ids-used-in-datasets" title="Permalink to this headline"></a></h3>
+<p>Four types of unique identifiers are used by DataLad to enable identification
+of different aspects of datasets and their components.</p>
+<dl class="simple">
+<dt>Dataset ID</dt><dd><p>A UUID that identifies a dataset as a whole across its entire history and
+flavors. This ID is stored in a dataset’s own configuration file
+(<code class="docutils literal notranslate"><span class="pre">&lt;dataset</span> <span class="pre">root&gt;/.datalad/config</span></code>) under the configuration key
+<code class="docutils literal notranslate"><span class="pre">datalad.dataset.id</span></code>.
+As this configuration is stored in a file that is part of the Git history of
+a dataset, this ID is identical for all “clones” of a dataset and across all
+its versions. If the purpose or scope of a dataset changes enough to warrant
+a new dataset ID, it can be changed by altering the dataset configuration
+setting.</p>
+</dd>
+<dt>Annex ID</dt><dd><p>A UUID assigned to an annex of each individual clone of a dataset repository.
+Git-annex uses this UUID to track file content availability information. The
+UUID is available under the configuration key <code class="docutils literal notranslate"><span class="pre">annex.uuid</span></code> and is stored
+in the configuration file of a local clone (<code class="docutils literal notranslate"><span class="pre">&lt;dataset</span> <span class="pre">root&gt;/.git/config</span></code>).
+A single dataset instance (i.e. clone) can only have a single annex UUID,
+but a dataset with multiple clones will have multiple annex UUIDs.</p>
+</dd>
+<dt>Commit ID</dt><dd><p>A Git hexsha or tag that identifies a version of a dataset. This ID uniquely
+identifies the content and history of a dataset up to its present state. As
+the dataset history also includes the dataset ID, a commit ID of a DataLad
+dataset is unique to a particular dataset.</p>
+</dd>
+<dt>Content ID</dt><dd><p>Git-annex key (typically a checksum) assigned to the content of a file in
+a dataset’s annex. The checksum reflects the content of a file, not its name.
+Hence the content of multiple identical files in a single (or across)
+dataset(s) will have the same checksum. Content IDs are managed by Git-annex
+in a dedicated <code class="docutils literal notranslate"><span class="pre">annex</span></code> branch of the dataset’s Git repository.</p>
+</dd>
+</dl>
+</section>
+<section id="dataset-nesting">
+<h3>Dataset nesting<a class="headerlink" href="#dataset-nesting" title="Permalink to this headline"></a></h3>
+<p>Datasets can contain other datasets (<a class="reference internal" href="glossary.html#term-subdataset"><span class="xref std std-term">subdataset</span></a>s), which can in turn
+contain subdatasets, and so on. There is no limit to the depth of nesting
+datasets. Each dataset in such a hierarchy has its own annex and its own
+history. The parent or <a class="reference internal" href="glossary.html#term-superdataset"><span class="xref std std-term">superdataset</span></a> only tracks the specific state of a
+subdataset, and information on where it can be obtained. This is a powerful yet
+lightweight mechanism for combining multiple individual datasets for a specific
+purpose, such as the combination of source code repositories with other
+resources for a tailored application. In many cases DataLad can work with a
+hierarchy of datasets just as if it were a single dataset. Here is a demo:</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~</span> % datalad create demo
+[<span class=" -Color -Color-BoldWhite">INFO   </span>] Creating a new annex repo at /demo/demo
+<span class=" -Color -Color-Bold">create</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+<span class=" -Color -Color-BoldCyan">~</span> % cd demo
+</pre></div>
+</div>
+<p>A DataLad dataset is just a Git repo with some initial configuration</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % git log --oneline
+<span class=" -Color -Color-Yellow">472e34b (</span><span class=" -Color -Color-BoldCyan">HEAD -&gt; </span><span class=" -Color -Color-BoldGreen">master</span><span class=" -Color -Color-Yellow">)</span> [DATALAD] new dataset
+<span class=" -Color -Color-Yellow">f968257</span> [DATALAD] Set default backend for all files to be MD5E
+</pre></div>
+</div>
+<p>We can generate nested datasets, by telling DataLad to register a
+new dataset in a parent dataset</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % datalad create -d . sub1
+[<span class=" -Color -Color-BoldWhite">INFO   </span>] Creating a new annex repo at /demo/demo/sub1
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">ok</span>): sub1 (<span class=" -Color -Color-BoldMagenta">dataset</span>) [added new subdataset]
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">notneeded</span>): sub1 (<span class=" -Color -Color-BoldMagenta">dataset</span>) [nothing to add from /demo/demo/sub1]
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">notneeded</span>): .gitmodules (<span class=" -Color -Color-BoldMagenta">file</span>) [already included in the dataset]
+<span class=" -Color -Color-Bold">save</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+<span class=" -Color -Color-Bold">create</span>(<span class=" -Color -Color-BoldGreen">ok</span>): sub1 (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+action summary:
+  add (notneeded: 2, ok: 1)
+  create (ok: 1)
+  save (ok: 1)
+</pre></div>
+</div>
+<p>A subdataset is nothing more than regular Git submodule</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % git submodule
+ 5f0cddf2026e3fb4864139f27e7415fd72c7d4d0 sub1 (heads/master)
+</pre></div>
+</div>
+<p>Of course subdatasets can be nested</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % datalad create -d . sub1/justadir/sub2
+[<span class=" -Color -Color-BoldWhite">INFO   </span>] Creating a new annex repo at /demo/demo/sub1/justadir/sub2
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">ok</span>): sub1/justadir/sub2 (<span class=" -Color -Color-BoldMagenta">dataset</span>) [added new subdataset]
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">notneeded</span>): sub1/justadir/sub2 (<span class=" -Color -Color-BoldMagenta">dataset</span>) [nothing to add from /demo/demo/sub1/justadir/sub2]
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">notneeded</span>): sub1/.gitmodules (<span class=" -Color -Color-BoldMagenta">file</span>) [already included in the dataset]
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">notneeded</span>): sub1 (<span class=" -Color -Color-BoldMagenta">dataset</span>) [already known subdataset]
+<span class=" -Color -Color-Bold">save</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo/sub1 (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+<span class=" -Color -Color-Bold">save</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+<span class=" -Color -Color-Bold">create</span>(<span class=" -Color -Color-BoldGreen">ok</span>): sub1/justadir/sub2 (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+action summary:
+  add (notneeded: 3, ok: 1)
+  create (ok: 1)
+  save (ok: 2)
+</pre></div>
+</div>
+<p>Unlike Git, DataLad automatically takes care of committing all
+changes associated with the added subdataset up to the given
+parent dataset</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % git status
+On branch master
+nothing to commit, working tree clean
+</pre></div>
+</div>
+<p>Let’s create some content in the deepest subdataset</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % mkdir sub1/justadir/sub2/anotherdir
+<span class=" -Color -Color-BoldCyan">~/demo</span> % touch sub1/justadir/sub2/anotherdir/afile
+</pre></div>
+</div>
+<p>Git can only tell us that something underneath the top-most
+subdataset was modified</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % git status
+On branch master
+Changes not staged for commit:
+  (use &quot;git add &lt;file&gt;...&quot; to update what will be committed)
+  (use &quot;git checkout -- &lt;file&gt;...&quot; to discard changes in working directory)
+  (commit or discard the untracked or modified content in submodules)
+
+     <span class=" -Color -Color-Red">modified:   sub1</span> (untracked content)
+
+no changes added to commit (use &quot;git add&quot; and/or &quot;git commit -a&quot;)
+</pre></div>
+</div>
+<p>DataLad saves us from further investigation</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % datalad diff -r
+   modified(dataset): sub1
+   modified(dataset): sub1/justadir/sub2
+untracked(directory): sub1/justadir/sub2/anotherdir
+</pre></div>
+</div>
+<p>Like Git, it can report individual untracked files, but also across
+repository boundaries</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % datalad diff -r --report-untracked all
+   modified(dataset): sub1
+   modified(dataset): sub1/justadir/sub2
+     untracked(file): sub1/justadir/sub2/anotherdir/afile
+</pre></div>
+</div>
+<p>Adding this new content with Git or git-annex would be an exercise</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % git add sub1/justadir/sub2/anotherdir/afile
+fatal: Pathspec &#39;sub1/justadir/sub2/anotherdir/afile&#39; is in submodule &#39;sub1&#39;
+</pre></div>
+</div>
+<p>DataLad does not require users to determine the correct repository
+in the tree</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % datalad add -d . sub1/justadir/sub2/anotherdir/afile
+<span class=" -Color -Color-Bold">add</span>(<span class=" -Color -Color-BoldGreen">ok</span>): sub1/justadir/sub2/anotherdir/afile (<span class=" -Color -Color-BoldMagenta">file</span>)
+<span class=" -Color -Color-Bold">save</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo/sub1/justadir/sub2 (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+<span class=" -Color -Color-Bold">save</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo/sub1 (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+<span class=" -Color -Color-Bold">save</span>(<span class=" -Color -Color-BoldGreen">ok</span>): /demo/demo (<span class=" -Color -Color-BoldMagenta">dataset</span>)
+action summary:
+  add (ok: 1)
+  save (ok: 3)
+</pre></div>
+</div>
+<p>Again, all associated changes in the entire dataset tree, up to
+the given parent dataset, were committed</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % git status
+On branch master
+nothing to commit, working tree clean
+</pre></div>
+</div>
+<p>DataLad’s ‘diff’ is able to report the changes from these related
+commits throughout the repository tree</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~/demo</span> % datalad diff --revision @~1 -r
+   modified(dataset): sub1
+   modified(dataset): sub1/justadir/sub2
+         added(file): sub1/justadir/sub2/anotherdir/afile
+</pre></div>
+</div>
+</section>
+<section id="dataset-collections">
+<h3>Dataset collections<a class="headerlink" href="#dataset-collections" title="Permalink to this headline"></a></h3>
+<p>A superdataset can also be seen as a curated collection of datasets, for example,
+for a certain data modality, a field of science, a certain author, or from
+one project (maybe the resource for a movie production). This lightweight
+coupling between super and subdatasets enables scenarios where individual datasets
+are maintained by a disjoint set of people, and the dataset collection itself can
+be curated by a completely independent entity. Any individual dataset can be
+part of any number of such collections.</p>
+<p>Benefiting from Git’s support for workflows based on decentralized “clones” of
+a repository, DataLad’s datasets can be (re-)published to a new location
+without loosing the connection between the “original” and the new “copy”. This
+is extremely useful for collaborative work, but also in more mundane scenarios
+such as data backup, or temporary deployment of a dataset on a compute cluster,
+or in the cloud.  Using git-annex, data can also get synchronized across
+different locations of a dataset (<a class="reference internal" href="glossary.html#term-sibling"><span class="xref std std-term">sibling</span></a>s in DataLad terminology).
+Using metadata tags, it is even possible to configure different levels of
+desired data redundancy across the network of dataset, or to prevent
+publication of sensitive data to publicly accessible repositories. Individual
+datasets in a hierarchy of (sub)datasets need not be stored at the same location.
+Continuing with an earlier example, it is possible to post a curated
+collection of datasets, as a superdataset, on Github, while the actual datasets
+live on different servers all around the world.</p>
+</section>
+</section>
+<section id="basic-command-line-usage">
+<h2>Basic command line usage<a class="headerlink" href="#basic-command-line-usage" title="Permalink to this headline"></a></h2>
+<p>All of DataLad’s functionality is available through a single command:
+<cite>datalad</cite></p>
+<p>Running the datalad command without any arguments, gives a summary
+of basic options, and a list of available sub-commands.</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~</span> % datalad
+usage: datalad [-h] [-l LEVEL] [-C PATH] [--version]
+               [--dbg] [--idbg] [-c KEY=VALUE]
+               [-f {default,json,json_pp,tailored,&#39;&lt;template&gt;&#39;}]
+               [--report-status {success,failure,ok,notneeded,impossible,error}]
+               [--report-type {dataset,file}]
+               [--on-failure {ignore,continue,stop}] [--cmd]
+               {create,install,get,publish,uninstall,drop,remove,update,create-sibling,create-sibling-github,unlock,save,search,metadata,aggregate-metadata,test,ls,clean,add-archive-content,download-url,run,rerun,addurls,export-archive,extract-metadata,export-to-figshare,no-annex,wtf,add-readme,annotate-paths,clone,create-test-dataset,diff,siblings,sshrun,subdatasets}
+               ...
+[<span class=" -Color -Color-BoldRed">ERROR  </span>] Please specify the command
+<span class=" -Color -Color-BoldCyan">~</span> % #
+</pre></div>
+</div>
+<p>More comprehensive information is available via the –help
+long-option (we will truncate the output here)</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~</span> % datalad --help       | head -n20
+Usage: datalad [global-opts] command [command-opts]
+
+DataLad provides a unified data distribution with the convenience of git-annex
+repositories as a backend.  DataLad command line tools allow to manipulate
+(obtain, create, update, publish, etc.) datasets and their collections.
+
+*Commands for dataset operations*
+
+  create
+      Create a new dataset from scratch
+  install
+      Install a dataset from a (remote) source
+  get
+      Get any dataset content (files/directories/subdatasets)
+  publish
+      Publish a dataset to a known sibling
+  uninstall
+      Uninstall subdatasets
+</pre></div>
+</div>
+<p>Getting information on any of the available sub commands works
+in the same way – just pass –help AFTER the sub-command (output
+again truncated)</p>
+<div class="highlight-ansi-color notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-BoldCyan">~</span> % datalad create --help       | head -n20
+Usage: datalad create [-h] [-f] [-D DESCRIPTION] [-d PATH] [--no-annex]
+                      [--nosave] [--annex-version ANNEX_VERSION]
+                      [--annex-backend ANNEX_BACKEND]
+                      [--native-metadata-type LABEL] [--shared-access MODE]
+                      [--git-opts STRING] [--annex-opts STRING]
+                      [--annex-init-opts STRING] [--text-no-annex]
+                      [PATH]
+
+Create a new dataset from scratch.
+
+This command initializes a new dataset at a given location, or the
+current directory. The new dataset can optionally be registered in an
+existing superdataset (the new dataset&#39;s path needs to be located
+within the superdataset for that, and the superdataset needs to be given
+explicitly). It is recommended to provide a brief description to label
+the dataset&#39;s nature *and* location, e.g. &quot;Michael&#39;s music on black
+laptop&quot;. This helps humans to identify data locations in distributed
+scenarios.  By default an identifier comprised of user and machine name,
+plus path will be generated.
+</pre></div>
+</div>
+</section>
+<section id="api-principles">
+<h2>API principles<a class="headerlink" href="#api-principles" title="Permalink to this headline"></a></h2>
+<p>You can use DataLad’s <code class="docutils literal notranslate"><span class="pre">install</span></code> command to download datasets. The command accepts
+URLs of different protocols (<code class="docutils literal notranslate"><span class="pre">http</span></code>, <code class="docutils literal notranslate"><span class="pre">ssh</span></code>) as an argument. Nevertheless, the easiest way
+to obtain a first dataset is downloading the default <a class="reference internal" href="glossary.html#term-superdataset"><span class="xref std std-term">superdataset</span></a> from
+<a class="reference external" href="https://datasets.datalad.org/">https://datasets.datalad.org/</a> using a shortcut.</p>
+<section id="downloading-datalad-s-default-superdataset">
+<h3>Downloading DataLad’s default superdataset<a class="headerlink" href="#downloading-datalad-s-default-superdataset" title="Permalink to this headline"></a></h3>
+<p><a class="reference external" href="https://datasets.datalad.org">https://datasets.datalad.org</a> provides a super-dataset consisting of datasets
+from various portals and sites.  Many of them were crawled, and periodically
+updated, using <a class="reference external" href="https://github.com/datalad/datalad-crawler">datalad-crawler</a>
+extension.  The argument <code class="docutils literal notranslate"><span class="pre">///</span></code> can be used
+as a shortcut that points to the superdataset located at <a class="reference external" href="https://datasets.datalad.org/">https://datasets.datalad.org/</a>.
+Here are three common examples in command line notation:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">///</span></code></dt><dd><p>installs this superdataset (metadata without subdatasets) in a
+<cite>datasets.datalad.org/</cite> subdirectory under the current directory</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">///openfmri</span></code></dt><dd><p>installs the openfmri superdataset into an <cite>openfmri/</cite> subdirectory.
+Additionally, the <code class="docutils literal notranslate"><span class="pre">-r</span></code> flag recursively downloads all metadata of datasets
+available from <a class="reference external" href="http://openfmri.org">http://openfmri.org</a> as subdatasets into the <cite>openfmri/</cite> subdirectory</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">-g</span> <span class="pre">-J3</span> <span class="pre">-r</span> <span class="pre">///labs/haxby</span></code></dt><dd><p>installs the superdataset of datasets released by the lab of Dr. James V. Haxby
+and all subdatasets’ metadata. The <code class="docutils literal notranslate"><span class="pre">-g</span></code> flag indicates getting the actual data, too.
+It does so by using 3 parallel download processes (<code class="docutils literal notranslate"><span class="pre">-J3</span></code> flag).</p>
+</dd>
+</dl>
+<p><a class="reference internal" href="generated/man/datalad-search.html#man-datalad-search"><span class="std std-ref">datalad search</span></a> command, if ran outside of any dataset,
+will install this default superdataset under a path specified in
+<code class="docutils literal notranslate"><span class="pre">datalad.locations.default-dataset</span></code> <a class="reference internal" href="config.html#configuration"><span class="std std-ref">configuration</span></a>
+variable (by default <code class="docutils literal notranslate"><span class="pre">$HOME/datalad</span></code>).</p>
+</section>
+<section id="downloading-datasets-via-http">
+<h3>Downloading datasets via http<a class="headerlink" href="#downloading-datasets-via-http" title="Permalink to this headline"></a></h3>
+<p>In most places where DataLad accepts URLs as arguments these URLs can be
+regular <code class="docutils literal notranslate"><span class="pre">http</span></code> or <code class="docutils literal notranslate"><span class="pre">https</span></code> protocol URLs. For example:</p>
+<p><code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">https://github.com/psychoinformatics-de/studyforrest-data-phase2.git</span></code></p>
+</section>
+<section id="downloading-datasets-via-ssh">
+<h3>Downloading datasets via ssh<a class="headerlink" href="#downloading-datasets-via-ssh" title="Permalink to this headline"></a></h3>
+<p>DataLad also supports SSH URLs, such as <code class="docutils literal notranslate"><span class="pre">ssh://me&#64;localhost/path</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">ssh://me&#64;localhost/path</span></code></p>
+<p>Finally, DataLad supports SSH login style resource identifiers, such as <code class="docutils literal notranslate"><span class="pre">me&#64;localhost:/path</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">me&#64;localhost:/path</span></code></p>
+</section>
+<section id="commands-install-vs-get">
+<h3>Commands <cite>install</cite> vs <cite>get</cite><a class="headerlink" href="#commands-install-vs-get" title="Permalink to this headline"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">install</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code> commands might seem confusingly similar at first.
+Both of them could be used to install any number of subdatasets, and fetch
+content of the data files.  Differences lie primarily in their default
+behaviour and outputs, and thus intended use.  Both <code class="docutils literal notranslate"><span class="pre">install</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code>
+take local paths as their arguments, but their default behavior and output
+might differ;</p>
+<ul class="simple">
+<li><p><strong>install</strong> primarily operates and reports at the level of <strong>datasets</strong>, and
+returns as a result dataset(s)
+which either were just installed, or were installed previously already under
+specified locations.   So result should be the same if the same <code class="docutils literal notranslate"><span class="pre">install</span></code>
+command ran twice on the same datasets.  It <strong>does not fetch</strong> data files by
+default</p></li>
+<li><p><strong>get</strong> primarily operates at the level of <strong>paths</strong> (datasets, directories, and/or
+files). As a result it returns only what was installed (datasets) or fetched
+(files).  So result of rerunning the same <code class="docutils literal notranslate"><span class="pre">get</span></code> command should report that
+nothing new was installed or fetched.  It <strong>fetches</strong> data files by default.</p></li>
+</ul>
+<p>In how both commands operate on provided paths, it could be said that <code class="docutils literal notranslate"><span class="pre">install</span>
+<span class="pre">==</span> <span class="pre">get</span> <span class="pre">-n</span></code>, and <code class="docutils literal notranslate"><span class="pre">install</span> <span class="pre">-g</span> <span class="pre">==</span> <span class="pre">get</span></code>.  But <code class="docutils literal notranslate"><span class="pre">install</span></code> also has ability to
+install new datasets from remote locations given their URLs (e.g.,
+<code class="docutils literal notranslate"><span class="pre">https://datasets.datalad.org/</span></code> for our super-dataset) and SSH targets (e.g.,
+<code class="docutils literal notranslate"><span class="pre">[login&#64;]host:path</span></code>) if they are provided as the argument to its call or
+explicitly as <code class="docutils literal notranslate"><span class="pre">--source</span></code> option.  If <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">--source</span> <span class="pre">URL</span>
+<span class="pre">DESTINATION</span></code> (command line example) is used, then dataset from URL gets
+installed under PATH. In case of <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">install</span> <span class="pre">URL</span></code> invocation, PATH is
+taken from the last name within URL similar to how <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">clone</span></code> does it.  If
+former specification allows to specify only a single URL and a PATH at a time,
+later one can take multiple remote locations from which datasets could be
+installed.</p>
+<p>So, as a rule of thumb – if you want to install from external URL or fetch a
+sub-dataset without downloading data files stored under annex – use <code class="docutils literal notranslate"><span class="pre">install</span></code>.
+In Python API <code class="docutils literal notranslate"><span class="pre">install</span></code> is also to be used when you want to receive in output the
+corresponding Dataset object to operate on, and be able to use it even if you
+rerun the script. In all other cases, use <code class="docutils literal notranslate"><span class="pre">get</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="related.html" class="btn btn-neutral float-left" title="Delineation from related solutions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="credentials.html" class="btn btn-neutral float-right" title="Credentials" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

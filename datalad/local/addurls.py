@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -32,7 +32,7 @@ from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.utils import (
-    default_result_renderer,
+    generic_result_renderer,
     render_action_summary,
 )
 from datalad.interface.results import annexjson2result, get_status_dict
@@ -875,9 +875,9 @@ class RegisterUrl(object):
         self.repo = repo or ds.repo
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
-        self.use_pointer = repo.is_managed_branch()
+        self.use_pointer = self.repo.is_managed_branch()
         self._avoid_fromkey = self.use_pointer and \
-            not repo._check_version_kludges("fromkey-supports-unlocked")
+            not self.repo._check_version_kludges("fromkey-supports-unlocked")
 
     def examinekey(self, parsed_key, filename, migrate=False):
         opts = []
@@ -961,13 +961,21 @@ class BatchedRegisterUrl(RegisterUrl):
         super().__init__(ds, repo)
         self._batch_commands = {}
 
-    def _batch(self, command, batch_input,
-               output_proc=None, json=False, batch_options=None):
+    def _batch(self,
+               command,
+               batch_input,
+               output_proc=None,
+               json=False,
+               batch_options=None):
+
         bcmd = self._batch_commands.get(command)
         if not bcmd:
             repo = self.repo
             bcmd = repo._batched.get(
-                command, path=repo.path, json=json, output_proc=output_proc,
+                codename=command,
+                path=repo.path,
+                json=json,
+                output_proc=output_proc,
                 annex_options=batch_options)
             self._batch_commands[command] = bcmd
         return bcmd(batch_input)
@@ -1306,7 +1314,9 @@ class Addurls(Interface):
     @staticmethod
     @datasetmethod(name='addurls')
     @eval_results
-    def __call__(dataset, urlfile, urlformat, filenameformat,
+    def __call__(urlfile, urlformat, filenameformat,
+                 *,
+                 dataset=None,
                  input_type="ext", exclude_autometa=None, meta=None, key=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
@@ -1414,6 +1424,7 @@ class Addurls(Interface):
             yield from ds.create(
                 result_xfm=None,
                 return_type='generator',
+                result_renderer='disabled',
                 cfg_proc=cfg_proc)
 
         annex_options = ["--fast"] if fast else []
@@ -1451,6 +1462,7 @@ class Addurls(Interface):
             else:
                 for res in subds.create(result_xfm=None,
                                         cfg_proc=cfg_proc,
+                                        result_renderer='disabled',
                                         return_type='generator'):
                     if res.get("action") == "create":
                         res["addurls.refds"] = ds_path
@@ -1565,6 +1577,7 @@ filename_format='{filenameformat}'"""
                 list(files_to_add),
                 message=message_addurls,
                 jobs=jobs,
+                result_renderer='disabled',
                 return_type='generator')
 
     @staticmethod
@@ -1572,7 +1585,7 @@ filename_format='{filenameformat}'"""
         refds = res.get("addurls.refds")
         if refds:
             res = dict(res, refds=refds)
-        default_result_renderer(res)
+        generic_result_renderer(res)
 
     custom_result_summary_renderer_pass_summary = True
 

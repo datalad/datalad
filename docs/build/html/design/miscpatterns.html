@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miscellaneous patterns &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Exception handling" href="exception_handling.html" />
+    <link rel="prev" title="Python import statements" href="python_imports.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Miscellaneous patterns</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#generator-methods-in-repo-classes">Generator methods in <cite>Repo</cite> classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#calls-to-git-commands">Calls to Git commands</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#command-examples">Command examples</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>Miscellaneous patterns</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="miscellaneous-patterns">
+<span id="chap-designpatterns"></span><h1>Miscellaneous patterns<a class="headerlink" href="#miscellaneous-patterns" title="Permalink to this headline"></a></h1>
+<p>DataLad is the result of a distributed and collaborative development effort
+over many years.  During this time the scope of the project has changed
+multiple times. As a consequence, the API and employed technologies have been
+adjusted repeatedly.  Depending on the age of a piece of code, a clear software
+design is not always immediately visible. This section documents a few design
+patterns that the project strives to adopt at present. Changes to existing code
+and new contributions should follow these guidelines.</p>
+<section id="generator-methods-in-repo-classes">
+<h2>Generator methods in <cite>Repo</cite> classes<a class="headerlink" href="#generator-methods-in-repo-classes" title="Permalink to this headline"></a></h2>
+<p>Substantial parts of DataLad are implemented to behave like Python generators
+in order to be maximally responsive when processing long-running tasks. This
+included methods of the core API classes
+<a class="reference internal" href="../generated/datalad.support.gitrepo.html#datalad.support.gitrepo.GitRepo" title="datalad.support.gitrepo.GitRepo"><code class="xref py py-class docutils literal notranslate"><span class="pre">GitRepo</span></code></a> and
+<a class="reference internal" href="../generated/datalad.support.annexrepo.html#datalad.support.annexrepo.AnnexRepo" title="datalad.support.annexrepo.AnnexRepo"><code class="xref py py-class docutils literal notranslate"><span class="pre">AnnexRepo</span></code></a>. By convention, such methods
+carry a trailing <cite>_</cite> in their name. In some cases, sibling methods with the
+same name, but without the trailing underscore are provided. These behave like
+their generator-equivalent, but eventually return an iterable once processing
+is fully completed.</p>
+</section>
+<section id="calls-to-git-commands">
+<h2>Calls to Git commands<a class="headerlink" href="#calls-to-git-commands" title="Permalink to this headline"></a></h2>
+<p>DataLad is built on Git, so calls to Git commands are a key element of the code
+base. All such calls should be made through methods of the
+<a class="reference internal" href="../generated/datalad.support.gitrepo.html#datalad.support.gitrepo.GitRepo" title="datalad.support.gitrepo.GitRepo"><code class="xref py py-class docutils literal notranslate"><span class="pre">GitRepo</span></code></a> class.  This is necessary, as only
+there it is made sure that Git operates under the desired conditions
+(environment configuration, etc.).</p>
+<p>For some functionality, for example querying and manipulating <cite>gitattributes</cite>,
+dedicated methods are provided. However, in many cases simple one-off calls to
+get specific information from Git, or trigger certain operations are needed.
+For these purposes the <a class="reference internal" href="../generated/datalad.support.gitrepo.html#datalad.support.gitrepo.GitRepo" title="datalad.support.gitrepo.GitRepo"><code class="xref py py-class docutils literal notranslate"><span class="pre">GitRepo</span></code></a> class provides
+a set of convenience methods aiming to cover use cases requiring particular
+return values:</p>
+<ul class="simple">
+<li><p>test success of a command:
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">call_git_success()</span></code></p></li>
+<li><p>obtain <cite>stdout</cite> of a command:
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">call_git()</span></code></p></li>
+<li><p>obtain a single output line:
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">call_git_oneline()</span></code></p></li>
+<li><p>obtain items from output split by a separator:
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">call_git_items_()</span></code></p></li>
+</ul>
+<p>All these methods take care of raising appropriate exceptions when expected
+conditions are not met. Whenever desired functionality can be achieved
+using simple custom calls to Git via these methods, their use is preferred
+over the implementation of additional, dedicated wrapper methods.</p>
+</section>
+<section id="command-examples">
+<h2>Command examples<a class="headerlink" href="#command-examples" title="Permalink to this headline"></a></h2>
+<p>Examples of Python and commandline invocations of DataLad’s user-oriented
+commands are defined in the class of the respective command as dictionaries
+within <cite>_examples_</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">_examples_</span> <span class="o">=</span> <span class="p">[</span>
+ <span class="nb">dict</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;Create a dataset &#39;mydataset&#39; in the current directory&quot;&quot;&quot;</span><span class="p">,</span>
+      <span class="n">code_py</span><span class="o">=</span><span class="s2">&quot;create(path=&#39;mydataset&#39;)&quot;</span><span class="p">,</span>
+      <span class="n">code_cmd</span><span class="o">=</span><span class="s2">&quot;datalad create mydataset&quot;</span><span class="p">,</span>
+ <span class="nb">dict</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;Apply the text2git procedure upon creation of a dataset&quot;&quot;&quot;</span><span class="p">,</span>
+      <span class="n">code_py</span><span class="o">=</span><span class="s2">&quot;create(path=&#39;mydataset&#39;, cfg_proc=&#39;text2git&#39;)&quot;</span><span class="p">,</span>
+      <span class="n">code_cmd</span><span class="o">=</span><span class="s2">&quot;datalad create -c text2git mydataset&quot;</span><span class="p">)</span>
+      <span class="p">]</span>
+</pre></div>
+</div>
+<p>The formatting of code lines is preserved. Changes to existing examples and
+new contributions should provide examples for Python and commandline API, as
+well as a concise description.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="python_imports.html" class="btn btn-neutral float-left" title="Python import statements" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="exception_handling.html" class="btn btn-neutral float-right" title="Exception handling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -14,38 +14,35 @@ Note: Tests of `run` that involve `rerun` are in interface.tests.test_run.
 __docformat__ = 'restructuredtext'
 
 import logging
-
 import os
 import os.path as op
+import sys
 from os import (
     mkdir,
     remove,
 )
-import sys
-
 from unittest.mock import patch
 
-from datalad.utils import (
-    chpwd,
-    ensure_unicode,
-    on_windows,
-)
-
-from datalad.cmdline.main import main
-from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import (
-    CommandError,
-    NoDatasetFound,
-    IncompleteResultsError,
-)
 from datalad.api import (
+    clone,
     run,
 )
+from datalad.cli.main import main
 from datalad.core.local.run import (
+    _format_iospecs,
+    _get_substitutions,
     format_command,
     run_command,
 )
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+    NoDatasetFound,
+)
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    OBSCURE_FILENAME,
     assert_false,
     assert_in,
     assert_in_results,
@@ -56,21 +53,25 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
-    known_failure_githubci_win,
     known_failure_windows,
     neq_,
-    OBSCURE_FILENAME,
     ok_,
     ok_exists,
     ok_file_has_content,
+    patch_config,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
+from datalad.utils import (
+    chpwd,
+    ensure_unicode,
+    on_windows,
+)
+
+cat_command = 'cat' if not on_windows else 'type'
 
 
 @with_tempfile(mkdir=True)
@@ -99,15 +100,17 @@ def test_basics(path, nodspath):
     with chpwd(path), \
             swallow_outputs():
         # provoke command failure
-        with assert_raises(CommandError) as cme:
-            ds.run('7i3amhmuch9invalid')
+        res = ds.run('7i3amhmuch9invalid', on_failure="ignore",
+                     result_renderer=None)
+        assert_result_count(res, 1, action="run", status="error")
+        run_res = [r for r in res if r["action"] == "run"][0]
         # let's not speculate that the exit code is always 127
-        ok_(cme.exception.code > 0)
+        ok_(run_res["run_info"]["exit"] > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('cd .> empty', message='TEST')
         assert_repo_status(ds.path)
-        assert_result_count(res, 2)
+        assert_result_count(res, 3)
         # TODO 'state' is still untracked!!!
         assert_result_count(res, 1, action='add',
                             path=op.join(ds.path, 'empty'), type='file')
@@ -142,6 +145,33 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+    # running without a command is a noop
+    with chpwd(path):
+        with swallow_logs(new_level=logging.INFO) as cml:
+            assert_raises(
+                IncompleteResultsError,
+                ds.run,
+                '7i3amhmuch9invalid',
+                # this is on_failure=stop by default
+            )
+            # must give recovery hint in Python notation
+            assert_in("can save the changes with \"Dataset(", cml.out)
+
+    with chpwd(path):
+        # make sure that an invalid input declaration prevents command
+        # execution by default
+        assert_raises(
+            IncompleteResultsError,
+            ds.run, 'cd .> dummy0', inputs=['not-here'])
+        ok_(not (ds.pathobj / 'dummy0').exists())
+        # but the default behavior can be changed
+        assert_raises(
+            IncompleteResultsError,
+            ds.run, 'cd .> dummy0', inputs=['not-here'],
+            on_failure='continue')
+        # it has stilled failed, but the command got executed nevertheless
+        ok_((ds.pathobj / 'dummy0').exists())
+
 
 @known_failure_windows
 # ^ For an unknown reason, appveyor started failing after we removed
@@ -175,8 +205,9 @@ def test_py2_unicode_command(path):
         assert_repo_status(ds.path)
         ok_exists(op.join(path, u" β1 "))
 
-    with assert_raises(CommandError), swallow_outputs():
-        ds.run(u"bβ2.dat")
+    assert_in_results(
+        ds.run(u"bβ2.dat", result_renderer=None, on_failure="ignore"),
+        status="error", action="run")
 
 
 @with_tempfile(mkdir=True)
@@ -186,19 +217,19 @@ def test_sidecar(path):
     ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    ds.config.set("datalad.run.record-sidecar", "false", where="local")
+    ds.config.set("datalad.run.record-sidecar", "false", scope="local")
     ds.run("cd .> dummy1", message="sidecar config")
 
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
-    ds.config.set("datalad.run.record-sidecar", "true", where="local")
+    ds.config.set("datalad.run.record-sidecar", "true", scope="local")
     ds.run("cd .> dummy2", message="sidecar config")
     assert_not_in('"cmd":', last_commit_msg(ds.repo))
 
     # Don't break when config.get() returns multiple values. Here it's two
     # values in .gitconfig, but a more realistic scenario is a value in
     # $repo/.git/config that overrides a setting in ~/.config/git/config.
-    ds.config.add("datalad.run.record-sidecar", "false", where="local")
+    ds.config.add("datalad.run.record-sidecar", "false", scope="local")
     ds.run("cd .> dummy3", message="sidecar config")
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
@@ -295,8 +326,10 @@ def test_run_assume_ready(path):
     ds.drop("f1", check=False)
     if not adjusted:
         # If the input is not actually ready, the command will fail.
-        with assert_raises(CommandError):
-            ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs")
+        assert_in_results(
+            ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs",
+                   on_failure="ignore", result_renderer=None),
+            action="run", status="error")
 
     # --assume-ready=outputs
 
@@ -335,12 +368,13 @@ def test_run_assume_ready(path):
     assert_not_in_results(res, action="unlock", type="file")
 
 
-# unexpected content of state "modified", likely a more fundamental issue with the
-# testrepo setup
-@known_failure_githubci_win
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_run_explicit(path):
-    ds = Dataset(path)
+@with_tempfile()
+@with_tempfile()
+def test_run_explicit(origpath, path):
+    origds = Dataset(origpath).create()
+    (origds.pathobj / "test-annex.dat").write_text('content')
+    origds.save()
+    ds = clone(origpath, path)
 
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
@@ -351,16 +385,18 @@ def test_run_explicit(path):
         ofh.write(", more")
 
     # We need explicit=True to run with dirty repo.
-    assert_status("impossible",
-                  ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-                         inputs=["test-annex.dat"],
-                         on_failure="ignore"))
+    assert_status(
+        "impossible",
+        ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
+               inputs=["test-annex.dat"],
+               on_failure="ignore"))
 
     hexsha_initial = ds.repo.get_hexsha()
     # If we specify test-annex.dat as an input, it will be retrieved before the
     # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-           inputs=["test-annex.dat"], explicit=True)
+    ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
+           inputs=["test-annex.dat"], explicit=True,
+           result_renderer='disabled')
     ok_(ds.repo.file_has_content("test-annex.dat"))
     # We didn't commit anything because outputs weren't specified.
     assert_false(ds.repo.file_has_content("doubled.dat"))
@@ -369,27 +405,28 @@ def test_run_explicit(path):
     # If an input doesn't exist, we just show the standard warning.
     with assert_raises(IncompleteResultsError):
         ds.run("ls", inputs=["not-there"], explicit=True,
-               on_failure="stop")
+               on_failure="stop", result_renderer='disabled')
 
     remove(op.join(path, "doubled.dat"))
 
     hexsha_initial = ds.repo.get_hexsha()
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.run(f"{cat_command} test-annex.dat test-annex.dat >doubled.dat",
            inputs=["test-annex.dat"], outputs=["doubled.dat"],
-           explicit=True)
+           explicit=True, result_renderer='disabled')
     ok_(ds.repo.file_has_content("doubled.dat"))
-    assert_repo_status(ds.path, modified=["dirt_modified"], untracked=['dirt_untracked'])
+    assert_repo_status(ds.path, modified=["dirt_modified"],
+                       untracked=['dirt_untracked'])
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
     # Saving explicit outputs works from subdirectories.
     subdir = op.join(path, "subdir")
     mkdir(subdir)
     with chpwd(subdir):
-        run("echo insubdir >foo", explicit=True, outputs=["foo"])
+        run("echo insubdir >foo", explicit=True, outputs=["foo"],
+            result_renderer='disabled')
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 
-@known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
@@ -461,7 +498,7 @@ def test_run_cmdline_disambiguation(path):
                 main(["datalad", "run", "--", "--message"])
             exec_cmd.assert_called_once_with(
                 '"--message"' if on_windows else "--message",
-                path, expected_exit=None)
+                path)
 
         # Our parser used to mishandle --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
@@ -473,7 +510,7 @@ def test_run_cmdline_disambiguation(path):
                     main(["datalad", "run"] + sep + ["echo", "--version"])
                 exec_cmd.assert_called_once_with(
                     '"echo" "--version"' if on_windows else "echo --version",
-                    path, expected_exit=None)
+                    path)
 
 
 @with_tempfile(mkdir=True)
@@ -546,7 +583,7 @@ def test_run_remove_keeps_leading_directory(path):
 
     assert_in_results(
         ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
-               result_renderer=None),
+               result_renderer='disabled'),
         action="run.remove", status="ok")
 
     assert_repo_status(ds.path)
@@ -556,7 +593,7 @@ def test_run_remove_keeps_leading_directory(path):
     repo.drop(output_rel, options=["--force"])
     assert_in_results(
         ds.run("cd .> something-else", outputs=[output_rel],
-               result_renderer=None),
+               result_renderer='disabled'),
         action="run.remove", status="ok")
     assert_repo_status(ds.path)
 
@@ -634,6 +671,9 @@ def test_dry_run(path):
 
     ds.save()
 
+    # unknown dry-run mode
+    assert_raises(ValueError, ds.run, 'blah', dry_run='absurd')
+
     with swallow_outputs() as cmo:
         ds.run("blah ", dry_run="basic")
         assert_in("Dry run", cmo.out)
@@ -677,8 +717,67 @@ def test_dry_run(path):
             cmo.out)
 
     # However, a dry run will not do the install/reglob procedure.
-    ds.uninstall("sub", check=False)
+    ds.drop("sub", what='all', reckless='kill', recursive=True)
     with swallow_outputs() as cmo:
         ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
         assert_in("sub/b*", cmo.out)
         assert_not_in("baz", cmo.out)
+
+
+@with_tree(tree={OBSCURE_FILENAME + ".t": "obscure",
+                 "normal.txt": "normal"})
+def test_io_substitution(path):
+    files = [OBSCURE_FILENAME + ".t", "normal.txt"]
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    # prefix the content of any given file with 'mod::'
+    cmd = "import sys; from pathlib import Path; t = [(Path(p), 'mod::' + Path(p).read_text()) for p in sys.argv[1:]]; [k.write_text(v) for k, v in t]"
+    cmd_str = "{} -c \"{}\" {{inputs}}".format(sys.executable, cmd)
+    # this should run and not crash with permission denied
+    ds.run(cmd_str, inputs=["{outputs}"], outputs=["*.t*"],
+           result_renderer='disabled')
+    # all filecontent got the prefix
+    for f in files:
+        ok_((ds.pathobj / f).read_text().startswith('mod::'))
+
+    # we could just ds.rerun() now, and it should work, but this would make
+    # rerun be a dependency of a core test
+    # instead just double-run, but with a non-list input-spec.
+    # should have same outcome
+    ds.run(cmd_str, inputs="{outputs}", outputs="*.t*",
+           result_renderer='disabled')
+    for f in files:
+        ok_((ds.pathobj / f).read_text().startswith('mod::mod::'))
+
+
+def test_format_iospecs():
+    seq = ['one', 'two']
+    eq_(seq, _format_iospecs(['{dummy}'], dummy=seq))
+    # garbage when combined with longer spec-sequences
+    # but this is unavoidable without introducing a whitelist
+    # of supported value types -- which would limit flexibility
+    eq_(["['one', 'two']", 'other'],
+        _format_iospecs(['{dummy}', 'other'], dummy=seq))
+
+
+def test_substitution_config():
+    # use a shim to avoid having to create an actual dataset
+    # the tested function only needs a `ds.config` to be a ConfigManager
+    from datalad import cfg
+
+    class dset:
+        config = cfg
+
+    # empty be default
+    eq_(_get_substitutions(dset), {})
+    # basic access
+    with patch_config({"datalad.run.substitutions.dummy": 'ork'}):
+        eq_(_get_substitutions(dset), dict(dummy='ork'))
+    # can report multi-value
+    with patch_config({"datalad.run.substitutions.dummy": ['a', 'b']}):
+        eq_(_get_substitutions(dset), dict(dummy=['a', 'b']))
+
+        # verify combo with iospec formatting
+        eq_(_format_iospecs(['{dummy}'],
+                            **_get_substitutions(dset)),
+            ['a', 'b'])

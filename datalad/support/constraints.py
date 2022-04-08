@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -29,6 +29,19 @@ def _type_str(t):
         s = ' or '.join(map(_type_str, t))
         return ("(%s)" % s) if len(t) > 1 else s
     return _strip_typerepr(str(t))
+
+
+class _NoneDeprecated:
+    """A helper construct to ease migrations for option=None.
+
+    Should be instantiated, so it gains `__repr__` and thus would render nicely
+    in docs etc.
+    """
+    def __repr__(self):
+        return 'None(DEPRECATED)'
+
+
+NoneDeprecated = _NoneDeprecated()
 
 
 class Constraint(object):
@@ -244,7 +257,7 @@ class EnsureStrPrefix(EnsureStr):
 class EnsureNone(Constraint):
     """Ensure an input is of value `None`"""
     def __call__(self, value):
-        if value is None:
+        if value is None or isinstance(value, _NoneDeprecated):
             return None
         else:
             raise ValueError("value must be `None`")
@@ -364,7 +377,31 @@ class EnsureRange(Constraint):
         return None
 
 
-class AltConstraints(Constraint):
+class _MultiConstraint(Constraint):
+    """Helper class to override the description methods to reported
+    multiple constraints
+    """
+    def _get_description(self, attr):
+        cs = [
+            getattr(c, attr)()
+            for c in self.constraints
+            if hasattr(c, attr)
+        ]
+        cs = [c for c in cs if c is not None]
+        doc = ' or '.join(cs)
+        if len(cs) > 1:
+            return f'({doc})'
+        else:
+            return doc
+
+    def long_description(self):
+        return self._get_description('long_description')
+
+    def short_description(self):
+        return self._get_description('short_description')
+
+
+class AltConstraints(_MultiConstraint):
     """Logical OR for constraints.
 
     An arbitrary number of constraints can be given. They are evaluated in the
@@ -400,25 +437,8 @@ class AltConstraints(Constraint):
         raise ValueError("all alternative constraints (%s) violated while testing value %r"
                          % (self.constraints, value))
 
-    def long_description(self):
-        cs = [c.long_description() for c in self.constraints if hasattr(c, 'long_description')]
-        doc = ', or '.join(cs)
-        if len(cs) > 1:
-            return '(%s)' % doc
-        else:
-            return doc
 
-    def short_description(self):
-        cs = [c.short_description() for c in self.constraints
-              if hasattr(c, 'short_description') and not c.short_description() is None]
-        doc = ' or '.join(cs)
-        if len(cs) > 1:
-            return '(%s)' % doc
-        else:
-            return doc
-
-
-class Constraints(Constraint):
+class Constraints(_MultiConstraint):
     """Logical AND for constraints.
 
     An arbitrary number of constraints can be given. They are evaluated in the
@@ -450,22 +470,6 @@ class Constraints(Constraint):
             value = c(value)
         return value
 
-    def long_description(self):
-        cs = [c.long_description() for c in self.constraints if hasattr(c, 'long_description')]
-        doc = ', and '.join(cs)
-        if len(cs) > 1:
-            return '(%s)' % doc
-        else:
-            return doc
-
-    def short_description(self):
-        cs = [c.short_description() for c in self.constraints
-              if hasattr(c, 'short_description') and not c.short_description() is None]
-        doc = ' and '.join(cs)
-        if len(cs) > 1:
-            return '(%s)' % doc
-        else:
-            return doc
 
 constraint_spec_map = {
     'float': EnsureFloat(),

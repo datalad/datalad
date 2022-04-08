@@ -96,6 +96,8 @@ def test_none():
     c = ct.EnsureNone()
     # this should always work
     assert_equal(c(None), None)
+    # instance of NoneDeprecated is also None
+    assert_equal(c(ct.NoneDeprecated), None)
     # this should always fail
     assert_raises(ValueError, lambda: c('None'))
     assert_raises(ValueError, lambda: c([]))

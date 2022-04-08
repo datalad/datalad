@@ -1,5 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -15,7 +15,6 @@ from datalad.support.param import Parameter
 from datalad.support import constraints as cnstr
 from datalad.interface.base import (
     get_api_name,
-    get_cmdline_command_name,
     Interface,
 )
 
@@ -87,7 +86,8 @@ def test_interface():
     import argparse
     parser = argparse.ArgumentParser()
 
-    di.setup_parser(parser)
+    from datalad.cli.parser import setup_parser_for_interface
+    setup_parser_for_interface(parser, di)
     with swallow_outputs() as cmo:
         assert_equal(parser.print_help(), None)
         assert(cmo.out)
@@ -131,19 +131,3 @@ def test_name_generation():
                       "cmdline_override",
                       "api_override-dont-touch")),
         "api_override-dont-touch")
-    assert_equal(
-        get_cmdline_command_name(("some.module_something", "SomeClass")),
-        "module-something")
-    assert_equal(
-        get_cmdline_command_name((
-            "some.module_something",
-            "SomeClass",
-            "override")),
-        "override")
-    assert_equal(
-        get_cmdline_command_name((
-            "some.module_something",
-            "SomeClass",
-            "override",
-            "api_ignore")),
-        "override")

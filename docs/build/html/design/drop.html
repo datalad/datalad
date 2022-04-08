@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drop dataset components &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Python import statements" href="python_imports.html" />
+    <link rel="prev" title="Log levels" href="log_levels.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Drop dataset components</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#use-cases">Use cases</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>Drop dataset components</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="drop-dataset-components">
+<span id="chap-design-drop"></span><h1>Drop dataset components<a class="headerlink" href="#drop-dataset-components" title="Permalink to this headline"></a></h1>
+<div class="topic">
+<p class="topic-title">Specification scope and status</p>
+<p>This specification is a proposal, subject to review and further discussion.
+It is now partially implemented in the <cite>drop</cite> command.</p>
+</div>
+<p>§1 The <strong class="command">drop</strong> command is the antagonist of <strong class="command">get</strong>. Whatever a
+<cite>drop</cite> can do, should be undoable by a subsequent <strong class="command">get</strong> (given
+unchanged remote availability).</p>
+<p>§2 Like <strong class="command">get</strong>, <strong class="command">drop</strong> primarily operates on a mandatory path
+specification (to discover relevant files and sudatasets to operate on).</p>
+<p>§3 <strong class="command">drop</strong> has <code class="docutils literal notranslate"><span class="pre">--what</span></code> parameter that serves as an extensible
+“mode-switch” to cover all relevant scenarios, like ‘drop all file content in
+the work-tree’ (e.g. <code class="docutils literal notranslate"><span class="pre">--what</span> <span class="pre">files</span></code>, default, <a class="reference external" href="https://github.com/datalad/datalad/issues/5858">#5858</a>), ‘drop all keys from any
+branch’ (i.e. <code class="docutils literal notranslate"><span class="pre">--what</span> <span class="pre">allkeys</span></code>, <a class="reference external" href="https://github.com/datalad/datalad/issues/2328">#2328</a>), but also ‘“drop” AKA
+uninstall entire subdataset hierarchies’ (e.g. <code class="docutils literal notranslate"><span class="pre">--what</span> <span class="pre">all</span></code>), or drop
+preferred content (<code class="docutils literal notranslate"><span class="pre">--what</span> <span class="pre">preferred-content</span></code>, <a class="reference external" href="https://github.com/datalad/datalad/issues/3122">#3122</a>).</p>
+<p>§4 <strong class="command">drop</strong> prevents data loss by default (<a class="reference external" href="https://github.com/datalad/datalad/issues/4750">#4750</a>). Like <strong class="command">get</strong> it
+features a <code class="docutils literal notranslate"><span class="pre">--reckless</span></code> “mode-switch” to disable some or all potentially slow
+safety mechnism, i.e. ‘key available in sufficient number of other remotes’,
+‘main or all branches pushed to remote(s)’ (<a class="reference external" href="https://github.com/datalad/datalad/issues/1142">#1142</a>), ‘only check availability
+of keys associated with the worktree, but not other branches’. “Reckless
+operation” can be automatic, when following a reckless <strong class="command">get</strong> (<a class="reference external" href="https://github.com/datalad/datalad/issues/4744">#4744</a>).</p>
+<p>§5 <strong class="command">drop</strong> properly manages annex lifetime information, e.g. by announcing
+an annex as <code class="docutils literal notranslate"><span class="pre">dead</span></code> on removal of a repository (<a class="reference external" href="https://github.com/datalad/datalad/issues/3887">#3887</a>).</p>
+<p>§6 Like <strong class="command">get</strong>, drop supports parallization <a class="reference external" href="https://github.com/datalad/datalad/issues/1953">#1953</a></p>
+<p>§7 <cite>datalad drop</cite> is not intended to be a comprehensive frontend to <cite>git annex
+drop</cite> (e.g. limited support for e.g. <a class="reference external" href="https://github.com/datalad/datalad/issues/1482">#1482</a> outside standard use cases
+like <a class="reference external" href="https://github.com/datalad/datalad/issues/2328">#2328</a>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is understood that the current <cite>uninstall</cite> command is largely or
+completely made obsolete by this <strong class="command">drop</strong> concept.</p>
+</div>
+<p>§8 Given the development in <a class="reference external" href="https://github.com/datalad/datalad/issues/5842">#5842</a>  towards the complete
+obsolescence of <cite>remove</cite> it becomes necessary to import one of its proposed
+features:</p>
+<p>§9 <strong class="command">drop</strong> should be able to recognize a botched attempt to delete a
+dataset with a plain rm -rf, and act on it in a meaningful way, even if it is
+just hinting at chmod + rm -rf.</p>
+<section id="use-cases">
+<h2>Use cases<a class="headerlink" href="#use-cases" title="Permalink to this headline"></a></h2>
+<p>The following use cases operate in the dataset hierarchy depicted below:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>super
+├── dir
+│   ├── fileD1
+│   └── fileD2
+├── fileS1
+├── fileS2
+├── subA
+│   ├── fileA
+│   ├── subsubC
+│   │   ├── fileC
+│   └── subsubD
+└── subB
+    └── fileB
+</pre></div>
+</div>
+<p>Unless explicitly stated, all command are assumed to be executed in the root of <cite>super</cite>.</p>
+<ul>
+<li><p>U1: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">fileS1</span></code></p>
+<blockquote>
+<div><p>Drops the file content of <cite>file1</cite> (as currently done by <strong class="command">drop</strong>)</p>
+</div></blockquote>
+</li>
+<li><p>U2: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">dir</span></code></p>
+<blockquote>
+<div><p>Drop all file content in the directory (<code class="docutils literal notranslate"><span class="pre">fileD{1,2}</span></code>; as currently done by
+<strong class="command">drop</strong></p>
+</div></blockquote>
+</li>
+<li><p>U3: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">subB</span></code></p>
+<blockquote>
+<div><p>Drop all file content from the entire <cite>subB</cite> (<cite>fileB</cite>)</p>
+</div></blockquote>
+</li>
+<li><p>U4: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">subB</span> <span class="pre">--what</span> <span class="pre">all</span></code></p>
+<blockquote>
+<div><p>Same as above (default <code class="docutils literal notranslate"><span class="pre">--what</span> <span class="pre">files</span></code>), because it is not operating in the
+context of a superdataset (no automatic upward lookups). Possibly hint at
+next usage pattern).</p>
+</div></blockquote>
+</li>
+<li><p>U5: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">-d</span> <span class="pre">.</span> <span class="pre">subB</span> <span class="pre">--what</span> <span class="pre">all</span></code></p>
+<p>Drop all from the superdataset under this path. I.e. drop all from the
+subdataset and drop the subdataset itself (AKA uninstall)</p>
+</li>
+<li><p>U6: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">subA</span> <span class="pre">--what</span> <span class="pre">all</span></code></p>
+<p>Error: “<code class="docutils literal notranslate"><span class="pre">subA</span></code> contains subdatasets, forgot –recursive?”</p>
+</li>
+<li><p>U7: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">-d</span> <span class="pre">.</span> <span class="pre">subA</span> <span class="pre">-r</span> <span class="pre">--what</span> <span class="pre">all</span></code></p>
+<p>Drop all content from the subdataset (<code class="docutils literal notranslate"><span class="pre">fileA</span></code>) and its subdatasets
+(<code class="docutils literal notranslate"><span class="pre">fileC</span></code>), uninstall the subdataset (<code class="docutils literal notranslate"><span class="pre">subA</span></code>) and its subdatasets
+(<code class="docutils literal notranslate"><span class="pre">subsubC</span></code>, <code class="docutils literal notranslate"><span class="pre">subsubD</span></code>)</p>
+</li>
+<li><p>U8: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">subA</span> <span class="pre">-r</span> <span class="pre">--what</span> <span class="pre">all</span></code></p>
+<p>Same as above, but keep <code class="docutils literal notranslate"><span class="pre">subA</span></code> installed</p>
+</li>
+<li><p>U9: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">sub-A</span> <span class="pre">-r</span></code></p>
+<blockquote>
+<div><p>Drop all content from the subdataset and its subdatasets (<code class="docutils literal notranslate"><span class="pre">fileA</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fileC</span></code>)</p>
+</div></blockquote>
+</li>
+<li><p>U10: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">.</span> <span class="pre">-r</span> <span class="pre">--what</span> <span class="pre">all</span></code></p>
+<p>Drops all file content and subdatasets, but leaves the superdataset
+repository behind</p>
+</li>
+<li><p>U11: <code class="docutils literal notranslate"><span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">-d</span> <span class="pre">.</span> <span class="pre">subB</span></code></p>
+<p>Does nothing and hints at alternative usage, see
+<a class="reference external" href="https://github.com/datalad/datalad/issues/5832#issuecomment-889656335">https://github.com/datalad/datalad/issues/5832#issuecomment-889656335</a></p>
+</li>
+<li><p>U12: <code class="docutils literal notranslate"><span class="pre">cd</span> <span class="pre">..</span> <span class="pre">&amp;&amp;</span> <span class="pre">datalad</span> <span class="pre">drop</span> <span class="pre">super/dir</span></code></p>
+<p>Like <strong class="command">get</strong>, errors because the execution is not associated with a
+dataset. This avoids complexities, when the given <cite>path</cite>’s point to multiple
+(disjoint) datasets. It is understood that it could be done, but it is
+intentionally not done. <cite>datalad -C super drop dir</cite> or <cite>datalad drop -d super
+super/dir</cite> would work.</p>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="log_levels.html" class="btn btn-neutral float-left" title="Log levels" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="python_imports.html" class="btn btn-neutral float-right" title="Python import statements" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

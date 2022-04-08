@@ -1,0 +1,9 @@
+#!/bin/bash
+# deploy the root CA that comes with the sources in order to be able to test
+# against the internal HTTPS server without fiddling
+
+if hash update-ca-certificates; then
+    sudo mkdir -p /usr/local/share/ca-certificates/
+    sudo cp datalad/tests/ca/ca-root.pem /usr/local/share/ca-certificates/datalad-root.crt
+    sudo update-ca-certificates
+fi

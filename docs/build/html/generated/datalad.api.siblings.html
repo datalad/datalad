@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.api.siblings &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.api.subdatasets" href="datalad.api.subdatasets.html" />
+    <link rel="prev" title="datalad.api.sshrun" href="datalad.api.sshrun.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../modref.html#plumbing-commands">Plumbing commands</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.clean.html">datalad.api.clean</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.clone.html">datalad.api.clone</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.copy_file.html">datalad.api.copy_file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.create_test_dataset.html">datalad.api.create_test_dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.diff.html">datalad.api.diff</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.download_url.html">datalad.api.download_url</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.sshrun.html">datalad.api.sshrun</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad.api.siblings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.subdatasets.html">datalad.api.subdatasets</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#miscellaneous-commands">Miscellaneous commands</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.api.siblings</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-api-siblings">
+<h1>datalad.api.siblings<a class="headerlink" href="#datalad-api-siblings" title="Permalink to this headline"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.api.siblings">
+<span class="sig-prename descclassname"><span class="pre">datalad.api.</span></span><span class="sig-name descname"><span class="pre">siblings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'query'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pushurl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fetch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">as_common_datasrc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">publish_depends</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">publish_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annex_wanted</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annex_required</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annex_group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">annex_groupwanted</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inherit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_annex_info</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursion_limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#datalad.api.siblings" title="Permalink to this definition"></a></dt>
+<dd><p>Manage sibling configuration</p>
+<p>This command offers four different actions: ‘query’, ‘add’, ‘remove’,
+‘configure’, ‘enable’. ‘query’ is the default action and can be used to obtain
+information about (all) known siblings. ‘add’ and ‘configure’ are highly
+similar actions, the only difference being that adding a sibling
+with a name that is already registered will fail, whereas
+re-configuring a (different) sibling under a known name will not
+be considered an error. ‘enable’ can be used to complete access
+configuration for non-Git sibling (aka git-annex special remotes).
+Lastly, the ‘remove’ action allows for the
+removal (or de-configuration) of a registered sibling.</p>
+<p>For each sibling (added, configured, or queried) all known sibling
+properties are reported. This includes:</p>
+<dl class="simple">
+<dt>“name”</dt><dd><p>Name of the sibling</p>
+</dd>
+<dt>“path”</dt><dd><p>Absolute path of the dataset</p>
+</dd>
+<dt>“url”</dt><dd><p>For regular siblings at minimum a “fetch” URL, possibly also a
+“pushurl”</p>
+</dd>
+</dl>
+<p>Additionally, any further configuration will also be reported using
+a key that matches that in the Git configuration.</p>
+<p>By default, sibling information is rendered as one line per sibling
+following this scheme:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">dataset_path</span><span class="o">&gt;</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">sibling_name</span><span class="o">&gt;</span><span class="p">(</span><span class="o">&lt;+|-&gt;</span><span class="p">)</span> <span class="p">[</span><span class="o">&lt;</span><span class="n">access_specification</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>where the <cite>+</cite> and <cite>-</cite> labels indicate the presence or absence of a
+remote data annex at a particular remote, and <cite>access_specification</cite>
+contains either a URL and/or a type label for the sibling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>action</strong> (<em>{'query'</em><em>, </em><em>'add'</em><em>, </em><em>'remove'</em><em>, </em><em>'configure'</em><em>, </em><em>'enable'}</em><em>, </em><em>optional</em>) – command action selection (see general documentation). [Default:
+‘query’]</p></li>
+<li><p><strong>dataset</strong> (<a class="reference internal" href="datalad.api.Dataset.html#datalad.api.Dataset" title="datalad.api.Dataset"><em>Dataset</em></a><em> or </em><em>None</em><em>, </em><em>optional</em>) – specify the dataset to configure.  If no dataset is given, an
+attempt is made to identify the dataset based on the input and/or
+the current working directory. [Default: None]</p></li>
+<li><p><strong>name</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – name of the sibling. For addition with path “URLs” and sibling
+removal this option is mandatory, otherwise the hostname part of a
+given URL is used as a default. This option can be used to limit
+‘query’ to a specific sibling. [Default: None]</p></li>
+<li><p><strong>url</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – the URL of or path to the dataset sibling named by <cite>name</cite>. For
+recursive operation it is required that a template string for
+building subdataset sibling URLs is given. List of currently
+available placeholders: %%NAME        the name of the dataset, where
+slashes are replaced by dashes. [Default: None]</p></li>
+<li><p><strong>pushurl</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – in case the <cite>url</cite> cannot be used to publish to the dataset sibling,
+this option specifies a URL to be used instead. If no <cite>url</cite> is
+given, <cite>pushurl</cite> serves as <cite>url</cite> as well. [Default: None]</p></li>
+<li><p><strong>description</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – short description to use for a dataset location. Its primary purpose
+is to help humans to identify a dataset copy (e.g., “mike’s dataset
+on lab server”). Note that when a dataset is published, this
+information becomes available on the remote side. [Default: None]</p></li>
+<li><p><strong>fetch</strong> (<em>bool</em><em>, </em><em>optional</em>) – fetch the sibling after configuration. [Default: False]</p></li>
+<li><p><strong>as_common_datasrc</strong> – configure a sibling as a common data source of the dataset that can
+be automatically used by all consumers of the dataset. The sibling
+must be a regular Git remote with a configured HTTP(S) URL.
+[Default: None]</p></li>
+<li><p><strong>publish_depends</strong> (<em>list of str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – add a dependency such that the given existing sibling is always
+published prior to the new sibling. This equals setting a
+configuration item ‘remote.SIBLINGNAME.datalad-publish-depends’.
+Multiple dependencies can be given as a list of sibling names.
+[Default: None]</p></li>
+<li><p><strong>publish_by_default</strong> (<em>list of str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – add a refspec to be published to this sibling by default if nothing
+specified. [Default: None]</p></li>
+<li><p><strong>annex_wanted</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – expression to specify ‘wanted’ content for the repository/sibling.
+See <a class="reference external" href="https://git-annex.branchable.com/git-annex-wanted/">https://git-annex.branchable.com/git-annex-wanted/</a> for more
+information. [Default: None]</p></li>
+<li><p><strong>annex_required</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – expression to specify ‘required’ content for the repository/sibling.
+See <a class="reference external" href="https://git-annex.branchable.com/git-annex-required/">https://git-annex.branchable.com/git-annex-required/</a> for more
+information. [Default: None]</p></li>
+<li><p><strong>annex_group</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – expression to specify a group for the repository. See <a class="reference external" href="https://git">https://git</a>-
+annex.branchable.com/git-annex-group/ for more information.
+[Default: None]</p></li>
+<li><p><strong>annex_groupwanted</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – expression for the groupwanted. Makes sense only if
+annex_wanted=”groupwanted” and annex-group is given too. See
+<a class="reference external" href="https://git-annex.branchable.com/git-annex-groupwanted/">https://git-annex.branchable.com/git-annex-groupwanted/</a> for more
+information. [Default: None]</p></li>
+<li><p><strong>inherit</strong> (<em>bool</em><em>, </em><em>optional</em>) – if sibling is missing, inherit settings (git config, git annex
+wanted/group/groupwanted) from its super-dataset. [Default: False]</p></li>
+<li><p><strong>get_annex_info</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to query all information about the annex configurations of
+siblings. Can be disabled if speed is a concern. [Default: True]</p></li>
+<li><p><strong>recursive</strong> (<em>bool</em><em>, </em><em>optional</em>) – if set, recurse into potential subdatasets. [Default: False]</p></li>
+<li><p><strong>recursion_limit</strong> (<em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – limit recursion into subdatasets to the given number of levels.
+[Default: None]</p></li>
+<li><p><strong>on_failure</strong> (<em>{'ignore'</em><em>, </em><em>'continue'</em><em>, </em><em>'stop'}</em><em>, </em><em>optional</em>) – behavior to perform on failure: ‘ignore’ any failure is reported,
+but does not cause an exception; ‘continue’ if any failure occurs an
+exception will be raised at the end, but processing other actions
+will continue for as long as possible; ‘stop’: processing will stop
+on first failure and an exception is raised. A failure is any result
+with status ‘impossible’ or ‘error’. Raised exception is an
+IncompleteResultsError that carries the result dictionaries of the
+failures in its <cite>failed</cite> attribute. [Default: ‘continue’]</p></li>
+<li><p><strong>result_filter</strong> (<em>callable</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – if given, each to-be-returned status dictionary is passed to this
+callable, and is only returned if the callable’s return value does
+not evaluate to False or a ValueError exception is raised. If the
+given callable supports <cite>**kwargs</cite> it will additionally be passed
+the keyword arguments of the original API call. [Default: None]</p></li>
+<li><p><strong>result_renderer</strong> – select rendering mode command results. ‘tailored’ enables a command-
+specific rendering style that is typically tailored to human
+consumption, if there is one for a specific command, or otherwise
+falls back on the the ‘generic’ result renderer; ‘generic’ renders
+each result in one line  with key info like action, status, path,
+and an optional message); ‘json’ a complete JSON line serialization
+of the full result record; ‘json_pp’ like ‘json’, but pretty-printed
+spanning multiple lines; ‘disabled’ turns off result rendering
+entirely; ‘&lt;template&gt;’ reports any value(s) of any result properties
+in any format indicated by the template (e.g. ‘{path}’, compare with
+JSON output for all key-value choices). The template syntax follows
+the Python “format() language”. It is possible to report individual
+dictionary values, e.g. ‘{metadata[name]}’. If a 2nd-level key
+contains a colon, e.g. ‘music:Genre’, ‘:’ must be substituted by ‘#’
+in the template, like so: ‘{metadata[music#Genre]}’. [Default:
+‘tailored’]</p></li>
+<li><p><strong>result_xfm</strong> (<em>{'datasets'</em><em>, </em><em>'successdatasets-or-none'</em><em>, </em><em>'paths'</em><em>, </em><em>'relpaths'</em><em>, </em><em>'metadata'}</em><em> or </em><em>callable</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – if given, each to-be-returned result status dictionary is passed to
+this callable, and its return value becomes the result instead. This
+is different from <cite>result_filter</cite>, as it can perform arbitrary
+transformation of the result value. This is mostly useful for top-
+level command invocations that need to provide the results in a
+particular format. Instead of a callable, a label for a pre-crafted
+result transformation can be given. [Default: None]</p></li>
+<li><p><strong>return_type</strong> (<em>{'generator'</em><em>, </em><em>'list'</em><em>, </em><em>'item-or-list'}</em><em>, </em><em>optional</em>) – return value behavior switch. If ‘item-or-list’ a single value is
+returned instead of a one-item return value list, or a list in case
+of multiple return values. <cite>None</cite> is return in case of an empty
+list. [Default: ‘list’]</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.api.sshrun.html" class="btn btn-neutral float-left" title="datalad.api.sshrun" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.api.subdatasets.html" class="btn btn-neutral float-right" title="datalad.api.subdatasets" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docstrings &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Glossary" href="../glossary.html" />
+    <link rel="prev" title="Positional vs Keyword parameters" href="pos_vs_kw_parameters.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Docstrings</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#formatting-overview-and-guidelines">Formatting overview and guidelines</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#version-information">Version information</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#api-conditional-docs">API-conditional docs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#reflow-text">Reflow text</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>Docstrings</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="docstrings">
+<span id="chap-design-docstrings"></span><h1>Docstrings<a class="headerlink" href="#docstrings" title="Permalink to this headline"></a></h1>
+<div class="topic">
+<p class="topic-title">Specification scope and status</p>
+<p>This specification provides a partial overview of the current
+implementation.</p>
+</div>
+<p>Docstrings in DataLad source code are used and consumed in many ways. Besides
+serving as documentation directly in the sources, they are also transformed
+and rendered in various ways.</p>
+<ul class="simple">
+<li><p>Command line <code class="docutils literal notranslate"><span class="pre">--help</span></code> output</p></li>
+<li><p>Python’s <code class="docutils literal notranslate"><span class="pre">help()</span></code> or IPython’s <code class="docutils literal notranslate"><span class="pre">?</span></code></p></li>
+<li><p>Manpages</p></li>
+<li><p>Sphinx-rendered documentation for the Python API and the command line API</p></li>
+</ul>
+<p>A common source docstring is transformed, amended and tuned specifically for
+each consumption scenario.</p>
+<section id="formatting-overview-and-guidelines">
+<h2>Formatting overview and guidelines<a class="headerlink" href="#formatting-overview-and-guidelines" title="Permalink to this headline"></a></h2>
+<section id="version-information">
+<h3>Version information<a class="headerlink" href="#version-information" title="Permalink to this headline"></a></h3>
+<p>Additions, changes, or deprecation should be recorded in a docstring using the
+standard Sphinx directives <code class="docutils literal notranslate"><span class="pre">versionadded</span></code>, <code class="docutils literal notranslate"><span class="pre">versionchanged</span></code>,
+<code class="docutils literal notranslate"><span class="pre">deprecated</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>.. deprecated:: 0.16
+   The ``dryrun||--dryrun`` option will be removed in a future release, use
+   the renamed ``dry_run||--dry-run`` option instead.
+</pre></div>
+</div>
+</section>
+<section id="api-conditional-docs">
+<h3>API-conditional docs<a class="headerlink" href="#api-conditional-docs" title="Permalink to this headline"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">CMD</span></code> and <code class="docutils literal notranslate"><span class="pre">PY</span></code> macros can be used to selectively include documentation
+for specific APIs only:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>options to pass to :command:`git init`. [PY: Options can be given as a list
+of command line arguments or as a GitPython-style option dictionary PY][CMD:
+Any argument specified after the destination path of the repository will be
+passed to git-init as-is CMD].
+</pre></div>
+</div>
+<p>For API-alternative command and argument specifications the following format
+can be used:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``&lt;python-api&gt;||&lt;cmdline-api``
+</pre></div>
+</div>
+<p>where the double backticks are mandatory and <code class="docutils literal notranslate"><span class="pre">&lt;python-part&gt;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">&lt;cmdline-part&gt;</span></code> represent the respective argument specification for each
+API. In these specifications only valid argument/command names are allowed,
+plus a comma character to list multiples, and the dot character to include an
+ellipsis:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``github_organization||-g,--github-organization``
+
+``create_sibling_...||create-sibling-...``
+</pre></div>
+</div>
+</section>
+<section id="reflow-text">
+<h3>Reflow text<a class="headerlink" href="#reflow-text" title="Permalink to this headline"></a></h3>
+<p>When automatic transformations negatively affect the presentation of a
+docstring due to excessive removal of content, leaving “holes”, the <code class="docutils literal notranslate"><span class="pre">REFLOW</span></code>
+macro can be used to enclose such segments, in order to reformat them
+as the final processing step. Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>|| REFLOW &gt;&gt;
+The API has been aligned with the some
+``create_sibling_...||create-sibling-...`` commands of other GitHub-like
+services, such as GOGS, GIN, GitTea.&lt;&lt; REFLOW ||
+</pre></div>
+</div>
+<p>The start macro must appear on a dedicated line.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pos_vs_kw_parameters.html" class="btn btn-neutral float-left" title="Positional vs Keyword parameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../glossary.html" class="btn btn-neutral float-right" title="Glossary" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

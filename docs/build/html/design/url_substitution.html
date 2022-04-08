@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL substitution &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Threaded runner" href="threaded_runner.html" />
+    <link rel="prev" title="Credential management" href="credentials.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_records.html">Result records</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">URL substitution</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>URL substitution</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="url-substitution">
+<span id="chap-design-url-substitution"></span><h1>URL substitution<a class="headerlink" href="#url-substitution" title="Permalink to this headline"></a></h1>
+<div class="topic">
+<p class="topic-title">Specification scope and status</p>
+<p>This specification describes the current implementation. This implementation
+is covering URL substitution in <code class="docutils literal notranslate"><span class="pre">clone</span></code> only. A further extension to
+URL processing elsewhere is possible.</p>
+</div>
+<p>URL substitution is a transformation of a given URL using a set of
+specifications. Such specification can be provided as configuration settings
+(via all supported configuration sources). These configuration items must
+follow the naming scheme <code class="docutils literal notranslate"><span class="pre">datalad.clone.url-substitute.&lt;label&gt;</span></code>, where
+<code class="docutils literal notranslate"><span class="pre">&lt;label&gt;</span></code> is an arbitrary identifier.</p>
+<p>A substitution specification is a string with a match and substitution
+expression, each following Python’s regular expression syntax.  Both
+expressions are concatenated into a single string with an arbitrary delimiter
+character. The delimiter is defined by prefixing the string with the delimiter.
+Prefix and delimiter are stripped from the expressions before processing.
+Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>,^http://(.*)$,https://\\1
+</pre></div>
+</div>
+<p>A particular configuration item can be defined multiple times (see examples
+below) to form a substitution series. Substitutions in the same series will be
+applied incrementally, in order of their definition. If the first substitution
+expression does not match, the entire series will be ignored. However,
+following a first positive match all further substitutions in a series are
+processed, regardless whether intermediate expressions match or not.</p>
+<p>Any number of substitution series can be configured. They will be considered in
+no particular order. Consequently, it advisable to implement the first match
+specification of any series as specific as possible, in order to prevent
+undesired transformations.</p>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this headline"></a></h2>
+<p>Change the protocol component of a given URL in order to hand over further
+processing to a dedicated Git remote helper. Specifically, the following
+example converts Open Science Framework project URLs like
+<code class="docutils literal notranslate"><span class="pre">https://osf.io/f5j3e/</span></code> into <code class="docutils literal notranslate"><span class="pre">osf://f5j3e</span></code>, a URL that can be handle by
+<code class="docutils literal notranslate"><span class="pre">git-remote-osf</span></code>, the Git remote helper provided by the <a class="reference external" href="https://github.com/datalad/datalad-osf">datalad-osf
+extension package</a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>datalad.clone.url-substitute.osf = ,^https://osf.io/([^/]+)[/]*$,osf://\1
+</pre></div>
+</div>
+<p>Here is a more complex examples with a series of substitutions. The first
+expression ensures that only GitHub URLs are being processed. The associated
+substitution disassembles the URL into its two only relevant components,
+the organisation/user name, and the project name:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>datalad.clone.url-substitute.github = ,https?://github.com/([^/]+)/(.*)$,\1###\2
+</pre></div>
+</div>
+<p>All other expressions in this series that are described below will only be considered
+if the above expression matched.</p>
+<p>The next two expressions in the series normalize URL components that maybe be
+auto-generated by some DataLad functionality, e.g. subdataset location
+candidate generation from directory names:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># replace (back)slashes with a single dash</span>
+<span class="n">datalad</span><span class="o">.</span><span class="n">clone</span><span class="o">.</span><span class="n">url</span><span class="o">-</span><span class="n">substitute</span><span class="o">.</span><span class="n">github</span> <span class="o">=</span> <span class="p">,[</span><span class="o">/</span>\\<span class="p">]</span><span class="o">+</span><span class="p">,</span><span class="o">-</span>
+
+<span class="c1"># replace with whitespace (URL-quoted or not) with a single underscore</span>
+<span class="n">datalad</span><span class="o">.</span><span class="n">clone</span><span class="o">.</span><span class="n">url</span><span class="o">-</span><span class="n">substitute</span><span class="o">.</span><span class="n">github</span> <span class="o">=</span> <span class="p">,</span>\<span class="n">s</span><span class="o">+|</span><span class="p">(</span><span class="o">%</span><span class="mi">2520</span><span class="p">)</span><span class="o">+|</span><span class="p">(</span><span class="o">%</span><span class="mi">20</span><span class="p">)</span><span class="o">+</span><span class="p">,</span><span class="n">_</span>
+</pre></div>
+</div>
+<p>The final expression in the series is recombining the organization/user name
+and project name components back into a complete URL:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datalad</span><span class="o">.</span><span class="n">clone</span><span class="o">.</span><span class="n">url</span><span class="o">-</span><span class="n">substitute</span><span class="o">.</span><span class="n">github</span> <span class="o">=</span> <span class="p">,([</span><span class="o">^</span><span class="c1">#]+)###(.*),https://github.com/\1/\2</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="credentials.html" class="btn btn-neutral float-left" title="Credential management" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="threaded_runner.html" class="btn btn-neutral float-right" title="Threaded runner" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

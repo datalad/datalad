@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -59,7 +59,7 @@ def test__version__():
                 # should be a "release" record
                 assert_not_in('???', regd['date'])
                 ok_startswith(__version__, changelog_version)
-                if lv__version__ != changelog_version:
+                if lv__version__ != lv_changelog_version:
                     # It was not tagged yet and Changelog has no new records
                     # (they are composed by auto upon release)
                     assert_greater(lv__version__, lv_changelog_version)

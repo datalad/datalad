@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.config &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DataLad
+            <img src="../../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>datalad.config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for datalad.config</h1><div class="highlight"><pre>
+<span></span><span class="c1"># emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-</span>
+<span class="c1"># ex: set sts=4 ts=4 sw=4 et:</span>
+<span class="c1"># ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="c1">#</span>
+<span class="c1">#   See COPYING file distributed along with the datalad package for the</span>
+<span class="c1">#   copyright and license terms.</span>
+<span class="c1">#</span>
+<span class="c1"># ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">fasteners</span> <span class="kn">import</span> <span class="n">InterProcessLock</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
+<span class="kn">import</span> <span class="nn">datalad</span>
+<span class="kn">from</span> <span class="nn">datalad.consts</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DATASET_CONFIG_FILE</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">datalad.cmd</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">GitWitlessRunner</span><span class="p">,</span>
+    <span class="n">StdOutErrCapture</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="n">lgr</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;datalad.config&#39;</span><span class="p">)</span>
+
+<span class="c1"># git-config key syntax with a section and a subsection</span>
+<span class="c1"># see git-config(1) for syntax details</span>
+<span class="n">cfg_k_regex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;([a-zA-Z0-9-.]+\.[^\0\n]+)$&#39;</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span><span class="p">)</span>
+<span class="c1"># identical to the key regex, but with an additional group for a</span>
+<span class="c1"># value in a null-delimited git-config dump</span>
+<span class="n">cfg_kv_regex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s1">&#39;([a-zA-Z0-9-.]+\.[^\0\n]+)\n(.*)$&#39;</span><span class="p">,</span>
+    <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span>
+<span class="p">)</span>
+<span class="n">cfg_section_regex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(.*)\.[^.]+&#39;</span><span class="p">)</span>
+<span class="n">cfg_sectionoption_regex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(.*)\.([^.]+)&#39;</span><span class="p">)</span>
+
+
+<span class="n">_where_reload_doc</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        where : {&#39;dataset&#39;, &#39;local&#39;, &#39;global&#39;, &#39;override&#39;}, optional</span>
+<span class="s2">          Indicator which configuration file to modify. &#39;dataset&#39; indicates the</span>
+<span class="s2">          persistent configuration in .datalad/config of a dataset; &#39;local&#39;</span>
+<span class="s2">          the configuration of a dataset&#39;s Git repository in .git/config;</span>
+<span class="s2">          &#39;global&#39; refers to the general configuration that is not specific to</span>
+<span class="s2">          a single repository (usually in $USER/.gitconfig); &#39;override&#39;</span>
+<span class="s2">          limits the modification to the ConfigManager instance, and the</span>
+<span class="s2">          assigned value overrides any setting from any other source.</span>
+<span class="s2">        reload : bool</span>
+<span class="s2">          Flag whether to reload the configuration from file(s) after</span>
+<span class="s2">          modification. This can be disable to make multiple sequential</span>
+<span class="s2">          modifications slightly more efficient.&quot;&quot;&quot;</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span>
+
+<span class="c1"># Selection of os.stat_result fields we care to collect/compare to judge</span>
+<span class="c1"># on either file has changed to warrant reload of configuration.</span>
+<span class="n">_stat_result</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;_stat_result&#39;</span><span class="p">,</span> <span class="s1">&#39;st_ino st_size st_ctime st_mtime&#39;</span><span class="p">)</span>
+
+
+<span class="c1"># we cannot import external_versions here, as the cfg comes before anything</span>
+<span class="c1"># and we would have circular imports</span>
+<div class="viewcode-block" id="get_git_version"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.get_git_version">[docs]</a><span class="nd">@lru_cache</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">get_git_version</span><span class="p">(</span><span class="n">runner</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Return version of available git&quot;&quot;&quot;</span>
+    <span class="n">runner</span> <span class="o">=</span> <span class="n">runner</span> <span class="ow">or</span> <span class="n">GitWitlessRunner</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s1">&#39;git version&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">(),</span>
+                      <span class="n">protocol</span><span class="o">=</span><span class="n">StdOutErrCapture</span><span class="p">)[</span><span class="s1">&#39;stdout&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">2</span><span class="p">]</span></div>
+
+
+<span class="k">def</span> <span class="nf">_where_reload</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Helper decorator to simplify providing repetitive docstring&quot;&quot;&quot;</span>
+    <span class="n">obj</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">%</span> <span class="n">_where_reload_doc</span>
+    <span class="k">return</span> <span class="n">obj</span>
+
+
+<div class="viewcode-block" id="parse_gitconfig_dump"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.parse_gitconfig_dump">[docs]</a><span class="k">def</span> <span class="nf">parse_gitconfig_dump</span><span class="p">(</span><span class="n">dump</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">multi_value</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse a dump-string from `git config -z --list`</span>
+
+<span class="sd">    This parser has limited support for discarding unrelated output</span>
+<span class="sd">    that may contaminate the given dump. It does so performing a</span>
+<span class="sd">    relatively strict matching of configuration key syntax, and discarding</span>
+<span class="sd">    lines in the output that are not valid git-config keys.</span>
+
+<span class="sd">    There is also built-in support for parsing outputs generated</span>
+<span class="sd">    with --show-origin (see return value).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dump : str</span>
+<span class="sd">      Null-byte separated output</span>
+<span class="sd">    cwd : path-like, optional</span>
+<span class="sd">      Use this absolute path to convert relative paths for origin reports</span>
+<span class="sd">      into absolute paths. By default, the process working directory</span>
+<span class="sd">      PWD is used.</span>
+<span class="sd">    multi_value : bool, optional</span>
+<span class="sd">      If True, report values from multiple specifications of the</span>
+<span class="sd">      same key as a tuple of values assigned to this key. Otherwise,</span>
+<span class="sd">      the last configuration is reported.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    --------</span>
+<span class="sd">    dict, set</span>
+<span class="sd">      Configuration items are returned as key/value pairs in a dictionary.</span>
+<span class="sd">      The second tuple-item will be a set of path objects comprising all</span>
+<span class="sd">      source files, if origin information was included in the dump</span>
+<span class="sd">      (--show-origin). An empty set is returned otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dct</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">fileset</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">dump</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\0</span><span class="s1">&#39;</span><span class="p">):</span>
+        <span class="c1"># line is a null-delimited chunk</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># in anticipation of output contamination, process within a loop</span>
+        <span class="c1"># where we can reject non syntax compliant pieces</span>
+        <span class="k">while</span> <span class="n">line</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;file:&#39;</span><span class="p">):</span>
+                <span class="c1"># origin line</span>
+                <span class="n">fname</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="mi">5</span><span class="p">:])</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">fname</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
+                    <span class="n">fname</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cwd</span><span class="p">)</span> <span class="o">/</span> <span class="n">fname</span> <span class="k">if</span> <span class="n">cwd</span> <span class="k">else</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="n">fname</span>
+                <span class="n">fileset</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+                <span class="k">break</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;command line:&#39;</span><span class="p">):</span>
+                <span class="c1"># no origin that we could as a pathobj</span>
+                <span class="k">break</span>
+            <span class="c1"># try getting key/value pair from the present chunk</span>
+            <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_gitcfg_rec_to_keyvalue</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># we are done with this chunk when there is a good key</span>
+                <span class="k">break</span>
+            <span class="c1"># discard the first line and start over</span>
+            <span class="n">ignore</span><span class="p">,</span> <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Non-standard git-config output, ignoring: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ignore</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">k</span><span class="p">:</span>
+            <span class="c1"># nothing else to log, all ignored dump was reported before</span>
+            <span class="k">continue</span>
+        <span class="c1"># multi-value reporting</span>
+        <span class="n">present_v</span> <span class="o">=</span> <span class="n">dct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">present_v</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">multi_value</span><span class="p">:</span>
+            <span class="n">dct</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">present_v</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">dct</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">present_v</span> <span class="o">+</span> <span class="p">(</span><span class="n">v</span><span class="p">,)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">dct</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">present_v</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dct</span><span class="p">,</span> <span class="n">fileset</span></div>
+
+
+<span class="c1"># keep alias with previous name for now</span>
+<span class="n">_parse_gitconfig_dump</span> <span class="o">=</span> <span class="n">parse_gitconfig_dump</span>
+
+
+<span class="k">def</span> <span class="nf">_gitcfg_rec_to_keyvalue</span><span class="p">(</span><span class="n">rec</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Helper for parse_gitconfig_dump()</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    rec: str</span>
+<span class="sd">      Key/value specification string</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str, str</span>
+<span class="sd">      Parsed key and value. Key and/or value could be None</span>
+<span class="sd">      if not snytax-compliant (former) or absent (latter).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">kv_match</span> <span class="o">=</span> <span class="n">cfg_kv_regex</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kv_match</span><span class="p">:</span>
+        <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">kv_match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">cfg_k_regex</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">rec</span><span class="p">):</span>
+        <span class="c1"># could be just a key without = value, which git treats as True</span>
+        <span class="c1"># if asked for a bool</span>
+        <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">rec</span><span class="p">,</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># no value, no good key</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">v</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span>
+
+
+<span class="k">def</span> <span class="nf">_update_from_env</span><span class="p">(</span><span class="n">store</span><span class="p">):</span>
+    <span class="n">overrides</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">dct</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;DATALAD_CONFIG_OVERRIDES_JSON&quot;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">overrides</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">lgr</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to load DATALAD_CONFIG_OVERRIDES_JSON: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">exc</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;DATALAD_&#39;</span><span class="p">):</span>
+            <span class="n">dct</span><span class="p">[</span><span class="n">k</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;__&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">overrides</span><span class="p">:</span>
+        <span class="n">store</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">overrides</span><span class="p">)</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">dct</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="anything2bool"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.anything2bool">[docs]</a><span class="k">def</span> <span class="nf">anything2bool</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="s1">&#39;lower&#39;</span><span class="p">):</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;off&quot;</span><span class="p">,</span> <span class="s2">&quot;no&quot;</span><span class="p">,</span> <span class="s2">&quot;false&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">}</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;on&quot;</span><span class="p">,</span> <span class="s2">&quot;yes&quot;</span><span class="p">,</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">}</span> \
+            <span class="ow">or</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="s1">&#39;isdigit&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">val</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">val</span><span class="p">))</span> \
+            <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">val</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;Got value </span><span class="si">%s</span><span class="s2"> which could not be interpreted as a boolean&quot;</span>
+            <span class="o">%</span> <span class="nb">repr</span><span class="p">(</span><span class="n">val</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager">[docs]</a><span class="k">class</span> <span class="nc">ConfigManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Thin wrapper around `git-config` with support for a dataset configuration.</span>
+
+<span class="sd">    The general idea is to have an object that is primarily used to read/query</span>
+<span class="sd">    configuration option.  Upon creation, current configuration is read via one</span>
+<span class="sd">    (or max two, in the case of the presence of dataset-specific configuration)</span>
+<span class="sd">    calls to `git config`.  If this class is initialized with a Dataset</span>
+<span class="sd">    instance, it supports reading and writing configuration from</span>
+<span class="sd">    ``.datalad/config`` inside a dataset too. This file is committed to Git and</span>
+<span class="sd">    hence useful to ship certain configuration items with a dataset.</span>
+
+<span class="sd">    The API aims to provide the most significant read-access API of a</span>
+<span class="sd">    dictionary, the Python ConfigParser, and GitPython&#39;s config parser</span>
+<span class="sd">    implementations.</span>
+
+<span class="sd">    This class is presently not capable of efficiently writing multiple</span>
+<span class="sd">    configurations items at once.  Instead, each modification results in a</span>
+<span class="sd">    dedicated call to `git config`. This author thinks this is OK, as he</span>
+<span class="sd">    cannot think of a situation where a large number of items need to be</span>
+<span class="sd">    written during normal operation.</span>
+
+<span class="sd">    Each instance carries a public `overrides` attribute. This dictionary</span>
+<span class="sd">    contains variables that override any setting read from a file. The overrides</span>
+<span class="sd">    are persistent across reloads.</span>
+
+<span class="sd">    Any DATALAD_* environment variable is also presented as a configuration</span>
+<span class="sd">    item. Settings read from environment variables are not stored in any of the</span>
+<span class="sd">    configuration files, but are read dynamically from the environment at each</span>
+<span class="sd">    `reload()` call. Their values take precedence over any specification in</span>
+<span class="sd">    configuration files, and even overrides.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dataset : Dataset, optional</span>
+<span class="sd">      If provided, all `git config` calls are executed in this dataset&#39;s</span>
+<span class="sd">      directory. Moreover, any modifications are, by default, directed to</span>
+<span class="sd">      this dataset&#39;s configuration file (which will be created on demand)</span>
+<span class="sd">    overrides : dict, optional</span>
+<span class="sd">      Variable overrides, see general class documentation for details.</span>
+<span class="sd">    source : {&#39;any&#39;, &#39;local&#39;, &#39;dataset&#39;, &#39;dataset-local&#39;}, optional</span>
+<span class="sd">      Which sources of configuration setting to consider. If &#39;dataset&#39;,</span>
+<span class="sd">      configuration items are only read from a dataset&#39;s persistent</span>
+<span class="sd">      configuration file, if any is present (the one in ``.datalad/config``, not</span>
+<span class="sd">      ``.git/config``); if &#39;local&#39;, any non-committed source is considered</span>
+<span class="sd">      (local and global configuration in Git config&#39;s terminology);</span>
+<span class="sd">      if &#39;dataset-local&#39;, persistent dataset configuration and local, but</span>
+<span class="sd">      not global or system configuration are considered; if &#39;any&#39;</span>
+<span class="sd">      all possible sources of configuration are considered.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_checked_git_identity</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># Lock for running changing operation across multiple threads.</span>
+    <span class="c1"># Since config itself to the same path could</span>
+    <span class="c1"># potentially be created independently in multiple threads, and we might be</span>
+    <span class="c1"># modifying global config as well, making lock static should not allow more than</span>
+    <span class="c1"># one thread to  write at a time, even if to different repositories.</span>
+    <span class="n">_run_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overrides</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s1">&#39;any&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">source</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;any&#39;</span><span class="p">,</span> <span class="s1">&#39;local&#39;</span><span class="p">,</span> <span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="s1">&#39;dataset-local&#39;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s1">&#39;Unknown ConfigManager(source=) setting: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">source</span><span class="p">))</span>
+        <span class="n">store</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="c1"># store in a simple dict</span>
+            <span class="c1"># no subclassing, because we want to be largely read-only, and implement</span>
+            <span class="c1"># config writing separately</span>
+            <span class="n">cfg</span><span class="o">=</span><span class="p">{},</span>
+            <span class="c1"># track the files that jointly make up the config in this store</span>
+            <span class="n">files</span><span class="o">=</span><span class="nb">set</span><span class="p">(),</span>
+            <span class="c1"># and their modification times to be able to avoid needless unforced reloads</span>
+            <span class="n">stats</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="c1"># populated with info from git</span>
+            <span class="n">git</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
+            <span class="c1"># only populated with info from committed dataset config</span>
+            <span class="n">dataset</span><span class="o">=</span><span class="n">store</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="c1"># merged representation (the only one that existed pre datalad 0.14)</span>
+        <span class="c1"># will be built on initial reload</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_repo_dot_git</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">dataset</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="s1">&#39;dot_git&#39;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_repo_dot_git</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dot_git</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">pathobj</span>
+            <span class="k">elif</span> <span class="n">dataset</span><span class="o">.</span><span class="n">repo</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_repo_dot_git</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">repo</span><span class="o">.</span><span class="n">dot_git</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">repo</span><span class="o">.</span><span class="n">pathobj</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;git&#39;</span><span class="p">,</span> <span class="s1">&#39;config&#39;</span><span class="p">]</span>
+        <span class="c1"># public dict to store variables that always override any setting</span>
+        <span class="c1"># read from a file</span>
+        <span class="c1"># `hasattr()` is needed because `datalad.cfg` is generated upon first module</span>
+        <span class="c1"># import, hence when this code runs first, there cannot be any config manager</span>
+        <span class="c1"># to inherit from</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span> <span class="o">=</span> <span class="n">datalad</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">datalad</span><span class="p">,</span> <span class="s1">&#39;cfg&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">overrides</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">overrides</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataset</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">source</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="s1">&#39;dataset-local&#39;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s1">&#39;ConfigManager configured to read dataset only, &#39;</span>
+                    <span class="s1">&#39;but no dataset given&#39;</span><span class="p">)</span>
+            <span class="c1"># The caller didn&#39;t specify a repository. Unset the git directory</span>
+            <span class="c1"># when calling &#39;git config&#39; to prevent a repository in the current</span>
+            <span class="c1"># working directory from leaking configuration into the output.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_config_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;git&#39;</span><span class="p">,</span> <span class="s1">&#39;--git-dir=&#39;</span><span class="p">,</span> <span class="s1">&#39;config&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_src_mode</span> <span class="o">=</span> <span class="n">source</span>
+        <span class="n">run_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">dataset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="s1">&#39;_git_runner&#39;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">_git_runner</span>
+            <span class="k">elif</span> <span class="n">dataset</span><span class="o">.</span><span class="n">repo</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">repo</span><span class="o">.</span><span class="n">_git_runner</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># make sure we run the git config calls in the dataset</span>
+                <span class="c1"># to pick up the right config files</span>
+                <span class="n">run_kwargs</span><span class="p">[</span><span class="s1">&#39;cwd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">path</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span> <span class="o">=</span> <span class="n">GitWitlessRunner</span><span class="p">(</span><span class="o">**</span><span class="n">run_kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ConfigManager</span><span class="o">.</span><span class="n">_checked_git_identity</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">cfg</span><span class="p">,</span> <span class="n">envs</span> <span class="ow">in</span> <span class="p">(</span>
+                    <span class="p">(</span><span class="s1">&#39;user.name&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;GIT_AUTHOR_NAME&#39;</span><span class="p">,</span> <span class="s1">&#39;GIT_COMMITTER_NAME&#39;</span><span class="p">)),</span>
+                    <span class="p">(</span><span class="s1">&#39;user.email&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;GIT_AUTHOR_EMAIL&#39;</span><span class="p">,</span> <span class="s1">&#39;GIT_COMMITTER_EMAIL&#39;</span><span class="p">))):</span>
+                <span class="k">if</span> <span class="n">cfg</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span> \
+                        <span class="ow">and</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">e</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">envs</span><span class="p">):</span>
+                    <span class="n">lgr</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;It is highly recommended to configure Git before using &quot;</span>
+                        <span class="s2">&quot;DataLad. Set both &#39;user.name&#39; and &#39;user.email&#39; &quot;</span>
+                        <span class="s2">&quot;configuration variables.&quot;</span>
+                    <span class="p">)</span>
+            <span class="n">ConfigManager</span><span class="o">.</span><span class="n">_checked_git_identity</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="ConfigManager.reload"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.reload">[docs]</a>    <span class="k">def</span> <span class="nf">reload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Reload all configuration items from the configured sources</span>
+
+<span class="sd">        If `force` is False, all files configuration was previously read from</span>
+<span class="sd">        are checked for differences in the modification times. If no difference</span>
+<span class="sd">        is found for any file no reload is performed. This mechanism will not</span>
+<span class="sd">        detect newly created global configuration files, use `force` in this case.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">run_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;-z&#39;</span><span class="p">,</span> <span class="s1">&#39;-l&#39;</span><span class="p">,</span> <span class="s1">&#39;--show-origin&#39;</span><span class="p">]</span>
+
+        <span class="c1"># update from desired config sources only</span>
+        <span class="c1"># 2-step strategy:</span>
+        <span class="c1">#   - load datalad dataset config from dataset</span>
+        <span class="c1">#   - load git config from all supported by git sources</span>
+        <span class="c1"># in doing so we always stay compatible with where Git gets its</span>
+        <span class="c1"># config from, but also allow to override persistent information</span>
+        <span class="c1"># from dataset locally or globally</span>
+
+        <span class="c1"># figure out what needs to be reloaded at all</span>
+        <span class="n">to_run</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># committed dataset config</span>
+        <span class="n">dataset_cfgfile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="o">/</span> <span class="n">DATASET_CONFIG_FILE</span> \
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_src_mode</span> <span class="o">!=</span> <span class="s1">&#39;local&#39;</span> <span class="ow">and</span>
+                <span class="n">dataset_cfgfile</span> <span class="ow">and</span>
+                <span class="n">dataset_cfgfile</span><span class="o">.</span><span class="n">exists</span><span class="p">())</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="n">force</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_need_reload</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">])):</span>
+            <span class="n">to_run</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">run_args</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;--file&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">dataset_cfgfile</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_src_mode</span> <span class="o">!=</span> <span class="s1">&#39;dataset&#39;</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="n">force</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_need_reload</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;git&#39;</span><span class="p">])):</span>
+            <span class="n">to_run</span><span class="p">[</span><span class="s1">&#39;git&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">run_args</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;--local&#39;</span><span class="p">]</span> \
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_src_mode</span> <span class="o">==</span> <span class="s1">&#39;dataset-local&#39;</span> \
+                <span class="k">else</span> <span class="n">run_args</span>
+
+        <span class="c1"># reload everything that was found todo</span>
+        <span class="k">while</span> <span class="n">to_run</span><span class="p">:</span>
+            <span class="n">store_id</span><span class="p">,</span> <span class="n">runargs</span> <span class="o">=</span> <span class="n">to_run</span><span class="o">.</span><span class="n">popitem</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="n">store_id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reload</span><span class="p">(</span><span class="n">runargs</span><span class="p">)</span>
+
+        <span class="c1"># always update the merged representation, even if we did not reload</span>
+        <span class="c1"># anything from a file. ENV or overrides could change independently</span>
+        <span class="c1"># start with the commit dataset config</span>
+        <span class="n">merged</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">][</span><span class="s1">&#39;cfg&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="c1"># local config always takes precedence</span>
+        <span class="n">merged</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;git&#39;</span><span class="p">][</span><span class="s1">&#39;cfg&#39;</span><span class="p">])</span>
+        <span class="c1"># superimpose overrides</span>
+        <span class="n">merged</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="p">)</span>
+        <span class="c1"># override with environment variables, unless we only want to read the</span>
+        <span class="c1"># dataset&#39;s commit config</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_src_mode</span> <span class="o">!=</span> <span class="s1">&#39;dataset&#39;</span><span class="p">:</span>
+            <span class="n">_update_from_env</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span> <span class="o">=</span> <span class="n">merged</span></div>
+
+    <span class="k">def</span> <span class="nf">_need_reload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">store</span><span class="p">):</span>
+        <span class="n">storestats</span> <span class="o">=</span> <span class="n">store</span><span class="p">[</span><span class="s1">&#39;stats&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">storestats</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="c1"># we have read files before</span>
+        <span class="c1"># check if any file we read from has changed</span>
+        <span class="n">curstats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_stats</span><span class="p">(</span><span class="n">store</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">curstats</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="o">!=</span> <span class="n">storestats</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">store</span><span class="p">[</span><span class="s1">&#39;files&#39;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">_reload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_args</span><span class="p">):</span>
+        <span class="c1"># query git-config</span>
+        <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span>
+            <span class="n">run_args</span><span class="p">,</span>
+            <span class="n">protocol</span><span class="o">=</span><span class="n">StdOutErrCapture</span><span class="p">,</span>
+            <span class="c1"># always expect git-config to output utf-8</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">store</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">store</span><span class="p">[</span><span class="s1">&#39;cfg&#39;</span><span class="p">],</span> <span class="n">store</span><span class="p">[</span><span class="s1">&#39;files&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parse_gitconfig_dump</span><span class="p">(</span>
+            <span class="n">stdout</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_runner</span><span class="o">.</span><span class="n">cwd</span><span class="p">)</span>
+
+        <span class="c1"># update stats of config files, they have just been discovered</span>
+        <span class="c1"># and should still exist</span>
+        <span class="n">store</span><span class="p">[</span><span class="s1">&#39;stats&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_stats</span><span class="p">(</span><span class="n">store</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">store</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_stats</span><span class="p">(</span><span class="n">store</span><span class="p">):</span>
+        <span class="n">stats</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">store</span><span class="p">[</span><span class="s1">&#39;files&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">exists</span><span class="p">:</span>
+                <span class="n">stat</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span>
+                <span class="n">stats</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="o">=</span> <span class="n">_stat_result</span><span class="p">(</span><span class="n">stat</span><span class="o">.</span><span class="n">st_ino</span><span class="p">,</span> <span class="n">stat</span><span class="o">.</span><span class="n">st_size</span><span class="p">,</span> <span class="n">stat</span><span class="o">.</span><span class="n">st_ctime</span><span class="p">,</span> <span class="n">stat</span><span class="o">.</span><span class="n">st_mtime</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">stats</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">stats</span>
+
+<div class="viewcode-block" id="ConfigManager.obtain"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.obtain">[docs]</a>    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">obtain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dialog_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">valtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+               <span class="n">store</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convenience method to obtain settings interactively, if needed</span>
+
+<span class="sd">        A UI will be used to ask for user input in interactive sessions.</span>
+<span class="sd">        Questions to ask, and additional explanations can be passed directly</span>
+<span class="sd">        as arguments, or retrieved from a list of pre-configured items.</span>
+
+<span class="sd">        Additionally, this method allows for type conversion and storage</span>
+<span class="sd">        of obtained settings. Both aspects can also be pre-configured.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        var : str</span>
+<span class="sd">          Variable name including any section like `git config` expects them,</span>
+<span class="sd">          e.g. &#39;core.editor&#39;</span>
+<span class="sd">        default : any type</span>
+<span class="sd">          In interactive sessions and if `store` is True, this default value</span>
+<span class="sd">          will be presented to the user for confirmation (or modification).</span>
+<span class="sd">          In all other cases, this value will be silently assigned unless</span>
+<span class="sd">          there is an existing configuration setting.</span>
+<span class="sd">        dialog_type : {&#39;question&#39;, &#39;yesno&#39;, None}</span>
+<span class="sd">          Which dialog type to use in interactive sessions. If `None`,</span>
+<span class="sd">          pre-configured UI options are used.</span>
+<span class="sd">        store : bool</span>
+<span class="sd">          Whether to store the obtained value (or default)</span>
+<span class="sd">        %s</span>
+<span class="sd">        `**kwargs`</span>
+<span class="sd">          Additional arguments for the UI function call, such as a question</span>
+<span class="sd">          `text`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># do local import, as this module is import prominently and the</span>
+        <span class="c1"># could theoretically import all kind of weird things for type</span>
+        <span class="c1"># conversion</span>
+        <span class="kn">from</span> <span class="nn">datalad.interface.common_cfg</span> <span class="kn">import</span> <span class="n">definitions</span> <span class="k">as</span> <span class="n">cfg_defs</span>
+        <span class="c1"># fetch what we know about this variable</span>
+        <span class="n">cdef</span> <span class="o">=</span> <span class="n">cfg_defs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="c1"># type conversion setup</span>
+        <span class="k">if</span> <span class="n">valtype</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s1">&#39;type&#39;</span> <span class="ow">in</span> <span class="n">cdef</span><span class="p">:</span>
+            <span class="n">valtype</span> <span class="o">=</span> <span class="n">cdef</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">valtype</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">valtype</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span>
+
+        <span class="c1"># any default?</span>
+        <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s1">&#39;default&#39;</span> <span class="ow">in</span> <span class="n">cdef</span><span class="p">:</span>
+            <span class="n">default</span> <span class="o">=</span> <span class="n">cdef</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]</span>
+
+        <span class="n">_value</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="c1"># nothing needs to be obtained, it is all here already</span>
+            <span class="n">_value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">store</span> <span class="ow">is</span> <span class="kc">False</span> <span class="ow">and</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># nothing will be stored, and we have a default -&gt; no user confirmation</span>
+            <span class="c1"># we cannot use logging, because we want to use the config to confiugre</span>
+            <span class="c1"># the logging</span>
+            <span class="c1">#lgr.debug(&#39;using default {} for config setting {}&#39;.format(default, var))</span>
+            <span class="n">_value</span> <span class="o">=</span> <span class="n">default</span>
+
+        <span class="k">if</span> <span class="n">_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># we got everything we need and can exit early</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">valtype</span><span class="p">(</span><span class="n">_value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;value &#39;</span><span class="si">{}</span><span class="s2">&#39; of existing configuration for &#39;</span><span class="si">{}</span><span class="s2">&#39; cannot be &quot;</span>
+                    <span class="s2">&quot;converted to the desired type &#39;</span><span class="si">{}</span><span class="s2">&#39; (</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">_value</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">valtype</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+
+        <span class="c1"># now we need to try to obtain something from the user</span>
+        <span class="kn">from</span> <span class="nn">datalad.ui</span> <span class="kn">import</span> <span class="n">ui</span>
+
+        <span class="c1"># configure UI</span>
+        <span class="n">dialog_opts</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="k">if</span> <span class="n">dialog_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># no override</span>
+            <span class="c1"># check for common knowledge on how to obtain a value</span>
+            <span class="k">if</span> <span class="s1">&#39;ui&#39;</span> <span class="ow">in</span> <span class="n">cdef</span><span class="p">:</span>
+                <span class="n">dialog_type</span> <span class="o">=</span> <span class="n">cdef</span><span class="p">[</span><span class="s1">&#39;ui&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="c1"># pull standard dialog settings</span>
+                <span class="n">dialog_opts</span> <span class="o">=</span> <span class="n">cdef</span><span class="p">[</span><span class="s1">&#39;ui&#39;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="c1"># update with input</span>
+                <span class="n">dialog_opts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">ui</span><span class="o">.</span><span class="n">is_interactive</span> <span class="ow">or</span> <span class="n">dialog_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="n">default</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;cannot obtain value for configuration item &#39;</span><span class="si">{}</span><span class="s2">&#39;, &quot;</span>
+                <span class="s2">&quot;not preconfigured, no default, no UI available&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">ui</span><span class="p">,</span> <span class="n">dialog_type</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;UI &#39;</span><span class="si">{}</span><span class="s2">&#39; does not support dialog type &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">ui</span><span class="p">,</span> <span class="n">dialog_type</span><span class="p">))</span>
+
+        <span class="c1"># configure storage destination, if needed</span>
+        <span class="k">if</span> <span class="n">store</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">where</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s1">&#39;destination&#39;</span> <span class="ow">in</span> <span class="n">cdef</span><span class="p">:</span>
+                <span class="n">where</span> <span class="o">=</span> <span class="n">cdef</span><span class="p">[</span><span class="s1">&#39;destination&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">where</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;request to store configuration item &#39;</span><span class="si">{}</span><span class="s2">&#39;, but no &quot;</span>
+                    <span class="s2">&quot;storage destination specified&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+
+        <span class="c1"># obtain via UI</span>
+        <span class="n">dialog</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ui</span><span class="p">,</span> <span class="n">dialog_type</span><span class="p">)</span>
+        <span class="n">_value</span> <span class="o">=</span> <span class="n">dialog</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">,</span> <span class="o">**</span><span class="n">dialog_opts</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># we got nothing</span>
+            <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s2">&quot;could not obtain value for configuration item &#39;</span><span class="si">{}</span><span class="s2">&#39;, &quot;</span>
+                    <span class="s2">&quot;not preconfigured, no default&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+            <span class="c1"># XXX maybe we should return default here, even it was returned</span>
+            <span class="c1"># from the UI -- if that is even possible</span>
+
+        <span class="c1"># execute type conversion before storing to check that we got</span>
+        <span class="c1"># something that looks like what we want</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">valtype</span><span class="p">(</span><span class="n">_value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;cannot convert user input `</span><span class="si">{}</span><span class="s2">` to desired type (</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">_value</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="c1"># XXX we could consider &quot;looping&quot; until we have a value of proper</span>
+            <span class="c1"># type in case of a user typo...</span>
+
+        <span class="k">if</span> <span class="n">store</span><span class="p">:</span>
+            <span class="c1"># store value as it was before any conversion, needs to be str</span>
+            <span class="c1"># anyway</span>
+            <span class="c1"># needs string conversion nevertheless, because default could come</span>
+            <span class="c1"># in as something else</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">_value</span><span class="p">),</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="n">reload</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span></div>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># give full list of all tracked config files, plus overrides</span>
+        <span class="k">return</span> <span class="s2">&quot;ConfigManager(</span><span class="si">{}{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">][</span><span class="s1">&#39;files&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">union</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;git&#39;</span><span class="p">][</span><span class="s1">&#39;files&#39;</span><span class="p">])],</span>
+            <span class="s1">&#39;, overrides=</span><span class="si">{!r}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># give path of dataset, if there is any, plus overrides</span>
+        <span class="k">return</span> <span class="s2">&quot;ConfigManager(</span><span class="si">{}{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;with overrides&#39;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1">#</span>
+    <span class="c1"># Compatibility with dict API</span>
+    <span class="c1">#</span>
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="o">.</span><span class="fm">__getitem__</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="o">.</span><span class="fm">__contains__</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ConfigManager.keys"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.keys">[docs]</a>    <span class="k">def</span> <span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns list of configuration item names&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+    <span class="c1"># XXX should this be *args?</span>
+<div class="viewcode-block" id="ConfigManager.get"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.get">[docs]</a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">get_all</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;D.get(k[,d]) -&gt; D[k] if k in D, else d.  d defaults to None.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        default : optional</span>
+<span class="sd">          Value to return when key is not present. `None` by default.</span>
+<span class="sd">        get_all : bool, optional</span>
+<span class="sd">          If True, return all values of multiple identical configuration keys.</span>
+<span class="sd">          By default only the last specified value is returned.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">get_all</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">val</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">val</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="c1"># return as-is, default could be a tuple, hence do not subject to</span>
+            <span class="c1"># get_all processing</span>
+            <span class="k">return</span> <span class="n">default</span></div>
+
+<div class="viewcode-block" id="ConfigManager.get_from_source"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.get_from_source">[docs]</a>    <span class="k">def</span> <span class="nf">get_from_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Like get(), but a source can be specific.</span>
+
+<span class="sd">        If `source` is &#39;dataset&#39;, only the committed configuration is queried,</span>
+<span class="sd">        overrides are applied. In the case of &#39;local&#39;, the committed</span>
+<span class="sd">        configuration is ignored, but overrides and configuration from</span>
+<span class="sd">        environment variables are applied as usual.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">source</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="s1">&#39;local&#39;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;source must be &#39;dataset&#39; or &#39;local&#39;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">source</span> <span class="o">==</span> <span class="s1">&#39;dataset&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="n">key</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">][</span><span class="s1">&#39;cfg&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">key</span><span class="p">,</span>
+                    <span class="n">default</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;dataset&#39;</span><span class="p">][</span><span class="s1">&#39;cfg&#39;</span><span class="p">]:</span>
+                <span class="c1"># the key is not in the committed config, hence we can</span>
+                <span class="c1"># just report based on the merged representation</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># expensive case, rebuild a config without the committed</span>
+                <span class="c1"># dataset config contributing</span>
+                <span class="n">env</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="n">_update_from_env</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">key</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                        <span class="n">key</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_stores</span><span class="p">[</span><span class="s1">&#39;local&#39;</span><span class="p">][</span><span class="s1">&#39;cfg&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                            <span class="n">key</span><span class="p">,</span>
+                            <span class="n">default</span><span class="p">)))</span></div>
+
+    <span class="c1">#</span>
+    <span class="c1"># Compatibility with ConfigParser API</span>
+    <span class="c1">#</span>
+<div class="viewcode-block" id="ConfigManager.sections"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.sections">[docs]</a>    <span class="k">def</span> <span class="nf">sections</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns a list of the sections available&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="n">cfg_section_regex</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="p">]))</span></div>
+
+<div class="viewcode-block" id="ConfigManager.options"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.options">[docs]</a>    <span class="k">def</span> <span class="nf">options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns a list of options available in the specified section.&quot;&quot;&quot;</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="p">:</span>
+            <span class="n">sec</span><span class="p">,</span> <span class="n">opt</span> <span class="o">=</span> <span class="n">cfg_sectionoption_regex</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">sec</span> <span class="o">==</span> <span class="n">section</span><span class="p">:</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">opts</span></div>
+
+<div class="viewcode-block" id="ConfigManager.has_section"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.has_section">[docs]</a>    <span class="k">def</span> <span class="nf">has_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Indicates whether a section is present in the configuration&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">section</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+<div class="viewcode-block" id="ConfigManager.has_option"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.has_option">[docs]</a>    <span class="k">def</span> <span class="nf">has_option</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;If the given section exists, and contains the given option&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="p">:</span>
+            <span class="n">sec</span><span class="p">,</span> <span class="n">opt</span> <span class="o">=</span> <span class="n">cfg_sectionoption_regex</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">sec</span> <span class="o">==</span> <span class="n">section</span> <span class="ow">and</span> <span class="n">opt</span> <span class="o">==</span> <span class="n">option</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+    <span class="k">def</span> <span class="nf">_get_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">typefn</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">])</span>
+        <span class="c1"># Mimic the handling of get_value(..., default=None), while still going</span>
+        <span class="c1"># through get() in order to get its default tuple handling.</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">typefn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ConfigManager.getint"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.getint">[docs]</a>    <span class="k">def</span> <span class="nf">getint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;A convenience method which coerces the option value to an integer&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_type</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ConfigManager.getfloat"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.getfloat">[docs]</a>    <span class="k">def</span> <span class="nf">getfloat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;A convenience method which coerces the option value to a float&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_type</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ConfigManager.getbool"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.getbool">[docs]</a>    <span class="k">def</span> <span class="nf">getbool</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;A convenience method which coerces the option value to a bool</span>
+
+<span class="sd">        Values &quot;on&quot;, &quot;yes&quot;, &quot;true&quot; and any int!=0 are considered True</span>
+<span class="sd">        Values which evaluate to bool False, &quot;off&quot;, &quot;no&quot;, &quot;false&quot; are considered</span>
+<span class="sd">        False</span>
+<span class="sd">        TypeError is raised for other values.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">])</span>
+        <span class="c1"># Mimic the handling of get_value(..., default=None), while still going</span>
+        <span class="c1"># through get() in order to get its default tuple handling.</span>
+        <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># no value at all, git treats it as True</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">anything2bool</span><span class="p">(</span><span class="n">val</span><span class="p">)</span></div>
+
+    <span class="c1"># this is a hybrid of ConfigParser and dict API</span>
+<div class="viewcode-block" id="ConfigManager.items"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.items">[docs]</a>    <span class="k">def</span> <span class="nf">items</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a list of (name, value) pairs for each option</span>
+
+<span class="sd">        Optionally limited to a given section.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">section</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merged_store</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">cfg_section_regex</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="n">section</span><span class="p">]</span></div>
+
+    <span class="c1">#</span>
+    <span class="c1"># Compatibility with GitPython&#39;s ConfigParser</span>
+    <span class="c1">#</span>
+<div class="viewcode-block" id="ConfigManager.get_value"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.get_value">[docs]</a>    <span class="k">def</span> <span class="nf">get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Like `get()`, but with an optional default value</span>
+
+<span class="sd">        If the default is not None, the given default value will be returned in</span>
+<span class="sd">        case the option did not exist. This behavior imitates GitPython&#39;s</span>
+<span class="sd">        config parser.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="n">section</span><span class="p">,</span> <span class="n">option</span><span class="p">))]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># this strange dance is needed because gitpython does it this way</span>
+            <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">default</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">e</span></div>
+
+    <span class="c1">#</span>
+    <span class="c1"># Modify configuration (proxy respective git-config call)</span>
+    <span class="c1">#</span>
+    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Centralized helper to run &quot;git config&quot; calls</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        args : list</span>
+<span class="sd">          Arguments to pass for git config</span>
+<span class="sd">        %s</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">          Keywords arguments for Runner&#39;s call</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">where</span><span class="p">:</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_location_args</span><span class="p">(</span><span class="n">where</span><span class="p">)</span> <span class="o">+</span> <span class="n">args</span>
+        <span class="k">if</span> <span class="s1">&#39;-l&#39;</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+            <span class="c1"># we are just reading, no need to reload, no need to lock</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_config_cmd</span> <span class="o">+</span> <span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;stdout&#39;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;stderr&#39;</span><span class="p">]</span>
+
+        <span class="c1"># all other calls are modifications</span>
+        <span class="k">if</span> <span class="s1">&#39;--file&#39;</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+            <span class="c1"># all paths we are passing are absolute</span>
+            <span class="n">custom_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;--file&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="n">custom_file</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">lockfile</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_dot_git</span> <span class="ow">and</span> <span class="p">(</span><span class="s1">&#39;--local&#39;</span> <span class="ow">in</span> <span class="n">args</span> <span class="ow">or</span> <span class="s1">&#39;--file&#39;</span> <span class="ow">in</span> <span class="n">args</span><span class="p">):</span>
+            <span class="c1"># modification of config in a dataset</span>
+            <span class="n">lockfile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_dot_git</span> <span class="o">/</span> <span class="s1">&#39;config.dataladlock&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># follow pattern in downloaders for lockfile location</span>
+            <span class="n">lockfile</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">obtain</span><span class="p">(</span><span class="s1">&#39;datalad.locations.locks&#39;</span><span class="p">))</span> \
+                       <span class="o">/</span> <span class="s1">&#39;gitconfig.lck&#39;</span>
+
+        <span class="k">with</span> <span class="n">ConfigManager</span><span class="o">.</span><span class="n">_run_lock</span><span class="p">,</span> <span class="n">InterProcessLock</span><span class="p">(</span><span class="n">lockfile</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">lgr</span><span class="p">):</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_config_cmd</span> <span class="o">+</span> <span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">reload</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;stdout&#39;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;stderr&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_get_location_args</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">where</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">cfg_labels</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="s1">&#39;local&#39;</span><span class="p">,</span> <span class="s1">&#39;global&#39;</span><span class="p">,</span> <span class="s1">&#39;override&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cfg_labels</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;unknown configuration label &#39;</span><span class="si">{}</span><span class="s2">&#39; (not in </span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">where</span><span class="p">,</span> <span class="n">cfg_labels</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;dataset&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s1">&#39;ConfigManager cannot store configuration to dataset, &#39;</span>
+                    <span class="s1">&#39;none specified&#39;</span><span class="p">)</span>
+            <span class="n">dataset_cfgfile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repo_pathobj</span> <span class="o">/</span> <span class="n">DATASET_CONFIG_FILE</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;--file&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">dataset_cfgfile</span><span class="p">)])</span>
+        <span class="k">elif</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;global&#39;</span><span class="p">:</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;--global&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span><span class="p">:</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;--local&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">args</span>
+
+<div class="viewcode-block" id="ConfigManager.add"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.add">[docs]</a>    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add a configuration variable and value</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        var : str</span>
+<span class="sd">          Variable name including any section like `git config` expects them, e.g.</span>
+<span class="sd">          &#39;core.editor&#39;</span>
+<span class="sd">        value : str</span>
+<span class="sd">          Variable value</span>
+<span class="sd">        %s&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;override&#39;</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">datalad.utils</span> <span class="kn">import</span> <span class="n">ensure_list</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">ensure_list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="n">val</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">val</span>
+            <span class="k">if</span> <span class="n">reload</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">([</span><span class="s1">&#39;--add&#39;</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">value</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="n">reload</span><span class="p">,</span>
+                  <span class="n">protocol</span><span class="o">=</span><span class="n">StdOutErrCapture</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ConfigManager.set"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.set">[docs]</a>    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set a variable to a value.</span>
+
+<span class="sd">        In opposition to `add`, this replaces the value of `var` if there is</span>
+<span class="sd">        one already.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        var : str</span>
+<span class="sd">          Variable name including any section like `git config` expects them, e.g.</span>
+<span class="sd">          &#39;core.editor&#39;</span>
+<span class="sd">        value : str</span>
+<span class="sd">          Variable value</span>
+<span class="sd">        force: bool</span>
+<span class="sd">          if set, replaces all occurrences of `var` by a single one with the</span>
+<span class="sd">          given `value`. Otherwise raise if multiple entries for `var` exist</span>
+<span class="sd">          already</span>
+<span class="sd">        %s&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;override&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="k">if</span> <span class="n">reload</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="kn">from</span> <span class="nn">datalad.support.gitrepo</span> <span class="kn">import</span> <span class="n">to_options</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">to_options</span><span class="p">(</span><span class="n">replace_all</span><span class="o">=</span><span class="n">force</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">var</span><span class="p">,</span> <span class="n">value</span><span class="p">],</span>
+                  <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="n">reload</span><span class="p">,</span> <span class="n">protocol</span><span class="o">=</span><span class="n">StdOutErrCapture</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ConfigManager.rename_section"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.rename_section">[docs]</a>    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">rename_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old</span><span class="p">,</span> <span class="n">new</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Rename a configuration section</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old : str</span>
+<span class="sd">          Name of the section to rename.</span>
+<span class="sd">        new : str</span>
+<span class="sd">          Name of the section to rename to.</span>
+<span class="sd">        %s&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;override&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="p">(</span><span class="n">new</span> <span class="o">+</span> <span class="n">k</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">old</span><span class="p">):])</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">old</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">reload</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">([</span><span class="s1">&#39;--rename-section&#39;</span><span class="p">,</span> <span class="n">old</span><span class="p">,</span> <span class="n">new</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="n">reload</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ConfigManager.remove_section"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.remove_section">[docs]</a>    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">remove_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sec</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Rename a configuration section</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        sec : str</span>
+<span class="sd">          Name of the section to remove.</span>
+<span class="sd">        %s&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;override&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">sec</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span><span class="p">)</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">reload</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">([</span><span class="s1">&#39;--remove-section&#39;</span><span class="p">,</span> <span class="n">sec</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="n">reload</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ConfigManager.unset"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.ConfigManager.unset">[docs]</a>    <span class="nd">@_where_reload</span>
+    <span class="k">def</span> <span class="nf">unset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s1">&#39;dataset&#39;</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Remove all occurrences of a variable</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        var : str</span>
+<span class="sd">          Name of the variable to remove</span>
+<span class="sd">        %s&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">where</span> <span class="o">==</span> <span class="s1">&#39;override&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overrides</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">reload</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># use unset all as it is simpler for now</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">([</span><span class="s1">&#39;--unset-all&#39;</span><span class="p">,</span> <span class="n">var</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="n">reload</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="rewrite_url"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.rewrite_url">[docs]</a><span class="k">def</span> <span class="nf">rewrite_url</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Any matching &#39;url.&lt;base&gt;.insteadOf&#39; configuration is applied</span>
+
+<span class="sd">    Any URL that starts with such a configuration will be rewritten</span>
+<span class="sd">    to start, instead, with &lt;base&gt;. When more than one insteadOf</span>
+<span class="sd">    strings match a given URL, the longest match is used.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    cfg : ConfigManager or dict</span>
+<span class="sd">      dict-like with configuration variable name/value-pairs.</span>
+<span class="sd">    url : str</span>
+<span class="sd">      URL to be rewritten, if matching configuration is found.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">      Rewritten or unmodified URL.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">insteadof</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="c1"># only leave the base url</span>
+        <span class="n">k</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="o">-</span><span class="mi">10</span><span class="p">]:</span> <span class="n">v</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">cfg</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;url.&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.insteadof&#39;</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="c1"># all config that applies</span>
+    <span class="n">matches</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="n">v</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">insteadof</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="n">val</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">val</span><span class="p">,))</span>
+        <span class="k">if</span> <span class="n">url</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="c1"># find longest match, like Git does</span>
+    <span class="k">if</span> <span class="n">matches</span><span class="p">:</span>
+        <span class="n">rewrite_base</span><span class="p">,</span> <span class="n">match</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+            <span class="n">matches</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+            <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">match</span> <span class="o">==</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">matches</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">lgr</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Ignoring URL rewrite configuration for &#39;</span><span class="si">%s</span><span class="s2">&#39;, &quot;</span>
+                <span class="s2">&quot;multiple conflicting definitions exists: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">match</span><span class="p">,</span>
+                <span class="p">[</span><span class="s1">&#39;url.</span><span class="si">{}</span><span class="s1">.insteadof&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">matches</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                 <span class="k">if</span> <span class="n">v</span> <span class="o">==</span> <span class="n">match</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rewrite_base</span><span class="p">,</span> <span class="n">url</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">match</span><span class="p">):])</span>
+    <span class="k">return</span> <span class="n">url</span></div>
+
+
+<span class="c1"># for convenience, bind to class too</span>
+<span class="n">ConfigManager</span><span class="o">.</span><span class="n">rewrite_url</span> <span class="o">=</span> <span class="n">rewrite_url</span>
+
+<span class="c1">#</span>
+<span class="c1"># Helpers for bypassing git-config when _writing_ config items,</span>
+<span class="c1"># mostly useful when a large number of changes needs to be made</span>
+<span class="c1"># and directly file manipulation without a safety net is worth</span>
+<span class="c1"># the risk for performance reasons.</span>
+<span class="c1">#</span>
+
+<div class="viewcode-block" id="quote_config"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.quote_config">[docs]</a><span class="k">def</span> <span class="nf">quote_config</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Helper to perform minimal quoting of config keys/value parts</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    v : str</span>
+<span class="sd">      To-be-quoted string</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">white</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="c1"># backslashes need to be quoted in any case</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\\\\</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="c1"># must not have additional unquoted quotes</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">white</span> <span class="ow">or</span> <span class="n">v</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">white</span><span class="p">:</span>
+        <span class="c1"># quoting the value due to leading/trailing whitespace</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="s1">&#39;&quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">v</span></div>
+
+
+<div class="viewcode-block" id="write_config_section"><a class="viewcode-back" href="../../generated/datalad.config.html#datalad.config.write_config_section">[docs]</a><span class="k">def</span> <span class="nf">write_config_section</span><span class="p">(</span><span class="n">fobj</span><span class="p">,</span> <span class="n">suite</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">props</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Write a config section with (multiple) settings.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    fobj : File</span>
+<span class="sd">       Opened target file</span>
+<span class="sd">    suite : str</span>
+<span class="sd">       First item of the section name, e.g. &#39;submodule&#39;, or</span>
+<span class="sd">       &#39;datalad&#39;</span>
+<span class="sd">    name : str</span>
+<span class="sd">       Remainder of the section name</span>
+<span class="sd">    props : dict</span>
+<span class="sd">       Keys are configuration setting names within the section</span>
+<span class="sd">       context (i.e. not duplicating `suite` and/or `name`, values</span>
+<span class="sd">       are configuration setting values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fmt</span> <span class="o">=</span> <span class="s1">&#39;[</span><span class="si">{_suite_}</span><span class="s1"> </span><span class="si">{_q_}{_name_}{_q_}</span><span class="s1">]</span><span class="se">\n</span><span class="s1">&#39;</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">props</span><span class="p">:</span>
+        <span class="n">fmt</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="se">\t</span><span class="si">{p}</span><span class="s1"> = {{</span><span class="si">{p}</span><span class="s1">}}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">p</span><span class="p">)</span>
+    <span class="n">quoted_name</span> <span class="o">=</span> <span class="n">quote_config</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">fobj</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+        <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">_suite_</span><span class="o">=</span><span class="n">suite</span><span class="p">,</span>
+            <span class="n">_q_</span><span class="o">=</span><span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">quoted_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="s1">&#39;&quot;&#39;</span><span class="p">,</span>
+            <span class="n">_name_</span><span class="o">=</span><span class="n">quoted_name</span><span class="p">,</span>
+            <span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">quote_config</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">props</span><span class="o">.</span><span class="n">items</span><span class="p">()}))</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

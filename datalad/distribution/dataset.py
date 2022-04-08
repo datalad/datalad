@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -9,7 +9,9 @@
 """Implements class Dataset
 """
 
+import inspect
 import logging
+from functools import wraps
 from os.path import (
     curdir,
     exists,
@@ -18,7 +20,6 @@ from os.path import (
     pardir,
 )
 from weakref import WeakValueDictionary
-import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
@@ -45,6 +46,7 @@ from datalad.utils import (
     getpwd,
     optional_args,
     get_dataset_root,
+    get_sig_param_names,
     # TODO remove after a while, when external consumers have adjusted
     # to use get_dataset_root()
     get_dataset_root as rev_get_dataset_root,
@@ -396,7 +398,8 @@ class Dataset(object, metaclass=PathBasedFlyweight):
                                            contains=path,
                                            result_filter=res_filter,
                                            on_failure='ignore',
-                                           result_xfm='paths')
+                                           result_xfm='paths',
+                                           result_renderer='disabled')
 
         while path:
             # normalize the path after adding .. so we guaranteed to not
@@ -446,11 +449,12 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 
     The decorator has no effect on the actual function decorated with it.
     """
+
     if not name:
         name = f.__name__
 
-    @wrapt.decorator
-    def apply_func(wrapped, instance, args, kwargs):
+    @wraps(f)
+    def apply_func(instance, *args, **kwargs):
         # Wrapper function to assign arguments of the bound function to
         # original function.
         #
@@ -458,32 +462,51 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # ----
         # This wrapper is NOT returned by the decorator, but only used to bind
         # the function `f` to the Dataset class.
-
         kwargs = kwargs.copy()
-        from datalad.utils import getargspec
-        orig_pos = getargspec(f).args
+
+        # due to use of functools.wraps and inability of of getarspec to get
+        # those, we use .signature.
+        # More information in de-wrapt PR https://github.com/datalad/datalad/pull/6190
+        from datalad.utils import get_sig_param_names
+        f_args, f_kwonlyargs = get_sig_param_names(f, ('pos_any', 'kw_only'))
 
         # If bound function is used with wrong signature (especially by
-        # explicitly passing a dataset, let's raise a proper exception instead
+        # explicitly passing a dataset), let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) >= len(orig_pos):
-            raise TypeError("{0}() takes at most {1} arguments ({2} given):"
-                            " {3}".format(name, len(orig_pos), len(args),
-                                          ['self'] + [a for a in orig_pos
-                                                      if a != dataset_argname]))
+        # In case whenever kwonlyargs are used, 'dataset' would not be listed
+        # among args, so we would account for it (possibly) be there.
+        if len(args) >= len(f_args) + int(bool(f_kwonlyargs)):
+            non_dataset_args = ["self"] + [a for a in f_args if a != dataset_argname]
+            raise TypeError(
+                f"{name}() takes at most {len(f_args)} arguments ({len(args)} given): "
+                f"{non_dataset_args}")
         if dataset_argname in kwargs:
-            raise TypeError("{}() got an unexpected keyword argument {}"
-                            "".format(name, dataset_argname))
+            raise TypeError(
+                f"{name}() got an unexpected keyword argument {dataset_argname}")
         kwargs[dataset_argname] = instance
-        ds_index = orig_pos.index(dataset_argname)
-        for i in range(0, len(args)):
-            if i < ds_index:
-                kwargs[orig_pos[i]] = args[i]
-            elif i >= ds_index:
-                kwargs[orig_pos[i+1]] = args[i]
-        return f(**kwargs)
+        if dataset_argname in f_kwonlyargs:
+            # * was used to enforce kwargs, so we just would pass things as is
+            pass
+        else:
+            # so it is "old" style, where it is a regular kwargs - we pass everything
+            # via kwargs
+            # TODO: issue a DX oriented warning that we advise to separate out kwargs,
+            # dataset included, with * from positional args?
+            ds_index = f_args.index(dataset_argname)
+            for i in range(0, len(args)):
+                if i < ds_index:
+                    kwargs[f_args[i]] = args[i]
+                elif i >= ds_index:
+                    kwargs[f_args[i+1]] = args[i]
+            args = []
+        return f(*args, **kwargs)
 
-    setattr(Dataset, name, apply_func(f))
+    setattr(Dataset, name, apply_func)
+    # set the ad-hoc attribute so that @build_doc could also bind built doc
+    # to the dataset method
+    if getattr(f, '_dataset_method', None):
+        raise RuntimeError(f"_dataset_method of {f} is already set to {f._dataset_method}")
+    setattr(f, '_dataset_method', apply_func)
     return f
 
 
@@ -539,7 +562,12 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     Returns
     -------
     Dataset
-      Or raises an exception (InsufficientArgumentsError).
+      If a dataset could be determined.
+
+    Raises
+    ------
+    NoDatasetFound
+      If not dataset could be determined.
     """
     if dataset is not None and not isinstance(dataset, Dataset):
         dataset = Dataset(dataset)
@@ -564,8 +592,8 @@ def require_dataset(dataset, check_installed=True, purpose=None):
               dataset.path)
 
     if check_installed and not dataset.is_installed():
-        raise ValueError(u"No installed dataset found at "
-                         u"{0}.".format(dataset.path))
+        raise NoDatasetFound(
+            f"No installed dataset found at {dataset.path}")
 
     return dataset
 

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.api.create_test_dataset &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.api.diff" href="datalad.api.diff.html" />
+    <link rel="prev" title="datalad.api.copy_file" href="datalad.api.copy_file.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#dataset-operations">Dataset operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#metadata-handling">Metadata handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#reproducible-execution">Reproducible execution</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../modref.html#plumbing-commands">Plumbing commands</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.clean.html">datalad.api.clean</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.clone.html">datalad.api.clone</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.copy_file.html">datalad.api.copy_file</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">datalad.api.create_test_dataset</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.diff.html">datalad.api.diff</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.download_url.html">datalad.api.download_url</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.sshrun.html">datalad.api.sshrun</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.siblings.html">datalad.api.siblings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="datalad.api.subdatasets.html">datalad.api.subdatasets</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../modref.html#miscellaneous-commands">Miscellaneous commands</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.api.create_test_dataset</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="datalad-api-create-test-dataset">
+<h1>datalad.api.create_test_dataset<a class="headerlink" href="#datalad-api-create-test-dataset" title="Permalink to this headline"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.api.create_test_dataset">
+<span class="sig-prename descclassname"><span class="pre">datalad.api.</span></span><span class="sig-name descname"><span class="pre">create_test_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#datalad.api.create_test_dataset" title="Permalink to this definition"></a></dt>
+<dd><p>Create test (meta-)dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – path/name where to create (if specified, must not exist). [Default:
+None]</p></li>
+<li><p><strong>spec</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – spec for hierarchy, defined as a min-max (min could be omitted to
+assume 0) defining how many (random number from min to max) of sub-
+datasets to generate at any given level of the hierarchy.  Each
+level separated from each other with /. Example:  1-3/-2  would
+generate from 1 to 3 subdatasets at the top level, and up to two
+within those at the 2nd level. [Default: None]</p></li>
+<li><p><strong>seed</strong> (<em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – seed for rng. [Default: None]</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.api.copy_file.html" class="btn btn-neutral float-left" title="datalad.api.copy_file" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.api.diff.html" class="btn btn-neutral float-right" title="datalad.api.diff" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

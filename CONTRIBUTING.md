@@ -125,7 +125,7 @@ we outline the workflow used by the developers:
 
 ## Development environment
 
-We support Python 3 only (>= 3.6).
+We support Python 3 only (>= 3.7).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -134,7 +134,7 @@ since we use it to provide backports of recent fixed external modules we depend 
 
 ```sh
 apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python3-scrapy python3-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
+apt-get install -y -q patool python3-scrapy python3-{argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
 ```
 
 and additionally, for development we suggest to use tox and new

@@ -1,0 +1,7 @@
+.. glossary::
+
+  datalad.locations.dataset-procedures    
+    Dataset procedure directory:
+    Where should datalad search for dataset procedures (relative to a dataset root)?
+    Default: .datalad/procedures
+    

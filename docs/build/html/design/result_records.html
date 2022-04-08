@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Result records &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="dataset argument" href="dataset_argument.html" />
+    <link rel="prev" title="File URL handling" href="file_url_handling.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="application_vs_library_mode.html">Application-type vs. library-type usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_url_handling.html">File URL handling</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Result records</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mandatory-fields">Mandatory fields</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#action"><code class="docutils literal notranslate"><span class="pre">action</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#path"><code class="docutils literal notranslate"><span class="pre">path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#common-optional-fields">Common optional fields</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#type"><code class="docutils literal notranslate"><span class="pre">type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#message"><code class="docutils literal notranslate"><span class="pre">message</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#refds"><code class="docutils literal notranslate"><span class="pre">refds</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#parentds"><code class="docutils literal notranslate"><span class="pre">parentds</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#state"><code class="docutils literal notranslate"><span class="pre">state</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#error-messages"><code class="docutils literal notranslate"><span class="pre">error-messages</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#exception"><code class="docutils literal notranslate"><span class="pre">exception</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#exception-traceback"><code class="docutils literal notranslate"><span class="pre">exception_traceback</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#additional-fields-observed-in-the-wild">Additional fields observed “in the wild”</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dataset_argument.html"><code class="docutils literal notranslate"><span class="pre">dataset</span></code> argument</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log_levels.html">Log levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drop.html">Drop dataset components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_imports.html">Python import statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="miscpatterns.html">Miscellaneous patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exception_handling.html">Exception handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="credentials.html">Credential management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_substitution.html">URL substitution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="threaded_runner.html">Threaded runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="batched_command.html">BatchedCommand and BatchedAnnex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard_parameters.html">Standard parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pos_vs_kw_parameters.html">Positional vs Keyword parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docstrings.html">Docstrings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modref.html">Python module reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Design</a> &raquo;</li>
+      <li>Result records</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="result-records">
+<span id="chap-design-result-records"></span><h1>Result records<a class="headerlink" href="#result-records" title="Permalink to this headline"></a></h1>
+<div class="topic">
+<p class="topic-title">Specification scope and status</p>
+<p>This specification describes the current implementation.</p>
+</div>
+<p>Result records are the standard return value format for all DataLad commands.
+Each command invocation yields one or more result records. Result records are
+routinely inspected throughout the code base, and are used to inform generic
+error handling, as well as particular calling commands on how to proceed with
+a specific operation.</p>
+<p>The technical implementation of a result record is a Python dictionary.  This
+dictionary must contain a number of mandatory fields/keys (see below). However,
+an arbitrary number of additional fields may be added to a result record.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">get_status_dict()</span></code> function simplifies the creation of result records.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Developers <em>must</em> compose result records with care! DataLad supports custom
+user-provided hook configurations that use result record fields to
+decide when to trigger a custom post-result operation. Such custom hooks
+rely on a persistent naming and composition of result record fields.
+Changes to result records, including field name changes, field value changes,
+but also timing/order of record emitting potentially break user set ups!</p>
+</div>
+<section id="mandatory-fields">
+<h2>Mandatory fields<a class="headerlink" href="#mandatory-fields" title="Permalink to this headline"></a></h2>
+<p>The following keys <em>must</em> be present in any result record. If any of these
+keys is missing, DataLad’s behavior is undefined.</p>
+<section id="action">
+<h3><code class="docutils literal notranslate"><span class="pre">action</span></code><a class="headerlink" href="#action" title="Permalink to this headline"></a></h3>
+<p>A string label identifying which type of operation a result is associated with.
+Labels <em>must not</em> contain white space. They should be compact, and lower-cases,
+and use <code class="docutils literal notranslate"><span class="pre">_</span></code> (underscore) to separate words in compound labels.</p>
+<p>A result without an <code class="docutils literal notranslate"><span class="pre">action</span></code> label will not be processed and is discarded.</p>
+</section>
+<section id="path">
+<h3><code class="docutils literal notranslate"><span class="pre">path</span></code><a class="headerlink" href="#path" title="Permalink to this headline"></a></h3>
+<p>A string with an <em>absolute</em> path describing the local entity a result is
+associated with. Paths must be platform-specific (e.g., Windows paths on
+Windows, and POSIX paths on other operating systems). When a result is about an
+entity that has no meaningful relation to the local file system (e.g., a URL to
+be downloaded), to <code class="docutils literal notranslate"><span class="pre">path</span></code> value should be determined with respect to the
+potential impact of the result on any local entity (e.g., a URL downloaded
+to a local file path, a local dataset modified based on remote information).</p>
+</section>
+<section id="status">
+<h3><code class="docutils literal notranslate"><span class="pre">status</span></code><a class="headerlink" href="#status" title="Permalink to this headline"></a></h3>
+<p>This field indicates the nature of a result in terms of four categories, identified
+by a string label.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ok</span></code>: a standard, to-be-expected result</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">notneeded</span></code>: an operation that was requested, but found to be unnecessary
+in order to achieve a desired goal</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">impossible</span></code>: a requested operation cannot be performed, possibly because
+its preconditions are not met</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">error</span></code>: an error occurred while performing an operation</p></li>
+</ul>
+<p>Based on the <code class="docutils literal notranslate"><span class="pre">status</span></code> field, a result is categorized into <em>success</em> (<code class="docutils literal notranslate"><span class="pre">ok</span></code>,
+<code class="docutils literal notranslate"><span class="pre">notneeded</span></code>) and <em>failure</em> (<code class="docutils literal notranslate"><span class="pre">impossible</span></code>, <code class="docutils literal notranslate"><span class="pre">error</span></code>). Depending on the
+<code class="docutils literal notranslate"><span class="pre">on_failure</span></code> parameterization of a command call, any failure-result emitted
+by a command can lead to an <code class="docutils literal notranslate"><span class="pre">IncompleteResultsError</span></code> being raised on command
+exit, or a non-zero exit code on the command line. With <code class="docutils literal notranslate"><span class="pre">on_failure='stop'</span></code>,
+an operation is halted on the first failure and the command errors out
+immediately, with <code class="docutils literal notranslate"><span class="pre">on_failure='continue'</span></code> an operation will continue despite
+intermediate failures and the command only errors out at the very end, with
+<code class="docutils literal notranslate"><span class="pre">on_failure='ignore'</span></code> the command will not error even when failures occurred.
+The latter mode can be used in cases where the initial status-characterization
+needs to be corrected for the particular context of an operation (e.g., to
+relabel expected and recoverable errors).</p>
+</section>
+</section>
+<section id="common-optional-fields">
+<h2>Common optional fields<a class="headerlink" href="#common-optional-fields" title="Permalink to this headline"></a></h2>
+<p>The following fields are not required, but can be used to enrich a result
+record with additional information that improves its interpretability, or
+triggers particular optional functionality in generic result processing.</p>
+<section id="type">
+<h3><code class="docutils literal notranslate"><span class="pre">type</span></code><a class="headerlink" href="#type" title="Permalink to this headline"></a></h3>
+<p>This field indicates the type of entity a result is associated with. This may
+or may not be the type of the local entity identified by the <code class="docutils literal notranslate"><span class="pre">path</span></code> value.
+The following values are common, and should be used in matching cases, but
+arbitrary other values are supported too:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">dataset</span></code>: a DataLad dataset</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">file</span></code>: a regular file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">directory</span></code>: a directory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">symlink</span></code>: a symbolic link</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">key</span></code>: a git-annex key</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sibling</span></code>: a Dataset sibling or Git remote</p></li>
+</ul>
+</section>
+<section id="message">
+<h3><code class="docutils literal notranslate"><span class="pre">message</span></code><a class="headerlink" href="#message" title="Permalink to this headline"></a></h3>
+<p>A message providing additional human-readable information on the nature or
+provenance of a result. Any non-<code class="docutils literal notranslate"><span class="pre">ok</span></code> results <em>should</em> have a message providing
+information on the rational of their status characterization.</p>
+<p>A message can be a string or a tuple. In case of a tuple, the second item can
+contain values for <code class="docutils literal notranslate"><span class="pre">%</span></code>-expansion of the message string. Expansion is performed
+only immediately prior to actually outputting the message, hence string formatting
+runtime costs can be avoided this way, if a message is not actually shown.</p>
+</section>
+<section id="logger">
+<h3><code class="docutils literal notranslate"><span class="pre">logger</span></code><a class="headerlink" href="#logger" title="Permalink to this headline"></a></h3>
+<p>If a result record has a <code class="docutils literal notranslate"><span class="pre">message</span></code> field, then a given <cite>Logger</cite> instance
+(typically from <code class="docutils literal notranslate"><span class="pre">logging.getLogger()</span></code>) will be used to automatically log
+this message. The log channel/level is determined based on
+<code class="docutils literal notranslate"><span class="pre">datalad.log.result-level</span></code> configuration setting. By default, this is
+the <code class="docutils literal notranslate"><span class="pre">debug</span></code> level. When set to <code class="docutils literal notranslate"><span class="pre">match-status</span></code> the log level is determined
+based on the <code class="docutils literal notranslate"><span class="pre">status</span></code> field of a result record:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">debug</span></code> for <code class="docutils literal notranslate"><span class="pre">'ok'</span></code>, and <code class="docutils literal notranslate"><span class="pre">'notneeded'</span></code> results</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">warning</span></code> for <code class="docutils literal notranslate"><span class="pre">'impossible'</span></code> results</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">error</span></code> for <code class="docutils literal notranslate"><span class="pre">'error'</span></code> results</p></li>
+</ul>
+<p>This feature should be used with care. Unconditional logging can lead to
+confusing double-reporting when results rendered and also visibly logged.</p>
+</section>
+<section id="refds">
+<h3><code class="docutils literal notranslate"><span class="pre">refds</span></code><a class="headerlink" href="#refds" title="Permalink to this headline"></a></h3>
+<p>This field can identify a path (using the same semantics and requirements as
+the <code class="docutils literal notranslate"><span class="pre">path</span></code> field) to a reference dataset that represents the larger context
+of an operation. For example, when recursively processing multiple files across
+a number of subdatasets, a <code class="docutils literal notranslate"><span class="pre">refds</span></code> value may point to the common superdataset.
+This value may influence, for example, how paths are rendered in user-output.</p>
+</section>
+<section id="parentds">
+<h3><code class="docutils literal notranslate"><span class="pre">parentds</span></code><a class="headerlink" href="#parentds" title="Permalink to this headline"></a></h3>
+<p>This field can identify a path (using the same semantics and requirements as
+the <code class="docutils literal notranslate"><span class="pre">path</span></code> field) to a dataset containing an entity.</p>
+</section>
+<section id="state">
+<h3><code class="docutils literal notranslate"><span class="pre">state</span></code><a class="headerlink" href="#state" title="Permalink to this headline"></a></h3>
+<p>A string label categorizing the state of an entity. Common values are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">clean</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">untracked</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">modified</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">deleted</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">absent</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">present</span></code></p></li>
+</ul>
+</section>
+<section id="error-messages">
+<h3><code class="docutils literal notranslate"><span class="pre">error-messages</span></code><a class="headerlink" href="#error-messages" title="Permalink to this headline"></a></h3>
+<p>List of any error messages that were captured or produced while achieving a
+result.</p>
+</section>
+<section id="exception">
+<h3><code class="docutils literal notranslate"><span class="pre">exception</span></code><a class="headerlink" href="#exception" title="Permalink to this headline"></a></h3>
+<p>An exception that occurred while achieving the reported result.</p>
+</section>
+<section id="exception-traceback">
+<h3><code class="docutils literal notranslate"><span class="pre">exception_traceback</span></code><a class="headerlink" href="#exception-traceback" title="Permalink to this headline"></a></h3>
+<p>A string with a traceback for the exception reported in <code class="docutils literal notranslate"><span class="pre">exception</span></code>.</p>
+</section>
+</section>
+<section id="additional-fields-observed-in-the-wild">
+<h2>Additional fields observed “in the wild”<a class="headerlink" href="#additional-fields-observed-in-the-wild" title="Permalink to this headline"></a></h2>
+<p>Given that arbitrary fields are supported in result records, it is impossible
+to compose a comprehensive list of field names (keys). However, in order to
+counteract needless proliferation, the following list describes fields that
+have been observed in implementations. Developers are encouraged to preferably
+use compatible names from this list, or extend the list for additional items.</p>
+<p>In alphabetical order:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">bytesize</span></code></dt><dd><p>The size of an entity in bytes (integer).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">gitshasum</span></code></dt><dd><p>SHA1 of an entity (string)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">prev_gitshasum</span></code></dt><dd><p>SHA1 of a previous state of an entity (string)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">key</span></code></dt><dd><p>The git-annex key associated with a <code class="docutils literal notranslate"><span class="pre">type</span></code>-<code class="docutils literal notranslate"><span class="pre">file</span></code> entity.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="file_url_handling.html" class="btn btn-neutral float-left" title="File URL handling" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dataset_argument.html" class="btn btn-neutral float-right" title="dataset argument" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

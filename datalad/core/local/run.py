@@ -1,5 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# ex: set sts=4 ts=4 sw=4 noet:
+# ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -11,60 +11,64 @@
 __docformat__ = 'restructuredtext'
 
 
-import logging
 import json
-import warnings
-
-from argparse import REMAINDER
+import logging
 import os
 import os.path as op
-from os.path import join as opj
-from os.path import normpath
-from os.path import relpath
+import warnings
+from argparse import REMAINDER
+from pathlib import Path
 from tempfile import mkdtemp
 
+import datalad
+import datalad.support.ansi_colors as ac
+from datalad.config import anything2bool
 from datalad.core.local.save import Save
+from datalad.core.local.status import Status
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
-from datalad.interface.unlock import Unlock
-
-from datalad.interface.base import Interface
-from datalad.interface.utils import default_result_renderer
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.common_opts import (
+    jobs_opt,
+    save_message_opt,
+)
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import save_message_opt
-
-from datalad.config import anything2bool
-
-import datalad.support.ansi_colors as ac
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureBool
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
+from datalad.local.unlock import Unlock
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+)
 from datalad.support.exceptions import (
     CapturedException,
-    CommandError
+    CommandError,
 )
 from datalad.support.globbedpaths import GlobbedPaths
-from datalad.support.param import Parameter
 from datalad.support.json_py import dump2stream
-
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import require_dataset
-from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.dataset import datasetmethod
-
+from datalad.support.param import Parameter
 from datalad.ui import ui
-
 from datalad.utils import (
+    SequenceFormatter,
     chpwd,
-    ensure_bytes,
+    ensure_list,
     ensure_unicode,
     get_dataset_root,
     getpwd,
     join_cmdline,
     quote_cmdlinearg,
-    SequenceFormatter,
 )
 
 lgr = logging.getLogger('datalad.core.local.run')
@@ -101,7 +105,10 @@ class Run(Interface):
     the command execution is made.
 
     If the given command errors, a `CommandError` exception with the same exit
-    code will be raised, and no modifications will be saved.
+    code will be raised, and no modifications will be saved. A command
+    execution will not be attempted, by default, when an error occurred during
+    input or output preparation. This default ``stop`` behavior can be
+    overridden via [CMD: --on-failure ... CMD][PY: `on_failure=...` PY].
 
     *Command format*
 
@@ -138,7 +145,7 @@ class Run(Interface):
 
       Add a placeholder "name" with the value "joe"::
 
-        % git config --file=.datalad/config datalad.run.substitutions.name joe
+        % datalad configuration --scope branch set datalad.run.substitutions.name=joe
         % datalad save -m "Configure name placeholder" .datalad/config
 
       Access the new placeholder in a command::
@@ -174,10 +181,25 @@ class Run(Interface):
              code_cmd="""\
              datalad run -m 'run my script' -i 'data/*' \\
              -i 'datafile.txt' -o 'output_dir/*' -o \\
-             'outfile.txt' 'code/script.sh'""")
+             'outfile.txt' 'code/script.sh'"""),
+        dict(text="Use ** to match any file at any directory depth recursively. "
+                  "Single * does not check files within matched directories.",
+             code_py="""\
+             run(cmd='code/script.sh',
+                 message='run my script',
+                 inputs=['data/**/*.dat'],
+                 outputs=['output_dir/**'])""",
+             code_cmd="""\
+             datalad run -m 'run my script' -i 'data/**/*.dat' \\
+             -o 'output_dir/**' 'code/script.sh'""")
     ]
 
     result_renderer = "tailored"
+    # make run stop immediately on non-success results.
+    # this prevents command execution after failure to obtain inputs of prepare
+    # outputs. but it can be overriding via the common 'on_failure' parameter
+    # if needed.
+    on_failure = 'stop'
 
     _params_ = dict(
         cmd=Parameter(
@@ -251,13 +273,19 @@ class Run(Interface):
             uninstalled dataset will be left unexpanded because no subdatasets
             will be installed for a dry run.""",
             constraints=EnsureChoice(None, "basic", "command")),
+        jobs=jobs_opt
     )
+    _params_['jobs']._doc += """\
+        NOTE: This option can only parallelize input retrieval (get) and output
+        recording (save). DataLad does NOT parallelize your scripts for you.
+    """
 
     @staticmethod
     @datasetmethod(name='run')
     @eval_results
     def __call__(
             cmd=None,
+            *,
             dataset=None,
             inputs=None,
             outputs=None,
@@ -266,7 +294,8 @@ class Run(Interface):
             explicit=False,
             message=None,
             sidecar=None,
-            dry_run=None):
+            dry_run=None,
+            jobs=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
@@ -274,7 +303,8 @@ class Run(Interface):
                              explicit=explicit,
                              message=message,
                              sidecar=sidecar,
-                             dry_run=dry_run):
+                             dry_run=dry_run,
+                             jobs=jobs):
             yield r
 
     @staticmethod
@@ -288,7 +318,24 @@ class Run(Interface):
             else:
                 raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
         else:
-            default_result_renderer(res)
+            if kwargs.get("on_failure") == "stop" and \
+               res.get("action") == "run" and res.get("status") == "error":
+                msg_path = res.get("msg_path")
+                if msg_path:
+                    ds_path = res["path"]
+                    if datalad.get_apimode() == 'python':
+                        help = f"\"Dataset('{ds_path}').save(path='.', " \
+                               "recursive=True, message_file='%s')\""
+                    else:
+                        help = "'datalad save -d . -r -F %s'"
+                    lgr.info(
+                        "The command had a non-zero exit code. "
+                        "If this is expected, you can save the changes with "
+                        f"{help}",
+                        # shorten to the relative path for a more concise
+                        # message
+                        Path(msg_path).relative_to(ds_path))
+            generic_result_renderer(res)
 
 
 def _display_basic(res):
@@ -349,7 +396,7 @@ def get_command_pwds(dataset):
             dataset = get_dataset_root(pwd)
 
         if dataset:
-            rel_pwd = relpath(pwd, dataset)
+            rel_pwd = op.relpath(pwd, dataset)
         else:
             rel_pwd = pwd  # and leave handling to caller
     return pwd, rel_pwd
@@ -394,8 +441,10 @@ def _install_and_reglob(dset_path, gpaths):
     while dirs_new and dirs != dirs_new:
         for res in install(dataset=dset_path,
                            path=dirs_new,
-                           result_xfm=None, return_type='generator',
-                           on_failure="ignore"):
+                           result_xfm=None,
+                           result_renderer='disabled',
+                           return_type='generator',
+                           on_failure='ignore'):
             if _is_nonexistent_path(res):
                 lgr.debug("Skipping install of non-existent path: %s",
                           res["path"])
@@ -404,7 +453,7 @@ def _install_and_reglob(dset_path, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset_path, inputs, extra_inputs=None):
+def prepare_inputs(dset_path, inputs, extra_inputs=None, jobs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -437,11 +486,15 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None):
                     action="run", ds=ds, status="error",
                     message=("Input did not match existing file: %s",
                              miss))
-        yield from get(dataset=dset_path, path=gp.expand_strict(),
-                       on_failure="ignore")
+        yield from get(dataset=dset_path,
+                       path=gp.expand_strict(),
+                       on_failure='ignore',
+                       result_renderer='disabled',
+                       return_type='generator',
+                       jobs=jobs)
 
 
-def _unlock_or_remove(dset_path, paths):
+def _unlock_or_remove(dset_path, paths, remove=False):
     """Unlock `paths` if content is present; remove otherwise.
 
     Parameters
@@ -449,6 +502,8 @@ def _unlock_or_remove(dset_path, paths):
     dset_path : str
     paths : list of string
         Absolute paths of dataset files.
+    remove : bool, optional
+        If enabled, always remove instead of performing an availability test.
 
     Returns
     -------
@@ -465,31 +520,54 @@ def _unlock_or_remove(dset_path, paths):
             # common cases (e.g., when rerunning with --onto).
             lgr.debug("Filtered out non-existing path: %s", path)
 
-    if existing:
-        notpresent_results = []
-        # Note: If Unlock() is given a directory (including a subdataset) as a
-        # path, files without content present won't be reported, so those cases
-        # aren't being covered by the "remove if not present" logic below.
-        for res in Unlock()(dataset=dset_path, path=existing,
-                            on_failure="ignore"):
+    if not existing:
+        return
+
+    to_remove = []
+    if remove:
+        # when we force-remove, we use status to discover matching content
+        # and let unlock's remove fallback handle these results
+        to_remove = Status()(
+            dataset=dset_path,
+            path=existing,
+            eval_subdataset_state='commit',
+            untracked='no',
+            annex='no',
+            on_failure="ignore",
+            # no rendering here, the relevant results are yielded below
+            result_renderer='disabled',
+            return_type='generator',
+            # we only remove files, no subdatasets or directories
+            result_filter=lambda x: x.get('type') in ('file', 'symlink'),
+        )
+    else:
+        # Note: If Unlock() is given a directory (including a subdataset)
+        # as a path, files without content present won't be reported, so
+        # those cases aren't being covered by the "remove if not present"
+        # logic below.
+        for res in Unlock()(dataset=dset_path,
+                            path=existing,
+                            on_failure='ignore',
+                            result_renderer='disabled',
+                            return_type='generator'):
             if res["status"] == "impossible" and res["type"] == "file" \
                and "cannot unlock" in res["message"]:
-                notpresent_results.append(res)
+                to_remove.append(res)
                 continue
             yield res
-        # Avoid `datalad remove` because it calls git-rm underneath, which will
-        # remove leading directories if no other files remain. See gh-5486.
-        for res in notpresent_results:
-            try:
-                os.unlink(res["path"])
-            except OSError as exc:
-                ce = CapturedException(exc)
-                yield dict(res, action="run.remove", status="error",
-                           message=("Removing file failed: %s", ce),
-                           exception=ce)
-            else:
-                yield dict(res, action="run.remove", status="ok",
-                           message="Removed file")
+    # Avoid `datalad remove` because it calls git-rm underneath, which will
+    # remove leading directories if no other files remain. See gh-5486.
+    for res in to_remove:
+        try:
+            os.unlink(res["path"])
+        except OSError as exc:
+            ce = CapturedException(exc)
+            yield dict(res, action="run.remove", status="error",
+                       message=("Removing file failed: %s", ce),
+                       exception=ce)
+        else:
+            yield dict(res, action="run.remove", status="ok",
+                       message="Removed file")
 
 
 def normalize_command(command):
@@ -550,7 +628,61 @@ def format_command(dset, command, **kwds):
     return sfmt.format(command, **kwds)
 
 
-def _execute_command(command, pwd, expected_exit=None):
+def _get_substitutions(dset):
+    """Get substitution mapping
+
+    Parameters
+    ----------
+    dset : Dataset
+      Providing the to-be-queried configuration.
+
+    Returns
+    -------
+    dict
+      Mapping substitution keys to their values.
+    """
+    return {
+        k.replace("datalad.run.substitutions.", ""): v
+        for k, v in dset.config.items("datalad.run.substitutions")
+    }
+
+
+def _format_iospecs(specs, **kwargs):
+    """Expand substitutions in specification lists.
+
+    The expansion is generally a format() call on each items, using
+    the kwargs as substitution mapping. A special case is, however,
+    a single-item specification list that exclusively contains a
+    plain substitution reference, i.e., ``{subst}``, that matches
+    a kwargs-key (minus the brace chars), whose value is a list.
+    In this case the entire specification list is substituted for
+    the list in kwargs, which is returned as such. This enables
+    the replace/re-use sequences, e.g. --inputs '{outputs}'
+
+    Parameters
+    ----------
+    specs: list(str) or None
+      Specification items to format.
+    **kwargs:
+      Placeholder key-value mapping to apply to specification items.
+
+    Returns
+    -------
+    list
+      All formatted items.
+    """
+    if not specs:
+        return
+    elif len(specs) == 1 and specs[0] \
+            and specs[0][0] == '{' and specs[0][-1] == '}' \
+            and isinstance(kwargs.get(specs[0][1:-1]), list):
+        return kwargs[specs[0][1:-1]]
+    return [
+        s.format(**kwargs) for s in specs
+    ]
+
+
+def _execute_command(command, pwd):
     from datalad.cmd import WitlessRunner
 
     exc = None
@@ -563,32 +695,105 @@ def _execute_command(command, pwd, expected_exit=None):
             command
         )
     except CommandError as e:
-        # strip our own info from the exception. The original command output
-        # went to stdout/err -- we just have to exitcode in the same way
         exc = e
         cmd_exitcode = e.code
-
-        if expected_exit is not None and expected_exit != cmd_exitcode:
-            # we failed in a different way during a rerun.  This can easily
-            # happen if we try to alter a locked file
-            #
-            # TODO add the ability to `git reset --hard` the dataset tree on failure
-            # we know that we started clean, so we could easily go back, needs gh-1424
-            # to be able to do it recursively
-            raise exc
-
     lgr.info("== Command exit (modification check follows) =====")
     return cmd_exitcode or 0, exc
 
 
+def _prep_worktree(ds_path, pwd, globbed,
+                   assume_ready=None, remove_outputs=False,
+                   rerun_outputs=None,
+                   jobs=None):
+    """
+    Yields
+    ------
+    dict
+      Result records
+    """
+    # ATTN: For correct path handling, all dataset commands call should be
+    # unbound. They should (1) receive a string dataset argument, (2) receive
+    # relative paths, and (3) happen within a chpwd(pwd) context.
+    with chpwd(pwd):
+        for res in prepare_inputs(
+                ds_path,
+                [] if assume_ready in ["inputs", "both"]
+                else globbed['inputs'],
+                # Ignore --assume-ready for extra_inputs. It's an unexposed
+                # implementation detail that lets wrappers sneak in inputs.
+                extra_inputs=globbed['extra_inputs'],
+                jobs=jobs):
+            yield res
+
+        if assume_ready not in ["outputs", "both"]:
+            if globbed['outputs']:
+                for res in _install_and_reglob(
+                        ds_path, globbed['outputs']):
+                    yield res
+                for res in _unlock_or_remove(
+                        ds_path,
+                        globbed['outputs'].expand_strict()
+                        if not remove_outputs
+                        # when force-removing, exclude declared inputs
+                        else set(
+                            globbed['outputs'].expand_strict()).difference(
+                                globbed['inputs'].expand_strict()),
+                        remove=remove_outputs):
+                    yield res
+
+            if rerun_outputs is not None:
+                for res in _unlock_or_remove(ds_path, rerun_outputs):
+                    yield res
+
+
+def _create_record(run_info, sidecar_flag, ds):
+    """
+    Returns
+    -------
+    str or None, str or None
+      The first value is either the full run record in JSON serialzied form,
+      or content-based ID hash, if the record was written to a file. In that
+      latter case, the second value is the path to the record sidecar file,
+      or None otherwise.
+    """
+    record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
+    if sidecar_flag is None:
+        use_sidecar = ds.config.get(
+            'datalad.run.record-sidecar', default=False)
+        use_sidecar = anything2bool(use_sidecar)
+    else:
+        use_sidecar = sidecar_flag
+
+    record_id = None
+    record_path = None
+    if use_sidecar:
+        # record ID is hash of record itself
+        from hashlib import md5
+        record_id = md5(record.encode('utf-8')).hexdigest()  # nosec
+        record_dir = ds.config.get(
+            'datalad.run.record-directory',
+            default=op.join('.datalad', 'runinfo'))
+        record_path = ds.pathobj / record_dir / record_id
+        if not op.lexists(record_path):
+            # go for compression, even for minimal records not much difference,
+            # despite offset cost
+            # wrap in list -- there is just one record
+            dump2stream([run_info], record_path, compressed=True)
+    return record_id or record, record_path
+
+
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
-                dry_run=False,
+                dry_run=False, jobs=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
                 rerun_outputs=None,
-                inject=False):
+                inject=False,
+                parametric_record=False,
+                remove_outputs=False,
+                skip_dirtycheck=False,
+                yield_expanded=None):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -617,6 +822,24 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
+    parametric_record : bool, optional
+        If enabled, substitution placeholders in the input/output specification
+        are retained verbatim in the run record. This enables using a single
+        run record for multiple different re-runs via individual
+        parametrization.
+    remove_outputs : bool, optional
+        If enabled, all declared outputs will be removed prior command
+        execution, except for paths that are also declared inputs.
+    skip_dirtycheck : bool, optional
+        If enabled, a check for dataset modifications is unconditionally
+        disabled, even if other parameters would indicate otherwise. This
+        can be used by callers that already performed analog verififcations
+        to avoid duplicate processing.
+    yield_expanded : {'inputs', 'outputs', 'both'}, optional
+        Include a 'expanded_%s' item into the run result with the exanded list
+        of paths matching the inputs and/or outputs specification,
+        respectively.
+
 
     Yields
     ------
@@ -626,11 +849,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         lgr.warning("No command given")
         return
 
+    specs = {
+        k: ensure_list(v) for k, v in (('inputs', inputs),
+                                       ('extra_inputs', extra_inputs),
+                                       ('outputs', outputs))
+    }
+
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
-        pwd = normpath(opj(dataset.path, rel_pwd))
-        rel_pwd = relpath(pwd, dataset.path)
+        pwd = op.normpath(op.join(dataset.path, rel_pwd))
+        rel_pwd = op.relpath(pwd, dataset.path)
     else:
         pwd, rel_pwd = get_command_pwds(dataset)
 
@@ -641,7 +870,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     lgr.debug('tracking command output underneath %s', ds)
 
-    if not (rerun_info or inject):  # Rerun already takes care of this.
+    # skip for callers that already take care of this
+    if not (skip_dirtycheck or rerun_info or inject):
         # For explicit=True, we probably want to check whether any inputs have
         # modifications. However, we can't just do is_dirty(..., path=inputs)
         # because we need to consider subdatasets and untracked files.
@@ -656,56 +886,72 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     'use `datalad status` to inspect unsaved changes'))
             return
 
+    # everything below expects the string-form of the command
     cmd = normalize_command(cmd)
+    # pull substitutions from config
+    cmd_fmt_kwargs = _get_substitutions(ds)
+    # amend with unexpanded dependency/output specifications, which might
+    # themselves contain substitution placeholder
+    for n, val in specs.items():
+        if val:
+            cmd_fmt_kwargs[n] = val
 
-    inputs = GlobbedPaths(inputs, pwd=pwd,
-                          expand=expand in ["inputs", "both"])
-    extra_inputs = GlobbedPaths(extra_inputs, pwd=pwd,
-                                # Follow same expansion rules as `inputs`.
-                                expand=expand in ["inputs", "both"])
-    outputs = GlobbedPaths(outputs, pwd=pwd,
-                           expand=expand in ["outputs", "both"])
+    # apply the substitution to the IO specs
+    expanded_specs = {
+        k: _format_iospecs(v, **cmd_fmt_kwargs) for k, v in specs.items()
+    }
+    # try-expect to catch expansion issues in _format_iospecs() which
+    # expands placeholders in dependency/output specification before
+    # globbing
+    try:
+        globbed = {
+            k: GlobbedPaths(
+                v,
+                pwd=pwd,
+                expand=expand in (
+                    # extra_inputs follow same expansion rules as `inputs`.
+                    ["both"] + (['outputs'] if k == 'outputs' else ['inputs'])
+                ))
+            for k, v in expanded_specs.items()
+        }
+    except KeyError as exc:
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=(
+                'input/output specification has an unrecognized '
+                'placeholder: %s', exc))
+        return
 
-    # ATTN: For correct path handling, all dataset commands call should be
-    # unbound. They should (1) receive a string dataset argument, (2) receive
-    # relative paths, and (3) happen within a chpwd(pwd) context.
     if not (inject or dry_run):
-        with chpwd(pwd):
-            for res in prepare_inputs(
-                    ds_path,
-                    [] if assume_ready in ["inputs", "both"] else inputs,
-                    # Ignore --assume-ready for extra_inputs. It's an unexposed
-                    # implementation detail that lets wrappers sneak in inputs.
-                    extra_inputs):
-                yield res
-
-            if assume_ready not in ["outputs", "both"]:
-                if outputs:
-                    for res in _install_and_reglob(ds_path, outputs):
-                        yield res
-                    for res in _unlock_or_remove(ds_path,
-                                                 outputs.expand_strict()):
-                        yield res
-
-                if rerun_outputs is not None:
-                    for res in _unlock_or_remove(ds_path, rerun_outputs):
-                        yield res
+        yield from _prep_worktree(
+            ds_path, pwd, globbed,
+            assume_ready=assume_ready,
+            remove_outputs=remove_outputs,
+            rerun_outputs=rerun_outputs,
+            jobs=None)
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.
         cmd_exitcode = 0
         exc = None
 
+    # prepare command formatting by extending the set of configurable
+    # substitutions with the essential components
+    cmd_fmt_kwargs.update(
+        pwd=pwd,
+        dspath=ds_path,
+        # Check if the command contains "{tmpdir}" to avoid creating an
+        # unnecessary temporary directory in most but not all cases.
+        tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
+        # the following override any matching non-glob substitution
+        # values
+        inputs=globbed['inputs'],
+        outputs=globbed['outputs'],
+    )
     try:
-        cmd_expanded = format_command(
-            ds, cmd,
-            pwd=pwd,
-            dspath=ds_path,
-            # Check if the command contains "{tmpdir}" to avoid creating an
-            # unnecessary temporary directory in most but not all cases.
-            tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
-            inputs=inputs,
-            outputs=outputs)
+        cmd_expanded = format_command(ds, cmd, **cmd_fmt_kwargs)
     except KeyError as exc:
         yield get_status_dict(
             'run',
@@ -721,11 +967,21 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # - exit code of the command
     run_info = {
         'cmd': cmd,
+        # rerun does not handle any prop being None, hence all
+        # the `or/else []`
         'chain': rerun_info["chain"] if rerun_info else [],
-        'inputs': inputs.paths,
-        'extra_inputs': extra_inputs.paths,
-        'outputs': outputs.paths,
     }
+    # for all following we need to make sure that the raw
+    # specifications, incl. any placeholders make it into
+    # the run-record to enable "parametric" re-runs
+    # ...except when expansion was requested
+    for k, v in specs.items():
+        run_info[k] = globbed[k].paths \
+            if expand in ["both"] + (
+                ['outputs'] if k == 'outputs' else ['inputs']) \
+            else (v if parametric_record
+                  else expanded_specs[k]) or []
+
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
         run_info['pwd'] = rel_pwd
@@ -738,16 +994,16 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         yield get_status_dict(
             "run [dry-run]", ds=ds, status="ok", message="Dry run",
             run_info=run_info,
-            dry_run_info=dict(cmd_expanded=cmd_expanded,
-                              pwd_full=pwd,
-                              inputs=inputs.expand(),
-                              outputs=outputs.expand()))
+            dry_run_info=dict(
+                cmd_expanded=cmd_expanded,
+                pwd_full=pwd,
+                **{k: globbed[k].expand() for k in ('inputs', 'outputs')},
+            )
+        )
         return
 
     if not inject:
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+        cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
 
     # Re-glob to capture any new outputs.
@@ -755,28 +1011,18 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # TODO: If a warning or error is desired when an --output pattern doesn't
     # have a match, this would be the spot to do it.
     if explicit or expand in ["outputs", "both"]:
-        outputs.expand(refresh=True)
-        run_info["outputs"] = outputs.paths
+        # also for explicit mode we have to re-glob to be able to save all
+        # matching outputs
+        globbed['outputs'].expand(refresh=True)
+        if expand in ["outputs", "both"]:
+            run_info["outputs"] = globbed['outputs'].paths
 
-    record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
+    # create the run record, either as a string, or written to a file
+    # depending on the config/request
+    record, record_path = _create_record(run_info, sidecar, ds)
 
-    if sidecar is None:
-        use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
-        use_sidecar = anything2bool(use_sidecar)
-    else:
-        use_sidecar = sidecar
-
-
-    if use_sidecar:
-        # record ID is hash of record itself
-        from hashlib import md5
-        record_id = md5(record.encode('utf-8')).hexdigest()
-        record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
-        record_path = op.join(ds_path, record_dir, record_id)
-        if not op.lexists(record_path):
-            # go for compression, even for minimal records not much difference, despite offset cost
-            # wrap in list -- there is just one record
-            dump2stream([run_info], record_path, compressed=True)
+    # abbreviate version of the command for illustrative purposes
+    cmd_shorty = _format_cmd_shorty(cmd_expanded)
 
     # compose commit message
     msg = u"""\
@@ -787,37 +1033,73 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 ^^^ Do not change lines above ^^^
 """
     msg = msg.format(
-        message if message is not None else _format_cmd_shorty(cmd_expanded),
-        '"{}"'.format(record_id) if use_sidecar else record)
+        message if message is not None else cmd_shorty,
+        '"{}"'.format(record) if record_path else record)
 
-    outputs_to_save = outputs.expand_strict() if explicit else None
-    if outputs_to_save is not None and use_sidecar:
+    outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
+    if outputs_to_save is not None and record_path:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
+    msg_path = None
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
-            msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
-            with open(msg_path, "wb") as ofh:
-                ofh.write(ensure_bytes(msg))
-            lgr.info("The command had a non-zero exit code. "
-                     "If this is expected, you can save the changes with "
-                     "'datalad save -d . -r -F %s'",
-                     msg_path)
-            if repo.dirty and not explicit:
-                # Give clean-up hints if a formerly clean repo is left dirty
-                lgr.info(
-                    "The commands 'git clean -di' and/or 'git reset' "
-                    "could be used to get to a clean dataset state again. "
-                    "Consult their man pages for more information."
-                )
-        raise exc
-    elif do_save:
+            # must record path to be relative to ds.path to meet
+            # result record semantics (think symlink resolution, etc)
+            msg_path = ds.pathobj / \
+                repo.dot_git.relative_to(repo.pathobj) / "COMMIT_EDITMSG"
+            msg_path.write_text(msg)
+
+    expected_exit = rerun_info.get("exit", 0) if rerun_info else None
+    if cmd_exitcode and expected_exit != cmd_exitcode:
+        status = "error"
+    else:
+        status = "ok"
+
+    run_result = get_status_dict(
+        "run", ds=ds,
+        status=status,
+        # use the abbrev. command as the message to give immediate clarity what
+        # completed/errors in the generic result rendering
+        message=cmd_shorty,
+        run_info=run_info,
+        # use the same key that `get_status_dict()` would/will use
+        # to record the exit code in case of an exception
+        exit_code=cmd_exitcode,
+        exception=exc,
+        # Provide msg_path and explicit outputs so that, under
+        # on_failure='stop', callers can react to a failure and then call
+        # save().
+        msg_path=str(msg_path) if msg_path else None,
+    )
+    if record_path:
+        # we the record is in a sidecar file, report its ID
+        run_result['record_id'] = record
+    for s in ('inputs', 'outputs'):
+        # this enables callers to further inspect the outputs without
+        # performing globbing again. Together with remove_outputs=True
+        # these would be guaranteed to be the outcome of the executed
+        # command. in contrast to `outputs_to_save` this does not
+        # include aux file, such as the run record sidecar file.
+        # calling .expand_strict() again is largely reporting cached
+        # information
+        # (format: relative paths)
+        if yield_expanded in (s, 'both'):
+            run_result[f'expanded_{s}'] = globbed[s].expand_strict()
+    yield run_result
+
+    if do_save:
         with chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,
                     path=outputs_to_save,
                     recursive=True,
                     message=msg,
-                    return_type='generator'):
+                    jobs=jobs,
+                    return_type='generator',
+                    # we want this command and its parameterization to be in full
+                    # control about the rendering of results, hence we must turn
+                    # off internal rendering
+                    result_renderer='disabled',
+                    on_failure='ignore'):
                 yield r

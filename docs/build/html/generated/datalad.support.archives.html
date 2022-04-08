@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>datalad.support.archives &mdash; DataLad 0.15.3+529.gc81453444.dirty documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="datalad.customremotes.base" href="datalad.customremotes.base.html" />
+    <link rel="prev" title="datalad.support.annexrepo" href="datalad.support.annexrepo.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> DataLad
+            <img src="../_static/datalad_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                0.15
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../publications.html">Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../background.html">Background and motivation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../related.html">Delineation from related solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basic principles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credentials.html">Credentials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metadata.html">Metadata</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customization.html">Customization and extension of functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cmdline.html">Command line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../modref.html">Python module reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#high-level-user-interface">High-level user interface</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../modref.html#support-functionality">Support functionality</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="datalad.cmd.html">datalad.cmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.consts.html">datalad.consts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.log.html">datalad.log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.utils.html">datalad.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.version.html">datalad.version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.gitrepo.html">datalad.support.gitrepo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.support.annexrepo.html">datalad.support.annexrepo</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">datalad.support.archives</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.base.html">datalad.customremotes.base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="datalad.customremotes.archives.html">datalad.customremotes.archives</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#configuration-management">Configuration management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#test-infrastructure">Test infrastructure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modref.html#command-line-interface-infrastructure">Command line interface infrastructure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../config.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DataLad</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../modref.html">Python module reference</a> &raquo;</li>
+      <li>datalad.support.archives</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-datalad.support.archives">
+<span id="datalad-support-archives"></span><h1>datalad.support.archives<a class="headerlink" href="#module-datalad.support.archives" title="Permalink to this headline"></a></h1>
+<p>Various handlers/functionality for different types of files (e.g. for archives)</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.archives.ArchivesCache">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.archives.</span></span><span class="sig-name descname"><span class="pre">ArchivesCache</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">toppath</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ArchivesCache"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ArchivesCache" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Cache to maintain extracted archives</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>toppath</strong> (<em>str</em>) – Top directory under .git/ of which temp directory would be created.
+If not provided – random tempdir is used</p></li>
+<li><p><strong>persistent</strong> (<em>bool</em><em>, </em><em>optional</em>) – Passed over into generated ExtractedArchives</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ArchivesCache.clean">
+<span class="sig-name descname"><span class="pre">clean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ArchivesCache.clean"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ArchivesCache.clean" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ArchivesCache.get_archive">
+<span class="sig-name descname"><span class="pre">get_archive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">archive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ArchivesCache.get_archive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ArchivesCache.get_archive" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.archives.ArchivesCache.path">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">path</span></span><a class="headerlink" href="#datalad.support.archives.ArchivesCache.path" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">datalad.support.archives.</span></span><span class="sig-name descname"><span class="pre">ExtractedArchive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">archive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Container for the extracted archive</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.STAMP_SUFFIX">
+<span class="sig-name descname"><span class="pre">STAMP_SUFFIX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'.stamp'</span></em><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.STAMP_SUFFIX" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.assure_extracted">
+<span class="sig-name descname"><span class="pre">assure_extracted</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive.assure_extracted"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.assure_extracted" title="Permalink to this definition"></a></dt>
+<dd><p>Return path to the extracted <cite>archive</cite>.  Extract archive if necessary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.clean">
+<span class="sig-name descname"><span class="pre">clean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive.clean"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.clean" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.get_extracted_file">
+<span class="sig-name descname"><span class="pre">get_extracted_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">afile</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive.get_extracted_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.get_extracted_file" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.get_extracted_filename">
+<span class="sig-name descname"><span class="pre">get_extracted_filename</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">afile</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive.get_extracted_filename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.get_extracted_filename" title="Permalink to this definition"></a></dt>
+<dd><p>Return full path to the <cite>afile</cite> within extracted <cite>archive</cite></p>
+<p>It does not actually extract any archive</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.get_extracted_files">
+<span class="sig-name descname"><span class="pre">get_extracted_files</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive.get_extracted_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.get_extracted_files" title="Permalink to this definition"></a></dt>
+<dd><p>Generator to provide filenames which are available under extracted archive</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.get_leading_directory">
+<span class="sig-name descname"><span class="pre">get_leading_directory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">consider</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#ExtractedArchive.get_leading_directory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.get_leading_directory" title="Permalink to this definition"></a></dt>
+<dd><p>Return leading directory of the content within archive</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>depth</strong> (<em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Maximal depth of leading directories to consider.  If None - no upper
+limit</p></li>
+<li><p><strong>consider</strong> (<em>list of str</em><em>, </em><em>optional</em>) – Regular expressions for file/directory names to be considered (before
+exclude). Applied to the entire relative path to the file as in the archive</p></li>
+<li><p><strong>exclude</strong> (<em>list of str</em><em>, </em><em>optional</em>) – Regular expressions for file/directory names to be excluded from consideration.
+Applied to the entire relative path to the file as in the archive</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>If there is no single leading directory – None returned</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.is_extracted">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_extracted</span></span><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.is_extracted" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.path">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">path</span></span><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.path" title="Permalink to this definition"></a></dt>
+<dd><p>Given an archive – return full path to it within cache (extracted)</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="datalad.support.archives.ExtractedArchive.stamp_path">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">stamp_path</span></span><a class="headerlink" href="#datalad.support.archives.ExtractedArchive.stamp_path" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="datalad.support.archives.decompress_file">
+<span class="sig-prename descclassname"><span class="pre">datalad.support.archives.</span></span><span class="sig-name descname"><span class="pre">decompress_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">archive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dir_</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">leading_directories</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'strip'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/datalad/support/archives.html#decompress_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#datalad.support.archives.decompress_file" title="Permalink to this definition"></a></dt>
+<dd><p>Decompress <cite>archive</cite> into a directory <cite>dir_</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>archive</strong> (<em>str</em>) – </p></li>
+<li><p><strong>dir</strong> (<em>str</em>) – </p></li>
+<li><p><strong>leading_directories</strong> (<em>{'strip'</em><em>, </em><em>None}</em>) – If <cite>strip</cite>, and archive contains a single leading directory under which
+all content is stored, all the content will be moved one directory up
+and that leading directory will be removed.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datalad.support.annexrepo.html" class="btn btn-neutral float-left" title="datalad.support.annexrepo" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="datalad.customremotes.base.html" class="btn btn-neutral float-right" title="datalad.customremotes.base" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2022, DataLad team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
