@@ -59,7 +59,7 @@ def test__version__():
                 # should be a "release" record
                 assert_not_in('???', regd['date'])
                 ok_startswith(__version__, changelog_version)
-                if lv__version__ != changelog_version:
+                if lv__version__ != lv_changelog_version:
                     # It was not tagged yet and Changelog has no new records
                     # (they are composed by auto upon release)
                     assert_greater(lv__version__, lv_changelog_version)
