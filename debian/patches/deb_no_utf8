@@ -12,7 +12,7 @@ Last-Update: 2018-06-05
 
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -60,7 +60,7 @@ novalue
+@@ -64,7 +64,7 @@ novalue
  empty =
  myint = 3
  
@@ -21,7 +21,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -133,16 +133,16 @@ def test_something(path, new_home):
+@@ -137,16 +137,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -41,7 +41,7 @@ Last-Update: 2018-06-05
           ('something.empty', ''),
           ('something.myint', '3'),
           ('something.novalue', None),
-@@ -162,7 +162,7 @@ def test_something(path, new_home):
+@@ -166,7 +166,7 @@ def test_something(path, new_home):
          cfg.get('something.user', get_all=True),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -50,7 +50,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      # git demands a key without value at all to be used as a flag, thus True
-@@ -181,8 +181,8 @@ def test_something(path, new_home):
+@@ -185,8 +185,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -63,7 +63,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_section('unheard.of'))
 --- a/datalad/core/local/tests/test_run.py
 +++ b/datalad/core/local/tests/test_run.py
-@@ -154,29 +154,29 @@ def test_py2_unicode_command(path):
+@@ -184,29 +184,29 @@ def test_py2_unicode_command(path):
      touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
      cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                          touch_cmd,
@@ -77,7 +77,8 @@ Last-Update: 2018-06-05
      # somewhat desperate attempt to detect our own Github CI tests on a
      # crippled filesystem (VFAT) that is so crippled that it doesn't handle
      # what is needed here. It just goes mad with encoded bytestrings:
-     # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
+-    # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
++    # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' B1 '"'"''' failed with exitcode 1 under /crippledfs/
      if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
 -        ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
 +        ds.run([sys.executable, "-c", touch_cmd, u"bB1.dat"])
@@ -94,15 +95,15 @@ Last-Update: 2018-06-05
 -        ok_exists(op.join(path, u" β1 "))
 +        ok_exists(op.join(path, u" B1 "))
  
-     with assert_raises(CommandError), swallow_outputs():
--        ds.run(u"bβ2.dat")
-+        ds.run(u"bB2.dat")
+     assert_in_results(
+-        ds.run(u"bβ2.dat", result_renderer=None, on_failure="ignore"),
++        ds.run(u"bB2.dat", result_renderer=None, on_failure="ignore"),
+         status="error", action="run")
  
  
- @with_tempfile(mkdir=True)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1413,7 +1413,9 @@ def with_parametric_batch(t):
+@@ -1527,7 +1527,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -113,25 +114,9 @@ Last-Update: 2018-06-05
  
  # OSX is exciting -- some I guess FS might be encoding differently from decoding
  # so Й might get recoded
---- a/datalad/core/local/tests/test_diff.py
-+++ b/datalad/core/local/tests/test_diff.py
-@@ -504,9 +504,12 @@ def test_diff_rsync_syntax(path):
- 
- @with_tempfile(mkdir=True)
- def test_diff_nonexistent_ref_unicode(path):
-+    # Unicode testing fails with pythons < 3.7 during debian build
-+	# https://github.com/datalad/datalad/issues/4016
-+    import sys
-     ds = Dataset(path).create()
-     assert_result_count(
--        ds.diff(fr="HEAD", to=u"β", on_failure="ignore", result_renderer=None),
-+        ds.diff(fr="HEAD", to=u"β" if sys.version_info[:2] >= (3, 7) else "b", on_failure="ignore", result_renderer=None),
-         1,
-         path=ds.path,
-         status="impossible")
 --- a/datalad/runner/tests/test_witless_runner.py
 +++ b/datalad/runner/tests/test_witless_runner.py
-@@ -63,7 +63,7 @@ def py2cmd(code):
+@@ -56,7 +56,7 @@ from .utils import py2cmd
  @with_tempfile
  def test_runner(tempfile):
      runner = Runner()

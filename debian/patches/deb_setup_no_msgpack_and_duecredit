@@ -12,15 +12,15 @@ Last-Update: 2018-03-03
 
 --- a/setup.py
 +++ b/setup.py
-@@ -50,8 +50,9 @@ requires = {
+@@ -40,8 +40,9 @@ requires = {
      ],
      'downloaders': [
          'boto',
--        'keyring>=8.0', 'keyrings.alt',
+-        'keyring>=20.0', 'keyrings.alt',
 -        'msgpack',
 +        # disabled for Debian - dependencies are specified in debian/control
-+        # 'keyring>=8.0', 'keyrings.alt',
-+        # 'msgpack',
++        #'keyring>=20.0', 'keyrings.alt',
++        #'msgpack',
          'requests>=1.2',
      ],
      'downloaders-extra': [
