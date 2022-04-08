@@ -86,7 +86,7 @@ Enhancements and new features
 -  A new ``foreach-dataset`` plumbing command allows to run commands on
    each (sub)dataset, similar to ``git submodule foreach``
    `#5517 <https://github.com/datalad/datalad/pull/5517>`__ (by
-   @yariktoptic)
+   @yarikoptic)
 -  The ``dataset`` parameter is not restricted to only locally
    resolvable file-URLs anymore
    `#6276 <https://github.com/datalad/datalad/pull/6276>`__ (by

@@ -25,7 +25,7 @@
 - A new switch allows to enable librarymode and queries for the effective API in use [#6213](https://github.com/datalad/datalad/pull/6213) (by @mih)
 - ``run`` and ``rerun`` now support parallel jobs via ``--jobs`` [#6279](https://github.com/datalad/datalad/pull/6279) (by @AKSoo)
 - A new ``foreach-dataset`` plumbing command allows to run commands on each (sub)dataset, similar to ``git submodule foreach``
-[#5517](https://github.com/datalad/datalad/pull/5517) (by @yariktoptic)
+[#5517](https://github.com/datalad/datalad/pull/5517) (by @yarikoptic)
 - The ``dataset`` parameter is not restricted to only locally resolvable file-URLs anymore [#6276](https://github.com/datalad/datalad/pull/6276) (by @christian-monch)
 - DataLad's credential system is now able to query `git-credential` by specifying credential type `git` in the respective provider configuration [#5796](https://github.com/datalad/datalad/pull/5796) (by @bpoldrack)
 - DataLad now comes with a git credential helper `git-credential-datalad` allowing Git to query DataLad's credential system [#5796](https://github.com/datalad/datalad/pull/5796) (by @bpoldrack and @mih)
