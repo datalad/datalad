@@ -1,4 +1,8 @@
-# 0.16.0 (Sun Apr 8 2022) --  Spring cleaning!
+# 0.16.1 (Fr Apr 8 2022) --  April Fools' Release
+
+- Fixes forgotten changelog in docs
+
+# 0.16.0 (Fr Apr 8 2022) --  Spring cleaning!
 
 #### 💫 Enhancements and new features
 
