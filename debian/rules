@@ -3,11 +3,10 @@
 
 export DH_VERBOSE = 1
 export PYBUILD_NAME = datalad
-# Excluding test_basics as a dirty workaround
-# for https://github.com/datalad/datalad/issues/4753
-# for https://github.com/datalad/datalad/issues/5379
-# test_script_shims - ideally addressed properly after verifying that pybuild does install scripts without EASY
-export PYBUILD_TEST_ARGS = -s -v
+# Excluding 
+# - test_datalad_credential_helper since wants interaction
+#   https://github.com/datalad/datalad/issues/6623
+export PYBUILD_TEST_ARGS = -s -v -e test_datalad_credential_helper
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=
 export https_proxy=
