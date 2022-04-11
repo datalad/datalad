@@ -3395,8 +3395,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else:
                     rec = {}
             rec.update({'{}{}'.format(key_prefix, k): j[k]
-                       for k in j if k != 'file' and k != 'error_messages'})
-            # change annex' `error_messages` into singular to match result
+                       for k in j if k != 'file' and k != 'error-messages'})
+            # change annex' `error-messages` into singular to match result
             # records:
             if j.get('error-messages', None):
                 rec['error_message'] = '\n'.join(m.strip() for m in j['error-messages'])
