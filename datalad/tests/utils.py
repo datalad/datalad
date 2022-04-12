@@ -64,7 +64,6 @@ from datalad.utils import (
 )
 
 from .. import utils
-from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
 from ..dochelpers import borrowkwargs
 from ..support.exceptions import (
