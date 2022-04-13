@@ -194,5 +194,10 @@
         "name": "Taylor Olson",
         "email": "to.overlake@gmail.com",
         "blog": "https://github.com/taylols"
+    },
+    "deepsourcebot": {
+        "name": "DeepSource Bot",
+        "bio": "Your friendly code review bot. 🤖",
+        "blog": "https://deepsource.io"
     }
 }

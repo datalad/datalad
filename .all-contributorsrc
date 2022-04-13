@@ -438,6 +438,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/28018084?v=4"
             ]
+        },
+        {
+            "login": "deepsourcebot",
+            "name": "DeepSource Bot",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://deepsource.io",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/60907429?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
