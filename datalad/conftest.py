@@ -125,7 +125,7 @@ def setup_package():
 
         # Prevent interactive credential entry (note "true" is the command to run)
         # See also the core.askPass setting above
-        set_envvar('GIT_ASKPASS', 'true')
+        m.setenv('GIT_ASKPASS', 'true')
 
         # Set to non-interactive UI
         _test_states['ui_backend'] = ui.backend
