@@ -383,5 +383,6 @@ after_test:
 
 on_finish:
   # conditionally block the exit of a CI run for direct debugging
+  - sh: touch ~/BLOCK
   - sh: while [ -f ~/BLOCK ]; do sleep 5; done
   - cmd: powershell.exe while ((Test-Path "C:\Users\\appveyor\\Desktop\\BLOCK.txt")) { Start-Sleep 5 }
