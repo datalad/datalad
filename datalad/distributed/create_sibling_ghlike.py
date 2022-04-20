@@ -37,6 +37,8 @@ from datalad.support.constraints import (
 )
 from datalad.support.param import Parameter
 from datalad.ui import ui
+from datalad.utils import todo_interface_for_extensions
+
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_ghlike')
 
@@ -152,6 +154,7 @@ class _GitHubLike(object):
             require_token,
         )
 
+    @todo_interface_for_extensions
     def _set_request_headers(self, credential_name, auth_info, require_token):
         if credential_name is None:
             credential_name = urlparse(self.api_url).netloc
