@@ -972,7 +972,7 @@
   aliases.  The `assure_*` variants are now marked as deprecated and
   will be removed in a later release.  ([#4908][])
 
-- The `datalad.inteface.run` module, which was deprecated in 0.12.0
+- The `datalad.interface.run` module, which was deprecated in 0.12.0
   and kept as a compatibility shim for `datalad.core.local.run`, has
   been removed.  ([#4583][])
 
