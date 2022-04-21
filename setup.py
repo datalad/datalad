@@ -59,7 +59,7 @@ requires = {
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
         'nose>=1.3.4',
-        'pytest~=6.0',
+        'pytest~=7.0',
         'pytest-cov~=3.0',
         'pytest-fail-slow',
         'vcrpy',
