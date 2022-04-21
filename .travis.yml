@@ -16,7 +16,7 @@ env:
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_ENV=GIT_SSH_COMMAND
-    - TESTS_TO_PERFORM=datalad
+    - TESTS_TO_PERFORM=datalad.tests.test_tests_utils
     # Should be an array, travis breaks on it, define/adjust in the "before_install"
     #- PYTEST_OPTS=( -v )
     # Note, that there's "turtle" as well, which is always excluded from
@@ -116,14 +116,14 @@ matrix:
     - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
-  - python: 3.7
-    # Test some under NFS mount  (only selected sub-set)
-    env:
-    # do not run SSH-based tests due to stall(s)
-    # https://github.com/datalad/datalad/pull/4172
-    - DATALAD_TESTS_SSH=0
-    - _DL_TMPDIR="/tmp/nfsmount"
-    - TESTS_TO_PERFORM="datalad.tests datalad.support"
+  #- python: 3.7
+  #  # Test some under NFS mount  (only selected sub-set)
+  #  env:
+  #  # do not run SSH-based tests due to stall(s)
+  #  # https://github.com/datalad/datalad/pull/4172
+  #  - DATALAD_TESTS_SSH=0
+  #  - _DL_TMPDIR="/tmp/nfsmount"
+  #  - TESTS_TO_PERFORM="datalad.tests datalad.support"
     #
   # The ones to run only on weekends against master.
   # They will not contribute to coverage etc, but might lead to failed status
@@ -249,7 +249,6 @@ script:
       --doctest-modules
       --cov=datalad
       --log-cli-level=INFO
-      -k test_tests_utils
       --pyargs
       $TESTS_TO_PERFORM
   - cd ..
