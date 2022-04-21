@@ -256,7 +256,7 @@ class Push(Interface):
         matched_anything = False
         for dspath, dsrecords in ds_spec:
             matched_anything = True
-            lgr.debug('Attempt push of Dataset at %s', dspath)
+            lgr.debug('Pushing Dataset at %s', dspath)
             pbars = {}
             yield from _push(
                 dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
@@ -650,7 +650,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         # server-side git-annex branch updates (and git-annex does
         # not trigger the hook on copy), but we know we have
         # full access via the push url -- we have just used it to copy.
-        lgr.debug("Fetch 'git-annex' branch updates from '%s'", target)
+        lgr.debug("Fetching 'git-annex' branch updates from '%s'", target)
         fetch_cmd = ['fetch', target, 'git-annex']
         pushurl = repo.config.get(
             'remote.{}.pushurl'.format(target), None)
@@ -851,7 +851,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 
-    lgr.debug("Push data from %s to '%s'", ds, target)
+    lgr.debug("Pushing data from %s to '%s'", ds, target)
 
     # input has type=dataset, but now it is about files
     res_kwargs.pop('type', None)
