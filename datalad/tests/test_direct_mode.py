@@ -75,7 +75,7 @@ def _set_direct_mode(self, enable_direct_mode=True):
 
 @with_tempfile
 @with_tempfile
-def test_direct_cfg(path1, path2):
+def test_direct_cfg(path1=None, path2=None):
     # and if repo already exists and we have env var - we fail too
     # Adding backend so we get some commit into the repo
     ar = AnnexRepo(path1, create=True, backend='MD5E')
@@ -85,8 +85,8 @@ def test_direct_cfg(path1, path2):
             # try to create annex repo in direct mode as see how it fails
             with assert_raises(DirectModeNoLongerSupportedError) as cme:
                 AnnexRepo(path, create=True)
-            assert_in("no longer supported by DataLad", str(cme.exception)) # we have generic part
-            assert_in("datalad.repo.direct configuration", str(cme.exception)) # situation specific part
+            assert_in("no longer supported by DataLad", str(cme.value)) # we have generic part
+            assert_in("datalad.repo.direct configuration", str(cme.value)) # situation specific part
     # assert not op.exists(path2)   # that we didn't create it - we do!
     #   fixing for that would be too cumbersome since we first call GitRepo.__init__
     #   with create
