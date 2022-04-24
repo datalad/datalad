@@ -62,6 +62,7 @@ def _test_consistent_order_of_args(intf, spec_posargs):
             assert False
 
 
+# TODO?: make parametric again instead of invoking
 def test_consistent_order_of_args():
     from datalad.interface.base import get_interface_groups
 
@@ -81,4 +82,4 @@ def test_consistent_order_of_args():
                 if param.cmd_args and not param.cmd_args[0].startswith('-')
             }
             # we have information about positional args
-            yield _test_consistent_order_of_args, intf, spec_posargs
+            _test_consistent_order_of_args(intf, spec_posargs)
