@@ -38,7 +38,7 @@ CLONE_PATCH_STR = "datalad.tests.utils_cached_dataset.Clone.__call__"
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_get_cached_dataset(cache_dir):
+def test_get_cached_dataset(cache_dir=None):
 
     # patch DATALAD_TESTS_CACHE to not use the actual cache with
     # the test testing that very cache.
@@ -155,7 +155,7 @@ def test_get_cached_dataset(cache_dir):
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_cached_dataset(cache_dir):
+def test_cached_dataset(cache_dir=None):
 
     # patch DATALAD_TESTS_CACHE to not use the actual cache with
     # the test testing that very cache.
@@ -256,7 +256,7 @@ def test_cached_dataset(cache_dir):
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_cached_url(cache_dir):
+def test_cached_url(cache_dir=None):
 
     # patch DATALAD_TESTS_CACHE to not use the actual cache with
     # the test testing that very cache.
