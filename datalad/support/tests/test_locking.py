@@ -55,7 +55,7 @@ class Subproc:
 
 
 @with_tempfile
-def test_lock_if_check_fails(tempfile):
+def test_lock_if_check_fails(tempfile=None):
     # basic test, should never try to lock so filename is not important
     with lock_if_check_fails(True, None) as (check, lock):
         assert check is True
@@ -107,7 +107,7 @@ def test_lock_if_check_fails(tempfile):
 
 
 @with_tempfile
-def test_try_lock_informatively(tempfile):
+def test_try_lock_informatively(tempfile=None):
     lock = InterProcessLock(tempfile + '.lck')
     lock_path = ensure_unicode(lock.path)  # can be bytes, complicates string formattingetc
     t0 = time()

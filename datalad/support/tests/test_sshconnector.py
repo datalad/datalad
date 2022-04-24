@@ -97,7 +97,7 @@ def test_ssh_get_connection():
 @with_tree(tree={'f0': 'f0', 'f1': 'f1'})
 @with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
-def test_ssh_open_close(tmp_path, tfile1):
+def test_ssh_open_close(tmp_path=None, tfile1):
 
     manager = SSHManager()
 
@@ -178,7 +178,7 @@ def test_ssh_manager_close():
 
 
 @with_tempfile
-def test_ssh_manager_close_no_throw(bogus_socket):
+def test_ssh_manager_close_no_throw(bogus_socket=None):
     manager = MultiplexSSHManager()
 
     class bogus:
@@ -208,7 +208,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
 @with_tempfile(content="two")
-def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
+def test_ssh_copy(sourcedir=None, sourcefile1, sourcefile2):
     port = get_ssh_port('datalad-test')
     remote_url = 'ssh://datalad-test:{}'.format(port)
     manager = SSHManager()
@@ -308,7 +308,7 @@ def test_ssh_git_props():
 @skip_if_on_windows
 @skip_ssh
 @with_tempfile(mkdir=True)
-def test_bundle_invariance(path):
+def test_bundle_invariance(path=None):
     remote_url = 'ssh://datalad-test'
     manager = SSHManager()
     testfile = Path(path) / 'dummy'

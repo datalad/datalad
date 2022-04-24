@@ -46,7 +46,7 @@ def test_exit_code():
 @skip_if_on_windows
 @skip_ssh
 @with_tempfile(content="123magic")
-def test_no_stdin_swallow(fname):
+def test_no_stdin_swallow(fname=None):
     # will relay actual exit code on CommandError
     cmd = ['datalad', 'sshrun', 'datalad-test', 'cat']
 
@@ -63,7 +63,7 @@ def test_no_stdin_swallow(fname):
 @skip_if_on_windows
 @skip_ssh
 @with_tempfile(suffix="1 space", content="magic")
-def test_fancy_quotes(f):
+def test_fancy_quotes(f=None):
     cmd = ['datalad', 'sshrun', 'datalad-test', """'cat '"'"'%s'"'"''""" % f]
     out = WitlessRunner().run(cmd, protocol=StdOutCapture)
     assert_equal(out['stdout'], 'magic')

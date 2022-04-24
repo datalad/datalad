@@ -41,7 +41,7 @@ Cite-As: Cool (2016)
 DOI: 10.5281/zenodo.48421
 
 """}})
-def test_get_metadata(path):
+def test_get_metadata(path=None):
 
     ds = Dataset(path).create(force=True)
     ds.save()

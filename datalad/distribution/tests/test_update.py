@@ -72,7 +72,7 @@ from datalad import cfg as dl_cfg
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_update_simple(origin, src_path, dst_path):
+def test_update_simple(origin=None, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -202,7 +202,7 @@ def test_update_simple(origin, src_path, dst_path):
 
 @with_tempfile
 @with_tempfile
-def test_update_git_smoke(src_path, dst_path):
+def test_update_git_smoke(src_path=None, dst_path):
     # Apparently was just failing on git repos for basic lack of coverage, hence this quick test
     ds = Dataset(src_path).create(annex=False)
     target = install(
@@ -218,7 +218,7 @@ def test_update_git_smoke(src_path, dst_path):
 
 @slow  # ~9s
 @with_tempfile(mkdir=True)
-def test_update_fetch_all(path):
+def test_update_fetch_all(path=None):
     path = Path(path)
     remote_1 = str(path / "remote_1")
     remote_2 = str(path / "remote_2")
@@ -283,7 +283,7 @@ def test_update_fetch_all(path):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_newthings_coming_down(originpath, destpath):
+def test_newthings_coming_down(originpath=None, destpath):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
     Dataset(originpath).save('load.dat')
@@ -344,7 +344,7 @@ def test_newthings_coming_down(originpath, destpath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_update_volatile_subds(originpath, otherpath, destpath):
+def test_update_volatile_subds(originpath=None, otherpath, destpath):
     origin = Dataset(originpath).create()
     repo = origin.repo
     if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
@@ -431,7 +431,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_reobtain_data(originpath, destpath):
+def test_reobtain_data(originpath=None, destpath):
     origin = Dataset(originpath).create()
     ds = install(
         source=originpath, path=destpath,
@@ -473,7 +473,7 @@ def test_reobtain_data(originpath, destpath):
 
 
 @with_tempfile(mkdir=True)
-def test_multiway_merge(path):
+def test_multiway_merge(path=None):
     # prepare ds with two siblings, but no tracking branch
     ds = Dataset(op.join(path, 'ds_orig')).create()
     r1 = AnnexRepo(path=op.join(path, 'ds_r1'), git_opts={'bare': True})
@@ -495,7 +495,7 @@ def test_multiway_merge(path):
 # determined.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_merge_no_merge_target(path):
+def test_merge_no_merge_target(path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_clone = install(source=ds_src.path, path=path / "clone",
@@ -511,7 +511,7 @@ def test_merge_no_merge_target(path):
 @skip_if_adjusted_branch
 @slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_merge_conflict(path):
+def test_merge_conflict(path=None):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
     ds_src_s0 = ds_src.create("s0")
@@ -565,7 +565,7 @@ def test_merge_conflict(path):
 @skip_if_adjusted_branch
 @slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_merge_conflict_in_subdataset_only(path):
+def test_merge_conflict_in_subdataset_only(path=None):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
     ds_src_sub_conflict = ds_src.create("sub_conflict")
@@ -607,7 +607,7 @@ def test_merge_conflict_in_subdataset_only(path):
 # depends on `git merge --ff-only ...` being used.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_merge_ff_only(path):
+def test_merge_ff_only(path=None):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
     ds_clone_ff = install(source=ds_src.path, path=path / "clone_ff",
@@ -638,7 +638,7 @@ def test_merge_ff_only(path):
 
 @slow  # 11sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_merge_follow_parentds_subdataset_other_branch(path):
+def test_merge_follow_parentds_subdataset_other_branch(path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     on_adjusted = ds_src.repo.is_managed_branch()
@@ -675,7 +675,7 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
 # This test depends on the source repo being an un-adjusted branch.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_merge_follow_parentds_subdataset_adjusted_warning(path):
+def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
     path = Path(path)
 
     ds_src = Dataset(path / "source").create()
@@ -814,7 +814,7 @@ def test_merge_follow_parentds_subdataset_detached():
 
 
 @with_tempfile(mkdir=True)
-def test_update_unborn_master(path):
+def test_update_unborn_master(path=None):
     ds_a = Dataset(op.join(path, "ds-a")).create()
     ds_a.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
     ds_a.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
@@ -842,7 +842,7 @@ def test_update_unborn_master(path):
 
 @slow  # ~25s
 @with_tempfile(mkdir=True)
-def test_update_follow_parentds_lazy(path):
+def test_update_follow_parentds_lazy(path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_s0 = ds_src.create("s0")
@@ -897,7 +897,7 @@ def test_update_follow_parentds_lazy(path):
 
 @slow  # ~10s
 @with_tempfile(mkdir=True)
-def test_update_follow_parentds_lazy_other_branch(path):
+def test_update_follow_parentds_lazy_other_branch(path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_sub = ds_src.create("sub")
@@ -932,7 +932,7 @@ def test_update_follow_parentds_lazy_other_branch(path):
 
 
 @with_tempfile(mkdir=True)
-def test_update_adjusted_incompatible_with_ff_only(path):
+def test_update_adjusted_incompatible_with_ff_only(path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
 
@@ -1009,7 +1009,7 @@ def test_update_how_subds_different():
 @slow  # ~15s
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_update_reset_dirty(path):
+def test_update_reset_dirty(path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_s1 = ds_src.create("s1")
@@ -1080,7 +1080,7 @@ def test_process_how_args():
 
 
 @with_tempfile(mkdir=True)
-def test_update_fetch_failure(path):
+def test_update_fetch_failure(path=None):
     path = Path(path)
 
     ds_a = Dataset(path / "ds_a").create()

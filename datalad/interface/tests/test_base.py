@@ -29,7 +29,7 @@ from ..base import (
 
 
 @with_tempfile(mkdir=True)
-def test_status_custom_summary_no_repeats(path):
+def test_status_custom_summary_no_repeats(path=None):
     from datalad.api import Dataset
     from datalad.core.local.status import Status
 

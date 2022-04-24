@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 
 @with_tempfile(mkdir=True)
-def test_duecredit_dataset(path):
+def test_duecredit_dataset(path=None):
     dataset = Dataset(path)
 
     # Verify that we do not call duecredit_dataset if due is not enabled

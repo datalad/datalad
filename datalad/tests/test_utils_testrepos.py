@@ -47,12 +47,12 @@ def test_BasicAnnexTestRepo_random_location_generated():
 
 
 @with_tempfile()
-def test_BasicAnnexTestRepo(path):
+def test_BasicAnnexTestRepo(path=None):
     _test_BasicAnnexTestRepo(path)
 
 
 @with_tempfile()
-def test_BasicGitTestRepo(path):
+def test_BasicGitTestRepo(path=None):
     trepo = BasicGitTestRepo(path)
     trepo.create()
     assert_repo_status(trepo.path, annex=False)

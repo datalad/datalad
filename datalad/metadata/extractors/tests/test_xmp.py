@@ -47,7 +47,7 @@ target = {
 
 
 @with_tempfile(mkdir=True)
-def test_xmp(path):
+def test_xmp(path=None):
     ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'xmp', scope='branch')
     copy(

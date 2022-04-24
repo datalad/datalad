@@ -71,7 +71,7 @@ def test_magic_number():
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_repo_diff(path, norepo):
+def test_repo_diff(path=None, norepo):
     ds = Dataset(path).create()
     assert_repo_status(ds.path)
     assert_raises(ValueError, ds.repo.diff, fr='WTF', to='MIKE')
@@ -158,7 +158,7 @@ def _dirty_results(res):
 # that focuses on the high-level command API
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_diff(path, norepo):
+def test_diff(path=None, norepo):
     with chpwd(norepo):
         assert_raises(NoDatasetFound, diff)
     ds = Dataset(path).create()
@@ -255,7 +255,7 @@ def test_diff(path, norepo):
 
 
 @with_tempfile(mkdir=True)
-def test_diff_recursive(path):
+def test_diff_recursive(path=None):
     ds = Dataset(path).create()
     sub = ds.create('sub')
     # look at the last change, and confirm a dataset was added
@@ -448,7 +448,7 @@ def test_path_diff(_path, linkpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_diff_nods(path, otherpath):
+def test_diff_nods(path=None, otherpath):
     ds = Dataset(path).create()
     assert_result_count(
         ds.diff(path=otherpath, on_failure='ignore', result_renderer='disabled'),
@@ -468,7 +468,7 @@ def test_diff_nods(path, otherpath):
 
 
 @with_tempfile(mkdir=True)
-def test_diff_rsync_syntax(path):
+def test_diff_rsync_syntax(path=None):
     # three nested datasets
     ds = Dataset(path).create()
     subds = ds.create('sub')
@@ -504,7 +504,7 @@ def test_diff_rsync_syntax(path):
 
 
 @with_tempfile(mkdir=True)
-def test_diff_nonexistent_ref_unicode(path):
+def test_diff_nonexistent_ref_unicode(path=None):
     ds = Dataset(path).create()
     assert_result_count(
         ds.diff(fr="HEAD", to=u"β", on_failure="ignore", result_renderer='disabled'),
@@ -515,7 +515,7 @@ def test_diff_nonexistent_ref_unicode(path):
 
 # https://github.com/datalad/datalad/issues/3997
 @with_tempfile(mkdir=True)
-def test_no_worktree_impact_false_deletions(path):
+def test_no_worktree_impact_false_deletions(path=None):
     ds = Dataset(path).create()
     # create a branch that has no new content
     ds.repo.call_git(['checkout', '-b', 'test'])
@@ -543,7 +543,7 @@ def test_no_worktree_impact_false_deletions(path):
 
 
 @with_tempfile(mkdir=True)
-def test_diff_fr_none_one_get_content_annexinfo_call(path):
+def test_diff_fr_none_one_get_content_annexinfo_call(path=None):
     from datalad.support.annexrepo import AnnexRepo
     ds = Dataset(path).create()
     (ds.pathobj / "foo").write_text("foo")

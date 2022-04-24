@@ -63,7 +63,7 @@ DEFAULT_REFSPEC = "refs/heads/{0}:refs/heads/{0}".format(DEFAULT_BRANCH)
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_invalid_call(origin, tdir):
+def test_invalid_call(origin=None, tdir):
     ds = Dataset(origin).create()
     # no target
     assert_status('impossible', ds.push(on_failure='ignore'))
@@ -420,7 +420,7 @@ def test_push_recursive(
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_push_subds_no_recursion(src_path, dst_top, dst_sub, dst_subsub):
+def test_push_subds_no_recursion(src_path=None, dst_top, dst_sub, dst_subsub):
     # dataset with one submodule and one subsubmodule
     top = Dataset(src_path).create()
     sub = top.create('sub m')
@@ -450,7 +450,7 @@ def test_push_subds_no_recursion(src_path, dst_top, dst_sub, dst_subsub):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_force_checkdatapresent(srcpath, dstpath):
+def test_force_checkdatapresent(srcpath=None, dstpath):
     src = Dataset(srcpath).create()
     target = mk_push_target(src, 'target', dstpath, annex=True, bare=True)
     (src.pathobj / 'test_mod_annex_file').write_text("Heavy stuff.")
@@ -514,7 +514,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
-def test_ria_push(srcpath, dstpath):
+def test_ria_push(srcpath=None, dstpath):
     # complex test involving a git remote, a special remote, and a
     # publication dependency
     src = Dataset(srcpath).create()
@@ -540,7 +540,7 @@ def test_ria_push(srcpath, dstpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_gh1426(origin_path, target_path):
+def test_gh1426(origin_path=None, target_path):
     # set up a pair of repos, one the published copy of the other
     origin = Dataset(origin_path).create()
     target = mk_push_target(
@@ -572,7 +572,7 @@ def test_gh1426(origin_path, target_path):
 @with_tree(tree={'1': '123'})
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_publish_target_url(src, desttop, desturl):
+def test_publish_target_url(src=None, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
     ds.save('1')
@@ -587,7 +587,7 @@ def test_publish_target_url(src, desttop, desturl):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
-def test_gh1763(src, target1, target2):
+def test_gh1763(src=None, target1, target2):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763
     src = Dataset(src).create(force=True)
@@ -616,7 +616,7 @@ def test_gh1763(src, target1, target2):
 
 @with_tempfile()
 @with_tempfile()
-def test_gh1811(srcpath, clonepath):
+def test_gh1811(srcpath=None, clonepath):
     orig = Dataset(srcpath).create()
     (orig.pathobj / 'some').write_text('some')
     orig.save()
@@ -640,7 +640,7 @@ def test_gh1811(srcpath, clonepath):
 @skip_if_adjusted_branch
 @with_tempfile()
 @with_tempfile()
-def test_push_wanted(srcpath, dstpath):
+def test_push_wanted(srcpath=None, dstpath):
     src = Dataset(srcpath).create()
     (src.pathobj / 'data.0').write_text('0')
     (src.pathobj / 'secure.1').write_text('1')
@@ -692,7 +692,7 @@ def test_push_wanted(srcpath, dstpath):
 @skip_if_adjusted_branch
 @slow  # 10sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_auto_data_transfer(path):
+def test_auto_data_transfer(path=None):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
     (ds_a.pathobj / "foo.dat").write_text("foo")
@@ -752,7 +752,7 @@ def test_auto_data_transfer(path):
 @skip_if_adjusted_branch
 @slow  # 16sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_auto_if_wanted_data_transfer_path_restriction(path):
+def test_auto_if_wanted_data_transfer_path_restriction(path=None):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
     ds_a_sub0 = ds_a.create("sub0")
@@ -819,7 +819,7 @@ def test_auto_if_wanted_data_transfer_path_restriction(path):
 
 
 @with_tempfile(mkdir=True)
-def test_push_git_annex_branch_when_no_data(path):
+def test_push_git_annex_branch_when_no_data(path=None):
     path = Path(path)
     ds = Dataset(path / "a").create()
     target = mk_push_target(ds, "target", str(path / "target"),
@@ -836,7 +836,7 @@ def test_push_git_annex_branch_when_no_data(path):
 @with_tree(tree={"ds": {"f0": "0", "f1": "0", "f2": "0",
                         "f3": "1",
                         "f4": "2", "f5": "2"}})
-def test_push_git_annex_branch_many_paths_same_data(path):
+def test_push_git_annex_branch_many_paths_same_data(path=None):
     path = Path(path)
     ds = Dataset(path / "ds").create(force=True)
     ds.save()
@@ -856,7 +856,7 @@ def test_push_git_annex_branch_many_paths_same_data(path):
 
 @known_failure_githubci_osx
 @with_tree(tree={"ds": {"f0": "0"}})
-def test_push_matching(path):
+def test_push_matching(path=None):
     path = Path(path)
     ds = Dataset(path / "ds").create(force=True)
     ds.config.set('push.default', 'matching', scope='local')
@@ -875,7 +875,7 @@ def test_push_matching(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
+def test_nested_pushclone_cycle_allplatforms(origpath=None, storepath, clonepath):
     if 'DATALAD_SEED' in os.environ:
         # we are using create-sibling-ria via the cmdline in here
         # this will create random UUIDs for datasets
@@ -973,7 +973,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
 
 
 @with_tempfile
-def test_push_custom_summary(path):
+def test_push_custom_summary(path=None):
     path = Path(path)
     ds = Dataset(path / "ds").create()
 

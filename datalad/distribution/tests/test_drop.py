@@ -19,7 +19,7 @@ from datalad.tests.utils import (
 
 
 @with_tree({"foo": "foo"})
-def test_drop_file_need_nocheck(path):
+def test_drop_file_need_nocheck(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     with assert_raises(IncompleteResultsError) as cme:

@@ -33,7 +33,7 @@ def check_push(ds):
 
 @skip_if_no_network
 @with_tempfile
-def test_gin(path):
+def test_gin(path=None):
     check4real(
         create_sibling_gin,
         path,

@@ -131,7 +131,7 @@ def test_external_versions_popular_packages():
 
 
 @with_tempfile(mkdir=True)
-def test_external_versions_rogue_module(topd):
+def test_external_versions_rogue_module(topd=None):
     ev = ExternalVersions()
     # if module throws some other non-ImportError exception upon import
     # we must not crash, but issue a warning

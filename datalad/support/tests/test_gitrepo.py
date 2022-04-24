@@ -81,7 +81,7 @@ from datalad.support.external_versions import external_versions
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_invalid_path(path):
+def test_GitRepo_invalid_path(path=None):
     with chpwd(path):
         assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
         ok_(not op.exists(op.join(path, "git:")))
@@ -92,7 +92,7 @@ def test_GitRepo_invalid_path(path):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_instance_from_clone(src, dst):
+def test_GitRepo_instance_from_clone(src=None, dst):
     origin = GitRepo(src, create=True)
     gr = GitRepo.clone(src, dst)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
@@ -109,7 +109,7 @@ def test_GitRepo_instance_from_clone(src, dst):
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_GitRepo_instance_from_existing(path):
+def test_GitRepo_instance_from_existing(path=None):
     GitRepo(path, create=True)
 
     gr = GitRepo(path)
@@ -120,7 +120,7 @@ def test_GitRepo_instance_from_existing(path):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_instance_from_not_existing(path, path2):
+def test_GitRepo_instance_from_not_existing(path=None, path2):
     # 1. create=False and path doesn't exist:
     assert_raises(NoSuchPathError, GitRepo, path, create=False)
     assert_false(op.exists(path))
@@ -145,7 +145,7 @@ def test_GitRepo_instance_from_not_existing(path, path2):
 
 
 @with_tempfile
-def test_GitRepo_init_options(path):
+def test_GitRepo_init_options(path=None):
     # passing an option, not explicitly defined in GitRepo class:
     gr = GitRepo(path, create=True, bare=True)
     ok_(gr.config.getbool(section="core", option="bare"))
@@ -158,7 +158,7 @@ def test_GitRepo_init_options(path):
                  '.git': {}})
 @with_tempfile
 @with_tempfile
-def test_GitRepo_bare(path, empty_dir, non_empty_dir, empty_dot_git, non_bare,
+def test_GitRepo_bare(path=None, empty_dir, non_empty_dir, empty_dot_git, non_bare,
                       clone_path):
 
     import gc
@@ -209,7 +209,7 @@ def test_GitRepo_bare(path, empty_dir, non_empty_dir, empty_dot_git, non_bare,
         }
     }
 )
-def test_init_fail_under_known_subdir(path):
+def test_init_fail_under_known_subdir(path=None):
     repo = GitRepo(path, create=True)
     repo.add(op.join('subds', 'file_name'))
     # Should fail even if we do not commit but only add to index:
@@ -227,7 +227,7 @@ def test_init_fail_under_known_subdir(path):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_equals(path1, path2):
+def test_GitRepo_equals(path1=None, path2):
 
     repo1 = GitRepo(path1)
     repo2 = GitRepo(path1)
@@ -241,7 +241,7 @@ def test_GitRepo_equals(path1, path2):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_add(src, path):
+def test_GitRepo_add(src=None, path):
 
     gr = GitRepo(path)
     filename = get_most_obscure_supported_name()
@@ -279,7 +279,7 @@ def test_GitRepo_add(src, path):
     'file2': 'content3'
 
     })
-def test_GitRepo_remove(path):
+def test_GitRepo_remove(path=None):
 
     gr = GitRepo(path, create=True)
     gr.add('*')
@@ -293,7 +293,7 @@ def test_GitRepo_remove(path):
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_GitRepo_commit(path):
+def test_GitRepo_commit(path=None):
 
     gr = GitRepo(path)
     filename = get_most_obscure_supported_name()
@@ -350,7 +350,7 @@ def test_GitRepo_commit(path):
 
 
 @with_tempfile
-def test_GitRepo_get_indexed_files(path):
+def test_GitRepo_get_indexed_files(path=None):
 
     gr = GitRepo(path)
     for filename in ('some1.txt', 'some2.dat'):
@@ -381,7 +381,7 @@ def test_GitRepo_get_indexed_files(path):
         )),
     ])
 @assert_cwd_unchanged(ok_to_chdir=True)
-def test_normalize_path(git_path):
+def test_normalize_path(git_path=None):
 
     gr = GitRepo(git_path)
 
@@ -490,7 +490,7 @@ def test_GitRepo_files_decorator():
 
 @skip_if_no_network
 @with_tempfile
-def test_GitRepo_remote_add(path):
+def test_GitRepo_remote_add(path=None):
     gr = GitRepo(path)
     gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
     out = gr.get_remotes()
@@ -500,7 +500,7 @@ def test_GitRepo_remote_add(path):
 
 
 @with_tempfile
-def test_GitRepo_remote_remove(path):
+def test_GitRepo_remote_remove(path=None):
 
     gr = GitRepo(path)
     gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
@@ -512,7 +512,7 @@ def test_GitRepo_remote_remove(path):
 
 
 @with_tempfile
-def test_GitRepo_get_remote_url(path):
+def test_GitRepo_get_remote_url(path=None):
 
     gr = GitRepo(path)
     gr.add_remote('github', 'https://github.com/datalad/testrepo--basic--r1')
@@ -522,7 +522,7 @@ def test_GitRepo_get_remote_url(path):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_fetch(orig_path, clone_path):
+def test_GitRepo_fetch(orig_path=None, clone_path):
 
     origin = GitRepo(orig_path)
     with open(op.join(orig_path, 'some.txt'), 'w') as f:
@@ -571,7 +571,7 @@ def _path2localsshurl(path):
 @skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
-def test_GitRepo_ssh_fetch(remote_path, repo_path):
+def test_GitRepo_ssh_fetch(remote_path=None, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path)
@@ -607,7 +607,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 @skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
-def test_GitRepo_ssh_push(repo_path, remote_path):
+def test_GitRepo_ssh_push(repo_path=None, remote_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
@@ -666,7 +666,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_push_n_checkout(orig_path, clone_path):
+def test_GitRepo_push_n_checkout(orig_path=None, clone_path):
 
     origin = GitRepo(orig_path)
     clone = GitRepo.clone(orig_path, clone_path)
@@ -685,7 +685,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_GitRepo_remote_update(path1, path2, path3):
+def test_GitRepo_remote_update(path1=None, path2, path3):
 
     git1 = GitRepo(path1)
     git2 = GitRepo(path2)
@@ -729,7 +729,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_get_files(src_path, path):
+def test_GitRepo_get_files(src_path=None, path):
     src = GitRepo(src_path)
     for filename in ('some1.txt', 'some2.dat'):
         with open(op.join(src_path, filename), 'w') as f:
@@ -784,7 +784,7 @@ def test_GitRepo_get_files(src_path, path):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_GitRepo_get_toppath(repo, tempdir, repo2):
+def test_GitRepo_get_toppath(repo=None, tempdir, repo2):
     GitRepo(repo, create=True)
     reporeal = str(Path(repo).resolve())
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)
@@ -801,7 +801,7 @@ def test_GitRepo_get_toppath(repo, tempdir, repo2):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_dirty(path):
+def test_GitRepo_dirty(path=None):
 
     repo = GitRepo(path, create=True)
     ok_(not repo.dirty)
@@ -860,7 +860,7 @@ def test_GitRepo_dirty(path):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_get_merge_base(src):
+def test_GitRepo_get_merge_base(src=None):
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
         f.write('load')
@@ -896,7 +896,7 @@ def test_GitRepo_get_merge_base(src):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_git_get_branch_commits_(src):
+def test_GitRepo_git_get_branch_commits_(src=None):
 
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
@@ -912,7 +912,7 @@ def test_GitRepo_git_get_branch_commits_(src):
 
 @with_tempfile
 @with_tempfile
-def test_get_tracking_branch(o_path, c_path):
+def test_get_tracking_branch(o_path=None, c_path):
     src = GitRepo(o_path)
     for filename in ('some1.txt', 'some2.dat'):
         with open(op.join(o_path, filename), 'w') as f:
@@ -945,7 +945,7 @@ def test_get_tracking_branch(o_path, c_path):
 
 
 @with_tempfile
-def test_GitRepo_get_submodules(path):
+def test_GitRepo_get_submodules(path=None):
     repo = GitRepo(path, create=True)
 
     s_abc = GitRepo(op.join(path, "s_abc"), create=True)
@@ -962,7 +962,7 @@ def test_GitRepo_get_submodules(path):
 
 
 @with_tempfile
-def test_get_submodules_parent_on_unborn_branch(path):
+def test_get_submodules_parent_on_unborn_branch(path=None):
     repo = GitRepo(path, create=True)
     subrepo = GitRepo(op.join(path, "sub"), create=True)
     subrepo.commit(msg="s", options=["--allow-empty"])
@@ -1027,7 +1027,7 @@ def test_to_options_from_gitpython():
 
 
 @with_tempfile
-def test_GitRepo_count_objects(repo_path):
+def test_GitRepo_count_objects(repo_path=None):
 
     repo = GitRepo(repo_path, create=True)
     # test if dictionary returned
@@ -1042,7 +1042,7 @@ def test_GitRepo_count_objects(repo_path):
 # https://github.com/datalad/datalad/issues/3639
 @skip_if_on_windows
 @with_tempfile
-def test_optimized_cloning(path):
+def test_optimized_cloning(path=None):
     # make test repo with one file and one commit
     originpath = op.join(path, 'origin')
     repo = GitRepo(originpath, create=True)
@@ -1078,7 +1078,7 @@ def test_optimized_cloning(path):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_GitRepo_flyweight(path1, path2):
+def test_GitRepo_flyweight(path1=None, path2):
 
     import gc
 
@@ -1166,7 +1166,7 @@ def test_GitRepo_flyweight(path1, path2):
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
                  'ignore.me': 'ignored content',
                  'dontigno.re': 'other content'})
-def test_GitRepo_gitignore(path):
+def test_GitRepo_gitignore(path=None):
 
     gr = GitRepo(path, create=True)
     sub = GitRepo(op.join(path, 'ignore-sub.me'))
@@ -1192,7 +1192,7 @@ def test_GitRepo_gitignore(path):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_set_remote_url(path):
+def test_GitRepo_set_remote_url(path=None):
 
     gr = GitRepo(path, create=True)
     gr.add_remote('some', 'http://example.com/.git')
@@ -1221,7 +1221,7 @@ def test_GitRepo_set_remote_url(path):
 
 
 @with_tempfile(mkdir=True)
-def test_gitattributes(path):
+def test_gitattributes(path=None):
     gr = GitRepo(path, create=True)
     # starts without any attributes file
     ok_(not op.exists(op.join(gr.path, '.gitattributes')))
@@ -1282,7 +1282,7 @@ def test_gitattributes(path):
 
 
 @with_tempfile(mkdir=True)
-def test_get_hexsha_tag(path):
+def test_get_hexsha_tag(path=None):
     gr = GitRepo(path, create=True)
     gr.commit(msg="msg", options=["--allow-empty"])
     gr.tag("atag", message="atag msg")
@@ -1291,7 +1291,7 @@ def test_get_hexsha_tag(path):
 
 
 @with_tempfile(mkdir=True)
-def test_get_tags(path):
+def test_get_tags(path=None):
     from unittest.mock import patch
 
     gr = GitRepo(path, create=True)
@@ -1358,7 +1358,7 @@ def test_get_tags(path):
 
 
 @with_tree(tree={'1': ""})
-def test_get_commit_date(path):
+def test_get_commit_date(path=None):
     gr = GitRepo(path, create=True)
     eq_(gr.get_commit_date(), None)
 
@@ -1381,7 +1381,7 @@ def test_get_commit_date(path):
 
 @with_tree(tree={"foo": "foo content",
                  "bar": "bar content"})
-def test_fake_dates(path):
+def test_fake_dates(path=None):
     gr = GitRepo(path, create=True, fake_dates=True)
 
     gr.add("foo")
@@ -1410,7 +1410,7 @@ def test_fake_dates(path):
 
 @slow   # 15sec on Yarik's laptop and tripped Travis CI
 @with_tempfile(mkdir=True)
-def test_duecredit(path):
+def test_duecredit(path=None):
     # Just to check that no obvious side-effects
     run = WitlessRunner(cwd=path).run
     cmd = [
@@ -1446,7 +1446,7 @@ def test_duecredit(path):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_get_revisions(path):
+def test_GitRepo_get_revisions(path=None):
     gr = GitRepo(path, create=True)
 
     def commit(msg):
@@ -1490,7 +1490,7 @@ def test_GitRepo_get_revisions(path):
 
 @with_tree({"foo": "foo",
             ".gitattributes": "* annex.largefiles=anything"})
-def test_gitrepo_add_to_git_with_annex_v7(path):
+def test_gitrepo_add_to_git_with_annex_v7(path=None):
     from datalad.support.annexrepo import AnnexRepo
     ar = AnnexRepo(path, create=True, version=7)
     gr = GitRepo(path)
@@ -1500,7 +1500,7 @@ def test_gitrepo_add_to_git_with_annex_v7(path):
 
 
 @with_tree({"foo": "foo", "bar": "bar"})
-def test_gitrepo_call_git_methods(path):
+def test_gitrepo_call_git_methods(path=None):
     gr = GitRepo(path)
     gr.add(["foo", "bar"])
     gr.commit(msg="foobar")
@@ -1553,7 +1553,7 @@ def test_protocols():
 
 
 @with_tempfile
-def test_gitrepo_push_default_first_kludge(path):
+def test_gitrepo_push_default_first_kludge(path=None):
     path = Path(path)
     repo_a = GitRepo(path / "a", bare=True)
     repo_b = GitRepo.clone(repo_a.path, str(path / "b"))

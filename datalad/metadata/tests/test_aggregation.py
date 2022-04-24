@@ -64,7 +64,7 @@ _dataset_hierarchy_template = {
 @slow  # 20sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-def test_basic_aggregate(path):
+def test_basic_aggregate(path=None):
     # TODO give datasets some more metadata to actually aggregate stuff
     base = Dataset(opj(path, 'origin')).create(force=True)
     sub = base.create('sub', force=True)
@@ -127,7 +127,7 @@ def test_basic_aggregate(path):
 }
 """}}},
 })
-def test_aggregate_query(path):
+def test_aggregate_query(path=None):
     ds = Dataset(path).create(force=True)
     # no magic change to actual dataset metadata due to presence of
     # aggregated metadata
@@ -149,7 +149,7 @@ def test_aggregate_query(path):
 @slow  # 23sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-def test_reaggregate_with_unavailable_objects(path):
+def test_reaggregate_with_unavailable_objects(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -185,7 +185,7 @@ def test_reaggregate_with_unavailable_objects(path):
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
-def test_aggregate_with_unavailable_objects_from_subds(path, target):
+def test_aggregate_with_unavailable_objects_from_subds(path=None, target):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -224,7 +224,7 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree=_dataset_hierarchy_template)
-def test_publish_aggregated(path):
+def test_publish_aggregated(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -274,7 +274,7 @@ def _get_referenced_objs(ds):
 
 @known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
 @with_tree(tree=_dataset_hierarchy_template)
-def test_aggregate_removal(path):
+def test_aggregate_removal(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -313,7 +313,7 @@ def test_aggregate_removal(path):
 @slow  # 22sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-def test_update_strategy(path):
+def test_update_strategy(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -373,7 +373,7 @@ def test_update_strategy(path):
     'this': 'that',
     'sub1': {'here': 'there'},
     'sub2': {'down': 'under'}})
-def test_partial_aggregation(path):
+def test_partial_aggregation(path=None):
     ds = Dataset(path).create(force=True)
     sub1 = ds.create('sub1', force=True)
     sub2 = ds.create('sub2', force=True)

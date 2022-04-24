@@ -18,13 +18,13 @@ from datalad.tests.utils import assert_equal, assert_false, \
 
 
 @with_tempfile(mkdir=True)
-def test_check_dates_empty_repo(path):
+def test_check_dates_empty_repo(path=None):
     assert_false(check_dates(GitRepo(path, create=True))["objects"])
 
 
 @with_tree(tree={"foo": "foo content",
                  "bar": "bar content"})
-def test_check_dates(path):
+def test_check_dates(path=None):
     refdate = 1218182889
 
     with set_date(refdate - 1):

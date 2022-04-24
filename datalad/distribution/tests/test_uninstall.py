@@ -17,6 +17,6 @@ from datalad.tests.utils import (
 
 
 @with_tempfile()
-def test_uninstall_uninstalled(path):
+def test_uninstall_uninstalled(path=None):
     ds = Dataset(path)
     assert_raises(ValueError, ds.uninstall)

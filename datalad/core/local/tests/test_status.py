@@ -44,7 +44,7 @@ from datalad.core.local.status import get_paths_by_ds
 
 
 @with_tempfile(mkdir=True)
-def test_runnin_on_empty(path):
+def test_runnin_on_empty(path=None):
     # empty repo
     repo = AnnexRepo(path, create=True)
     # just wrap with a dataset
@@ -56,7 +56,7 @@ def test_runnin_on_empty(path):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile(mkdir=True)
-def test_status_basics(path, linkpath, otherdir):
+def test_status_basics(path=None, linkpath, otherdir):
     if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(path, target_is_directory=True)
@@ -86,7 +86,7 @@ def test_status_basics(path, linkpath, otherdir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_status_nods(path, otherpath):
+def test_status_nods(path=None, otherpath):
     ds = Dataset(path).create()
     assert_result_count(
         ds.status(path=otherpath, on_failure='ignore', result_renderer='disabled'),
@@ -229,7 +229,7 @@ def test_status(_path, linkpath):
 # https://github.com/datalad/datalad-revolution/issues/64
 # breaks when the tempdir is a symlink
 @with_tempfile(mkdir=True)
-def test_subds_status(path):
+def test_subds_status(path=None):
     ds = Dataset(path).create()
     subds = ds.create('subds')
     assert_repo_status(ds.path)
@@ -280,7 +280,7 @@ def test_subds_status(path):
 
 
 @with_tempfile
-def test_status_symlinked_dir_within_repo(path):
+def test_status_symlinked_dir_within_repo(path=None):
     if not has_symlink_capability():
         raise SkipTest("Can't create symlinks")
     # <path>
@@ -325,7 +325,7 @@ def test_status_symlinked_dir_within_repo(path):
 
 @with_tempfile
 @with_tempfile
-def test_get_paths_by_ds(path, otherdspath):
+def test_get_paths_by_ds(path=None, otherdspath):
     otherds = Dataset(otherdspath).create()
     ds = get_deeply_nested_structure(path)
 

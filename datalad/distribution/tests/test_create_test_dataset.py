@@ -30,7 +30,7 @@ from datalad.tests.utils import eq_
 
 
 @with_tempfile(mkdir=True)
-def test_create(outdir):
+def test_create(outdir=None):
     from datalad.api import create
     assert_raises(ValueError, create, outdir, description='Precious data', annex=False)
 
@@ -62,7 +62,7 @@ def test_create_1test_dataset():
 
 
 @with_tempfile(mkdir=True)
-def test_new_relpath(topdir):
+def test_new_relpath(topdir=None):
     from datalad.api import create_test_dataset
     with swallow_logs(), chpwd(topdir), swallow_outputs():
         dss = create_test_dataset('testds', spec='1')
@@ -73,7 +73,7 @@ def test_new_relpath(topdir):
 
 
 @with_tempfile()
-def test_hierarchy(topdir):
+def test_hierarchy(topdir=None):
     # GH 1178
     from datalad.api import create_test_dataset
     with swallow_logs(), swallow_outputs():

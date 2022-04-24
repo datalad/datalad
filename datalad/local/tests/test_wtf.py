@@ -40,7 +40,7 @@ from datalad.tests.utils import (
 
 
 @with_tree({OBSCURE_FILENAME: {}})
-def test_wtf(topdir):
+def test_wtf(topdir=None):
     path = opj(topdir, OBSCURE_FILENAME)
     # smoke test for now
     with swallow_outputs() as cmo:

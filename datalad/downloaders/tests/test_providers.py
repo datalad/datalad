@@ -123,7 +123,7 @@ authentication_type = none
 """}},
    '.git': { "HEAD" : ""}})
 @patch.multiple("platformdirs.AppDirs", site_config_dir=None, user_config_dir=None)
-def test_Providers_from_config__files(sysdir, userdir, dsdir):
+def test_Providers_from_config__files(sysdir=None, userdir, dsdir):
     """Test configuration file precedence
 
     Ensure that provider precedence works in the correct order:
@@ -160,7 +160,7 @@ def test_Providers_from_config__files(sysdir, userdir, dsdir):
 
 
 @with_tempfile(mkdir=True)
-def test_providers_enter_new(path):
+def test_providers_enter_new(path=None):
     with patch.multiple("platformdirs.AppDirs", site_config_dir=None,
                         user_config_dir=path):
         providers_dir = op.join(path, "providers")
@@ -222,7 +222,7 @@ authentication_type = none
 url_re = https?://foo\\.org/.*
 authentication_type = none
 """})
-def test_providers_multiple_matches(path):
+def test_providers_multiple_matches(path=None):
     providers = Providers.from_config_files(
         files=[op.join(path, "providers.cfg")], reload=True)
     all_provs = providers.get_provider('https://foo.org/data',
@@ -242,7 +242,7 @@ authentication_type = none
 url_re = https?://foo\\.org/.*
 authentication_type = none
 """})
-def test_providers_badre(path):
+def test_providers_badre(path=None):
     """Test that a config with a bad regular expression doesn't crash
 
     Ensure that when a provider config has a bad url_re, there is no

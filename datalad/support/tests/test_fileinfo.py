@@ -38,7 +38,7 @@ from datalad.tests.utils import (
 @slow  # 10sec on travis
 @known_failure_githubci_win
 @with_tempfile
-def test_get_content_info(path):
+def test_get_content_info(path=None):
     repo = GitRepo(path)
     assert_equal(repo.get_content_info(), {})
     # an invalid reference causes an exception
@@ -156,7 +156,7 @@ def test_get_content_info(path):
 
 
 @with_tempfile
-def test_compare_content_info(path):
+def test_compare_content_info(path=None):
     # TODO remove when `create` is RF to return the new Dataset
     ds = Dataset(path).create()
     assert_repo_status(path)
@@ -173,7 +173,7 @@ def test_compare_content_info(path):
 
 
 @with_tempfile
-def test_subds_path(path):
+def test_subds_path(path=None):
     # a dataset with a subdataset with a file, all neatly tracked
     ds = Dataset(path).create()
     subds = ds.create('sub')
@@ -194,7 +194,7 @@ def test_subds_path(path):
 
 
 @with_tempfile
-def test_report_absent_keys(path):
+def test_report_absent_keys(path=None):
     ds = Dataset(path).create()
     # create an annexed file
     testfile = ds.pathobj / 'dummy'
@@ -236,7 +236,7 @@ def test_report_absent_keys(path):
 
 
 @with_tempfile
-def test_annexinfo_init(path):
+def test_annexinfo_init(path=None):
     ds = Dataset(path).create()
     foo = ds.pathobj / "foo"
     foo_cont = b"foo content"
@@ -267,7 +267,7 @@ def test_annexinfo_init(path):
 
 
 @with_tempfile
-def test_info_path_inside_submodule(path):
+def test_info_path_inside_submodule(path=None):
     ds = Dataset(path).create()
     subds = ds.create("submod")
     foo = (subds.pathobj / "foo")
@@ -279,7 +279,7 @@ def test_info_path_inside_submodule(path):
 
 
 @with_tempfile
-def test_get_content_info_dotgit(path):
+def test_get_content_info_dotgit(path=None):
     ds = Dataset(path).create()
     # Files in .git/ won't be reported, though this takes a kludge on our side
     # before Git 2.25.
@@ -287,7 +287,7 @@ def test_get_content_info_dotgit(path):
 
 
 @with_tempfile
-def test_get_content_info_paths_empty_list(path):
+def test_get_content_info_paths_empty_list(path=None):
     ds = Dataset(path).create()
 
     # Unlike None, passing any empty list as paths to get_content_info() does
@@ -313,7 +313,7 @@ def test_get_content_info_paths_empty_list(path):
 
 
 @with_tempfile
-def test_status_paths_empty_list(path):
+def test_status_paths_empty_list(path=None):
     ds = Dataset(path).create()
     assert_equal(ds.repo.status(paths=[]), {})
 
@@ -322,7 +322,7 @@ def test_status_paths_empty_list(path):
                  ('inannex.txt', 'inannex'),
                  ('dir1', {'dropped': 'dropped'}),
                  ('dir2', {'d21': 'd21', 'd22': 'd22'})))
-def test_get_file_annexinfo(path):
+def test_get_file_annexinfo(path=None):
     ds = Dataset(path).create(force=True)
     ds.save('ingit.txt', to_git=True)
     ds.save()

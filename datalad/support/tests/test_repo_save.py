@@ -29,7 +29,7 @@ from datalad.tests.utils import (
 
 
 @with_tempfile
-def test_save_basics(path):
+def test_save_basics(path=None):
     ds = Dataset(path).create()
     # nothing happens
     eq_(list(ds.repo.save(paths=[], _status={})),
@@ -69,19 +69,19 @@ def _test_save_all(path, repocls):
 @slow  # 11sec on travis
 @known_failure_windows  # see gh-5462
 @with_tempfile
-def test_gitrepo_save_all(path):
+def test_gitrepo_save_all(path=None):
     _test_save_all(path, GitRepo)
 
 
 @slow  # 11sec on travis
 @known_failure_windows  # see gh-5462
 @with_tempfile
-def test_annexrepo_save_all(path):
+def test_annexrepo_save_all(path=None):
     _test_save_all(path, AnnexRepo)
 
 
 @with_tempfile
-def test_save_to_git(path):
+def test_save_to_git(path=None):
     ds = Dataset(path).create()
     create_tree(
         ds.path,

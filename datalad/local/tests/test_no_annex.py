@@ -28,7 +28,7 @@ from datalad.tests.utils import (
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_no_annex(path):
+def test_no_annex(path=None):
     ds = create(path)
     assert_repo_status(ds.path)
     create_tree(

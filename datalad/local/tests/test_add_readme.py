@@ -43,7 +43,7 @@ _ds_template = {
 
 @known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
 @with_tree(_ds_template)
-def test_add_readme(path):
+def test_add_readme(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     ds.aggregate_metadata()

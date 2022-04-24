@@ -23,7 +23,7 @@ from ..export_to_figshare import (
 
 
 @with_tree({})
-def test_get_default_title(path):
+def test_get_default_title(path=None):
     repo = GitRepo(path)
     ds = Dataset(path)
     # There is no dataset initialized yet, so only path will be the title

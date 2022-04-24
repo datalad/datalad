@@ -82,7 +82,7 @@ def _check_auto_save(ds, orig_state):
 
 
 @with_tempfile(mkdir=True)
-def test_dirty(path):
+def test_dirty(path=None):
     for mode in _dirty_modes:
         # does nothing without a dataset
         handle_dirty_dataset(None, mode)
@@ -153,7 +153,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
 
 @slow  # 74.4509s
 @with_tree(demo_hierarchy)
-def test_save_hierarchy(path):
+def test_save_hierarchy(path=None):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
     ds.save(recursive=True)
@@ -340,7 +340,7 @@ def test_result_filter():
 
 @with_tree({k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
 @with_tempfile(mkdir=True)
-def test_discover_ds_trace(path, otherdir):
+def test_discover_ds_trace(path=None, otherdir):
     ds = make_demo_hierarchy_datasets(
         path,
         {k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})

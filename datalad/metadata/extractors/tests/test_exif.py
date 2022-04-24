@@ -79,7 +79,7 @@ target = {
 
 
 @with_tempfile(mkdir=True)
-def test_exif(path):
+def test_exif(path=None):
     ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'exif', scope='branch')
     copy(

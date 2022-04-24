@@ -172,7 +172,7 @@ def test_credentials_from_env():
 
 @skip_if(not external_versions['keyrings.alt'])
 @with_tempfile
-def test_delete_not_crashing(path):
+def test_delete_not_crashing(path=None):
     # although in above test we just use/interact with Keyring without specifying
     # any custom one, there we do not change it so I guess it is ok. Here we want
     # a real keyring backend which we will alter
@@ -199,7 +199,7 @@ def test_delete_not_crashing(path):
 
 
 @with_tempfile
-def test_gitcredential_read(path):
+def test_gitcredential_read(path=None):
 
     matching_url = "https://example.datalad.org"
     non_matching_url = "http://some.other.org"
@@ -271,7 +271,7 @@ def test_gitcredential_read(path):
 
 
 @with_tempfile
-def test_gitcredential(path):
+def test_gitcredential(path=None):
 
     # Note, that credential labels are irrelevant in context of the to be tested
     # Object here.

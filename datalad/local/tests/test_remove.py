@@ -36,7 +36,7 @@ from datalad.tests.utils import (
 
 
 @with_tempfile
-def test_remove(path):
+def test_remove(path=None):
     # see docstring for test data structure
     ds = get_deeply_nested_structure(path)
     gitfile = op.join("subdir", "git_file.txt")
@@ -160,7 +160,7 @@ def test_remove(path):
 
 
 @with_tempfile
-def test_remove_subdataset_nomethod(path):
+def test_remove_subdataset_nomethod(path=None):
     ds = Dataset(path).create()
     ds.create('subds')
     with chpwd(path):
@@ -174,13 +174,13 @@ def test_remove_subdataset_nomethod(path):
 
 
 @with_tempfile()
-def test_remove_uninstalled(path):
+def test_remove_uninstalled(path=None):
     ds = Dataset(path)
     assert_raises(ValueError, ds.remove)
 
 
 @with_tempfile()
-def test_remove_nowhining(path):
+def test_remove_nowhining(path=None):
     # when removing a dataset under a dataset (but not a subdataset)
     # should not provide a meaningless message that something was not right
     ds = Dataset(path).create()
@@ -191,7 +191,7 @@ def test_remove_nowhining(path):
 
 
 @with_tempfile()
-def test_remove_recreation(path):
+def test_remove_recreation(path=None):
     # test recreation is possible and doesn't conflict with in-memory
     # remainings of the old instances
     # see issue #1311
@@ -203,7 +203,7 @@ def test_remove_recreation(path):
 
 
 @with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
-def test_remove_more_than_one(path):
+def test_remove_more_than_one(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     assert_repo_status(path)
@@ -213,7 +213,7 @@ def test_remove_more_than_one(path):
 
 
 @with_tempfile()
-def test_no_interaction_with_untracked_content(path):
+def test_no_interaction_with_untracked_content(path=None):
     # extracted from what was a metadata test originally
     ds = Dataset(op.join(path, 'origin')).create(force=True)
     create_tree(ds.path, {'sub': {'subsub': {'dat': 'lots of data'}}})
@@ -226,7 +226,7 @@ def test_no_interaction_with_untracked_content(path):
 
 
 @with_tempfile()
-def test_kill(path):
+def test_kill(path=None):
     # nested datasets with load
     ds = Dataset(path).create()
     (ds.pathobj / 'file.dat').write_text('load')
@@ -251,7 +251,7 @@ def test_kill(path):
 
 
 @with_tempfile()
-def test_clean_subds_removal(path):
+def test_clean_subds_removal(path=None):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
     subds2 = ds.create('two')

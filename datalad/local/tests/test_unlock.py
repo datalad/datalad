@@ -46,7 +46,7 @@ from datalad.utils import Path
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_unlock_raises(path, path2, path3):
+def test_unlock_raises(path=None, path2, path3):
 
     # make sure, we are not within a dataset:
     _cwd = getpwd()
@@ -89,7 +89,7 @@ def test_unlock_raises(path, path2, path3):
 @skip_if_root
 @with_tempfile
 @with_tempfile
-def test_unlock(origpath, clonepath):
+def test_unlock(origpath=None, clonepath):
     origds = Dataset(origpath).create()
     (origds.pathobj / 'test-annex.dat').write_text('some text')
     origds.save()
@@ -167,7 +167,7 @@ def test_unlock(origpath, clonepath):
 
 
 @with_tree(tree={"dir": {"a": "a", "b": "b"}})
-def test_unlock_directory(path):
+def test_unlock_directory(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     ds.unlock(path="dir")
@@ -209,7 +209,7 @@ def test_unlock_directory(path):
 @with_tree(tree={"untracked": "untracked",
                  "regular_git": "regular_git",
                  "already_unlocked": "already_unlocked"})
-def test_unlock_cant_unlock(path):
+def test_unlock_cant_unlock(path=None):
     ds = Dataset(path).create(force=True)
     ds.save(path="regular_git", to_git=True)
     ds.save(path="already_unlocked")
@@ -234,7 +234,7 @@ def test_unlock_cant_unlock(path):
 
 
 @with_tree(tree={'subdir': {'sub': {}}})
-def test_unlock_gh_5456(path):
+def test_unlock_gh_5456(path=None):
     path = Path(path)
     unrelated_super = Dataset(path).create(annex=False, force=True)
     ds = Dataset(path / 'subdir' / 'sub').create()

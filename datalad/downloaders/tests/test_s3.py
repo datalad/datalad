@@ -64,7 +64,7 @@ def test_s3_download_basic():
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @use_cassette('test_s3_mtime')
 @with_tempfile
-def test_mtime(tempfile):
+def test_mtime(tempfile=None):
     url = url_2versions_nonversioned1_ver2
     with swallow_outputs():
         # without allow_old=False it might be reusing previous connection
@@ -83,7 +83,7 @@ def test_mtime(tempfile):
 @with_tempfile
 # forgot how to tell it not to change return value, so this side_effect beast now
 @patch.object(S3Authenticator, 'authenticate', side_effect=S3Authenticator.authenticate, autospec=True)
-def test_reuse_session(tempfile, mocked_auth):
+def test_reuse_session(tempfile=None, mocked_auth):
     Providers.reset_default_providers()  # necessary for the testing below
     providers = get_test_providers(url_2versions_nonversioned1_ver1)  # to check credentials
     with swallow_outputs():
@@ -130,7 +130,7 @@ def test_deny_access():
 
 
 @with_tempfile
-def test_boto_host_specification(tempfile):
+def test_boto_host_specification(tempfile=None):
     # This test relies on a yoh-specific set of credentials to access
     # s3://dandiarchive . Unfortunately it seems that boto (2.49.0-2.1) might
     # have difficulties to establish a proper connection and would blow
@@ -168,7 +168,7 @@ def test_restricted_bucket_on_NDA():
 
 @use_cassette('test_download_multiple_NDA')
 @with_tempfile(mkdir=True)
-def test_download_multiple_NDA(outdir):
+def test_download_multiple_NDA(outdir=None):
     # This would smoke/integration test logic for composite credential testing expiration
     # of the token while reusing session from first url on the 2nd one
     urls = [

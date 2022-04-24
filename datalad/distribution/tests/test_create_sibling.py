@@ -128,7 +128,7 @@ def assert_postupdate_hooks(path, installed=True, flat=False):
 
 
 @with_tempfile(mkdir=True)
-def test_invalid_call(path):
+def test_invalid_call(path=None):
     with chpwd(path):
         # ^ Change directory so that we don't fail with an
         # InvalidGitRepositoryError if the test is executed from a git
@@ -166,7 +166,7 @@ def test_invalid_call(path):
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_target_ssh_simple(origin, src_path, target_rootpath):
+def test_target_ssh_simple(origin=None, src_path, target_rootpath):
     port = get_ssh_port("datalad-test")
     # prepare src
     source = install(
@@ -795,7 +795,7 @@ def test_check_exists_interactive():
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-def test_local_relpath(path):
+def test_local_relpath(path=None):
     path = Path(path)
     ds_main = Dataset(path / "main").create()
     ds_main.create("subds")
@@ -821,7 +821,7 @@ def test_local_relpath(path):
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-def test_local_path_target_dir(path):
+def test_local_path_target_dir(path=None):
     path = Path(path)
     ds_main = Dataset(path / "main").create()
 
@@ -862,7 +862,7 @@ def test_local_path_target_dir(path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_non_master_branch(src_path, target_path):
+def test_non_master_branch(src_path=None, target_path):
     src_path = Path(src_path)
     target_path = Path(target_path)
 
@@ -900,7 +900,7 @@ def test_non_master_branch(src_path, target_path):
 @known_failure_windows  # https://github.com/datalad/datalad/issues/5287
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_preserve_attrs(src, dest):
+def test_preserve_attrs(src=None, dest):
     create_tree(src, {"src": {"foo": {"bar": "This is test text."}}})
     os.utime(opj(src, "src", "foo", "bar"), (1234567890, 1234567890))
     _RunnerAdapter().put(opj(src, "src"), dest, recursive=True, preserve_attrs=True)
@@ -912,7 +912,7 @@ def test_preserve_attrs(src, dest):
 
 
 @with_tempfile(mkdir=True)
-def test_only_one_level_without_recursion(path):
+def test_only_one_level_without_recursion(path=None):
     # this tests for https://github.com/datalad/datalad/issues/5614: accidental
     # recursion of one level by default
     path = Path(path)

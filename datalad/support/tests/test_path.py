@@ -28,7 +28,7 @@ from ...tests.utils import (
 
 
 @with_tempfile(mkdir=True)
-def test_robust_abspath(tdir):
+def test_robust_abspath(tdir=None):
     with chpwd(tdir):
         eq_(robust_abspath(curdir), tdir)
         try:

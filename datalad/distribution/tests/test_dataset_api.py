@@ -20,7 +20,7 @@ from ...tests.utils import (
 
 
 @with_tempfile(mkdir=True)
-def test_datasetmethod_bound(path):
+def test_datasetmethod_bound(path=None):
     ds = Dataset(path)
     # should be automagically imported/picked up if not bound already
     assert ds.create  # simplest, intfspec only 2 entries

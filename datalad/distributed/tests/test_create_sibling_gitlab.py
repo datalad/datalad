@@ -50,7 +50,7 @@ def _get_nested_collections(path):
 
 # doesn't actually need gitlab and exercises most of the decision logic
 @with_tempfile
-def test_dryrun(path):
+def test_dryrun(path=None):
     ctlg = _get_nested_collections(path)
     # no site config -> error
     assert_raises(ValueError, ctlg['root'].create_sibling_gitlab)
@@ -300,7 +300,7 @@ class _CreateFailureGitLab(_FakeGitLab):
 
 
 @with_tempfile
-def test_fake_gitlab(path):
+def test_fake_gitlab(path=None):
     from unittest.mock import patch
     ds = Dataset(path).create()
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _NewProjectGitLab):

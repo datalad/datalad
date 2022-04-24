@@ -30,7 +30,7 @@ from datalad.tests.utils import (
 @slow  # ~7s
 @integration
 @with_tempfile(mkdir=True)
-def test_download_docker_blob(path):
+def test_download_docker_blob(path=None):
     from datalad.consts import (
         DATALAD_SPECIAL_REMOTE,
         DATALAD_SPECIAL_REMOTES_UUIDS,

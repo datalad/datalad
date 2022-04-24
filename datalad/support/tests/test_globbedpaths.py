@@ -59,7 +59,7 @@ bOBSCURE_FILENAME = f"b{OBSCURE_FILENAME}.dat"
                  "3.txt": "",
                  bOBSCURE_FILENAME: "",
                  "subdir": {"1.txt": "", "2.txt": "", "subsub": {"3.dat": ""}}})
-def test_globbedpaths(path):
+def test_globbedpaths(path=None):
     dotdir = op.curdir + op.sep
 
     for patterns, expected in [
@@ -134,7 +134,7 @@ def test_globbedpaths(path):
 
 
 @with_tree(tree={"1.txt": "", "2.dat": "", "3.txt": ""})
-def test_globbedpaths_misses(path):
+def test_globbedpaths_misses(path=None):
     gp = GlobbedPaths(["amiss"], pwd=path)
     eq_(gp.expand_strict(), [])
     eq_(gp.misses, ["amiss"])
@@ -178,7 +178,7 @@ def test_globbedpaths_misses(path):
                  "bdir": {},
                  "other": {},
                  "1.txt": "", "2.dat": "", "3.txt": ""})
-def test_globbedpaths_partial_matches(path):
+def test_globbedpaths_partial_matches(path=None):
     gp = GlobbedPaths([op.join("?dir", "*.txt"), "*.txt"], pwd=path)
     eq_(gp.expand_strict(), ["1.txt", "3.txt"])
 
@@ -196,7 +196,7 @@ def test_globbedpaths_partial_matches(path):
                  "2.dat": "",
                  "3.txt": "",
                  "foo.dat": ""})
-def test_globbedpaths_cached(path):
+def test_globbedpaths_cached(path=None):
     # Smoke test to trigger cache handling.
     gp = GlobbedPaths([op.join("?", ".dat"), "*.txt"], pwd=path)
     for full, partial, misses in product([False, True], repeat=3):

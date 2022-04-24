@@ -35,7 +35,7 @@ testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data',
 
 
 @with_tempfile(mkdir=True)
-def test_error(path):
+def test_error(path=None):
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
         assert_raises(ValueError, extract_metadata, types=['bogus__'], files=[testpath])
@@ -43,7 +43,7 @@ def test_error(path):
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_ds_extraction(path):
+def test_ds_extraction(path=None):
     skip_if_no_module('libxmp')
 
     ds = Dataset(path).create()
@@ -79,7 +79,7 @@ def test_ds_extraction(path):
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_file_extraction(path):
+def test_file_extraction(path=None):
     skip_if_no_module('libxmp')
 
     # go into virgin dir to avoid detection of any dataset

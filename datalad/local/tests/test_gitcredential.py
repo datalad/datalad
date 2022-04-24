@@ -25,7 +25,7 @@ from datalad.utils import (
 
 
 @with_tempfile
-def test_gitcredential_interface(path):
+def test_gitcredential_interface(path=None):
     # use a dataset as a local configuration vehicle
     ds = Dataset(path).create()
 
@@ -71,7 +71,7 @@ def test_gitcredential_interface(path):
 
 
 @with_tempfile
-def test_datalad_credential_helper(path):
+def test_datalad_credential_helper(path=None):
 
     ds = Dataset(path).create()
 
@@ -154,7 +154,7 @@ def test_datalad_credential_helper(path):
 
 
 @with_tempfile
-def test_credential_cycle(path):
+def test_credential_cycle(path=None):
 
     # Test that we break a possible cycle when DataLad is configured to query
     # git-credential and Git is configured to query Datalad.

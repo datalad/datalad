@@ -479,7 +479,7 @@ def test_get_local_file_url():
 
 
 @with_tempfile(mkdir=True)
-def test_get_local_file_url_compatibility(path):
+def test_get_local_file_url_compatibility(path=None):
     # smoke test for file:// URL compatibility with other datalad/git/annex
     # pieces
     path = Path(path)

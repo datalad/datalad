@@ -36,7 +36,7 @@ call = partial(check_dates, result_renderer="disabled", return_type="list")
 
 
 @with_tree(tree={"invalid": {".git": {}}})
-def test_check_dates_invalid_repo(path):
+def test_check_dates_invalid_repo(path=None):
     with swallow_logs(new_level=logging.WARNING) as cml:
         call(paths=[path])
         cml.assert_logged("Skipping invalid")
@@ -56,7 +56,7 @@ def test_check_dates_invalid_date():
 
 
 @with_tree(tree={"repo": {"a": "a"}})
-def test_check_dates(path):
+def test_check_dates(path=None):
     skip_if_no_module("dateutil")
 
     ref_ts = 1218182889  # Fri, 08 Aug 2008 04:08:09 -0400

@@ -44,14 +44,14 @@ _dataset_template = {
 
 
 @with_tree(_dataset_template)
-def test_failure(path):
+def test_failure(path=None):
     # non-existing dataset
     with assert_raises(ValueError):
         export_archive(dataset=Dataset('nowhere'))
 
 
 @with_tree(_dataset_template)
-def test_archive(path):
+def test_archive(path=None):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save()
     committed_date = ds.repo.get_commit_date()
@@ -102,7 +102,7 @@ def test_archive(path):
 
 
 @with_tree(_dataset_template)
-def test_zip_archive(path):
+def test_zip_archive(path=None):
     ds = Dataset(opj(path, 'ds')).create(force=True, annex=False)
     ds.save()
     with chpwd(path):

@@ -28,7 +28,7 @@ def check_noannex(ds):
 
 
 @with_tempfile(mkdir=True)
-def test_noannex_simple(path):
+def test_noannex_simple(path=None):
     ds = Dataset(path).create()
     assert_true(isinstance(ds.repo, AnnexRepo))
     ds.run_procedure('cfg_noannex')  # we are killing annex while ds.repo
@@ -38,7 +38,7 @@ def test_noannex_simple(path):
 @with_tree(tree={
     'data': 'some'
 })
-def test_noannex_create_force(path):
+def test_noannex_create_force(path=None):
     ds = Dataset(path).create(force=True, cfg_proc='noannex')
     check_noannex(ds)
 
@@ -46,7 +46,7 @@ def test_noannex_create_force(path):
 @with_tree(tree={
     'data': 'some'
 })
-def test_noannex_fail_if_has_annexed(path):
+def test_noannex_fail_if_has_annexed(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     assert_true(isinstance(ds.repo, AnnexRepo))

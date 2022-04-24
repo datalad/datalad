@@ -268,7 +268,7 @@ def test_script_shims():
 
 @slow  # 11.2591s
 @with_tempfile(mkdir=True)
-def test_cfg_override(path):
+def test_cfg_override(path=None):
     with chpwd(path):
         cmd = ['datalad', 'wtf', '-s', 'some']
         # control
@@ -311,7 +311,7 @@ def test_incorrect_cfg_override():
 
 
 @with_tempfile
-def test_librarymode(path):
+def test_librarymode(path=None):
     Dataset(path).create()
     was_mode = datalad.__runtime_mode
     try:
@@ -329,7 +329,7 @@ def test_librarymode(path):
 
 
 @with_tempfile
-def test_completion(out_fn):
+def test_completion(out_fn=None):
     skip_if_no_module('argcomplete')
 
     from datalad.cmd import WitlessRunner

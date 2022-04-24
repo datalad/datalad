@@ -54,7 +54,7 @@ from .utils import py2cmd
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_runner(tempfile):
+def test_runner(tempfile=None):
     runner = Runner()
     content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
     cmd = 'echo %s > %s' % (content, tempfile)
@@ -89,7 +89,7 @@ def test_runner_stdout_capture():
 
 
 @with_tempfile(mkdir=True)
-def test_runner_failure(dir_):
+def test_runner_failure(dir_=None):
     runner = Runner()
     with assert_raises(CommandError) as cme:
         runner.run(
@@ -99,7 +99,7 @@ def test_runner_failure(dir_):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_fix_PWD(path):
+def test_runner_fix_PWD(path=None):
     env = os.environ.copy()
     env['PWD'] = orig_cwd = os.getcwd()
     runner = Runner(cwd=path, env=env)
@@ -112,7 +112,7 @@ def test_runner_fix_PWD(path):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_cwd_encoding(path):
+def test_runner_cwd_encoding(path=None):
     env = os.environ.copy()
     # Add PWD to env so that runner will temporarily adjust it to point to cwd.
     env['PWD'] = os.getcwd()
@@ -126,7 +126,7 @@ def test_runner_cwd_encoding(path):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_stdin(path):
+def test_runner_stdin(path=None):
     runner = Runner()
     fakestdin = Path(path) / 'io'
     # go for difficult content
@@ -205,7 +205,7 @@ def test_runner_parametrized_protocol():
 @integration  # ~3 sec
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_asyncio_loop_noninterference1(path1, path2):
+def test_asyncio_loop_noninterference1(path1=None, path2):
     if on_windows and sys.version_info < (3, 8):
         raise SkipTest(
             "get_event_loop() raises "
@@ -230,7 +230,7 @@ ds.status()
 
 
 @with_tempfile
-def test_asyncio_forked(temp):
+def test_asyncio_forked(temp=None):
     # temp will be used to communicate from child either it succeeded or not
     temp = Path(temp)
     runner = Runner()

@@ -72,7 +72,7 @@ def test_download_url_exceptions():
 
 
 @with_tree(tree={"dir": {}})
-def test_download_url_existing_dir_no_slash_exception(path):
+def test_download_url_existing_dir_no_slash_exception(path=None):
     with chpwd(path):
         res = download_url('url', path="dir", save=False, on_failure='ignore')
         assert_result_count(res, 1, status='error')
@@ -89,7 +89,7 @@ def test_download_url_existing_dir_no_slash_exception(path):
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_return(toppath, topurl, outdir):
+def test_download_url_return(toppath=None, topurl, outdir):
     # Ensure that out directory has trailing slash.
     outdir = opj(outdir, "")
     files = ['file1.txt', 'file2.txt']
@@ -125,7 +125,7 @@ def test_download_url_return(toppath, topurl, outdir):
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_dataset(toppath, topurl, path):
+def test_download_url_dataset(toppath=None, topurl, path):
     # Non-dataset directory.
     file1_fullpath = opj(path, "file1.txt")
     with chpwd(path):
@@ -187,7 +187,7 @@ def test_download_url_dataset(toppath, topurl, path):
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_archive(toppath, topurl, path):
+def test_download_url_archive(toppath=None, topurl, path):
     ds = Dataset(path).create()
     ds.download_url([topurl + "archive.tar.gz"], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
@@ -208,7 +208,7 @@ def test_download_url_archive(toppath, topurl, path):
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_archive_from_subdir(toppath, topurl, path):
+def test_download_url_archive_from_subdir(toppath=None, topurl, path):
     ds = Dataset(path).create()
     subdir_path = opj(ds.path, "subdir", "")
     os.mkdir(subdir_path)
@@ -221,7 +221,7 @@ def test_download_url_archive_from_subdir(toppath, topurl, path):
                  "a1.tar.gz": {'f1.txt': 'def'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_archive_trailing_separator(toppath, topurl, path):
+def test_download_url_archive_trailing_separator(toppath=None, topurl, path):
     ds = Dataset(path).create()
     # Archives will be extracted in the specified subdirectory, which doesn't
     # need to exist.
@@ -239,7 +239,7 @@ def test_download_url_archive_trailing_separator(toppath, topurl, path):
 @slow  # 12-14 sec
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_download_url_need_datalad_remote(path):
+def test_download_url_need_datalad_remote(path=None):
     # publicly available (requires anonymous s3 access, so still needs our special remote)
     url = "s3://dandiarchive/ros3test.hdf5"
     path = Path(path)

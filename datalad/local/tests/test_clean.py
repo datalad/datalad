@@ -35,7 +35,7 @@ from datalad.utils import (
 
 
 @with_tempfile(mkdir=True)
-def test_clean(d):
+def test_clean(d=None):
     AnnexRepo(d, create=True)
     ds = Dataset(d)
     assert_status('notneeded', clean(dataset=ds))

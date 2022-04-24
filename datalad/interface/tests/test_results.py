@@ -23,7 +23,7 @@ from datalad.tests.utils import (
 
 
 @ with_tempfile
-def test_annexjson2result(dspath):
+def test_annexjson2result(dspath=None):
     # no explicit success means 'error'
     eq_(annexjson2result(dict(), None),
         dict(status='error'))

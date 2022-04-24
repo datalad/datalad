@@ -164,7 +164,7 @@ def _test_initremote_basic(url, io, store, ds_path, link):
 @known_failure_windows
 @skip_ssh
 @with_tempfile
-def test_initremote_basic_sshurl(storepath):
+def test_initremote_basic_sshurl(storepath=None):
     _test_initremote_basic(
         'ria+ssh://datalad-test{}'.format(Path(storepath).as_posix()), \
         SSHRemoteIO('datalad-test'), \
@@ -175,7 +175,7 @@ def test_initremote_basic_sshurl(storepath):
 # ora remote cannot handle windows file:// URLs
 @known_failure_windows
 @with_tempfile
-def test_initremote_basic_fileurl(storepath):
+def test_initremote_basic_fileurl(storepath=None):
     _test_initremote_basic(
         "ria+{}".format(Path(storepath).as_uri()),
         LocalIO(),
@@ -187,7 +187,7 @@ def test_initremote_basic_fileurl(storepath):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_initremote_basic_httpurl(storepath, storeurl):
+def test_initremote_basic_httpurl(storepath=None, storeurl):
     _test_initremote_basic(
         f"ria+{storeurl}",
         LocalIO(),
@@ -197,7 +197,7 @@ def test_initremote_basic_httpurl(storepath, storeurl):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http(use_ssl=True)
-def test_initremote_basic_httpsurl(storepath, storeurl):
+def test_initremote_basic_httpsurl(storepath=None, storeurl):
     _test_initremote_basic(
         f"ria+{storeurl}",
         LocalIO(),
@@ -609,7 +609,7 @@ def test_binary_data():
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_push_url(storepath, dspath, blockfile):
+def test_push_url(storepath=None, dspath, blockfile):
 
     dspath = Path(dspath)
     store = Path(storepath)
@@ -667,7 +667,7 @@ def test_push_url(storepath, dspath, blockfile):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_url_keys(dspath, storepath, httppath, httpurl):
+def test_url_keys(dspath=None, storepath, httppath, httpurl):
     ds = Dataset(dspath).create()
     repo = ds.repo
     filename = 'url_no_size.html'

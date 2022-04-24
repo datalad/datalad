@@ -38,7 +38,7 @@ from ..base import (
 # PermissionError: [WinError 32] The process cannot access the file because it is being used by another process:
 @known_failure_githubci_win
 @with_tree(tree={'file.dat': ''})
-def test_get_contentlocation(tdir):
+def test_get_contentlocation(tdir=None):
     repo = AnnexRepo(tdir, create=True, init=True)
     repo.add('file.dat')
     repo.commit('added file.dat')
@@ -61,7 +61,7 @@ def test_ensure_datalad_remote_unkown_remote():
 
 
 @with_tempfile
-def test_ensure_datalad_remote_init_and_enable_needed(path):
+def test_ensure_datalad_remote_init_and_enable_needed(path=None):
     from datalad.consts import DATALAD_SPECIAL_REMOTE
     ds = Dataset(path).create(force=True)
     repo = ds.repo

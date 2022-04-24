@@ -40,7 +40,7 @@ from datalad.tests.utils import (
   "author": "Jane Doe <noemail@example.com>"
 }
 """})
-def test_get_metadata(path):
+def test_get_metadata(path=None):
 
     ds = Dataset(path).create(force=True)
     p = MetadataExtractor(ds, [])

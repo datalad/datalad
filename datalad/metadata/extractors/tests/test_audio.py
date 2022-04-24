@@ -46,7 +46,7 @@ target = {
 
 
 @with_tempfile(mkdir=True)
-def test_audio(path):
+def test_audio(path=None):
     ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'audio', scope='branch')
     copy(

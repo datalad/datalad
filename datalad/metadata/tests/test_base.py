@@ -78,7 +78,7 @@ _dataset_hierarchy_template = {
 
 
 @with_tempfile(mkdir=True)
-def test_get_metadata_type(path):
+def test_get_metadata_type(path=None):
     ds = Dataset(path).create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(ds), [])
@@ -115,7 +115,7 @@ def _compare_metadata_helper(origres, compds):
 @known_failure_githubci_win
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
-def test_aggregation(path):
+def test_aggregation(path=None):
     with chpwd(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
@@ -212,7 +212,7 @@ def test_aggregation(path):
 
 
 @with_tempfile(mkdir=True)
-def test_ignore_nondatasets(path):
+def test_ignore_nondatasets(path=None):
     # we want to ignore the version/commits for this test
     def _kill_time(meta):
         for m in meta:
@@ -242,7 +242,7 @@ def test_ignore_nondatasets(path):
 
 
 @with_tempfile(mkdir=True)
-def test_get_aggregates_fails(path):
+def test_get_aggregates_fails(path=None):
     with chpwd(path), assert_raises(NoDatasetFound):
         metadata(get_aggregates=True)
     ds = Dataset(path).create()
@@ -252,7 +252,7 @@ def test_get_aggregates_fails(path):
 
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
-def test_bf2458(src, dst):
+def test_bf2458(src=None, dst):
     ds = Dataset(src).create(force=True)
     ds.save(to_git=False)
 

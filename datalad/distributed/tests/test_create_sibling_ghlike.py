@@ -31,7 +31,7 @@ from datalad.tests.utils import (
 
 
 @with_tempfile
-def test_invalid_call(path):
+def test_invalid_call(path=None):
     # no dataset
     assert_raises(ValueError, create_sibling_gin, 'bogus', dataset=path)
     ds = Dataset(path).create()
@@ -58,7 +58,7 @@ def test_invalid_call(path):
 
 
 @with_tempfile
-def test_dryrun(path):
+def test_dryrun(path=None):
     ds = Dataset(path).create()
     # see that the correct request would be made
     res = ds.create_sibling_gin('bogus', credential='some', dry_run=True)

@@ -19,7 +19,7 @@ from datalad.tests.utils import (
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_no_blows(cookiesdir):
+def test_no_blows(cookiesdir=None):
     cookies = CookiesDB(op.join(cookiesdir, 'mycookies'))
     # set the cookie
     cookies['best'] = 'mine'

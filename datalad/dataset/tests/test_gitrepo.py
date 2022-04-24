@@ -51,7 +51,7 @@ from datalad.support.exceptions import (
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_invalid_path(path):
+def test_GitRepo_invalid_path(path=None):
     with chpwd(path):
         assert_raises(ValueError, GitRepo, path="git://some/url")
         ok_(not op.exists(op.join(path, "git:")))
@@ -61,7 +61,7 @@ def test_GitRepo_invalid_path(path):
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_GitRepo_instance_from_existing(path):
+def test_GitRepo_instance_from_existing(path=None):
     GitRepo(path).init()
 
     gr = GitRepo(path)
@@ -72,7 +72,7 @@ def test_GitRepo_instance_from_existing(path):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_instance_from_not_existing(path, path2):
+def test_GitRepo_instance_from_not_existing(path=None, path2):
     # 1. create=False and path doesn't exist:
     repo = GitRepo(path)
     assert_false(op.exists(path))
@@ -99,7 +99,7 @@ def test_GitRepo_instance_from_not_existing(path, path2):
 
 
 @with_tempfile
-def test_GitRepo_init_options(path):
+def test_GitRepo_init_options(path=None):
     # passing an option, not explicitly defined in GitRepo class:
     gr = GitRepo(path).init(init_options=['--bare'])
     ok_(gr.cfg.getbool(section="core", option="bare"))
@@ -112,7 +112,7 @@ def test_GitRepo_init_options(path):
         }
     }
 )
-def test_init_fail_under_known_subdir(path):
+def test_init_fail_under_known_subdir(path=None):
     repo = GitRepo(path).init()
     repo.call_git(['add', op.join('subds', 'file_name')])
     # Should fail even if we do not commit but only add to index:
@@ -130,7 +130,7 @@ def test_init_fail_under_known_subdir(path):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_equals(path1, path2):
+def test_GitRepo_equals(path1=None, path2):
 
     repo1 = GitRepo(path1)
     repo2 = GitRepo(path1)
@@ -143,7 +143,7 @@ def test_GitRepo_equals(path1, path2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_GitRepo_flyweight(path1, path2):
+def test_GitRepo_flyweight(path1=None, path2):
 
     import gc
 
@@ -229,7 +229,7 @@ def test_GitRepo_flyweight(path1, path2):
 
 
 @with_tree({"foo": "foo", "bar": "bar"})
-def test_gitrepo_call_git_methods(path):
+def test_gitrepo_call_git_methods(path=None):
     gr = GitRepo(path).init()
     gr.call_git(['add', "foo", "bar"])
     gr.call_git(['commit', '-m', "foobar"])
@@ -266,7 +266,7 @@ def test_gitrepo_call_git_methods(path):
 
 @with_tree(tree={"foo": "foo content",
                  "bar": "bar content"})
-def test_fake_dates(path):
+def test_fake_dates(path=None):
     raise SkipTest("Core GitRepo class does not have format_commit() yet")
 
     gr = GitRepo(path).init()
@@ -304,7 +304,7 @@ def test_fake_dates(path):
 @with_tree(tree={"HEAD": "",
                  "config": ""})
 @with_tree(tree={".git": "gitdir: subdir"})
-def test_get_dot_git(emptycase, gitdircase, barecase, gitfilecase):
+def test_get_dot_git(emptycase=None, gitdircase, barecase, gitfilecase):
     emptycase = Path(emptycase)
     gitdircase = Path(gitdircase)
     barecase = Path(barecase)

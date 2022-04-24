@@ -25,7 +25,7 @@ from datalad.api import (
 
 @with_tempfile()
 @with_tempfile()
-def test_basics(src, dst):
+def test_basics(src=None, dst):
     # dataset with subdataset, not specific configuration
     ds = Dataset(src).create()
     (ds.pathobj / 'file1').write_text('some')

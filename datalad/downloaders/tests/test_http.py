@@ -131,7 +131,7 @@ def test_process_www_authenticate():
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_HTTPDownloader_basic(toppath, topurl):
+def test_HTTPDownloader_basic(toppath=None, topurl):
     furl = "%sfile.dat" % topurl
     tfpath = opj(toppath, "file-downloaded.dat")
     downloader = HTTPDownloader()  # no auth/credentials needed
@@ -203,7 +203,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 @with_memory_keyring
-def test_access_denied(toppath, topurl, keyring):
+def test_access_denied(toppath=None, topurl, keyring):
     furl = topurl + "file.dat"
 
     def deny_access(*args, **kwargs):
@@ -407,7 +407,7 @@ def test_download_ftp():
 @with_tree(tree={'file.dat': '1'})
 @serve_path_via_http
 @with_tempfile
-def test_mtime(path, url, tempfile):
+def test_mtime(path=None, url, tempfile):
     # let's set custom mtime
     file_to_download = opj(path, 'file.dat')
     os.utime(file_to_download, (time.time(), 1000))
@@ -483,7 +483,7 @@ test_cookie = 'somewebsite=testcookie'
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTMLFormAuthenticator_httpretty(d):
+def test_HTMLFormAuthenticator_httpretty(d=None):
     fpath = opj(d, 'crap.txt')
 
     credential = FakeCredential1(name='test', url=None)
@@ -546,7 +546,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
 @with_memory_keyring
 @with_testsui(responses=['no', 'yes', 'testlogin', 'testpassword'])
-def test_auth_but_no_cred(keyring):
+def test_auth_but_no_cred(keyring=None):
     authenticator = HTMLFormAuthenticator("")
     # Replying 'no' to the set credentials prompt should raise ValueError
     assert_raises(ValueError, HTTPDownloader, credential=None, authenticator=authenticator)
@@ -633,7 +633,7 @@ class FakeCredential2(UserPassword):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
-def test_scenario_2(d):
+def test_scenario_2(d=None):
     fpath = opj(d, 'crap.txt')
 
     credential = FakeCredential2(name='test', url=None)
@@ -705,7 +705,7 @@ class FakeCredential3(Token):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTTPBearerTokenAuthenticator(d):
+def test_HTTPBearerTokenAuthenticator(d=None):
     fpath = opj(d, 'crap.txt')
 
     def request_get_callback(request, uri, headers):
@@ -747,7 +747,7 @@ class FakeLorisCredential(Token):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTTPLorisTokenAuthenticator(d):
+def test_HTTPLorisTokenAuthenticator(d=None):
     fpath = opj(d, 'crap.txt')
 
     def request_get_callback(request, uri, headers):
@@ -786,7 +786,7 @@ def test_HTTPLorisTokenAuthenticator(d):
 @with_fake_cookies_db
 @with_memory_keyring
 @with_testsui(responses=['yes', 'user'])
-def test_lorisadapter(d, keyring):
+def test_lorisadapter(d=None, keyring):
     fpath = opj(d, 'crap.txt')
     loginurl = "http://www.example.com/api/v0.0.2/login"
 
@@ -825,7 +825,7 @@ def test_lorisadapter(d, keyring):
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_download_url(toppath, topurl):
+def test_download_url(toppath=None, topurl):
     furl = "%sfile.dat" % topurl
     # fails if URL is dysfunctional
     assert_raises(DownloadError, download_url, furl + 'magic', toppath)

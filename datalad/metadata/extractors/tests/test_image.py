@@ -41,7 +41,7 @@ target = {
 
 
 @with_tempfile(mkdir=True)
-def test_image(path):
+def test_image(path=None):
     ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'image', scope='branch')
     copy(
