@@ -491,7 +491,7 @@ def test_property_reevaluation(repo1=None):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_symlinked_dataset_properties(repo1=None, repo2, repo3=None, non_repo=None, symlink=None):
+def test_symlinked_dataset_properties(repo1=None, repo2=None, repo3=None, non_repo=None, symlink=None):
 
     ds = Dataset(repo1).create()
 
