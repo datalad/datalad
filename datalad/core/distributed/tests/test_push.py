@@ -420,7 +420,7 @@ def test_push_recursive(
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_push_subds_no_recursion(src_path=None, dst_top, dst_sub=None, dst_subsub=None):
+def test_push_subds_no_recursion(src_path=None, dst_top=None, dst_sub=None, dst_subsub=None):
     # dataset with one submodule and one subsubmodule
     top = Dataset(src_path).create()
     sub = top.create('sub m')

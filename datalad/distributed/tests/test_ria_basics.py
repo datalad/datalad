@@ -667,7 +667,7 @@ def test_push_url(storepath=None, dspath=None, blockfile=None):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_url_keys(dspath=None, storepath, httppath=None, httpurl=None):
+def test_url_keys(dspath=None, storepath=None, httppath=None, httpurl=None):
     ds = Dataset(dspath).create()
     repo = ds.repo
     filename = 'url_no_size.html'

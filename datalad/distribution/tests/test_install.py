@@ -759,7 +759,7 @@ def test_install_source_relpath(src=None, dest=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_install_consistent_state(src=None, dest, dest2=None, dest3=None):
+def test_install_consistent_state(src=None, dest=None, dest2=None, dest3=None):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
     # then it is desired to get that default installed branch to get to the

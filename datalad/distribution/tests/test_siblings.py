@@ -513,7 +513,7 @@ def test_bf3733(path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_as_common_datasource(testbed=None, viapath, viaurl, remotepath=None, url=None):
+def test_as_common_datasource(testbed=None, viapath, viaurl=None, remotepath=None, url=None):
     ds = Dataset(remotepath).create()
     (ds.pathobj / 'testfile').write_text('likemagic')
     (ds.pathobj / 'testfile2').write_text('likemagic2')
