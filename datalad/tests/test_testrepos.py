@@ -44,7 +44,7 @@ def test_point_to_github(url=None):
 
 @with_testrepos
 @with_tempfile
-def test_clone(src=None, tempdir):
+def test_clone(src=None, tempdir=None):
     # Verify that all our repos are clonable
     r = WitlessRunner()
     output = r.run(["git" , "clone", src, tempdir], protocol=StdOutErrCapture)
