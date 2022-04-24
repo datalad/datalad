@@ -208,7 +208,7 @@ def test_ssh_manager_close_no_throw(bogus_socket=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
 @with_tempfile(content="two")
-def test_ssh_copy(sourcedir=None, sourcefile1, sourcefile2=None):
+def test_ssh_copy(sourcedir=None, sourcefile1=None, sourcefile2=None):
     port = get_ssh_port('datalad-test')
     remote_url = 'ssh://datalad-test:{}'.format(port)
     manager = SSHManager()

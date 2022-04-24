@@ -99,7 +99,7 @@ treeargs = dict(
 @with_tree(**treeargs)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-def test_add_archive_dirs(path_orig=None, url, repo_path=None):
+def test_add_archive_dirs(path_orig=None, url=None, repo_path=None):
     # change to repo_path
     with chpwd(repo_path):
         # create annex repo
@@ -199,7 +199,7 @@ tree4uargs = dict(
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-def test_add_archive_content(path_orig=None, url, repo_path=None):
+def test_add_archive_content(path_orig=None, url=None, repo_path=None):
     with chpwd(repo_path):
         # TODO we need to be able to pass path into add_archive_content
         # We could mock but I mean for the API
@@ -372,7 +372,7 @@ def test_add_archive_content(path_orig=None, url, repo_path=None):
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-def test_add_archive_content_strip_leading(path_orig=None, url, repo_path=None):
+def test_add_archive_content_strip_leading(path_orig=None, url=None, repo_path=None):
     with chpwd(repo_path):
         ds = Dataset(repo_path).create(force=True)
         repo = ds.repo

@@ -42,7 +42,7 @@ from datalad.customremotes.ria_utils import (
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile
-def test_initremote(store_path=None, store_url, ds_path=None):
+def test_initremote(store_path=None, store_url=None, ds_path=None):
     ds = Dataset(ds_path).create()
     store_path = Path(store_path)
     url = "ria+" + store_url
@@ -99,7 +99,7 @@ def test_initremote(store_path=None, store_url, ds_path=None):
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile
-def test_read_access(store_path=None, store_url, ds_path=None):
+def test_read_access(store_path=None, store_url=None, ds_path=None):
 
     ds = Dataset(ds_path).create()
     populate_dataset(ds)

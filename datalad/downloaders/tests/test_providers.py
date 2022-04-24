@@ -123,7 +123,7 @@ authentication_type = none
 """}},
    '.git': { "HEAD" : ""}})
 @patch.multiple("platformdirs.AppDirs", site_config_dir=None, user_config_dir=None)
-def test_Providers_from_config__files(sysdir=None, userdir, dsdir=None):
+def test_Providers_from_config__files(sysdir=None, userdir=None, dsdir=None):
     """Test configuration file precedence
 
     Ensure that provider precedence works in the correct order:

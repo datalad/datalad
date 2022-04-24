@@ -25,7 +25,7 @@ from datalad.tests.utils import (
             'sub': {'other.txt': 'other'}})
 @with_tempfile
 @with_tempfile
-def test_ephemeral(ds_path=None, store_path, clone_path=None):
+def test_ephemeral(ds_path=None, store_path=None, clone_path=None):
 
     dspath = Path(ds_path)
     store = Path(store_path)

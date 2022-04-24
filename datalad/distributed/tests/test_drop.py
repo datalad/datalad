@@ -216,7 +216,7 @@ def test_drop_allkeys(origpath=None, clonepath=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_undead_annex_detection(gitpath=None, origpath, clonepath=None):
+def test_undead_annex_detection(gitpath=None, origpath=None, clonepath=None):
     gitds = Dataset(gitpath).create(annex=False)
     # a gitrepo can be inspected too, it might just not know anything
     eq_([], _detect_nondead_annex_at_remotes(gitds.repo, 'someid'))
@@ -340,7 +340,7 @@ def test_unpushed_state_detection(origpath=None, clonepath=None):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
-def test_safetynet(otherpath=None, origpath, clonepath=None):
+def test_safetynet(otherpath=None, origpath=None, clonepath=None):
     # we start with a dataset that is hosted somewhere
     origds = Dataset(origpath).create()
     # a clone is made to work on the dataset

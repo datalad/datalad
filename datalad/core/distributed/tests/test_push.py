@@ -420,7 +420,7 @@ def test_push_recursive(
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_push_subds_no_recursion(src_path=None, dst_top, dst_sub, dst_subsub=None):
+def test_push_subds_no_recursion(src_path=None, dst_top, dst_sub=None, dst_subsub=None):
     # dataset with one submodule and one subsubmodule
     top = Dataset(src_path).create()
     sub = top.create('sub m')
@@ -572,7 +572,7 @@ def test_gh1426(origin_path=None, target_path=None):
 @with_tree(tree={'1': '123'})
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_publish_target_url(src=None, desttop, desturl=None):
+def test_publish_target_url(src=None, desttop=None, desturl=None):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
     ds.save('1')
@@ -587,7 +587,7 @@ def test_publish_target_url(src=None, desttop, desturl=None):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
-def test_gh1763(src=None, target1, target2=None):
+def test_gh1763(src=None, target1=None, target2=None):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763
     src = Dataset(src).create(force=True)
@@ -875,7 +875,7 @@ def test_push_matching(path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_nested_pushclone_cycle_allplatforms(origpath=None, storepath, clonepath=None):
+def test_nested_pushclone_cycle_allplatforms(origpath=None, storepath=None, clonepath=None):
     if 'DATALAD_SEED' in os.environ:
         # we are using create-sibling-ria via the cmdline in here
         # this will create random UUIDs for datasets

@@ -316,7 +316,7 @@ def test_annex_repo_sameas_special(repo=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_file_has_content(batch=None, src, annex_path=None):
+def test_AnnexRepo_file_has_content(batch=None, src=None, annex_path=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test.dat').write_text('123\n')
     origin.save('test.dat', git=True)
@@ -350,7 +350,7 @@ def test_AnnexRepo_file_has_content(batch=None, src, annex_path=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_is_under_annex(batch=None, src, annex_path=None):
+def test_AnnexRepo_is_under_annex(batch=None, src=None, annex_path=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save('some')
@@ -389,7 +389,7 @@ def test_AnnexRepo_is_under_annex(batch=None, src, annex_path=None):
                  ('d', {'sub.txt': 'more stuff'})))
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_web_remote(sitepath=None, siteurl, dst=None):
+def test_AnnexRepo_web_remote(sitepath=None, siteurl=None, dst=None):
 
     ar = AnnexRepo(dst, create=True)
     testurl = urljoin(siteurl, 'about.txt')
@@ -1024,7 +1024,7 @@ def test_AnnexRepo_get_contentlocation():
                  ('d', {'sub.txt': 'more stuff'})))
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl, dst=None):
+def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl=None, dst=None):
 
     if dl_cfg.get('datalad.fake-dates'):
         raise SkipTest(
@@ -1124,7 +1124,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl, dst=None):
 @with_tree(tree={"foo": "foo content"})
 @serve_path_via_http()
 @with_tree(tree={"bar": "bar content"})
-def test_annexrepo_fake_dates_disables_batched(sitepath=None, siteurl, dst=None):
+def test_annexrepo_fake_dates_disables_batched(sitepath=None, siteurl=None, dst=None):
     ar = AnnexRepo(dst, create=True, fake_dates=True)
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
@@ -1295,7 +1295,7 @@ def test_annex_remove(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_repo_version(path1=None, path2, path3=None):
+def test_repo_version(path1=None, path2=None, path3=None):
     with swallow_logs(new_level=logging.INFO) as cm:
         annex = AnnexRepo(path1, create=True, version=6)
         assert_repo_status(path1, annex=True)
@@ -1336,7 +1336,7 @@ def test_init_scanning_message(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_annex_copy_to(src=None, origin, clone=None):
+def test_annex_copy_to(src=None, origin=None, clone=None):
     ar = AnnexRepo(src)
     (ar.pathobj / 'test.dat').write_text("123\n")
     ar.save('some', git=True)
@@ -1807,7 +1807,7 @@ def test_AnnexRepo_flyweight(path1=None, path2=None):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_AnnexRepo_get_toppath(repo=None, tempdir, repo2=None):
+def test_AnnexRepo_get_toppath(repo=None, tempdir=None, repo2=None):
     AnnexRepo(repo, create=True)
 
     reporeal = str(Path(repo).resolve())
@@ -2022,7 +2022,7 @@ def test_AnnexRepo_metadata(path=None):
 @with_tree(tree={'file.txt': 'content'})
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_addurl_batched_and_set_metadata(path=None, url, dest=None):
+def test_AnnexRepo_addurl_batched_and_set_metadata(path=None, url=None, dest=None):
     ar = AnnexRepo(dest, create=True)
     fname = "file.txt"
     ar.add_url_to_file(fname, urljoin(url, fname), batch=True)

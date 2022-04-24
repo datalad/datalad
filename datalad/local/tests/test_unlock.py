@@ -46,7 +46,7 @@ from datalad.utils import Path
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_unlock_raises(path=None, path2, path3=None):
+def test_unlock_raises(path=None, path2=None, path3=None):
 
     # make sure, we are not within a dataset:
     _cwd = getpwd()

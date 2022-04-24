@@ -43,7 +43,7 @@ from datalad.consts import DATALAD_SPECIAL_REMOTE
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copy_file(workdir=None, webdir, weburl=None):
+def test_copy_file(workdir=None, webdir=None, weburl=None):
     workdir = Path(workdir)
     webdir = Path(webdir)
     src_ds = Dataset(workdir / 'src').create()
@@ -96,7 +96,7 @@ def test_copy_file(workdir=None, webdir, weburl=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_copy_file_errors(dspath1=None, dspath2, nondspath=None):
+def test_copy_file_errors(dspath1=None, dspath2=None, nondspath=None):
     ds1 = Dataset(dspath1)
     # nothing given
     assert_raises(ValueError, copy_file)
@@ -137,7 +137,7 @@ def test_copy_file_errors(dspath1=None, dspath2, nondspath=None):
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copy_file_datalad_specialremote(workdir=None, webdir, weburl=None):
+def test_copy_file_datalad_specialremote(workdir=None, webdir=None, weburl=None):
     workdir = Path(workdir)
     src_ds = Dataset(workdir / 'src').create()
     # enable datalad special remote
@@ -377,7 +377,7 @@ def test_copy_file_prevent_dotgit_placement(srcpath=None, destpath=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_copy_file_nourl(serv_path=None, orig_path, tst_path=None):
+def test_copy_file_nourl(serv_path=None, orig_path=None, tst_path=None):
     """Tests availability transfer to normal git-annex remote"""
     # prep source dataset that will have the file content
     srv_ds = Dataset(serv_path).create()

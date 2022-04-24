@@ -91,7 +91,7 @@ datalad_store_testds_id = '76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561'
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_invalid_args(path=None, otherpath, alienpath=None):
+def test_invalid_args(path=None, otherpath=None, alienpath=None):
     # source == path
     assert_raises(ValueError, clone, 'Zoidberg', path='Zoidberg')
     assert_raises(ValueError, clone, 'ssh://mars/Zoidberg', path='ssh://mars/Zoidberg')
@@ -266,7 +266,7 @@ def test_clone_dataset_from_just_source(src=None, url=None):
     })
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_clone_dataladri(src=None, topurl, path=None):
+def test_clone_dataladri(src=None, topurl=None, path=None):
     # make plain git repo
     ds_path = Path(src) / 'ds'
     gr = GitRepo(ds_path, create=True)
@@ -284,7 +284,7 @@ def test_clone_dataladri(src=None, topurl, path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_isnot_recursive(path_src=None, path_nr, path_r=None):
+def test_clone_isnot_recursive(path_src=None, path_nr=None, path_r=None):
     src = Dataset(path_src).create()
     src.create('subm 1')
     src.create('2')
@@ -836,7 +836,7 @@ def _move2store(storepath, d):
 })
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_ria_http(lcl=None, storepath, url=None):
+def test_ria_http(lcl=None, storepath=None, url=None):
     # create a local dataset with a subdataset
     lcl = Path(lcl)
     storepath = Path(storepath)
@@ -1194,7 +1194,7 @@ def test_ria_postclonecfg():
 @with_tree(tree={'somefile.txt': 'some content'})
 @with_tempfile
 @with_tempfile
-def test_no_ria_postclonecfg(dspath=None, storepath, clonepath=None):
+def test_no_ria_postclonecfg(dspath=None, storepath=None, clonepath=None):
 
     dspath = Path(dspath)
     storepath = Path(storepath)
@@ -1250,7 +1250,7 @@ def test_no_ria_postclonecfg(dspath=None, storepath, clonepath=None):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
-def test_ria_postclone_noannex(dspath=None, storepath, clonepath=None):
+def test_ria_postclone_noannex(dspath=None, storepath=None, clonepath=None):
 
     # Test for gh-5186: Cloning from local FS, shouldn't lead to annex
     # initializing origin.
@@ -1304,7 +1304,7 @@ def test_ria_postclone_noannex(dspath=None, storepath, clonepath=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_inherit_src_candidates(lcl=None, storepath, url=None):
+def test_inherit_src_candidates(lcl=None, storepath=None, url=None):
     lcl = Path(lcl)
     storepath = Path(storepath)
     # dataset with a subdataset
@@ -1569,7 +1569,7 @@ def test_gin_cloning(path=None):
 @with_tree(tree={"special": {"f0": "0"}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_fetch_git_special_remote(url_path=None, url, path=None):
+def test_fetch_git_special_remote(url_path=None, url=None, path=None):
     url_path = Path(url_path)
     path = Path(path)
     ds_special = Dataset(url_path / "special").create(force=True)

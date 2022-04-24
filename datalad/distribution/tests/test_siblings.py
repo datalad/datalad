@@ -55,7 +55,7 @@ from datalad.utils import (
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_siblings(origin=None, repo_path, local_clone_path=None):
+def test_siblings(origin=None, repo_path=None, local_clone_path=None):
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"
@@ -513,7 +513,7 @@ def test_bf3733(path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_as_common_datasource(testbed=None, viapath, viaurl, remotepath, url=None):
+def test_as_common_datasource(testbed=None, viapath, viaurl, remotepath=None, url=None):
     ds = Dataset(remotepath).create()
     (ds.pathobj / 'testfile').write_text('likemagic')
     (ds.pathobj / 'testfile2').write_text('likemagic2')

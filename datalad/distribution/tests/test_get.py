@@ -80,7 +80,7 @@ def _make_dataset_hierarchy(path):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_get_flexible_source_candidates_for_submodule(t=None, t2, t3=None):
+def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
     f = _get_flexible_source_candidates_for_submodule
     # for now without mocking -- let's just really build a dataset
     ds = create(t)
@@ -291,7 +291,7 @@ def test_get_subdataset_inherit_reckless():
                  'file4.txt': 'whatever 4'})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_get_multiple_files(path=None, url, ds_dir=None):
+def test_get_multiple_files(path=None, url=None, ds_dir=None):
     from os import listdir
     from datalad.support.network import RI
 
@@ -761,7 +761,7 @@ def test_missing_path_handling(path=None):
                  'sub2': {'file2.txt': 'content 2'}})
 @with_tempfile
 @with_tempfile
-def test_source_candidate_subdataset(store1=None, store2, intermediate=None,
+def test_source_candidate_subdataset(store1=None, store2=None, intermediate=None,
                                      super, clone):
 
     # This tests the scenario of gh-6159.

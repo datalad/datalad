@@ -166,7 +166,7 @@ def test_invalid_call(path=None):
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_target_ssh_simple(origin=None, src_path, target_rootpath=None):
+def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
     port = get_ssh_port("datalad-test")
     # prepare src
     source = install(

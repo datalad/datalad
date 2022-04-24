@@ -56,7 +56,7 @@ def test_runnin_on_empty(path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile(mkdir=True)
-def test_status_basics(path=None, linkpath, otherdir=None):
+def test_status_basics(path=None, linkpath=None, otherdir=None):
     if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(path, target_is_directory=True)

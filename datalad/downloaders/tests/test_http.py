@@ -203,7 +203,7 @@ def test_HTTPDownloader_basic(toppath=None, topurl=None):
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 @with_memory_keyring
-def test_access_denied(toppath=None, topurl, keyring=None):
+def test_access_denied(toppath=None, topurl=None, keyring=None):
     furl = topurl + "file.dat"
 
     def deny_access(*args, **kwargs):
@@ -407,7 +407,7 @@ def test_download_ftp():
 @with_tree(tree={'file.dat': '1'})
 @serve_path_via_http
 @with_tempfile
-def test_mtime(path=None, url, tempfile=None):
+def test_mtime(path=None, url=None, tempfile=None):
     # let's set custom mtime
     file_to_download = opj(path, 'file.dat')
     os.utime(file_to_download, (time.time(), 1000))

@@ -304,7 +304,7 @@ def test_fake_dates(path=None):
 @with_tree(tree={"HEAD": "",
                  "config": ""})
 @with_tree(tree={".git": "gitdir: subdir"})
-def test_get_dot_git(emptycase=None, gitdircase, barecase, gitfilecase=None):
+def test_get_dot_git(emptycase=None, gitdircase, barecase=None, gitfilecase=None):
     emptycase = Path(emptycase)
     gitdircase = Path(gitdircase)
     barecase = Path(barecase)

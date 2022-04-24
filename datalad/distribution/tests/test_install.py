@@ -293,7 +293,7 @@ def test_install_dataset_from_just_source_via_path(url=None, path=None):
     })
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_install_dataladri(src=None, topurl, path=None):
+def test_install_dataladri(src=None, topurl=None, path=None):
     # make plain git repo
     ds_path = opj(src, 'ds')
     gr = GitRepo(ds_path, create=True)
@@ -313,7 +313,7 @@ def test_install_dataladri(src=None, topurl, path=None):
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_install_recursive(src=None, path_nr, path_r=None):
+def test_install_recursive(src=None, path_nr=None, path_r=None):
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
     ok_(ds.is_installed())
@@ -654,7 +654,7 @@ def test_install_recursive_repeat(src=None, path=None):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_install_skip_list_arguments(src=None, path, path_outside=None):
+def test_install_skip_list_arguments(src=None, path=None, path_outside=None):
     ds = install(path, source=src)
     ok_(ds.is_installed())
 
@@ -759,7 +759,7 @@ def test_install_source_relpath(src=None, dest=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_install_consistent_state(src=None, dest, dest2, dest3=None):
+def test_install_consistent_state(src=None, dest, dest2=None, dest3=None):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
     # then it is desired to get that default installed branch to get to the

@@ -45,7 +45,7 @@ def test_downloader_bad_json(urlpath=None, url=None):
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_downloader_download(urlpath=None, url, path=None):
+def test_downloader_download(urlpath=None, url=None, path=None):
     path = Path(path)
     downloader = SHubDownloader()
     downloader.api_url = url

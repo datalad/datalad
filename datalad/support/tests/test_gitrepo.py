@@ -158,7 +158,7 @@ def test_GitRepo_init_options(path=None):
                  '.git': {}})
 @with_tempfile
 @with_tempfile
-def test_GitRepo_bare(path=None, empty_dir, non_empty_dir, empty_dot_git, non_bare=None,
+def test_GitRepo_bare(path=None, empty_dir, non_empty_dir, empty_dot_git=None, non_bare=None,
                       clone_path):
 
     import gc
@@ -685,7 +685,7 @@ def test_GitRepo_push_n_checkout(orig_path=None, clone_path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_GitRepo_remote_update(path1=None, path2, path3=None):
+def test_GitRepo_remote_update(path1=None, path2=None, path3=None):
 
     git1 = GitRepo(path1)
     git2 = GitRepo(path2)
@@ -784,7 +784,7 @@ def test_GitRepo_get_files(src_path=None, path=None):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_GitRepo_get_toppath(repo=None, tempdir, repo2=None):
+def test_GitRepo_get_toppath(repo=None, tempdir=None, repo2=None):
     GitRepo(repo, create=True)
     reporeal = str(Path(repo).resolve())
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)

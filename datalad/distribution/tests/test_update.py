@@ -72,7 +72,7 @@ from datalad import cfg as dl_cfg
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_update_simple(origin=None, src_path, dst_path=None):
+def test_update_simple(origin=None, src_path=None, dst_path=None):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -344,7 +344,7 @@ def test_newthings_coming_down(originpath=None, destpath=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_update_volatile_subds(originpath=None, otherpath, destpath=None):
+def test_update_volatile_subds(originpath=None, otherpath=None, destpath=None):
     origin = Dataset(originpath).create()
     repo = origin.repo
     if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
