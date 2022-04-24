@@ -187,7 +187,7 @@ def test_initremote_basic_fileurl(storepath=None):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_initremote_basic_httpurl(storepath=None, storeurl):
+def test_initremote_basic_httpurl(storepath=None, storeurl=None):
     _test_initremote_basic(
         f"ria+{storeurl}",
         LocalIO(),
@@ -197,7 +197,7 @@ def test_initremote_basic_httpurl(storepath=None, storeurl):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http(use_ssl=True)
-def test_initremote_basic_httpsurl(storepath=None, storeurl):
+def test_initremote_basic_httpsurl(storepath=None, storeurl=None):
     _test_initremote_basic(
         f"ria+{storeurl}",
         LocalIO(),
@@ -609,7 +609,7 @@ def test_binary_data():
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_push_url(storepath=None, dspath, blockfile):
+def test_push_url(storepath=None, dspath, blockfile=None):
 
     dspath = Path(dspath)
     store = Path(storepath)
@@ -667,7 +667,7 @@ def test_push_url(storepath=None, dspath, blockfile):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_url_keys(dspath=None, storepath, httppath, httpurl):
+def test_url_keys(dspath=None, storepath, httppath, httpurl=None):
     ds = Dataset(dspath).create()
     repo = ds.repo
     filename = 'url_no_size.html'

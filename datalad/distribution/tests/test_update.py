@@ -72,7 +72,7 @@ from datalad import cfg as dl_cfg
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_update_simple(origin=None, src_path, dst_path):
+def test_update_simple(origin=None, src_path, dst_path=None):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -202,7 +202,7 @@ def test_update_simple(origin=None, src_path, dst_path):
 
 @with_tempfile
 @with_tempfile
-def test_update_git_smoke(src_path=None, dst_path):
+def test_update_git_smoke(src_path=None, dst_path=None):
     # Apparently was just failing on git repos for basic lack of coverage, hence this quick test
     ds = Dataset(src_path).create(annex=False)
     target = install(
@@ -283,7 +283,7 @@ def test_update_fetch_all(path=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_newthings_coming_down(originpath=None, destpath):
+def test_newthings_coming_down(originpath=None, destpath=None):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
     Dataset(originpath).save('load.dat')
@@ -344,7 +344,7 @@ def test_newthings_coming_down(originpath=None, destpath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_update_volatile_subds(originpath=None, otherpath, destpath):
+def test_update_volatile_subds(originpath=None, otherpath, destpath=None):
     origin = Dataset(originpath).create()
     repo = origin.repo
     if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
@@ -431,7 +431,7 @@ def test_update_volatile_subds(originpath=None, otherpath, destpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_reobtain_data(originpath=None, destpath):
+def test_reobtain_data(originpath=None, destpath=None):
     origin = Dataset(originpath).create()
     ds = install(
         source=originpath, path=destpath,

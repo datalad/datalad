@@ -388,7 +388,7 @@ def test_inside_async():
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_popen_invocation(src_path=None, dest_path):
+def test_popen_invocation(src_path=None, dest_path=None):
     # https://github.com/ReproNim/testkraken/issues/93
     from multiprocessing import Process
 

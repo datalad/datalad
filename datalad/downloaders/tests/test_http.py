@@ -131,7 +131,7 @@ def test_process_www_authenticate():
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_HTTPDownloader_basic(toppath=None, topurl):
+def test_HTTPDownloader_basic(toppath=None, topurl=None):
     furl = "%sfile.dat" % topurl
     tfpath = opj(toppath, "file-downloaded.dat")
     downloader = HTTPDownloader()  # no auth/credentials needed
@@ -203,7 +203,7 @@ def test_HTTPDownloader_basic(toppath=None, topurl):
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 @with_memory_keyring
-def test_access_denied(toppath=None, topurl, keyring):
+def test_access_denied(toppath=None, topurl, keyring=None):
     furl = topurl + "file.dat"
 
     def deny_access(*args, **kwargs):
@@ -407,7 +407,7 @@ def test_download_ftp():
 @with_tree(tree={'file.dat': '1'})
 @serve_path_via_http
 @with_tempfile
-def test_mtime(path=None, url, tempfile):
+def test_mtime(path=None, url, tempfile=None):
     # let's set custom mtime
     file_to_download = opj(path, 'file.dat')
     os.utime(file_to_download, (time.time(), 1000))
@@ -786,7 +786,7 @@ def test_HTTPLorisTokenAuthenticator(d=None):
 @with_fake_cookies_db
 @with_memory_keyring
 @with_testsui(responses=['yes', 'user'])
-def test_lorisadapter(d=None, keyring):
+def test_lorisadapter(d=None, keyring=None):
     fpath = opj(d, 'crap.txt')
     loginurl = "http://www.example.com/api/v0.0.2/login"
 
@@ -825,7 +825,7 @@ def test_lorisadapter(d=None, keyring):
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_download_url(toppath=None, topurl):
+def test_download_url(toppath=None, topurl=None):
     furl = "%sfile.dat" % topurl
     # fails if URL is dysfunctional
     assert_raises(DownloadError, download_url, furl + 'magic', toppath)

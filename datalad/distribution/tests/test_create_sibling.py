@@ -166,7 +166,7 @@ def test_invalid_call(path=None):
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_target_ssh_simple(origin=None, src_path, target_rootpath):
+def test_target_ssh_simple(origin=None, src_path, target_rootpath=None):
     port = get_ssh_port("datalad-test")
     # prepare src
     source = install(
@@ -862,7 +862,7 @@ def test_local_path_target_dir(path=None):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_non_master_branch(src_path=None, target_path):
+def test_non_master_branch(src_path=None, target_path=None):
     src_path = Path(src_path)
     target_path = Path(target_path)
 
@@ -900,7 +900,7 @@ def test_non_master_branch(src_path=None, target_path):
 @known_failure_windows  # https://github.com/datalad/datalad/issues/5287
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_preserve_attrs(src=None, dest):
+def test_preserve_attrs(src=None, dest=None):
     create_tree(src, {"src": {"foo": {"bar": "This is test text."}}})
     os.utime(opj(src, "src", "foo", "bar"), (1234567890, 1234567890))
     _RunnerAdapter().put(opj(src, "src"), dest, recursive=True, preserve_attrs=True)

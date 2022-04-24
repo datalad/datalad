@@ -60,7 +60,7 @@ raw = dict(return_type='list', result_filter=None, result_xfm=None, on_failure='
 
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_create_raises(path=None, outside_path):
+def test_create_raises(path=None, outside_path=None):
     ds = Dataset(path)
     # incompatible arguments (annex only):
     assert_raises(ValueError, ds.create, annex=False, description='some')
@@ -147,7 +147,7 @@ def test_create_force_subds(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_create_curdir(path=None, path2):
+def test_create_curdir(path=None, path2=None):
     with chpwd(path, mkdir=True):
         create()
     ds = Dataset(path)
@@ -164,7 +164,7 @@ def test_create_curdir(path=None, path2):
 
 @with_tempfile
 @with_tempfile
-def test_create(probe=None, path):
+def test_create(probe=None, path=None):
     # only as a probe whether this FS is a crippled one
     ar = AnnexRepo(probe, create=True)
 
@@ -501,7 +501,7 @@ def test_create_relpath_semantics():
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_gh2927(path=None, linkpath):
+def test_gh2927(path=None, linkpath=None):
     if has_symlink_capability():
         # make it more complicated by default
         Path(linkpath).symlink_to(path, target_is_directory=True)

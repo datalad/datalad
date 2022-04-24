@@ -94,7 +94,7 @@ echo "I am never to be ran but could be discovered"
 exit 1
 """})
 @with_tempfile
-def test_procedure_discovery(path=None, super_path):
+def test_procedure_discovery(path=None, super_path=None):
     with chpwd(path):
         # ^ Change directory so that we don't fail with an
         # InvalidGitRepositoryError if the test is executed from a git

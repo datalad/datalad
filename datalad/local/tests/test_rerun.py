@@ -79,7 +79,7 @@ grep_command = 'grep ' if not on_windows else 'findstr '
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_rerun(path=None, nodspath):
+def test_rerun(path=None, nodspath=None):
     ds = Dataset(path).create()
     sub = ds.create('sub')
     probe_path = op.join(sub.path, 'sequence')
@@ -614,7 +614,7 @@ def test_rerun_script(path=None):
                                         "d.txt": "d"}},
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
-def test_run_inputs_outputs(src=None, path):
+def test_run_inputs_outputs(src=None, path=None):
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),
                   ("s0", "s1_0"),

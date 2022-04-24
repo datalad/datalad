@@ -72,7 +72,7 @@ def test_GitRepo_instance_from_existing(path=None):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_instance_from_not_existing(path=None, path2):
+def test_GitRepo_instance_from_not_existing(path=None, path2=None):
     # 1. create=False and path doesn't exist:
     repo = GitRepo(path)
     assert_false(op.exists(path))
@@ -130,7 +130,7 @@ def test_init_fail_under_known_subdir(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_equals(path1=None, path2):
+def test_GitRepo_equals(path1=None, path2=None):
 
     repo1 = GitRepo(path1)
     repo2 = GitRepo(path1)
@@ -143,7 +143,7 @@ def test_GitRepo_equals(path1=None, path2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_GitRepo_flyweight(path1=None, path2):
+def test_GitRepo_flyweight(path1=None, path2=None):
 
     import gc
 
@@ -304,7 +304,7 @@ def test_fake_dates(path=None):
 @with_tree(tree={"HEAD": "",
                  "config": ""})
 @with_tree(tree={".git": "gitdir: subdir"})
-def test_get_dot_git(emptycase=None, gitdircase, barecase, gitfilecase):
+def test_get_dot_git(emptycase=None, gitdircase, barecase, gitfilecase=None):
     emptycase = Path(emptycase)
     gitdircase = Path(gitdircase)
     barecase = Path(barecase)

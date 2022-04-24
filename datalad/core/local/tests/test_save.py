@@ -426,7 +426,7 @@ def test_add_files(path=None):
 
 @with_tree(**tree_arg)
 @with_tempfile(mkdir=True)
-def test_add_subdataset(path=None, other):
+def test_add_subdataset(path=None, other=None):
     subds = create(op.join(path, 'dir'), force=True)
     ds = create(path, force=True)
     ok_(subds.repo.dirty)

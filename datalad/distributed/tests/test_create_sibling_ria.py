@@ -204,7 +204,7 @@ def test_create_simple():
             'sub': {'other.txt': 'other'},
             'sub2': {'evenmore.txt': 'more'}})
 @with_tempfile
-def test_create_push_url(detection_path=None, ds_path, store_path):
+def test_create_push_url(detection_path=None, ds_path, store_path=None):
 
     store_path = Path(store_path)
     ds_path = Path(ds_path)
@@ -264,7 +264,7 @@ def test_create_push_url(detection_path=None, ds_path, store_path):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_create_alias(ds_path=None, ria_path, clone_path):
+def test_create_alias(ds_path=None, ria_path, clone_path=None):
     ds_path = Path(ds_path)
     clone_path = Path(clone_path)
 
@@ -310,7 +310,7 @@ def test_create_alias(ds_path=None, ria_path, clone_path):
 @skip_if_on_windows  # ORA remote is incompatible with windows clients
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})
-def test_storage_only(base_path=None, ds_path):
+def test_storage_only(base_path=None, ds_path=None):
     store_url = 'ria+' + get_local_file_url(base_path)
 
     ds = Dataset(ds_path).create(force=True)
@@ -337,7 +337,7 @@ def test_storage_only(base_path=None, ds_path):
 @with_tempfile
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})
-def test_no_storage(store1=None, store2, ds_path):
+def test_no_storage(store1=None, store2, ds_path=None):
     store1_url = 'ria+' + get_local_file_url(store1)
     store2_url = 'ria+' + get_local_file_url(store2)
 

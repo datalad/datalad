@@ -55,7 +55,7 @@ from datalad.utils import (
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_siblings(origin=None, repo_path, local_clone_path):
+def test_siblings(origin=None, repo_path, local_clone_path=None):
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"
@@ -351,7 +351,7 @@ def test_no_annex(path=None):
 
 @with_tempfile()
 @with_tempfile()
-def test_arg_missing(path=None, path2):
+def test_arg_missing(path=None, path2=None):
     # test fix for gh-3553
     ds = create(path)
     assert_raises(
@@ -400,7 +400,7 @@ def test_arg_missing(path=None, path2):
 
 @with_sameas_remote
 @with_tempfile(mkdir=True)
-def test_sibling_enable_sameas(repo=None, clone_path):
+def test_sibling_enable_sameas(repo=None, clone_path=None):
     ds = Dataset(repo.path)
     create_tree(ds.path, {"f0": "0"})
     ds.save(path="f0")
@@ -470,7 +470,7 @@ def test_sibling_inherit_no_super_remote(basedir=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_sibling_path_is_posix(basedir=None, otherpath):
+def test_sibling_path_is_posix(basedir=None, otherpath=None):
     ds_source = Dataset(opj(basedir, "source")).create()
     # add remote with system native path
     ds_source.siblings(
@@ -513,7 +513,7 @@ def test_bf3733(path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_as_common_datasource(testbed=None, viapath, viaurl, remotepath, url):
+def test_as_common_datasource(testbed=None, viapath, viaurl, remotepath, url=None):
     ds = Dataset(remotepath).create()
     (ds.pathobj / 'testfile').write_text('likemagic')
     (ds.pathobj / 'testfile2').write_text('likemagic2')
@@ -569,7 +569,7 @@ def test_as_common_datasource(testbed=None, viapath, viaurl, remotepath, url):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_specialremote(dspath=None, remotepath):
+def test_specialremote(dspath=None, remotepath=None):
     ds = Dataset(dspath).create()
     ds.repo.call_annex(
         ['initremote', 'myremote', 'type=directory',

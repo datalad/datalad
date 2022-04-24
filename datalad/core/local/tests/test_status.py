@@ -56,7 +56,7 @@ def test_runnin_on_empty(path=None):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile(mkdir=True)
-def test_status_basics(path=None, linkpath, otherdir):
+def test_status_basics(path=None, linkpath, otherdir=None):
     if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(path, target_is_directory=True)
@@ -86,7 +86,7 @@ def test_status_basics(path=None, linkpath, otherdir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_status_nods(path=None, otherpath):
+def test_status_nods(path=None, otherpath=None):
     ds = Dataset(path).create()
     assert_result_count(
         ds.status(path=otherpath, on_failure='ignore', result_renderer='disabled'),
@@ -325,7 +325,7 @@ def test_status_symlinked_dir_within_repo(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_get_paths_by_ds(path=None, otherdspath):
+def test_get_paths_by_ds(path=None, otherdspath=None):
     otherds = Dataset(otherdspath).create()
     ds = get_deeply_nested_structure(path)
 

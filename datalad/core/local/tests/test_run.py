@@ -93,7 +93,7 @@ def last_commit_msg(repo):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_basics(path=None, nodspath):
+def test_basics(path=None, nodspath=None):
     ds = Dataset(path).create()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
@@ -370,7 +370,7 @@ def test_run_assume_ready(path=None):
 
 @with_tempfile()
 @with_tempfile()
-def test_run_explicit(origpath=None, path):
+def test_run_explicit(origpath=None, path=None):
     origds = Dataset(origpath).create()
     (origds.pathobj / "test-annex.dat").write_text('content')
     origds.save()

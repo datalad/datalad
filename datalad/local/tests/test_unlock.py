@@ -46,7 +46,7 @@ from datalad.utils import Path
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_unlock_raises(path=None, path2, path3):
+def test_unlock_raises(path=None, path2, path3=None):
 
     # make sure, we are not within a dataset:
     _cwd = getpwd()
@@ -89,7 +89,7 @@ def test_unlock_raises(path=None, path2, path3):
 @skip_if_root
 @with_tempfile
 @with_tempfile
-def test_unlock(origpath=None, clonepath):
+def test_unlock(origpath=None, clonepath=None):
     origds = Dataset(origpath).create()
     (origds.pathobj / 'test-annex.dat').write_text('some text')
     origds.save()

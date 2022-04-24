@@ -149,7 +149,7 @@ def test_invalid_args(path=None):
 #@use_cassette('test_install_crcns')
 #@with_tempfile(mkdir=True)
 #@with_tempfile(mkdir=True)
-#def test_install_crcns(tdir=None, ds_path):
+#def test_install_crcns(tdir=None, ds_path=None):
 #    with chpwd(tdir):
 #        with swallow_logs(new_level=logging.INFO) as cml:
 #            install("all-nonrecursive", source='///')
@@ -203,7 +203,7 @@ def test_install_datasets_root(tdir=None):
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-def test_install_simple_local(src=None, path):
+def test_install_simple_local(src=None, path=None):
     origin = Dataset(path)
 
     # now install it somewhere else
@@ -244,7 +244,7 @@ def test_install_simple_local(src=None, path):
 @known_failure_githubci_win
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
-def test_install_dataset_from_just_source(url=None, path):
+def test_install_dataset_from_just_source(url=None, path=None):
     with chpwd(path, mkdir=True):
         ds = install(source=url)
 
@@ -258,7 +258,7 @@ def test_install_dataset_from_just_source(url=None, path):
 @slow   # 25sec on Yarik's laptop
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_dataset_from_instance(src=None, dst):
+def test_install_dataset_from_instance(src=None, dst=None):
     origin = Dataset(src)
     clone = install(source=origin, path=dst)
 
@@ -273,7 +273,7 @@ def test_install_dataset_from_instance(src=None, dst):
 @known_failure_githubci_win
 @with_testrepos(flavors=['network'])
 @with_tempfile
-def test_install_dataset_from_just_source_via_path(url=None, path):
+def test_install_dataset_from_just_source_via_path(url=None, path=None):
     # for remote urls only, the source could be given to `path`
     # to allows for simplistic cmdline calls
     # Q (ben): remote urls only? Sure? => TODO
@@ -293,7 +293,7 @@ def test_install_dataset_from_just_source_via_path(url=None, path):
     })
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_install_dataladri(src=None, topurl, path):
+def test_install_dataladri(src=None, topurl, path=None):
     # make plain git repo
     ds_path = opj(src, 'ds')
     gr = GitRepo(ds_path, create=True)
@@ -313,7 +313,7 @@ def test_install_dataladri(src=None, topurl, path):
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_install_recursive(src=None, path_nr, path_r):
+def test_install_recursive(src=None, path_nr, path_r=None):
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
     ok_(ds.is_installed())
@@ -368,7 +368,7 @@ def test_install_recursive(src=None, path_nr, path_r):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_recursive_with_data(src=None, path):
+def test_install_recursive_with_data(src=None, path=None):
 
     # now again; with data:
     res = install(path, source=src, recursive=True, get_data=True,
@@ -404,7 +404,7 @@ def test_install_recursive_with_data(src=None, path):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-def test_install_into_dataset(source=None, top_path):
+def test_install_into_dataset(source=None, top_path=None):
 
     ds = create(top_path)
     assert_repo_status(ds.path)
@@ -467,7 +467,7 @@ def test_failed_install_multiple(top_path=None):
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-def test_install_known_subdataset(src=None, path):
+def test_install_known_subdataset(src=None, path=None):
 
     # get the superdataset:
     ds = install(path, source=src)
@@ -499,7 +499,7 @@ def test_install_known_subdataset(src=None, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_implicit_install(src=None, dst):
+def test_implicit_install(src=None, dst=None):
 
     origin_top = create(src)
     origin_sub = origin_top.create("sub")
@@ -571,7 +571,7 @@ def test_failed_install(dspath=None):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_list(path=None, top_path):
+def test_install_list(path=None, top_path=None):
 
     # we want to be able to install several things, if these are known
     # (no 'source' allowed). Therefore first toplevel:
@@ -600,7 +600,7 @@ def test_install_list(path=None, top_path):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_reckless(path=None, top_path):
+def test_reckless(path=None, top_path=None):
     ds = install(top_path, source=path, reckless=True)
     eq_(ds.config.get('annex.hardlink', None), 'true')
     eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
@@ -615,7 +615,7 @@ def test_reckless(path=None, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-def test_install_recursive_repeat(src=None, path):
+def test_install_recursive_repeat(src=None, path=None):
     top_src = Dataset(src).create(force=True)
     sub1_src = top_src.create('sub 1', force=True)
     sub2_src = top_src.create('sub 2', force=True)
@@ -654,7 +654,7 @@ def test_install_recursive_repeat(src=None, path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_install_skip_list_arguments(src=None, path, path_outside):
+def test_install_skip_list_arguments(src=None, path, path_outside=None):
     ds = install(path, source=src)
     ok_(ds.is_installed())
 
@@ -692,7 +692,7 @@ def test_install_skip_list_arguments(src=None, path, path_outside):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_skip_failed_recursive(src=None, path):
+def test_install_skip_failed_recursive(src=None, path=None):
 
     # install top level:
     ds = install(path, source=src)
@@ -726,7 +726,7 @@ def test_install_skip_failed_recursive(src=None, path):
                            }
                  })
 @with_tempfile(mkdir=True)
-def test_install_noautoget_data(src=None, path):
+def test_install_noautoget_data(src=None, path=None):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
@@ -746,7 +746,7 @@ def test_install_noautoget_data(src=None, path):
 
 @with_tempfile
 @with_tempfile
-def test_install_source_relpath(src=None, dest):
+def test_install_source_relpath(src=None, dest=None):
     ds1 = create(src)
     src_ = basename(src)
     with chpwd(dirname(src)):
@@ -759,7 +759,7 @@ def test_install_source_relpath(src=None, dest):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_install_consistent_state(src=None, dest, dest2, dest3):
+def test_install_consistent_state(src=None, dest, dest2, dest3=None):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
     # then it is desired to get that default installed branch to get to the
@@ -818,7 +818,7 @@ def test_install_consistent_state(src=None, dest, dest2, dest3):
 @skip_ssh
 @with_tempfile
 @with_tempfile
-def test_install_subds_with_space(opath=None, tpath):
+def test_install_subds_with_space(opath=None, tpath=None):
     ds = create(opath)
     ds.create('sub ds')
     # works even now, boring
@@ -836,7 +836,7 @@ def test_install_subds_with_space(opath=None, tpath):
 # https://github.com/datalad/datalad/issues/2232
 @with_tempfile
 @with_tempfile
-def test_install_from_tilda(opath=None, tpath):
+def test_install_from_tilda(opath=None, tpath=None):
     ds = create(opath)
     ds.create('sub ds')
     orelpath = os.path.join(

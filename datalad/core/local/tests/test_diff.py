@@ -71,7 +71,7 @@ def test_magic_number():
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_repo_diff(path=None, norepo):
+def test_repo_diff(path=None, norepo=None):
     ds = Dataset(path).create()
     assert_repo_status(ds.path)
     assert_raises(ValueError, ds.repo.diff, fr='WTF', to='MIKE')
@@ -158,7 +158,7 @@ def _dirty_results(res):
 # that focuses on the high-level command API
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_diff(path=None, norepo):
+def test_diff(path=None, norepo=None):
     with chpwd(norepo):
         assert_raises(NoDatasetFound, diff)
     ds = Dataset(path).create()
@@ -448,7 +448,7 @@ def test_path_diff(_path, linkpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_diff_nods(path=None, otherpath):
+def test_diff_nods(path=None, otherpath=None):
     ds = Dataset(path).create()
     assert_result_count(
         ds.diff(path=otherpath, on_failure='ignore', result_renderer='disabled'),

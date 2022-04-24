@@ -89,7 +89,7 @@ def test_download_url_existing_dir_no_slash_exception(path=None):
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_return(toppath=None, topurl, outdir):
+def test_download_url_return(toppath=None, topurl, outdir=None):
     # Ensure that out directory has trailing slash.
     outdir = opj(outdir, "")
     files = ['file1.txt', 'file2.txt']
@@ -125,7 +125,7 @@ def test_download_url_return(toppath=None, topurl, outdir):
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_dataset(toppath=None, topurl, path):
+def test_download_url_dataset(toppath=None, topurl, path=None):
     # Non-dataset directory.
     file1_fullpath = opj(path, "file1.txt")
     with chpwd(path):
@@ -187,7 +187,7 @@ def test_download_url_dataset(toppath=None, topurl, path):
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_archive(toppath=None, topurl, path):
+def test_download_url_archive(toppath=None, topurl, path=None):
     ds = Dataset(path).create()
     ds.download_url([topurl + "archive.tar.gz"], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
@@ -208,7 +208,7 @@ def test_download_url_archive(toppath=None, topurl, path):
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_archive_from_subdir(toppath=None, topurl, path):
+def test_download_url_archive_from_subdir(toppath=None, topurl, path=None):
     ds = Dataset(path).create()
     subdir_path = opj(ds.path, "subdir", "")
     os.mkdir(subdir_path)
@@ -221,7 +221,7 @@ def test_download_url_archive_from_subdir(toppath=None, topurl, path):
                  "a1.tar.gz": {'f1.txt': 'def'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_download_url_archive_trailing_separator(toppath=None, topurl, path):
+def test_download_url_archive_trailing_separator(toppath=None, topurl, path=None):
     ds = Dataset(path).create()
     # Archives will be extracted in the specified subdirectory, which doesn't
     # need to exist.

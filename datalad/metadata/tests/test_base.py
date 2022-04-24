@@ -252,7 +252,7 @@ def test_get_aggregates_fails(path=None):
 
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
-def test_bf2458(src=None, dst):
+def test_bf2458(src=None, dst=None):
     ds = Dataset(src).create(force=True)
     ds.save(to_git=False)
 

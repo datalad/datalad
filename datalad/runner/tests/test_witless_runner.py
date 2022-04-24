@@ -205,7 +205,7 @@ def test_runner_parametrized_protocol():
 @integration  # ~3 sec
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_asyncio_loop_noninterference1(path1=None, path2):
+def test_asyncio_loop_noninterference1(path1=None, path2=None):
     if on_windows and sys.version_info < (3, 8):
         raise SkipTest(
             "get_event_loop() raises "

@@ -47,7 +47,7 @@ def _p(rpath):
 @slow  # 13sec on travis
 @with_tempfile
 @with_tempfile
-def test_get_subdatasets(origpath=None, path):
+def test_get_subdatasets(origpath=None, path=None):
     # setup
     orig = Dataset(origpath).create()
     orig_sub = orig.create('sub dataset1')
@@ -331,7 +331,7 @@ def test_parent_on_unborn_branch(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_name_starts_with_hyphen(origpath=None, path):
+def test_name_starts_with_hyphen(origpath=None, path=None):
     ds = Dataset.create(origpath)
     # create
     dash_sub = ds.create('-sub')

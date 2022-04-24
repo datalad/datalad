@@ -24,7 +24,7 @@ from datalad.tests.utils import (
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_downloader_bad_query(urlpath=None, url):
+def test_downloader_bad_query(urlpath=None, url=None):
     downloader = SHubDownloader()
     downloader.api_url = url
     with assert_raises(DownloadError):
@@ -33,7 +33,7 @@ def test_downloader_bad_query(urlpath=None, url):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_downloader_bad_json(urlpath=None, url):
+def test_downloader_bad_json(urlpath=None, url=None):
     downloader = SHubDownloader()
     downloader.api_url = url
     create_tree(urlpath,
@@ -45,7 +45,7 @@ def test_downloader_bad_json(urlpath=None, url):
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_downloader_download(urlpath=None, url, path):
+def test_downloader_download(urlpath=None, url, path=None):
     path = Path(path)
     downloader = SHubDownloader()
     downloader.api_url = url

@@ -51,7 +51,7 @@ _dataset_config_template = {
 
 @with_tree(tree=_dataset_config_template)
 @with_tempfile(mkdir=True)
-def test_something(path=None, new_home):
+def test_something(path=None, new_home=None):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save()
 

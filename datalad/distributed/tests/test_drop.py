@@ -46,7 +46,7 @@ from datalad.utils import chpwd
 
 @with_tempfile
 @with_tempfile
-def test_drop_file_content(path=None, outside_path):
+def test_drop_file_content(path=None, outside_path=None):
     # see docstring for test data structure
     ds = get_deeply_nested_structure(path)
     axfile_rootds = op.join("subdir", "annexed_file.txt")
@@ -158,7 +158,7 @@ def test_drop_file_content(path=None, outside_path):
 
 @with_tempfile
 @with_tempfile
-def test_drop_allkeys(origpath=None, clonepath):
+def test_drop_allkeys(origpath=None, clonepath=None):
     # create a dataset with two keys, belonging to two files,
     # in two different branches
     ds = Dataset(origpath).create()
@@ -216,7 +216,7 @@ def test_drop_allkeys(origpath=None, clonepath):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_undead_annex_detection(gitpath=None, origpath, clonepath):
+def test_undead_annex_detection(gitpath=None, origpath, clonepath=None):
     gitds = Dataset(gitpath).create(annex=False)
     # a gitrepo can be inspected too, it might just not know anything
     eq_([], _detect_nondead_annex_at_remotes(gitds.repo, 'someid'))
@@ -292,7 +292,7 @@ def test_uninstall_recursive(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_unpushed_state_detection(origpath=None, clonepath):
+def test_unpushed_state_detection(origpath=None, clonepath=None):
     origds = Dataset(origpath).create()
     # always test in annex mode
     tester = lambda x: _detect_unpushed_revs(x, True)
@@ -340,7 +340,7 @@ def test_unpushed_state_detection(origpath=None, clonepath):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
-def test_safetynet(otherpath=None, origpath, clonepath):
+def test_safetynet(otherpath=None, origpath, clonepath=None):
     # we start with a dataset that is hosted somewhere
     origds = Dataset(origpath).create()
     # a clone is made to work on the dataset
@@ -541,7 +541,7 @@ def test_drop_from_git(path=None):
 # https://github.com/datalad/datalad/issues/6180
 @with_tempfile
 @with_tempfile
-def test_drop_uninit_annexrepo(origpath=None, path):
+def test_drop_uninit_annexrepo(origpath=None, path=None):
     Dataset(origpath).create()
     # just git-clone to bypass `git annex init`
     GitRepo.clone(origpath, path)

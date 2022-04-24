@@ -97,7 +97,7 @@ def test_ssh_get_connection():
 @with_tree(tree={'f0': 'f0', 'f1': 'f1'})
 @with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
-def test_ssh_open_close(tmp_path=None, tfile1):
+def test_ssh_open_close(tmp_path=None, tfile1=None):
 
     manager = SSHManager()
 
@@ -208,7 +208,7 @@ def test_ssh_manager_close_no_throw(bogus_socket=None):
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
 @with_tempfile(content="two")
-def test_ssh_copy(sourcedir=None, sourcefile1, sourcefile2):
+def test_ssh_copy(sourcedir=None, sourcefile1, sourcefile2=None):
     port = get_ssh_port('datalad-test')
     remote_url = 'ssh://datalad-test:{}'.format(port)
     manager = SSHManager()

@@ -66,7 +66,7 @@ from ..archives import (
           (fn_archive_obscure_ext, (('d', ((fn_in_archive_obscure, '123'),)),)),
           (fn_archive_obscure, '123')))
 @with_tempfile()
-def test_basic_scenario(d=None, d2):
+def test_basic_scenario(d=None, d2=None):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
     annex = AnnexRepo(d, backend='MD5E')
     annex.init_remote(

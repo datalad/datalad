@@ -83,7 +83,7 @@ def test_mtime(tempfile=None):
 @with_tempfile
 # forgot how to tell it not to change return value, so this side_effect beast now
 @patch.object(S3Authenticator, 'authenticate', side_effect=S3Authenticator.authenticate, autospec=True)
-def test_reuse_session(tempfile=None, mocked_auth):
+def test_reuse_session(tempfile=None, mocked_auth=None):
     Providers.reset_default_providers()  # necessary for the testing below
     providers = get_test_providers(url_2versions_nonversioned1_ver1)  # to check credentials
     with swallow_outputs():

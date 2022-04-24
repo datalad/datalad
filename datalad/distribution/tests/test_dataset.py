@@ -92,7 +92,7 @@ def test_EnsureDataset():
 @known_failure_windows
 @with_testrepos('submodule_annex')
 @with_tempfile(mkdir=True)
-def test_is_installed(src=None, path):
+def test_is_installed(src=None, path=None):
     ds = Dataset(path)
     assert_false(ds.is_installed())
 
@@ -345,7 +345,7 @@ def test_dataset_id(path=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_Dataset_flyweight(path1=None, path2):
+def test_Dataset_flyweight(path1=None, path2=None):
 
     import gc
     import sys
@@ -491,7 +491,7 @@ def test_property_reevaluation(repo1=None):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_symlinked_dataset_properties(repo1=None, repo2, repo3, non_repo, symlink):
+def test_symlinked_dataset_properties(repo1=None, repo2, repo3, non_repo, symlink=None):
 
     ds = Dataset(repo1).create()
 

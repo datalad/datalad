@@ -141,7 +141,7 @@ from datalad.support.annexrepo import (
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_instance_from_clone(src=None, dst):
+def test_AnnexRepo_instance_from_clone(src=None, dst=None):
 
     origin = AnnexRepo(src, create=True)
     ar = AnnexRepo.clone(src, dst)
@@ -284,7 +284,7 @@ def test_AnnexRepo_get_outofspace(annex_path=None):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_get_remote_na(src=None, path):
+def test_AnnexRepo_get_remote_na(src=None, path=None):
     origin = AnnexRepo(src, create=True)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save()
@@ -316,7 +316,7 @@ def test_annex_repo_sameas_special(repo=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_file_has_content(batch=None, src, annex_path):
+def test_AnnexRepo_file_has_content(batch=None, src, annex_path=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test.dat').write_text('123\n')
     origin.save('test.dat', git=True)
@@ -350,7 +350,7 @@ def test_AnnexRepo_file_has_content(batch=None, src, annex_path):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_is_under_annex(batch=None, src, annex_path):
+def test_AnnexRepo_is_under_annex(batch=None, src, annex_path=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save('some')
@@ -389,7 +389,7 @@ def test_AnnexRepo_is_under_annex(batch=None, src, annex_path):
                  ('d', {'sub.txt': 'more stuff'})))
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_web_remote(sitepath=None, siteurl, dst):
+def test_AnnexRepo_web_remote(sitepath=None, siteurl, dst=None):
 
     ar = AnnexRepo(dst, create=True)
     testurl = urljoin(siteurl, 'about.txt')
@@ -599,7 +599,7 @@ def test_repo_info(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_migrating_backends(src=None, dst):
+def test_AnnexRepo_migrating_backends(src=None, dst=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save('some')
@@ -661,7 +661,7 @@ tree1_md5e_keys = {
 
 @with_parametric_batch
 @with_tree(**tree1args)
-def test_dropkey(batch=None, path):
+def test_dropkey(batch=None, path=None):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = list(tree1_md5e_keys)
@@ -683,7 +683,7 @@ def test_dropkey(batch=None, path):
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def test_AnnexRepo_backend_option(path=None, url):
+def test_AnnexRepo_backend_option(path=None, url=None):
     ar = AnnexRepo(path, backend='MD5')
 
     # backend recorded in .gitattributes
@@ -709,7 +709,7 @@ def test_AnnexRepo_backend_option(path=None, url):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_get_file_backend(src=None, dst):
+def test_AnnexRepo_get_file_backend(src=None, dst=None):
     origin = AnnexRepo(src, create=True)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save()
@@ -779,7 +779,7 @@ def test_AnnexRepo_always_commit(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_on_uninited_annex(src=None, path):
+def test_AnnexRepo_on_uninited_annex(src=None, path=None):
     origin = AnnexRepo(src, create=True)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save()
@@ -898,7 +898,7 @@ def test_AnnexRepo_add_to_git(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_get(src=None, dst):
+def test_AnnexRepo_get(src=None, dst=None):
     ar = AnnexRepo(src)
     (ar.pathobj / 'test-annex.dat').write_text(
         "content to be annex-addurl'd")
@@ -942,7 +942,7 @@ def test_AnnexRepo_get(src=None, dst):
 
 @with_tree(tree={'file.dat': 'content'})
 @with_tempfile
-def test_v7_detached_get(opath=None, path):
+def test_v7_detached_get(opath=None, path=None):
     # http://git-annex.branchable.com/bugs/get_fails_to_place_v7_unlocked_file_content_into_the_file_tree_in_v7_in_repo_with_detached_HEAD/
     origin = AnnexRepo(opath, create=True, version=7)
     GitRepo.add(origin, 'file.dat')  # force direct `git add` invocation
@@ -1024,7 +1024,7 @@ def test_AnnexRepo_get_contentlocation():
                  ('d', {'sub.txt': 'more stuff'})))
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl, dst):
+def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl, dst=None):
 
     if dl_cfg.get('datalad.fake-dates'):
         raise SkipTest(
@@ -1124,7 +1124,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl, dst):
 @with_tree(tree={"foo": "foo content"})
 @serve_path_via_http()
 @with_tree(tree={"bar": "bar content"})
-def test_annexrepo_fake_dates_disables_batched(sitepath=None, siteurl, dst):
+def test_annexrepo_fake_dates_disables_batched(sitepath=None, siteurl, dst=None):
     ar = AnnexRepo(dst, create=True, fake_dates=True)
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
@@ -1295,7 +1295,7 @@ def test_annex_remove(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_repo_version(path1=None, path2, path3):
+def test_repo_version(path1=None, path2, path3=None):
     with swallow_logs(new_level=logging.INFO) as cm:
         annex = AnnexRepo(path1, create=True, version=6)
         assert_repo_status(path1, annex=True)
@@ -1336,7 +1336,7 @@ def test_init_scanning_message(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_annex_copy_to(src=None, origin, clone):
+def test_annex_copy_to(src=None, origin, clone=None):
     ar = AnnexRepo(src)
     (ar.pathobj / 'test.dat').write_text("123\n")
     ar.save('some', git=True)
@@ -1442,7 +1442,7 @@ def test_annex_copy_to(src=None, origin, clone):
 
 @with_tempfile
 @with_tempfile
-def test_annex_drop(src=None, dst):
+def test_annex_drop(src=None, dst=None):
     ar = AnnexRepo(src)
     (ar.pathobj / 'test-annex.dat').write_text("content")
     ar.save('some')
@@ -1526,7 +1526,7 @@ def test_annex_get_annexed_files(path=None):
 
 @with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(batch=None, p):
+def test_is_available(batch=None, p=None):
     annex = AnnexRepo(p)
 
     # bkw = {'batch': batch}
@@ -1664,7 +1664,7 @@ def test_annex_version_handling_bad_git_annex(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_get_description(path1=None, path2):
+def test_get_description(path1=None, path2=None):
     annex1 = AnnexRepo(path1, create=True)
     # some content for git-annex branch
     create_tree(path1, {'1.dat': 'content'})
@@ -1695,7 +1695,7 @@ def test_get_description(path1=None, path2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_AnnexRepo_flyweight(path1=None, path2):
+def test_AnnexRepo_flyweight(path1=None, path2=None):
 
     import sys
 
@@ -1807,7 +1807,7 @@ def test_AnnexRepo_flyweight(path1=None, path2):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_AnnexRepo_get_toppath(repo=None, tempdir, repo2):
+def test_AnnexRepo_get_toppath(repo=None, tempdir, repo2=None):
     AnnexRepo(repo, create=True)
 
     reporeal = str(Path(repo).resolve())
@@ -2022,7 +2022,7 @@ def test_AnnexRepo_metadata(path=None):
 @with_tree(tree={'file.txt': 'content'})
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_addurl_batched_and_set_metadata(path=None, url, dest):
+def test_AnnexRepo_addurl_batched_and_set_metadata(path=None, url, dest=None):
     ar = AnnexRepo(dest, create=True)
     fname = "file.txt"
     ar.add_url_to_file(fname, urljoin(url, fname), batch=True)
@@ -2046,7 +2046,7 @@ def test_change_description(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_get_corresponding_branch(src_path=None, path):
+def test_AnnexRepo_get_corresponding_branch(src_path=None, path=None):
     src = AnnexRepo(src_path, create=True)
     (src.pathobj / 'test-annex.dat').write_text("content")
     src.save('some')
@@ -2068,7 +2068,7 @@ def test_AnnexRepo_get_corresponding_branch(src_path=None, path):
 
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_get_tracking_branch(src_path=None, path):
+def test_AnnexRepo_get_tracking_branch(src_path=None, path=None):
     src = AnnexRepo(src_path, create=True)
     (src.pathobj / 'test-annex.dat').write_text("content")
     src.save('some')

@@ -68,7 +68,7 @@ def test_search_outside1_noninteractive_ui(tdir=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_search_outside1(tdir=None, newhome):
+def test_search_outside1(tdir=None, newhome=None):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
@@ -85,7 +85,7 @@ def test_search_outside1(tdir=None, newhome):
 @with_testsui(responses='yes')
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_search_outside1_install_default_ds(tdir=None, default_dspath):
+def test_search_outside1_install_default_ds(tdir=None, default_dspath=None):
     with chpwd(tdir):
         # let's mock out even actual install/search calls
         with \

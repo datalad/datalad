@@ -92,7 +92,7 @@ def test_GitRepo_invalid_path(path=None):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_instance_from_clone(src=None, dst):
+def test_GitRepo_instance_from_clone(src=None, dst=None):
     origin = GitRepo(src, create=True)
     gr = GitRepo.clone(src, dst)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
@@ -120,7 +120,7 @@ def test_GitRepo_instance_from_existing(path=None):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_instance_from_not_existing(path=None, path2):
+def test_GitRepo_instance_from_not_existing(path=None, path2=None):
     # 1. create=False and path doesn't exist:
     assert_raises(NoSuchPathError, GitRepo, path, create=False)
     assert_false(op.exists(path))
@@ -158,7 +158,7 @@ def test_GitRepo_init_options(path=None):
                  '.git': {}})
 @with_tempfile
 @with_tempfile
-def test_GitRepo_bare(path=None, empty_dir, non_empty_dir, empty_dot_git, non_bare,
+def test_GitRepo_bare(path=None, empty_dir, non_empty_dir, empty_dot_git, non_bare=None,
                       clone_path):
 
     import gc
@@ -227,7 +227,7 @@ def test_init_fail_under_known_subdir(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_equals(path1=None, path2):
+def test_GitRepo_equals(path1=None, path2=None):
 
     repo1 = GitRepo(path1)
     repo2 = GitRepo(path1)
@@ -241,7 +241,7 @@ def test_GitRepo_equals(path1=None, path2):
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
-def test_GitRepo_add(src=None, path):
+def test_GitRepo_add(src=None, path=None):
 
     gr = GitRepo(path)
     filename = get_most_obscure_supported_name()
@@ -522,7 +522,7 @@ def test_GitRepo_get_remote_url(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_fetch(orig_path=None, clone_path):
+def test_GitRepo_fetch(orig_path=None, clone_path=None):
 
     origin = GitRepo(orig_path)
     with open(op.join(orig_path, 'some.txt'), 'w') as f:
@@ -571,7 +571,7 @@ def _path2localsshurl(path):
 @skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
-def test_GitRepo_ssh_fetch(remote_path=None, repo_path):
+def test_GitRepo_ssh_fetch(remote_path=None, repo_path=None):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path)
@@ -607,7 +607,7 @@ def test_GitRepo_ssh_fetch(remote_path=None, repo_path):
 @skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
-def test_GitRepo_ssh_push(repo_path=None, remote_path):
+def test_GitRepo_ssh_push(repo_path=None, remote_path=None):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
@@ -666,7 +666,7 @@ def test_GitRepo_ssh_push(repo_path=None, remote_path):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_push_n_checkout(orig_path=None, clone_path):
+def test_GitRepo_push_n_checkout(orig_path=None, clone_path=None):
 
     origin = GitRepo(orig_path)
     clone = GitRepo.clone(orig_path, clone_path)
@@ -685,7 +685,7 @@ def test_GitRepo_push_n_checkout(orig_path=None, clone_path):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_GitRepo_remote_update(path1=None, path2, path3):
+def test_GitRepo_remote_update(path1=None, path2, path3=None):
 
     git1 = GitRepo(path1)
     git2 = GitRepo(path2)
@@ -729,7 +729,7 @@ def test_GitRepo_remote_update(path1=None, path2, path3):
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_get_files(src_path=None, path):
+def test_GitRepo_get_files(src_path=None, path=None):
     src = GitRepo(src_path)
     for filename in ('some1.txt', 'some2.dat'):
         with open(op.join(src_path, filename), 'w') as f:
@@ -784,7 +784,7 @@ def test_GitRepo_get_files(src_path=None, path):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_GitRepo_get_toppath(repo=None, tempdir, repo2):
+def test_GitRepo_get_toppath(repo=None, tempdir, repo2=None):
     GitRepo(repo, create=True)
     reporeal = str(Path(repo).resolve())
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)
@@ -912,7 +912,7 @@ def test_GitRepo_git_get_branch_commits_(src=None):
 
 @with_tempfile
 @with_tempfile
-def test_get_tracking_branch(o_path=None, c_path):
+def test_get_tracking_branch(o_path=None, c_path=None):
     src = GitRepo(o_path)
     for filename in ('some1.txt', 'some2.dat'):
         with open(op.join(o_path, filename), 'w') as f:
@@ -1078,7 +1078,7 @@ def test_optimized_cloning(path=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_GitRepo_flyweight(path1=None, path2):
+def test_GitRepo_flyweight(path1=None, path2=None):
 
     import gc
 

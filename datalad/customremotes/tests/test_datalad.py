@@ -83,7 +83,7 @@ def check_basic_scenario(url, d):
 # this little adapters to test both on local and s3 urls
 @with_tree(tree={'3versions-allversioned.txt': "somefile"})
 @serve_path_via_http
-def test_basic_scenario_local_url(p=None, local_url):
+def test_basic_scenario_local_url(p=None, local_url=None):
     check_basic_scenario("%s3versions-allversioned.txt" % local_url)
 
 

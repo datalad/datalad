@@ -43,7 +43,7 @@ from datalad.consts import DATALAD_SPECIAL_REMOTE
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copy_file(workdir=None, webdir, weburl):
+def test_copy_file(workdir=None, webdir, weburl=None):
     workdir = Path(workdir)
     webdir = Path(webdir)
     src_ds = Dataset(workdir / 'src').create()
@@ -96,7 +96,7 @@ def test_copy_file(workdir=None, webdir, weburl):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_copy_file_errors(dspath1=None, dspath2, nondspath):
+def test_copy_file_errors(dspath1=None, dspath2, nondspath=None):
     ds1 = Dataset(dspath1)
     # nothing given
     assert_raises(ValueError, copy_file)
@@ -137,7 +137,7 @@ def test_copy_file_errors(dspath1=None, dspath2, nondspath):
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copy_file_datalad_specialremote(workdir=None, webdir, weburl):
+def test_copy_file_datalad_specialremote(workdir=None, webdir, weburl=None):
     workdir = Path(workdir)
     src_ds = Dataset(workdir / 'src').create()
     # enable datalad special remote
@@ -215,7 +215,7 @@ def test_copy_file_into_nonannex(workdir=None):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copy_file_recursion(srcdir=None, destdir):
+def test_copy_file_recursion(srcdir=None, destdir=None):
     src_ds = Dataset(srcdir).create(force=True)
     src_ds.save()
     dest_ds = Dataset(destdir).create()
@@ -234,7 +234,7 @@ def test_copy_file_recursion(srcdir=None, destdir):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copy_file_into_dshierarchy(srcdir=None, destdir):
+def test_copy_file_into_dshierarchy(srcdir=None, destdir=None):
     srcdir = Path(srcdir)
     src_ds = Dataset(srcdir).create(force=True)
     src_ds.save()
@@ -267,7 +267,7 @@ def test_copy_file_into_dshierarchy(srcdir=None, destdir):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copy_file_specs_from(srcdir=None, destdir):
+def test_copy_file_specs_from(srcdir=None, destdir=None):
     srcdir = Path(srcdir)
     destdir = Path(destdir)
     files = [p for p in srcdir.glob('**/*') if not p.is_dir()]
@@ -325,7 +325,7 @@ def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_copy_file_prevent_dotgit_placement(srcpath=None, destpath):
+def test_copy_file_prevent_dotgit_placement(srcpath=None, destpath=None):
     src = Dataset(srcpath).create()
     sub = src.create('sub')
     dest = Dataset(destpath).create()
@@ -377,7 +377,7 @@ def test_copy_file_prevent_dotgit_placement(srcpath=None, destpath):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_copy_file_nourl(serv_path=None, orig_path, tst_path):
+def test_copy_file_nourl(serv_path=None, orig_path, tst_path=None):
     """Tests availability transfer to normal git-annex remote"""
     # prep source dataset that will have the file content
     srv_ds = Dataset(serv_path).create()

@@ -91,7 +91,7 @@ datalad_store_testds_id = '76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561'
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_invalid_args(path=None, otherpath, alienpath):
+def test_invalid_args(path=None, otherpath, alienpath=None):
     # source == path
     assert_raises(ValueError, clone, 'Zoidberg', path='Zoidberg')
     assert_raises(ValueError, clone, 'ssh://mars/Zoidberg', path='ssh://mars/Zoidberg')
@@ -124,7 +124,7 @@ def test_invalid_args(path=None, otherpath, alienpath):
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_crcns(tdir=None, ds_path):
+def test_clone_crcns(tdir=None, ds_path=None):
     with chpwd(tdir):
         res = clone('///', path="all-nonrecursive", on_failure='ignore',
                     result_xfm=None, return_type='list')
@@ -215,7 +215,7 @@ def check_clone_simple_local(src, path):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_clone_simple_local(src=None, url):
+def test_clone_simple_local(src=None, url=None):
     srcobj = Path(src)
     gitds = Dataset(srcobj / 'git').create(annex=False)
     annexds = Dataset(srcobj/ 'annex').create(annex=True)
@@ -248,7 +248,7 @@ def check_clone_dataset_from_just_source(url, path):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_clone_dataset_from_just_source(src=None, url):
+def test_clone_dataset_from_just_source(src=None, url=None):
     ds = Dataset(src).create()
     (ds.pathobj / 'INFO.txt').write_text('content')
     ds.save()
@@ -266,7 +266,7 @@ def test_clone_dataset_from_just_source(src=None, url):
     })
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_clone_dataladri(src=None, topurl, path):
+def test_clone_dataladri(src=None, topurl, path=None):
     # make plain git repo
     ds_path = Path(src) / 'ds'
     gr = GitRepo(ds_path, create=True)
@@ -284,7 +284,7 @@ def test_clone_dataladri(src=None, topurl, path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_isnot_recursive(path_src=None, path_nr, path_r):
+def test_clone_isnot_recursive(path_src=None, path_nr, path_r=None):
     src = Dataset(path_src).create()
     src.create('subm 1')
     src.create('2')
@@ -301,7 +301,7 @@ def test_clone_isnot_recursive(path_src=None, path_nr, path_r):
 
 @with_tempfile
 @with_tempfile
-def test_clone_into_dataset(source_path=None, top_path):
+def test_clone_into_dataset(source_path=None, top_path=None):
     source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
@@ -360,7 +360,7 @@ def test_clone_into_dataset(source_path=None, top_path):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_notclone_known_subdataset(src_path=None, path):
+def test_notclone_known_subdataset(src_path=None, path=None):
     src = Dataset(src_path).create()
     sub = src.create('subm 1')
     sub_id = sub.id
@@ -404,7 +404,7 @@ def test_failed_clone(dspath=None):
     'ds': {'test.txt': 'some'},
     })
 @with_tempfile
-def test_clone_missing_commit(source=None, clone):
+def test_clone_missing_commit(source=None, clone=None):
 
     from datalad.core.distributed.clone import clone_dataset
 
@@ -503,7 +503,7 @@ def test_reckless():
 
 @with_tempfile
 @with_tempfile
-def test_install_source_relpath(src=None, dest):
+def test_install_source_relpath(src=None, dest=None):
     src = Path(src)
     create(src)
     src_ = src.name
@@ -513,7 +513,7 @@ def test_install_source_relpath(src=None, dest):
 
 @with_tempfile
 @with_tempfile
-def test_clone_isnt_a_smartass(origin_path=None, path):
+def test_clone_isnt_a_smartass(origin_path=None, path=None):
     origin = create(origin_path)
     cloned = clone(origin, path,
                    result_xfm='datasets', return_type='item-or-list')
@@ -569,7 +569,7 @@ def test_autoenabled_remote_msg(path=None):
 
 @with_sameas_remote(autoenabled=True)
 @with_tempfile(mkdir=True)
-def test_clone_autoenable_msg_handles_sameas(repo=None, clone_path):
+def test_clone_autoenable_msg_handles_sameas(repo=None, clone_path=None):
     ds = Dataset(repo.path)
     with swallow_logs(new_level=logging.INFO) as cml:
         res = clone(ds, clone_path, result_xfm=None, return_type='list')
@@ -640,7 +640,7 @@ def test_installationpath_from_url():
 # https://github.com/datalad/datalad/issues/3958
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_expanduser(srcpath=None, destpath):
+def test_expanduser(srcpath=None, destpath=None):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
 
@@ -736,7 +736,7 @@ def test_relative_submodule_url(path=None):
 
 @with_tree(tree={"subdir": {}})
 @with_tempfile(mkdir=True)
-def test_local_url_with_fetch(path=None, path_other):
+def test_local_url_with_fetch(path=None, path_other=None):
     path = Path(path)
     path_other = Path(path_other)
     Dataset(path / "source").create()
@@ -836,7 +836,7 @@ def _move2store(storepath, d):
 })
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_ria_http(lcl=None, storepath, url):
+def test_ria_http(lcl=None, storepath, url=None):
     # create a local dataset with a subdataset
     lcl = Path(lcl)
     storepath = Path(storepath)
@@ -1194,7 +1194,7 @@ def test_ria_postclonecfg():
 @with_tree(tree={'somefile.txt': 'some content'})
 @with_tempfile
 @with_tempfile
-def test_no_ria_postclonecfg(dspath=None, storepath, clonepath):
+def test_no_ria_postclonecfg(dspath=None, storepath, clonepath=None):
 
     dspath = Path(dspath)
     storepath = Path(storepath)
@@ -1250,7 +1250,7 @@ def test_no_ria_postclonecfg(dspath=None, storepath, clonepath):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
-def test_ria_postclone_noannex(dspath=None, storepath, clonepath):
+def test_ria_postclone_noannex(dspath=None, storepath, clonepath=None):
 
     # Test for gh-5186: Cloning from local FS, shouldn't lead to annex
     # initializing origin.
@@ -1304,7 +1304,7 @@ def test_ria_postclone_noannex(dspath=None, storepath, clonepath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_inherit_src_candidates(lcl=None, storepath, url):
+def test_inherit_src_candidates(lcl=None, storepath, url=None):
     lcl = Path(lcl)
     storepath = Path(storepath)
     # dataset with a subdataset
@@ -1362,7 +1362,7 @@ def test_ria_http_storedataladorg(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_ephemeral(origin_path=None, bare_path,
+def test_ephemeral(origin_path=None, bare_path=None,
                    clone1_path, clone2_path, clone3_path):
 
     file_test = Path('ds') / 'test.txt'
@@ -1569,7 +1569,7 @@ def test_gin_cloning(path=None):
 @with_tree(tree={"special": {"f0": "0"}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_fetch_git_special_remote(url_path=None, url, path):
+def test_fetch_git_special_remote(url_path=None, url, path=None):
     url_path = Path(url_path)
     path = Path(path)
     ds_special = Dataset(url_path / "special").create(force=True)
@@ -1653,7 +1653,7 @@ def test_clone_git_clone_opts(path=None):
 
 @with_tempfile
 @with_tempfile
-def test_clone_url_mapping(src_path=None, dest_path):
+def test_clone_url_mapping(src_path=None, dest_path=None):
     src = create(src_path)
     dest = Dataset(dest_path)
     # check that the impossible doesn't work

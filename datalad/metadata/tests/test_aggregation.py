@@ -185,7 +185,7 @@ def test_reaggregate_with_unavailable_objects(path=None):
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
-def test_aggregate_with_unavailable_objects_from_subds(path=None, target):
+def test_aggregate_with_unavailable_objects_from_subds(path=None, target=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
