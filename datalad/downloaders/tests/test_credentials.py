@@ -58,7 +58,7 @@ def test_cred1_enter_new():
     with assert_raises(ValueError) as cme:
         cred.enter_new(username='user')
     assert_in('field(s): username.  Known but not specified: password, user',
-              str(cme.exception))
+              str(cme.value))
 
     # Test that if user is provided, it is not asked
     cred.enter_new(user='user2')

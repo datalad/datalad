@@ -64,7 +64,7 @@ def test_drop_file_content(path, outside_path):
     with assert_raises(IncompleteResultsError) as cme:
         ds.drop(axfile_rootds)
     # The --force suggestion from git-annex-drop is translated to --reckless.
-    assert_in("--reckless", str(cme.exception))
+    assert_in("--reckless", str(cme.value))
 
     # error on non-existing paths
     non_existant_relpaths = ['funky', op.join('subds_modified', 'subfunky')]

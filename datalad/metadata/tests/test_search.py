@@ -63,7 +63,7 @@ def test_search_outside1_noninteractive_ui(tdir):
     with chpwd(tdir):
         with assert_raises(NoDatasetFound) as cme:
             list(search("bu"))
-        assert_in('run interactively', str(cme.exception))
+        assert_in('run interactively', str(cme.value))
 
 
 @with_tempfile(mkdir=True)
@@ -163,7 +163,7 @@ def test_search_non_dataset(tdir):
     with assert_raises(NoDatasetFound) as cme:
         list(search('smth', dataset=tdir))
     # Should instruct user how that repo could become a datalad dataset
-    assert_in("datalad create --force", str(cme.exception))
+    assert_in("datalad create --force", str(cme.value))
 
 
 @known_failure_githubci_win
@@ -262,7 +262,7 @@ type
         ds.search('*wrong')
     assert_re_in(
         r"regular expression '\(\?i\)\*wrong' \(original: '\*wrong'\) is incorrect: ",
-        str(cme.exception))
+        str(cme.value))
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:

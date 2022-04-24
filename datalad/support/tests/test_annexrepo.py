@@ -1488,12 +1488,12 @@ def test_annex_drop(src, dst):
     with assert_raises(CommandError) as e:
         ar.drop('somefile.txt')
     # CommandError has to pull the errors from the JSON record 'note'
-    assert_in('necessary cop', str(e.exception))
+    assert_in('necessary cop', str(e.value))
 
     with assert_raises(CommandError) as e:
         ar._call_annex_records(['fsck', '-N', '3'])
     # CommandError has to pull the errors from the JSON record 'error-messages'
-    assert_in('1 of 3 trustworthy copies', str(e.exception))
+    assert_in('1 of 3 trustworthy copies', str(e.value))
 
 
 @with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
@@ -1640,7 +1640,7 @@ def test_annex_version_handling_bad_git_annex(path):
             AnnexRepo(path)
         linux_distribution_name = get_linux_distribution()[0]
         if linux_distribution_name == 'debian':
-            assert_in("handbook.datalad.org", str(cme.exception))
+            assert_in("handbook.datalad.org", str(cme.value))
         eq_(AnnexRepo.git_annex_version, None)
 
     with set_annex_version('6.20160505'):
@@ -2217,7 +2217,7 @@ def test_annexjson_protocol(path):
     assert_in(msg, e.exception.stderr)
     # there should be no errors reported in an individual records
     # hence also no pointless statement in the str()
-    assert_not_in('errors from JSON records', str(e.exception))
+    assert_not_in('errors from JSON records', str(e.value))
 
 
 @with_tempfile
@@ -2358,8 +2358,8 @@ def check_files_split_exc(cls, topdir):
     else:
         with assert_raises(Exception) as ecm:
             r.add(files)
-        assert_not_in('too long', str(ecm.exception))
-        assert_not_in('too many', str(ecm.exception))
+        assert_not_in('too long', str(ecm.value))
+        assert_not_in('too many', str(ecm.value))
 
 
 @slow  # 15 + 17sec on travis

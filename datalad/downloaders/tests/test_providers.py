@@ -100,7 +100,7 @@ def test_get_downloader_class():
     with patch.object(external_versions, '_versions', {'requests': None}):
         with assert_raises(RuntimeError) as cmr:
             Provider._get_downloader_class(url)
-        assert_in("you need 'requests'", str(cmr.exception))
+        assert_in("you need 'requests'", str(cmr.value))
 
 
 @with_tree(tree={

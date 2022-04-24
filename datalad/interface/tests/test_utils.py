@@ -509,7 +509,7 @@ def test_incorrect_msg_interpolation():
     with assert_raises(TypeError) as cme:
         TestUtils2().__call__()
     # this must be our custom exception
-    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.exception))
+    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.value))
 
     # there should be no exception if reported in the record path contains %
     TestUtils2().__call__("%eatthis")

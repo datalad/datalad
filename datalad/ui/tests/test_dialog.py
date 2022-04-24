@@ -179,18 +179,18 @@ def test_silent_question():
     ui = SilentConsoleLog()
     with assert_raises(RuntimeError) as cme:
         ui.question("could you help me", title="Pretty please")
-    assert_in('question: could you help me. Title: Pretty please.', str(cme.exception))
+    assert_in('question: could you help me. Title: Pretty please.', str(cme.value))
 
     with assert_raises(RuntimeError) as cme:
         ui.question("could you help me", title="Pretty please", choices=['secret1'], hidden=True)
-    assert_in('question: could you help me. Title: Pretty please.', str(cme.exception))
-    assert_not_in('secret1', str(cme.exception))
-    assert_in('not shown', str(cme.exception))
+    assert_in('question: could you help me. Title: Pretty please.', str(cme.value))
+    assert_not_in('secret1', str(cme.value))
+    assert_in('not shown', str(cme.value))
 
     # additional kwargs, no title, choices
     with assert_raises(RuntimeError) as cme:
         ui.question("q", choices=['secret1'])
-    assert_in('secret1', str(cme.exception))
+    assert_in('secret1', str(cme.value))
 
 
 @patch("datalad.log.is_interactive", lambda: False)

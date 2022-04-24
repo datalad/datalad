@@ -903,7 +903,7 @@ def test_ria_http(lcl, storepath, url):
         with assert_raises(IncompleteResultsError) as cme:
             clone('ria+{}#{}@impossible'.format(url, ds.id),
                   lcl / 'clone_failed')
-        assert_in("not found in upstream", str(cme.exception))
+        assert_in("not found in upstream", str(cme.value))
 
     # lastly test if URL rewriting is in effect
     # on the surface we clone from an SSH source identified by some custom

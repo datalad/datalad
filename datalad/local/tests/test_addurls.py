@@ -96,7 +96,7 @@ def test_formatter_no_mapping_arg():
     with assert_raises(ValueError) as cme:
         fmt.format("{0}", "not a mapping")
     # we provide that detail/element in a message
-    assert_in("not a mapping", str(cme.exception))
+    assert_in("not a mapping", str(cme.value))
 
 
 def test_formatter_placeholder_with_spaces():
@@ -364,7 +364,7 @@ def test_addurls_nonannex_repo(path):
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2",
                    result_renderer='disabled')
-    assert_in("not an annex repo", str(raised.exception))
+    assert_in("not an annex repo", str(raised.value))
 
 
 @with_tree({"in.csv": "linky,abcd\nhttps://datalad.org,f"})
@@ -374,30 +374,30 @@ def test_addurls_unknown_placeholder(path):
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{link}", "{abcd}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("linky", str(exc.exception))
+    assert_in("linky", str(exc.value))
     # Close but wrong file name placeholder
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{abc}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("abcd", str(exc.exception))
+    assert_in("abcd", str(exc.value))
     # Out-of-bounds index.
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{3}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("index", str(exc.exception))
+    assert_in("index", str(exc.value))
 
     # Suggestions also work for automatic file name placeholders
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{_url_hostnam}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("_url_hostname", str(exc.exception))
+    assert_in("_url_hostname", str(exc.value))
     # ... though if you whiff on the beginning prefix, we don't suggest
     # anything because we decide to generate those fields based on detecting
     # the prefix.
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{_uurl_hostnam}", dry_run=True,
                    result_renderer='disabled')
-    assert_not_in("_url_hostname", str(exc.exception))
+    assert_not_in("_url_hostname", str(exc.value))
 
 
 @with_tempfile(mkdir=True)
@@ -647,7 +647,7 @@ class TestAddurls(object):
         with assert_raises(IncompleteResultsError) as raised:
             ds.addurls(self.json_file, "{url}", "{subdir}",
                        result_renderer='disabled')
-        assert_in("collided", str(raised.exception))
+        assert_in("collided", str(raised.value))
 
         ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}",
                    result_renderer='disabled')
@@ -831,7 +831,7 @@ class TestAddurls(object):
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type,
                            result_renderer='disabled')
-            assert_in("Failed to read", str(exc.exception))
+            assert_in("Failed to read", str(exc.value))
 
     @with_tree({"in.csv": "url,name,subdir",
                 "in.tsv": "url\tname\tsubdir",

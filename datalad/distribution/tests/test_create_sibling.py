@@ -203,7 +203,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target_alt",
             sshurl="ssh://datalad-test",
             target_dir=target_path)
-    ok_(str(cm.exception).startswith(
+    ok_(str(cm.value).startswith(
         "Target path %s already exists." % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()

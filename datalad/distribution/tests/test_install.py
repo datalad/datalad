@@ -198,7 +198,7 @@ def test_install_datasets_root(tdir):
 
         with assert_raises(IncompleteResultsError) as cme:
             install("sub", source='///')
-        assert_in("already exists and not empty", str(cme.exception))
+        assert_in("already exists and not empty", str(cme.value))
 
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])

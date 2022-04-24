@@ -262,7 +262,7 @@ def test_check():
     with assert_raises(MissingExternalDependency) as cme:
         ev.check('dataladkukaracha', min_version="buga", msg="duga")
 
-    assert_in("duga", str(cme.exception))
+    assert_in("duga", str(cme.value))
 
     with assert_raises(OutdatedExternalDependency):
         ev.check('datalad', min_version="10000000")  # we will never get there!

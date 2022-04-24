@@ -118,7 +118,7 @@ def test_init_fail_under_known_subdir(path):
     # Should fail even if we do not commit but only add to index:
     with assert_raises(PathKnownToRepositoryError) as cme:
         GitRepo(op.join(path, 'subds')).init()
-    assert_in("file_name", str(cme.exception))  # we provide a list of offenders
+    assert_in("file_name", str(cme.value))  # we provide a list of offenders
     # and after we commit - the same story
     repo.call_git(['commit', '-m', "added file"])
     with assert_raises(PathKnownToRepositoryError) as cme:

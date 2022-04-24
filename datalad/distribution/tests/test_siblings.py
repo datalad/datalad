@@ -174,7 +174,7 @@ def test_siblings(origin, repo_path, local_clone_path):
     #    add_sibling(dataset=source, name="test-remote",
     #                url=httpurl1 + "/elsewhere")
     #assert_in("""'test-remote' already exists with conflicting settings""",
-    #          str(cm.exception))
+    #          str(cm.value))
     ## add a push url without force fails, since in a way the fetch url is the
     ## configured push url, too, in that case:
     #with assert_raises(RuntimeError) as cm:
@@ -182,7 +182,7 @@ def test_siblings(origin, repo_path, local_clone_path):
     #                url=httpurl1 + "/elsewhere",
     #                pushurl=sshurl, force=False)
     #assert_in("""'test-remote' already exists with conflicting settings""",
-    #          str(cm.exception))
+    #          str(cm.value))
 
     # add push url (force):
     res = siblings('configure',

@@ -25,5 +25,5 @@ def test_drop_file_need_nocheck(path):
     with assert_raises(IncompleteResultsError) as cme:
         ds.drop("foo")
     # The --force suggestion from git-annex-drop is translated to --reckless.
-    assert_in("--reckless", str(cme.exception))
+    assert_in("--reckless", str(cme.value))
     assert_status("ok", ds.drop("foo", check=False, on_failure="ignore"))

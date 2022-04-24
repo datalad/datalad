@@ -163,7 +163,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # and the file name can't be determined from the URL.
     with assert_raises(DownloadError) as cm:
         download(topurl, toppath)
-    assert_in("File name could not be determined", str(cm.exception))
+    assert_in("File name could not be determined", str(cm.value))
 
     # Some errors handling
     # XXX obscure mocking since impossible to mock write alone

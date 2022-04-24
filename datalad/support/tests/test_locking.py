@@ -166,8 +166,8 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         t0 = time()
         with assert_raises(CommandError) as cme:
             runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
-        assert_in(f"Failed to acquire lock at {lock_path} in 2 attempts.", str(cme.exception))
-        assert_in(f"RuntimeError", str(cme.exception))
+        assert_in(f"Failed to acquire lock at {lock_path} in 2 attempts.", str(cme.value))
+        assert_in(f"RuntimeError", str(cme.value))
         assert_false(cme.exception.stdout)  # nothing there since print should not happen
         assert_in(f'Failed to acquire lock at {lock_path} in 0.05', cme.exception.stderr)
         assert_in(f'Failed to acquire lock at {lock_path} in 0.15', cme.exception.stderr)
