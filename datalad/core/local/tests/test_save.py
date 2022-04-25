@@ -8,9 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test save command"""
 
+import itertools
 import logging
 import os
 import os.path as op
+
+import pytest
 
 from datalad.utils import (
     ensure_list,
@@ -162,29 +165,34 @@ def test_save_message_file(path=None):
         "add foo")
 
 
-def test_renamed_file():
-    @with_tempfile()
-    def check_renamed_file(recursive, annex, path):
-        ds = Dataset(path).create(annex=annex)
-        create_tree(path, {'old': ''})
-        ds.repo.add('old')
-        ds.repo.call_git(["mv"], files=["old", "new"])
-        ds.save(recursive=recursive)
-        assert_repo_status(path)
+@with_tempfile()
+def check_renamed_file(recursive, annex, path):
+    ds = Dataset(path).create(annex=annex)
+    create_tree(path, {'old': ''})
+    ds.repo.add('old')
+    ds.repo.call_git(["mv"], files=["old", "new"])
+    ds.save(recursive=recursive)
+    assert_repo_status(path)
 
-        # https://github.com/datalad/datalad/issues/6558
-        new = (ds.pathobj / "new")
-        new.unlink()
-        new.mkdir()
-        (new / "file").touch()
-        ds.repo.call_git(["add"], files=[str(new / "file")])
-        ds.save(recursive=recursive)
-        assert_repo_status(path)
+    # https://github.com/datalad/datalad/issues/6558
+    new = (ds.pathobj / "new")
+    new.unlink()
+    new.mkdir()
+    (new / "file").touch()
+    ds.repo.call_git(["add"], files=[str(new / "file")])
+    ds.save(recursive=recursive)
+    assert_repo_status(path)
 
 
-    for recursive in False,:  #, True TODO when implemented
-        for annex in True, False:
-            yield check_renamed_file, recursive, annex
+@pytest.mark.parametrize(
+    "recursive,annex",
+    itertools.product(
+        (False, ),  #, True TODO when implemented
+        (True, False),
+    )
+)
+def test_renamed_file(recursive, annex):
+    check_renamed_file(recursive, annex)
 
 
 @with_tempfile(mkdir=True)
@@ -883,10 +891,15 @@ def check_save_dotfiles(to_git, save_path, path):
         check(path)
 
 
-def test_save_dotfiles():
-    for git in [True, False, None]:
-        for save_path in [None, "nodot-subdir"]:
-            yield check_save_dotfiles, git, save_path
+@pytest.mark.parametrize(
+    "git,save_path",
+    itertools.product(
+        [True, False, None],
+        [None, "nodot-subdir"],
+    )
+)
+def test_save_dotfiles(git, save_path):
+    check_save_dotfiles(git, save_path)
 
 
 @with_tempfile

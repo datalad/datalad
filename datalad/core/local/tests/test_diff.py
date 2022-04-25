@@ -342,7 +342,7 @@ def test_diff_recursive(path=None):
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_path_diff(_path, linkpath):
+def test_path_diff(_path=None, linkpath=None):
     # do the setup on the real path, not the symlink, to have its
     # bugs not affect this test of status()
     ds = get_deeply_nested_structure(str(_path))

@@ -323,7 +323,7 @@ def test_run_assume_ready(path=None):
         ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs"),
         action="get", type="file")
 
-    ds.drop("f1", check=False)
+    ds.drop("f1", reckless='kill')
     if not adjusted:
         # If the input is not actually ready, the command will fail.
         assert_in_results(

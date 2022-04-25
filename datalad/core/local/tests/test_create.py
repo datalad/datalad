@@ -13,6 +13,7 @@
 import os
 import os.path as op
 
+import pytest
 
 from datalad.distribution.dataset import (
     Dataset
@@ -454,10 +455,9 @@ def check_create_obscure(create_kwargs, path):
     ok_(ds.is_installed())
 
 
-def test_create_with_obscure_name():
-    fname = OBSCURE_FILENAME
-    yield check_create_obscure, {"path": fname}
-    yield check_create_obscure, {"dataset": fname}
+@pytest.mark.parametrize("kwarg", ["path", "dataset"])
+def test_create_with_obscure_name(kwarg):
+    check_create_obscure, {"kwarg": OBSCURE_FILENAME}
 
 
 @with_tempfile
@@ -484,19 +484,25 @@ def check_create_path_semantics(
         eq_(subds.pathobj, target_path)
 
 
-def test_create_relpath_semantics():
-    yield check_create_path_semantics, 'subdir', None, 'subdir_relpath'
-    yield check_create_path_semantics, 'subdir', 'abspath', 'subdir_relpath'
-    yield check_create_path_semantics, 'subdir', 'abspath', 'abspath'
-    yield check_create_path_semantics, 'parentds', None, 'relpath'
-    yield check_create_path_semantics, 'parentds', 'abspath', 'relpath'
-    yield check_create_path_semantics, 'parentds', 'abspath', 'abspath'
-    yield check_create_path_semantics, None, 'abspath', 'abspath'
-    yield check_create_path_semantics, None, 'instance', 'abspath'
-    yield check_create_path_semantics, None, 'instance', 'relpath'
-    yield check_create_path_semantics, 'elsewhere', 'abspath', 'abspath'
-    yield check_create_path_semantics, 'elsewhere', 'instance', 'abspath'
-    yield check_create_path_semantics, 'elsewhere', 'instance', 'relpath'
+@pytest.mark.parametrize(
+    "cwd,create_ds,path_arg",
+    [
+        ('subdir', None, 'subdir_relpath'),
+        ('subdir', 'abspath', 'subdir_relpath'),
+        ('subdir', 'abspath', 'abspath'),
+        ('parentds', None, 'relpath'),
+        ('parentds', 'abspath', 'relpath'),
+        ('parentds', 'abspath', 'abspath'),
+        (None, 'abspath', 'abspath'),
+        (None, 'instance', 'abspath'),
+        (None, 'instance', 'relpath'),
+        ('elsewhere', 'abspath', 'abspath'),
+        ('elsewhere', 'instance', 'abspath'),
+        ('elsewhere', 'instance', 'relpath'),
+    ]
+)
+def test_create_relpath_semantics(cwd, create_ds, path_arg):
+    check_create_path_semantics(cwd, create_ds, path_arg)
 
 
 @with_tempfile(mkdir=True)
@@ -513,7 +519,7 @@ def test_gh2927(path=None, linkpath=None):
 
 
 @with_tempfile(mkdir=True)
-def check_create_initopts_form(form, path):
+def check_create_initopts_form(form, path=None):
     path = Path(path)
 
     template_dir = path / "templates"
@@ -528,9 +534,9 @@ def check_create_initopts_form(form, path):
     ok_exists(ds.repo.dot_git / "foo")
 
 
-def test_create_initopts_form():
-    yield check_create_initopts_form, "dict"
-    yield check_create_initopts_form, "list"
+@pytest.mark.parametrize("form", ["dict", "list"])
+def test_create_initopts_form(form):
+    check_create_initopts_form(form)
 
 
 @with_tempfile
