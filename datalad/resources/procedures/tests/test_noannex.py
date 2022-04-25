@@ -10,14 +10,14 @@
 
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import with_tempfile, with_tree
 from datalad.support.exceptions import CommandError
-
-from nose.tools import (
-    assert_true,
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils import (
     assert_false,
     assert_raises,
+    assert_true,
+    with_tempfile,
+    with_tree,
 )
 
 
