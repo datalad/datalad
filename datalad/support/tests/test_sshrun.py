@@ -40,7 +40,7 @@ def test_exit_code():
         else:
             # to test both scenarios
             main(cmd)
-    assert_equal(cme.exception.code, 42)
+    assert_equal(cme.value.code, 42)
 
 
 @skip_if_on_windows

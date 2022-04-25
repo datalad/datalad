@@ -273,7 +273,7 @@ def test_AnnexRepo_get_outofspace(annex_path=None):
     with patch.object(GitWitlessRunner, 'run_on_filelist_chunks', raise_cmderror) as cma, \
             assert_raises(OutOfSpaceError) as cme:
         ar.get("file")
-    exc = cme.exception
+    exc = cme.value
     eq_(exc.sizemore_msg, '905.6 MB')
     assert_re_in(".*annex.*(find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
 
@@ -288,12 +288,12 @@ def test_AnnexRepo_get_remote_na(src=None, path=None):
 
     with assert_raises(RemoteNotAvailableError) as cme:
         ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
-    eq_(cme.exception.remote, "NotExistingRemote")
+    eq_(cme.value.remote, "NotExistingRemote")
 
     # and similar one whenever invoking with remote parameter
     with assert_raises(RemoteNotAvailableError) as cme:
         ar.get('test-annex.dat', remote="NotExistingRemote")
-    eq_(cme.exception.remote, "NotExistingRemote")
+    eq_(cme.value.remote, "NotExistingRemote")
 
 
 @with_sameas_remote
@@ -1428,8 +1428,8 @@ def test_annex_copy_to(src=None, origin=None, clone=None):
             patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
-    eq_(cme.exception.results, ["copied"])
-    eq_(cme.exception.failed, ['nonex1', 'nonex2'])
+    eq_(cme.value.results, ["copied"])
+    eq_(cme.value.failed, ['nonex1', 'nonex2'])
 
 
 @with_tempfile

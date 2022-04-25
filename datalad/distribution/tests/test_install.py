@@ -459,7 +459,7 @@ def test_failed_install_multiple(top_path=None):
     # those which succeeded should be saved now
     eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed
-    eq_(set(r.get('source_url', r['path']) for r in cme.exception.failed),
+    eq_(set(r.get('source_url', r['path']) for r in cme.value.failed),
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 

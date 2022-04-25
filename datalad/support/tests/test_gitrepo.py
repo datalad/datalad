@@ -1178,11 +1178,11 @@ def test_GitRepo_gitignore(path=None):
 
     with assert_raises(GitIgnoreError) as cme:
         gr.add('ignore.me')
-    eq_(cme.exception.paths, ['ignore.me'])
+    eq_(cme.value.paths, ['ignore.me'])
 
     with assert_raises(GitIgnoreError) as cme:
         gr.add(['ignore.me', 'dontigno.re', op.join('ignore-sub.me', 'a_file.txt')])
-    eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
+    eq_(set(cme.value.paths), {'ignore.me', 'ignore-sub.me'})
 
     eq_(gr.get_gitattributes('.')['.'], {})  # nothing is recorded within .gitattributes
 

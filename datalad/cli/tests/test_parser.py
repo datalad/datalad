@@ -21,13 +21,13 @@ def test_fail_with_short_help():
     out = StringIO()
     with assert_raises(SystemExit) as cme:
         fail_with_short_help(exit_code=3, out=out)
-    assert_equal(cme.exception.code, 3)
+    assert_equal(cme.value.code, 3)
     assert_equal(out.getvalue(), "")
 
     out = StringIO()
     with assert_raises(SystemExit) as cme:
         fail_with_short_help(msg="Failed badly", out=out)
-    assert_equal(cme.exception.code, 1)
+    assert_equal(cme.value.code, 1)
     assert_equal(out.getvalue(), "error: Failed badly\n")
 
     # Suggestions, hint, etc
@@ -41,7 +41,7 @@ def test_fail_with_short_help():
             exit_code=0,  # no one forbids
             what="parent",
             out=out)
-    assert_equal(cme.exception.code, 0)
+    assert_equal(cme.value.code, 0)
     assert_equal(out.getvalue(),
                  "error: Failed badly\n"
                  "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"

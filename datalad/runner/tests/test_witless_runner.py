@@ -95,7 +95,7 @@ def test_runner_failure(dir_=None):
         runner.run(
             py2cmd('import sys; sys.exit(53)')
         )
-    eq_(53, cme.exception.code)
+    eq_(53, cme.value.code)
 
 
 @with_tempfile(mkdir=True)

@@ -168,9 +168,9 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
             runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
         assert_in(f"Failed to acquire lock at {lock_path} in 2 attempts.", str(cme.value))
         assert_in(f"RuntimeError", str(cme.value))
-        assert_false(cme.exception.stdout)  # nothing there since print should not happen
-        assert_in(f'Failed to acquire lock at {lock_path} in 0.05', cme.exception.stderr)
-        assert_in(f'Failed to acquire lock at {lock_path} in 0.15', cme.exception.stderr)
+        assert_false(cme.value.stdout)  # nothing there since print should not happen
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.05', cme.value.stderr)
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.15', cme.value.stderr)
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
 
     # now that we left context, should work out just fine
