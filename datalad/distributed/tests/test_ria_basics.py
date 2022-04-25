@@ -240,9 +240,8 @@ def _test_initremote_alias(host, ds_path, store):
 def test_initremote_alias():
 
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_initremote_alias)), \
-          'datalad-test'
-    yield _test_initremote_alias, None
+    known_failure_windows(skip_ssh(_test_initremote_alias))('datalad-test')
+    _test_initremote_alias(None)
 
 
 
@@ -297,9 +296,8 @@ def _test_initremote_rewrite(host, ds_path, store):
 
 def test_initremote_rewrite():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_initremote_rewrite)), \
-          'datalad-test'
-    yield _test_initremote_rewrite, None
+    known_failure_windows(skip_ssh(_test_initremote_rewrite))('datalad-test')
+    _test_initremote_rewrite(None)
 
 
 @known_failure_windows  # see gh-4469
@@ -390,8 +388,8 @@ def _test_remote_layout(host, dspath, store, archiv_store):
 @slow  # 12sec + ? on travis
 def test_remote_layout():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_remote_layout)), 'datalad-test'
-    yield _test_remote_layout, None
+    known_failure_windows(skip_ssh(_test_remote_layout))('datalad-test')
+    _test_remote_layout(None)
 
 
 @known_failure_windows  # see gh-4469
@@ -481,8 +479,8 @@ def _test_version_check(host, dspath, store):
 @slow  # 17sec + ? on travis
 def test_version_check():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_version_check)), 'datalad-test'
-    yield _test_version_check, None
+    known_failure_windows(skip_ssh(_test_version_check))('datalad-test')
+    _test_version_check(None)
 
 
 # git-annex-testremote is way too slow on crippled FS.
@@ -601,8 +599,8 @@ def _test_binary_data(host, store, dspath):
 
 def test_binary_data():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_binary_data)), 'datalad-test'
-    yield skip_if_no_network(_test_binary_data), None
+    known_failure_windows(skip_ssh(_test_binary_data))('datalad-test')
+    skip_if_no_network(_test_binary_data)(None)
 
 
 @known_failure_windows
@@ -788,5 +786,5 @@ def _test_permission(host, storepath, dspath):
 
 
 def test_obtain_permission():
-    yield skip_ssh(_test_permission), 'datalad-test'
-    yield skip_if_root(_test_permission), None
+    skip_ssh(_test_permission)('datalad-test')
+    skip_if_root(_test_permission)(None)

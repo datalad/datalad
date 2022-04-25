@@ -9,21 +9,23 @@
 
 import logging
 import os.path as op
+from functools import wraps
 from unittest.mock import patch
 
 from datalad import cfg as dl_cfg
 from datalad.api import (
+    Dataset,
     clone,
-    Dataset
 )
+from datalad.support.network import get_local_file_url
 from datalad.tests.utils import (
-    attr,
     assert_false,
     assert_in,
     assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_status,
+    attr,
     chpwd,
     eq_,
     known_failure_githubci_win,
@@ -37,8 +39,6 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import Path
-from functools import wraps
-from datalad.support.network import get_local_file_url
 
 
 def with_store_insteadof(func):
@@ -93,7 +93,7 @@ def test_invalid_calls(path=None):
             'sub': {'other.txt': 'other'},
             'sub2': {'evenmore.txt': 'more'}})
 @with_tempfile(mkdir=True)
-def _test_create_store(host, base_path, ds_path, clone_path):
+def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
 
     ds = Dataset(ds_path).create(force=True)
 
@@ -192,9 +192,9 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 @slow  # 11 + 42 sec on travis
 def test_create_simple():
 
-    yield _test_create_store, None
+    _test_create_store(None)
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
+    skip_if_on_windows(skip_ssh(_test_create_store))('datalad-test')
 
 
 @skip_ssh
