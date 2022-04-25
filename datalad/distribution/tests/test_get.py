@@ -10,19 +10,21 @@
 """
 
 from os import curdir
-from os.path import (
-    join as opj,
-    basename,
-)
+from os.path import basename
+from os.path import join as opj
 from unittest.mock import patch
+
+import pytest
 
 from datalad.api import (
     create,
     get,
     install,
 )
+from datalad.distribution.get import (
+    _get_flexible_source_candidates_for_submodule,
+)
 from datalad.interface.results import only_matching_paths
-from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
@@ -30,36 +32,37 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import get_local_file_url
 from datalad.tests.utils import (
-    ok_,
+    DEFAULT_REMOTE,
+    assert_false,
+    assert_in,
+    assert_in_results,
+    assert_message,
+    assert_not_in_results,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    create_tree,
     eq_,
+    known_failure_githubci_win,
+    known_failure_windows,
+    ok_,
+    serve_path_via_http,
+    skip_if_adjusted_branch,
+    skip_if_on_windows,
+    skip_ssh,
+    slow,
     with_tempfile,
     with_testrepos,
     with_tree,
-    create_tree,
-    assert_false,
-    assert_raises,
-    assert_in,
-    assert_status,
-    assert_in_results,
-    assert_not_in_results,
-    assert_repo_status,
-    assert_result_count,
-    assert_message,
-    DEFAULT_REMOTE,
-    serve_path_via_http,
-    skip_if_adjusted_branch,
-    skip_ssh,
-    skip_if_on_windows,
-    slow,
-    known_failure_windows,
-    known_failure_githubci_win,
 )
 from datalad.utils import (
-    with_pathsep,
-    chpwd,
     Path,
+    chpwd,
     rmtree,
+    with_pathsep,
 )
+
 from ..dataset import Dataset
 
 
@@ -256,8 +259,9 @@ def test_get_single_file(path=None):
     ok_(annexprops['has_content'])
 
 
+@pytest.mark.parametrize("override", [False, True])
 @with_tempfile(mkdir=True)
-def check_get_subdataset_inherit_reckless(override, path):
+def test_get_subdataset_inherit_reckless(override, path=None):
     src = Dataset(opj(path, "a")).create()
     src_subds = src.create("sub")
     src_subds.create("subsub")
@@ -280,11 +284,6 @@ def check_get_subdataset_inherit_reckless(override, path):
             None if override else "true")
 
 
-def test_get_subdataset_inherit_reckless():
-    yield check_get_subdataset_inherit_reckless, False
-    yield check_get_subdataset_inherit_reckless, True
-
-
 @with_tree(tree={'file1.txt': 'whatever 1',
                  'file2.txt': 'whatever 2',
                  'file3.txt': 'whatever 3',
@@ -293,6 +292,7 @@ def test_get_subdataset_inherit_reckless():
 @with_tempfile(mkdir=True)
 def test_get_multiple_files(path=None, url=None, ds_dir=None):
     from os import listdir
+
     from datalad.support.network import RI
 
     file_list = [f for f in listdir(path) if not f.startswith('.')]
@@ -762,7 +762,7 @@ def test_missing_path_handling(path=None):
 @with_tempfile
 @with_tempfile
 def test_source_candidate_subdataset(store1=None, store2=None, intermediate=None,
-                                     super, clone):
+                                     super=None, clone=None):
 
     # This tests the scenario of gh-6159.
     # However, the actual point is to test that `get` does not overwrite a

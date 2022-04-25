@@ -11,34 +11,30 @@
 
 import os
 import os.path as op
+from os.path import abspath
+from os.path import join as opj
 from os.path import (
-    abspath,
-    join as opj,
     lexists,
     relpath,
 )
-from ..dataset import (
-    Dataset,
-    EnsureDataset,
-    require_dataset,
-    resolve_path,
-)
+
+import pytest
+
+import datalad.utils as ut
 from datalad import cfg as dl_cfg
 from datalad.api import (
     create,
     get,
 )
-import datalad.utils as ut
-from datalad.utils import (
-    _path_,
-    chpwd,
-    on_windows,
-    Path,
-    rmtree,
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_equal,
     assert_false,
     assert_is,
@@ -54,16 +50,24 @@ from datalad.tests.utils import (
     assert_true,
     eq_,
     known_failure_windows,
-    OBSCURE_FILENAME,
     ok_,
-    SkipTest,
     swallow_logs,
     with_tempfile,
     with_testrepos,
 )
-from datalad.support.exceptions import (
-    InsufficientArgumentsError,
-    NoDatasetFound,
+from datalad.utils import (
+    Path,
+    _path_,
+    chpwd,
+    on_windows,
+    rmtree,
+)
+
+from ..dataset import (
+    Dataset,
+    EnsureDataset,
+    require_dataset,
+    resolve_path,
 )
 
 
@@ -265,8 +269,9 @@ def test_hat_dataset_more(path=None):
         eq_(Dataset('^'), ds)
 
 
+@pytest.mark.parametrize("ds_path", ["simple-path", OBSCURE_FILENAME])
 @with_tempfile(mkdir=True)
-def check_require_dataset(ds_path, topdir):
+def test_require_dataset(ds_path, topdir=None):
     path = opj(topdir, ds_path)
     os.mkdir(path)
     with chpwd(path):
@@ -288,11 +293,6 @@ def check_require_dataset(ds_path, topdir):
             require_dataset,
             'some',
             check_installed=True)
-
-
-def test_require_dataset():
-    yield check_require_dataset, "simple-path"
-    yield check_require_dataset, OBSCURE_FILENAME
 
 
 @with_tempfile(mkdir=True)

@@ -11,82 +11,85 @@
 
 import logging
 import os
-
 from os.path import (
-    join as opj,
-    isdir,
-    exists,
     basename,
     dirname,
+    exists,
+    isdir,
 )
+from os.path import join as opj
 from unittest.mock import patch
+
+import pytest
+
 from datalad.api import (
     create,
-    install,
     get,
+    install,
 )
-from datalad.utils import (
-    chpwd,
-    on_windows,
-    getpwd,
-    _path_,
-    rmtree,
-    Path,
-)
-from datalad.support import path as op
+from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.results import YieldDatasets
+from datalad.support import path as op
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
-    InsufficientArgumentsError,
     IncompleteResultsError,
+    InsufficientArgumentsError,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import WitlessRunner as Runner
 from datalad.tests.utils import (
-    skip_ssh,
-    create_tree,
-    with_tempfile,
-    assert_in,
-    with_tree,
-    with_testrepos,
-    eq_,
-    ok_,
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     assert_false,
-    ok_file_has_content,
+    assert_in,
+    assert_in_results,
+    assert_is_instance,
     assert_not_in,
     assert_raises,
-    assert_is_instance,
     assert_repo_status,
     assert_result_count,
     assert_status,
-    assert_in_results,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
+    create_tree,
+    eq_,
+    get_datasets_topdir,
+    integration,
+    known_failure_githubci_win,
+    known_failure_windows,
+    ok_,
+    ok_file_has_content,
     ok_startswith,
+    put_file_under_git,
     serve_path_via_http,
-    swallow_logs,
-    use_cassette,
     skip_if_no_network,
     skip_if_on_windows,
-    put_file_under_git,
-    integration,
+    skip_ssh,
     slow,
+    swallow_logs,
+    use_cassette,
     usecase,
-    get_datasets_topdir,
-    known_failure_windows,
-    known_failure_githubci_win,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
+from datalad.utils import (
+    Path,
+    _path_,
+    chpwd,
+    getpwd,
+    on_windows,
+    rmtree,
+)
+
 from ..dataset import Dataset
 
 ###############
 # Test helpers:
 ###############
 
-
+@pytest.mark.parametrize("annex", [False, True])
 @with_tree(tree={'file.txt': '123'})
 @serve_path_via_http
 @with_tempfile
-def _test_guess_dot_git(annex, path, url, tdir):
+def test_guess_dot_git(annex, path=None, url=None, tdir=None):
     repo = (AnnexRepo if annex else GitRepo)(path, create=True)
     repo.add('file.txt', git=not annex)
     repo.commit()
@@ -104,11 +107,6 @@ def _test_guess_dot_git(annex, path, url, tdir):
     eq_(installed.pathobj.resolve(), Path(tdir).resolve())
     ok_(exists(tdir))
     assert_repo_status(tdir, annex=annex)
-
-
-def test_guess_dot_git():
-    for annex in False, True:
-        yield _test_guess_dot_git, annex
 
 
 ######################
@@ -879,9 +877,10 @@ def test_install_subds_from_another_remote(topdir=None):
 
 # Takes > 2 sec
 # Do not use cassette
+@pytest.mark.parametrize("suffix", ["", "/.git"])
 @skip_if_no_network
 @with_tempfile
-def check_datasets_datalad_org(suffix, tdir):
+def test_datasets_datalad_org(suffix, tdir=None):
     # Test that git annex / datalad install, get work correctly on our datasets.datalad.org
     # Apparently things can break, especially with introduction of the
     # smart HTTP backend for apache2 etc
@@ -897,11 +896,6 @@ def check_datasets_datalad_org(suffix, tdir):
         1,
         status='ok')
     assert_status('ok', ds.drop(what='all', reckless='kill', recursive=True))
-
-
-def test_datasets_datalad_org():
-    yield check_datasets_datalad_org, ''
-    yield check_datasets_datalad_org, '/.git'
 
 
 # https://github.com/datalad/datalad/issues/3469

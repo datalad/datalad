@@ -16,7 +16,7 @@ env:
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_ENV=GIT_SSH_COMMAND
-    - TESTS_TO_PERFORM=datalad.{cli,core,customremotes,dataset,distributed,resources,tests}
+    - TESTS_TO_PERFORM=datalad.{cli,core,customremotes,dataset,distributed,distribution,resources,tests}
     # Should be an array, travis breaks on it, define/adjust in the "before_install"
     #- PYTEST_OPTS=( -v )
     # Note, that there's "turtle" as well, which is always excluded from

@@ -11,59 +11,55 @@
 
 import os
 import os.path as op
-from os.path import (
-    join as opj,
-    exists,
-)
+from os.path import exists
+from os.path import join as opj
 from unittest.mock import patch
 
-from ..dataset import Dataset
+from datalad import cfg as dl_cfg
 from datalad.api import (
     clone,
     install,
-    update,
     remove,
+    update,
 )
-from datalad.distribution.update import (
-    _process_how_args,
-)
-from datalad.utils import (
-    knows_annex,
-    rmtree,
-    chpwd,
-    Path,
-)
-from datalad.support.gitrepo import (
-    GitRepo,
-)
+from datalad.distribution.update import _process_how_args
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
-    with_tempfile,
-    assert_in,
-    with_testrepos,
-    assert_not_in,
-    eq_,
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    SkipTest,
     assert_false,
+    assert_in,
+    assert_in_results,
     assert_is_instance,
-    ok_,
-    create_tree,
-    maybe_adjust_repo,
-    ok_file_has_content,
-    assert_status,
+    assert_not_in,
     assert_raises,
     assert_repo_status,
     assert_result_count,
-    assert_in_results,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
-    skip_if_adjusted_branch,
-    SkipTest,
-    slow,
+    assert_status,
+    create_tree,
+    eq_,
     known_failure_windows,
+    maybe_adjust_repo,
     neq_,
+    ok_,
+    ok_file_has_content,
+    skip_if_adjusted_branch,
+    slow,
+    with_tempfile,
+    with_testrepos,
 )
-from datalad import cfg as dl_cfg
+from datalad.utils import (
+    Path,
+    chpwd,
+    knows_annex,
+    rmtree,
+)
+
+from ..dataset import Dataset
+
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
 # At least one aspect of the failure is a more general adjusted branch issue.
@@ -703,10 +699,12 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
+@slow  # 12 + 21sec on Yarik's laptop
+@pytest.mark.parametrize("on_adjusted", [True, False])
 # Skip non-adjusted case for systems that only support adjusted branches.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
+def test_merge_follow_parentds_subdataset_detached(on_adjusted, path=None):
     if on_adjusted and DEFAULT_REMOTE != "origin" and \
        external_versions['cmd:annex'] <= "8.20210330":
         raise SkipTest(
@@ -805,12 +803,6 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
         status="impossible",
         path=ds_clone_s1.path,
         action="update")
-
-
-@slow  # 12 + 21sec on Yarik's laptop
-def test_merge_follow_parentds_subdataset_detached():
-    yield check_merge_follow_parentds_subdataset_detached, True
-    yield check_merge_follow_parentds_subdataset_detached, False
 
 
 @with_tempfile(mkdir=True)
@@ -948,10 +940,15 @@ def test_update_adjusted_incompatible_with_ff_only(path=None):
         action="update", status="ok")
 
 
+@pytest.mark.parametrize("follow,action", [
+    # Ideally each combination would be checked, but this test is a bit slow.
+    ("parentds", "reset"),
+    ("sibling", "checkout"),
+])
 @slow  # ~10s
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def check_update_how_subds_different(follow, action, path):
+def test_update_how_subds_different(follow, action, path=None):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_sub = ds_src.create("sub")
@@ -998,12 +995,6 @@ def check_update_how_subds_different(follow, action, path):
         assert_false(ds_clone_sub_branch_post)
     else:
         eq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
-
-
-def test_update_how_subds_different():
-    # Ideally each combination would be checked, but this test is a bit slow.
-    yield check_update_how_subds_different, "parentds", "reset"
-    yield check_update_how_subds_different, "sibling", "checkout"
 
 
 @slow  # ~15s

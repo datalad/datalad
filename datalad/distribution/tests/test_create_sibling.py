@@ -9,26 +9,31 @@
 
 """
 
+import logging
 import os
-from os import chmod
 import stat
 import sys
+from os import chmod
+from os.path import (
+    basename,
+    exists,
+)
+from os.path import join as opj
 
-from os.path import join as opj, exists, basename
-
-from ..dataset import Dataset
 from datalad.api import (
     create_sibling,
     install,
     push,
 )
-from datalad.cmd import (
-    WitlessRunner as Runner,
-    StdOutErrCapture,
-)
+from datalad.cmd import StdOutErrCapture
+from datalad.cmd import WitlessRunner as Runner
 from datalad.distribution.create_sibling import _RunnerAdapter
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
+from datalad.support.gitrepo import GitRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
     DEFAULT_BRANCH,
@@ -63,18 +68,15 @@ from datalad.tests.utils import (
     with_testrepos,
     with_testsui,
 )
-from datalad.support.exceptions import (
-    CommandError,
-    InsufficientArgumentsError,
-)
 from datalad.utils import (
+    Path,
     _path_,
     chpwd,
     on_windows,
-    Path,
 )
 
-import logging
+from ..dataset import Dataset
+
 lgr = logging.getLogger('datalad.tests')
 
 
@@ -91,8 +93,9 @@ def have_webui():
 
     try:
         import datalad_deprecated.sibling_webui
-        from datalad_deprecated.tests.test_create_sibling_webui \
-            import assert_publish_with_ui
+        from datalad_deprecated.tests.test_create_sibling_webui import (
+            assert_publish_with_ui,
+        )
         _have_webui = True
     except (ModuleNotFoundError, ImportError):
         _have_webui = False
@@ -277,8 +280,9 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
             source.repo.get_remote_url("local_target", push=True))
 
         if have_webui():
-            from datalad_deprecated.tests.test_create_sibling_webui \
-                import assert_publish_with_ui
+            from datalad_deprecated.tests.test_create_sibling_webui import (
+                assert_publish_with_ui,
+            )
             assert_publish_with_ui(target_path)
 
         # now, push should work:
@@ -385,8 +389,9 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             GitRepo(target_dir, create=False)
 
             if have_webui():
-                from datalad_deprecated.tests.test_create_sibling_webui \
-                    import assert_publish_with_ui
+                from datalad_deprecated.tests.test_create_sibling_webui import (
+                    assert_publish_with_ui,
+                )
                 assert_publish_with_ui(target_dir, rootds=not suffix, flat=flat)
 
         for repo in [source.repo, sub1.repo, sub2.repo]:
@@ -441,8 +446,8 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
 @slow  # 28 + 19sec on travis
 def test_target_ssh_recursive():
     skip_if_on_windows()
-    yield skip_ssh(check_target_ssh_recursive), True
-    yield check_target_ssh_recursive, False
+    skip_ssh(check_target_ssh_recursive)(True)
+    check_target_ssh_recursive(False)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -527,8 +532,8 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
 @slow  # 10sec + ? on travis
 def test_target_ssh_since():
     skip_if_on_windows()
-    yield skip_ssh(check_target_ssh_since), True
-    yield check_target_ssh_since, False
+    skip_ssh(check_target_ssh_since)(True)
+    check_target_ssh_since(False)
 
 
 @skip_if_on_windows
@@ -557,8 +562,8 @@ def check_failon_no_permissions(use_ssh, src_path, target_path):
 
 
 def test_failon_no_permissions():
-    yield skip_ssh(check_failon_no_permissions), True
-    yield check_failon_no_permissions, False
+    skip_ssh(check_failon_no_permissions)(True)
+    check_failon_no_permissions(False)
 
 
 @with_tempfile(mkdir=True)
@@ -630,6 +635,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     # now publish "with" data, which should also trigger the hook!
     # https://github.com/datalad/datalad/issues/1658
     from glob import glob
+
     from datalad.consts import WEB_META_LOG
     logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
     published4 = ds.push(to=sibname, data='anything')
@@ -643,8 +649,8 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
 @slow  # 14 + 10sec on travis
 def test_replace_and_relative_sshpath():
     skip_if_on_windows()
-    yield skip_ssh(check_replace_and_relative_sshpath), True
-    yield check_replace_and_relative_sshpath, False
+    skip_ssh(check_replace_and_relative_sshpath)(True)
+    check_replace_and_relative_sshpath(False)
 
 
 @with_tempfile(mkdir=True)
@@ -752,10 +758,10 @@ def test_target_ssh_inherit():
     # TODO: was waiting for resolution on
     #   https://github.com/datalad/datalad/issues/1274
     # which is now closed but this one is failing ATM, thus leaving as TODO
-    # yield _test_target_ssh_inherit, None      # no wanted etc
+    # _test_target_ssh_inherit(None)      # no wanted etc
     # Takes too long so one will do with UI and another one without
-    yield skip_ssh(_test_target_ssh_inherit), 'manual', have_webui(), True  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup', False, False  # backup -- all data files
+    skip_ssh(_test_target_ssh_inherit)('manual', have_webui(), True)  # manual -- no load should be annex copied
+    _test_target_ssh_inherit('backup', False, False)  # backup -- all data files
 
 
 @with_testsui(responses=["no", "yes"])
@@ -789,8 +795,8 @@ def check_exists_interactive(use_ssh, path):
 
 def test_check_exists_interactive():
     skip_if_on_windows()
-    yield skip_ssh(check_exists_interactive), True
-    yield check_exists_interactive, False
+    skip_ssh(check_exists_interactive)(True)
+    check_exists_interactive(False)
 
 
 @skip_if_on_windows
