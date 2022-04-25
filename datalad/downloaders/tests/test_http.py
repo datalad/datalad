@@ -340,24 +340,28 @@ def check_download_external_url_no_mtime(*args, **kwargs):
 # @use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
     skip_if_no_network()
-    yield check_download_external_url, \
-          "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
-          "<form action=", \
-          "datafiles/meta_data_files.tar.gz"
+    check_download_external_url(
+        "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5",
+        "<form action=",
+        "datafiles/meta_data_files.tar.gz",
+    )
     # seems to be gone
-    # yield check_download_external_url, \
-    #       'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
-    #       "failed", \
-    #       "2000 1005 2000 3000"
-    yield check_download_external_url, \
-          'https://db.humanconnectome.org/data/experiments/ConnectomeDB_E09797/resources/166768/files/filescans.csv', \
-          "failed", \
-          "'Scan','FilePath'"
+    # check_download_external_url(
+    #       'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval',
+    #       "failed",
+    #       "2000 1005 2000 3000",
+    # )
+    check_download_external_url(
+        'https://db.humanconnectome.org/data/experiments/ConnectomeDB_E09797/resources/166768/files/filescans.csv',
+        "failed",
+        "'Scan','FilePath'",
+    )
 
-    yield check_download_external_url_no_mtime, \
-        "https://n5eil01u.ecs.nsidc.org/ICEBRIDGE/IDBMG4.004/1993.01.01/BedMachineGreenland-2021-04-20.nc.xml", \
-        'input type="password"', \
-        'DOCTYPE GranuleMetaDataFile'
+    check_download_external_url_no_mtime(
+        "https://n5eil01u.ecs.nsidc.org/ICEBRIDGE/IDBMG4.004/1993.01.01/BedMachineGreenland-2021-04-20.nc.xml",
+        'input type="password"',
+        'DOCTYPE GranuleMetaDataFile',
+    )
 
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 

@@ -11,33 +11,32 @@
 import os
 from unittest.mock import patch
 
-from ..s3 import S3Authenticator
-from ..s3 import S3Downloader
-from ..providers import Providers  # to test against crcns
+import pytest
 
+from ...downloaders.base import DownloadError
+from ...support import path as op
+from ...support.exceptions import AccessDeniedError
 from ...tests.utils import (
+    SkipTest,
     assert_equal,
     assert_raises,
     integration,
-    skip_if_no_network,
     skip_if_no_module,
-    SkipTest,
+    skip_if_no_network,
     swallow_outputs,
     turtle,
     use_cassette,
     with_tempfile,
     with_testsui,
 )
-from ...downloaders.base import DownloadError
-from ...support.exceptions import AccessDeniedError
-
-from ...utils import (
-    md5sum,
+from ...utils import md5sum
+from ..providers import Providers  # to test against crcns
+from ..s3 import (
+    S3Authenticator,
+    S3Downloader,
 )
-
-from ...support import path as op
-from .utils import get_test_providers
 from .test_http import check_download_external_url
+from .utils import get_test_providers
 
 skip_if_no_module('boto')
 skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
@@ -51,15 +50,15 @@ url_dandi1 = 's3://dandiarchive/dandiarchive/dandiarchive/data/d8dd3e2b-8f74-494
 
 
 @use_cassette('test_s3_download_basic')
-def test_s3_download_basic():
+@pytest.mark.parametrize("url,success_str,failed_str", [
+    (url_2versions_nonversioned1, 'version2', 'version1'),
+    (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
+    (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
+    (url_1version_bucketwithdot, 'version1', 'nothing'),
+])
+def test_s3_download_basic(url, success_str, failed_str):
+    check_download_external_url(url, failed_str, success_str)
 
-    for url, success_str, failed_str in [
-        (url_2versions_nonversioned1, 'version2', 'version1'),
-        (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
-        (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
-        (url_1version_bucketwithdot, 'version1', 'nothing')
-    ]:
-        yield check_download_external_url, url, failed_str, success_str
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @use_cassette('test_s3_mtime')
@@ -163,7 +162,7 @@ def test_restricted_bucket_on_NDA():
         ("s3://NDAR_Central_4/submission_23075/README", 'BIDS', 'error'),
         ("s3://NDAR_Central_4/submission_23075/dataset_description.json", 'DA041147', 'error'),
     ]:
-        yield check_download_external_url, url, failed_str, success_str
+        check_download_external_url(url, failed_str, success_str)
 
 
 @use_cassette('test_download_multiple_NDA')
@@ -181,7 +180,14 @@ def test_download_multiple_NDA(outdir=None):
         ret = providers.download(url, outdir)
 
 
-def check_get_key(b, key, version_id):
+@use_cassette('test_get_key')
+@pytest.mark.parametrize("b,key,version_id", [
+    ('NDAR_Central_4', 'submission_23075/README', None),
+    ('datalad-test0-versioned', '1version-nonversioned1.txt', None),
+    ('datalad-test0-versioned', '3versions-allversioned.txt', None),
+    ('datalad-test0-versioned', '3versions-allversioned.txt', 'pNsV5jJrnGATkmNrP8.i_xNH6CY4Mo5s'),
+])
+def test_get_key(b, key, version_id):
     url = "s3://%s/%s" % (b, key)
     if version_id:
         url += '?versionId=' + version_id
@@ -198,17 +204,6 @@ def check_get_key(b, key, version_id):
         assert_equal(*vals, msg="%s differs between two keys: %s" % (f, vals))
 
 
-@use_cassette('test_get_key')
-def test_get_key():
-    for b, p, v in [
-        ('NDAR_Central_4', 'submission_23075/README', None),
-        ('datalad-test0-versioned', '1version-nonversioned1.txt', None),
-        ('datalad-test0-versioned', '3versions-allversioned.txt', None),
-        ('datalad-test0-versioned', '3versions-allversioned.txt', 'pNsV5jJrnGATkmNrP8.i_xNH6CY4Mo5s'),
-    ]:
-        yield check_get_key, b, p, v
-
-
 # not really to be ran as part of the tests since it does
 # largely nothing but wait for token to expire!
 # It is still faster than waiting for real case to crash
@@ -221,8 +216,16 @@ def _test_expiring_token(outdir):
     providers = get_test_providers(url, reload=True)
     downloader = providers.get_provider(url).get_downloader(url)
 
-    from time import time, sleep
-    from datalad.downloaders.credentials import AWS_S3, CompositeCredential, UserPassword
+    from time import (
+        sleep,
+        time,
+    )
+
+    from datalad.downloaders.credentials import (
+        AWS_S3,
+        CompositeCredential,
+        UserPassword,
+    )
     from datalad.support.keyring_ import MemoryKeyring
     from datalad.tests.utils import ok_file_has_content
     credential = downloader.credential  # AWS_S3('datalad-test-s3')
