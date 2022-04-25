@@ -20,10 +20,13 @@ from io import StringIO
 from unittest.mock import patch
 from urllib.parse import urlparse
 
+import pytest
+
 import datalad.local.addurls as au
+from datalad import cfg as dl_cfg
 from datalad.api import (
-    addurls,
     Dataset,
+    addurls,
     subdatasets,
 )
 from datalad.cmd import WitlessRunner
@@ -31,6 +34,9 @@ from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    HTTPPath,
+    SkipTest,
     assert_dict_equal,
     assert_false,
     assert_in,
@@ -44,22 +50,21 @@ from datalad.tests.utils import (
     chpwd,
     create_tree,
     eq_,
-    HTTPPath,
     known_failure_githubci_win,
     ok_exists,
     ok_file_has_content,
     ok_startswith,
+    on_windows,
     skip_if,
-    SkipTest,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,
-    on_windows,
-    DEFAULT_BRANCH,
 )
-from datalad.utils import get_tempfile_kwargs, rmtemp
-from datalad import cfg as dl_cfg
+from datalad.utils import (
+    get_tempfile_kwargs,
+    rmtemp,
+)
 
 
 def test_formatter():
@@ -322,7 +327,8 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-def check_extract_csv_json_equal(input_type):
+@pytest.mark.parametrize("input_type", ["csv", "tsv"])
+def test_extract_csv_json_equal(input_type):
     delim = "\t" if input_type == "tsv" else ","
 
     keys = ST_DATA["header"]
@@ -340,11 +346,6 @@ def check_extract_csv_json_equal(input_type):
         *au._read(csv_rows, input_type), **kwds)
 
     eq_(json_output, csv_output)
-
-
-def test_extract_csv_tsv_json_equal():
-    yield check_extract_csv_json_equal, "csv"
-    yield check_extract_csv_json_equal, "tsv"
 
 
 def test_extract_wrong_input_type():
@@ -856,17 +857,11 @@ class TestAddurls(object):
             ok_exists(op.join(ds.path, fname))
 
     def test_addurls_stdin_input(self=None):
-        def make_test(text, input_type, description):
-            def fn():
-                self.check_addurls_stdin_input(json_text, "ext")
-            fn.description = description
-            return fn
-
         with open(self.json_file) as jfh:
             json_text = jfh.read()
 
-        yield make_test(json_text, "ext", "json,default input type")
-        yield make_test(json_text, "json", "json,json input type")
+        self.check_addurls_stdin_input(json_text, "ext")
+        self.check_addurls_stdin_input(json_text, "json")
 
         def make_delim_text(delim):
             row = "{name}" + delim + "{url}"
@@ -874,8 +869,8 @@ class TestAddurls(object):
                 [row.format(name="name", url="url")] +
                 [row.format(**rec) for rec in json.loads(json_text)])
 
-        yield make_test(make_delim_text(","), "csv", "csv,csv input type")
-        yield make_test(make_delim_text("\t"), "tsv", "tsv,tsv input type")
+        self.check_addurls_stdin_input(make_delim_text(","), "csv")
+        self.check_addurls_stdin_input(make_delim_text("\t"), "tsv")
 
     @with_tempfile(mkdir=True)
     def test_addurls_stdin_input_command_line(self=None, path=None):
@@ -938,13 +933,13 @@ class TestAddurls(object):
 
     def test_addurls_from_key(self=None):
         fn = self.check_addurls_from_key
-        for case in [
+        for testfunc, arg1, arg2 in [
                 (fn, "MD5-s{size}--{md5sum}", "MD5"),
                 (fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"),
                 (skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"),
                 (skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
-            yield case + (False,)
-            yield case + (True,)
+            testfunc(arg1, arg2, False)
+            testfunc(arg1, arg2, True)
 
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self=None, path=None):
