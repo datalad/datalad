@@ -10,7 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from nose.tools import assert_equal
+from datalad.tests.utils import assert_equal
 
 from ..helpers import _fix_datalad_ri
 
