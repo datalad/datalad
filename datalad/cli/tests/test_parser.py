@@ -62,7 +62,7 @@ def check_setup_parser(args, exit_code=None):
             else:
                 parser = setup_parser(args)
     if exit_code is not None:
-        assert_equal(cm.exception.code, exit_code)
+        assert_equal(cm.value.code, exit_code)
     stdout = cmout.getvalue()
     stderr = cmerr.getvalue()
     return {'parser': parser, 'out': stdout, 'err': stderr}
