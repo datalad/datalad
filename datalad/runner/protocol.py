@@ -9,7 +9,6 @@
 """Base class of a protocol to be used with the DataLad runner
 """
 
-import asyncio
 import logging
 import warnings
 from collections import deque
@@ -46,7 +45,92 @@ class GeneratorMixIn:
         self.result_queue.append(result)
 
 
-class WitlessProtocol(asyncio.SubprocessProtocol):
+class _BaseProtocol:
+    """Common base class for protocol interfaces.
+
+    Usually user implements protocols that derived from BaseProtocol
+    like Protocol or ProcessProtocol.
+
+    The only case when BaseProtocol should be implemented directly is
+    write-only transport like write pipe.
+
+    Note: copied from asyncio.protocols.
+    """
+
+    __slots__ = ()
+
+    def connection_made(self, transport):
+        """Called when a connection is made.
+
+        The argument is the transport representing the pipe connection.
+        To receive data, wait for data_received() calls.
+        When the connection is closed, connection_lost() is called.
+        """
+
+    def connection_lost(self, exc):
+        """Called when the connection is lost or closed.
+
+        The argument is an exception object or None (the latter
+        meaning a regular EOF is received or the connection was
+        aborted or closed).
+        """
+
+    def pause_writing(self):
+        """Called when the transport's buffer goes over the high-water mark.
+
+        Pause and resume calls are paired -- pause_writing() is called
+        once when the buffer goes strictly over the high-water mark
+        (even if subsequent writes increases the buffer size even
+        more), and eventually resume_writing() is called once when the
+        buffer size reaches the low-water mark.
+
+        Note that if the buffer size equals the high-water mark,
+        pause_writing() is not called -- it must go strictly over.
+        Conversely, resume_writing() is called when the buffer size is
+        equal or lower than the low-water mark.  These end conditions
+        are important to ensure that things go as expected when either
+        mark is zero.
+
+        NOTE: This is the only Protocol callback that is not called
+        through EventLoop.call_soon() -- if it were, it would have no
+        effect when it's most needed (when the app keeps writing
+        without yielding until pause_writing() is called).
+        """
+
+    def resume_writing(self):
+        """Called when the transport's buffer drains below the low-water mark.
+
+        See pause_writing() for details.
+        """
+
+
+class _SubprocessProtocol(_BaseProtocol):
+    """Interface for protocol for subprocess calls.
+
+    Note: copied from asyncio.protocols.
+    """
+
+    __slots__ = ()
+
+    def pipe_data_received(self, fd, data):
+        """Called when the subprocess writes data into stdout/stderr pipe.
+
+        fd is int file descriptor.
+        data is bytes object.
+        """
+
+    def pipe_connection_lost(self, fd, exc):
+        """Called when a file descriptor associated with the child process is
+        closed.
+
+        fd is the int file descriptor that was closed.
+        """
+
+    def process_exited(self):
+        """Called when subprocess has exited."""
+
+
+class WitlessProtocol(_SubprocessProtocol):
     """Subprocess communication protocol base class for `run_async_cmd`
 
     This class implements basic subprocess output handling. Derived classes
