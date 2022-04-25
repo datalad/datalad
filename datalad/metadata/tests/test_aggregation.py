@@ -167,7 +167,7 @@ def test_reaggregate_with_unavailable_objects(path=None):
     eq_(len(objs), 6)
     eq_(all(base.repo.file_has_content(objs)), True)
     # drop all object content
-    base.drop(objs, check=False)
+    base.drop(objs, reckless='kill')
     eq_(all(base.repo.file_has_content(objs)), False)
     assert_repo_status(base.path)
     # now re-aggregate, the state hasn't changed, so the file names will

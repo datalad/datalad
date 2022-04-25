@@ -60,7 +60,7 @@ def test_copy_file(workdir=None, webdir=None, weburl=None):
         # unless we have a target ds on a cripples FS (where `annex fromkey`
         # doesn't work until after 8.20210428), we can even drop the file
         # content in the source repo
-        src_ds.drop('myfile1.txt', check=False)
+        src_ds.drop('myfile1.txt', reckless='kill')
         nok_(src_ds.repo.file_has_content('myfile1.txt'))
     # copy the file from the source dataset into it.
     # it must copy enough info to actually put datalad into the position
@@ -192,7 +192,7 @@ def test_copy_file_into_nonannex(workdir=None):
     (src_ds.pathobj / 'present.txt').write_text('123')
     (src_ds.pathobj / 'gone.txt').write_text('abc')
     src_ds.save()
-    src_ds.drop('gone.txt', check=False)
+    src_ds.drop('gone.txt', reckless='kill')
 
     # destination has no annex
     dest_ds = Dataset(workdir / 'dest').create(annex=False)
@@ -384,7 +384,7 @@ def test_copy_file_nourl(serv_path=None, orig_path=None, tst_path=None):
     (srv_ds.pathobj / 'myfile.dat').write_text('I am content')
     (srv_ds.pathobj / 'noavail.dat').write_text('null')
     srv_ds.save()
-    srv_ds.drop('noavail.dat', check=False)
+    srv_ds.drop('noavail.dat', reckless='kill')
     # make an empty superdataset, with the test dataset as a subdataset
     orig_ds = Dataset(orig_path).create()
     orig_ds.clone(source=serv_path, path='serv')

@@ -217,7 +217,7 @@ def test_report_absent_keys(path=None):
         assert_in(testfile, ai)
         assert_equal(ai[testfile]['has_content'], True)
     # drop the key, not available anywhere else
-    ds.drop('dummy', check=False)
+    ds.drop('dummy', reckless='kill')
     # does not change a thing, except the key is gone
     for ai in (
             ds.repo.get_content_annexinfo(eval_availability=True),
@@ -327,7 +327,7 @@ def test_get_file_annexinfo(path=None):
     ds.save('ingit.txt', to_git=True)
     ds.save()
     # have some content-less component for testing
-    ds.drop(ds.pathobj / 'dir1', check=False)
+    ds.drop(ds.pathobj / 'dir1', reckless='kill')
 
     repo = ds.repo
     # only handles a single file at a time

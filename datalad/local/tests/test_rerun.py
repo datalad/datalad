@@ -151,7 +151,7 @@ def test_rerun(path=None, nodspath=None):
     report[-1]["commit"] == ds.repo.get_hexsha()
 
     # If a file is dropped, we remove it instead of unlocking it.
-    ds.drop(probe_path, check=False)
+    ds.drop(probe_path, reckless='kill')
     with swallow_outputs():
         ds.rerun()
 
@@ -727,7 +727,7 @@ def test_run_inputs_outputs(src=None, path=None):
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
-    ds.drop("sub/subfile", check=False)
+    ds.drop("sub/subfile", reckless='kill')
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
 
     # --input/--output globs can be stored in expanded form.
@@ -832,7 +832,7 @@ def test_rerun_assume_ready(path=None):
     ds.run(double_in_both_cmd("f1", "out1", "out2"), outputs=["out1"])
     # Drop the content so that we remove instead of unlock, making the test is
     # more meaningful on an adjusted branch.
-    ds.drop(["out1", "out2"], check=False)
+    ds.drop(["out1", "out2"], reckless='kill')
     # --assume-ready affects both explicitly specified and automatic outputs.
     res = ds.rerun(assume_ready="outputs")
     assert_not_in_results(res, action="remove")

@@ -709,7 +709,7 @@ def test_get_relays_command_errors(path=None):
     ds = Dataset(path).create()
     (ds.pathobj / "foo").write_text("foo")
     ds.save()
-    ds.drop("foo", check=False)
+    ds.drop("foo", reckless='kill')
     assert_result_count(
         ds.get("foo", on_failure="ignore", result_renderer='disabled'),
         1, action="get", type="file", status="error")

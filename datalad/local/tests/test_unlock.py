@@ -183,7 +183,7 @@ def test_unlock_directory(path=None):
     else:
         assert_repo_status(ds.path, modified=[dirpath / "a", dirpath / "b"])
     ds.save()
-    ds.drop(str(dirpath / "a"), check=False)
+    ds.drop(str(dirpath / "a"), reckless='kill')
     assert_false(ds.repo.file_has_content(str(dirpath / "a")))
 
     # Unlocking without an explicit non-directory path doesn't fail if one of

@@ -95,7 +95,7 @@ def test_archive(path=None):
     check_contents(custom_outname, 'myexport')
 
     # now loose some content
-    ds.drop('file_up', check=False)
+    ds.drop('file_up', reckless='kill')
     assert_raises(IOError, ds.export_archive, filename=opj(path, 'my'))
     ds.export_archive(filename=opj(path, 'partial'), missing_content='ignore')
     assert_true(os.path.exists(opj(path, 'partial.tar.gz')))
