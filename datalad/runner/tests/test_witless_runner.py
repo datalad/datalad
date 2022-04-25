@@ -19,6 +19,8 @@ from time import (
     time,
 )
 
+import pytest
+
 from datalad.tests.utils import (
     OBSCURE_FILENAME,
     SkipTest,

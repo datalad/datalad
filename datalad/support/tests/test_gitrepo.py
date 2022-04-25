@@ -155,7 +155,7 @@ def test_GitRepo_init_options(path=None):
 @with_tempfile
 @with_tempfile
 def test_GitRepo_bare(path=None, empty_dir=None, non_empty_dir=None, empty_dot_git=None, non_bare=None,
-                      clone_path):
+                      clone_path=None):
 
     import gc
 

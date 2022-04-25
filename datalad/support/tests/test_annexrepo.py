@@ -312,7 +312,7 @@ def test_annex_repo_sameas_special(repo=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_file_has_content(batch=None, src=None, annex_path=None):
+def test_AnnexRepo_file_has_content(batch, src=None, annex_path=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test.dat').write_text('123\n')
     origin.save('test.dat', git=True)
@@ -346,7 +346,7 @@ def test_AnnexRepo_file_has_content(batch=None, src=None, annex_path=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_is_under_annex(batch=None, src=None, annex_path=None):
+def test_AnnexRepo_is_under_annex(batch, src=None, annex_path=None):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save('some')
@@ -657,7 +657,7 @@ tree1_md5e_keys = {
 
 @with_parametric_batch
 @with_tree(**tree1args)
-def test_dropkey(batch=None, path=None):
+def test_dropkey(batch, path=None):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = list(tree1_md5e_keys)
@@ -1518,7 +1518,7 @@ def test_annex_get_annexed_files(path=None):
 
 @with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(batch=None, p=None):
+def test_is_available(batch, p=None):
     annex = AnnexRepo(p)
 
     # bkw = {'batch': batch}

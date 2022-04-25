@@ -15,6 +15,8 @@ from os.path import exists
 from os.path import join as opj
 from unittest.mock import patch
 
+import pytest
+
 from datalad import cfg as dl_cfg
 from datalad.api import (
     clone,
