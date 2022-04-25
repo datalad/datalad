@@ -1,6 +1,8 @@
 import argparse
 from argparse import Namespace
 
+import pytest
+
 from datalad.utils import (
     updated,
 )
@@ -148,7 +150,11 @@ def test_get_result_filter_arg_vs_config():
         eq_(repr(cargs), repr(cargs_overload))
 
 
-def check_call_from_parser_pos_arg_underscore(how):
+@pytest.mark.parametrize(
+    "how",
+    ["bare", "dest", "args"]
+)
+def test_call_from_parser_pos_arg_underscore(how):
     kwds = {"doc": "pos_arg doc"}
     if how == "dest":
         kwds["dest"] = "pos_arg"
@@ -172,7 +178,3 @@ def check_call_from_parser_pos_arg_underscore(how):
     eq_(call_from_parser(Cmd, args),
         "val")
 
-
-def test_call_from_parser_pos_arg_underscore():
-    for how in "bare", "dest", "args":
-        yield check_call_from_parser_pos_arg_underscore, how

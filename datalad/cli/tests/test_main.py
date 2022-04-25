@@ -11,6 +11,8 @@
 import os
 import re
 from io import StringIO
+
+import pytest
 from unittest.mock import patch
 
 import datalad
@@ -79,7 +81,7 @@ def run_main(args, exit_code=0, expect_stderr=False):
             with assert_raises(SystemExit) as cm:
                 main(["datalad"] + list(args))
             eq_('cmdline', datalad.get_apimode())
-            assert_equal(cm.exception.code, exit_code)
+            assert_equal(cm.value.code, exit_code)
             stdout = cmout.getvalue()
             stderr = cmerr.getvalue()
             if expect_stderr is False:
@@ -203,7 +205,21 @@ def test_combined_short_option():
     assert_in("too few arguments", stderr)
 
 
-def check_incorrect_option(opts, err_str):
+# apparently a bit different if following a good one so let's do both
+err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
+err_insufficient = err_invalid  # "specify"
+
+
+@pytest.mark.parametrize(
+    "opts,err_str",
+    [
+        (('--buga',), err_invalid),
+        (('--dbg', '--buga'), err_invalid),
+        (('--dbg',), err_insufficient),
+        (tuple(), err_insufficient),
+    ]
+)
+def test_incorrect_option(opts, err_str):
     # The first line used to be:
     # stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
     # But: what do we expect to be in sys.argv[0] here?
@@ -225,18 +241,15 @@ def check_incorrect_option(opts, err_str):
     assert_re_in(err_str, out, match=False)
 
 
-def test_incorrect_options():
-    # apparently a bit different if following a good one so let's do both
-    err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
-    yield check_incorrect_option, ('--buga',), err_invalid
-    yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
-
-    err_insufficient = err_invalid  # "specify"
-    yield check_incorrect_option, ('--dbg',), err_insufficient
-    yield check_incorrect_option, tuple(), err_insufficient
-
-
-def check_script_shims(script):
+@pytest.mark.parametrize(
+    "script",
+    [
+        'datalad',
+        'git-annex-remote-datalad-archives',
+        'git-annex-remote-datalad',
+    ]
+)
+def test_script_shims(script):
     runner = Runner()
     if not on_windows:
 
@@ -255,15 +268,6 @@ def check_script_shims(script):
     assert get_numeric_portion(version), f"Got no numeric portion from {version}"
     assert_equal(get_numeric_portion(__version__),
                  get_numeric_portion(version))
-
-
-def test_script_shims():
-    for script in [
-        'datalad',
-        'git-annex-remote-datalad-archives',
-        'git-annex-remote-datalad',
-    ]:
-        yield check_script_shims, script
 
 
 @slow  # 11.2591s
