@@ -19,8 +19,6 @@ from time import (
     time,
 )
 
-from nose.tools import timed
-
 from datalad.tests.utils import (
     OBSCURE_FILENAME,
     SkipTest,
@@ -148,7 +146,7 @@ def test_runner_stdin(path=None):
     assert_in(OBSCURE_FILENAME, res['stdout'])
 
 
-@timed(3)
+@pytest.mark.fail_slow(3)
 def test_runner_stdin_no_capture():
     # Ensure that stdin writing alone progresses
     runner = Runner()
@@ -159,7 +157,7 @@ def test_runner_stdin_no_capture():
     )
 
 
-@timed(3)
+@pytest.mark.fail_slow(3)
 def test_runner_no_stdin_no_capture():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
@@ -170,7 +168,7 @@ def test_runner_no_stdin_no_capture():
     )
 
 
-@timed(3)
+@pytest.mark.fail_slow(3)
 def test_runner_empty_stdin():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()

@@ -61,7 +61,7 @@ requires = {
         'nose>=1.3.4',
         'pytest~=7.0',
         'pytest-cov~=3.0',
-        'pytest-fail-slow',
+        'pytest-fail-slow~=0.2',
         'vcrpy',
     ],
     'metadata': [
