@@ -13,6 +13,7 @@ import logging
 import os.path as op
 import stat
 
+import pytest
 from unittest.mock import patch
 
 from datalad.config import ConfigManager
@@ -497,9 +498,10 @@ def check_reckless(annex, src_path, top_path, sharedpath):
             & stat.S_IWGRP)
 
 
-def test_reckless():
-    yield check_reckless, True
-    yield check_reckless, False
+@pytest.mark.parametrize('reckless', [True, False])
+def test_reckless(reckless):
+    check_reckless(reckless)
+
 
 @with_tempfile
 @with_tempfile
@@ -660,7 +662,7 @@ def test_expanduser(srcpath=None, destpath=None):
             message='target path already exists and not empty, refuse to '
             'clone into target path')
         # wipe out destination, and try again
-        assert_status('ok', remove(dataset=dest, check=False))
+        assert_status('ok', remove(dataset=dest, reckless='kill'))
         # now it should do it, and clone the right one
         cloneds = clone(op.join('~', 'src'), 'dest')
         eq_(cloneds.pathobj, Path(destpath) / 'dest')
@@ -1157,6 +1159,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
     return ds.id
 
 
+# TODO?: make parametric again on _test_ria_postclonecfg
 @known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
@@ -1173,8 +1176,9 @@ def test_ria_postclonecfg():
         id = _postclonetest_prepare(lcl, store, store2)
 
         # test cloning via ria+file://
-        yield _test_ria_postclonecfg, \
+        _test_ria_postclonecfg(
               get_local_file_url(store, compatibility='git'), id
+        )
 
         # Note: HTTP disabled for now. Requires proper implementation in ORA
         #       remote. See
@@ -1185,8 +1189,9 @@ def test_ria_postclonecfg():
         #     yield _test_ria_postclonecfg, url, id
 
         # test cloning via ria+ssh://
-        yield skip_ssh(_test_ria_postclonecfg), \
+        skip_ssh(_test_ria_postclonecfg)(
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+        )
 
 
 @known_failure_windows
@@ -1363,7 +1368,7 @@ def test_ria_http_storedataladorg(path=None):
 @with_tempfile
 @with_tempfile
 def test_ephemeral(origin_path=None, bare_path=None,
-                   clone1_path, clone2_path, clone3_path):
+                   clone1_path=None, clone2_path=None, clone3_path=None):
 
     file_test = Path('ds') / 'test.txt'
     file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
@@ -1478,7 +1483,7 @@ def test_clone_unborn_head(path=None):
     # Make the git-annex branch the most recently updated ref so that we test
     # that it is skipped.
     with set_date(abc_ts + 2):
-        ds_origin.drop("bar", check=False)
+        ds_origin.drop("bar", reckless='kill')
     ds_origin.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
     ds = clone(ds_origin.path, op.join(path, "b"))

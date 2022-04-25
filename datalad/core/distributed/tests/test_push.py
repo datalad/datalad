@@ -13,6 +13,8 @@
 import os
 import logging
 
+import pytest
+
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     IncompleteResultsError,
@@ -247,9 +249,9 @@ def check_push(annex, src_path, dst_path):
     eq_(orig_branches, src_repo.get_branches())
 
 
-def test_push():
-    yield check_push, False
-    yield check_push, True
+@pytest.mark.parametrize("annex", [False, True])
+def test_push(annex):
+    check_push(annex)
 
 
 def check_datasets_order(res, order='bottom-up'):
@@ -282,7 +284,7 @@ def check_datasets_order(res, order='bottom-up'):
 @with_tempfile(mkdir=True, suffix='subnoannex')
 @with_tempfile(mkdir=True, suffix='subsub')
 def test_push_recursive(
-        origin_path, src_path, dst_top, dst_sub, dst_subnoannex, dst_subsub):
+        origin_path=None, src_path=None, dst_top=None, dst_sub=None, dst_subnoannex=None, dst_subsub=None):
     # dataset with two submodules and one subsubmodule
     origin = Dataset(origin_path).create()
     origin_subm1 = origin.create('sub m')
@@ -649,7 +651,7 @@ def test_push_wanted(srcpath=None, dstpath=None):
 
     # Dropping a file to mimic a case of simply not having it locally (thus not
     # to be "pushed")
-    src.drop('secure.2', check=False)
+    src.drop('secure.2', reckless='kill')
 
     # Annotate sensitive content, actual value "verysecure" does not matter in
     # this example
