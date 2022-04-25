@@ -10,15 +10,18 @@
 
 __docformat__ = 'restructuredtext'
 
-from io import StringIO
 import builtins
-
+from io import StringIO
 from unittest.mock import (
     call,
     patch,
 )
 
+import pytest
+
+from datalad.ui.progressbars import progressbars
 from datalad.utils import swallow_logs
+
 from ...tests.utils import (
     assert_in,
     assert_not_in,
@@ -33,7 +36,6 @@ from ..dialog import (
     DialogUI,
     IPythonUI,
 )
-from datalad.ui.progressbars import progressbars
 
 
 def patch_input(**kwargs):
@@ -115,7 +117,11 @@ def test_hidden_doubleentry():
         gpcm.assert_has_calls([call('?: ')])
 
 
-def _test_progress_bar(backend, len, increment):
+@pytest.mark.parametrize("backend", progressbars)
+@pytest.mark.parametrize("len", [0, 4, 10, 1000])
+@pytest.mark.parametrize("increment", [True, False])
+def test_progress_bar(backend, len, increment):
+    # More of smoke testing given various lengths of fill_text
     out = StringIO()
     fill_str = ('123456890' * (len//10))[:len]
     pb = DialogUI(out).get_progressbar(
@@ -146,14 +152,6 @@ def _test_progress_bar(backend, len, increment):
         # returns back and there is no spurious newline
         if output:
             ok_endswith(output, '\r')
-
-
-def test_progress_bar():
-    # More of smoke testing given various lengths of fill_text
-    for backend in progressbars:
-        for l in 0, 4, 10, 1000:
-            for increment in True, False:
-                yield _test_progress_bar, backend, l, increment
 
 
 def test_IPythonUI():
