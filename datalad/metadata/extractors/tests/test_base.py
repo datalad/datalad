@@ -9,13 +9,14 @@
 """Test all extractors at a basic level"""
 
 from inspect import isgenerator
+
 from datalad.api import Dataset
 from datalad.support.entrypoints import iter_entrypoints
 from datalad.tests.utils import (
+    SkipTest,
     assert_equal,
     assert_repo_status,
     known_failure_githubci_win,
-    SkipTest,
     with_tree,
 )
 
@@ -76,9 +77,9 @@ def check_api(annex, path):
 @known_failure_githubci_win
 def test_api_git():
     # should tollerate both pure git and annex repos
-    yield check_api, False
+    check_api(False)
 
 
 @known_failure_githubci_win
 def test_api_annex():
-    yield check_api, True
+    check_api(True)
