@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-from contextlib import ExitStack
 
 import pytest
 
