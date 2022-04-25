@@ -214,7 +214,7 @@ def test_no_rdflib_loaded():
 )
 @serve_path_via_http()
 @with_tempfile
-def check_observe_tqdm(topdir, topurl, outdir):
+def check_observe_tqdm(topdir=None, topurl=None, outdir=None):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
     from datalad.api import (

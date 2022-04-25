@@ -11,6 +11,8 @@
 
 from os.path import isabs
 
+import pytest
+
 from datalad.api import (
     Dataset,
     clone,
@@ -70,8 +72,9 @@ def test_ensure_datalad_remote_init_and_enable_needed(path=None):
     assert_in(DATALAD_SPECIAL_REMOTE, repo.get_remotes())
 
 
+@pytest.mark.parametrize("autoenable", [False, True])
 @with_tempfile
-def check_ensure_datalad_remote_maybe_enable(autoenable, path):
+def test_ensure_datalad_remote_maybe_enable(autoenable, path=None):
     path = Path(path)
     ds_a = Dataset(path / "a").create(force=True)
     init_datalad_remote(ds_a.repo, DATALAD_SPECIAL_REMOTE,
@@ -83,8 +86,3 @@ def check_ensure_datalad_remote_maybe_enable(autoenable, path):
         assert_not_in("datalad", repo.get_remotes())
     ensure_datalad_remote(repo)
     assert_in("datalad", repo.get_remotes())
-
-
-def test_ensure_datalad_remote_maybe_enable():
-    yield check_ensure_datalad_remote_maybe_enable, False
-    yield check_ensure_datalad_remote_maybe_enable, True

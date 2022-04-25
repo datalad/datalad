@@ -8,8 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the universal datalad's annex customremote"""
 
-import logging
 import glob
+import logging
 import os.path as op
 
 from datalad.distribution.dataset import Dataset
@@ -30,7 +30,7 @@ from datalad.tests.utils import (
 
 @with_tempfile()
 @skip_if_no_network
-def check_basic_scenario(url, d):
+def check_basic_scenario(url, d=None):
     ds = Dataset(d).create()
     annex = ds.repo
 
@@ -67,6 +67,7 @@ def check_basic_scenario(url, d):
     # whereis command succeeding
     # https://github.com/datalad/datalad/issues/6453#issuecomment-1047533276
     from datalad.runner import StdOutErrCapture
+
     # we need to swallow logs since if DATALAD_LOG_LEVEL is set low, we
     # would get all the git-annex debug output in stderr
     with swallow_logs(new_level=logging.INFO) as cml:
