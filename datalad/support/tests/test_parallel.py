@@ -7,11 +7,18 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from time import sleep, time
+import logging
 from functools import partial
+from time import (
+    sleep,
+    time,
+)
 
+# logging effects threading and causes some 'weak' tests to fail,
+# so we will just skip those (well, if happens again -- disable altogether)
+from datalad import lgr
 from datalad.support import path as op
-
+from datalad.support.exceptions import IncompleteResultsError
 # absolute import only to be able to run test without `nose` so to see progress bar
 from datalad.support.parallel import (
     ProducerConsumer,
@@ -22,23 +29,16 @@ from datalad.tests.utils import (
     assert_equal,
     assert_greater,
     assert_greater_equal,
-    assert_repo_status,
     assert_raises,
+    assert_repo_status,
     known_failure_osx,
-    rmtree,
-    on_windows,
     on_osx,
+    on_windows,
+    rmtree,
     skip_if,
     slow,
     with_tempfile,
 )
-
-from datalad.support.exceptions import IncompleteResultsError
-
-# logging effects threading and causes some 'weak' tests to fail,
-# so we will just skip those (well, if happens again -- disable altogether)
-from datalad import lgr
-import logging
 
 info_log_level = lgr.getEffectiveLevel() >= logging.INFO
 
@@ -102,16 +102,16 @@ def test_ProducerConsumer():
         # Largely a smoke test, which only verifies correct results output
     for jobs in "auto", None, 1, 10:
         for PC in ProducerConsumer, ProducerConsumerProgressLog:
-            yield check_ProducerConsumer, PC, jobs
-        yield check_producing_consumer, jobs
-        yield check_producer_future_key, jobs
+            check_ProducerConsumer(PC, jobs)
+        check_producing_consumer(jobs)
+        check_producer_future_key(jobs)
 
 
 @slow  # 12sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_creatsubdatasets(topds_path, n=2):
-    from datalad.distribution.dataset import Dataset
     from datalad.api import create
+    from datalad.distribution.dataset import Dataset
     ds = Dataset(topds_path).create()
     paths = [op.join(topds_path, "subds%d" % i) for i in range(n)]
     paths.extend(op.join(topds_path, "subds%d" % i, "subsub%d" %k) for i in range(n) for k in range(2))
@@ -231,6 +231,7 @@ def test_gracefull_death():
 # it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
 def test_stalling(kill=False):
     import concurrent.futures
+
     from datalad.cmd import WitlessRunner
 
     def worker():

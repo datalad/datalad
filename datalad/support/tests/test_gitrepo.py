@@ -10,15 +10,12 @@
 
 """
 
-from datalad.tests.utils import assert_is_instance
-
 import logging
-
 import os
 import os.path as op
-
 import sys
 
+import pytest
 
 from datalad import get_encoding_info
 from datalad.cmd import (
@@ -26,28 +23,37 @@ from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
-
-from datalad.utils import (
-    chpwd,
-    getpwd,
-    on_windows,
-    rmtree,
-    Path,
+from datalad.support.exceptions import (
+    CommandError,
+    FileNotInRepositoryError,
+    InvalidGitRepositoryError,
+    NoSuchPathError,
+    PathKnownToRepositoryError,
 )
+from datalad.support.external_versions import external_versions
+from datalad.support.gitrepo import (
+    GitRepo,
+    _normalize_path,
+    normalize_paths,
+    to_options,
+)
+from datalad.support.sshconnector import get_connection_hash
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    SkipTest,
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
     assert_in,
     assert_in_results,
+    assert_is_instance,
     assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_repo_status,
     assert_true,
     create_tree,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
     eq_,
     get_most_obscure_supported_name,
     integration,
@@ -56,28 +62,18 @@ from datalad.tests.utils import (
     skip_if_no_network,
     skip_if_on_windows,
     skip_nomultiplex_ssh,
-    SkipTest,
     slow,
     swallow_logs,
     with_tempfile,
     with_tree,
 )
-from datalad.support.sshconnector import get_connection_hash
-
-from datalad.support.gitrepo import (
-    _normalize_path,
-    GitRepo,
-    normalize_paths,
-    to_options,
+from datalad.utils import (
+    Path,
+    chpwd,
+    getpwd,
+    on_windows,
+    rmtree,
 )
-from datalad.support.exceptions import (
-    CommandError,
-    FileNotInRepositoryError,
-    InvalidGitRepositoryError,
-    PathKnownToRepositoryError,
-    NoSuchPathError,
-)
-from datalad.support.external_versions import external_versions
 
 
 @with_tempfile(mkdir=True)
@@ -1533,24 +1529,18 @@ def test_gitrepo_call_git_methods(path=None):
         assert_not_in("expected blob type", cml.out)
 
 
+@integration
+    # http is well tested already
+    # 'git' is not longer supported
+@pytest.mark.parametrize("proto", ["https"])
 @skip_if_no_network
 @with_tempfile
-def _test_protocols(proto, destdir):
-    GitRepo.clone('%s://github.com/datalad-tester/testtt' % proto, destdir)
-
-
-@integration
-def test_protocols():
+def test_protocols(proto, destdir=None):
     # git-annex-standalone build can get git bundle which would fail to
     # download via https, resulting in messages such as
     #  fatal: unable to find remote helper for 'https'
     # which happened with git-annex-standalone 7.20191017+git2-g7b13db551-1~ndall+1
-
-    # http is well tested already
-    # 'git' is not longer supported
-    for proto in ('https', ):
-        yield _test_protocols, proto
-
+    GitRepo.clone('%s://github.com/datalad-tester/testtt' % proto, destdir)
 
 @with_tempfile
 def test_gitrepo_push_default_first_kludge(path=None):

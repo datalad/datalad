@@ -14,6 +14,8 @@ from collections import OrderedDict
 from os.path import isabs
 from os.path import join as opj
 
+import pytest
+
 from datalad.distribution.dataset import Dataset
 from datalad.support.network import (
     RI,
@@ -84,7 +86,15 @@ def test_dlurljoin():
     eq_(dlurljoin('http://a.b/dir/', '/'), 'http://a.b/')
     eq_(dlurljoin('http://a.b/dir/', '/x/y'), 'http://a.b/x/y')
 
-def _test_get_url_straight_filename(suf):
+@pytest.mark.parametrize("suf", [
+    '',
+    '#',
+    '#tag',
+    '#tag/obscure',
+    '?param=1',
+    '?param=1&another=/',
+])
+def test_get_url_straight_filename(suf):
     eq_(get_url_straight_filename('http://a.b/' + suf), '')
     eq_(get_url_straight_filename('http://a.b/p1' + suf), 'p1')
     eq_(get_url_straight_filename('http://a.b/p1/' + suf), '')
@@ -94,14 +104,6 @@ def _test_get_url_straight_filename(suf):
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf, allowdir=True), 'p2')
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf, allowdir=True, strip=('p2', 'xxx')), 'p1')
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf, strip=('p2', 'xxx')), '')
-
-def test_get_url_straight_filename():
-    yield _test_get_url_straight_filename, ''
-    yield _test_get_url_straight_filename, '#'
-    yield _test_get_url_straight_filename, '#tag'
-    yield _test_get_url_straight_filename, '#tag/obscure'
-    yield _test_get_url_straight_filename, '?param=1'
-    yield _test_get_url_straight_filename, '?param=1&another=/'
 
 from ..network import rfc2822_to_epoch
 
@@ -353,7 +355,12 @@ def test_git_transport_ri():
     _check_ri("trans-port::server:path", GitTransportRI, RI='server:path', transport='trans-port')
 
 
-def _test_url_quote_path(cls, clskwargs, target_url):
+@pytest.mark.parametrize("cls,clskwargs,target_url", [
+    (SSHRI, {}, r'example.com:/ "' + r"';a&b&cd `| "),
+    (URL, {'scheme': "http"}, 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'),
+    (PathRI, {}, r'/ "' + r"';a&b&cd `| "),  # nothing is done to file:implicit
+])
+def test_url_quote_path(cls, clskwargs, target_url):
     path = '/ "\';a&b&cd `| '
     if not (cls is PathRI):
         clskwargs['hostname'] = hostname = 'example.com'
@@ -375,12 +382,6 @@ def _test_url_quote_path(cls, clskwargs, target_url):
     eq_(url_.path, path)
     if 'hostname' in clskwargs:
         eq_(url.hostname, hostname)
-
-
-def test_url_quote_path():
-    yield _test_url_quote_path, SSHRI, {}, r'example.com:/ "' + r"';a&b&cd `| "
-    yield _test_url_quote_path, URL, {'scheme': "http"}, 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
-    yield _test_url_quote_path, PathRI, {}, r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
 
 
 def test_url_compose_archive_one():

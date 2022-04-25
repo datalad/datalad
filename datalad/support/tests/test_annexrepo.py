@@ -17,102 +17,45 @@ import os
 import re
 import sys
 import unittest.mock
-
 from functools import partial
 from glob import glob
 from os import mkdir
 from os.path import (
-    join as opj,
     basename,
-    relpath,
     curdir,
-    pardir,
     exists,
+)
+from os.path import join as opj
+from os.path import (
+    pardir,
+    relpath,
 )
 from queue import Queue
 from shutil import copyfile
-
-from urllib.parse import urljoin
-from urllib.parse import urlsplit
-
 from unittest.mock import patch
-
-from datalad import (
-    cfg as dl_cfg,
+from urllib.parse import (
+    urljoin,
+    urlsplit,
 )
 
-from datalad.cmd import (
-    GitWitlessRunner,
-    WitlessRunner as Runner,
-)
+import pytest
+
+from datalad import cfg as dl_cfg
+from datalad.cmd import GitWitlessRunner
+from datalad.cmd import WitlessRunner as Runner
 from datalad.consts import (
     DATALAD_SPECIAL_REMOTE,
     DATALAD_SPECIAL_REMOTES_UUIDS,
     WEB_SPECIAL_REMOTE_UUID,
 )
 from datalad.runner.gitrunner import GitWitlessRunner
-from datalad.support.annexrepo import GeneratorAnnexJsonNoStderrProtocol
-from datalad.support.external_versions import external_versions
 from datalad.support import path as op
-
-from datalad.support.sshconnector import get_connection_hash
-
-from datalad.utils import (
-    chpwd,
-    get_linux_distribution,
-    quote_cmdlinearg,
-    on_windows,
-    rmtree,
-    unlink,
-    Path,
-)
-from datalad.tests.utils import (
-    assert_cwd_unchanged,
-    assert_dict_equal as deq_,
-    assert_equal,
-    assert_false,
-    assert_in,
-    assert_is_instance,
-    assert_not_equal,
-    assert_not_in,
-    assert_not_is_instance,
-    assert_raises,
-    assert_re_in,
-    assert_repo_status,
-    assert_result_count,
-    assert_true,
-    create_tree,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
-    eq_,
-    find_files,
-    get_most_obscure_supported_name,
-    known_failure_githubci_win,
-    known_failure_windows,
-    maybe_adjust_repo,
-    OBSCURE_FILENAME,
-    ok_,
-    ok_annex_get,
-    ok_file_has_content,
-    ok_file_under_git,
-    ok_git_config_not_empty,
-    on_travis,
-    serve_path_via_http,
-    set_annex_version,
-    skip_if,
-    skip_if_adjusted_branch,
-    skip_if_on_windows,
-    skip_if_root,
-    skip_nomultiplex_ssh,
-    SkipTest,
-    slow,
-    swallow_logs,
-    swallow_outputs,
-    with_parametric_batch,
-    with_sameas_remote,
-    with_tempfile,
-    with_testrepos,
-    with_tree,
+# imports from same module:
+from datalad.support.annexrepo import (
+    AnnexJsonProtocol,
+    AnnexRepo,
+    GeneratorAnnexJsonNoStderrProtocol,
+    GeneratorAnnexJsonProtocol,
 )
 from datalad.support.exceptions import (
     AnnexBatchCommandError,
@@ -127,14 +70,67 @@ from datalad.support.exceptions import (
     OutOfSpaceError,
     RemoteNotAvailableError,
 )
-
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
-
-# imports from same module:
-from datalad.support.annexrepo import (
-    AnnexRepo,
-    AnnexJsonProtocol,
-    GeneratorAnnexJsonProtocol,
+from datalad.support.sshconnector import get_connection_hash
+from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    OBSCURE_FILENAME,
+    SkipTest,
+    assert_cwd_unchanged,
+)
+from datalad.tests.utils import assert_dict_equal as deq_
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_in,
+    assert_is_instance,
+    assert_not_equal,
+    assert_not_in,
+    assert_not_is_instance,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_result_count,
+    assert_true,
+    create_tree,
+    eq_,
+    find_files,
+    get_most_obscure_supported_name,
+    known_failure_githubci_win,
+    known_failure_windows,
+    maybe_adjust_repo,
+    ok_,
+    ok_annex_get,
+    ok_file_has_content,
+    ok_file_under_git,
+    ok_git_config_not_empty,
+    on_travis,
+    serve_path_via_http,
+    set_annex_version,
+    skip_if,
+    skip_if_adjusted_branch,
+    skip_if_on_windows,
+    skip_if_root,
+    skip_nomultiplex_ssh,
+    slow,
+    swallow_logs,
+    swallow_outputs,
+    with_parametric_batch,
+    with_sameas_remote,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
+    get_linux_distribution,
+    on_windows,
+    quote_cmdlinearg,
+    rmtree,
+    unlink,
 )
 
 
@@ -962,10 +958,11 @@ def test_v7_detached_get(opath=None, path=None):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
+@pytest.mark.parametrize("batch", [False, True])
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def _test_AnnexRepo_get_contentlocation(batch, src, path, work_dir_outside):
+def test_AnnexRepo_get_contentlocation(batch, src=None, path=None, work_dir_outside=None):
     ar = AnnexRepo(src)
     (ar.pathobj / 'test-annex.dat').write_text(
         "content to be annex-addurl'd")
@@ -1010,11 +1007,6 @@ def _test_AnnexRepo_get_contentlocation(batch, src, path, work_dir_outside):
         # they both should point to the same location eventually
         eq_((annex.pathobj / fname).resolve(),
             (annex.pathobj / key_location).resolve())
-
-
-def test_AnnexRepo_get_contentlocation():
-    for batch in (False, True):
-        yield _test_AnnexRepo_get_contentlocation, batch
 
 
 @known_failure_windows
@@ -2245,13 +2237,9 @@ def test_annexjson_protocol_long(path=None):
     eq_(res['stdout_json'], records)
 
 
-def test_annexjson_protocol_incorrect():
-    yield check_annexjson_protocol_incorrect, ''
-    yield check_annexjson_protocol_incorrect, ', end=""'
-
-
+@pytest.mark.parametrize("print_opt", ['', ', end=""'])
 @with_tempfile
-def check_annexjson_protocol_incorrect(print_opt, path):
+def test_annexjson_protocol_incorrect(print_opt, path=None):
     # Test that we still log some incorrectly formed JSON record
     bad_json = '{"I": "am wrong,}'
     with open(path, 'w') as f:
@@ -2278,6 +2266,7 @@ def check_annexjson_protocol_incorrect(print_opt, path):
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
 @known_failure_githubci_win
+@pytest.mark.parametrize("unlock", [True, False])
 @with_tree(tree={
     '.gitattributes': "** annex.largefiles=(largerthan=4b)",
     'alwaysbig': 'a'*10,
@@ -2285,7 +2274,7 @@ def check_annexjson_protocol_incorrect(print_opt, path):
     'tobechanged-git': 'a',
     'tobechanged-annex': 'a'*10,
 })
-def check_commit_annex_commit_changed(unlock, path):
+def test_commit_annex_commit_changed(unlock, path=None):
     # Here we test commit working correctly if file was just removed
     # (not unlocked), edited and committed back
 
@@ -2340,13 +2329,10 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'tobechanged-annex', annexed=True)
 
 
-def test_commit_annex_commit_changed():
-    for unlock in True, False:
-        yield check_commit_annex_commit_changed, unlock
-
-
+@slow  # 15 + 17sec on travis
+@pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
 @with_tempfile(mkdir=True)
-def check_files_split_exc(cls, topdir):
+def test_files_split_exc(cls, topdir=None):
     r = cls(topdir)
     # absent files -- should not crash with "too long" but some other more
     # meaningful exception
@@ -2361,11 +2347,6 @@ def check_files_split_exc(cls, topdir):
         assert_not_in('too long', str(ecm.value))
         assert_not_in('too many', str(ecm.value))
 
-
-@slow  # 15 + 17sec on travis
-def test_files_split_exc():
-    for cls in GitRepo, AnnexRepo:
-        yield check_files_split_exc, cls
 
 # with 204  (/ + (98+3)*2 + /) chars guaranteed, we hit "filename too long" quickly on windows
 # so we are doomed to shorten the filepath for testing on windows. Since the limits are smaller
@@ -2387,9 +2368,11 @@ _HEAVY_TREE = {
     for d in range(_ht_n)
 }
 
-
+# @known_failure_windows  # might fail with some older annex `cp` failing to set permissions
+@slow  # 313s  well -- if errors out - only 3 sec
+@pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
 @with_tree(tree=_HEAVY_TREE)
-def check_files_split(cls, topdir):
+def test_files_split(cls, topdir=None):
     from glob import glob
     r = cls(topdir)
     dirs = glob(op.join(topdir, '*'))
@@ -2406,13 +2389,6 @@ def check_files_split(cls, topdir):
         with open(f, 'w') as f:
             f.write('1')
     dl.save(dataset=r.path, path=dirs)
-
-
-# @known_failure_windows  # might fail with some older annex `cp` failing to set permissions
-@slow  # 313s  well -- if errors out - only 3 sec
-def test_files_split():
-    for cls in GitRepo, AnnexRepo:
-        yield check_files_split, cls
 
 
 @skip_if_on_windows

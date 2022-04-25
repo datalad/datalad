@@ -8,26 +8,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-
 from os import linesep
 
 from datalad import __version__
-from ..external_versions import ExternalVersions, LooseVersion
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CommandError,
     MissingExternalDependency,
     OutdatedExternalDependency,
 )
-from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
-    create_tree,
-    set_annex_version,
-    swallow_logs,
-    patch,
-    with_tempfile,
-)
-
-from datalad.tests.utils import (
+    SkipTest,
     assert_equal,
     assert_false,
     assert_greater,
@@ -36,8 +27,17 @@ from datalad.tests.utils import (
     assert_not_in,
     assert_raises,
     assert_true,
+    create_tree,
+    patch,
+    set_annex_version,
+    swallow_logs,
+    with_tempfile,
 )
-from datalad.tests.utils import SkipTest
+
+from ..external_versions import (
+    ExternalVersions,
+    LooseVersion,
+)
 
 
 # just to ease testing
@@ -123,7 +123,7 @@ def test_external_versions_popular_packages():
 
     for modname in ('scipy', 'numpy', 'mvpa2', 'sklearn', 'statsmodels', 'pandas',
                     'matplotlib', 'psychopy', 'github'):
-        yield _test_external, ev, modname
+        _test_external(ev, modname)
 
     # more of a smoke test
     assert_false(linesep in ev.dumps())
@@ -206,8 +206,8 @@ def test_annex_version_comparison():
         #   release, snapshot, neurodebian build of a snapshot
         for v in base, base + '-g0a34f08', base + '+gitg9f179ae-1~ndall+1':
             # they all must be comparable to our specification of min version
-            yield _test_annex_version_comparison, v, cmp_
-    yield _test_annex_version_comparison, str(AnnexRepo.GIT_ANNEX_MIN_VERSION), 0
+            _test_annex_version_comparison(v, cmp_)
+    _test_annex_version_comparison(str(AnnexRepo.GIT_ANNEX_MIN_VERSION), 0)
 
 
 def _test_list_tuple(thing):
@@ -227,7 +227,7 @@ def test_list_tuple():
         __version__ = [0, 1]
 
     for v in thing_with_list_version, thing_with_tuple_version, '0.1', (0, 1), [0, 1]:
-        yield _test_list_tuple, v
+        _test_list_tuple(v)
 
 
 def test_system_ssh_version():
