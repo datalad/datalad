@@ -159,7 +159,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
     # take the dataset that went in first
     repo = ds.repo
     repo_path = repo.pathobj
-    lgr.debug('query %s.diffstatus() for paths: %s', repo, paths)
+    lgr.debug('Querying %s.diffstatus() for paths: %s', repo, paths)
     # recode paths with repo reference for low-level API
     paths = [repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None
     status = repo.diffstatus(
@@ -170,7 +170,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
         eval_submodule_state=eval_submodule_state,
         _cache=cache)
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
-        lgr.debug('query %s.get_content_annexinfo() for paths: %s', repo, paths)
+        lgr.debug('Querying %s.get_content_annexinfo() for paths: %s', repo, paths)
         # this will amend `status`
         repo.get_content_annexinfo(
             paths=paths,

@@ -473,7 +473,6 @@ def _setup_git_repo(path, initopts=None, fake_dates=False):
       Created repository and records for any repo component that needs to be
       passed to git-add as a result of the setup procedure.
     """
-    lgr.info("Creating a new git repo at %s", path)
     tbrepo = GitRepo(
         path,
         create=True,
@@ -516,7 +515,6 @@ def _setup_annex_repo(path, initopts=None, fake_dates=False,
       passed to git-add as a result of the setup procedure.
     """
     # always come with annex when created from scratch
-    lgr.info("Creating a new annex repo at %s", path)
     tbrepo = AnnexRepo(
         path,
         create=True,
