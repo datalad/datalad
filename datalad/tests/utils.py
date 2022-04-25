@@ -1595,16 +1595,8 @@ def ignore_nose_capturing_stdout(func):
     return func
 
 
-@optional_args
-def with_parametric_batch(t):
-    """Helper to run parametric test with possible combinations of batch and direct
-    """
-    @wraps(t)
-    def  _wrap_with_parametric_batch():
-        for batch in (False, True):
-                yield t, batch
-
-    return  _wrap_with_parametric_batch
+# Helper to run parametric test with possible combinations of batch and direct
+with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 
 
 # List of most obscure filenames which might or not be supported by different
