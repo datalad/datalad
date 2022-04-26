@@ -39,14 +39,8 @@ def _without_command(results):
     return out
 
 
-@pytest.mark.parametrize("populator", [
-    # empty dataset
-    create,
-    # ver much not empty dataset
-    get_deeply_nested_structure,
-])
 @with_tempfile(mkdir=True)
-def test_basic_resilience(populator, path=None):
+def check_basic_resilience(populator, path=None):
     ds = populator(path)
     ds.save()
     kwargs = dict(recursive=True)
@@ -91,6 +85,16 @@ def test_basic_resilience(populator, path=None):
         ok_clean_git(ds.path, index_modified=[ds.pathobj / 'subds_modified'])
     else:
         ok_clean_git(ds.path)
+
+
+@pytest.mark.parametrize("populator", [
+    # empty dataset
+    create,
+    # ver much not empty dataset
+    get_deeply_nested_structure,
+])
+def test_basic_resilience(populator):
+    check_basic_resilience(populator)
 
 
 @with_tempfile(mkdir=True)
