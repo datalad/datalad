@@ -11,17 +11,16 @@
 
 """
 
-from functools import wraps
 import inspect
+import logging
 import os
 import os.path as op
 import shutil
 import stat
 import sys
 import time
-import logging
-from unittest.mock import patch
-
+from collections import OrderedDict
+from functools import wraps
 from operator import itemgetter
 from os.path import (
     abspath,
@@ -31,22 +30,27 @@ from os.path import (
     expanduser,
     expandvars,
     isabs,
-    join as opj,
+)
+from os.path import join as opj
+from os.path import (
     normpath,
     pardir,
 )
-from collections import OrderedDict
+from unittest.mock import patch
 
 import pytest
 
+from datalad import cfg as dl_cfg
+from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import (
+    CMD_MAX_ARG,
+    Path,
     _path_,
     all_same,
     any_re_search,
     auto_repr,
     better_wraps,
-    CMD_MAX_ARG,
-    Path,
+    chpwd,
     create_tree,
     disable_logger,
     dlabspath,
@@ -55,14 +59,14 @@ from datalad.utils import (
     file_basename,
     find_files,
     generate_chunks,
-    getargspec,
     get_dataset_root,
     get_open_files,
     get_path_prefix,
     get_sig_param_names,
     get_timestamp_suffix,
     get_trace,
-    getpwd, chpwd,
+    getargspec,
+    getpwd,
     import_module_from_file,
     import_modules,
     is_explicit_path,
@@ -88,9 +92,10 @@ from datalad.utils import (
     unlink,
     updated,
 )
-from datalad.support.annexrepo import AnnexRepo
 
 from .utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
     as_unicode,
     assert_cwd_unchanged,
     assert_equal,
@@ -110,7 +115,6 @@ from .utils import (
     has_symlink_capability,
     known_failure,
     nok_,
-    OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
     ok_generator,
@@ -122,12 +126,10 @@ from .utils import (
     skip_if_on_windows,
     skip_if_root,
     skip_known_failure,
-    SkipTest,
     skip_wo_symlink_capability,
     with_tempfile,
     with_tree,
 )
-from datalad import cfg as dl_cfg
 
 
 def test_better_wraps():
@@ -161,7 +163,7 @@ def test_better_wraps():
 
 
 # TODO?: make again parametric on eq_argspec invocations?
-@pytest.mark.filterwarnings("ignore: inspect.getargspec\(\) is deprecated")
+@pytest.mark.filterwarnings(r"ignore: inspect.getargspec\(\) is deprecated")
 def test_getargspec():
 
     def eq_argspec(f, expected, has_kwonlyargs=False):
@@ -665,8 +667,8 @@ def test_is_explicit_path():
 @with_tempfile
 @with_tempfile
 def test_knows_annex(here=None, there=None):
-    from datalad.support.gitrepo import GitRepo
     from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.gitrepo import GitRepo
     GitRepo(path=here, create=True)
     assert_false(knows_annex(here))
     AnnexRepo(path=here, create=True)
@@ -1205,7 +1207,10 @@ def test_get_open_files(p=None):
         return
 
     # if we start a process within that directory, should get informed
-    from subprocess import Popen, PIPE
+    from subprocess import (
+        PIPE,
+        Popen,
+    )
     from time import time
     t0 = time()
     proc = Popen([sys.executable, '-c',
@@ -1303,11 +1308,11 @@ def test_is_interactive(fout=None):
         StdOutErrCapture,
         WitlessRunner,
     )
-    from datalad.support.gitrepo import GitProgress
     from datalad.support.annexrepo import (
         AnnexInitOutput,
         AnnexJsonProtocol,
     )
+    from datalad.support.gitrepo import GitProgress
 
     bools = ["False", "True"]
 

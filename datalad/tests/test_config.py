@@ -14,10 +14,23 @@ import logging
 import os
 from os.path import exists
 from os.path import join as opj
+from unittest.mock import patch
 
 import pytest
 
-from unittest.mock import patch
+from datalad import cfg as dl_cfg
+from datalad.api import create
+from datalad.cmd import CommandError
+from datalad.config import (
+    ConfigManager,
+    _where_to_scope,
+    parse_gitconfig_dump,
+    rewrite_url,
+    write_config_section,
+)
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
@@ -35,26 +48,10 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import (
+    Path,
     get_home_envvars,
     swallow_logs,
-    Path
 )
-
-from datalad.distribution.dataset import Dataset
-from datalad.api import create
-from datalad.config import (
-    _where_to_scope,
-    ConfigManager,
-    parse_gitconfig_dump,
-    rewrite_url,
-    write_config_section,
-)
-from datalad.cmd import CommandError
-
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad import cfg as dl_cfg
-
 
 # XXX tabs are intentional (part of the format)!
 # XXX put back! confuses pep8
@@ -640,7 +637,7 @@ def test_global_config():
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
 
 
-@pytest.mark.filterwarnings("ignore: status\(report_filetype=\) no longer supported")
+@pytest.mark.filterwarnings(r"ignore: status\(report_filetype=\) no longer supported")
 @with_tempfile()
 @with_tempfile()
 def test_bare(src=None, path=None):

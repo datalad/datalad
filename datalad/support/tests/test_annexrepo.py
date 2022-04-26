@@ -1162,7 +1162,7 @@ def test_annex_backends(path=None):
 
 # ignore deprecation warnings since here we should not use high level
 # interface like push
-@pytest.mark.filterwarnings("ignore: AnnexRepo.copy_to\(\) is deprecated")
+@pytest.mark.filterwarnings(r"ignore: AnnexRepo.copy_to\(\) is deprecated")
 @skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
 def test_annex_ssh(topdir=None):
@@ -1329,7 +1329,7 @@ def test_init_scanning_message(path=None):
 
 
 # ignore deprecation warnings since that is the test testing that functionality
-@pytest.mark.filterwarnings("ignore: AnnexRepo.copy_to\(\) is deprecated")
+@pytest.mark.filterwarnings(r"ignore: AnnexRepo.copy_to\(\) is deprecated")
 @with_tempfile
 @with_tempfile
 @with_tempfile

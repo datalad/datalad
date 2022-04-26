@@ -19,8 +19,8 @@ from datalad.tests.utils import (
     with_tempfile,
 )
 from datalad.utils import (
-    chpwd,
     Path,
+    chpwd,
 )
 
 
@@ -172,7 +172,7 @@ def test_credential_cycle(path=None):
     provider_dir = ds.pathobj / '.datalad' / 'providers'
     provider_dir.mkdir(parents=True, exist_ok=True)
     provider_cfg = provider_dir / 'test_cycle.cfg'
-    provider_cfg.write_text("""
+    provider_cfg.write_text(r"""
 [provider:test_cycle]
     url_re = http.*://.*data\.example\.com
     authentication_type = http_basic_auth
