@@ -228,9 +228,9 @@ def test_get_invalid_call(path=None, file_outside=None):
     create_tree(path, {'annexed.dat': 'some'})
     ds.save("annexed.dat")
     ds.repo.drop("annexed.dat", options=['--force'])
-    with assert_raises(RemoteNotAvailableError) as ce:
+    with assert_raises(RemoteNotAvailableError) as cme:
         ds.get("annexed.dat", source='MysteriousRemote')
-    eq_("MysteriousRemote", ce.value.remote)
+    eq_("MysteriousRemote", cme.value.remote)
 
     res = ds.get("NotExistingFile.txt", on_failure='ignore')
     assert_status('impossible', res)
