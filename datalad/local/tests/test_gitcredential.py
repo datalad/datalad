@@ -31,10 +31,10 @@ def test_gitcredential_interface(path=None):
 
     # preserve credentials between git processes for a brief time
     # credential-cache is not supported on windows (needs UNIX sockets)
-    # ds.config.set('credential.helper', 'cache', where='local')
+    # ds.config.set('credential.helper', 'cache', scope='local')
     # However, first set an empty helper in order to disable already set helpers
-    ds.config.set('credential.helper', '', where='local')
-    ds.config.set('credential.helper', 'store', where='local')
+    ds.config.set('credential.helper', '', scope='local')
+    ds.config.set('credential.helper', 'store', scope='local')
 
     # git manages credentials by target URL
     credurl = 'https://example.datalad.org/somepath'
@@ -76,9 +76,9 @@ def test_datalad_credential_helper(path=None):
     ds = Dataset(path).create()
 
     # tell git to use git-credential-datalad
-    ds.config.add('credential.helper', 'datalad', where='local')
+    ds.config.add('credential.helper', 'datalad', scope='local')
     ds.config.add('datalad.credentials.githelper.noninteractive', 'true',
-                  where='global')
+                  scope='global')
 
     from datalad.downloaders.providers import Providers
 
@@ -165,9 +165,9 @@ def test_credential_cycle(path=None):
     ds = Dataset(path).create()
 
     # tell git to use git-credential-datalad
-    ds.config.add('credential.helper', 'datalad', where='local')
+    ds.config.add('credential.helper', 'datalad', scope='local')
     ds.config.add('datalad.credentials.githelper.noninteractive', 'true',
-                  where='global')
+                  scope='global')
 
     provider_dir = ds.pathobj / '.datalad' / 'providers'
     provider_dir.mkdir(parents=True, exist_ok=True)

@@ -215,9 +215,9 @@ def test_gitcredential_read(path=None):
         "!f() { test \"$1\" = get && echo \"password=apassword\"; }; f"
 
     ds.config.add(f"credential.{matching_url}.username", "auser",
-                  where="local")
+                  scope="local")
     ds.config.add(f"credential.{matching_url}.helper", cred_helper,
-                  where="local")
+                  scope="local")
 
     # we can get those credentials when the context is right:
     cred = GitCredential("some", auth_url=matching_url,
@@ -280,7 +280,7 @@ def test_gitcredential(path=None):
     non_matching_url = "http://some.other.org"
     ds = Dataset(path).create()
     # use git native credential store
-    ds.config.add("credential.helper", "store", where='local')
+    ds.config.add("credential.helper", "store", scope='local')
 
     # store credentials
     cred = GitCredential("cred_label", auth_url=matching_url, dataset=ds)
