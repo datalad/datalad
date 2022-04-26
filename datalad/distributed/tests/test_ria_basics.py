@@ -335,7 +335,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
     ds.repo.init_remote('store', options=init_opts)
 
     # copy files into the RIA store
-    ds.repo.copy_to('.', 'store')
+    ds.push('.', to='store')
 
     # we should see the exact same annex object tree
     dsgit_dir, archive_dir, dsobj_dir = \
@@ -386,9 +386,13 @@ def _test_remote_layout(host, dspath, store, archiv_store):
 
 
 @slow  # 12sec + ? on travis
+# TODO: Skipped due to gh-4436
+@known_failure_windows
+@skip_ssh
+def test_remote_layout_ssh():
+    _test_remote_layout('datalad-test')
+
 def test_remote_layout():
-    # TODO: Skipped due to gh-4436
-    known_failure_windows(skip_ssh(_test_remote_layout))('datalad-test')
     _test_remote_layout(None)
 
 
@@ -421,7 +425,7 @@ def _test_version_check(host, dspath, store):
     # add special remote
     init_opts = common_init_opts + ['url={}'.format(store_url)]
     ds.repo.init_remote('store', options=init_opts)
-    ds.repo.copy_to('.', 'store')
+    ds.push('.', to='store')
 
     # check version files
     remote_ds_tree_version_file = store / 'ria-layout-version'
@@ -468,18 +472,22 @@ def _test_version_check(host, dspath, store):
 
     # TODO: use self.annex.error in special remote and see whether we get an
     #       actual error result
-    assert_raises(CommandError,
-                  ds.repo.copy_to, 'new_file', 'store')
+    with assert_raises(CommandError):
+        ds.push('new_file', to='store')
 
     # However, we can force it by configuration
     ds.config.add("annex.ora-remote.store.force-write", "true", scope='local')
-    ds.repo.copy_to('new_file', 'store')
+    ds.push('new_file', to='store')
 
 
 @slow  # 17sec + ? on travis
-def test_version_check():
+@skip_ssh
+@known_failure_windows
+def test_version_check_ssh():
     # TODO: Skipped due to gh-4436
-    known_failure_windows(skip_ssh(_test_version_check))('datalad-test')
+    _test_version_check('datalad-test')
+
+def test_version_check():
     _test_version_check(None)
 
 
@@ -785,6 +793,10 @@ def _test_permission(host, storepath, dspath):
     assert_false(file_key_in_store.exists())
 
 
-def test_obtain_permission():
-    skip_ssh(_test_permission)('datalad-test')
-    skip_if_root(_test_permission)(None)
+@skip_ssh
+def test_obtain_permission_ssh():
+    _test_permission('datalad-test')
+
+@skip_if_root
+def test_obtain_permission_root():
+    _test_permission(None)

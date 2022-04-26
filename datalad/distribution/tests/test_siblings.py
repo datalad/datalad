@@ -404,7 +404,7 @@ def test_sibling_enable_sameas(repo=None, clone_path=None):
     ds = Dataset(repo.path)
     create_tree(ds.path, {"f0": "0"})
     ds.save(path="f0")
-    ds.repo.copy_to(["f0"], remote="r_dir")
+    ds.push(["f0"], to="r_dir")
     ds.repo.drop(["f0"])
 
     ds_cloned = clone(ds.path, clone_path)

@@ -659,7 +659,7 @@ def test_run_inputs_outputs(src=None, path=None):
     create_tree(ds.path, {i: i for i in inputs})
 
     ds.save()
-    ds.repo.copy_to(inputs, remote=DEFAULT_REMOTE)
+    ds.push(inputs, to=DEFAULT_REMOTE)
     ds.repo.drop(inputs, options=["--force"])
 
     test_cases = [(["*.dat"], ["a.dat", "b.dat"]),
@@ -679,7 +679,7 @@ def test_run_inputs_outputs(src=None, path=None):
     create_tree(ds.path, {"subdir": {"a": "subdir a",
                                      "b": "subdir b"}})
     ds.save("subdir")
-    ds.repo.copy_to(["subdir/a", "subdir/b"], remote=DEFAULT_REMOTE)
+    ds.push(["subdir/a", "subdir/b"], to=DEFAULT_REMOTE)
     ds.repo.drop("subdir", options=["--force"])
     ds.run("cd .> subdir-dummy", inputs=[op.join(ds.path, "subdir")])
     ok_(all(ds.repo.file_has_content(op.join("subdir", f)) for f in ["a", "b"]))
@@ -698,7 +698,7 @@ def test_run_inputs_outputs(src=None, path=None):
     # time of the run.
     create_tree(ds.path, {"after-dot-run": "after-dot-run content"})
     ds.save()
-    ds.repo.copy_to(["after-dot-run"], remote=DEFAULT_REMOTE)
+    ds.push(["after-dot-run"], to=DEFAULT_REMOTE)
     ds.repo.drop(["after-dot-run"], options=["--force"])
     ds.rerun(DEFAULT_BRANCH + "^")
     ds.repo.file_has_content("after-dot-run")

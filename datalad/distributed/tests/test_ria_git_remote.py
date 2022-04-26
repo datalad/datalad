@@ -90,7 +90,7 @@ def _test_bare_git_version_1(host, dspath, store):
     ds.repo.enable_remote('bare-git')
 
     # copy files to the remote
-    ds.repo.copy_to('.', 'bare-git')
+    ds.push('.', to='bare-git')
     eq_(len(ds.repo.whereis('one.txt')), 2)
 
     # now we can drop all content locally, reobtain it, and survive an
@@ -132,7 +132,7 @@ def _test_bare_git_version_1(host, dspath, store):
     eq_(len(ds.repo.whereis('one.txt')), 1)
     # and the other way around: upload via ora-remote and have it available via
     # git-remote:
-    ds.repo.copy_to('.', 'ora-remote')
+    ds.push('.', to='ora-remote')
     # fsck to make availability known
     assert_status(
         'ok',
@@ -197,7 +197,7 @@ def _test_bare_git_version_2(host, dspath, store):
     # and the ORA remote in addition:
     ds.repo.init_remote('ora-remote', options=init_opts)
     # upload keys via ORA:
-    ds.repo.copy_to('.', 'ora-remote')
+    ds.push('.', to='ora-remote')
     # bare-git doesn't know yet:
     eq_(len(ds.repo.whereis('one.txt')), 2)
     # fsck to make availability known
@@ -281,7 +281,7 @@ def test_bare_git_version_2():
 #
 #     assert remote_base_path.exists()
 #     assert remote_dataset_path.exists()
-#     ds.repo.copy_to('.', 'riaremote')
+#     ds.push('.', to='riaremote')
 #
 #     # Now, let's make the remote end a valid, bare git repository
 #     eq_(subprocess.run(['git', 'init', '--bare'], cwd=str(remote_dataset_path)).returncode,
