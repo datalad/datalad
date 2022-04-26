@@ -221,6 +221,8 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path=None):
     assert_false(dm)
 
 
+# ignore warning since we are testing that function here. Remove upon full deprecation
+@pytest.mark.filterwarnings("ignore: AnnexRepo.get_file_key\(\) is deprecated")
 @assert_cwd_unchanged
 @with_tempfile
 def test_AnnexRepo_get_file_key(annex_path=None):
@@ -763,7 +765,7 @@ def test_AnnexRepo_always_commit(path=None):
 
     # With always_commit back to True, do something that will trigger a commit
     # on the annex branches.
-    repo.sync()
+    repo.call_annex(['sync'])
 
     out = repo.call_annex(['log'])
     assert_in(file1, out)
@@ -2563,7 +2565,9 @@ def test_whereis_batch_eqv(path=None):
     repo_b.drop(["baz"], options=["--from=" + DEFAULT_REMOTE, "--force"])
 
     files = ["foo", "bar", "baz"]
-    keys = repo_b.get_file_key(files)
+    info = repo_b.get_content_annexinfo(files)
+    keys = [info[repo_b.pathobj / f]['key'] for f in files]
+
     for output in "full", "uuids", "descriptions":
         out_non_batch = repo_b.whereis(files=files, batch=False, output=output)
         assert_equal(out_non_batch,

@@ -1874,7 +1874,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
         ds.drop([
             'file_dropped_clean',
             opj('subdir', 'file_dropped_clean')],
-            check=False)
+            reckless='kill')
     # clean and proper subdatasets
     ds.create('subds_clean')
     ds.create(opj('subdir', 'subds_clean'))
