@@ -73,7 +73,8 @@ def run_main(args, exit_code=0, expect_stderr=False):
         # sys.stdout but also from the UI, which insists on holding
         # a dedicated handle
         fakeout = StringIO()
-        with patch('sys.stderr', new_callable=StringIO) as cmerr, \
+        fakeerr = StringIO()
+        with patch('sys.stderr', new=fakeerr) as cmerr, \
              patch('sys.stdout', new=fakeout) as cmout, \
              patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
             with assert_raises(SystemExit) as cm:
