@@ -1535,7 +1535,7 @@ def test_gitrepo_call_git_methods(path=None):
 @pytest.mark.parametrize("proto", ["https"])
 @skip_if_no_network
 @with_tempfile
-def test_protocols(proto, destdir=None):
+def test_protocols(destdir=None, *, proto):
     # git-annex-standalone build can get git bundle which would fail to
     # download via https, resulting in messages such as
     #  fatal: unable to find remote helper for 'https'

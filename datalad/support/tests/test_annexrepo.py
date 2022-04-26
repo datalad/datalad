@@ -312,7 +312,7 @@ def test_annex_repo_sameas_special(repo=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_file_has_content(batch, src=None, annex_path=None):
+def test_AnnexRepo_file_has_content(src=None, annex_path=None, *, batch):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test.dat').write_text('123\n')
     origin.save('test.dat', git=True)
@@ -346,7 +346,7 @@ def test_AnnexRepo_file_has_content(batch, src=None, annex_path=None):
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_is_under_annex(batch, src=None, annex_path=None):
+def test_AnnexRepo_is_under_annex(src=None, annex_path=None, *, batch):
     origin = AnnexRepo(src)
     (origin.pathobj / 'test-annex.dat').write_text("content")
     origin.save('some')
@@ -657,7 +657,7 @@ tree1_md5e_keys = {
 
 @with_parametric_batch
 @with_tree(**tree1args)
-def test_dropkey(batch, path=None):
+def test_dropkey(path=None, *, batch):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = list(tree1_md5e_keys)
@@ -962,7 +962,7 @@ def test_v7_detached_get(opath=None, path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_AnnexRepo_get_contentlocation(batch, src=None, path=None, work_dir_outside=None):
+def test_AnnexRepo_get_contentlocation(src=None, path=None, work_dir_outside=None, *, batch):
     ar = AnnexRepo(src)
     (ar.pathobj / 'test-annex.dat').write_text(
         "content to be annex-addurl'd")
@@ -1523,7 +1523,7 @@ def test_annex_get_annexed_files(path=None):
 
 @with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(batch, p=None):
+def test_is_available(p=None, *, batch):
     annex = AnnexRepo(p)
 
     # bkw = {'batch': batch}
@@ -2244,7 +2244,7 @@ def test_annexjson_protocol_long(path=None):
 
 @pytest.mark.parametrize("print_opt", ['', ', end=""'])
 @with_tempfile
-def test_annexjson_protocol_incorrect(print_opt, path=None):
+def test_annexjson_protocol_incorrect(path=None, *, print_opt):
     # Test that we still log some incorrectly formed JSON record
     bad_json = '{"I": "am wrong,}'
     with open(path, 'w') as f:
@@ -2279,7 +2279,7 @@ def test_annexjson_protocol_incorrect(print_opt, path=None):
     'tobechanged-git': 'a',
     'tobechanged-annex': 'a'*10,
 })
-def test_commit_annex_commit_changed(unlock, path=None):
+def test_commit_annex_commit_changed(path=None, *, unlock):
     # Here we test commit working correctly if file was just removed
     # (not unlocked), edited and committed back
 
@@ -2337,7 +2337,7 @@ def test_commit_annex_commit_changed(unlock, path=None):
 @slow  # 15 + 17sec on travis
 @pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
 @with_tempfile(mkdir=True)
-def test_files_split_exc(cls, topdir=None):
+def test_files_split_exc(topdir=None, *, cls):
     r = cls(topdir)
     # absent files -- should not crash with "too long" but some other more
     # meaningful exception
@@ -2377,7 +2377,7 @@ _HEAVY_TREE = {
 @slow  # 313s  well -- if errors out - only 3 sec
 @pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
 @with_tree(tree=_HEAVY_TREE)
-def test_files_split(cls, topdir=None):
+def test_files_split(topdir=None, *, cls):
     from glob import glob
     r = cls(topdir)
     dirs = glob(op.join(topdir, '*'))

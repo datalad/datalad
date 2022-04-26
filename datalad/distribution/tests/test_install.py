@@ -89,7 +89,7 @@ from ..dataset import Dataset
 @with_tree(tree={'file.txt': '123'})
 @serve_path_via_http
 @with_tempfile
-def test_guess_dot_git(annex, path=None, url=None, tdir=None):
+def test_guess_dot_git(path=None, url=None, tdir=None, *, annex):
     repo = (AnnexRepo if annex else GitRepo)(path, create=True)
     repo.add('file.txt', git=not annex)
     repo.commit()
@@ -880,7 +880,7 @@ def test_install_subds_from_another_remote(topdir=None):
 @pytest.mark.parametrize("suffix", ["", "/.git"])
 @skip_if_no_network
 @with_tempfile
-def test_datasets_datalad_org(suffix, tdir=None):
+def test_datasets_datalad_org(tdir=None, *, suffix):
     # Test that git annex / datalad install, get work correctly on our datasets.datalad.org
     # Apparently things can break, especially with introduction of the
     # smart HTTP backend for apache2 etc

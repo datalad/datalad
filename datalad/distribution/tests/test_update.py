@@ -706,7 +706,7 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
 # Skip non-adjusted case for systems that only support adjusted branches.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_merge_follow_parentds_subdataset_detached(on_adjusted, path=None):
+def test_merge_follow_parentds_subdataset_detached(path=None, *, on_adjusted):
     if on_adjusted and DEFAULT_REMOTE != "origin" and \
        external_versions['cmd:annex'] <= "8.20210330":
         raise SkipTest(
@@ -950,7 +950,7 @@ def test_update_adjusted_incompatible_with_ff_only(path=None):
 @slow  # ~10s
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_update_how_subds_different(follow, action, path=None):
+def test_update_how_subds_different(path=None, *, follow, action):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_sub = ds_src.create("sub")

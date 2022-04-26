@@ -74,7 +74,7 @@ def test_ensure_datalad_remote_init_and_enable_needed(path=None):
 
 @pytest.mark.parametrize("autoenable", [False, True])
 @with_tempfile
-def test_ensure_datalad_remote_maybe_enable(autoenable, path=None):
+def test_ensure_datalad_remote_maybe_enable(path=None, *, autoenable):
     path = Path(path)
     ds_a = Dataset(path / "a").create(force=True)
     init_datalad_remote(ds_a.repo, DATALAD_SPECIAL_REMOTE,

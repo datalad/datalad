@@ -261,7 +261,7 @@ def test_get_single_file(path=None):
 
 @pytest.mark.parametrize("override", [False, True])
 @with_tempfile(mkdir=True)
-def test_get_subdataset_inherit_reckless(override, path=None):
+def test_get_subdataset_inherit_reckless(path=None, *, override):
     src = Dataset(opj(path, "a")).create()
     src_subds = src.create("sub")
     src_subds.create("subsub")

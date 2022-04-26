@@ -271,7 +271,7 @@ def test_hat_dataset_more(path=None):
 
 @pytest.mark.parametrize("ds_path", ["simple-path", OBSCURE_FILENAME])
 @with_tempfile(mkdir=True)
-def test_require_dataset(ds_path, topdir=None):
+def test_require_dataset(topdir=None, *, ds_path):
     path = opj(topdir, ds_path)
     os.mkdir(path)
     with chpwd(path):
