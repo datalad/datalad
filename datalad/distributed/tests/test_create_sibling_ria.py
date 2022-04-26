@@ -353,7 +353,7 @@ def test_no_storage(store1=None, store2=None, ds_path=None):
 
     # deprecated way of disabling storage still works
     res = ds.create_sibling_ria(store2_url, "datastore2",
-                                disable_storage__=True, new_store_ok=True)
+                                storage_sibling=False, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore2', 'datastore1', 'here'},
         {s['name'] for s in ds.siblings(result_renderer='disabled')})
