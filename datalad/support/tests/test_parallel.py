@@ -109,7 +109,7 @@ def test_ProducerConsumer():
 
 @slow  # 12sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_creatsubdatasets(topds_path, n=2):
+def test_creatsubdatasets(n=2, topds_path=None):
     from datalad.api import create
     from datalad.distribution.dataset import Dataset
     ds = Dataset(topds_path).create()
