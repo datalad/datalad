@@ -218,7 +218,7 @@ def test_no_interaction_with_untracked_content(path=None):
     ds = Dataset(op.join(path, 'origin')).create(force=True)
     create_tree(ds.path, {'sub': {'subsub': {'dat': 'lots of data'}}})
     subds = ds.create('sub', force=True)
-    subds.remove(op.join('.datalad', 'config'), if_dirty='ignore')
+    subds.remove(op.join('.datalad', 'config'))
     nok_((subds.pathobj / '.datalad' / 'config').exists())
     # this will only work, if `remove` didn't do anything stupid and
     # caused all content to be saved
@@ -243,8 +243,7 @@ def test_kill(path=None):
     assert_result_count(
         res, 1,
         status='error', path=ds.path)
-    eq_(ds.remove(recursive=True,
-                  reckless='availability',
+    eq_(ds.remove(reckless='availability',
                   result_xfm='datasets'),
         [subds, ds])
     nok_(ds.pathobj.exists())
