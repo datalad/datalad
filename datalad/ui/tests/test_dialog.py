@@ -22,7 +22,7 @@ import pytest
 from datalad.ui.progressbars import progressbars
 from datalad.utils import swallow_logs
 
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     assert_in,
     assert_not_in,
     assert_raises,

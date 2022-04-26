@@ -1,10 +1,8 @@
 from unittest.mock import patch
 
+from datalad.runner.coreprotocols import StdOutErrCapture
 from datalad.runner.protocol import GeneratorMixIn
-from datalad.runner.coreprotocols import (
-    StdOutErrCapture,
-)
-from datalad.tests.utils import assert_equal
+from datalad.tests.utils_pytest import assert_equal
 
 from ..gitrunner import GitWitlessRunner
 

@@ -16,7 +16,7 @@ import pytest
 from ...downloaders.base import DownloadError
 from ...support import path as op
 from ...support.exceptions import AccessDeniedError
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_raises,
@@ -227,7 +227,7 @@ def _test_expiring_token(outdir):
         UserPassword,
     )
     from datalad.support.keyring_ import MemoryKeyring
-    from datalad.tests.utils import ok_file_has_content
+    from datalad.tests.utils_pytest import ok_file_has_content
     credential = downloader.credential  # AWS_S3('datalad-test-s3')
 
     # We will replace credential with a CompositeCredential which will

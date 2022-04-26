@@ -23,7 +23,7 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
     NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     assert_false,
     assert_in_results,

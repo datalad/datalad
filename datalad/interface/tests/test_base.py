@@ -10,7 +10,11 @@
 
 """
 
-from datalad.tests.utils import (
+from datalad.cmd import (
+    StdOutCapture,
+    WitlessRunner,
+)
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_not_in,
     eq_,
@@ -18,14 +22,8 @@ from datalad.tests.utils import (
     swallow_outputs,
     with_tempfile,
 )
-from datalad.cmd import (
-    StdOutCapture,
-    WitlessRunner,
-)
 
-from ..base import (
-    update_docstring_with_parameters,
-)
+from ..base import update_docstring_with_parameters
 
 
 @with_tempfile(mkdir=True)

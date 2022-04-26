@@ -35,7 +35,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import urlquote
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     SkipTest,

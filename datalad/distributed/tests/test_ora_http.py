@@ -1,9 +1,17 @@
 import shutil
-from datalad.api import (
-    Dataset,
+
+from datalad.api import Dataset
+from datalad.customremotes.ria_utils import (
+    create_ds_in_store,
+    create_store,
 )
-from datalad.utils import Path
-from datalad.tests.utils import (
+from datalad.distributed.ora_remote import LocalIO
+from datalad.distributed.tests.ria_utils import (
+    common_init_opts,
+    populate_dataset,
+)
+from datalad.support.exceptions import CommandError
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_in,
     assert_not_in,
@@ -14,23 +22,9 @@ from datalad.tests.utils import (
     known_failure_windows,
     serve_path_via_http,
     skip_if_adjusted_branch,
-    with_tempfile
+    with_tempfile,
 )
-from datalad.distributed.ora_remote import (
-    LocalIO,
-)
-from datalad.support.exceptions import (
-    CommandError,
-)
-from datalad.distributed.tests.ria_utils import (
-    populate_dataset,
-    common_init_opts
-)
-from datalad.customremotes.ria_utils import (
-    create_store,
-    create_ds_in_store,
-)
-
+from datalad.utils import Path
 
 # NOTE: All we want and can test here is the HTTP functionality of the ORA
 #       remote. As of now, this is get and checkpresent only, sending one

@@ -12,7 +12,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_raises,
     assert_true,

@@ -3,21 +3,18 @@ from argparse import Namespace
 
 import pytest
 
-from datalad.utils import (
-    updated,
-)
-from datalad.interface.base import (
-    Interface,
-)
+from datalad.interface.base import Interface
 from datalad.support.param import Parameter
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_not_in,
     eq_,
     patch_config,
 )
+from datalad.utils import updated
+
 from ..exec import (
-    call_from_parser,
     _get_result_filter,
+    call_from_parser,
 )
 from ..parser import (
     parser_add_common_options,

@@ -33,7 +33,7 @@ from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     HTTPPath,
     SkipTest,

@@ -11,22 +11,21 @@ import logging
 import os.path as op
 
 from datalad.support.json_py import (
+    JSONDecodeError,
     dump,
     dump2stream,
     dump2xzstream,
+    load,
     load_stream,
     load_xzstream,
-    load,
     loads,
-    JSONDecodeError,
 )
-
-from datalad.tests.utils import (
-    with_tempfile,
-    eq_,
-    assert_raises,
+from datalad.tests.utils_pytest import (
     assert_in,
+    assert_raises,
+    eq_,
     swallow_logs,
+    with_tempfile,
 )
 
 

@@ -19,7 +19,7 @@ from datalad.api import (
 )
 from datalad.consts import DATALAD_SPECIAL_REMOTE
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_not_in,

@@ -36,7 +36,7 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     assert_false,

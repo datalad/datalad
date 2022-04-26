@@ -26,7 +26,7 @@ from datalad.log import (
 )
 from datalad.support import ansi_colors as colors
 from datalad.support.constraints import EnsureBool
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,

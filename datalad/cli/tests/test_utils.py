@@ -1,16 +1,17 @@
 import sys
-
-import pytest
 from unittest.mock import patch
 
+import pytest
+
+from datalad.tests.utils_pytest import (
+    eq_,
+    ok_,
+)
 from datalad.utils import (
     swallow_logs,
     swallow_outputs,
 )
-from datalad.tests.utils import (
-    eq_,
-    ok_,
-)
+
 from ..utils import setup_exceptionhook
 
 

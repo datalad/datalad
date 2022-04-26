@@ -42,7 +42,7 @@ from _pytest.outcomes import (
 from datalad import cfg as dl_cfg
 from datalad.support import path as op
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAMES,
     OBSCURE_PREFIX,
     assert_cwd_unchanged,
@@ -182,7 +182,7 @@ def test_with_testrepos():
 
 
 def test_get_resolved_values():
-    from datalad.tests.utils import _get_resolved_flavors
+    from datalad.tests.utils_pytest import _get_resolved_flavors
     flavors = ['networkish', 'local']
     eq_(([] if dl_cfg.get('datalad.tests.nonetwork') else ['networkish'])
         + ['local'],
@@ -647,7 +647,7 @@ def test_setup():
     # just verify that we monkey patched consts correctly
     from datalad.consts import DATASETS_TOPURL
     eq_(DATASETS_TOPURL, 'https://datasets-tests.datalad.org/')
-    from datalad.tests.utils import get_datasets_topdir
+    from datalad.tests.utils_pytest import get_datasets_topdir
     eq_(get_datasets_topdir(), 'datasets-tests.datalad.org')
 
 

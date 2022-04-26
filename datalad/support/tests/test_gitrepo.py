@@ -38,7 +38,7 @@ from datalad.support.gitrepo import (
     to_options,
 )
 from datalad.support.sshconnector import get_connection_hash
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     SkipTest,

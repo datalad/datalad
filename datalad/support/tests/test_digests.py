@@ -8,11 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import join as opj
-from ..digests import Digester
-from datalad.tests.utils import (
+
+from datalad.tests.utils_pytest import (
     assert_equal,
     with_tree,
 )
+
+from ..digests import Digester
 
 
 @with_tree(tree={'sample.txt': '123',

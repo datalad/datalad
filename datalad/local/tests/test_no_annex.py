@@ -11,19 +11,20 @@
 
 
 from os.path import join as opj
+
 from datalad.api import (
     create,
     no_annex,
 )
-from datalad.utils import Path
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_repo_status,
     create_tree,
     eq_,
     known_failure_githubci_win,
-    SkipTest,
     with_tempfile,
 )
+from datalad.utils import Path
 
 
 @known_failure_githubci_win

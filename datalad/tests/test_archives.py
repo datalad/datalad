@@ -24,7 +24,7 @@ from datalad.support.archives import (
 )
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
     assert_false,
@@ -66,7 +66,7 @@ tree_simplearchive = dict(
 if on_windows:
 
     def test_unixify_path():
-        from ..tests.utils import eq_
+        from ..tests.utils_pytest import eq_
         eq_(unixify_path(r"a"), "a")
         eq_(unixify_path(r"c:\buga"), "/c/buga")
         eq_(unixify_path(r"c:\buga\duga.dat"), "/c/buga/duga.dat")

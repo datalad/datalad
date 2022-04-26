@@ -8,13 +8,14 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from datalad.support import path as op
-from ..cookies import CookiesDB
-from datalad.utils import rmtree
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     known_failure_githubci_win,
     with_tempfile,
 )
+from datalad.utils import rmtree
+
+from ..cookies import CookiesDB
 
 
 @known_failure_githubci_win

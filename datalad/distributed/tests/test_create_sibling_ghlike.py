@@ -18,7 +18,7 @@ from datalad.api import (
     create_sibling_gin,
 )
 from datalad.downloaders.http import DEFAULT_USER_AGENT
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_in,
     assert_in_results,

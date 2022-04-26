@@ -73,15 +73,15 @@ from datalad.support.exceptions import (
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.support.sshconnector import get_connection_hash
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     OBSCURE_FILENAME,
     SkipTest,
     assert_cwd_unchanged,
 )
-from datalad.tests.utils import assert_dict_equal as deq_
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import assert_dict_equal as deq_
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_false,
     assert_in,

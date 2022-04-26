@@ -5,9 +5,9 @@ __docformat__ = 'restructuredtext'
 from io import StringIO
 from unittest.mock import patch
 
-from datalad.tests.utils import (
-    assert_in,
+from datalad.tests.utils_pytest import (
     assert_equal,
+    assert_in,
     assert_raises,
 )
 

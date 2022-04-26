@@ -8,22 +8,23 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+
+from ...tests.utils_pytest import (
+    SkipTest,
+    assert_raises,
+    eq_,
+    with_tempfile,
+)
+from ...utils import (
+    chpwd,
+    rmtree,
+)
 from ..path import (
     abspath,
     curdir,
     get_parent_paths,
     robust_abspath,
     split_ext,
-)
-from ...utils import (
-    chpwd,
-    rmtree,
-)
-from ...tests.utils import (
-    assert_raises,
-    eq_,
-    with_tempfile,
-    SkipTest,
 )
 
 

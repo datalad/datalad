@@ -9,31 +9,33 @@
 """Tests for credentials"""
 
 from unittest.mock import patch
-from datalad.tests.utils import (
+
+from datalad import cfg as dlcfg
+from datalad.api import Dataset
+from datalad.support.external_versions import external_versions
+from datalad.support.keyring_ import (
+    Keyring,
+    MemoryKeyring,
+)
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_equal,
     assert_false,
     assert_in,
     assert_raises,
     assert_true,
     ok_file_has_content,
-    SkipTest,
     skip_if,
     with_tempfile,
     with_testsui,
 )
-from datalad.support.external_versions import external_versions
-from datalad.api import Dataset
-from datalad.support.keyring_ import (
-    Keyring,
-    MemoryKeyring,
-)
+
 from ..credentials import (
     AWS_S3,
     CompositeCredential,
     GitCredential,
     UserPassword,
 )
-from datalad import cfg as dlcfg
 
 
 @with_testsui(responses=[

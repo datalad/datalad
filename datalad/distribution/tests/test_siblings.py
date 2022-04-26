@@ -9,45 +9,43 @@
 
 """
 
-from datalad.support.path import (
-    basename,
-    join as opj,
-    normpath,
-    relpath,
-)
-
 from datalad.api import (
+    Dataset,
     clone,
     create,
-    Dataset,
     install,
     siblings,
 )
-from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-
-from datalad.tests.utils import (
-    chpwd,
-    create_tree,
-    with_tempfile, with_testrepos,
+from datalad.support.gitrepo import GitRepo
+from datalad.support.path import basename
+from datalad.support.path import join as opj
+from datalad.support.path import (
+    normpath,
+    relpath,
+)
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
     assert_raises,
-    assert_status,
     assert_result_count,
-    with_sameas_remote,
+    assert_status,
+    chpwd,
+    create_tree,
     eq_,
     ok_,
     serve_path_via_http,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
+    with_sameas_remote,
+    with_tempfile,
+    with_testrepos,
 )
-
 from datalad.utils import (
-    on_windows,
     Path,
+    on_windows,
 )
 
 

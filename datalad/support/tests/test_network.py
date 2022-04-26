@@ -38,7 +38,7 @@ from datalad.support.network import (
     same_website,
     urlquote,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
     assert_in,

@@ -10,17 +10,25 @@
 
 """
 
-import os
 import logging
+import os
 
 import pytest
 
+from datalad.core.distributed.clone import Clone
+from datalad.core.distributed.push import Push
 from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     IncompleteResultsError,
     InsufficientArgumentsError,
 )
-from datalad.tests.utils import (
+from datalad.support.gitrepo import GitRepo
+from datalad.support.network import get_local_file_url
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    SkipTest,
     assert_false,
     assert_in,
     assert_in_results,
@@ -30,8 +38,6 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     assert_status,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
     eq_,
     known_failure_githubci_osx,
     known_failure_githubci_win,
@@ -46,7 +52,6 @@ from datalad.tests.utils import (
     swallow_logs,
     with_tempfile,
     with_tree,
-    SkipTest,
 )
 from datalad.utils import (
     Path,
@@ -54,11 +59,6 @@ from datalad.utils import (
     path_startswith,
     swallow_outputs,
 )
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.core.distributed.clone import Clone
-from datalad.core.distributed.push import Push
-from datalad.support.network import get_local_file_url
 
 DEFAULT_REFSPEC = "refs/heads/{0}:refs/heads/{0}".format(DEFAULT_BRANCH)
 

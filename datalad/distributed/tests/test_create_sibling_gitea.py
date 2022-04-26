@@ -9,7 +9,7 @@
 
 
 from datalad.api import create_sibling_gitea
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     skip_if_no_network,
     with_tempfile,
 )

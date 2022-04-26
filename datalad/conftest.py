@@ -32,7 +32,7 @@ def setup_package():
     from datalad.support.cookies import cookies_db
     from datalad.support.external_versions import external_versions
     from datalad.tests import _TEMP_PATHS_GENERATED
-    from datalad.tests.utils import (
+    from datalad.tests.utils_pytest import (
         DEFAULT_BRANCH,
         DEFAULT_REMOTE,
         OBSCURE_FILENAME,
@@ -151,7 +151,7 @@ def setup_package():
 
         if cfg.obtain('datalad.tests.setup.testrepos'):
             lgr.debug("Pre-populating testrepos")
-            from datalad.tests.utils import with_testrepos
+            from datalad.tests.utils_pytest import with_testrepos
             with_testrepos()(lambda repo: 1)()
 
         yield

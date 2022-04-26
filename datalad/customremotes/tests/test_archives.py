@@ -32,7 +32,7 @@ from ...tests.test_archives import (
     fn_archive_obscure_ext,
     fn_in_archive_obscure,
 )
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     abspath,
     assert_equal,
     assert_false,

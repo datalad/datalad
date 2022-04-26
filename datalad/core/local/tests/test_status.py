@@ -9,13 +9,20 @@
 """Test status command"""
 
 import os.path as op
-import datalad.utils as ut
 
-from datalad.utils import (
-    chpwd,
-    on_windows,
+import datalad.utils as ut
+from datalad.api import status
+from datalad.core.local.status import get_paths_by_ds
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+    NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_dict_equal,
     assert_in,
     assert_in_results,
@@ -26,21 +33,12 @@ from datalad.tests.utils import (
     eq_,
     get_deeply_nested_structure,
     has_symlink_capability,
-    OBSCURE_FILENAME,
-    SkipTest,
     with_tempfile,
 )
-from datalad.support.exceptions import (
-    CommandError,
-    IncompleteResultsError,
-    NoDatasetFound,
+from datalad.utils import (
+    chpwd,
+    on_windows,
 )
-from datalad.distribution.dataset import Dataset
-from datalad.support.annexrepo import AnnexRepo
-from datalad.api import (
-    status,
-)
-from datalad.core.local.status import get_paths_by_ds
 
 
 @with_tempfile(mkdir=True)

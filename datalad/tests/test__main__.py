@@ -8,15 +8,18 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import sys
-
-from unittest.mock import patch
 from io import StringIO
-from datalad.tests.utils import (
+from unittest.mock import patch
+
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_raises,
 )
 
-from .. import __main__, __version__
+from .. import (
+    __main__,
+    __version__,
+)
 
 
 @patch('sys.stdout', new_callable=StringIO)

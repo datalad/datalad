@@ -15,21 +15,13 @@ import os.path as op
 
 import pytest
 
-from datalad.distribution.dataset import (
-    Dataset
-)
 from datalad.api import create
-from datalad.support.exceptions import CommandError
+from datalad.cmd import WitlessRunner as Runner
+from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.utils import (
-    chpwd,
-    Path,
-)
-from datalad.cmd import (
-    WitlessRunner as Runner,
-)
-
-from datalad.tests.utils import (
+from datalad.support.exceptions import CommandError
+from datalad.tests.utils_pytest import (
+    OBSCURE_FILENAME,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -38,12 +30,15 @@ from datalad.tests.utils import (
     assert_status,
     eq_,
     has_symlink_capability,
-    OBSCURE_FILENAME,
     ok_,
     ok_exists,
     swallow_outputs,
     with_tempfile,
     with_tree,
+)
+from datalad.utils import (
+    Path,
+    chpwd,
 )
 
 _dataset_hierarchy_template = {

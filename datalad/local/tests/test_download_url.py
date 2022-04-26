@@ -20,7 +20,7 @@ from datalad.api import (
     clone,
     download_url,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_REMOTE,
     assert_cwd_unchanged,
     assert_false,

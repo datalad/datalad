@@ -9,18 +9,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test metadata extraction"""
 
-from os.path import (
-    dirname,
-    join as opj,
-)
-
+from os.path import dirname
+from os.path import join as opj
 from shutil import copy
 
-from datalad.coreapi import Dataset
 from datalad.api import extract_metadata
-from datalad.utils import chpwd
-
-from datalad.tests.utils import (
+from datalad.coreapi import Dataset
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_raises,
     assert_repo_status,
@@ -29,7 +24,7 @@ from datalad.tests.utils import (
     skip_if_no_module,
     with_tempfile,
 )
-
+from datalad.utils import chpwd
 
 testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data', 'xmp.pdf')
 

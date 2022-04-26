@@ -28,7 +28,7 @@ from datalad.distribution.update import _process_how_args
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     SkipTest,

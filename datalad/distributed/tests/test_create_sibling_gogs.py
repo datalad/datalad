@@ -11,7 +11,7 @@ from datalad.api import (
     Dataset,
     create_sibling_gogs,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     skip_if_no_network,
     with_tempfile,

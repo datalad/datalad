@@ -14,7 +14,7 @@ import pytest
 
 from datalad.api import create
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_greater,
     assert_in,

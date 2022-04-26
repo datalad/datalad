@@ -18,7 +18,7 @@ from datalad.api import (
     clone,
 )
 from datalad.support.network import get_local_file_url
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_raises,

@@ -28,7 +28,7 @@ from datalad.distributed.tests.ria_utils import (
     populate_dataset,
 )
 from datalad.interface.results import annexjson2result
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_result_count,
     assert_status,
     eq_,

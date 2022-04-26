@@ -10,16 +10,26 @@
 
 """
 
-from contextlib import contextmanager
 import logging
-from time import sleep
-from os.path import (
-    exists,
-    join as opj,
-)
 import re
+from contextlib import contextmanager
+from os.path import exists
+from os.path import join as opj
+from time import sleep
 
-from datalad.tests.utils import (
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+)
+from datalad.interface.base import build_doc
+from datalad.support.constraints import (
+    EnsureKeyChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.param import Parameter
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_equal,
     assert_in,
@@ -35,28 +45,18 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.utils import swallow_logs
-from datalad.utils import swallow_outputs
-from datalad.distribution.dataset import (
-    Dataset,
-    datasetmethod,
-    EnsureDataset,
+from datalad.utils import (
+    swallow_logs,
+    swallow_outputs,
 )
-from datalad.support.param import Parameter
-from datalad.support.constraints import (
-    EnsureKeyChoice,
-    EnsureNone,
-    EnsureStr,
-)
+
 from ..base import Interface
+from ..results import get_status_dict
 from ..utils import (
     discover_dataset_trace_to_targets,
     eval_results,
     handle_dirty_dataset,
 )
-from ..results import get_status_dict
-from datalad.interface.base import build_doc
-
 
 __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.interface.tests.test_utils')

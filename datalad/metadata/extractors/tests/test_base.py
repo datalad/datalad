@@ -12,7 +12,7 @@ from inspect import isgenerator
 
 from datalad.api import Dataset
 from datalad.support.entrypoints import iter_entrypoints
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_repo_status,

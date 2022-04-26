@@ -13,12 +13,12 @@
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    assert_in,
     assert_repo_status,
     assert_status,
-    assert_in,
-    ok_startswith,
     known_failure_githubci_win,
+    ok_startswith,
     with_tree,
 )
 

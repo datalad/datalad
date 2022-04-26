@@ -9,14 +9,13 @@
 
 from packaging.version import Version
 
-from .utils import *
-
-
 import datalad
 from datalad.support.network import (
     get_url_response_stamp,
     is_url_quoted,
 )
+
+from .utils_pytest import *
 
 
 def test_is_url_quoted():

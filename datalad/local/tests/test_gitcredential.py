@@ -10,7 +10,7 @@
 from datalad.api import Dataset
 from datalad.downloaders.credentials import UserPassword
 from datalad.local.gitcredential import GitCredentialInterface
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_is_instance,
     assert_not_in,

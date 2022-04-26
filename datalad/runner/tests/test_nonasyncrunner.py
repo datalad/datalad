@@ -21,11 +21,11 @@ from typing import (
     Optional,
 )
 from unittest.mock import (
-    patch,
     MagicMock,
+    patch,
 )
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_raises,
     assert_true,
@@ -48,9 +48,7 @@ from ..nonasyncrunner import (
     ThreadedRunner,
     run_command,
 )
-from ..protocol import (
-    GeneratorMixIn,
-)
+from ..protocol import GeneratorMixIn
 from ..runnerthreads import (
     ReadThread,
     WriteThread,

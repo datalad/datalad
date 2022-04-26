@@ -8,23 +8,20 @@
 """Test saveds function"""
 
 
-from datalad.tests.utils import (
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_not_in,
-    create_tree,
-    with_tempfile,
-    eq_,
-    known_failure_windows,
-)
-
-from datalad.distribution.dataset import Dataset
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
     assert_repo_status,
+    create_tree,
+    eq_,
     get_annexstatus,
     get_convoluted_situation,
+    known_failure_windows,
     slow,
+    with_tempfile,
 )
 
 

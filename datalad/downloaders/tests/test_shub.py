@@ -10,15 +10,15 @@
 
 from datalad.downloaders.shub import SHubDownloader
 from datalad.support.exceptions import DownloadError
-from datalad.utils import (
-    Path,
-    create_tree,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     ok_file_has_content,
     serve_path_via_http,
     with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    create_tree,
 )
 
 

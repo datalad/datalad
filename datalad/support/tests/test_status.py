@@ -7,11 +7,12 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from ..status import FileStatus
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_not_equal,
 )
+
+from ..status import FileStatus
 
 
 def test_FileStatus_basic():

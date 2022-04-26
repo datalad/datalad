@@ -9,33 +9,34 @@
 import os
 import os.path as op
 import sys
-
-from fasteners import InterProcessLock
 from pathlib import Path
 from time import time
+
+from fasteners import InterProcessLock
+
+from datalad.tests.utils_pytest import (
+    assert_false,
+    assert_greater,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_true,
+    eq_,
+    ok_,
+    ok_exists,
+    on_osx,
+    with_tempfile,
+)
 
 from ...cmd import (
     CommandError,
     StdOutErrCapture,
     WitlessRunner,
 )
+from ...utils import ensure_unicode
 from ..locking import (
     lock_if_check_fails,
     try_lock_informatively,
-)
-from ...utils import ensure_unicode
-from datalad.tests.utils import (
-    assert_false,
-    assert_greater,
-    assert_true,
-    assert_in,
-    assert_not_in,
-    assert_raises,
-    eq_,
-    ok_,
-    ok_exists,
-    on_osx,
-    with_tempfile,
 )
 
 
@@ -80,7 +81,10 @@ def test_lock_if_check_fails(tempfile=None):
         ok_exists(tempfile + '.get-lck')
     assert not op.exists(tempfile + '.get-lck')  # and it gets removed after
 
-    from multiprocessing import Queue, Process
+    from multiprocessing import (
+        Process,
+        Queue,
+    )
     q = Queue()
     p = Process(target=Subproc(tempfile), args=(q,))
 
@@ -148,6 +152,7 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
         try:
             import psutil
+
             # PID does not correspond
             assert_in('Check following process: PID=', res['stderr'])
             assert_in(f'CWD={os.getcwd()} CMDLINE=', res['stderr'])

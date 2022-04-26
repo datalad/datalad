@@ -31,7 +31,7 @@ from datalad.support.exceptions import (
     RemoteNotAvailableError,
 )
 from datalad.support.network import get_local_file_url
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_REMOTE,
     assert_false,
     assert_in,

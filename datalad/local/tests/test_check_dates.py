@@ -7,16 +7,16 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from functools import partial
 import json
 import logging
 import os
+from functools import partial
 
 from datalad.api import check_dates
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.tests.test_repodates import set_date
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_false,
     assert_in,

@@ -27,7 +27,7 @@ from datalad.support.exceptions import (
     CommandError,
     InsufficientArgumentsError,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     assert_false,
     assert_in_results,

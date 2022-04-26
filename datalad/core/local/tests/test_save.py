@@ -15,12 +15,19 @@ import os.path as op
 
 import pytest
 
-from datalad.utils import (
-    ensure_list,
-    Path,
-    rmtree,
+import datalad.utils as ut
+from datalad.api import (
+    create,
+    install,
+    save,
 )
-from datalad.tests.utils import (
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -30,16 +37,13 @@ from datalad.tests.utils import (
     assert_status,
     chpwd,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
     known_failure,
     known_failure_windows,
     maybe_adjust_repo,
     neq_,
-    OBSCURE_FILENAME,
     ok_,
     patch,
-    SkipTest,
     skip_if_adjusted_branch,
     skip_wo_symlink_capability,
     swallow_logs,
@@ -47,17 +51,11 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-
-import datalad.utils as ut
-from datalad.distribution.dataset import Dataset
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
-from datalad.api import (
-    create,
-    install,
-    save,
+from datalad.utils import (
+    Path,
+    ensure_list,
+    rmtree,
 )
-
 
 tree_arg = dict(tree={'test.txt': 'some',
                       'test_annex.txt': 'some annex',

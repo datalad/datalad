@@ -11,9 +11,9 @@
 import os
 import re
 from io import StringIO
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 import datalad
 from datalad import __version__
@@ -23,7 +23,8 @@ from datalad.api import (
 )
 from datalad.cmd import StdOutErrCapture
 from datalad.cmd import WitlessRunner as Runner
-from datalad.tests.utils import (
+from datalad.interface.base import get_interface_groups
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,
@@ -35,21 +36,18 @@ from datalad.tests.utils import (
     ok_,
     ok_startswith,
     on_windows,
-    slow,
     skip_if_no_module,
+    slow,
     with_tempfile,
 )
 from datalad.ui.utils import (
     get_console_width,
     get_terminal_size,
 )
-from datalad.utils import (
-    chpwd,
-)
-from datalad.interface.base import get_interface_groups
+from datalad.utils import chpwd
 
-from ..main import main
 from ..helpers import get_commands_from_groups
+from ..main import main
 
 
 def run_main(args, exit_code=0, expect_stderr=False):

@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
+import tempfile
 from glob import glob
 from os import unlink
 from os.path import (
@@ -25,7 +26,6 @@ from os.path import (
     pardir,
 )
 from pathlib import Path
-import tempfile
 
 from datalad.api import (
     Dataset,
@@ -40,7 +40,7 @@ from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     assert_equal,
     assert_false,

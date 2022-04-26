@@ -29,7 +29,7 @@ from ..utils import (
     swallow_outputs,
 )
 from . import _TEMP_PATHS_GENERATED
-from .utils import get_tempfile_kwargs
+from .utils_pytest import get_tempfile_kwargs
 
 # eventually become a URL to a local file served via http
 # that can be used for http/url-based testing

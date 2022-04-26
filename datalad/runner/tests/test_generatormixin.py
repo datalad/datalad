@@ -2,13 +2,13 @@ import sys
 from queue import Queue
 from typing import Optional
 
-from datalad.runner.nonasyncrunner import run_command
-from datalad.runner.protocol import GeneratorMixIn
 from datalad.runner.coreprotocols import (
     NoCapture,
     StdOutErrCapture,
 )
-from datalad.tests.utils import (
+from datalad.runner.nonasyncrunner import run_command
+from datalad.runner.protocol import GeneratorMixIn
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_raises,
 )

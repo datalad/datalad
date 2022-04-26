@@ -9,9 +9,10 @@
 """Test BIDS metadata extractor """
 
 from simplejson import dumps
+
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.extractors.datalad_rfc822 import MetadataExtractor
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     with_tree,
 )

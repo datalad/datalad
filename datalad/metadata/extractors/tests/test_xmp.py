@@ -10,7 +10,7 @@
 
 import pytest
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_repo_status,
     assert_result_count,

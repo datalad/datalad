@@ -21,7 +21,7 @@ from datalad.consts import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_false,
     assert_status,

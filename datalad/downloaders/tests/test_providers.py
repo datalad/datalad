@@ -13,7 +13,7 @@ import os.path as op
 from unittest.mock import patch
 
 from ...support.external_versions import external_versions
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     assert_equal,
     assert_false,
     assert_greater,

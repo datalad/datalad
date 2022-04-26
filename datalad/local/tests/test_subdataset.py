@@ -9,34 +9,34 @@
 
 
 import os
+from os.path import join as opj
 from os.path import (
-    join as opj,
-    relpath,
     pardir,
+    relpath,
 )
 
-from datalad.distribution.dataset import Dataset
 from datalad.api import (
     clone,
     create,
     subdatasets,
 )
-from datalad.utils import (
-    chpwd,
-    Path,
-    PurePosixPath,
-)
-from datalad.tests.utils import (
-    assert_true,
+from datalad.distribution.dataset import Dataset
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_not_in,
     assert_repo_status,
     assert_result_count,
     assert_status,
+    assert_true,
     eq_,
     slow,
     with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    chpwd,
 )
 
 

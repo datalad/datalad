@@ -10,7 +10,7 @@
 """
 
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     with_tempfile,
 )

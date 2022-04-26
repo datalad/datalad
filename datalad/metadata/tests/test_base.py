@@ -10,16 +10,13 @@
 """Test metadata """
 
 import logging
-
-from os.path import (
-    join as opj,
-    relpath,
-)
 import os.path as op
+from os.path import join as opj
+from os.path import relpath
 
 from datalad.api import (
-    aggregate_metadata,
     Dataset,
+    aggregate_metadata,
     install,
     metadata,
 )
@@ -28,11 +25,13 @@ from datalad.metadata.metadata import (
     get_metadata_type,
     query_aggregated_metadata,
 )
-from datalad.utils import (
-    chpwd,
-    ensure_unicode,
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_equal,
     assert_in,
@@ -50,13 +49,10 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.support.exceptions import (
-    InsufficientArgumentsError,
-    NoDatasetFound,
+from datalad.utils import (
+    chpwd,
+    ensure_unicode,
 )
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-
 
 _dataset_hierarchy_template = {
     'origin': {

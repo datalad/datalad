@@ -12,48 +12,47 @@
 import logging
 import os.path as op
 import stat
-
-import pytest
 from unittest.mock import patch
 
-from datalad.config import ConfigManager
+import pytest
+
 from datalad import consts
 from datalad.api import (
     clone,
     create,
     remove,
 )
-from datalad.utils import (
-    chpwd,
-    get_home_envvars,
-    Path,
-    on_windows,
-    rmtree
+from datalad.cmd import GitWitlessRunner
+from datalad.cmd import WitlessRunner as Runner
+from datalad.config import ConfigManager
+from datalad.core.distributed.clone import (
+    _get_installationpath_from_url,
+    decode_source_spec,
 )
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import (
-    GitWitlessRunner,
-    WitlessRunner as Runner,
-)
-from datalad.tests.utils import (
+from datalad.support.network import get_local_file_url
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    SkipTest,
     assert_false,
     assert_in,
     assert_in_results,
-    assert_not_is_instance,
     assert_message,
     assert_not_in,
+    assert_not_is_instance,
     assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_result_values_equal,
     assert_status,
     create_tree,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
     eq_,
     get_datasets_topdir,
+    has_symlink_capability,
     integration,
     known_failure,
     known_failure_githubci_win,
@@ -62,11 +61,10 @@ from datalad.tests.utils import (
     nok_,
     ok_,
     ok_file_has_content,
-    has_symlink_capability,
     ok_startswith,
     patch_config,
-    set_date,
     serve_path_via_http,
+    set_date,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
@@ -76,14 +74,14 @@ from datalad.tests.utils import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
-    SkipTest,
 )
-from datalad.support.network import get_local_file_url
-from datalad.core.distributed.clone import (
-    _get_installationpath_from_url,
-    decode_source_spec,
+from datalad.utils import (
+    Path,
+    chpwd,
+    get_home_envvars,
+    on_windows,
+    rmtree,
 )
-from datalad.distribution.dataset import Dataset
 
 # this is the dataset ID of our test dataset in the main datalad RIA store
 datalad_store_testds_id = '76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561'
@@ -1069,13 +1067,11 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
 def _postclonetest_prepare(lcl, storepath, storepath2, link):
 
     from datalad.customremotes.ria_utils import (
-        create_store,
         create_ds_in_store,
-        get_layout_locations
+        create_store,
+        get_layout_locations,
     )
-    from datalad.distributed.ora_remote import (
-        LocalIO,
-    )
+    from datalad.distributed.ora_remote import LocalIO
 
     create_tree(lcl,
                 tree={
@@ -1208,12 +1204,8 @@ def test_no_ria_postclonecfg(dspath=None, storepath=None, clonepath=None):
     # Test that particular configuration(s) do NOT lead to a reconfiguration
     # upon clone. (See gh-5628)
 
-    from datalad.customremotes.ria_utils import (
-        create_store,
-    )
-    from datalad.distributed.ora_remote import (
-        LocalIO,
-    )
+    from datalad.customremotes.ria_utils import create_store
+    from datalad.distributed.ora_remote import LocalIO
 
     ds = Dataset(dspath).create(force=True)
     ds.save()
@@ -1265,15 +1257,11 @@ def test_ria_postclone_noannex(dspath=None, storepath=None, clonepath=None):
     clonepath = Path(clonepath)
 
     from datalad.customremotes.ria_utils import (
-        create_store,
         create_ds_in_store,
-        get_layout_locations
+        create_store,
+        get_layout_locations,
     )
-    from datalad.distributed.ora_remote import (
-        LocalIO,
-    )
-
-
+    from datalad.distributed.ora_remote import LocalIO
 
     # First create a dataset in a RIA store the standard way
     somefile = dspath / 'a_file.txt'

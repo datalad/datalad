@@ -12,18 +12,16 @@
 
 from unittest.mock import patch
 
+from datalad.support import path as op
 from datalad.support.annexrepo import AnnexRepo
-
 from datalad.support.exceptions import (
     CommandNotAvailableError,
     DirectModeNoLongerSupportedError,
 )
-from datalad.support import path as op
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_in,
     assert_raises,
-    SkipTest,
     with_tempfile,
 )
 

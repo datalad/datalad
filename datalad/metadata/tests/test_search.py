@@ -27,7 +27,7 @@ from datalad.api import (
     search,
 )
 from datalad.support.exceptions import NoDatasetFound
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,

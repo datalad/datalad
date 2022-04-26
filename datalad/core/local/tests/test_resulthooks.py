@@ -8,19 +8,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test result hooks"""
 
-from datalad.utils import (
-    on_windows,
+from datalad.api import (
+    Dataset,
+    install,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_result_count,
     eq_,
     ok_,
     with_tempfile,
 )
-from datalad.api import (
-    Dataset,
-    install,
-)
+from datalad.utils import on_windows
 
 
 @with_tempfile()

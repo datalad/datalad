@@ -15,8 +15,7 @@ from os.path import join as opj
 
 from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_false,
     assert_not_in,

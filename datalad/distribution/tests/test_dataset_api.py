@@ -12,11 +12,11 @@ This one to be effective should be tested first or in isolation from other
 test files
 """
 
-from ..dataset import Dataset
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     assert_raises,
     with_tempfile,
 )
+from ..dataset import Dataset
 
 
 @with_tempfile(mkdir=True)

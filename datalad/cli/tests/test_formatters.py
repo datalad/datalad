@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_in,
     assert_not_in,

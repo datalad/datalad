@@ -8,28 +8,27 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test image extractor"""
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_in,
     assert_repo_status,
     assert_result_count,
     assert_status,
     eq_,
-    SkipTest,
     with_tempfile,
 )
+
 try:
     from PIL import Image
 except ImportError as exc:
     raise SkipTest(
        "No PIL module available or it cannot be imported") from exc
 
+from os.path import dirname
+from os.path import join as opj
 from shutil import copy
-from os.path import (
-    dirname,
-    join as opj,
-)
-from datalad.api import Dataset
 
+from datalad.api import Dataset
 
 target = {
     "dcterms:SizeOrDuration": [4, 3],

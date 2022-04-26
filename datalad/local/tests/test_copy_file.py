@@ -8,18 +8,12 @@
 """Test copy_file command"""
 
 
-from os.path import (
-    join as opj,
-)
+from os.path import join as opj
 
+from datalad.api import copy_file
+from datalad.consts import DATALAD_SPECIAL_REMOTE
 from datalad.distribution.dataset import Dataset
-from datalad.api import (
-    copy_file,
-)
-from datalad.utils import (
-    Path,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in_results,
     assert_raises,
     assert_repo_status,
@@ -34,7 +28,7 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.consts import DATALAD_SPECIAL_REMOTE
+from datalad.utils import Path
 
 
 @with_tempfile(mkdir=True)

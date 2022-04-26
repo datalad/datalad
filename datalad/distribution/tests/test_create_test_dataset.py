@@ -13,20 +13,19 @@ from glob import glob
 from os.path import join as opj
 
 from datalad.core.local.repo import repo_from_path
-from datalad.tests.utils import (
-    with_tempfile,
+from datalad.distribution.create_test_dataset import _parse_spec
+from datalad.tests.utils_pytest import (
     assert_raises,
     assert_repo_status,
+    eq_,
     ok_,
+    with_tempfile,
 )
 from datalad.utils import (
+    chpwd,
     swallow_logs,
     swallow_outputs,
-    chpwd,
 )
-from datalad.distribution.create_test_dataset import _parse_spec
-
-from datalad.tests.utils import eq_
 
 
 @with_tempfile(mkdir=True)

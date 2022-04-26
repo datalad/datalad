@@ -200,7 +200,7 @@ ok_ = assert_true
 neq_ = assert_not_equal
 nok_ = assert_false
 
-lgr = logging.getLogger("datalad.tests.utils")
+lgr = logging.getLogger("datalad.tests.utils_pytest")
 
 
 def skip_if_no_module(module):
@@ -1222,7 +1222,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     Examples
     --------
 
-    >>> from datalad.tests.utils import with_testrepos
+    >>> from datalad.tests.utils_pytest import with_testrepos
     >>> @with_testrepos('basic_annex')
     ... def test_write(repo):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))

@@ -93,7 +93,7 @@ from datalad.utils import (
     updated,
 )
 
-from .utils import (
+from .utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
     as_unicode,
@@ -288,7 +288,7 @@ def test_swallow_logs(logfile=None):
     with swallow_logs(new_level=9, file_=logfile) as cm:
         eq_(cm.out, '')
         lgr.info("next info")
-    from datalad.tests.utils import ok_file_has_content
+    from datalad.tests.utils_pytest import ok_file_has_content
     ok_file_has_content(logfile, "[INFO] next info", strip=True)
 
 
@@ -329,7 +329,7 @@ def test_disable_logger():
     # get a logger hierarchy:
     lgr_top = logging.getLogger('datalad')
     lgr_middle = logging.getLogger('datalad.tests')
-    lgr_bottom = logging.getLogger('datalad.tests.utils')
+    lgr_bottom = logging.getLogger('datalad.tests.utils_pytest')
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
         with disable_logger():  # default: 'datalad':
@@ -1039,7 +1039,7 @@ from datalad.utils import read_csv_lines
 
 def test_known_failure_direct_mode():
     # Decorator is deprecated now and that is what we check
-    from .utils import known_failure_direct_mode
+    from .utils_pytest import known_failure_direct_mode
 
     x = []
     with swallow_logs(new_level=logging.WARNING) as cml:

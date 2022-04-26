@@ -16,19 +16,23 @@ import os
 import os.path as op
 from unittest.mock import patch
 
-from datalad.support.exceptions import (
-    NoDatasetFound,
+import datalad.utils as ut
+from datalad.api import (
+    create,
+    diff,
+    save,
 )
-
-from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.cmd import (
     GitWitlessRunner,
     StdOutCapture,
 )
-from datalad.utils import (
-    Path,
-)
-from datalad.tests.utils import (
+from datalad.consts import PRE_INIT_COMMIT_SHA
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import NoDatasetFound
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_in,
     assert_raises,
     assert_repo_status,
@@ -36,25 +40,15 @@ from datalad.tests.utils import (
     assert_status,
     chpwd,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
     get_deeply_nested_structure,
     has_symlink_capability,
     known_failure_githubci_win,
     neq_,
-    OBSCURE_FILENAME,
     ok_,
-    SkipTest,
     with_tempfile,
 )
-
-import datalad.utils as ut
-from datalad.distribution.dataset import Dataset
-from datalad.api import (
-    create,
-    diff,
-    save,
-)
+from datalad.utils import Path
 
 
 def test_magic_number():

@@ -9,22 +9,23 @@
 
 import sys
 from io import StringIO
-from datalad.tests.utils import assert_raises, assert_equal
-
 from unittest.mock import patch
 
 from datalad.api import sshrun
+from datalad.cli.main import main
 from datalad.cmd import (
     StdOutCapture,
     WitlessRunner,
 )
-from datalad.cli.main import main
-
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils_pytest import (
+    SkipTest,
+    assert_equal,
+    assert_raises,
+    skip_if_on_windows,
+    skip_ssh,
+    swallow_outputs,
+    with_tempfile,
+)
 
 
 @skip_if_on_windows

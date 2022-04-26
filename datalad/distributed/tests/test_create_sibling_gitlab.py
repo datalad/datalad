@@ -15,7 +15,7 @@ from datalad.api import (
     create,
     create_sibling_gitlab,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     assert_repo_status,
     assert_result_count,

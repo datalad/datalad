@@ -25,7 +25,7 @@ from datalad.support.parallel import (
     ProducerConsumerProgressLog,
     no_parentds_in_futures,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_greater,
     assert_greater_equal,

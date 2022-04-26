@@ -9,4 +9,4 @@
 """
 
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import *
+from datalad.tests.utils_pytest import *

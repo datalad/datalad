@@ -10,18 +10,19 @@
 
 import os
 
-from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import usecase
-from datalad.tests.utils import (
-    DEFAULT_REMOTE,
-    ok_,
-    with_testrepos,
-    with_tempfile,
-)
 from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
+    DEFAULT_REMOTE,
+    ok_,
+    usecase,
+    with_tempfile,
+    with_testrepos,
+)
+
 from .utils_testdatasets import make_studyforrest_mockup
 
 

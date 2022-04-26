@@ -15,15 +15,11 @@ from os.path import (
     exists,
     getmtime,
     isdir,
-    join as opj,
 )
+from os.path import join as opj
 
-from datalad.tests.utils import SkipTest
-
-
-from datalad.utils import Path
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_false,
     assert_in,
     assert_is_instance,
@@ -40,15 +36,17 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
+from datalad.utils import Path
+
 from ..sshconnector import (
+    MultiplexSSHConnection,
+    MultiplexSSHManager,
+    NoMultiplexSSHConnection,
     SSHConnection,
     SSHManager,
-    MultiplexSSHManager,
-    MultiplexSSHConnection,
-    NoMultiplexSSHConnection,
+    get_connection_hash,
     sh_quote,
 )
-from ..sshconnector import get_connection_hash
 
 # Some tests test the internals and assumptions of multiplex connections
 _ssh_manager_is_multiplex = SSHManager is MultiplexSSHManager

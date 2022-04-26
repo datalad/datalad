@@ -1,21 +1,19 @@
+import logging
+from unittest.mock import patch
+
 from ...distribution import dataset as dataset_mod
 from ...distribution.dataset import Dataset
-from ..due_utils import duecredit_dataset
-
-from ..due import (
-    Doi,
-    due,
-    Text,
-)
-
-from ..external_versions import external_versions
-
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     swallow_logs,
     with_tempfile,
 )
-import logging
-from unittest.mock import patch
+from ..due import (
+    Doi,
+    Text,
+    due,
+)
+from ..due_utils import duecredit_dataset
+from ..external_versions import external_versions
 
 
 @with_tempfile(mkdir=True)

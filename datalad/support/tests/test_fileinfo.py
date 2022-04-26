@@ -10,28 +10,25 @@
 
 import os.path as op
 from pathlib import Path
-import datalad.utils as ut
 
-from datalad.tests.utils import (
+import datalad.utils as ut
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import NoSuchPathError
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_equal,
     assert_false,
     assert_in,
     assert_not_in,
     assert_raises,
+    assert_repo_status,
     get_annexstatus,
+    get_convoluted_situation,
     known_failure_githubci_win,
     slow,
     with_tempfile,
     with_tree,
-)
-
-from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import NoSuchPathError
-from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
-    assert_repo_status,
-    get_convoluted_situation,
 )
 
 

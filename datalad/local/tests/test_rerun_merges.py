@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     assert_false,
     eq_,

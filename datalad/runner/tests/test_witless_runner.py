@@ -21,7 +21,7 @@ from time import (
 
 import pytest
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
     assert_cwd_unchanged,

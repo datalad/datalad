@@ -9,12 +9,12 @@
 '''Unit tests for basic constraints functionality.'''
 
 
-from ..support import constraints as ct
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_raises,
 )
+
+from ..support import constraints as ct
 
 
 def test_int():

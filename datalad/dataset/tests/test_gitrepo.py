@@ -10,24 +10,26 @@
 
 """
 
-from datalad.tests.utils import assert_is_instance
-
 import logging
-
 import os
 import os.path as op
-
 import sys
 
-from datalad.utils import (
-    chpwd,
-    Path,
+from datalad.dataset.gitrepo import (
+    GitRepo,
+    _get_dot_git,
 )
-from datalad.tests.utils import (
+from datalad.support.exceptions import (
+    CommandError,
+    PathKnownToRepositoryError,
+)
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
     assert_in,
+    assert_is_instance,
     assert_not_in,
     assert_raises,
     eq_,
@@ -36,17 +38,10 @@ from datalad.tests.utils import (
     swallow_logs,
     with_tempfile,
     with_tree,
-    SkipTest,
 )
-
-from datalad.dataset.gitrepo import (
-    GitRepo,
-    _get_dot_git,
-)
-
-from datalad.support.exceptions import (
-    CommandError,
-    PathKnownToRepositoryError,
+from datalad.utils import (
+    Path,
+    chpwd,
 )
 
 

@@ -61,7 +61,7 @@ from ...support.exceptions import (
 )
 from ...support.network import get_url_disposition_filename
 from ...support.status import FileStatus
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_false,

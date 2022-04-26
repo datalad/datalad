@@ -16,7 +16,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.downloaders.tests.utils import get_test_providers
 from datalad.support.exceptions import CommandError
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_raises,
     eq_,

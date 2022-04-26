@@ -1,14 +1,15 @@
 from unittest.mock import patch
+
+from datalad import cfg
 from datalad.support.exceptions import (
-    format_exception_with_cause,
     CapturedException,
+    format_exception_with_cause,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_re_in,
     assert_true,
 )
-from datalad import cfg
 
 
 def test_CapturedException():

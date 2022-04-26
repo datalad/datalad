@@ -9,8 +9,9 @@
 
 
 from os.path import join as opj
+
 from datalad.api import create
-from datalad.tests.utils import create_tree
+from datalad.tests.utils_pytest import create_tree
 
 
 def make_studyforrest_mockup(path):

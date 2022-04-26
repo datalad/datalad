@@ -9,21 +9,19 @@
 
 import os
 import os.path as op
+from unittest.mock import patch
 
-from datalad.utils import get_home_envvars
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_in,
     assert_raises,
     chpwd,
     get_dataset_root,
     ok_file_has_content,
-    SkipTest,
     swallow_logs,
     with_tree,
 )
-
-from unittest.mock import patch
+from datalad.utils import get_home_envvars
 
 
 # verify that any target platform can deal with forward slashes
@@ -88,6 +86,7 @@ def test_git_config_warning(path=None):
         # no configs in that empty HOME
         from datalad.api import Dataset
         from datalad.config import ConfigManager
+
         # reach into the class and disable the "checked" flag that
         # has already been tripped before we get here
         ConfigManager._checked_git_identity = False

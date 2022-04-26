@@ -11,14 +11,13 @@
 
 import re
 
-from datalad.support.param import Parameter
-from datalad.support import constraints as cnstr
 from datalad.interface.base import (
-    get_api_name,
     Interface,
+    get_api_name,
 )
-
-from datalad.tests.utils import (
+from datalad.support import constraints as cnstr
+from datalad.support.param import Parameter
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_in,
     assert_is,

@@ -8,16 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test result handling"""
 
-from datalad.utils import (
-    on_windows,
-)
-from datalad.tests.utils import (
+from datalad.interface.utils import generic_result_renderer
+from datalad.tests.utils_pytest import (
     assert_in,
     swallow_outputs,
 )
-from datalad.interface.utils import (
-    generic_result_renderer,
-)
+from datalad.utils import on_windows
 
 
 def test_generic_result_renderer():

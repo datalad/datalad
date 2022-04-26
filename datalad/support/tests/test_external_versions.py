@@ -17,7 +17,7 @@ from datalad.support.exceptions import (
     MissingExternalDependency,
     OutdatedExternalDependency,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_false,

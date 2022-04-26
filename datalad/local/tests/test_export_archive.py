@@ -10,20 +10,16 @@
 """Test archive exporter"""
 
 import os
-import time
-from os.path import join as opj
-from os.path import isabs
 import tarfile
+import time
+from os.path import isabs
+from os.path import join as opj
 
 from datalad.api import (
     Dataset,
     export_archive,
 )
-from datalad.utils import (
-    chpwd,
-    md5sum,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_false,
     assert_not_equal,
@@ -33,6 +29,10 @@ from datalad.tests.utils import (
     assert_true,
     ok_startswith,
     with_tree,
+)
+from datalad.utils import (
+    chpwd,
+    md5sum,
 )
 
 _dataset_template = {
