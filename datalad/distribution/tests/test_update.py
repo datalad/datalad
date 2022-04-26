@@ -397,7 +397,7 @@ def test_update_volatile_subds(originpath=None, otherpath=None, destpath=None):
     assert_repo_status(ds.path)
 
     # now remove just-installed subdataset from origin again
-    origin.remove(sname, check=False)
+    origin.remove(sname, reckless='kill')
     assert_not_in(sname, origin.subdatasets(result_xfm='relpaths'))
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     # merge should disconnect the installed subdataset, but leave the actual
@@ -409,7 +409,7 @@ def test_update_volatile_subds(originpath=None, otherpath=None, destpath=None):
     ok_(Dataset(opj(ds.path, sname)).is_installed())
 
     # now remove the now disconnected subdataset for further tests
-    remove(dataset=op.join(ds.path, sname), check=False)
+    remove(dataset=op.join(ds.path, sname), reckless='kill')
     assert_repo_status(ds.path)
 
     # new separate subdataset, not within the origin dataset

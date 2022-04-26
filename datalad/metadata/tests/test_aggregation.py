@@ -291,7 +291,7 @@ def test_aggregate_removal(path=None):
     eq_(_get_contained_objs(base), _get_referenced_objs(base))
     # now delete the deepest subdataset to test cleanup of aggregated objects
     # in the top-level ds
-    base.remove(opj('sub', 'subsub'), check=False)
+    base.remove(opj('sub', 'subsub'), reckless='kill')
     # now aggregation has to detect that subsub is not simply missing, but gone
     # for good
     base.aggregate_metadata(recursive=True, update_mode='all')
