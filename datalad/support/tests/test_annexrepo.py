@@ -1160,6 +1160,9 @@ def test_annex_backends(path=None):
     eq_(repo_compat.default_backends, ["MD5E", "WORM"])
 
 
+# ignore deprecation warnings since here we should not use high level
+# interface like push
+@pytest.mark.filterwarnings("ignore: AnnexRepo.copy_to\(\) is deprecated")
 @skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
 def test_annex_ssh(topdir=None):
@@ -1325,6 +1328,8 @@ def test_init_scanning_message(path=None):
         assert_re_in(".*scanning for .* files", cml.out, flags=re.IGNORECASE, match=False)
 
 
+# ignore deprecation warnings since that is the test testing that functionality
+@pytest.mark.filterwarnings("ignore: AnnexRepo.copy_to\(\) is deprecated")
 @with_tempfile
 @with_tempfile
 @with_tempfile
