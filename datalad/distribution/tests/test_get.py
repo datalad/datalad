@@ -230,7 +230,7 @@ def test_get_invalid_call(path=None, file_outside=None):
     ds.repo.drop("annexed.dat", options=['--force'])
     with assert_raises(RemoteNotAvailableError) as ce:
         ds.get("annexed.dat", source='MysteriousRemote')
-    eq_("MysteriousRemote", ce.exception.remote)
+    eq_("MysteriousRemote", ce.value.remote)
 
     res = ds.get("NotExistingFile.txt", on_failure='ignore')
     assert_status('impossible', res)

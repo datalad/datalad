@@ -2203,7 +2203,7 @@ def test_annexjson_protocol(path=None):
         ar._call_annex(['find', '.', 'error', '--json'],
                        protocol=AnnexJsonProtocol)
     # normal operation is not impaired
-    eq_(e.exception.kwargs['stdout_json'], orig_j)
+    eq_(e.value.kwargs['stdout_json'], orig_j)
     # we get a clue what went wrong,
     # but reporting depends on config + version (default changed):
     msg = "pathspec 'error' did not match" if not dl_cfg.getbool(
@@ -2211,7 +2211,7 @@ def test_annexjson_protocol(path=None):
         # git-annex switched default for this config:
         default=bool(external_versions['cmd:annex'] < '10.20220222')) else \
         "error not found"
-    assert_in(msg, e.exception.stderr)
+    assert_in(msg, e.value.stderr)
     # there should be no errors reported in an individual records
     # hence also no pointless statement in the str()
     assert_not_in('errors from JSON records', str(e.value))
