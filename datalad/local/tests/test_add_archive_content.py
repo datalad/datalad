@@ -25,6 +25,7 @@ from os.path import (
     pardir,
 )
 from pathlib import Path
+import tempfile
 
 from datalad.api import (
     Dataset,
@@ -67,6 +68,7 @@ from datalad.tests.utils import (
 from datalad.utils import (
     chpwd,
     find_files,
+    get_tempfile_kwargs,
     getpwd,
     on_windows,
     rmtemp,
@@ -492,10 +494,12 @@ class TestAddArchiveOptions():
     # few tests bundled with a common setup/teardown to minimize boiler plate
     # nothing here works on windows, no even teardown(), prevent failure at the
     # origin
-    @with_tree(tree={'1.tar': {'file.txt': 'load',
-                               '1.dat': 'load2'}},
-               delete=False)
-    def setup(self, repo_path):
+    def setup(self):
+        repo_path = tempfile.mkdtemp(**get_tempfile_kwargs(prefix="tree"))
+        create_tree(
+            repo_path,
+            {'1.tar': {'file.txt': 'load',
+                       '1.dat': 'load2'}})
         self.ds = ds = Dataset(repo_path)
         ds.create(force=True)
         self.annex = ds.repo
@@ -507,13 +511,13 @@ class TestAddArchiveOptions():
         self.annex.precommit()
         rmtemp(self.ds.path)
 
-    def test_add_delete(self=None):
+    def test_add_delete(self):
         # To test that .tar gets removed
         self.ds.add_archive_content('1.tar', strip_leading_dirs=True,
                                     delete=True)
         assert_false(lexists(self.ds.pathobj / '1.tar'))
 
-    def test_add_archive_leading_dir(self=None):
+    def test_add_archive_leading_dir(self):
         import os
         os.mkdir(self.ds.pathobj / 'sub')
         f123 = Path('sub') / '123.tar'
@@ -533,7 +537,7 @@ class TestAddArchiveOptions():
 
     # https://github.com/datalad/datalad/issues/6187
     @skip_if_adjusted_branch
-    def test_add_delete_after_and_drop(self=None):
+    def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed
         # but that new stuff was added to annex repo.  We know the key since
         # default backend and content remain the same
@@ -623,7 +627,7 @@ class TestAddArchiveOptions():
             []
         )
 
-    def test_override_existing_under_git(self=None):
+    def test_override_existing_under_git(self):
         create_tree(self.ds.path, {'1.dat': 'load2'})
         self.ds.save('1.dat', to_git=True, message='added to git')
         self.ds.add_archive_content(
