@@ -240,6 +240,8 @@ script:
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
+  #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
+  #  in effect, dumping too many logs.
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
@@ -248,7 +250,6 @@ script:
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
       --cov=datalad
-      --log-cli-level=INFO
       --pyargs
       $TESTS_TO_PERFORM
   - cd ..
