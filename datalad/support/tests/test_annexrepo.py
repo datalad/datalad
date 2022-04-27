@@ -2235,7 +2235,8 @@ def test_annexjson_protocol_long(path=None, *, caplog):
         for record in records:
             print("print(%r);" % json.dumps(record), file=f)
     runner = GitWitlessRunner()
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.ERROR), \
+        swallow_logs(new_level=logging.ERROR):
         res = runner.run(
             [sys.executable, path],
             protocol=AnnexJsonProtocol
