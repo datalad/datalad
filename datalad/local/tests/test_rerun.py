@@ -17,6 +17,8 @@ import os.path as op
 import sys
 from io import StringIO
 from os import remove
+
+import pytest
 from unittest.mock import patch
 
 from datalad.api import (
@@ -601,6 +603,8 @@ def test_rerun_script(path=None):
 
 @slow  # ~10s
 @known_failure_windows
+@pytest.mark.xfail(reason="push fails due to IncompleteResultsError "
+                          "[remote rejected] (branch is currently checked out)")
 # ^ Issue only happens on appveyor, Python itself implodes. Cannot be
 #   reproduced on a real win7 box
 # Comment above looks outdated. Last trial on Appveyor failed, but seems related
