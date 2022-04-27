@@ -2220,7 +2220,7 @@ def test_annexjson_protocol(path=None):
 
 
 @with_tempfile
-def test_annexjson_protocol_long(path=None):
+def test_annexjson_protocol_long(path=None, *, caplog):
     records = [
         {"k": "v" * 20},
         # Value based off of
@@ -2235,10 +2235,11 @@ def test_annexjson_protocol_long(path=None):
         for record in records:
             print("print(%r);" % json.dumps(record), file=f)
     runner = GitWitlessRunner()
-    res = runner.run(
-        [sys.executable, path],
-        protocol=AnnexJsonProtocol
-    )
+    with caplog.at_level(logging.INFO):
+        res = runner.run(
+            [sys.executable, path],
+            protocol=AnnexJsonProtocol
+        )
     eq_(res['stdout'], '')
     eq_(res['stderr'], '')
     eq_(res['stdout_json'], records)
@@ -2246,13 +2247,17 @@ def test_annexjson_protocol_long(path=None):
 
 @pytest.mark.parametrize("print_opt", ['', ', end=""'])
 @with_tempfile
-def test_annexjson_protocol_incorrect(path=None, *, print_opt):
+def test_annexjson_protocol_incorrect(path=None, *, print_opt, caplog):
     # Test that we still log some incorrectly formed JSON record
     bad_json = '{"I": "am wrong,}'
     with open(path, 'w') as f:
         print("print(%r%s);" % (bad_json, print_opt), file=f)
     runner = GitWitlessRunner()
-    with swallow_logs(new_level=logging.ERROR) as cml:
+    # caplog only to not cause memory error in case of heavy debugging
+    # Unfortunately it lacks similar .assert_logged with a regex matching
+    # to be just used instead
+    with caplog.at_level(logging.ERROR), \
+        swallow_logs(new_level=logging.ERROR) as cml:
         res = runner.run(
             [sys.executable, path],
             protocol=AnnexJsonProtocol
