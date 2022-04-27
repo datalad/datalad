@@ -218,7 +218,7 @@ class Configuration(Interface):
             return
 
         for subds in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=True,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',

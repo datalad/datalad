@@ -20,6 +20,8 @@ from os.path import (
 )
 from os.path import join as opj
 
+import pytest
+
 from datalad.api import (
     create_sibling,
     install,
@@ -443,11 +445,13 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
         push(dataset=source, to=remote_name, recursive=True, since='^') # just a smoke test
 
 
+# we are explicitly testing deprecated since='' inside
+@pytest.mark.filterwarnings("ignore: 'since' should point to commitish")
 @slow  # 28 + 19sec on travis
 def test_target_ssh_recursive():
     skip_if_on_windows()
-    skip_ssh(check_target_ssh_recursive)(True)
     check_target_ssh_recursive(False)
+    skip_ssh(check_target_ssh_recursive)(True)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])

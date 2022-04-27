@@ -657,7 +657,7 @@ def test_gh3356(src=None, path=None):
     assert_result_count(res, 2, action='get', type='file', status='ok')
     # status must report content for two files
     assert_result_count(
-        clone.status(recursive=True, annex='all', report_filetype='eval'), 2,
+        clone.status(recursive=True, annex='all'), 2,
         action='status', has_content=True)
 
 

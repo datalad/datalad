@@ -9,6 +9,8 @@
 
 """
 
+import pytest
+
 from datalad.distribution.dataset import Dataset
 from datalad.tests.utils_pytest import (
     assert_raises,
@@ -16,6 +18,7 @@ from datalad.tests.utils_pytest import (
 )
 
 
+@pytest.mark.filterwarnings("ignore: The `uninstall` command is deprecated")
 @with_tempfile()
 def test_uninstall_uninstalled(path=None):
     ds = Dataset(path)
