@@ -136,28 +136,6 @@ ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
 
-
-def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
-    """A helper to run datalad's tests.  Requires nose
-    """
-    argv = [] #module]
-    # could make it 'smarter' but decided to be explicit so later we could
-    # easily migrate to another runner without changing any API here
-    if verbose:
-        argv.append('-v')
-    if nocapture:
-        argv.append('-s')
-    if pdb:
-        argv.append('--pdb')
-    if stop:
-        argv.append('--stop')
-    from datalad.support.third.nosetester import NoseTester
-    tester = NoseTester(module)
-    tester.package_name = module.split('.', 1)[0]
-    tester.test(extra_argv=argv)
-
-test.__test__ = False
-
 from ._version import get_versions
 
 __version__ = get_versions()['version']
