@@ -222,7 +222,7 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path=None):
 
 
 # ignore warning since we are testing that function here. Remove upon full deprecation
-@pytest.mark.filterwarnings("ignore: AnnexRepo.get_file_key\(\) is deprecated")
+@pytest.mark.filterwarnings(r"ignore: AnnexRepo.get_file_key\(\) is deprecated")
 @assert_cwd_unchanged
 @with_tempfile
 def test_AnnexRepo_get_file_key(annex_path=None):
