@@ -94,7 +94,11 @@ def get_linux_distribution():
             result = platform.linux_distribution()
     else:
         import distro  # We require this for Python 3.8 and above.
-        result = distro.linux_distribution(full_distribution_name=False)
+        return (
+            distro.id(),
+            distro.version(),
+            distro.codename(),
+        )
     return result
 
 
