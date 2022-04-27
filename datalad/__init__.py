@@ -126,6 +126,15 @@ from datalad.utils import (
 
 from .log import lgr
 
+
+def setup_package():
+    from datalad.tests.utils import setup_package
+    return setup_package()
+
+def teardown_package():
+    from datalad.tests.utils import teardown_package
+    return teardown_package()
+
 # To analyze/initiate our decision making on what current directory to return
 getpwd()
 
