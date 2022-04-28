@@ -62,4 +62,6 @@ jobs:
       run: |
         mkdir -p __testhome__
         cd __testhome__
-        python -m pytest -c ../tox.ini -s -v --cov=datalad --pyargs $(echo ${{ matrix.extension }} | tr '-' '_')
+        python -m nose -s -v --with-cov --cover-package datalad $(echo ${{ matrix.extension }} | tr '-' '_')
+        # TODO: later whenever some extensions would migrate to pytest -- use pytest
+        # python -m pytest -c ../tox.ini -s -v --cov=datalad --pyargs $(echo ${{ matrix.extension }} | tr '-' '_')
