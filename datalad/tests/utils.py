@@ -76,6 +76,7 @@ from nose.tools import (
 
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
+from datalad import ssh_manager
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
@@ -86,6 +87,9 @@ from datalad.core.local.repo import repo_from_path
 from datalad.utils import (
     Path,
     ensure_unicode,
+    get_encoding_info,
+    get_envvars_info,
+    get_home_envvars,
 )
 
 from .. import utils
@@ -130,6 +134,14 @@ nok_ = assert_false
 
 lgr = logging.getLogger("datalad.tests.utils")
 
+# To store settings which setup_package changes and teardown_package should return
+_test_states = {
+    'loglevel': None,
+    'env': {},
+}
+
+# handle to an HTTP server instance that is used as part of the tests
+test_http_server = None
 
 def setup_package():
     import os
@@ -228,7 +240,7 @@ def setup_package():
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
-    cfg.reload(force=True)
+    dl_cfg.reload(force=True)
 
     # datalad.locations.sockets has likely changed. Discard any cached values.
     ssh_manager._socket_dir = None
@@ -262,7 +274,7 @@ def setup_package():
     # Set to non-interactive UI
     _test_states['ui_backend'] = ui.backend
     # obtain() since that one consults for the default value
-    ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
+    ui.set_backend(dl_cfg.obtain('datalad.tests.ui.backend'))
 
     # Monkey patch nose so it does not ERROR out whenever code asks for fileno
     # of the output. See https://github.com/nose-devs/nose/issues/6
@@ -285,14 +297,14 @@ def setup_package():
     # not doing teardown, so the original server might never get stopped
     if test_http_server is None:
         serve_path = tempfile.mkdtemp(
-            dir=cfg.get("datalad.tests.temp.dir"),
+            dir=dl_cfg.get("datalad.tests.temp.dir"),
             prefix='httpserve',
         )
         test_http_server = HTTPPath(serve_path)
         test_http_server.start()
         _TEMP_PATHS_GENERATED.append(serve_path)
 
-    if cfg.obtain('datalad.tests.setup.testrepos'):
+    if dl_cfg.obtain('datalad.tests.setup.testrepos'):
         lgr.debug("Pre-populating testrepos")
         from datalad.tests.utils import with_testrepos
         with_testrepos()(lambda repo: 1)()
@@ -356,7 +368,7 @@ def teardown_package():
     # Might be superfluous, since after teardown datalad.cfg shouldn't be
     # needed. However, maintaining a consistent state seems a good thing
     # either way.
-    cfg.reload(force=True)
+    dl_cfg.reload(force=True)
 
     ssh_manager._socket_dir = None
 
