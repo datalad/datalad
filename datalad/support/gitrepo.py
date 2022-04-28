@@ -2190,6 +2190,9 @@ class GitRepo(CoreGitRepo):
         if not branch:
             branch = self.get_active_branch()
         cmd.append(branch)
+        # and trailing -- marker to make sure that Git never confused the branch
+        # with a potentially existing directory of the same name
+        cmd.append('--')
         for r in self.call_git_items_(cmd):
             if stop and stop == r:
                 return
