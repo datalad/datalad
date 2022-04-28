@@ -46,10 +46,6 @@ from os.path import relpath
 from os.path import split as pathsplit
 from unittest.mock import patch
 
-import pytest
-
-pytest.importorskip("nose")
-
 from nose import SkipTest
 from nose.plugins.attrib import attr
 from nose.tools import (
