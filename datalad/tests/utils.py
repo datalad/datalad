@@ -76,7 +76,10 @@ from nose.tools import (
 
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
-from datalad import ssh_manager
+from datalad import (
+    conftest,
+    ssh_manager,
+)
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
@@ -139,9 +142,6 @@ _test_states = {
     'loglevel': None,
     'env': {},
 }
-
-# handle to an HTTP server instance that is used as part of the tests
-test_http_server = None
 
 def setup_package():
     import os
@@ -291,17 +291,16 @@ def setup_package():
     # file:// URLs in the tests, have a standard HTTP server
     # that serves an 'httpserve' directory in the test HOME
     # the URL will be available from datalad.test_http_server.url
-    global test_http_server
     # Start the server only if not running already
     # Relevant: we have test_misc.py:test_test which runs datalad.test but
     # not doing teardown, so the original server might never get stopped
-    if test_http_server is None:
+    if conftest.test_http_server is None:
         serve_path = tempfile.mkdtemp(
             dir=dl_cfg.get("datalad.tests.temp.dir"),
             prefix='httpserve',
         )
-        test_http_server = HTTPPath(serve_path)
-        test_http_server.start()
+        conftest.test_http_server = HTTPPath(serve_path)
+        conftest.test_http_server.start()
         _TEMP_PATHS_GENERATED.append(serve_path)
 
     if dl_cfg.obtain('datalad.tests.setup.testrepos'):
@@ -342,10 +341,9 @@ def teardown_package():
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
 
-    global test_http_server
-    if test_http_server:
-        test_http_server.stop()
-        test_http_server = None
+    if conftest.test_http_server:
+        conftest.test_http_server.stop()
+        conftest.test_http_server = None
     else:
         lgr.debug("For some reason global http_server was not set/running, thus not stopping")
 

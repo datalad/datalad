@@ -212,6 +212,9 @@ def capture_logs(caplog, monkeypatch):
 
 
 def pytest_ignore_collect(path):
+    # Skip the tests of old nose code:
+    if path.basename == "test_tests_utils.py":
+        return True
     # When pytest is told to run doctests, by default it will import every
     # source file in its search, but a number of datalad source file have
     # undesirable side effects when imported.  This hook should ensure that
