@@ -60,6 +60,7 @@ from datalad.support.exceptions import CapturedException
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
     _get_non_existing_from_annex_output,
+    _sanitize_key,
 )
 from datalad.ui import ui
 import datalad.utils as ut
@@ -3231,7 +3232,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             # TODO optimize order based on some check that reveals
             # what scheme is used in a given annex
             r['has_content'] = False
-            key = r['key']
+            # some keys like URL-s700145--https://arxiv.org/pdf/0904.3664v1.pdf
+            # require sanitization to be able to mark content availability
+            # correctly. Can't limit to URL backend only; custom key backends
+            # may need it, too
+            key = _sanitize_key(r['key'])
             for testpath in (
                     # ATM git-annex reports hashdir in native path
                     # conventions and the actual file path `f` in
