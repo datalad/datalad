@@ -20,6 +20,7 @@ from datalad.customremotes import (
     SpecialRemote,
 )
 from datalad.customremotes.main import main as super_main
+from datalad.support.annex_utils import _sanitize_key
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     AccessDeniedError,
@@ -1478,35 +1479,6 @@ class RIARemote(SpecialRemote):
             self._last_keypath[1]
 
     # TODO: implement method 'error'
-
-
-def _sanitize_key(key):
-    """Returns a sanitized key that is a suitable directory/file name
-
-    Documentation from the analog implementation in git-annex
-    Annex/Locations.hs
-
-    Converts a key into a filename fragment without any directory.
-
-    Escape "/" in the key name, to keep a flat tree of files and avoid
-    issues with keys containing "/../" or ending with "/" etc.
-
-    "/" is escaped to "%" because it's short and rarely used, and resembles
-        a slash
-    "%" is escaped to "&s", and "&" to "&a"; this ensures that the mapping
-        is one to one.
-    ":" is escaped to "&c", because it seemed like a good idea at the time.
-
-    Changing what this function escapes and how is not a good idea, as it
-    can cause existing objects to get lost.
-    """
-    esc = {
-        '/': '%',
-        '%': '&s',
-        '&': '&a',
-        ':': '&c',
-    }
-    return ''.join(esc.get(c, c) for c in key)
 
 
 def main():
