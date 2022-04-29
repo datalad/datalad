@@ -14,6 +14,7 @@ import logging
 import os
 import os.path as op
 import sys
+import tempfile
 from functools import partial
 from collections import OrderedDict
 
@@ -138,7 +139,27 @@ def _describe_system():
                                   _t2s(pl.win32_ver())]).rstrip(),
         'max_path_length': get_max_path_length(getpwd()),
         'encoding': get_encoding_info(),
+        'filesystem': [_get_fs_type(p) for p in [os.getcwd(),
+                                                 tempfile.gettempdir(),
+                                                 str(Path.home())]]
     }
+
+
+def _get_fs_type(path):
+    try:
+        from psutil import disk_partitions
+        match = ""
+        fs = ""
+        for part in disk_partitions():
+            if path.startswith(part.mountpoint) and \
+                    len(match) < len(part.mountpoint):
+                fs = part.fstype
+                match = part.mountpoint
+    except Exception as exc:
+        ce = CapturedException(exc)
+        lgr.warning("Failed to get filesystem information: %s", ce)
+        fs = tuple()
+    return f'{path}: {fs}'
 
 
 def _describe_environment():
