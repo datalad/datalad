@@ -439,56 +439,24 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         total=4,
     )
 
+    #
+    # First we must figure out where to push to, if needed
+    #
+
     # will contain info to determine what refspecs need to be pushed
     # and to which remote, if none is given
     wannabe_gitpush = None
     # pristine input arg
     _target = target
-    # verified or auto-detected
-    target = None
-    if not _target:
-        # let Git figure out what needs doing
-        # we will reuse the result further down again, so nothing is wasted
-        wannabe_gitpush = _get_push_dryrun(repo)
-        # we did not get an explicit push target, get it from Git
-        target = set(p.get('remote', None) for p in wannabe_gitpush)
-        # handle case where a pushinfo record did not have a 'remote'
-        # property -- should not happen, but be robust
-        target.discard(None)
-        if not len(target):
-            yield dict(
-                res_kwargs,
-                status='impossible',
-                message='No push target given, and none could be '
-                        'auto-detected, please specify via --to',
-            )
-            return
-        elif len(target) > 1:
-            # dunno if this can ever happen, but if it does, report
-            # nicely
-            yield dict(
-                res_kwargs,
-                status='error',
-                message=(
-                    'No push target given, '
-                    'multiple candidates auto-detected: %s',
-                    list(target),
-                )
-            )
-            return
-        else:
-            # can only be a single one at this point
-            target = target.pop()
-
-    if not target:
-        if _target not in repo.get_remotes():
-            yield dict(
-                res_kwargs,
-                status='error',
-                message=(
-                    "Unknown target sibling '%s'.", _target))
-            return
-        target = _target
+    # verified or auto-detected target sibling name
+    target, status, message, wannabe_gitpush = _get_push_target(repo, target)
+    if target is None:
+        yield dict(
+            res_kwargs,
+            status=status,
+            message=message,
+        )
+        return
 
     log_progress(
         lgr.info, pbar_id, "Push refspecs",
@@ -934,3 +902,63 @@ def _get_push_dryrun(repo, remote=None):
             e)
         wannabe_gitpush = []
     return wannabe_gitpush
+
+
+def _get_push_target(repo, target_arg):
+    """
+    Returns
+    -------
+    str or None, str, str or None, list
+      Target label, if determined; status label; optional message;
+      git-push-dryrun result for re-use
+    """
+    # verified or auto-detected
+    target = None
+    # for re-use
+    wannabe_gitpush = []
+    if not target_arg:
+        # let Git figure out what needs doing
+        # we will reuse the result further down again, so nothing is wasted
+        wannabe_gitpush = _get_push_dryrun(repo)
+        # we did not get an explicit push target, get it from Git
+        target = set(p.get('remote', None) for p in wannabe_gitpush)
+        # handle case where a pushinfo record did not have a 'remote'
+        # property -- should not happen, but be robust
+        target.discard(None)
+        if not len(target):
+            return (
+                None,
+                'impossible',
+                'No push target given, and none could be '
+                'auto-detected, please specify via --to',
+                wannabe_gitpush,
+            )
+        elif len(target) > 1:
+            # dunno if this can ever happen, but if it does, report
+            # nicely
+            return (
+                None,
+                'error',
+                ('No push target given, '
+                 'multiple candidates auto-detected: %s',
+                 list(target)),
+                wannabe_gitpush,
+            )
+        else:
+            # can only be a single one at this point
+            target = target.pop()
+
+    if not target:
+        if target_arg not in repo.get_remotes():
+            return (
+                None,
+                'error',
+                ("Unknown target sibling '%s'.", target_arg),
+                wannabe_gitpush,
+            )
+        target = target_arg
+
+    # we must have a valid target label now
+    assert target
+
+    return (target, 'ok', None, wannabe_gitpush)
