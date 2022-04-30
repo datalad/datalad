@@ -438,25 +438,23 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         label='Push',
         total=4,
     )
+
+    # will contain info to determine what refspecs need to be pushed
+    # and to which remote, if none is given
+    wannabe_gitpush = None
     # pristine input arg
     _target = target
     # verified or auto-detected
     target = None
     if not _target:
-        try:
-            # let Git figure out what needs doing
-            # we will reuse the result further down again, so nothing is wasted
-            wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
-            # we did not get an explicit push target, get it from Git
-            target = set(p.get('remote', None) for p in wannabe_gitpush)
-            # handle case where a pushinfo record did not have a 'remote'
-            # property -- should not happen, but be robust
-            target.discard(None)
-        except Exception as e:
-            lgr.debug(
-                'Dry-run push to determine default push target failed, '
-                'assume no configuration: %s', e)
-            target = set()
+        # let Git figure out what needs doing
+        # we will reuse the result further down again, so nothing is wasted
+        wannabe_gitpush = _get_push_dryrun(repo)
+        # we did not get an explicit push target, get it from Git
+        target = set(p.get('remote', None) for p in wannabe_gitpush)
+        # handle case where a pushinfo record did not have a 'remote'
+        # property -- should not happen, but be robust
+        target.discard(None)
         if not len(target):
             yield dict(
                 res_kwargs,
@@ -508,22 +506,18 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     # cache repo type
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
 
+    # TODO move check for git vs special remote here
+
     # TODO prevent this when `target` is a special remote
+    # TODO only relevant for Git remote
     # (possibly redo) a push attempt to figure out what needs pushing
     # do this on the main target only, and apply the result to all
     # dependencies
-    try:
-        if _target:
-            # only do it when an explicit target was given, otherwise
-            # we can reuse the result from the auto-probing above
-            wannabe_gitpush = repo.push(
-                remote=target,
-                git_options=['--dry-run'])
-    except Exception as e:
-        lgr.debug(
-            'Dry-run push to check push configuration failed, '
-            'assume no configuration: %s', e)
-        wannabe_gitpush = []
+    if _target:
+        # only do it when an explicit target was given, otherwise
+        # we can reuse the result from the auto-probing above
+        wannabe_gitpush = _get_push_dryrun(repo, remote=target)
+
     refspecs2push = [
         # if an upstream branch is set, go with it
         p['from_ref']
@@ -925,3 +919,18 @@ def _get_corresponding_remote_state(repo, to):
             #to = tracked_remote
             since = '%s/%s' % (tracked_remote, tracked_refspec)
     return since
+
+
+def _get_push_dryrun(repo, remote=None):
+    """
+    """
+    try:
+        wannabe_gitpush = repo.push(remote=remote, git_options=['--dry-run'])
+    except Exception as e:
+        lgr.debug(
+            'Dry-run push to %r remote failed, '
+            'assume no configuration: %s',
+            remote if remote else 'default',
+            e)
+        wannabe_gitpush = []
+    return wannabe_gitpush
