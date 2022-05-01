@@ -472,7 +472,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     # (possibly redo) a push attempt to figure out what needs pushing
     # do this on the main target only, and apply the result to all
     # dependencies
-    if _target:
+    if _target and wannabe_gitpush is None:
         # only do it when an explicit target was given, otherwise
         # we can reuse the result from the auto-probing above
         wannabe_gitpush = _get_push_dryrun(repo, remote=target)
@@ -900,6 +900,11 @@ def _get_corresponding_remote_state(repo, to):
 
 def _get_push_dryrun(repo, remote=None):
     """
+    Returns
+    -------
+    list
+      The result of the dry-run. Will be an empty list of the dry-run
+      failed for any reason.
     """
     try:
         wannabe_gitpush = repo.push(remote=remote, git_options=['--dry-run'])
@@ -917,14 +922,15 @@ def _get_push_target(repo, target_arg):
     """
     Returns
     -------
-    str or None, str, str or None, list
+    str or None, str, str or None, list or None
       Target label, if determined; status label; optional message;
-      git-push-dryrun result for re-use
+      git-push-dryrun result for re-use or None, if no dry-run was
+      attempted.
     """
     # verified or auto-detected
     target = None
     # for re-use
-    wannabe_gitpush = []
+    wannabe_gitpush = None
     if not target_arg:
         # let Git figure out what needs doing
         # we will reuse the result further down again, so nothing is wasted
