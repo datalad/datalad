@@ -462,15 +462,6 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         lgr.info, pbar_id, "Push refspecs",
         label="Push to '{}'".format(target), update=1, total=4)
 
-    # define config var name for potential publication dependencies
-    depvar = 'remote.{}.datalad-publish-depends'.format(target)
-    # list of remotes that are publication dependencies for the
-    # target remote
-    publish_depends = ensure_list(ds.config.get(depvar, []))
-    if publish_depends:
-        lgr.debug("Discovered publication dependencies for '%s': %s'",
-                  target, publish_depends)
-
     # cache repo type
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
 
@@ -543,10 +534,28 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     for branch in must_have_branches:
         _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
 
+    #
+    # We know where to push to, honor dependencies
+    # XXX we could do this right after we know the value of `target`,
+    # but this owuld mean we would also push to dependencies
+    # even when no actual push to the primary target is needed
+    #
+
+    # list of remotes that are publication dependencies for the
+    # target remote
+    publish_depends = ensure_list(ds.config.get(
+        f'remote.{target}.datalad-publish-depends', []))
+    if publish_depends:
+        lgr.debug("Discovered publication dependencies for '%s': %s'",
+                  target, publish_depends)
+
     # we know what to push and where, now dependency processing first
     for r in publish_depends:
         # simply make a call to this function again, all the same, but
         # target is different
+        # TODO: what if a publication dependency doesn't have any of the
+        # determined refspecs2push, yet. Should we not attempt to push them,
+        # because the main target has it?
         yield from _push(
             dspath,
             content,
