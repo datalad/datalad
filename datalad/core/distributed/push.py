@@ -464,30 +464,22 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     # cache repo type
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
+    # handling pure special remotes is a lot simpler
+    target_is_git_remote = repo.config.get(
+        f'remote.{target}.url', None) is not None
+    # TODO would is be useful to also check whether the
+    # target is set 'annex-ignore' right here?
 
-    # TODO move check for git vs special remote here
+    if target_is_git_remote:
+        # branch and refspec only need handling for Git remotes
+        refspecs2push = _get_refspecs2push(
+            repo, is_annex_repo, target, target_arg=_target,
+            wannabe_gitpush=wannabe_gitpush)
 
-    # TODO prevent this when `target` is a special remote
-    # TODO only relevant for Git remote
-    refspecs2push = _get_refspecs2push(
-        repo, target, target_arg=_target, wannabe_gitpush=wannabe_gitpush)
-
-    # TODO this is not right with managed branches
-    active_branch = repo.get_active_branch()
-    if active_branch and is_annex_repo:
-        # we could face a managed branch, in which case we need to
-        # determine the actual one and make sure it is sync'ed with the
-        # managed one, and push that one instead. following methods can
-        # be called unconditionally
-        repo.localsync(managed_only=True)
-        active_branch = repo.get_corresponding_branch(
-            active_branch) or active_branch
-
-    if not refspecs2push and not active_branch:
-        # nothing was set up for push, and we have no active branch
-        # this is a weird one, let's confess and stop here
-        # I don't think we need to support such a scenario
-        if not active_branch:
+        if not refspecs2push:
+            # nothing was set up for push, and we have no active branch
+            # this is a weird one, let's confess and stop here
+            # I don't think we need to support such a scenario
             yield dict(
                 res_kwargs,
                 status='impossible',
@@ -496,15 +488,6 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 'branch'
             )
             return
-
-    # make sure that we always push the active branch (the context for the
-    # potential path arguments) and the annex branch -- because we claim
-    # to know better than any git config
-    must_have_branches = [active_branch] if active_branch else []
-    if is_annex_repo:
-        must_have_branches.append('git-annex')
-    for branch in must_have_branches:
-        _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
 
     #
     # We know where to push to, honor dependencies
@@ -541,9 +524,8 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             got_path_arg=got_path_arg,
         )
 
+
     # and lastly the primary push target
-    target_is_git_remote = repo.config.get(
-        'remote.{}.url'.format(target), None) is not None
 
     # git-annex data copy
     #
@@ -641,14 +623,15 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     )
 
 
-def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
-    # try to anticipate any flavor of an idea of a branch ending up in a refspec
+def _append_branch_to_refspec_if_needed(repo, refspecs, branch):
+    # try to anticipate any flavor of an idea of a branch ending up in a
+    # refspec
     looks_like_that_branch = re.compile(
         r'((^|.*:)refs/heads/|.*:|^){}$'.format(branch))
     if all(not looks_like_that_branch.match(r) for r in refspecs):
         refspecs.append(
             branch
-            if ds.config.get('branch.{}.merge'.format(branch), None)
+            if repo.config.get('branch.{}.merge'.format(branch), None)
             else '{branch}:{branch}'.format(branch=branch)
         )
 
@@ -951,7 +934,8 @@ def _get_push_target(repo, target_arg):
     return (target, 'ok', None, wannabe_gitpush)
 
 
-def _get_refspecs2push(repo, target, target_arg=None, wannabe_gitpush=None):
+def _get_refspecs2push(repo, is_annex_repo, target, target_arg=None,
+                       wannabe_gitpush=None):
     """Determine which refspecs shall be pushed to target
 
     Parameters
@@ -998,4 +982,25 @@ def _get_refspecs2push(repo, target, target_arg=None, wannabe_gitpush=None):
             # managed branch directly, instead of the corresponding branch
             'refs/heads/adjusted' not in p['from_ref'])
     ]
+
+    active_branch = repo.get_active_branch()
+    if active_branch and is_annex_repo:
+        # we could face a managed branch, in which case we need to
+        # determine the actual one and make sure it is sync'ed with the
+        # managed one, and push that one instead. following methods can
+        # be called unconditionally
+        repo.localsync(managed_only=True)
+        active_branch = repo.get_corresponding_branch(
+            active_branch) or active_branch
+
+    # make sure that we always push the active branch (the context for the
+    # potential path arguments) and the annex branch -- because we claim
+    # to know better than any git config
+    must_have_branches = [active_branch] if active_branch else []
+    if is_annex_repo:
+        must_have_branches.append('git-annex')
+    for branch in must_have_branches:
+        # refspecs2push= (in-place modification inside)
+        _append_branch_to_refspec_if_needed(repo, refspecs2push, branch)
+
     return refspecs2push
