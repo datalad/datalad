@@ -550,9 +550,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     else:
         lgr.debug("No data transfer: %s is not a git annex repository", repo)
 
-    if not target_is_git_remote:
+    if not target_is_git_remote or not refspecs2push:
         # there is nothing that we need to push or sync with on the git-side
         # of things with this remote
+        lgr.debug('No git-remote or no refspecs found that need to be pushed')
+        # TODO ensure progress bar is ended properly
         return
 
     log_progress(
@@ -607,10 +609,6 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         if "fatal: couldn't find remote ref git-annex" not in e.stderr.lower():
             raise
         lgr.debug('Remote does not have a git-annex branch: %s', e)
-
-    if not refspecs2push:
-        lgr.debug('No refspecs found that need to be pushed')
-        return
 
     # and push all relevant branches, plus the git-annex branch to announce
     # local availability info too
