@@ -469,37 +469,9 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     # TODO prevent this when `target` is a special remote
     # TODO only relevant for Git remote
-    # (possibly redo) a push attempt to figure out what needs pushing
-    # do this on the main target only, and apply the result to all
-    # dependencies
-    if _target and wannabe_gitpush is None:
-        # only do it when an explicit target was given, otherwise
-        # we can reuse the result from the auto-probing above
-        wannabe_gitpush = _get_push_dryrun(repo, remote=target)
+    refspecs2push = _get_refspecs2push(
+        repo, target, target_arg=_target, wannabe_gitpush=wannabe_gitpush)
 
-    refspecs2push = [
-        # if an upstream branch is set, go with it
-        p['from_ref']
-        if ds.config.get(
-            # refs come in as refs/heads/<branchname>
-            # need to cut the prefix
-            'branch.{}.remote'.format(p['from_ref'][11:]),
-            None) == target and ds.config.get(
-                'branch.{}.merge'.format(p['from_ref'][11:]),
-                None)
-        # if not, define target refspec explicitly to avoid having to
-        # set an upstream branch, which would happen implicitly from
-        # a users POV, and may also be hard to decide when publication
-        # dependencies are present
-        else '{}:{}'.format(p['from_ref'], p['to_ref'])
-        for p in wannabe_gitpush
-        # TODO: what if a publication dependency doesn't have it yet
-        # should we not attempt to push, because the main target has it?
-        if 'uptodate' not in p['operations'] and (
-            # cannot think of a scenario where we would want to push a
-            # managed branch directly, instead of the corresponding branch
-            'refs/heads/adjusted' not in p['from_ref'])
-    ]
     # TODO this is not right with managed branches
     active_branch = repo.get_active_branch()
     if active_branch and is_annex_repo:
@@ -977,3 +949,53 @@ def _get_push_target(repo, target_arg):
     assert target
 
     return (target, 'ok', None, wannabe_gitpush)
+
+
+def _get_refspecs2push(repo, target, target_arg=None, wannabe_gitpush=None):
+    """Determine which refspecs shall be pushed to target
+
+    Parameters
+    ----------
+    repo: Repo
+    target: str
+      Pre-determined push target
+    target_arg: str, optional
+      Target level given to original push() call, if any.
+    wannabe_gitpush: list, optional
+      Any cashed git-push-dryrun results for `target`
+
+    Returns
+    -------
+    list
+      Refspec labels
+    """
+    # (possibly redo) a push attempt to figure out what needs pushing
+    # do this on the main target only, and apply the result to all
+    # dependencies
+    if target_arg and wannabe_gitpush is None:
+        # only do it when an explicit target was given, otherwise
+        # we can reuse the result from the auto-probing above
+        wannabe_gitpush = _get_push_dryrun(repo, remote=target)
+
+    refspecs2push = [
+        # if an upstream branch is set, go with it
+        p['from_ref']
+        if repo.config.get(
+            # refs come in as refs/heads/<branchname>
+            # need to cut the prefix
+            'branch.{}.remote'.format(p['from_ref'][11:]),
+            None) == target and repo.config.get(
+                'branch.{}.merge'.format(p['from_ref'][11:]),
+                None)
+        # if not, define target refspec explicitly to avoid having to
+        # set an upstream branch, which would happen implicitly from
+        # a users POV, and may also be hard to decide when publication
+        # dependencies are present
+        else '{}:{}'.format(p['from_ref'], p['to_ref'])
+        for p in wannabe_gitpush
+        if 'uptodate' not in p['operations'] and (
+            # cannot think of a scenario where we would want to push a
+            # managed branch directly, instead of the corresponding branch
+            'refs/heads/adjusted' not in p['from_ref'])
+    ]
+    return refspecs2push
