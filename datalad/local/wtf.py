@@ -147,6 +147,8 @@ def _describe_system():
 
 
 def _get_fs_type(loc, path):
+    global fs_hint
+    fs_hint = None
     try:
         from psutil import disk_partitions
         match = ""
@@ -158,7 +160,7 @@ def _get_fs_type(loc, path):
                 match = part.mountpoint
     except Exception as exc:
         ce = CapturedException(exc)
-        lgr.warning("Failed to get filesystem information: %s", ce)
+        fs_hint = "Hint: Install psutils to get file system type information"
         fs = tuple()
     return {'path': path,
             'type': fs}
@@ -504,7 +506,10 @@ class WTF(Interface):
         from datalad.ui import ui
         out = _render_report(res)
         ui.message(out)
-
+        if fs_hint is not None:
+            from datalad.support import ansi_colors
+            ui.message("{}".format(
+                ansi_colors.color_word(fs_hint, ansi_colors.YELLOW)))
 
 def _render_report(res):
     report = u'# WTF'
