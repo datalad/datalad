@@ -44,6 +44,7 @@ jobs:
             -m nose --with-cov --cover-package datalad --logging-level=INFO \
             datalad.tests.test_tests_utils
           coverage report
+          coverage xml
         working-directory: __testhome__
 
       - name: Upload coverage to Codecov
