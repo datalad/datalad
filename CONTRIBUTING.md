@@ -141,7 +141,7 @@ and additionally, for development we suggest to use tox and new
 versions of dependencies from pypy:
 
 ```sh
-apt-get install -y -q python3-{dev,httpretty,nose,pip,vcr,virtualenv} python3-tox
+apt-get install -y -q python3-{dev,httpretty,pytest,pip,vcr,virtualenv} python3-tox
 # Some libraries which might be needed for installing via pip
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
@@ -276,13 +276,7 @@ python setup.py develop
 and then use that virtual environment to run the tests, via
 
 ```sh
-python -m nose -s -v datalad
-```
-
-or similarly,
-
-```sh
-nosetests -s -v datalad
+pytest datalad
 ```
 
 then to later deactivate the virtualenv just simply enter
@@ -290,9 +284,6 @@ then to later deactivate the virtualenv just simply enter
 ```sh
 deactivate
 ```
-
-**Note**: on Windows, please add `--traverse-namespace` option to the `nose`
-call, or otherwise `nose` would not discover tests.
 
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
@@ -359,8 +350,8 @@ You can also check for common programming errors with the following tools:
 
 - Code with good unittest coverage (at least 80%), check with:
 
-          pip install nose coverage
-          nosetests --with-coverage path/to/tests_for_package
+          pip install pytest coverage
+          pytest --cov=datalad path/to/tests_for_package
 
 - We rely on https://codecov.io to provide convenient view of code coverage.
   Installation of the codecov extension for Firefox/Iceweasel or Chromium
