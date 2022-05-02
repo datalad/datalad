@@ -19,6 +19,9 @@ from .utils import py2cmd
 
 
 class TestProtocol(GeneratorMixIn, StdOutErrCapture):
+
+    __test__ = False  # class is not a class of tests
+
     def __init__(self,
                  done_future=None,
                  encoding=None):

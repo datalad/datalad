@@ -8,7 +8,8 @@ from ..gitrunner import GitWitlessRunner
 
 
 class TestGeneratorProtocol(GeneratorMixIn, StdOutErrCapture):
-    pass
+
+    __test__ = False  # class is not a class of tests
 
 
 def test_gitrunner_generator():
