@@ -231,7 +231,7 @@ def test_report_absent_keys(path=None):
         assert_in(testfile, ai)
         assert_equal(ai[testfile]['has_content'], False)
     # make sure files with URL keys are correctly reported:
-    from datalad import test_http_server
+    from datalad.conftest import test_http_server
     remote_file_name = 'imaremotefile.dat'
     local_file_name = 'mehasurlkey'
     (Path(test_http_server.path) / remote_file_name).write_text("weee")
