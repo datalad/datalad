@@ -139,13 +139,14 @@ def _describe_system():
                                   _t2s(pl.win32_ver())]).rstrip(),
         'max_path_length': get_max_path_length(getpwd()),
         'encoding': get_encoding_info(),
-        'filesystem': [_get_fs_type(p) for p in [os.getcwd(),
-                                                 tempfile.gettempdir(),
-                                                 str(Path.home())]]
+        'filesystem': {l: _get_fs_type(l, p) for l, p in
+                       [('CWD', os.getcwd()),
+                        ('TMP', tempfile.gettempdir()),
+                        ('HOME', str(Path.home()))]}
     }
 
 
-def _get_fs_type(path):
+def _get_fs_type(loc, path):
     try:
         from psutil import disk_partitions
         match = ""
@@ -159,7 +160,8 @@ def _get_fs_type(path):
         ce = CapturedException(exc)
         lgr.warning("Failed to get filesystem information: %s", ce)
         fs = tuple()
-    return f'{path}: {fs}'
+    return {'path': path,
+            'type': fs}
 
 
 def _describe_environment():
