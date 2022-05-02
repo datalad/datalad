@@ -156,7 +156,7 @@ def setup_package():
         plugintest,
     )
 
-    from datalad import consts
+    from datalad import consts, lgr
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
     from datalad.tests.utils import (
