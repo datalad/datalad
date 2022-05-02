@@ -297,6 +297,24 @@ release of Debian or Ubuntu) with all dependencies listed in README.md pre-insta
 [datalad/tests/utils.py]() defines many useful decorators. Some of those just to annotate tests
 for various aspects to allow for easy sub-selection.
 
+#### Migration from `nose` to `pytest` in downstream code
+
+`datalad.tests.utils` remains providing `nose`-based utils and `datalad.__init__` provides `nose`-based
+fixtures to not break extensions which still use `nose` for testing. For a typical migration of a DataLad
+extension to use `pytest` instead of `nose`:
+
+- keep all the `assert_*` and `ok_` helpers but import them from `datalad.tests.utils_pytest`
+  instead
+- for `@with_*` and other decorators populating positional arguments, convert corresponding
+  posarg to kwarg by adding `=None`
+- convert all generator-based parametric tests into direct invocation or, preferably,
+  `@pytest.mark.parametrized` tests
+- address DeprecationWarnings in the code. Only where desired to test deprecation,
+  add `@pytest.mark.filterwarnings("ignore: BEGINNING OF WARNING")` decorator to the test.
+
+For an example, see a "migrate to pytest" PR against datalad-deprecated:
+https://github.com/datalad/datalad-deprecated/pull/51 .
+
 ##### Speed
 
 Please annotate with following decorators
