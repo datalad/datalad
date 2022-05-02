@@ -90,7 +90,6 @@ _group_3misc = (
         ('datalad.local.no_annex', 'NoAnnex'),
         ('datalad.local.check_dates', 'CheckDates'),
         ('datalad.local.unlock', 'Unlock'),
-        ('datalad.distribution.uninstall', 'Uninstall'),
     ])
 
 _group_4plumbing = (

@@ -125,12 +125,3 @@ Helpers and support utilities
    datalad shell-completion: Helper to support command completion <generated/man/datalad-shell-completion>
    datalad test: Frontend for running DataLad's internal test battery <generated/man/datalad-test>
    datalad wtf: Report on a DataLad installation and its configuration <generated/man/datalad-wtf>
-
-
-Deprecated commands
--------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   datalad uninstall: Drop subdatasets <generated/man/datalad-uninstall>
