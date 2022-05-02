@@ -617,7 +617,7 @@ def test_gh1763(src, target1, target2):
 @with_tempfile()
 @with_tempfile()
 def test_gh1811(srcpath, clonepath):
-    orig = Dataset(srcpath).create()
+    orig = Dataset(srcpath).create(annex=False)
     (orig.pathobj / 'some').write_text('some')
     orig.save()
     clone = Clone.__call__(source=orig.path, path=clonepath)
