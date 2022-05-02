@@ -17,13 +17,11 @@ from os.path import (
     exists,
     join as opj,
 )
-import re
 
 from datalad.tests.utils import (
     assert_dict_equal,
     assert_equal,
     assert_in,
-    assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_re_in,
@@ -52,7 +50,6 @@ from ..base import Interface
 from ..utils import (
     discover_dataset_trace_to_targets,
     eval_results,
-    handle_dirty_dataset,
 )
 from ..results import get_status_dict
 from datalad.interface.base import build_doc
@@ -60,59 +57,6 @@ from datalad.interface.base import build_doc
 
 __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.interface.tests.test_utils')
-_dirty_modes = ('fail', 'ignore', 'save-before')
-
-
-def _check_all_clean(ds, state):
-    assert state is not None
-    for mode in _dirty_modes:
-        # nothing wrong, nothing saved
-        handle_dirty_dataset(ds, mode)
-        assert_equal(state, ds.repo.get_hexsha())
-
-
-def _check_auto_save(ds, orig_state):
-    handle_dirty_dataset(ds, 'ignore')
-    assert_raises(RuntimeError, handle_dirty_dataset, ds, 'fail')
-    handle_dirty_dataset(ds, 'save-before')
-    state = ds.repo.get_hexsha()
-    assert_not_equal(orig_state, state)
-    _check_all_clean(ds, state)
-    return state
-
-
-@with_tempfile(mkdir=True)
-def test_dirty(path):
-    for mode in _dirty_modes:
-        # does nothing without a dataset
-        handle_dirty_dataset(None, mode)
-    # placeholder, but not yet created
-    ds = Dataset(path)
-    # unknown mode
-    assert_raises(ValueError, handle_dirty_dataset, ds, 'MADEUP')
-    # not yet created is very dirty
-    assert_raises(RuntimeError, handle_dirty_dataset, ds, 'fail')
-    handle_dirty_dataset(ds, 'ignore')
-    assert_raises(RuntimeError, handle_dirty_dataset, ds, 'save-before')
-    # should yield a clean repo
-    ds.create()
-    orig_state = ds.repo.get_hexsha()
-    _check_all_clean(ds, orig_state)
-    # tainted: untracked
-    with open(opj(ds.path, 'something'), 'w') as f:
-        f.write('some')
-    # we don't want to auto-add untracked files by saving (anymore)
-    assert_raises(AssertionError, _check_auto_save, ds, orig_state)
-    # tainted: staged
-    ds.repo.add('something', git=True)
-    orig_state = _check_auto_save(ds, orig_state)
-    # tainted: submodule
-    # not added to super on purpose!
-    subds = ds.create('subds')
-    _check_all_clean(subds, subds.repo.get_hexsha())
-    assert_repo_status(ds.path)
-    # subdataset must be added as a submodule!
-    assert_equal(ds.subdatasets(result_xfm='relpaths'), ['subds'])
 
 
 demo_hierarchy = {

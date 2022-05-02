@@ -58,49 +58,6 @@ from datalad.core.local.resulthooks import (
 lgr = logging.getLogger('datalad.interface.utils')
 
 
-# TODO remove
-# only `drop` and `uninstall` are still using this
-def handle_dirty_dataset(ds, mode, msg=None):
-    """Detect and treat unsaved changes as instructed by `mode`
-
-    Parameters
-    ----------
-    ds : Dataset or None
-      Dataset to be inspected. Does nothing if `None`.
-    mode : {'fail', 'ignore', 'save-before'}
-      How to act upon discovering unsaved changes.
-    msg : str or None
-      Custom message to use for a potential commit.
-
-    Returns
-    -------
-    None
-    """
-    if ds is None:
-        # nothing to be handled
-        return
-    if msg is None:
-        msg = '[DATALAD] auto-saved changes'
-
-    # make sure that all pending changes (batched annex operations, etc.)
-    # are actually reflected in Git
-    if ds.repo:
-        ds.repo.precommit()
-
-    if mode == 'ignore':
-        return
-    elif mode == 'fail':
-        if not ds.repo or ds.repo.dirty:
-            raise RuntimeError('dataset {} has unsaved changes'.format(ds))
-    elif mode == 'save-before':
-        if not ds.is_installed():
-            raise RuntimeError('dataset {} is not yet installed'.format(ds))
-        from datalad.core.local.save import Save
-        Save.__call__(dataset=ds, message=msg, updated=True)
-    else:
-        raise ValueError("unknown if-dirty mode '{}'".format(mode))
-
-
 def get_tree_roots(paths):
     """Return common root paths for a set of paths
 
