@@ -185,7 +185,7 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - PYTEST_OPTS=( )
+  - PYTEST_OPTS=( -v )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"; then
