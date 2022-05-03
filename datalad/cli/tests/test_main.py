@@ -188,13 +188,11 @@ def test_dashh_clone():
     assert_re_in('Use .--help. to get more comprehensive information', stdout.splitlines())
 
 
-@pytest.mark.xfail(reason="stderr is not captured while on travis!")
 def test_usage_on_insufficient_args():
     stdout, stderr = run_main(['install'], exit_code=2, expect_stderr=True)
     ok_startswith(stderr, 'usage:')
 
 
-@pytest.mark.xfail(reason="stderr is not captured while on travis!")
 def test_subcmd_usage_on_unknown_args():
     stdout, stderr = run_main(['get', '--murks'], exit_code=1, expect_stderr=True)
     in_('get', stdout)

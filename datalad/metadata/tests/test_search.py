@@ -167,7 +167,6 @@ def test_search_non_dataset(tdir=None):
     assert_in("datalad create --force", str(cme.value))
 
 
-@pytest.mark.xfail(reason="cmo.out is not captured while on travis!")
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_within_ds_file_search(path=None):
