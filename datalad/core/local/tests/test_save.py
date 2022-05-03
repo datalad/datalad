@@ -8,16 +8,26 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test save command"""
 
+import itertools
 import logging
 import os
 import os.path as op
 
-from datalad.utils import (
-    ensure_list,
-    Path,
-    rmtree,
+import pytest
+
+import datalad.utils as ut
+from datalad.api import (
+    create,
+    install,
+    save,
 )
-from datalad.tests.utils import (
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -27,16 +37,13 @@ from datalad.tests.utils import (
     assert_status,
     chpwd,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
     known_failure,
     known_failure_windows,
     maybe_adjust_repo,
     neq_,
-    OBSCURE_FILENAME,
     ok_,
     patch,
-    SkipTest,
     skip_if_adjusted_branch,
     skip_wo_symlink_capability,
     swallow_logs,
@@ -44,17 +51,11 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-
-import datalad.utils as ut
-from datalad.distribution.dataset import Dataset
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
-from datalad.api import (
-    create,
-    install,
-    save,
+from datalad.utils import (
+    Path,
+    ensure_list,
+    rmtree,
 )
-
 
 tree_arg = dict(tree={'test.txt': 'some',
                       'test_annex.txt': 'some annex',
@@ -67,7 +68,7 @@ tree_arg = dict(tree={'test.txt': 'some',
 
 
 @with_tempfile()
-def test_save(path):
+def test_save(path=None):
 
     ds = Dataset(path).create(annex=False)
 
@@ -146,7 +147,7 @@ def test_save(path):
 
 
 @with_tempfile()
-def test_save_message_file(path):
+def test_save_message_file(path=None):
     ds = Dataset(path).create()
     with assert_raises(ValueError):
         ds.save("blah", message="me", message_file="and me")
@@ -162,33 +163,38 @@ def test_save_message_file(path):
         "add foo")
 
 
-def test_renamed_file():
-    @with_tempfile()
-    def check_renamed_file(recursive, annex, path):
-        ds = Dataset(path).create(annex=annex)
-        create_tree(path, {'old': ''})
-        ds.repo.add('old')
-        ds.repo.call_git(["mv"], files=["old", "new"])
-        ds.save(recursive=recursive)
-        assert_repo_status(path)
+@with_tempfile()
+def check_renamed_file(recursive, annex, path):
+    ds = Dataset(path).create(annex=annex)
+    create_tree(path, {'old': ''})
+    ds.repo.add('old')
+    ds.repo.call_git(["mv"], files=["old", "new"])
+    ds.save(recursive=recursive)
+    assert_repo_status(path)
 
-        # https://github.com/datalad/datalad/issues/6558
-        new = (ds.pathobj / "new")
-        new.unlink()
-        new.mkdir()
-        (new / "file").touch()
-        ds.repo.call_git(["add"], files=[str(new / "file")])
-        ds.save(recursive=recursive)
-        assert_repo_status(path)
+    # https://github.com/datalad/datalad/issues/6558
+    new = (ds.pathobj / "new")
+    new.unlink()
+    new.mkdir()
+    (new / "file").touch()
+    ds.repo.call_git(["add"], files=[str(new / "file")])
+    ds.save(recursive=recursive)
+    assert_repo_status(path)
 
 
-    for recursive in False,:  #, True TODO when implemented
-        for annex in True, False:
-            yield check_renamed_file, recursive, annex
+@pytest.mark.parametrize(
+    "recursive,annex",
+    itertools.product(
+        (False, ),  #, True TODO when implemented
+        (True, False),
+    )
+)
+def test_renamed_file(recursive, annex):
+    check_renamed_file(recursive, annex)
 
 
 @with_tempfile(mkdir=True)
-def test_subdataset_save(path):
+def test_subdataset_save(path=None):
     parent = Dataset(path).create()
     sub = parent.create('sub')
     assert_repo_status(parent.path)
@@ -221,7 +227,7 @@ def test_subdataset_save(path):
 
 
 @with_tempfile(mkdir=True)
-def test_subsuperdataset_save(path):
+def test_subsuperdataset_save(path=None):
     # Verify that when invoked without recursion save does not
     # cause querying of subdatasets of the subdataset
     # see https://github.com/datalad/datalad/issues/4523
@@ -255,7 +261,7 @@ def test_subsuperdataset_save(path):
 
 @skip_wo_symlink_capability
 @with_tempfile(mkdir=True)
-def test_symlinked_relpath(path):
+def test_symlinked_relpath(path=None):
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
     os.makedirs(op.join(path, "origin"))
     dspath = op.join(path, "linked")
@@ -291,7 +297,7 @@ def test_symlinked_relpath(path):
 
 @skip_wo_symlink_capability
 @with_tempfile(mkdir=True)
-def test_bf1886(path):
+def test_bf1886(path=None):
     parent = Dataset(path).create()
     parent.create('sub')
     assert_repo_status(parent.path)
@@ -336,7 +342,7 @@ def test_bf1886(path):
     '1': '',
     '2': '',
     '3': ''})
-def test_gh2043p1(path):
+def test_gh2043p1(path=None):
     # this tests documents the interim agreement on what should happen
     # in the case documented in gh-2043
     ds = Dataset(path).create(force=True)
@@ -369,7 +375,7 @@ def test_gh2043p1(path):
 @with_tree({
     'staged': 'staged',
     'untracked': 'untracked'})
-def test_bf2043p2(path):
+def test_bf2043p2(path=None):
     ds = Dataset(path).create(force=True)
     ds.repo.add('staged')
     assert_repo_status(ds.path, added=['staged'], untracked=['untracked'])
@@ -383,7 +389,7 @@ def test_bf2043p2(path):
 @with_tree({
     OBSCURE_FILENAME + u'_staged': 'staged',
     OBSCURE_FILENAME + u'_untracked': 'untracked'})
-def test_encoding(path):
+def test_encoding(path=None):
     staged = OBSCURE_FILENAME + u'_staged'
     untracked = OBSCURE_FILENAME + u'_untracked'
     ds = Dataset(path).create(force=True)
@@ -394,7 +400,7 @@ def test_encoding(path):
 
 
 @with_tree(**tree_arg)
-def test_add_files(path):
+def test_add_files(path=None):
     ds = Dataset(path).create(force=True)
 
     test_list_1 = ['test_annex.txt']
@@ -426,7 +432,7 @@ def test_add_files(path):
 
 @with_tree(**tree_arg)
 @with_tempfile(mkdir=True)
-def test_add_subdataset(path, other):
+def test_add_subdataset(path=None, other=None):
     subds = create(op.join(path, 'dir'), force=True)
     ds = create(path, force=True)
     ok_(subds.repo.dirty)
@@ -475,7 +481,7 @@ def test_add_subdataset(path, other):
     'file2.txt': 'some text to go to annex',
     '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
 )
-def test_add_mimetypes(path):
+def test_add_mimetypes(path=None):
     ds = Dataset(path).create(force=True)
     ds.repo.add('.gitattributes')
     ds.repo.commit('added attributes to git explicitly')
@@ -503,7 +509,7 @@ def test_add_mimetypes(path):
 
 
 @with_tempfile(mkdir=True)
-def test_gh1597(path):
+def test_gh1597(path=None):
     ds = Dataset(path).create()
     sub = ds.create('sub')
     res = ds.subdatasets()
@@ -522,7 +528,7 @@ def test_gh1597(path):
 
 
 @with_tempfile(mkdir=True)
-def test_gh1597_simpler(path):
+def test_gh1597_simpler(path=None):
     ds = Dataset(path).create()
     # same goes for .gitattributes
     with open(op.join(ds.path, '.gitignore'), 'a') as f:
@@ -544,7 +550,7 @@ def test_gh1597_simpler(path):
 
 
 @with_tempfile(mkdir=True)
-def test_update_known_submodule(path):
+def test_update_known_submodule(path=None):
     def get_baseline(p):
         ds = Dataset(p).create()
         sub = create(str(ds.pathobj / 'sub'))
@@ -563,7 +569,7 @@ def test_update_known_submodule(path):
 
 
 @with_tempfile(mkdir=True)
-def test_add_recursive(path):
+def test_add_recursive(path=None):
     # make simple hierarchy
     parent = Dataset(path).create()
     assert_repo_status(parent.path)
@@ -592,7 +598,7 @@ def test_add_recursive(path):
 
 
 @with_tree(**tree_arg)
-def test_relpath_add(path):
+def test_relpath_add(path=None):
     ds = Dataset(path).create(force=True)
     with chpwd(op.join(path, 'dir')):
         eq_(save('testindir')[0]['path'],
@@ -605,7 +611,7 @@ def test_relpath_add(path):
 
 @skip_wo_symlink_capability
 @with_tempfile()
-def test_bf2541(path):
+def test_bf2541(path=None):
     ds = create(path)
     subds = ds.create('sub')
     assert_repo_status(ds.path)
@@ -616,7 +622,7 @@ def test_bf2541(path):
 
 
 @with_tempfile()
-def test_remove_subds(path):
+def test_remove_subds(path=None):
     ds = create(path)
     ds.create('sub')
     ds.create(op.join('sub', 'subsub'))
@@ -637,7 +643,7 @@ def test_remove_subds(path):
 
 
 @with_tempfile()
-def test_partial_unlocked(path):
+def test_partial_unlocked(path=None):
     # https://github.com/datalad/datalad/issues/1651
     ds = create(path)
     (ds.pathobj / 'normal.txt').write_text(u'123')
@@ -664,7 +670,7 @@ def test_partial_unlocked(path):
 
 @with_tree({'.gitattributes': "* annex.largefiles=(largerthan=4b)",
             "foo": "in annex"})
-def test_save_partial_commit_shrinking_annex(path):
+def test_save_partial_commit_shrinking_annex(path=None):
     # This is a variation on the test above. The main difference is that there
     # are other staged changes in addition to the unlocked filed.
     ds = create(path, force=True)
@@ -682,7 +688,7 @@ def test_save_partial_commit_shrinking_annex(path):
 
 
 @with_tempfile()
-def test_path_arg_call(path):
+def test_path_arg_call(path=None):
     ds = create(path)
     for testfile in (
             ds.pathobj / 'abs.txt',
@@ -697,7 +703,7 @@ def test_path_arg_call(path):
 # one can't create these file names on FAT/NTFS systems
 @skip_if_adjusted_branch
 @with_tempfile
-def test_windows_incompatible_names(path):
+def test_windows_incompatible_names(path=None):
     ds = Dataset(path).create()
     create_tree(path, {
         'imgood': 'Look what a nice name I have',
@@ -764,7 +770,7 @@ def test_windows_incompatible_names(path):
         },
     },
 })
-def test_surprise_subds(path):
+def test_surprise_subds(path=None):
     # https://github.com/datalad/datalad/issues/3139
     ds = create(path, force=True)
     # a lonely repo without any commit
@@ -816,7 +822,7 @@ def test_surprise_subds(path):
 
 
 @with_tree({"foo": ""})
-def test_bf3285(path):
+def test_bf3285(path=None):
     ds = Dataset(path).create(force=True)
     # Note: Using repo.pathobj matters in the "TMPDIR=/var/tmp/sym\ link" case
     # because assert_repo_status is based off of {Annex,Git}Repo.path, which is
@@ -830,7 +836,7 @@ def test_bf3285(path):
 
 @with_tree({"outside": "",
             "ds": {"within": ""}})
-def test_on_failure_continue(path):
+def test_on_failure_continue(path=None):
     ds = Dataset(op.join(path, "ds")).create(force=True)
     # save() calls status() in a way that respects on_failure.
     assert_in_results(
@@ -844,7 +850,7 @@ def test_on_failure_continue(path):
 
 
 @with_tree(tree={OBSCURE_FILENAME: "abc"})
-def test_save_obscure_name(path):
+def test_save_obscure_name(path=None):
     ds = Dataset(path).create(force=True)
     fname = OBSCURE_FILENAME
     # Just check that we don't fail with a unicode error.
@@ -883,14 +889,19 @@ def check_save_dotfiles(to_git, save_path, path):
         check(path)
 
 
-def test_save_dotfiles():
-    for git in [True, False, None]:
-        for save_path in [None, "nodot-subdir"]:
-            yield check_save_dotfiles, git, save_path
+@pytest.mark.parametrize(
+    "git,save_path",
+    itertools.product(
+        [True, False, None],
+        [None, "nodot-subdir"],
+    )
+)
+def test_save_dotfiles(git, save_path):
+    check_save_dotfiles(git, save_path)
 
 
 @with_tempfile
-def test_save_nested_subs_explicit_paths(path):
+def test_save_nested_subs_explicit_paths(path=None):
     ds = Dataset(path).create()
     spaths = [Path("s1"), Path("s1", "s2"), Path("s1", "s2", "s3")]
     for spath in spaths:
@@ -901,7 +912,7 @@ def test_save_nested_subs_explicit_paths(path):
 
 
 @with_tempfile
-def test_save_gitrepo_annex_subds_adjusted(path):
+def test_save_gitrepo_annex_subds_adjusted(path=None):
     ds = Dataset(path).create(annex=False)
     subds = ds.create("sub")
     maybe_adjust_repo(subds.repo)
@@ -913,7 +924,7 @@ def test_save_gitrepo_annex_subds_adjusted(path):
 
 @known_failure
 @with_tempfile
-def test_save_adjusted_partial(path):
+def test_save_adjusted_partial(path=None):
     ds = Dataset(path).create()
     subds = ds.create("sub")
     maybe_adjust_repo(subds.repo)
@@ -926,7 +937,7 @@ def test_save_adjusted_partial(path):
 
 
 @with_tempfile
-def test_save_diff_ignore_submodules_config(path):
+def test_save_diff_ignore_submodules_config(path=None):
     ds = Dataset(path).create()
     subds = ds.create("sub")
     (subds.pathobj / "foo").write_text("foo")
@@ -940,7 +951,7 @@ def test_save_diff_ignore_submodules_config(path):
 
 @with_tree(tree={'somefile': 'file content',
                  'subds': {'file_in_sub': 'other'}})
-def test_save_amend(dspath):
+def test_save_amend(dspath=None):
 
     dspath = Path(dspath)
     file_in_super = dspath / 'somefile'

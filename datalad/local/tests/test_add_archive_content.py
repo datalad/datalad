@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
+import tempfile
 from glob import glob
 from os import unlink
 from os.path import (
@@ -39,7 +40,7 @@ from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
@@ -67,6 +68,7 @@ from datalad.tests.utils import (
 from datalad.utils import (
     chpwd,
     find_files,
+    get_tempfile_kwargs,
     getpwd,
     on_windows,
     rmtemp,
@@ -99,7 +101,7 @@ treeargs = dict(
 @with_tree(**treeargs)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-def test_add_archive_dirs(path_orig, url, repo_path):
+def test_add_archive_dirs(path_orig=None, url=None, repo_path=None):
     # change to repo_path
     with chpwd(repo_path):
         # create annex repo
@@ -199,7 +201,7 @@ tree4uargs = dict(
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-def test_add_archive_content(path_orig, url, repo_path):
+def test_add_archive_content(path_orig=None, url=None, repo_path=None):
     with chpwd(repo_path):
         # TODO we need to be able to pass path into add_archive_content
         # We could mock but I mean for the API
@@ -372,7 +374,7 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-def test_add_archive_content_strip_leading(path_orig, url, repo_path):
+def test_add_archive_content_strip_leading(path_orig=None, url=None, repo_path=None):
     with chpwd(repo_path):
         ds = Dataset(repo_path).create(force=True)
         repo = ds.repo
@@ -391,7 +393,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
-def test_add_archive_content_zip(repo_path):
+def test_add_archive_content_zip(repo_path=None):
     ds = Dataset(repo_path).create(force=True)
     with chpwd(repo_path):
         with swallow_outputs():
@@ -404,7 +406,7 @@ def test_add_archive_content_zip(repo_path):
 
 @with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
                  "notds": {"2.tar.gz": {"bar": "def"}}})
-def test_add_archive_content_absolute_path(path):
+def test_add_archive_content_absolute_path(path=None):
     ds = Dataset(opj(path, "ds")).create(force=True)
     repo = ds.repo
     ds.save("1.tar.gz", message="1.tar.gz")
@@ -428,7 +430,7 @@ def test_add_archive_content_absolute_path(path):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
-def test_add_archive_use_archive_dir(repo_path):
+def test_add_archive_use_archive_dir(repo_path=None):
     ds = Dataset(repo_path).create(force=True)
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
@@ -475,7 +477,7 @@ def test_add_archive_use_archive_dir(repo_path):
         },
     }
 )
-def test_add_archive_single_file(repo_path):
+def test_add_archive_single_file(repo_path=None):
     ds = Dataset(repo_path).create(force=True)
     with chpwd(repo_path):
         archives = glob('archives/*')
@@ -492,10 +494,12 @@ class TestAddArchiveOptions():
     # few tests bundled with a common setup/teardown to minimize boiler plate
     # nothing here works on windows, no even teardown(), prevent failure at the
     # origin
-    @with_tree(tree={'1.tar': {'file.txt': 'load',
-                               '1.dat': 'load2'}},
-               delete=False)
-    def setup(self, repo_path):
+    def setup(self):
+        repo_path = tempfile.mkdtemp(**get_tempfile_kwargs(prefix="tree"))
+        create_tree(
+            repo_path,
+            {'1.tar': {'file.txt': 'load',
+                       '1.dat': 'load2'}})
         self.ds = ds = Dataset(repo_path)
         ds.create(force=True)
         self.annex = ds.repo
@@ -570,7 +574,7 @@ class TestAddArchiveOptions():
         # there should be no .datalad temporary files hanging around
         self.assert_no_trash_left_behind()
 
-    def test_add_delete_after_and_drop_subdir(self):
+    def test_add_delete_after_and_drop_subdir(self=None):
         os.mkdir(opj(self.annex.path, 'subdir'))
         mv_out = self.annex.call_git(
             ['mv', '1.tar', 'subdir']

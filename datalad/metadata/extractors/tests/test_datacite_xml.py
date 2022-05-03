@@ -9,14 +9,14 @@
 """Test datacite metadata extractor """
 
 from simplejson import dumps
+
+from datalad.api import create
 from datalad.metadata.extractors.datacite import MetadataExtractor
 from datalad.metadata.metadata import _get_metadatarelevant_paths
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     with_tree,
 )
-from datalad.api import create
-
 
 xml_content = """\
 <?xml version="1.0" encoding="UTF-8"?>
@@ -66,7 +66,7 @@ xml_content = """\
 
 @with_tree(tree={'.datalad': {'meta.datacite.xml': xml_content}})
 @with_tree(tree={'elsewhere': {'meta.datacite.xml': xml_content}})
-def test_get_metadata(path1, path2):
+def test_get_metadata(path1=None, path2=None):
     for p in (path1, path2):
         print('PATH')
         ds = create(p, force=True)

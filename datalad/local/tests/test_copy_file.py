@@ -8,18 +8,12 @@
 """Test copy_file command"""
 
 
-from os.path import (
-    join as opj,
-)
+from os.path import join as opj
 
+from datalad.api import copy_file
+from datalad.consts import DATALAD_SPECIAL_REMOTE
 from datalad.distribution.dataset import Dataset
-from datalad.api import (
-    copy_file,
-)
-from datalad.utils import (
-    Path,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in_results,
     assert_raises,
     assert_repo_status,
@@ -34,7 +28,7 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.consts import DATALAD_SPECIAL_REMOTE
+from datalad.utils import Path
 
 
 @with_tempfile(mkdir=True)
@@ -43,7 +37,7 @@ from datalad.consts import DATALAD_SPECIAL_REMOTE
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copy_file(workdir, webdir, weburl):
+def test_copy_file(workdir=None, webdir=None, weburl=None):
     workdir = Path(workdir)
     webdir = Path(webdir)
     src_ds = Dataset(workdir / 'src').create()
@@ -60,7 +54,7 @@ def test_copy_file(workdir, webdir, weburl):
         # unless we have a target ds on a cripples FS (where `annex fromkey`
         # doesn't work until after 8.20210428), we can even drop the file
         # content in the source repo
-        src_ds.drop('myfile1.txt', check=False)
+        src_ds.drop('myfile1.txt', reckless='kill')
         nok_(src_ds.repo.file_has_content('myfile1.txt'))
     # copy the file from the source dataset into it.
     # it must copy enough info to actually put datalad into the position
@@ -96,7 +90,7 @@ def test_copy_file(workdir, webdir, weburl):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_copy_file_errors(dspath1, dspath2, nondspath):
+def test_copy_file_errors(dspath1=None, dspath2=None, nondspath=None):
     ds1 = Dataset(dspath1)
     # nothing given
     assert_raises(ValueError, copy_file)
@@ -137,7 +131,7 @@ def test_copy_file_errors(dspath1, dspath2, nondspath):
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
+def test_copy_file_datalad_specialremote(workdir=None, webdir=None, weburl=None):
     workdir = Path(workdir)
     src_ds = Dataset(workdir / 'src').create()
     # enable datalad special remote
@@ -186,13 +180,13 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
 
 
 @with_tempfile(mkdir=True)
-def test_copy_file_into_nonannex(workdir):
+def test_copy_file_into_nonannex(workdir=None):
     workdir = Path(workdir)
     src_ds = Dataset(workdir / 'src').create()
     (src_ds.pathobj / 'present.txt').write_text('123')
     (src_ds.pathobj / 'gone.txt').write_text('abc')
     src_ds.save()
-    src_ds.drop('gone.txt', check=False)
+    src_ds.drop('gone.txt', reckless='kill')
 
     # destination has no annex
     dest_ds = Dataset(workdir / 'dest').create(annex=False)
@@ -215,7 +209,7 @@ def test_copy_file_into_nonannex(workdir):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copy_file_recursion(srcdir, destdir):
+def test_copy_file_recursion(srcdir=None, destdir=None):
     src_ds = Dataset(srcdir).create(force=True)
     src_ds.save()
     dest_ds = Dataset(destdir).create()
@@ -234,7 +228,7 @@ def test_copy_file_recursion(srcdir, destdir):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copy_file_into_dshierarchy(srcdir, destdir):
+def test_copy_file_into_dshierarchy(srcdir=None, destdir=None):
     srcdir = Path(srcdir)
     src_ds = Dataset(srcdir).create(force=True)
     src_ds.save()
@@ -267,7 +261,7 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copy_file_specs_from(srcdir, destdir):
+def test_copy_file_specs_from(srcdir=None, destdir=None):
     srcdir = Path(srcdir)
     destdir = Path(destdir)
     files = [p for p in srcdir.glob('**/*') if not p.is_dir()]
@@ -325,7 +319,7 @@ def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
+def test_copy_file_prevent_dotgit_placement(srcpath=None, destpath=None):
     src = Dataset(srcpath).create()
     sub = src.create('sub')
     dest = Dataset(destpath).create()
@@ -377,14 +371,14 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_copy_file_nourl(serv_path, orig_path, tst_path):
+def test_copy_file_nourl(serv_path=None, orig_path=None, tst_path=None):
     """Tests availability transfer to normal git-annex remote"""
     # prep source dataset that will have the file content
     srv_ds = Dataset(serv_path).create()
     (srv_ds.pathobj / 'myfile.dat').write_text('I am content')
     (srv_ds.pathobj / 'noavail.dat').write_text('null')
     srv_ds.save()
-    srv_ds.drop('noavail.dat', check=False)
+    srv_ds.drop('noavail.dat', reckless='kill')
     # make an empty superdataset, with the test dataset as a subdataset
     orig_ds = Dataset(orig_path).create()
     orig_ds.clone(source=serv_path, path='serv')

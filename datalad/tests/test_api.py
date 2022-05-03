@@ -9,22 +9,24 @@
 '''Unit tests for Python API functionality.'''
 
 import re
+
+from datalad.tests.utils_pytest import (
+    SkipTest,
+    assert_false,
+    assert_in,
+    assert_true,
+    eq_,
+)
 from datalad.utils import get_sig_param_names
-
-from datalad.tests.utils import assert_true, assert_false
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import eq_
-
-from datalad.tests.utils import assert_in
 
 
 def test_basic_setup():
     # the import alone will verify that all default values match their
     # constraints
     from datalad import api
+
     # random pick of something that should be there
     assert_true(hasattr(api, 'install'))
-    assert_true(hasattr(api, 'test'))
     assert_true(hasattr(api, 'create'))
     # make sure all helper utilities do not pollute the namespace
     # and we end up only with __...__ attributes
@@ -62,10 +64,11 @@ def _test_consistent_order_of_args(intf, spec_posargs):
             assert False
 
 
+# TODO?: make parametric again instead of invoking
 def test_consistent_order_of_args():
-    from datalad.interface.base import get_interface_groups
-
     from importlib import import_module
+
+    from datalad.interface.base import get_interface_groups
 
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
@@ -81,4 +84,4 @@ def test_consistent_order_of_args():
                 if param.cmd_args and not param.cmd_args[0].startswith('-')
             }
             # we have information about positional args
-            yield _test_consistent_order_of_args, intf, spec_posargs
+            _test_consistent_order_of_args(intf, spec_posargs)

@@ -32,7 +32,7 @@ from ...tests.test_archives import (
     fn_archive_obscure_ext,
     fn_in_archive_obscure,
 )
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     abspath,
     assert_equal,
     assert_false,
@@ -66,7 +66,7 @@ from ..archives import (
           (fn_archive_obscure_ext, (('d', ((fn_in_archive_obscure, '123'),)),)),
           (fn_archive_obscure, '123')))
 @with_tempfile()
-def test_basic_scenario(d, d2):
+def test_basic_scenario(d=None, d2=None):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
     annex = AnnexRepo(d, backend='MD5E')
     annex.init_remote(
@@ -148,7 +148,7 @@ def test_basic_scenario(d, d2):
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_in_archive_obscure: '123'}}}
 )
-def test_annex_get_from_subdir(topdir):
+def test_annex_get_from_subdir(topdir=None):
     ds = Dataset(topdir)
     ds.create(force=True)
     ds.save('a.tar.gz')
@@ -214,7 +214,7 @@ def test_no_rdflib_loaded():
 )
 @serve_path_via_http()
 @with_tempfile
-def check_observe_tqdm(topdir, topurl, outdir):
+def check_observe_tqdm(topdir=None, topurl=None, outdir=None):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
     from datalad.api import (
@@ -241,7 +241,7 @@ def check_observe_tqdm(topdir, topurl, outdir):
 
 @known_failure_githubci_win
 @with_tempfile
-def test_link_file_load(tempfile):
+def test_link_file_load(tempfile=None):
     tempfile2 = tempfile + '_'
 
     with open(tempfile, 'w') as f:

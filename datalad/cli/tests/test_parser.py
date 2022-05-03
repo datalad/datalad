@@ -5,9 +5,9 @@ __docformat__ = 'restructuredtext'
 from io import StringIO
 from unittest.mock import patch
 
-from nose.tools import (
-    assert_in,
+from datalad.tests.utils_pytest import (
     assert_equal,
+    assert_in,
     assert_raises,
 )
 
@@ -21,13 +21,13 @@ def test_fail_with_short_help():
     out = StringIO()
     with assert_raises(SystemExit) as cme:
         fail_with_short_help(exit_code=3, out=out)
-    assert_equal(cme.exception.code, 3)
+    assert_equal(cme.value.code, 3)
     assert_equal(out.getvalue(), "")
 
     out = StringIO()
     with assert_raises(SystemExit) as cme:
         fail_with_short_help(msg="Failed badly", out=out)
-    assert_equal(cme.exception.code, 1)
+    assert_equal(cme.value.code, 1)
     assert_equal(out.getvalue(), "error: Failed badly\n")
 
     # Suggestions, hint, etc
@@ -41,7 +41,7 @@ def test_fail_with_short_help():
             exit_code=0,  # no one forbids
             what="parent",
             out=out)
-    assert_equal(cme.exception.code, 0)
+    assert_equal(cme.value.code, 0)
     assert_equal(out.getvalue(),
                  "error: Failed badly\n"
                  "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
@@ -62,7 +62,7 @@ def check_setup_parser(args, exit_code=None):
             else:
                 parser = setup_parser(args)
     if exit_code is not None:
-        assert_equal(cm.exception.code, exit_code)
+        assert_equal(cm.value.code, exit_code)
     stdout = cmout.getvalue()
     stderr = cmerr.getvalue()
     return {'parser': parser, 'out': stdout, 'err': stderr}

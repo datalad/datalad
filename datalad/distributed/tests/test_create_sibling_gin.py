@@ -9,7 +9,7 @@
 
 
 from datalad.api import create_sibling_gin
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in_results,
     skip_if_no_network,
     with_tempfile,
@@ -33,7 +33,7 @@ def check_push(ds):
 
 @skip_if_no_network
 @with_tempfile
-def test_gin(path):
+def test_gin(path=None):
     check4real(
         create_sibling_gin,
         path,

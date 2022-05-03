@@ -99,6 +99,5 @@ _group_4plumbing = (
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
-        ('datalad.interface.test', 'Test'),
         ('datalad.interface.shell_completion', 'ShellCompletion', 'shell-completion'),
     ])

@@ -2,13 +2,13 @@ import sys
 from queue import Queue
 from typing import Optional
 
-from datalad.runner.nonasyncrunner import run_command
-from datalad.runner.protocol import GeneratorMixIn
 from datalad.runner.coreprotocols import (
     NoCapture,
     StdOutErrCapture,
 )
-from datalad.tests.utils import (
+from datalad.runner.nonasyncrunner import run_command
+from datalad.runner.protocol import GeneratorMixIn
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_raises,
 )
@@ -19,6 +19,9 @@ from .utils import py2cmd
 
 
 class TestProtocol(GeneratorMixIn, StdOutErrCapture):
+
+    __test__ = False  # class is not a class of tests
+
     def __init__(self,
                  done_future=None,
                  encoding=None):

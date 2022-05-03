@@ -9,45 +9,43 @@
 
 """
 
-from datalad.support.path import (
-    basename,
-    join as opj,
-    normpath,
-    relpath,
-)
-
 from datalad.api import (
+    Dataset,
     clone,
     create,
-    Dataset,
     install,
     siblings,
 )
-from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-
-from datalad.tests.utils import (
-    chpwd,
-    create_tree,
-    with_tempfile, with_testrepos,
+from datalad.support.gitrepo import GitRepo
+from datalad.support.path import basename
+from datalad.support.path import join as opj
+from datalad.support.path import (
+    normpath,
+    relpath,
+)
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
     assert_raises,
-    assert_status,
     assert_result_count,
-    with_sameas_remote,
+    assert_status,
+    chpwd,
+    create_tree,
     eq_,
     ok_,
     serve_path_via_http,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
+    with_sameas_remote,
+    with_tempfile,
+    with_testrepos,
 )
-
 from datalad.utils import (
-    on_windows,
     Path,
+    on_windows,
 )
 
 
@@ -55,7 +53,7 @@ from datalad.utils import (
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_siblings(origin, repo_path, local_clone_path):
+def test_siblings(origin=None, repo_path=None, local_clone_path=None):
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"
@@ -174,7 +172,7 @@ def test_siblings(origin, repo_path, local_clone_path):
     #    add_sibling(dataset=source, name="test-remote",
     #                url=httpurl1 + "/elsewhere")
     #assert_in("""'test-remote' already exists with conflicting settings""",
-    #          str(cm.exception))
+    #          str(cm.value))
     ## add a push url without force fails, since in a way the fetch url is the
     ## configured push url, too, in that case:
     #with assert_raises(RuntimeError) as cm:
@@ -182,7 +180,7 @@ def test_siblings(origin, repo_path, local_clone_path):
     #                url=httpurl1 + "/elsewhere",
     #                pushurl=sshurl, force=False)
     #assert_in("""'test-remote' already exists with conflicting settings""",
-    #          str(cm.exception))
+    #          str(cm.value))
 
     # add push url (force):
     res = siblings('configure',
@@ -278,7 +276,7 @@ def test_siblings(origin, repo_path, local_clone_path):
 
 
 @with_tempfile(mkdir=True)
-def test_here(path):
+def test_here(path=None):
     # few smoke tests regarding the 'here' sibling
     ds = create(path)
     res = ds.siblings(
@@ -328,7 +326,7 @@ def test_here(path):
 
 
 @with_tempfile(mkdir=True)
-def test_no_annex(path):
+def test_no_annex(path=None):
     # few smoke tests regarding the 'here' sibling
     ds = create(path, annex=False)
     res = ds.siblings(
@@ -351,7 +349,7 @@ def test_no_annex(path):
 
 @with_tempfile()
 @with_tempfile()
-def test_arg_missing(path, path2):
+def test_arg_missing(path=None, path2=None):
     # test fix for gh-3553
     ds = create(path)
     assert_raises(
@@ -400,11 +398,11 @@ def test_arg_missing(path, path2):
 
 @with_sameas_remote
 @with_tempfile(mkdir=True)
-def test_sibling_enable_sameas(repo, clone_path):
+def test_sibling_enable_sameas(repo=None, clone_path=None):
     ds = Dataset(repo.path)
     create_tree(ds.path, {"f0": "0"})
     ds.save(path="f0")
-    ds.repo.copy_to(["f0"], remote="r_dir")
+    ds.push(["f0"], to="r_dir")
     ds.repo.drop(["f0"])
 
     ds_cloned = clone(ds.path, clone_path)
@@ -437,7 +435,7 @@ def test_sibling_enable_sameas(repo, clone_path):
 
 
 @with_tempfile(mkdir=True)
-def test_sibling_inherit(basedir):
+def test_sibling_inherit(basedir=None):
     ds_source = Dataset(opj(basedir, "source")).create()
 
     # In superdataset, set up remote "source" that has git-annex group "grp".
@@ -457,7 +455,7 @@ def test_sibling_inherit(basedir):
 
 
 @with_tempfile(mkdir=True)
-def test_sibling_inherit_no_super_remote(basedir):
+def test_sibling_inherit_no_super_remote(basedir=None):
     ds_source = Dataset(opj(basedir, "source")).create()
     ds_super = Dataset(opj(basedir, "super")).create()
     ds_clone = ds_super.clone(
@@ -470,7 +468,7 @@ def test_sibling_inherit_no_super_remote(basedir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_sibling_path_is_posix(basedir, otherpath):
+def test_sibling_path_is_posix(basedir=None, otherpath=None):
     ds_source = Dataset(opj(basedir, "source")).create()
     # add remote with system native path
     ds_source.siblings(
@@ -489,7 +487,7 @@ def test_sibling_path_is_posix(basedir, otherpath):
 
 
 @with_tempfile()
-def test_bf3733(path):
+def test_bf3733(path=None):
     ds = create(path)
     # call siblings configure for an unknown sibling without a URL
     # doesn't work, but also doesn't crash
@@ -513,7 +511,7 @@ def test_bf3733(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
+def test_as_common_datasource(testbed=None, viapath=None, viaurl=None, remotepath=None, url=None):
     ds = Dataset(remotepath).create()
     (ds.pathobj / 'testfile').write_text('likemagic')
     (ds.pathobj / 'testfile2').write_text('likemagic2')
@@ -569,7 +567,7 @@ def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_specialremote(dspath, remotepath):
+def test_specialremote(dspath=None, remotepath=None):
     ds = Dataset(dspath).create()
     ds.repo.call_annex(
         ['initremote', 'myremote', 'type=directory',

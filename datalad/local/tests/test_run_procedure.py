@@ -27,7 +27,7 @@ from datalad.support.exceptions import (
     CommandError,
     InsufficientArgumentsError,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     assert_false,
     assert_in_results,
@@ -51,7 +51,7 @@ from datalad.utils import (
 
 
 @with_tempfile(mkdir=True)
-def test_invalid_call(path):
+def test_invalid_call(path=None):
     with chpwd(path):
         # ^ Change directory so that we don't fail with an
         # InvalidGitRepositoryError if the test is executed from a git
@@ -64,7 +64,7 @@ def test_invalid_call(path):
 
 
 @with_tree(tree={'README.md': 'dirty'})
-def test_dirty(path):
+def test_dirty(path=None):
     ds = Dataset(path).create(force=True)
     # must fail, because README.md is to be modified, but already dirty
     assert_in_results(
@@ -94,7 +94,7 @@ echo "I am never to be ran but could be discovered"
 exit 1
 """})
 @with_tempfile
-def test_procedure_discovery(path, super_path):
+def test_procedure_discovery(path=None, super_path=None):
     with chpwd(path):
         # ^ Change directory so that we don't fail with an
         # InvalidGitRepositoryError if the test is executed from a git
@@ -220,7 +220,7 @@ with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('{}\\n'.format(sys.argv[2]))
 save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
-def test_configs(path):
+def test_configs(path=None):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
@@ -296,7 +296,7 @@ with open(op.join(sys.argv[1], sys.argv[2]), 'w') as f:
     f.write('hello\\n')
 save(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
 """}})
-def test_spaces(path):
+def test_spaces(path=None):
     """
     Test whether args with spaces are correctly parsed.
     """
@@ -321,7 +321,7 @@ print(sys.argv)
 # script, dataset, and two others
 assert len(sys.argv) == 4
 """}}})
-def test_quoting(path):
+def test_quoting(path=None):
     ds = Dataset(op.join(path, OBSCURE_FILENAME)).create(force=True)
     # Our custom procedure fails if it receives anything other than two
     # procedure arguments (so the script itself receives 3). Check a few cases
@@ -375,7 +375,7 @@ When the earth was flat
     '0blob': '\x00',
     'emptyline': '\n',  # libmagic: "binary" "application/octet-stream"
 })
-def test_text2git(path):
+def test_text2git(path=None):
     # Test if files being correctly annexed in a ds configured with text2git.
     TEXT_FILES = ('JSON', 'YAML', 'MARKDOWN', 'empty')
     BINARY_FILES = ('0blob', 'emptyline')
@@ -397,7 +397,7 @@ def test_text2git(path):
 import sys
 print(sys.argv)
 """}}})
-def test_name_with_underscore(path):
+def test_name_with_underscore(path=None):
     ds = Dataset(path).create(force=True)
 
     # we are using the presence of a managed branch as a proxy indicator
@@ -424,7 +424,7 @@ def test_name_with_underscore(path):
 
 
 @with_tempfile
-def test_call_fmt_from_env_requires_reload(path):
+def test_call_fmt_from_env_requires_reload(path=None):
     ds = Dataset(path).create()
     subds = ds.create("sub")
     (subds.pathobj / ".datalad" / "procedures").mkdir(
@@ -439,7 +439,7 @@ def test_call_fmt_from_env_requires_reload(path):
 
 
 @with_tempfile
-def test_run_proc_with_dict(path):
+def test_run_proc_with_dict(path=None):
     # Test whether a result from run_procedure(discover=True) will be accepted
     ds = Dataset(path).create()
     g = ds.run_procedure(discover=True, result_renderer='disabled',

@@ -49,7 +49,7 @@ jobs:
       run: |
         mkdir -p __testhome__
         cd __testhome__
-        python -m nose -s -v --with-cov --cover-package datalad --cover-xml datalad.core datalad.support
+        python -m pytest -c ../tox.ini -s -v --cov=datalad --cov-report=xml --pyargs datalad.core datalad.support
 
     - name: Upload coverage report to Codecov
       uses: codecov/codecov-action@v2

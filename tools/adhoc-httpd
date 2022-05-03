@@ -8,10 +8,10 @@
 #   % adhoc-httpd /tmp ssl
 #   % adhoc-httpd /tmp nossl myuser yourpassword
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
-from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils_pytest import serve_path_via_http
 
 path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
 if not path.exists():

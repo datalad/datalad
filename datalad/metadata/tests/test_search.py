@@ -15,19 +15,20 @@ from os import makedirs
 from os.path import dirname
 from os.path import join as opj
 from shutil import copy
+from pkg_resources import EntryPoint
+
+import pytest
 from unittest.mock import (
     MagicMock,
     patch,
 )
-
-from pkg_resources import EntryPoint
 
 from datalad.api import (
     Dataset,
     search,
 )
 from datalad.support.exceptions import NoDatasetFound
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,
@@ -58,17 +59,17 @@ from ..search import (
 
 @with_testsui(interactive=False)
 @with_tempfile(mkdir=True)
-def test_search_outside1_noninteractive_ui(tdir):
+def test_search_outside1_noninteractive_ui(tdir=None):
     # we should raise an informative exception
     with chpwd(tdir):
         with assert_raises(NoDatasetFound) as cme:
             list(search("bu"))
-        assert_in('run interactively', str(cme.exception))
+        assert_in('run interactively', str(cme.value))
 
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_search_outside1(tdir, newhome):
+def test_search_outside1(tdir=None, newhome=None):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
@@ -85,7 +86,7 @@ def test_search_outside1(tdir, newhome):
 @with_testsui(responses='yes')
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_search_outside1_install_default_ds(tdir, default_dspath):
+def test_search_outside1_install_default_ds(tdir=None, default_dspath=None):
     with chpwd(tdir):
         # let's mock out even actual install/search calls
         with \
@@ -157,18 +158,18 @@ def _check_mocked_install(default_dspath, mock_install):
 
 
 @with_tempfile
-def test_search_non_dataset(tdir):
+def test_search_non_dataset(tdir=None):
     from datalad.support.gitrepo import GitRepo
     GitRepo(tdir, create=True)
     with assert_raises(NoDatasetFound) as cme:
         list(search('smth', dataset=tdir))
     # Should instruct user how that repo could become a datalad dataset
-    assert_in("datalad create --force", str(cme.exception))
+    assert_in("datalad create --force", str(cme.value))
 
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_within_ds_file_search(path):
+def test_within_ds_file_search(path=None):
     try:
         import mutagen
     except ImportError:
@@ -262,7 +263,7 @@ type
         ds.search('*wrong')
     assert_re_in(
         r"regular expression '\(\?i\)\*wrong' \(original: '\*wrong'\) is incorrect: ",
-        str(cme.exception))
+        str(cme.value))
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:

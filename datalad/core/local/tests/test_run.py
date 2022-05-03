@@ -40,7 +40,7 @@ from datalad.support.exceptions import (
     IncompleteResultsError,
     NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     OBSCURE_FILENAME,
     assert_false,
@@ -75,7 +75,7 @@ cat_command = 'cat' if not on_windows else 'type'
 
 
 @with_tempfile(mkdir=True)
-def test_invalid_call(path):
+def test_invalid_call(path=None):
     with chpwd(path):
         # no dataset, no luck
         assert_raises(NoDatasetFound, run, 'doesntmatter')
@@ -93,7 +93,7 @@ def last_commit_msg(repo):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_basics(path, nodspath):
+def test_basics(path=None, nodspath=None):
     ds = Dataset(path).create()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
@@ -178,7 +178,7 @@ def test_basics(path, nodspath):
 #   receive.autogc=0 and gc.auto=0 from our common git options (gh-3482).
 # moreover the usage of unicode in the file names also breaks this on windows
 @with_tempfile(mkdir=True)
-def test_py2_unicode_command(path):
+def test_py2_unicode_command(path=None):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
     ds = Dataset(path).create()
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
@@ -211,7 +211,7 @@ def test_py2_unicode_command(path):
 
 
 @with_tempfile(mkdir=True)
-def test_sidecar(path):
+def test_sidecar(path=None):
     ds = Dataset(path).create()
     # Simple sidecar message checks.
     ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
@@ -247,7 +247,7 @@ def test_sidecar(path):
 
 
 @with_tree(tree={"to_remove": "abc"})
-def test_run_save_deletion(path):
+def test_run_save_deletion(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     ds.run("{} to_remove".format("del" if on_windows else "rm"))
@@ -255,14 +255,14 @@ def test_run_save_deletion(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_from_subds(path):
+def test_run_from_subds(path=None):
     subds = Dataset(path).create().create("sub")
     subds.run("cd .> foo")
     assert_repo_status(subds.path)
 
 
 @with_tree(tree={"sub": {"input": ""}})
-def test_run_from_subds_gh3551(path):
+def test_run_from_subds_gh3551(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     ds.create("output")
@@ -300,7 +300,7 @@ def test_run_from_subds_gh3551(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_assume_ready(path):
+def test_run_assume_ready(path=None):
     ds = Dataset(path).create()
     repo = ds.repo
     adjusted = repo.is_managed_branch()
@@ -323,7 +323,7 @@ def test_run_assume_ready(path):
         ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs"),
         action="get", type="file")
 
-    ds.drop("f1", check=False)
+    ds.drop("f1", reckless='kill')
     if not adjusted:
         # If the input is not actually ready, the command will fail.
         assert_in_results(
@@ -370,7 +370,7 @@ def test_run_assume_ready(path):
 
 @with_tempfile()
 @with_tempfile()
-def test_run_explicit(origpath, path):
+def test_run_explicit(origpath=None, path=None):
     origds = Dataset(origpath).create()
     (origds.pathobj / "test-annex.dat").write_text('content')
     origds.save()
@@ -430,7 +430,7 @@ def test_run_explicit(origpath, path):
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
-def test_inputs_quotes_needed(path):
+def test_inputs_quotes_needed(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
     cmd = "import sys; open(sys.argv[-1], 'w').write('!'.join(sys.argv[1:]))"
@@ -453,7 +453,7 @@ def test_inputs_quotes_needed(path):
 
 
 @with_tree(tree={"foo": "f", "bar": "b"})
-def test_inject(path):
+def test_inject(path=None):
     ds = Dataset(path).create(force=True)
     assert_repo_status(ds.path, untracked=['foo', 'bar'])
     list(run_command("nonsense command",
@@ -466,7 +466,7 @@ def test_inject(path):
 
 
 @with_tempfile(mkdir=True)
-def test_format_command_strip_leading_dashes(path):
+def test_format_command_strip_leading_dashes(path=None):
     ds = Dataset(path).create()
     eq_(format_command(ds, ["--", "cmd", "--opt"]),
         '"cmd" "--opt"' if on_windows else "cmd --opt")
@@ -479,7 +479,7 @@ def test_format_command_strip_leading_dashes(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_cmdline_disambiguation(path):
+def test_run_cmdline_disambiguation(path=None):
     Dataset(path).create()
     with chpwd(path):
         # Without a positional argument starting a command, any option is
@@ -514,7 +514,7 @@ def test_run_cmdline_disambiguation(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_path_semantics(path):
+def test_run_path_semantics(path=None):
     # Test that we follow path resolution from gh-3435: paths are relative to
     # dataset if a dataset instance is given and relative to the current
     # working directory otherwise.
@@ -569,7 +569,7 @@ def test_run_path_semantics(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_remove_keeps_leading_directory(path):
+def test_run_remove_keeps_leading_directory(path=None):
     ds = Dataset(op.join(path, "ds")).create()
     repo = ds.repo
 
@@ -599,7 +599,7 @@ def test_run_remove_keeps_leading_directory(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_reglob_outputs(path):
+def test_run_reglob_outputs(path=None):
     ds = Dataset(path).create()
     repo = ds.repo
     (ds.pathobj / "write_text.py").write_text("""
@@ -621,7 +621,7 @@ with open(name + ".txt", "w") as fh:
 
 
 @with_tempfile(mkdir=True)
-def test_run_unexpanded_placeholders(path):
+def test_run_unexpanded_placeholders(path=None):
     ds = Dataset(path).create()
     cmd = [sys.executable, "-c",
            "import sys; open(sys.argv[1], 'w').write(' '.join(sys.argv[2:]))"]
@@ -644,7 +644,7 @@ def test_run_unexpanded_placeholders(path):
 
 
 @with_tempfile(mkdir=True)
-def test_run_empty_repo(path):
+def test_run_empty_repo(path=None):
     ds = Dataset(path).create()
     cmd = [sys.executable, "-c", "open('foo', 'w').write('')"]
     # Using "*" in a completely empty repo will fail.
@@ -658,7 +658,7 @@ def test_run_empty_repo(path):
 
 
 @with_tree(tree={"foo": "f", "bar": "b"})
-def test_dry_run(path):
+def test_dry_run(path=None):
     ds = Dataset(path).create(force=True)
 
     # The dataset is reported as dirty, and the custom result render relays
@@ -726,7 +726,7 @@ def test_dry_run(path):
 
 @with_tree(tree={OBSCURE_FILENAME + ".t": "obscure",
                  "normal.txt": "normal"})
-def test_io_substitution(path):
+def test_io_substitution(path=None):
     files = [OBSCURE_FILENAME + ".t", "normal.txt"]
     ds = Dataset(path).create(force=True)
     ds.save()

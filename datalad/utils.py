@@ -7,39 +7,34 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import collections
-from collections.abc import Callable
-import re
 import builtins
-import time
-
-import logging
-import shutil
-import os
-import sys
-import tempfile
-from tempfile import NamedTemporaryFile
-import platform
+import collections
 import gc
 import glob
 import gzip
+import inspect
+import logging
+import os
+import os.path as op
+import platform
+import posixpath
+import re
+import shutil
 import stat
 import string
+import sys
+import tempfile
+import time
 import warnings
-
-import os.path as op
-
-from copy import copy as shallow_copy
+from collections.abc import Callable
 from contextlib import contextmanager
+from copy import copy as shallow_copy
 from functools import (
     lru_cache,
     wraps,
 )
-from time import sleep
-import inspect
 from itertools import tee
 # this import is required because other modules import opj from here.
-from os.path import join as opj
 from os.path import (
     abspath,
     basename,
@@ -52,26 +47,25 @@ from os.path import (
     isabs,
     isdir,
     islink,
+)
+from os.path import join as opj
+from os.path import (
     lexists,
     normpath,
     pardir,
     relpath,
     sep,
     split,
-    splitdrive
+    splitdrive,
 )
-
-import posixpath
-
-from shlex import (
-    quote as shlex_quote,
-    split as shlex_split,
-)
+from shlex import quote as shlex_quote
+from shlex import split as shlex_split
+from tempfile import NamedTemporaryFile
+from time import sleep
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 from datalad.support.exceptions import CapturedException
-
 
 unicode_srctypes = str, bytes
 
@@ -100,7 +94,11 @@ def get_linux_distribution():
             result = platform.linux_distribution()
     else:
         import distro  # We require this for Python 3.8 and above.
-        result = distro.linux_distribution(full_distribution_name=False)
+        return (
+            distro.id(),
+            distro.version(),
+            distro.codename(),
+        )
     return result
 
 
@@ -440,6 +438,7 @@ from pathlib import (
     PurePosixPath,
 )
 
+
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
 
@@ -679,6 +678,7 @@ else:
         Works only on linux and OSX ATM
         """
         from .cmd import WitlessRunner
+
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
@@ -1160,8 +1160,8 @@ def collect_method_callstats(func):
         The underlying possibly suboptimal use might be coming from their callers.
         It might or not relate to the previous TODO
     """
-    from collections import defaultdict
     import traceback
+    from collections import defaultdict
     from time import time
     memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
     # gross timing
@@ -1379,6 +1379,7 @@ def swallow_outputs():
             oldprint(*args, sep=sep, end=end, file=file)
 
     from .ui import ui
+
     # preserve -- they could have been mocked already
     oldprint = getattr(builtins, 'print')
     oldout, olderr = sys.stdout, sys.stderr
@@ -1474,8 +1475,10 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
             **kwargs: str, optional
               Passed to `assert_re_in` or `assert_in`
             """
-            from datalad.tests.utils import assert_re_in
-            from datalad.tests.utils import assert_in
+            from datalad.tests.utils_pytest import (
+                assert_in,
+                assert_re_in,
+            )
 
             if regex:
                 match = r'\[%s\] ' % level if level else r"\[\S+\] "
@@ -2183,8 +2186,10 @@ def open_r_encdetect(fname, readahead=1000):
       How many bytes to read for guessing the encoding type.  If
       negative - full file will be read
     """
-    from chardet import detect
     import io
+
+    from chardet import detect
+
     # read some bytes from the file
     with open(fname, 'rb') as f:
         head = f.read(readahead)
@@ -2344,7 +2349,8 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
 
 def get_encoding_info():
     """Return a dictionary with various encoding/locale information"""
-    import sys, locale
+    import locale
+    import sys
     from collections import OrderedDict
     return OrderedDict([
         ('default', sys.getdefaultencoding()),
@@ -2660,7 +2666,7 @@ lgr.log(5, "Done importing datalad.utils")
 
 
 def check_symlink_capability(path, target):
-    """helper similar to datalad.tests.utils.has_symlink_capability
+    """helper similar to datalad.tests.utils_pytest.has_symlink_capability
 
     However, for use in a datalad command context, we shouldn't
     assume to be able to write to tmpfile and also not import a whole lot from

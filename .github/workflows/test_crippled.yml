@@ -47,4 +47,4 @@ jobs:
       run: |
         mkdir -p __testhome__
         cd __testhome__
-        python -m nose -s -v -A "not (turtle)" datalad.core datalad.local datalad.distributed datalad.tests.test_utils_cached_dataset
+        python -m pytest -c ../tox.ini -s -v -m "not (turtle)" --pyargs datalad.core datalad.local datalad.distributed datalad.tests.test_utils_cached_dataset

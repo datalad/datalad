@@ -7,7 +7,7 @@ from unittest.mock import (
     patch,
 )
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_in,
     assert_is_none,

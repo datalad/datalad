@@ -33,13 +33,18 @@ from urllib.request import (
     urlopen,
 )
 
+import pytest
+from _pytest.outcomes import (
+    Failed,
+    Skipped,
+)
+
 from datalad import cfg as dl_cfg
 from datalad.support import path as op
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAMES,
     OBSCURE_PREFIX,
-    SkipTest,
     assert_cwd_unchanged,
     assert_dict_equal,
     assert_false,
@@ -108,7 +113,7 @@ def test_with_tempfile_dir_via_env_variable():
 
 @with_tempfile
 @with_tempfile
-def test_nested_with_tempfile_basic(f1, f2):
+def test_nested_with_tempfile_basic(f1=None, f2=None):
     ok_(f1 != f2)
     ok_(not os.path.exists(f1))
     ok_(not os.path.exists(f2))
@@ -123,7 +128,7 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tempfile(suffix='.cfg.old')
 @with_testrepos(flavors=local_testrepo_flavors, count=1)
 def check_nested_with_tempfile_parametrized_surrounded(
-        param, f0, tree, f1, f2, repo):
+        param, f0=None, tree=None, f1=None, f2=None, repo=None):
     eq_(param, "param1")
     ok_(f0.endswith('big'), msg="got %s" % f0)
     ok_(os.path.basename(f0).startswith('TEST'), msg="got %s" % f0)
@@ -135,11 +140,11 @@ def check_nested_with_tempfile_parametrized_surrounded(
 
 
 def test_nested_with_tempfile_parametrized_surrounded():
-    yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+    check_nested_with_tempfile_parametrized_surrounded("param1")
 
 
 @with_tempfile(content="testtest")
-def test_with_tempfile_content(f):
+def test_with_tempfile_content(f=None):
     ok_file_has_content(f, "testtest")
     ok_file_has_content(f, "test*", re_=True)
 
@@ -177,7 +182,7 @@ def test_with_testrepos():
 
 
 def test_get_resolved_values():
-    from datalad.tests.utils import _get_resolved_flavors
+    from datalad.tests.utils_pytest import _get_resolved_flavors
     flavors = ['networkish', 'local']
     eq_(([] if dl_cfg.get('datalad.tests.nonetwork') else ['networkish'])
         + ['local'],
@@ -190,7 +195,7 @@ def test_get_resolved_values():
         @with_testrepos(flavors=['network'])
         def magical():
             raise AssertionError("Must not be ran")
-        assert_raises(SkipTest, magical)
+        assert_raises(Skipped, magical)
 
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
@@ -211,7 +216,7 @@ def test_with_tempfile_mkdir():
 
 
 @with_tempfile()
-def test_with_tempfile_default_prefix(d1):
+def test_with_tempfile_default_prefix(d1=None):
     d = basename(d1)
     short = 'datalad_temp_'
     full = short + \
@@ -224,7 +229,7 @@ def test_with_tempfile_default_prefix(d1):
 
 
 @with_tempfile(prefix="nodatalad_")
-def test_with_tempfile_specified_prefix(d1):
+def test_with_tempfile_specified_prefix(d1=None):
     ok_startswith(basename(d1), 'nodatalad_')
     ok_('test_with_tempfile_specified_prefix' not in d1)
 
@@ -241,7 +246,7 @@ def test_get_most_obscure_supported_name():
 def test_keeptemp_via_env_variable():
 
     if dl_cfg.get('datalad.tests.temp.keep'):  # pragma: no cover
-        raise SkipTest("We have env variable set to preserve tempfiles")
+        pytest.skip("We have env variable set to preserve tempfiles")
 
     files = []
 
@@ -265,7 +270,7 @@ def test_keeptemp_via_env_variable():
 
 @skip_wo_symlink_capability
 @with_tempfile
-def test_ok_symlink_helpers(tmpfile):
+def test_ok_symlink_helpers(tmpfile=None):
 
     assert_raises(AssertionError, ok_symlink, tmpfile)
     assert_raises(AssertionError, ok_good_symlink, tmpfile)
@@ -321,7 +326,8 @@ def test_ok_generator():
     assert_raises(AssertionError, ok_generator, func(1))
 
 
-def _test_assert_Xwd_unchanged(func):
+@pytest.mark.parametrize("func", [os.chdir, chpwd])
+def test_assert_Xwd_unchanged(func):
     orig_cwd = os.getcwd()
     orig_pwd = getpwd()
 
@@ -337,12 +343,8 @@ def _test_assert_Xwd_unchanged(func):
     eq_(orig_pwd, getpwd(),
         "assert_cwd_unchanged didn't return us back to pwd %s" % orig_pwd)
 
-def test_assert_Xwd_unchanged():
-    yield _test_assert_Xwd_unchanged, os.chdir
-    yield _test_assert_Xwd_unchanged, chpwd
-
-
-def _test_assert_Xwd_unchanged_ok_chdir(func):
+@pytest.mark.parametrize("func", [os.chdir, chpwd])
+def test_assert_Xwd_unchanged_ok_chdir(func):
     # Test that we are not masking out other "more important" exceptions
 
     orig_cwd = os.getcwd()
@@ -360,11 +362,6 @@ def _test_assert_Xwd_unchanged_ok_chdir(func):
         eq_(orig_pwd, getpwd(),
             "assert_cwd_unchanged didn't return us back to cwd %s" % orig_pwd)
         assert_not_in("Mitigating and changing back", cml.out)
-
-
-def test_assert_Xwd_unchanged_ok_chdir():
-    yield _test_assert_Xwd_unchanged_ok_chdir, os.chdir
-    yield _test_assert_Xwd_unchanged_ok_chdir, chpwd
 
 
 def test_assert_cwd_unchanged_not_masking_exceptions():
@@ -408,9 +405,9 @@ def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no
         filesysencoding = sys.getfilesystemencoding()
         test_fpath_encoded = str(test_fpath.as_posix()).encode(filesysencoding)
     except UnicodeEncodeError:  # pragma: no cover
-        raise SkipTest("Environment doesn't support unicode filenames")
+        pytest.skip("Environment doesn't support unicode filenames")
     if test_fpath_encoded.decode(filesysencoding) != test_fpath.as_posix():  # pragma: no cover
-        raise SkipTest("Can't convert back/forth using %s encoding"
+        pytest.skip("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
     test_fpath_full = tmp_dir / test_fpath
@@ -459,21 +456,27 @@ def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no
     test_path_and_url()
 
 
-def test_serve_path_via_http():
-    for test_fpath in ['test1.txt',
-                       Path('test_dir', 'test2.txt'),
-                       Path('test_dir', 'd2', 'd3', 'test3.txt'),
-                       'file with space test4',
-                       u'Джэйсон',
-                       get_most_obscure_supported_name(),
-                      ]:
-        yield _test_serve_path_via_http, test_fpath, False, None
-        yield _test_serve_path_via_http, test_fpath, True, None
-        yield _test_serve_path_via_http, test_fpath, False, ('ernie', 'bert')
+@pytest.mark.parametrize("test_fpath", [
+    'test1.txt',
+    Path('test_dir', 'test2.txt'),
+    Path('test_dir', 'd2', 'd3', 'test3.txt'),
+    'file with space test4',
+    u'Джэйсон',
+    get_most_obscure_supported_name(),
+])
+@pytest.mark.parametrize("use_ssl,auth", [
+    (False, None),
+    (True, None),
+    (False, ('ernie', 'bert')),
+])
+def test_serve_path_via_http(test_fpath, use_ssl, auth):
+    _test_serve_path_via_http(test_fpath, use_ssl, auth)
 
+
+def test_serve_path_via_http_local_proxy():
     # just with the last one check that we did remove proxy setting
     with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
-        yield _test_serve_path_via_http, test_fpath, False, None
+        _test_serve_path_via_http(get_most_obscure_supported_name(), False, None)
 
 
 @known_failure_githubci_win
@@ -529,14 +532,14 @@ def test_skip_if_no_network():
         @skip_if_no_network
         def somefunc(a1):
             return a1
-        ok_(hasattr(somefunc, "network"))
+        #ok_(hasattr(somefunc, "network"))
         with patch_config({'datalad.tests.nonetwork': '1'}):
-            assert_raises(SkipTest, somefunc, 1)
+            assert_raises(Skipped, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
         # and now if used as a function, not a decorator
         with patch_config({'datalad.tests.nonetwork': '1'}):
-            assert_raises(SkipTest, skip_if_no_network)
+            assert_raises(Skipped, skip_if_no_network)
         with patch.dict('os.environ', {}):
             eq_(skip_if_no_network(), None)
 
@@ -546,7 +549,7 @@ def test_skip_if_no_module():
     def testish():
         skip_if_no_module("nonexistingforsuremodule")
         raise ValueError
-    assert_raises(SkipTest, testish)
+    assert_raises(Skipped, testish)
 
     def testish2():
         skip_if_no_module("datalad")
@@ -556,7 +559,7 @@ def test_skip_if_no_module():
 
 def test_skip_if():
 
-    with assert_raises(SkipTest):
+    with assert_raises(Skipped):
         @skip_if(True)
         def f():  # pragma: no cover
             raise AssertionError("must have not been ran")
@@ -570,7 +573,7 @@ def test_skip_if():
 
 @assert_cwd_unchanged
 @with_tempfile(mkdir=True)
-def test_run_under_dir(d):
+def test_run_under_dir(d=None):
     orig_pwd = getpwd()
     orig_cwd = os.getcwd()
 
@@ -600,7 +603,7 @@ def test_assert_dict_equal():
     try:
         import numpy as np
     except:  # pragma: no cover
-        raise SkipTest("need numpy for this tiny one")
+        pytest.skip("need numpy for this tiny one")
     # one is scalar another one array
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
@@ -644,20 +647,20 @@ def test_setup():
     # just verify that we monkey patched consts correctly
     from datalad.consts import DATASETS_TOPURL
     eq_(DATASETS_TOPURL, 'https://datasets-tests.datalad.org/')
-    from datalad.tests.utils import get_datasets_topdir
+    from datalad.tests.utils_pytest import get_datasets_topdir
     eq_(get_datasets_topdir(), 'datasets-tests.datalad.org')
 
 
 def test_skip_ssh():
     with patch_config({'datalad.tests.ssh': False}):
-        with assert_raises(SkipTest):
+        with assert_raises(Skipped):
             skip_ssh(lambda: False)()
 
 
 def test_probe_known_failure():
     # should raise assert error if function no longer fails
     with patch_config({'datalad.tests.knownfailures.probe': True}):
-        with assert_raises(AssertionError):
+        with assert_raises(Failed):
             probe_known_failure(lambda: True)()
 
     with patch_config({'datalad.tests.knownfailures.probe': False}):
@@ -675,7 +678,7 @@ def test_ignore_nose_capturing_stdout():
 
 @skip_wo_symlink_capability
 @with_tree(tree={'ingit': '', 'staged': 'staged', 'notingit': ''})
-def test_ok_file_under_git_symlinks(path):
+def test_ok_file_under_git_symlinks(path=None):
     # Test that works correctly under symlinked path
     orepo = GitRepo(path)
     orepo.add('ingit')

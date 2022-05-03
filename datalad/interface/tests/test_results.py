@@ -10,20 +10,20 @@
 
 """
 
+from datalad.distribution.dataset import Dataset
 from datalad.interface.results import (
     annexjson2result,
     get_status_dict,
 )
-from datalad.distribution.dataset import Dataset
 from datalad.runner import CommandError
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     eq_,
     with_tempfile,
 )
 
 
 @ with_tempfile
-def test_annexjson2result(dspath):
+def test_annexjson2result(dspath=None):
     # no explicit success means 'error'
     eq_(annexjson2result(dict(), None),
         dict(status='error'))

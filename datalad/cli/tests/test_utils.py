@@ -1,19 +1,22 @@
 import sys
-
 from unittest.mock import patch
+
+import pytest
+
+from datalad.tests.utils_pytest import (
+    eq_,
+    ok_,
+)
 from datalad.utils import (
     swallow_logs,
     swallow_outputs,
 )
-from datalad.tests.utils import (
-    eq_,
-    ok_,
-    SkipTest,
-)
+
 from ..utils import setup_exceptionhook
 
 
-def _check_setup_exceptionhook(interactive):
+@pytest.mark.parametrize("interactive", [True, False])
+def test_setup_exceptionhook(interactive):
     old_exceptionhook = sys.excepthook
 
     post_mortem_tb = []
@@ -37,11 +40,6 @@ def _check_setup_exceptionhook(interactive):
             our_exceptionhook(type_, value_, tb_)
 
     eq_(old_exceptionhook, sys.excepthook)
-
-
-def test_setup_exceptionhook():
-    for tval in [True, False]:
-        yield _check_setup_exceptionhook, tval
 
 
 

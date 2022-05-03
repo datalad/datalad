@@ -133,7 +133,6 @@ class Unlock(Interface):
                 dataset=dataset,
                 path=paths_lexist,
                 untracked="normal" if res_paths_nondir else "no",
-                report_filetype=False,
                 annex="availability",
                 recursive=recursive,
                 recursion_limit=recursion_limit,

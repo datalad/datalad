@@ -10,23 +10,24 @@
 
 import os
 
-from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import usecase
-from datalad.tests.utils import (
-    DEFAULT_REMOTE,
-    ok_,
-    with_testrepos,
-    with_tempfile,
-)
 from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
+    DEFAULT_REMOTE,
+    ok_,
+    usecase,
+    with_tempfile,
+    with_testrepos,
+)
+
 from .utils_testdatasets import make_studyforrest_mockup
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-def test_having_annex(path):
+def test_having_annex(path=None):
     ok_(os.path.exists(os.path.join(path, '.git')))
     repo = GitRepo(path)
     # might not necessarily be present upon initial submodule init
@@ -38,13 +39,13 @@ def test_having_annex(path):
         msg="Didn't find git-annex among refs %s" % refs)
 
 @with_testrepos(flavors=['network'])
-def test_point_to_github(url):
+def test_point_to_github(url=None):
     ok_('github.com' in url)
     ok_(url.startswith('https://github.com/datalad/testrepo--'))
 
 @with_testrepos
 @with_tempfile
-def test_clone(src, tempdir):
+def test_clone(src=None, tempdir=None):
     # Verify that all our repos are clonable
     r = WitlessRunner()
     output = r.run(["git" , "clone", src, tempdir], protocol=StdOutErrCapture)
@@ -61,6 +62,6 @@ def test_clone(src, tempdir):
 
 @usecase
 @with_tempfile(mkdir=True)
-def test_make_studyforrest_mockup(path):
+def test_make_studyforrest_mockup(path=None):
     # smoke test
     make_studyforrest_mockup(path)

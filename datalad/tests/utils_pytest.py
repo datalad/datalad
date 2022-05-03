@@ -44,42 +44,13 @@ from os.path import (
 from os.path import join as opj
 from os.path import relpath
 from os.path import split as pathsplit
+from unittest import SkipTest
 from unittest.mock import patch
 
-from nose import SkipTest
-from nose.plugins.attrib import attr
-from nose.tools import (
-    assert_equal,
-    assert_false,
-    assert_greater,
-    assert_greater_equal,
-)
-from nose.tools import assert_in
-from nose.tools import assert_in as in_
-from nose.tools import (
-    assert_is,
-    assert_is_instance,
-    assert_is_none,
-    assert_is_not,
-    assert_is_not_none,
-    assert_not_equal,
-    assert_not_in,
-    assert_not_is_instance,
-    assert_raises,
-    assert_set_equal,
-    assert_true,
-    eq_,
-    make_decorator,
-    ok_,
-    raises,
-)
+import pytest
 
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
-from datalad import (
-    conftest,
-    ssh_manager,
-)
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
@@ -90,9 +61,6 @@ from datalad.core.local.repo import repo_from_path
 from datalad.utils import (
     Path,
     ensure_unicode,
-    get_encoding_info,
-    get_envvars_info,
-    get_home_envvars,
 )
 
 from .. import utils
@@ -131,256 +99,117 @@ if external_versions["cmd:git"] >= "2.30.0":
 else:
     DEFAULT_REMOTE = "origin"
 
+def attr(name):
+    return getattr(pytest.mark, name)
+
+def assert_equal(first, second, msg=None):
+    if msg is None:
+        assert first == second
+    else:
+        assert first == second, msg
+
+def assert_false(expr, msg=None):
+    if msg is None:
+        assert not expr
+    else:
+        assert not expr, msg
+
+def assert_greater(first, second, msg=None):
+    if msg is None:
+        assert first > second
+    else:
+        assert first > second, msg
+
+def assert_greater_equal(first, second, msg=None):
+    if msg is None:
+        assert first >= second
+    else:
+        assert first >= second, msg
+
+def assert_in(first, second, msg=None):
+    if msg is None:
+        assert first in second
+    else:
+        assert first in second, msg
+
+in_ = assert_in
+
+def assert_is(first, second, msg=None):
+    if msg is None:
+        assert first is second
+    else:
+        assert first is second, msg
+
+def assert_is_instance(first, second, msg=None):
+    if msg is None:
+        assert isinstance(first, second)
+    else:
+        assert isinstance(first, second), msg
+
+def assert_is_none(expr, msg=None):
+    if msg is None:
+        assert expr is None
+    else:
+        assert expr is None, msg
+
+def assert_is_not(first, second, msg=None):
+    if msg is None:
+        assert first is not second
+    else:
+        assert first is not second, msg
+
+def assert_is_not_none(expr, msg=None):
+    if msg is None:
+        assert expr is not None
+    else:
+        assert expr is not None, msg
+
+def assert_not_equal(first, second, msg=None):
+    if msg is None:
+        assert first != second
+    else:
+        assert first != second, msg
+
+def assert_not_in(first, second, msg=None):
+    if msg is None:
+        assert first not in second
+    else:
+        assert first not in second, msg
+
+def assert_not_is_instance(first, second, msg=None):
+    if msg is None:
+        assert not isinstance(first, second)
+    else:
+        assert not isinstance(first, second), msg
+
+assert_raises = pytest.raises
+
+assert_set_equal = assert_equal
+
+def assert_true(expr, msg=None):
+    if msg is None:
+        assert expr
+    else:
+        assert expr, msg
+
+eq_ = assert_equal
+
+ok_ = assert_true
+
 # additional shortcuts
 neq_ = assert_not_equal
 nok_ = assert_false
 
-lgr = logging.getLogger("datalad.tests.utils")
-
-# To store settings which setup_package changes and teardown_package should return
-_test_states = {
-    'loglevel': None,
-    'env': {},
-}
-
-def setup_package():
-    import os
-    import tempfile
-    from io import StringIO as OrigStringIO
-    from pathlib import Path
-
-    from nose.ext import dtcompat
-    from nose.plugins import (
-        capture,
-        multiprocess,
-        plugintest,
-    )
-
-    from datalad import consts, lgr
-    from datalad.support.annexrepo import AnnexRepo
-    from datalad.support.external_versions import external_versions
-    from datalad.tests.utils import (
-        DEFAULT_BRANCH,
-        DEFAULT_REMOTE,
-        HTTPPath,
-    )
-    from datalad.ui import ui
-    from datalad.utils import (
-        make_tempfile,
-        on_osx,
-    )
-
-    if on_osx:
-        # enforce honoring TMPDIR (see gh-5307)
-        tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
-
-    _test_states['env'] = {}
-
-    def set_envvar(v, val):
-        """Memoize and then set env var"""
-        _test_states['env'][v] = os.environ.get(v, None)
-        os.environ[v] = val
-
-    _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
-    consts.DATASETS_TOPURL = 'https://datasets-tests.datalad.org/'
-    set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
-
-    set_envvar("GIT_CONFIG_PARAMETERS",
-               "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
-               .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
-
-    def prep_tmphome():
-        # re core.askPass:
-        # Don't let git ask for credentials in CI runs. Note, that this variable
-        # technically is not a flag, but an executable (which is why name and value
-        # are a bit confusing here - we just want a no-op basically). The environment
-        # variable GIT_ASKPASS overwrites this, but neither env var nor this config
-        # are supported by git-credential on all systems and git versions (most recent
-        # ones should work either way, though). Hence use both across CI builds.
-        gitconfig = """\
-[user]
-	name = DataLad Tester
-	email = test@example.com
-[core]
-	askPass =
-[datalad "log"]
-	exc = 1
-[annex "security"]
-	# from annex 6.20180626 file:/// and http://localhost access isn't
-	# allowed by default
-	allowed-url-schemes = http https file
-	allowed-http-addresses = all
-"""
-        # TODO: split into a function + context manager
-        with make_tempfile(mkdir=True) as new_home:
-            pass
-        # register for clean-up on exit
-        _TEMP_PATHS_GENERATED.append(new_home)
-
-        # populate default config
-        new_home = Path(new_home)
-        new_home.mkdir(parents=True, exist_ok=True)
-        cfg_file = new_home / '.gitconfig'
-        cfg_file.write_text(gitconfig)
-        return new_home, cfg_file
-
-    if external_versions['cmd:git'] < "2.32":
-        # To overcome pybuild overriding HOME but us possibly wanting our
-        # own HOME where we pre-setup git for testing (name, email)
-        if 'GIT_HOME' in os.environ:
-            set_envvar('HOME', os.environ['GIT_HOME'])
-        else:
-            # we setup our own new HOME, the BEST and HUGE one
-            new_home, _ = prep_tmphome()
-            for v, val in get_home_envvars(new_home).items():
-                set_envvar(v, val)
-    else:
-        _, cfg_file = prep_tmphome()
-        set_envvar('GIT_CONFIG_GLOBAL', str(cfg_file))
-
-    # Re-load ConfigManager, since otherwise it won't consider global config
-    # from new $HOME (see gh-4153
-    dl_cfg.reload(force=True)
-
-    # datalad.locations.sockets has likely changed. Discard any cached values.
-    ssh_manager._socket_dir = None
-
-    # To overcome pybuild by default defining http{,s}_proxy we would need
-    # to define them to e.g. empty value so it wouldn't bother touching them.
-    # But then haskell libraries do not digest empty value nicely, so we just
-    # pop them out from the environment
-    for ev in ('http_proxy', 'https_proxy'):
-        if ev in os.environ and not (os.environ[ev]):
-            lgr.debug("Removing %s from the environment since it is empty", ev)
-            os.environ.pop(ev)
-
-    DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
-    if DATALAD_LOG_LEVEL is None:
-        # very very silent.  Tests introspecting logs should use
-        # swallow_logs(new_level=...)
-        _test_states['loglevel'] = lgr.getEffectiveLevel()
-        lgr.setLevel(100)
-
-        # And we should also set it within environ so underlying commands also stay silent
-        set_envvar('DATALAD_LOG_LEVEL', '100')
-    else:
-        # We are not overriding them, since explicitly were asked to have some log level
-        _test_states['loglevel'] = None
-
-    # Prevent interactive credential entry (note "true" is the command to run)
-    # See also the core.askPass setting above
-    set_envvar('GIT_ASKPASS', 'true')
-
-    # Set to non-interactive UI
-    _test_states['ui_backend'] = ui.backend
-    # obtain() since that one consults for the default value
-    ui.set_backend(dl_cfg.obtain('datalad.tests.ui.backend'))
-
-    # Monkey patch nose so it does not ERROR out whenever code asks for fileno
-    # of the output. See https://github.com/nose-devs/nose/issues/6
-    class StringIO(OrigStringIO):
-        fileno = lambda self: 1
-        encoding = None
-
-    dtcompat.StringIO = StringIO
-    capture.StringIO = StringIO
-    multiprocess.StringIO = StringIO
-    plugintest.StringIO = StringIO
-
-    # in order to avoid having to fiddle with rather uncommon
-    # file:// URLs in the tests, have a standard HTTP server
-    # that serves an 'httpserve' directory in the test HOME
-    # the URL will be available from datalad.test_http_server.url
-    # Start the server only if not running already
-    # Relevant: we have test_misc.py:test_test which runs datalad.test but
-    # not doing teardown, so the original server might never get stopped
-    if conftest.test_http_server is None:
-        serve_path = tempfile.mkdtemp(
-            dir=dl_cfg.get("datalad.tests.temp.dir"),
-            prefix='httpserve',
-        )
-        conftest.test_http_server = HTTPPath(serve_path)
-        conftest.test_http_server.start()
-        _TEMP_PATHS_GENERATED.append(serve_path)
-
-    if dl_cfg.obtain('datalad.tests.setup.testrepos'):
-        lgr.debug("Pre-populating testrepos")
-        from datalad.tests.utils import with_testrepos
-        with_testrepos()(lambda repo: 1)()
-
-
-def teardown_package():
-    import os
-
-    from datalad import consts
-    from datalad.support.annexrepo import AnnexRepo
-    from datalad.support.cookies import cookies_db
-    from datalad.support.external_versions import external_versions as ev
-    from datalad.tests.utils import (
-        OBSCURE_FILENAME,
-        rmtemp,
-    )
-    from datalad.ui import ui
-
-    lgr.debug("Printing versioning information collected so far")
-    print(ev.dumps(query=True))
-    try:
-        print("Obscure filename: str=%s repr=%r"
-                % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
-    except UnicodeEncodeError as exc:
-        ce = CapturedException(exc)
-        print("Obscure filename failed to print: %s" % ce)
-    def print_dict(d):
-        return " ".join("%s=%r" % v for v in d.items())
-    print("Encodings: %s" % print_dict(get_encoding_info()))
-    print("Environment: %s" % print_dict(get_envvars_info()))
-
-    if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
-        return
-    ui.set_backend(_test_states['ui_backend'])
-    if _test_states['loglevel'] is not None:
-        lgr.setLevel(_test_states['loglevel'])
-
-    if conftest.test_http_server:
-        conftest.test_http_server.stop()
-        conftest.test_http_server = None
-    else:
-        lgr.debug("For some reason global http_server was not set/running, thus not stopping")
-
-    if len(_TEMP_PATHS_GENERATED):
-        msg = "Removing %d dirs/files: %s" % (len(_TEMP_PATHS_GENERATED), ', '.join(_TEMP_PATHS_GENERATED))
-    else:
-        msg = "Nothing to remove"
-    lgr.debug("Teardown tests. " + msg)
-    for path in _TEMP_PATHS_GENERATED:
-        rmtemp(str(path), ignore_errors=True)
-
-    # restore all the env variables
-    for v, val in _test_states['env'].items():
-        if val is not None:
-            os.environ[v] = val
-        else:
-            os.environ.pop(v)
-
-    # Re-establish correct global config after changing $HOME.
-    # Might be superfluous, since after teardown datalad.cfg shouldn't be
-    # needed. However, maintaining a consistent state seems a good thing
-    # either way.
-    dl_cfg.reload(force=True)
-
-    ssh_manager._socket_dir = None
-
-    consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
-
-    cookies_db.close()
-    AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
+lgr = logging.getLogger("datalad.tests.utils_pytest")
 
 
 def skip_if_no_module(module):
+    # Using pytest.importorskip here won't always work, as some imports (e.g.,
+    # libxmp) can fail with exceptions other than ImportError
     try:
         imp = __import__(module)
     except Exception as exc:
-        raise SkipTest("Module %s fails to load" % module) from exc
+        pytest.skip("Module %s fails to load" % module)
 
 
 def skip_if_scrapy_without_selector():
@@ -389,8 +218,7 @@ def skip_if_scrapy_without_selector():
         import scrapy
         from scrapy.selector import Selector
     except ImportError:
-        from nose import SkipTest
-        raise SkipTest(
+        pytest.skip(
             "scrapy misses Selector (too old? version: %s)"
             % getattr(scrapy, '__version__'))
 
@@ -403,9 +231,9 @@ def skip_if_url_is_not_available(url, regex=None):
     try:
         content = providers.fetch(url)
         if regex and re.search(regex, content):
-            raise SkipTest("%s matched %r -- skipping the test" % (url, regex))
+            pytest.skip("%s matched %r -- skipping the test" % (url, regex))
     except DownloadError:
-        raise SkipTest("%s failed to download" % url)
+        pytest.skip("%s failed to download" % url)
 
 
 def check_not_generatorfunction(func):
@@ -424,7 +252,7 @@ def skip_if_no_network(func=None):
 
     def check_and_raise():
         if dl_cfg.get('datalad.tests.nonetwork'):
-            raise SkipTest("Skipping since no network settings")
+            pytest.skip("Skipping since no network settings")
 
     if func:
         @wraps(func)
@@ -445,7 +273,7 @@ def skip_if_on_windows(func=None):
 
     def check_and_raise():
         if on_windows:
-            raise SkipTest("Skipping on Windows")
+            pytest.skip("Skipping on Windows")
 
     if func:
         @wraps(func)
@@ -468,7 +296,7 @@ def skip_if_root(func=None):
 
     def check_and_raise():
         if hasattr(os, "geteuid") and os.geteuid() == 0:
-            raise SkipTest("Skipping: test assumptions fail under root")
+            pytest.skip("Skipping: test assumptions fail under root")
 
     if func:
         @wraps(func)
@@ -505,7 +333,7 @@ def skip_if(func, cond=True, msg=None, method='raise'):
     def  _wrap_skip_if(*args, **kwargs):
         if cond:
             if method == 'raise':
-                raise SkipTest(msg if msg else "condition was True")
+                pytest.skip(msg if msg else "condition was True")
             elif method == 'pass':
                 print(msg if msg else "condition was True")
                 return
@@ -547,7 +375,7 @@ def skip_nomultiplex_ssh(func):
     @skip_ssh
     def  _wrap_skip_nomultiplex_ssh(*args, **kwargs):
         if SSHManager is not MultiplexSSHManager:
-            raise SkipTest("SSH without multiplexing is used")
+            pytest.skip("SSH without multiplexing is used")
         return func(*args, **kwargs)
     return  _wrap_skip_nomultiplex_ssh
 
@@ -956,7 +784,7 @@ class HTTPPath(object):
             port = queue.get(timeout=300)
         except multiprocessing.queues.Empty as e:
             if self.use_ssl:
-                raise SkipTest('No working SSL support') from e
+                pytest.skip('No working SSL support')
             else:
                 raise
         self.url = 'http{}://{}:{}/'.format(
@@ -994,7 +822,7 @@ class HTTPPath(object):
             #except requests.exceptions.SSLError as e:
             except Exception as e:
                 self.stop()
-                raise SkipTest('No working HTTPS setup') from e
+                pytest.skip('No working HTTPS setup')
             # now verify that the stdlib tooling also works
             # if this fails, check datalad/tests/ca/prov.sh
             # for info on deploying a datalad-root.crt
@@ -1015,7 +843,7 @@ class HTTPPath(object):
             #except URLError as e:
             except Exception as e:
                 self.stop()
-                raise SkipTest('No working HTTPS setup') from e
+                pytest.skip('No working HTTPS setup')
 
     def stop(self):
         """Stop serving `path`.
@@ -1078,12 +906,12 @@ def with_memory_keyring(t):
 def without_http_proxy(tfunc):
     """Decorator to remove http*_proxy env variables for the duration of the test
     """
-    
+
     @wraps(tfunc)
     @attr('without_http_proxy')
     def  _wrap_without_http_proxy(*args, **kwargs):
         if on_windows:
-            raise SkipTest('Unclear why this is not working on windows')
+            pytest.skip('Unclear why this is not working on windows')
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
@@ -1394,7 +1222,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     Examples
     --------
 
-    >>> from datalad.tests.utils import with_testrepos
+    >>> from datalad.tests.utils_pytest import with_testrepos
     >>> @with_testrepos('basic_annex')
     ... def test_write(repo):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
@@ -1406,7 +1234,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
         # addurls with our generated file:// URLs doesn't work on appveyor
         # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
         #if 'APPVEYOR' in os.environ:
-        #    raise SkipTest("Testrepo setup is broken on AppVeyor")
+        #    pytest.skip("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1418,7 +1246,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             assert(testrepos_uris)
         else:
             if not testrepos_uris:
-                raise SkipTest("No non-networked repos to test on")
+                pytest.skip("No non-networked repos to test on")
 
         fake_dates = dl_cfg.get("datalad.fake-dates")
         ntested = 0
@@ -1470,7 +1298,7 @@ def with_sameas_remote(func, autoenabled=False):
         # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
         if external_versions['cmd:system-ssh'] < '7.4' and \
            '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
-            raise SkipTest("Test known to hang")
+            pytest.skip("Test known to hang")
 
         sr_path, repo_path = args[-2:]
         fn_args = args[:-2]
@@ -1767,16 +1595,8 @@ def ignore_nose_capturing_stdout(func):
     return func
 
 
-@optional_args
-def with_parametric_batch(t):
-    """Helper to run parametric test with possible combinations of batch and direct
-    """
-    @wraps(t)
-    def  _wrap_with_parametric_batch():
-        for batch in (False, True):
-                yield t, batch
-
-    return  _wrap_with_parametric_batch
+# Helper to run parametric test with possible combinations of batch and direct
+with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 
 
 # List of most obscure filenames which might or not be supported by different
@@ -2001,7 +1821,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     #if 'APPVEYOR' in os.environ:
     #    # issue only happens on appveyor, Python itself implodes
     #    # cannot be reproduced on a real windows box
-    #    raise SkipTest(
+    #    pytest.skip(
     #        'get_convoluted_situation() causes appveyor to crash, '
     #        'reason unknown')
     repo = repocls(path, create=True)
@@ -2054,7 +1874,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
         ds.drop([
             'file_dropped_clean',
             opj('subdir', 'file_dropped_clean')],
-            check=False)
+            reckless='kill')
     # clean and proper subdatasets
     ds.create('subds_clean')
     ds.create(opj('subdir', 'subds_clean'))
@@ -2246,7 +2066,7 @@ def skip_wo_symlink_capability(func):
     @attr('skip_wo_symlink_capability')
     def  _wrap_skip_wo_symlink_capability(*args, **kwargs):
         if not has_symlink_capability():
-            raise SkipTest("no symlink capabilities")
+            pytest.skip("no symlink capabilities")
         return func(*args, **kwargs)
     return  _wrap_skip_wo_symlink_capability
 
@@ -2269,7 +2089,7 @@ def skip_if_adjusted_branch(func):
             _TESTS_ADJUSTED_TMPDIR = _check()
 
         if _TESTS_ADJUSTED_TMPDIR:
-            raise SkipTest("Test incompatible with adjusted branch default")
+            pytest.skip("Test incompatible with adjusted branch default")
         return func(*args, **kwargs)
     return _wrap_skip_if_adjusted_branch
 
@@ -2284,6 +2104,8 @@ def get_ssh_port(host):
     Note that if `host` does not match a host in ssh_config, the default value
     of 22 is returned.
 
+    Skips test if port cannot be found.
+
     Parameters
     ----------
     host : str
@@ -2291,10 +2113,6 @@ def get_ssh_port(host):
     Returns
     -------
     port (int)
-
-    Raises
-    ------
-    SkipTest if port cannot be found.
     """
     out = ''
     runner = WitlessRunner()
@@ -2315,7 +2133,7 @@ def get_ssh_port(host):
             break
 
     if port is None:
-        raise SkipTest("port for {} could not be determined: {}"
+        pytest.skip("port for {} could not be determined: {}"
                        .format(host, err))
     return port
 

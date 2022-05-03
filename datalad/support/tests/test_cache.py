@@ -7,8 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from ...tests.utils_pytest import assert_equal
 from ..cache import DictCache
-from ...tests.utils import assert_equal
 
 
 def test_DictCache():

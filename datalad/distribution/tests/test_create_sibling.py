@@ -9,28 +9,35 @@
 
 """
 
+import logging
 import os
-from os import chmod
 import stat
 import sys
+from os import chmod
+from os.path import (
+    basename,
+    exists,
+)
+from os.path import join as opj
 
-from os.path import join as opj, exists, basename
+import pytest
 
-from ..dataset import Dataset
 from datalad.api import (
     create_sibling,
     install,
     push,
 )
-from datalad.cmd import (
-    WitlessRunner as Runner,
-    StdOutErrCapture,
-)
+from datalad.cmd import StdOutErrCapture
+from datalad.cmd import WitlessRunner as Runner
 from datalad.distribution.create_sibling import _RunnerAdapter
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
+from datalad.support.gitrepo import GitRepo
 from datalad.support.network import urlquote
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     SkipTest,
@@ -63,18 +70,15 @@ from datalad.tests.utils import (
     with_testrepos,
     with_testsui,
 )
-from datalad.support.exceptions import (
-    CommandError,
-    InsufficientArgumentsError,
-)
 from datalad.utils import (
+    Path,
     _path_,
     chpwd,
     on_windows,
-    Path,
 )
 
-import logging
+from ..dataset import Dataset
+
 lgr = logging.getLogger('datalad.tests')
 
 
@@ -91,8 +95,9 @@ def have_webui():
 
     try:
         import datalad_deprecated.sibling_webui
-        from datalad_deprecated.tests.test_create_sibling_webui \
-            import assert_publish_with_ui
+        from datalad_deprecated.tests.test_create_sibling_webui import (
+            assert_publish_with_ui,
+        )
         _have_webui = True
     except (ModuleNotFoundError, ImportError):
         _have_webui = False
@@ -128,7 +133,7 @@ def assert_postupdate_hooks(path, installed=True, flat=False):
 
 
 @with_tempfile(mkdir=True)
-def test_invalid_call(path):
+def test_invalid_call(path=None):
     with chpwd(path):
         # ^ Change directory so that we don't fail with an
         # InvalidGitRepositoryError if the test is executed from a git
@@ -166,7 +171,7 @@ def test_invalid_call(path):
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_target_ssh_simple(origin, src_path, target_rootpath):
+def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
     port = get_ssh_port("datalad-test")
     # prepare src
     source = install(
@@ -203,7 +208,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target_alt",
             sshurl="ssh://datalad-test",
             target_dir=target_path)
-    ok_(str(cm.exception).startswith(
+    ok_(str(cm.value).startswith(
         "Target path %s already exists." % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()
@@ -277,8 +282,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             source.repo.get_remote_url("local_target", push=True))
 
         if have_webui():
-            from datalad_deprecated.tests.test_create_sibling_webui \
-                import assert_publish_with_ui
+            from datalad_deprecated.tests.test_create_sibling_webui import (
+                assert_publish_with_ui,
+            )
             assert_publish_with_ui(target_path)
 
         # now, push should work:
@@ -385,8 +391,9 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             GitRepo(target_dir, create=False)
 
             if have_webui():
-                from datalad_deprecated.tests.test_create_sibling_webui \
-                    import assert_publish_with_ui
+                from datalad_deprecated.tests.test_create_sibling_webui import (
+                    assert_publish_with_ui,
+                )
                 assert_publish_with_ui(target_dir, rootds=not suffix, flat=flat)
 
         for repo in [source.repo, sub1.repo, sub2.repo]:
@@ -438,11 +445,13 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
         push(dataset=source, to=remote_name, recursive=True, since='^') # just a smoke test
 
 
+# we are explicitly testing deprecated since='' inside
+@pytest.mark.filterwarnings("ignore: 'since' should point to commitish")
 @slow  # 28 + 19sec on travis
 def test_target_ssh_recursive():
     skip_if_on_windows()
-    yield skip_ssh(check_target_ssh_recursive), True
-    yield check_target_ssh_recursive, False
+    check_target_ssh_recursive(False)
+    skip_ssh(check_target_ssh_recursive)(True)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -527,8 +536,8 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
 @slow  # 10sec + ? on travis
 def test_target_ssh_since():
     skip_if_on_windows()
-    yield skip_ssh(check_target_ssh_since), True
-    yield check_target_ssh_since, False
+    skip_ssh(check_target_ssh_since)(True)
+    check_target_ssh_since(False)
 
 
 @skip_if_on_windows
@@ -557,8 +566,8 @@ def check_failon_no_permissions(use_ssh, src_path, target_path):
 
 
 def test_failon_no_permissions():
-    yield skip_ssh(check_failon_no_permissions), True
-    yield check_failon_no_permissions, False
+    skip_ssh(check_failon_no_permissions)(True)
+    check_failon_no_permissions(False)
 
 
 @with_tempfile(mkdir=True)
@@ -630,6 +639,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     # now publish "with" data, which should also trigger the hook!
     # https://github.com/datalad/datalad/issues/1658
     from glob import glob
+
     from datalad.consts import WEB_META_LOG
     logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
     published4 = ds.push(to=sibname, data='anything')
@@ -643,8 +653,8 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
 @slow  # 14 + 10sec on travis
 def test_replace_and_relative_sshpath():
     skip_if_on_windows()
-    yield skip_ssh(check_replace_and_relative_sshpath), True
-    yield check_replace_and_relative_sshpath, False
+    skip_ssh(check_replace_and_relative_sshpath)(True)
+    check_replace_and_relative_sshpath(False)
 
 
 @with_tempfile(mkdir=True)
@@ -752,10 +762,10 @@ def test_target_ssh_inherit():
     # TODO: was waiting for resolution on
     #   https://github.com/datalad/datalad/issues/1274
     # which is now closed but this one is failing ATM, thus leaving as TODO
-    # yield _test_target_ssh_inherit, None      # no wanted etc
+    # _test_target_ssh_inherit(None)      # no wanted etc
     # Takes too long so one will do with UI and another one without
-    yield skip_ssh(_test_target_ssh_inherit), 'manual', have_webui(), True  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup', False, False  # backup -- all data files
+    skip_ssh(_test_target_ssh_inherit)('manual', have_webui(), True)  # manual -- no load should be annex copied
+    _test_target_ssh_inherit('backup', False, False)  # backup -- all data files
 
 
 @with_testsui(responses=["no", "yes"])
@@ -789,13 +799,13 @@ def check_exists_interactive(use_ssh, path):
 
 def test_check_exists_interactive():
     skip_if_on_windows()
-    yield skip_ssh(check_exists_interactive), True
-    yield check_exists_interactive, False
+    skip_ssh(check_exists_interactive)(True)
+    check_exists_interactive(False)
 
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-def test_local_relpath(path):
+def test_local_relpath(path=None):
     path = Path(path)
     ds_main = Dataset(path / "main").create()
     ds_main.create("subds")
@@ -821,7 +831,7 @@ def test_local_relpath(path):
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-def test_local_path_target_dir(path):
+def test_local_path_target_dir(path=None):
     path = Path(path)
     ds_main = Dataset(path / "main").create()
 
@@ -862,7 +872,7 @@ def test_local_path_target_dir(path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_non_master_branch(src_path, target_path):
+def test_non_master_branch(src_path=None, target_path=None):
     src_path = Path(src_path)
     target_path = Path(target_path)
 
@@ -900,7 +910,7 @@ def test_non_master_branch(src_path, target_path):
 @known_failure_windows  # https://github.com/datalad/datalad/issues/5287
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_preserve_attrs(src, dest):
+def test_preserve_attrs(src=None, dest=None):
     create_tree(src, {"src": {"foo": {"bar": "This is test text."}}})
     os.utime(opj(src, "src", "foo", "bar"), (1234567890, 1234567890))
     _RunnerAdapter().put(opj(src, "src"), dest, recursive=True, preserve_attrs=True)
@@ -912,7 +922,7 @@ def test_preserve_attrs(src, dest):
 
 
 @with_tempfile(mkdir=True)
-def test_only_one_level_without_recursion(path):
+def test_only_one_level_without_recursion(path=None):
     # this tests for https://github.com/datalad/datalad/issues/5614: accidental
     # recursion of one level by default
     path = Path(path)

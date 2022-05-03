@@ -345,9 +345,9 @@ test_script:
   - cmd: md __testhome__
   - sh: mkdir __testhome__
   - cd __testhome__
-    # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
-  - cmd: python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
-  - sh: PATH=$PWD/../tools/coverage-bin:$PATH python -W error::DeprecationWarning:^datalad -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+    # run test selection
+  - cmd: python -m pytest -c ../tox.ini -s -v -m "not (turtle)" --cov=datalad --pyargs %DTS%
+  - sh: PATH=$PWD/../tools/coverage-bin:$PATH python -m pytest -c ../tox.ini -s -v -m "not (turtle)" --cov=datalad --pyargs ${DTS}
 
 
 after_test:

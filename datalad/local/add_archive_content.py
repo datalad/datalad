@@ -278,7 +278,6 @@ class AddArchiveContent(Interface):
         # let Status decide whether we can act on the given file
         for s in ds.status(
                 path=archive_path,
-                report_filetype=False,
                 on_failure='ignore',
                 result_renderer='disabled'):
             if s['status'] == 'error':

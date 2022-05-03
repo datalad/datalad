@@ -61,7 +61,7 @@ from ...support.exceptions import (
 )
 from ...support.network import get_url_disposition_filename
 from ...support.status import FileStatus
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_false,
@@ -131,7 +131,7 @@ def test_process_www_authenticate():
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_HTTPDownloader_basic(toppath, topurl):
+def test_HTTPDownloader_basic(toppath=None, topurl=None):
     furl = "%sfile.dat" % topurl
     tfpath = opj(toppath, "file-downloaded.dat")
     downloader = HTTPDownloader()  # no auth/credentials needed
@@ -163,7 +163,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # and the file name can't be determined from the URL.
     with assert_raises(DownloadError) as cm:
         download(topurl, toppath)
-    assert_in("File name could not be determined", str(cm.exception))
+    assert_in("File name could not be determined", str(cm.value))
 
     # Some errors handling
     # XXX obscure mocking since impossible to mock write alone
@@ -203,7 +203,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 @with_memory_keyring
-def test_access_denied(toppath, topurl, keyring):
+def test_access_denied(toppath=None, topurl=None, keyring=None):
     furl = topurl + "file.dat"
 
     def deny_access(*args, **kwargs):
@@ -340,24 +340,28 @@ def check_download_external_url_no_mtime(*args, **kwargs):
 # @use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
     skip_if_no_network()
-    yield check_download_external_url, \
-          "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
-          "<form action=", \
-          "datafiles/meta_data_files.tar.gz"
+    check_download_external_url(
+        "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5",
+        "<form action=",
+        "datafiles/meta_data_files.tar.gz",
+    )
     # seems to be gone
-    # yield check_download_external_url, \
-    #       'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
-    #       "failed", \
-    #       "2000 1005 2000 3000"
-    yield check_download_external_url, \
-          'https://db.humanconnectome.org/data/experiments/ConnectomeDB_E09797/resources/166768/files/filescans.csv', \
-          "failed", \
-          "'Scan','FilePath'"
+    # check_download_external_url(
+    #       'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval',
+    #       "failed",
+    #       "2000 1005 2000 3000",
+    # )
+    check_download_external_url(
+        'https://db.humanconnectome.org/data/experiments/ConnectomeDB_E09797/resources/166768/files/filescans.csv',
+        "failed",
+        "'Scan','FilePath'",
+    )
 
-    yield check_download_external_url_no_mtime, \
-        "https://n5eil01u.ecs.nsidc.org/ICEBRIDGE/IDBMG4.004/1993.01.01/BedMachineGreenland-2021-04-20.nc.xml", \
-        'input type="password"', \
-        'DOCTYPE GranuleMetaDataFile'
+    check_download_external_url_no_mtime(
+        "https://n5eil01u.ecs.nsidc.org/ICEBRIDGE/IDBMG4.004/1993.01.01/BedMachineGreenland-2021-04-20.nc.xml",
+        'input type="password"',
+        'DOCTYPE GranuleMetaDataFile',
+    )
 
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
@@ -407,7 +411,7 @@ def test_download_ftp():
 @with_tree(tree={'file.dat': '1'})
 @serve_path_via_http
 @with_tempfile
-def test_mtime(path, url, tempfile):
+def test_mtime(path=None, url=None, tempfile=None):
     # let's set custom mtime
     file_to_download = opj(path, 'file.dat')
     os.utime(file_to_download, (time.time(), 1000))
@@ -483,7 +487,7 @@ test_cookie = 'somewebsite=testcookie'
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTMLFormAuthenticator_httpretty(d):
+def test_HTMLFormAuthenticator_httpretty(d=None):
     fpath = opj(d, 'crap.txt')
 
     credential = FakeCredential1(name='test', url=None)
@@ -546,7 +550,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
 @with_memory_keyring
 @with_testsui(responses=['no', 'yes', 'testlogin', 'testpassword'])
-def test_auth_but_no_cred(keyring):
+def test_auth_but_no_cred(keyring=None):
     authenticator = HTMLFormAuthenticator("")
     # Replying 'no' to the set credentials prompt should raise ValueError
     assert_raises(ValueError, HTTPDownloader, credential=None, authenticator=authenticator)
@@ -633,7 +637,7 @@ class FakeCredential2(UserPassword):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
-def test_scenario_2(d):
+def test_scenario_2(d=None):
     fpath = opj(d, 'crap.txt')
 
     credential = FakeCredential2(name='test', url=None)
@@ -705,7 +709,7 @@ class FakeCredential3(Token):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTTPBearerTokenAuthenticator(d):
+def test_HTTPBearerTokenAuthenticator(d=None):
     fpath = opj(d, 'crap.txt')
 
     def request_get_callback(request, uri, headers):
@@ -747,7 +751,7 @@ class FakeLorisCredential(Token):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTTPLorisTokenAuthenticator(d):
+def test_HTTPLorisTokenAuthenticator(d=None):
     fpath = opj(d, 'crap.txt')
 
     def request_get_callback(request, uri, headers):
@@ -786,7 +790,7 @@ def test_HTTPLorisTokenAuthenticator(d):
 @with_fake_cookies_db
 @with_memory_keyring
 @with_testsui(responses=['yes', 'user'])
-def test_lorisadapter(d, keyring):
+def test_lorisadapter(d=None, keyring=None):
     fpath = opj(d, 'crap.txt')
     loginurl = "http://www.example.com/api/v0.0.2/login"
 
@@ -825,7 +829,7 @@ def test_lorisadapter(d, keyring):
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_download_url(toppath, topurl):
+def test_download_url(toppath=None, topurl=None):
     furl = "%sfile.dat" % topurl
     # fails if URL is dysfunctional
     assert_raises(DownloadError, download_url, furl + 'magic', toppath)

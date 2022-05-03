@@ -18,11 +18,11 @@ env:
     - DATALAD_LOG_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
     # Should be an array, travis breaks on it, define/adjust in the "before_install"
-    #- NOSE_OPTS=( -v )
+    #- PYTEST_OPTS=( -v )
     # Note, that there's "turtle" as well, which is always excluded from
     # running on Travis.
-    - NOSE_SELECTION="integration or usecase or slow or network"
-    - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
+    - PYTEST_SELECTION="integration or usecase or slow or network"
+    - PYTEST_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
     - DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
@@ -36,48 +36,48 @@ matrix:
     env:
     # Run all tests in a single whoop here
     # We cannot have empty -A selector, so the one which always will be fulfilled
-    - NOSE_SELECTION=
-    - NOSE_SELECTION_OP=not
+    - PYTEST_SELECTION=
+    - PYTEST_SELECTION_OP=not
     # To test https://github.com/datalad/datalad/pull/4342 fix.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LC_ALL=ru_RU.UTF-8
   - python: 3.9
     dist: bionic # Xenial doesn't have 3.8 pre-installed (only 3.8-dev).
     env:
-    - NOSE_SELECTION=
-    - NOSE_SELECTION_OP=not
+    - PYTEST_SELECTION=
+    - PYTEST_SELECTION_OP=not
   - python: '3.10'
     dist: focal
     env:
-      - NOSE_SELECTION=
-      - NOSE_SELECTION_OP=not
+      - PYTEST_SELECTION=
+      - PYTEST_SELECTION_OP=not
   - if: type = cron
     python: 3.7
     # Single run for Python 3.7
     env:
     # Run all tests in a single whoop here
     # We cannot have empty -A selector, so the one which always will be fulfilled
-    - NOSE_SELECTION=
-    - NOSE_SELECTION_OP=not
+    - PYTEST_SELECTION=
+    - PYTEST_SELECTION_OP=not
   - python: 3.7
     # Split runs for v6 since a single one is too long now
     env:
-    - NOSE_SELECTION_OP=not
+    - PYTEST_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20210310 -m conda"
   - python: 3.7
     env:
-    - NOSE_SELECTION_OP=""
+    - PYTEST_SELECTION_OP=""
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20210310 -m conda"
-    # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
+    # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for pytest.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
   - python: 3.7
-    # Run slow etc tests under a single tricky scenario
+   # Run slow etc tests under a single tricky scenario
     env:
     - _DL_TMPDIR="/var/tmp/sym link"
-    - NOSE_SELECTION_OP=""
+    - PYTEST_SELECTION_OP=""
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
@@ -153,7 +153,7 @@ matrix:
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
-    - NOSE_WRAPPER="sudo -E"
+    - PYTEST_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
   - if: type = cron
@@ -185,11 +185,11 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - NOSE_OPTS=( )
+  - PYTEST_OPTS=( -v )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
-  - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
-      NOSE_OPTS=( "${NOSE_OPTS[@]}" --with-doctest --with-timer --timer-ok 5 --timer-warning 30 --timer-fail error --timer-filter warning,error );
+  - if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"; then
+      PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow 30 );
       export DATALAD_TESTS_SETUP_TESTREPOS=1;
     fi
   # Just in case we need to check if nfs is there etc
@@ -240,14 +240,17 @@ script:
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
+  #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
+  #  in effect, dumping too many logs.
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER python -W error::DeprecationWarning:^datalad
-      -m nose "${NOSE_OPTS[@]}"
-      -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
-      --with-doctest
-      --with-cov --cover-package datalad
-      --logging-level=INFO
+    $PYTEST_WRAPPER python
+      -m pytest "${PYTEST_OPTS[@]}"
+      -c ../tox.ini
+      -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
+      --doctest-modules
+      --cov=datalad
+      --pyargs
       $TESTS_TO_PERFORM
   - cd ..
 
@@ -265,5 +268,5 @@ after_success:
 # for a particular debugging
 #after_failure:
 #  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-#  - DATALAD_LOG_LEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=DEBUG
+#  - DATALAD_LOG_LEVEL=DEBUG $PYTEST_WRAPPER `which pytest` -s -v --doctest-modules --cov datalad --log-cli-level=DEBUG
 #  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi

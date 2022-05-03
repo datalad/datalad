@@ -9,9 +9,12 @@
 """Test frictionless datapackage metadata extractor """
 
 from simplejson import dumps
+
 from datalad.api import Dataset
-from datalad.metadata.extractors.frictionless_datapackage import MetadataExtractor
-from datalad.tests.utils import (
+from datalad.metadata.extractors.frictionless_datapackage import (
+    MetadataExtractor,
+)
+from datalad.tests.utils_pytest import (
     assert_equal,
     with_tree,
 )
@@ -40,7 +43,7 @@ from datalad.tests.utils import (
   "author": "Jane Doe <noemail@example.com>"
 }
 """})
-def test_get_metadata(path):
+def test_get_metadata(path=None):
 
     ds = Dataset(path).create(force=True)
     p = MetadataExtractor(ds, [])

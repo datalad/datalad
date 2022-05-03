@@ -10,21 +10,21 @@
 
 from datalad.downloaders.shub import SHubDownloader
 from datalad.support.exceptions import DownloadError
-from datalad.utils import (
-    Path,
-    create_tree,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     ok_file_has_content,
     serve_path_via_http,
     with_tempfile,
 )
+from datalad.utils import (
+    Path,
+    create_tree,
+)
 
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_downloader_bad_query(urlpath, url):
+def test_downloader_bad_query(urlpath=None, url=None):
     downloader = SHubDownloader()
     downloader.api_url = url
     with assert_raises(DownloadError):
@@ -33,7 +33,7 @@ def test_downloader_bad_query(urlpath, url):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_downloader_bad_json(urlpath, url):
+def test_downloader_bad_json(urlpath=None, url=None):
     downloader = SHubDownloader()
     downloader.api_url = url
     create_tree(urlpath,
@@ -45,7 +45,7 @@ def test_downloader_bad_json(urlpath, url):
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_downloader_download(urlpath, url, path):
+def test_downloader_download(urlpath=None, url=None, path=None):
     path = Path(path)
     downloader = SHubDownloader()
     downloader.api_url = url

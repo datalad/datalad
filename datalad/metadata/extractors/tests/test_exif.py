@@ -8,27 +8,26 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test EXIF extractor"""
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_in,
     assert_repo_status,
     assert_result_count,
     assert_status,
     eq_,
-    SkipTest,
     with_tempfile,
 )
+
 try:
     import exifread
 except ImportError:
     raise SkipTest
 
+from os.path import dirname
+from os.path import join as opj
 from shutil import copy
-from os.path import (
-    dirname,
-    join as opj,
-)
-from datalad.api import Dataset
 
+from datalad.api import Dataset
 
 target = {
     "InteroperabilityVersion": "[48, 49, 48, 48]",
@@ -79,7 +78,7 @@ target = {
 
 
 @with_tempfile(mkdir=True)
-def test_exif(path):
+def test_exif(path=None):
     ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'exif', scope='branch')
     copy(

@@ -8,9 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for vcr adapter"""
 
+from ...tests.utils_pytest import (
+    SkipTest,
+    eq_,
+)
 from ..vcr_ import use_cassette
-from ...tests.utils import SkipTest
-from ...tests.utils import eq_
 
 
 def test_use_cassette_if_no_vcr():

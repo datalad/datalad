@@ -87,7 +87,7 @@ class _CachedRepo(object):
             eval_availability=True,
             # if it truly is a symlink, not just an annex pointer, we would not
             # want to resolve it
-            eval_file_type=True,
+            # deprecated! unused;  eval_file_type=True,
         )
         finfo = finfo.popitem()[1] if finfo else {}
         return finfo

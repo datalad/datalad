@@ -123,7 +123,6 @@ Helpers and support utilities
    datalad foreach-dataset: Run a command or Python code on the dataset and/or each of its sub-datasets <generated/man/datalad-foreach-dataset>
    datalad sshrun: Remote command execution using DataLad's connection management <generated/man/datalad-sshrun>
    datalad shell-completion: Helper to support command completion <generated/man/datalad-shell-completion>
-   datalad test: Frontend for running DataLad's internal test battery <generated/man/datalad-test>
    datalad wtf: Report on a DataLad installation and its configuration <generated/man/datalad-wtf>
 
 
