@@ -353,7 +353,7 @@ def skip_ssh(func):
     def  _wrap_skip_ssh(*args, **kwargs):
         test_ssh = dl_cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
-            pytest.skip("Run this test by setting DATALAD_TESTS_SSH")
+            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return  _wrap_skip_ssh
 
