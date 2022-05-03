@@ -899,6 +899,9 @@ def test_GitRepo_git_get_branch_commits_(src=None):
         f.write('load')
     repo.add('*')
     repo.commit('committing')
+    # go in a branch with a name that matches the file to require
+    # proper disambiguation
+    repo.call_git(['checkout', '-b', 'file.txt'])
 
     commits_default = list(repo.get_branch_commits_())
     commits = list(repo.get_branch_commits_(DEFAULT_BRANCH))

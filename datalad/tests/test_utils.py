@@ -88,6 +88,7 @@ from datalad.utils import (
     split_cmdline,
     swallow_logs,
     swallow_outputs,
+    todo_interface_for_extensions,
     unique,
     unlink,
     updated,
@@ -496,6 +497,15 @@ def test_auto_repr():
         f"buga_long(a=1, b=[{', '.join(map(str, range(20)))}])"
     )
     assert_equal(buga_long().some(), "some")
+
+
+def test_todo_interface_for_extensions():
+
+    @todo_interface_for_extensions
+    def f(i, j):
+        return i*j
+
+    assert_equal(f(2, 3), 6)
 
 
 def test_assure_iter():

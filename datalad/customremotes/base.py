@@ -142,7 +142,7 @@ def init_datalad_remote(repo, remote, encryption=None, autoenable=False,
                         opts=[]):
     """Initialize datalad special remote"""
     from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
-    lgr.info("Initiating special remote %s", remote)
+    lgr.info("Initializing special remote %s", remote)
     remote_opts = [
         'encryption=%s' % str(encryption).lower(),
         'type=external',

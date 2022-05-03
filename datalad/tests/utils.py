@@ -323,6 +323,9 @@ def teardown_package():
     from datalad.ui import ui
 
     lgr.debug("Printing versioning information collected so far")
+    # Query for version of datalad, so it is included in ev.dumps below - useful while
+    # testing extensions where version of datalad might differ in the environment.
+    ev['datalad']
     print(ev.dumps(query=True))
     try:
         print("Obscure filename: str=%s repr=%r"

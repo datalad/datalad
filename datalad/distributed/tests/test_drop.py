@@ -9,6 +9,7 @@
 
 import os
 import os.path as op
+from unittest.mock import patch
 
 from datalad.api import (
     Dataset,
@@ -548,3 +549,21 @@ def test_drop_uninit_annexrepo(origpath=None, path=None):
     ds = Dataset(path)
     assert_status('ok', ds.drop(what='datasets'))
     nok_(ds.is_installed())
+
+
+# https://github.com/datalad/datalad/issues/6577
+@with_tempfile
+def test_drop_allkeys_result_contains_annex_error_messages(path):
+    # when calling drop with allkeys, expect git-annex error
+    # message(s) to be present in the result record error_message
+    ds = Dataset(path).create()
+    # mock annex call always yielding error-messages in this dataset
+    with patch.object(ds.repo, '_call_annex_records_items_') as mock_call:
+        mock_call.return_value = iter([{
+            'command': 'drop',
+            'success': False,
+            'error-messages': ['git-annex error message here']}])
+        assert_in_results(
+            ds.drop(what='allkeys', on_failure='ignore'),
+            error_message='git-annex error message here',
+        )

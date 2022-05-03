@@ -415,7 +415,9 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 res['message'] = message
             error_messages = r.get('error-messages')
             if error_messages:
-                res['error_messages'] = error_messages
+                res['error_message'] = '\n'.join(
+                    m.strip() for m in error_messages
+                )
             # play safe, if there is no status, assume error
             if res.get('status', 'error') != 'ok':
                 drop_all_errored = True

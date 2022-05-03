@@ -157,6 +157,9 @@ def setup_package():
         yield
 
         lgr.debug("Printing versioning information collected so far")
+        # Query for version of datalad, so it is included in ev.dumps below - useful while
+        # testing extensions where version of datalad might differ in the environment.
+        external_versions['datalad']
         print(external_versions.dumps(query=True))
         try:
             print("Obscure filename: str=%s repr=%r"

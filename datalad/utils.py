@@ -1285,6 +1285,10 @@ def auto_repr(cls, short=True):
     return cls
 
 
+def todo_interface_for_extensions(f):
+    return f
+
+
 #
 # Context Managers
 #

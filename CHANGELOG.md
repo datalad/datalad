@@ -1,3 +1,29 @@
+# 0.16.2 (Thu Apr 21 2022)
+
+#### 🐛 Bug Fix
+
+- Demote (to level 1 from DEBUG) and speed-up API doc logging (parseParameters) [#6635](https://github.com/datalad/datalad/pull/6635) ([@mih](https://github.com/mih))
+- Factor out actual data transfer in push [#6618](https://github.com/datalad/datalad/pull/6618) ([@christian-monch](https://github.com/christian-monch))
+- ENH: include version of datalad in tests teardown Versions: report [#6628](https://github.com/datalad/datalad/pull/6628) ([@yarikoptic](https://github.com/yarikoptic))
+- MNT: Require importlib-metadata >=3.6 for Python < 3.10 for entry_points taking kwargs [#6631](https://github.com/datalad/datalad/pull/6631) ([@effigies](https://github.com/effigies))
+- Factor out credential handling of create-sibling-ghlike [#6627](https://github.com/datalad/datalad/pull/6627) ([@mih](https://github.com/mih))
+- BF: Fix wrong key name of annex' JSON records [#6624](https://github.com/datalad/datalad/pull/6624) ([@bpoldrack](https://github.com/bpoldrack))
+
+#### ⚠️ Pushed to `maint`
+
+- Fix typo in changelog ([@mih](https://github.com/mih))
+- [ci skip] minor typo fix ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Chris Markiewicz ([@effigies](https://github.com/effigies))
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.1 (Fr Apr 8 2022) --  April Fools' Release
 
 - Fixes forgotten changelog in docs
@@ -972,7 +998,7 @@
   aliases.  The `assure_*` variants are now marked as deprecated and
   will be removed in a later release.  ([#4908][])
 
-- The `datalad.inteface.run` module, which was deprecated in 0.12.0
+- The `datalad.interface.run` module, which was deprecated in 0.12.0
   and kept as a compatibility shim for `datalad.core.local.run`, has
   been removed.  ([#4583][])
 
