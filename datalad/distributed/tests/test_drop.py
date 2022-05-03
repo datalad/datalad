@@ -553,7 +553,7 @@ def test_drop_uninit_annexrepo(origpath=None, path=None):
 
 # https://github.com/datalad/datalad/issues/6577
 @with_tempfile
-def test_drop_allkeys_result_contains_annex_error_messages(path):
+def test_drop_allkeys_result_contains_annex_error_messages(path=None):
     # when calling drop with allkeys, expect git-annex error
     # message(s) to be present in the result record error_message
     ds = Dataset(path).create()
