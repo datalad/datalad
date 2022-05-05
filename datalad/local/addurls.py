@@ -1141,7 +1141,7 @@ class Addurls(Interface):
     To download each link into a file name composed of the 'who' and 'ext'
     fields, we could run::
 
-      $ datalad addurls -d avatar_ds --fast avatars.csv '{link}' '{who}.{ext}'
+      $ datalad addurls -d avatar_ds avatars.csv '{link}' '{who}.{ext}'
 
     The `-d avatar_ds` is used to create a new dataset in "$PWD/avatar_ds".
 
@@ -1149,7 +1149,7 @@ class Addurls(Interface):
     "avatars" subdirectory, we could use "//" in the `FILENAME-FORMAT`
     argument::
 
-      $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
+      $ datalad addurls avatars.csv '{link}' 'avatars//{who}.{ext}'
 
     If the information is represented as JSON lines instead of comma separated
     values or a JSON array, you can use a utility like jq to transform the JSON
@@ -1272,7 +1272,13 @@ class Addurls(Interface):
             args=("--fast",),
             action="store_true",
             doc="""If True, add the URLs, but don't download their content.
-            Underneath, this passes the --fast flag to `git annex addurl`."""),
+            WARNING: ONLY USE THIS OPTION IF YOU UNDERSTAND THE CONSEQUENCES.
+            If the content of the URLs is not downloaded, then datalad
+            will refuse to retrieve the contents with `datalad get <file>` by default
+            because the content of the URLs is not verified.  Add 
+            `annex.security.allow-unverified-downloads` to your git config to bypass
+            the safety check.  Underneath, this passes the
+            `--fast` flag to `git annex addurl`."""),
         ifexists=Parameter(
             args=("--ifexists",),
             doc="""What to do if a constructed file name already exists.  The
