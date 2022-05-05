@@ -514,7 +514,8 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        logtarget = self._get_config('target', logtarget or 'stderr')
+        if not logtarget:
+            logtarget = self._get_config('target', 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
