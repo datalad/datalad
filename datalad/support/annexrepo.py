@@ -2189,6 +2189,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                  git_options=None, annex_options=None):
         """Downloads each url to its own file, which is added to the annex.
 
+        .. deprecated:: 0.17
+            Use add_url_to_file() or call_annex() instead.
+
         Parameters
         ----------
         urls: list of str
@@ -2199,6 +2202,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         cwd: string, optional
             working directory from within which to invoke git-annex
         """
+        warnings.warn(
+            "AnnexRepo.add_urls() is deprecated and will be removed in a "
+            "future release. Use AnnexRepo.add_url_to_file() or "
+            "AnnexRepo.call_annex() instead.",
+            DeprecationWarning)
 
         if git_options:
             lgr.warning("add_urls: git_options not yet implemented. Ignored.")
