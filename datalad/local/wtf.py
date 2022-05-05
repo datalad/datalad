@@ -147,8 +147,7 @@ def _describe_system():
 
 
 def _get_fs_type(loc, path):
-    global fs_hint
-    fs_hint = None
+    res = {'path': path}
     try:
         from psutil import disk_partitions
         match = ""
@@ -158,12 +157,12 @@ def _get_fs_type(loc, path):
                     len(match) < len(part.mountpoint):
                 fs = part.fstype
                 match = part.mountpoint
+        res['type'] = fs
     except Exception as exc:
         ce = CapturedException(exc)
-        fs_hint = "Hint: Install psutils to get file system type information"
-        fs = tuple()
-    return {'path': path,
-            'type': fs}
+        # if an exception occurs, leave out the fs type. The result renderer can
+        # display a hint based on its lack in the report
+    return res
 
 
 def _describe_environment():
@@ -506,10 +505,14 @@ class WTF(Interface):
         from datalad.ui import ui
         out = _render_report(res)
         ui.message(out)
-        if fs_hint is not None:
+        # if the record lacks file system information, hint at a psutil problem
+        if res['infos']['system']['filesystem']['TMP'].get('type') is None:
             from datalad.support import ansi_colors
             ui.message("{}".format(
-                ansi_colors.color_word(fs_hint, ansi_colors.YELLOW)))
+                ansi_colors.color_word(
+                    'Hint: Failed to file system information with psutil',
+                    ansi_colors.YELLOW)))
+
 
 def _render_report(res):
     report = u'# WTF'
