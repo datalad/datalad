@@ -32,7 +32,7 @@ URI_PREFIX = "dl"
 class AnnexCustomRemote(SpecialRemote):
     # default properties
     COST = 100
-    AVAILABILITY = "LOCAL"
+    AVAILABILITY = "local"
 
     def __init__(self, annex):  # , availability=DEFAULT_AVAILABILITY):
         super().__init__(annex)
@@ -122,7 +122,7 @@ class AnnexCustomRemote(SpecialRemote):
         return self.COST
 
     def getavailability(self):
-        return self.AVAILABILITY.lower()
+        return self.AVAILABILITY
 
 
 # this function only has anecdotal value and is not used anywhere
