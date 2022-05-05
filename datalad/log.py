@@ -504,8 +504,6 @@ class LoggerHelper(object):
 
         Parameters
         ----------
-        target: string, optional
-          Which log target to request logger for
         logtarget: {'stderr', str }, optional
           Where to direct the logs. 'stderr' stands for the standard stream.
           Any other string is considered a filename.  Multiple entries could be
