@@ -513,7 +513,6 @@ class LoggerHelper(object):
         -------
         logging.Logger
         """
-        # By default mimic previously talkative behavior
         if not logtarget:
             logtarget = self._get_config('target', 'stderr')
 
