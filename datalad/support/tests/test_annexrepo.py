@@ -400,7 +400,7 @@ def test_AnnexRepo_web_remote(sitepath=None, siteurl=None, dst=None):
 
     # get the file from remote
     with swallow_outputs() as cmo:
-        ar.add_urls([testurl])
+        ar.add_url_to_file(testfile, testurl)
     l = ar.whereis(testfile)
     assert_in(WEB_SPECIAL_REMOTE_UUID, l)
     eq_(len(l), 2)
@@ -486,7 +486,7 @@ def test_AnnexRepo_web_remote(sitepath=None, siteurl=None, dst=None):
     # multiple files/urls
     # get the file from remote
     with swallow_outputs() as cmo:
-        ar.add_urls([testurl2])
+        ar.add_url_to_file(testfile2, testurl2)
 
     # TODO: if we ask for whereis on all files, we should get for all files
     lall = ar.whereis('.')
@@ -698,11 +698,8 @@ def test_AnnexRepo_backend_option(path=None, url=None):
     eq_(ar.get_file_backend('remotefile2'), 'SHA1')
 
     with swallow_outputs() as cmo:
-        ar.add_urls([url + 'faraway'], backend='SHA1')
-    # TODO: what's the annex-generated name of this?
-    # For now, workaround:
-    ok_(ar.get_file_backend(f) == 'SHA1'
-        for f in ar.get_indexed_files() if 'faraway' in f)
+        ar.add_url_to_file('from_faraway', url + 'faraway', backend='SHA1')
+    eq_(ar.get_file_backend('from_faraway'), 'SHA1')
 
 
 @with_tempfile
