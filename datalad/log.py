@@ -15,6 +15,7 @@ import sys
 import platform
 import random
 import logging.handlers
+import warnings
 
 from os.path import basename, dirname
 
@@ -503,10 +504,8 @@ class LoggerHelper(object):
 
         Parameters
         ----------
-        target: string, optional
-          Which log target to request logger for
-        logtarget: { 'stdout', 'stderr', str }, optional
-          Where to direct the logs.  stdout and stderr stand for standard streams.
+        logtarget: {'stderr', str }, optional
+          Where to direct the logs. 'stderr' stands for the standard stream.
           Any other string is considered a filename.  Multiple entries could be
           specified comma-separated
 
@@ -514,8 +513,8 @@ class LoggerHelper(object):
         -------
         logging.Logger
         """
-        # By default mimic previously talkative behavior
-        logtarget = self._get_config('target', logtarget or 'stderr')
+        if not logtarget:
+            logtarget = self._get_config('target', 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
@@ -523,9 +522,12 @@ class LoggerHelper(object):
                 self.get_initialized_logger(logtarget=handler_)
             return self.lgr
 
-        if logtarget.lower() in ('stdout', 'stderr'):
-            loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
+        if logtarget.lower() == 'stderr':
+            loghandler = logging.StreamHandler(sys.stderr)
             use_color = is_interactive()  # explicitly decide here
+        elif logtarget.lower() == 'stdout':
+            warnings.warn("'stdout' was discontinued as valid log target and "
+                          "will be ignored.", DeprecationWarning)
         else:
             # must be a simple filename
             # Use RotatingFileHandler for possible future parametrization to keep
