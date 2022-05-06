@@ -12,7 +12,13 @@ jobs:
       matrix:
         install_scenario:
           - brew
-          - snapshot
+          # Disabled, because reported annex-version of snapshot can't be
+          # properly accounted for by tests and inevitably leads to failure.
+          # Essentially, this is because snapshot is in between a commit with
+          # a bugfix and the following release. Only makes sense, when
+          # snapshot is actually up-to-date with annex source repo, which it
+          # currently isn't.
+          #- snapshot
     steps:
     - name: Set up environment
       run: |
