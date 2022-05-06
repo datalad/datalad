@@ -76,7 +76,7 @@ def check_basic_scenario(url, d=None):
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output
     with assert_raises(CommandError) as cme:
-        annex.add_urls([url + '_bogus'])
+        annex.add_url_to_file('bogus', url + '_bogus')
     assert_in('addurl: 1 failed', cme.value.stderr)
 
 

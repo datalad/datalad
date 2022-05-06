@@ -109,8 +109,7 @@ def test_add_archive_dirs(path_orig=None, url=None, repo_path=None):
         repo = ds.repo
         # add archive to the repo so we could test
         with swallow_outputs():
-            repo.add_urls([opj(url, '1.tar.gz')],
-                             options=["--pathdepth", "-1"])
+            repo.add_url_to_file('1.tar.gz', opj(url, '1.tar.gz'))
         repo.commit("added 1.tar.gz")
 
         # test with excludes and annex options
@@ -225,13 +224,12 @@ def test_add_archive_content(path_orig=None, url=None, repo_path=None):
             message="Can not add archive outside of the dataset"
         )
 
-
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
-            repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+            repo.add_url_to_file('1.tar.gz', opj(url, '1.tar.gz'))
             for s in range(1, 5):
-                repo.add_urls([opj(url, '%du/1.tar.gz' % s)],
-                                 options=["--pathdepth", "-2"])
+                repo.add_url_to_file('%du/1.tar.gz' % s,
+                                     opj(url, '%du/1.tar.gz' % s))
             repo.commit("added 1.tar.gz")
 
         key_1tar = repo.get_file_annexinfo('1.tar.gz')['key']  # will be used in the test later
@@ -319,8 +317,7 @@ def test_add_archive_content(path_orig=None, url=None, repo_path=None):
         # Let's add first archive to the repo so we could test
         # named the same way but different content
         with swallow_outputs():
-            repo.add_urls([opj(url, 'd1', '1.tar.gz')], options=["--pathdepth", "-1"],
-                          cwd=getpwd())  # invoke under current subdir
+            repo.add_url_to_file('d1/1.tar.gz', opj(url, 'd1', '1.tar.gz'))
         repo.commit("added 1.tar.gz in d1")
 
         def d2_basic_checks():
@@ -380,8 +377,7 @@ def test_add_archive_content_strip_leading(path_orig=None, url=None, repo_path=N
         repo = ds.repo
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
-            repo.add_urls([opj(url, '1.tar.gz')],
-                             options=["--pathdepth", "-1"])
+            repo.add_url_to_file('1.tar.gz', opj(url, '1.tar.gz'))
         repo.commit("added 1.tar.gz")
 
         add_archive_content('1.tar.gz', strip_leading_dirs=True)
