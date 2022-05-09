@@ -140,24 +140,31 @@ def _describe_system():
         'max_path_length': get_max_path_length(getpwd()),
         'encoding': get_encoding_info(),
         'filesystem': {l: _get_fs_type(l, p) for l, p in
-                       [('CWD', os.getcwd()),
-                        ('TMP', tempfile.gettempdir()),
-                        ('HOME', str(Path.home()))]}
+                       [('CWD', Path.cwd()),
+                        ('TMP', Path(tempfile.gettempdir())),
+                        ('HOME', Path.home())]}
     }
 
 
 def _get_fs_type(loc, path):
+    """Return file system info for given Paths. Provide pathlib path as input"""
     res = {'path': path}
     try:
         from psutil import disk_partitions
-        match = ""
-        fs = ""
-        for part in disk_partitions():
-            if path.startswith(part.mountpoint) and \
-                    len(match) < len(part.mountpoint):
-                fs = part.fstype
-                match = part.mountpoint
-        res['type'] = fs
+        parts = {Path(p.mountpoint): p  for p in disk_partitions()}
+        match = None
+        for mp in parts:
+            # if the mountpoint is the test path or its parent
+            # take it, whenever there is no match, or a longer match
+            if (mp == path or mp in path.parents) and (
+                    match is None or len(p.parents) > len(match.parents)):
+                match = mp
+        match = parts[match]
+        for sattr, tattr in (('fstype', 'type'),
+                             ('maxpath', 'max_pathlength'),
+                             ('opts', 'mount_opts')):
+            if hasattr(match, sattr):
+                res[tattr] = getattr(match, sattr)
     except Exception as exc:
         ce = CapturedException(exc)
         # if an exception occurs, leave out the fs type. The result renderer can
