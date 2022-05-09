@@ -194,5 +194,11 @@
         "name": "Taylor Olson",
         "email": "to.overlake@gmail.com",
         "blog": "https://github.com/taylols"
+    },
+    "jdkent": {
+        "name": "James Kent",
+        "email": "jamesdkent21@gmail.com",
+        "bio": "Postdoc",
+        "blog": "https://jdkent.github.io/"
     }
 }
