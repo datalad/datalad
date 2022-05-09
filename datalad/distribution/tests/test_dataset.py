@@ -23,12 +23,12 @@ import pytest
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
 from datalad.api import (
+    clone,
     create,
     get,
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
-    InsufficientArgumentsError,
     NoDatasetFound,
 )
 from datalad.support.gitrepo import GitRepo
@@ -53,7 +53,6 @@ from datalad.tests.utils_pytest import (
     ok_,
     swallow_logs,
     with_tempfile,
-    with_testrepos,
 )
 from datalad.utils import (
     Path,
@@ -92,19 +91,22 @@ def test_EnsureDataset():
 
 # TODO: test remember/recall more extensive?
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:531
-@known_failure_windows
-@with_testrepos('submodule_annex')
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_is_installed(src=None, path=None):
+    ca = dict(result_renderer='disabled')
+    # a remote dataset with a subdataset underneath
+    origds = Dataset(src).create(**ca)
+    _ = origds.create('subm 1', **ca)
+
     ds = Dataset(path)
     assert_false(ds.is_installed())
 
     # get a clone:
-    AnnexRepo.clone(src, path)
+    clone(src, path, **ca)
     ok_(ds.is_installed())
     # submodule still not installed:
-    subds = Dataset(opj(path, 'subm 1'))
+    subds = Dataset(ds.pathobj / 'subm 1')
     assert_false(subds.is_installed())
     # We must not be able to create a new repository under a known
     # subdataset path.
@@ -114,20 +116,16 @@ def test_is_installed(src=None, path=None):
     res = subds.create(on_failure='ignore',
                        return_type='list',
                        result_filter=None,
-                       result_xfm=None)
+                       result_xfm=None,
+                       **ca)
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, status='error', path=subds.path,
         message=('collision with %s (dataset) in dataset %s',
                  subds.path, ds.path))
     # get the submodule
-    # This would init so there is a .git file with symlink info, which is
-    # as we agreed is more pain than gain, so let's use our install which would
-    # do it right, after all we are checking 'is_installed' ;)
-    # from datalad.cmd import Runner
-    # Runner().run(['git', 'submodule', 'update', '--init', 'subm 1'], cwd=path)
-    with chpwd(path):
-        get('subm 1')
+    with chpwd(ds.path):
+        get('subm 1', **ca)
     ok_(subds.is_installed())
     # wipe it out
     rmtree(ds.path)
