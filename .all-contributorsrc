@@ -438,6 +438,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/28018084?v=4"
             ]
+        },
+        {
+            "login": "jdkent",
+            "name": "James Kent",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://jdkent.github.io/",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/12564882?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
