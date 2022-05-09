@@ -512,13 +512,23 @@ class WTF(Interface):
         from datalad.ui import ui
         out = _render_report(res)
         ui.message(out)
-        # if the record lacks file system information, hint at a psutil problem
-        if res['infos']['system']['filesystem']['TMP'].get('type') is None:
-            from datalad.support import ansi_colors
-            ui.message("{}".format(
-                ansi_colors.color_word(
-                    'Hint: Failed to file system information with psutil',
-                    ansi_colors.YELLOW)))
+        # add any necessary hints afterwards
+        maybe_show_hints(res)
+
+
+def maybe_show_hints(res):
+    """Helper to add hints to custom result rendering"""
+    # check for missing file system info
+    # if the system record lacks file system information, hint at a psutil
+    # problem. Query for TMP should be safe, is included in system info
+    from datalad.ui.utils import show_hint
+
+    if 'system' in res.get('infos', {}) and \
+        'type' not in res['infos']['system']['filesystem']['TMP']:
+        try:
+            import psutil
+        except ImportError:
+            show_hint('Hint: install psutil to get filesystem information')
 
 
 def _render_report(res):
