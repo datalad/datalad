@@ -49,11 +49,14 @@ from datalad.utils import (
 )
 
 
-# work on cloned repos to be safer
-@with_testrepos('submodule_annex', flavors=['clone'])
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_siblings(origin=None, repo_path=None, local_clone_path=None):
+    ca = dict(result_renderer='disabled')
+    # a remote dataset with a subdataset underneath
+    origds = Dataset(origin).create(**ca)
+    _ = origds.create('subm 1', **ca)
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"
@@ -63,10 +66,10 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
     # we need a dataset to work at
     with chpwd(repo_path):  # not yet there
         assert_raises(InsufficientArgumentsError,
-                      siblings, 'add', url=httpurl1)
+                      siblings, 'add', url=httpurl1, **ca)
 
     # prepare src
-    source = install(repo_path, source=origin, recursive=True)
+    source = install(repo_path, source=origin, recursive=True, **ca)
     # pollute config
     depvar = 'remote.test-remote.datalad-publish-depends'
     source.config.add(depvar, 'stupid', scope='local')
@@ -79,7 +82,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
         url=httpurl1,
         publish_depends=['r1', 'r2'],
         on_failure='ignore',
-        result_renderer='disabled')
+        **ca)
     assert_status('error', res)
     eq_(res[0]['message'],
         ('unknown sibling(s) specified as publication dependency: %s',
@@ -91,7 +94,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
                    dataset=source, name="test-remote",
                    url=httpurl1,
                    result_xfm='paths',
-                   result_renderer='disabled')
+                   **ca)
 
     eq_(res, [source.path])
     assert_in("test-remote", source.repo.get_remotes())
@@ -100,29 +103,25 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
 
     # reconfiguring doesn't change anything
     siblings('configure', dataset=source, name="test-remote",
-             url=httpurl1,
-             result_renderer='disabled')
+             url=httpurl1, **ca)
     assert_in("test-remote", source.repo.get_remotes())
     eq_(httpurl1,
         source.repo.get_remote_url("test-remote"))
     # re-adding doesn't work
     res = siblings('add', dataset=source, name="test-remote",
-                   url=httpurl1, on_failure='ignore',
-                   result_renderer='disabled')
+                   url=httpurl1, on_failure='ignore', **ca)
     assert_status('error', res)
     # only after removal
-    res = siblings('remove', dataset=source, name="test-remote",
-                   result_renderer='disabled')
+    res = siblings('remove', dataset=source, name="test-remote", **ca)
     assert_status('ok', res)
     assert_not_in("test-remote", source.repo.get_remotes())
     # remove again (with result renderer to smoke-test a renderer
     # special case for this too)
-    res = siblings('remove', dataset=source, name="test-remote")
+    res = siblings('remove', dataset=source, name="test-remote", **ca)
     assert_status('notneeded', res)
 
     res = siblings('add', dataset=source, name="test-remote",
-                   url=httpurl1, on_failure='ignore',
-                   result_renderer='disabled')
+                   url=httpurl1, on_failure='ignore', **ca)
     assert_status('ok', res)
 
     # add another remove with a publication dependency
@@ -136,7 +135,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
                    publish_depends='test-remote',
                    # just for smoke testing
                    publish_by_default=DEFAULT_BRANCH,
-                   result_renderer='disabled')
+                   **ca)
     assert_status('ok', res)
     # config replaced with new setup
     #source.config.reload(force=True)
@@ -146,8 +145,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
     # add to another remote automagically taking it from the url
     # and being in the dataset directory
     with chpwd(source.path):
-        res = siblings('add', url=httpurl2,
-                       result_renderer='disabled')
+        res = siblings('add', url=httpurl2, **ca)
     assert_result_count(
         res, 1,
         name="remote2.example.com", type='sibling')
@@ -157,7 +155,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
     res = siblings('configure',
                    dataset=source, name="test-remote",
                    url=httpurl1 + "/elsewhere",
-                   result_renderer='disabled')
+                   **ca)
     assert_status('ok', res)
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
@@ -187,7 +185,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
                    dataset=source, name="test-remote",
                    url=httpurl1 + "/elsewhere",
                    pushurl=sshurl,
-                   result_renderer='disabled')
+                   **ca)
     assert_status('ok', res)
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
@@ -203,7 +201,8 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
             recursive=True,
             # we need to disable annex queries, as it will try to access
             # the fake URL configured above
-            get_annex_info=False):
+            get_annex_info=False,
+            **ca):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote", repo.get_remotes())
         url = repo.get_remote_url("test-remote")
@@ -225,7 +224,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
             # we need to disable annex queries, as it will try to access
             # the fake URL configured above
             get_annex_info=False,
-            result_renderer='disabled'):
+            **ca):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote-2", repo.get_remotes())
         url = repo.get_remote_url("test-remote-2")
@@ -259,7 +258,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
             # we need to disable annex queries, as it will try to access
             # the fake URL configured above
             get_annex_info=False,
-            result_renderer='disabled'):
+            **ca):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote-3", repo.get_remotes())
         url = repo.get_remote_url("test-remote-3")
