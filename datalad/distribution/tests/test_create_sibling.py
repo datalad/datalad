@@ -37,6 +37,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import urlquote
+from datalad.tests.utils_testdatasets import _mk_submodule_annex
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
@@ -67,7 +68,6 @@ from datalad.tests.utils_pytest import (
     slow,
     swallow_logs,
     with_tempfile,
-    with_testrepos,
     with_testsui,
 )
 from datalad.utils import (
@@ -168,10 +168,16 @@ def test_invalid_call(path=None):
 @slow  # 26sec on travis
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
-@with_testrepos('.*basic.*', flavors=['local'])
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
+    ca = dict(result_renderer='disabled')
+    test_fname = 'test-annex.dat'
+    orig = Dataset(origin).create(**ca)
+    (orig.pathobj / test_fname).write_text('some')
+    orig.save(**ca)
+
     port = get_ssh_port("datalad-test")
     # prepare src
     source = install(
@@ -350,10 +356,11 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
 
 
 @slow  # 53.8496s
-@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
 def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
+    _mk_submodule_annex(origin, 'test-annex.dat', 'whatever')
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -454,10 +461,12 @@ def test_target_ssh_recursive():
     skip_ssh(check_target_ssh_recursive)(True)
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
 def check_target_ssh_since(use_ssh, origin, src_path, target_path):
+    _mk_submodule_annex(origin, 'test-annex.dat', 'whatever')
+
     if use_ssh:
         sshurl = "ssh://datalad-test" + target_path
     else:
