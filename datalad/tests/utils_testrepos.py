@@ -13,7 +13,9 @@ from abc import (
     ABCMeta,
     abstractmethod,
 )
-from os.path import exists
+from os.path import (
+    exists,
+)
 from os.path import join as opj
 
 from datalad import cfg as dl_cfg
