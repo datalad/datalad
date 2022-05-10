@@ -17,6 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from datalad.api import (
+    clone,
     create,
     get,
     install,
@@ -32,28 +33,27 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import get_local_file_url
 from datalad.tests.utils_pytest import (
-    DEFAULT_REMOTE,
+    create_tree,
     assert_false,
-    assert_in,
-    assert_in_results,
-    assert_message,
-    assert_not_in_results,
     assert_raises,
+    assert_in,
+    assert_status,
+    assert_in_results,
+    assert_not_in_results,
     assert_repo_status,
     assert_result_count,
-    assert_status,
-    create_tree,
+    assert_message,
+    DEFAULT_REMOTE,
     eq_,
-    known_failure_githubci_win,
     known_failure_windows,
+    known_failure_githubci_win,
     ok_,
     serve_path_via_http,
     skip_if_adjusted_branch,
-    skip_if_on_windows,
     skip_ssh,
+    skip_if_on_windows,
     slow,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 from datalad.utils import (
@@ -243,13 +243,19 @@ def test_get_invalid_call(path=None, file_outside=None):
         message=('path not associated with dataset %s', ds))
 
 
-@with_testrepos('basic_annex', flavors='clone')
-def test_get_single_file(path=None):
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_single_file(src=None, path=None):
+    ca = dict(result_renderer='disabled')
+    test_fname = 'test-annex.dat'
+    orig = Dataset(src).create(**ca)
+    (orig.pathobj / test_fname).write_text('some')
+    orig.save(**ca)
 
-    ds = Dataset(path)
+    ds = clone(src, path, **ca)
     ok_(ds.is_installed())
     ok_(ds.repo.file_has_content('test-annex.dat') is False)
-    result = ds.get("test-annex.dat")
+    result = ds.get("test-annex.dat", **ca)
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
@@ -373,13 +379,28 @@ def test_get_recurse_dirs(o_path=None, c_path=None):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
+def _mk_submodule_annex(path, fname, fcontent):
+    ca = dict(result_renderer='disabled')
+    # a remote dataset with a subdataset underneath
+    origds = Dataset(path).create(**ca)
+    (origds.pathobj / fname).write_text(fcontent)
+    # naming is weird, but a legacy artifact
+    s1 = origds.create('subm 1', **ca)
+    (s1.pathobj / fname).write_text(fcontent)
+    s2 = origds.create('2', **ca)
+    (s2.pathobj / fname).write_text(fcontent)
+    origds.save(recursive=True, **ca)
+    return origds
+
+
 @slow  # 15.1496s
-@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_get_recurse_subdatasets(src=None, path=None):
+    _mk_submodule_annex(src, 'test-annex.dat', 'irrelevant')
 
-    ds = install(
-        path, source=src,
+    ds = clone(
+        src, path,
         result_xfm='datasets', return_type='item-or-list')
 
     # ask for the two subdatasets specifically. This will obtain them,
@@ -460,9 +481,10 @@ def test_get_recurse_subdatasets(src=None, path=None):
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
 
-@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_get_greedy_recurse_subdatasets(src=None, path=None):
+    _mk_submodule_annex(src, 'test-annex.dat', 'irrelevant')
 
     ds = install(
         path, source=src,
@@ -478,9 +500,10 @@ def test_get_greedy_recurse_subdatasets(src=None, path=None):
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
 
 
-@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_get_install_missing_subdataset(src=None, path=None):
+    _mk_submodule_annex(src, 'test-annex.dat', 'irrelevant')
 
     ds = install(
         path=path, source=src,
