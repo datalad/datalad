@@ -63,14 +63,17 @@ from datalad.utils import (
 from ..dataset import Dataset
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
-# At least one aspect of the failure is a more general adjusted branch issue.
-@known_failure_windows
 @slow
-@with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_simple(origin=None, src_path=None, dst_path=None):
+    ca = dict(result_renderer='disabled')
+    # a remote dataset with a subdataset underneath
+    origds = Dataset(origin).create(**ca)
+    # naming is weird, but a legacy artifact
+    _ = origds.create('subm 1', **ca)
+    _ = origds.create('2', **ca)
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
