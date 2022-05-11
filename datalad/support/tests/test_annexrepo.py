@@ -41,6 +41,7 @@ from urllib.parse import (
 import pytest
 
 from datalad import cfg as dl_cfg
+from datalad.api import clone
 from datalad.cmd import GitWitlessRunner
 from datalad.cmd import WitlessRunner as Runner
 from datalad.consts import (
@@ -48,6 +49,7 @@ from datalad.consts import (
     DATALAD_SPECIAL_REMOTES_UUIDS,
     WEB_SPECIAL_REMOTE_UUID,
 )
+from datalad.distribution.dataset import Dataset
 from datalad.runner.gitrunner import GitWitlessRunner
 from datalad.support import path as op
 # imports from same module:
@@ -120,7 +122,6 @@ from datalad.tests.utils_pytest import (
     with_parametric_batch,
     with_sameas_remote,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 from datalad.utils import (
@@ -1520,10 +1521,21 @@ def test_annex_get_annexed_files(path=None):
         set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
 
 
-@with_parametric_batch
-@with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(p=None, *, batch):
-    annex = AnnexRepo(p)
+@pytest.mark.parametrize("batch", [True, False])
+@with_tree(tree={"test-annex.dat": "content"})
+@serve_path_via_http()
+@with_tempfile()
+@with_tempfile()
+def test_is_available(_=None, content_url=None, origpath=None, path=None, *,
+                      batch):
+
+    fname = "test-annex.dat"
+    content_url += "/" + fname
+    origds = Dataset(origpath).create()
+    origds.repo.add_url_to_file(fname, content_url)
+    origds.save()
+    origds.drop(fname)
+    annex = clone(origpath, path).repo
 
     # bkw = {'batch': batch}
     if batch:
@@ -1531,7 +1543,6 @@ def test_is_available(p=None, *, batch):
     else:
         is_available = annex.is_available
 
-    fname = 'test-annex.dat'
     key = annex.get_content_annexinfo([fname]).popitem()[1]['key']
 
     # explicit is to verify data type etc
