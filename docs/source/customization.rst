@@ -24,7 +24,7 @@ useful features for extension developers:
   and Python API
 - extensions can define `entry_points` for any number of additional metadata extractors
   that become automatically available to DataLad
-- extensions can define `entry_points` for their test suites, such that the standard `datalad test`
+- extensions can define `entry_points` for their test suites, such that the standard `datalad create`
   command will automatically run these tests in addition to the tests shipped with Datalad core
 - extensions can ship additional dataset procedures by installing them into a
   directory ``resources/procedures`` underneath the extension module directory
