@@ -60,6 +60,7 @@ from datalad.support.exceptions import CapturedException
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
     _get_non_existing_from_annex_output,
+    _sanitize_key,
 )
 from datalad.ui import ui
 import datalad.utils as ut
@@ -3231,7 +3232,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             # TODO optimize order based on some check that reveals
             # what scheme is used in a given annex
             r['has_content'] = False
-            key = r['key']
+            # some keys like URL-s700145--https://arxiv.org/pdf/0904.3664v1.pdf
+            # require sanitization to be able to mark content availability
+            # correctly. Can't limit to URL backend only; custom key backends
+            # may need it, too
+            key = _sanitize_key(r['key'])
             for testpath in (
                     # ATM git-annex reports hashdir in native path
                     # conventions and the actual file path `f` in
@@ -3395,8 +3400,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else:
                     rec = {}
             rec.update({'{}{}'.format(key_prefix, k): j[k]
-                       for k in j if k != 'file' and k != 'error_messages'})
-            # change annex' `error_messages` into singular to match result
+                       for k in j if k != 'file' and k != 'error-messages'})
+            # change annex' `error-messages` into singular to match result
             # records:
             if j.get('error-messages', None):
                 rec['error_message'] = '\n'.join(m.strip() for m in j['error-messages'])
@@ -3684,13 +3689,15 @@ class AnnexJsonProtocol(WitlessProtocol):
         # json_loads() is already logging any error, which is OK, because
         # under no circumstances we would expect broken JSON
         lines = data.splitlines()
+        data_ends_with_eol = data.endswith(os.linesep.encode())
+        del data
         for iline, line in enumerate(lines):
             try:
                 j = json_loads(line)
             except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
-                    if iline == len(lines) - 1 and not data.endswith(os.linesep.encode()):
+                    if iline == len(lines) - 1 and not data_ends_with_eol:
                         lgr.debug("Caught %s while trying to parse JSON line %s which might "
                                   "be not yet a full line", exc, line)
                         # it is the last line and fails to parse -- it can/likely

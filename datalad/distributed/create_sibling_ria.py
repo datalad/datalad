@@ -222,7 +222,7 @@ class CreateSiblingRia(Interface):
             installation is required on the target host."""),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'error', 'reconfigure', None),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure'),
             metavar='MODE',
             doc="""Action to perform, if a (storage) sibling is already
             configured under the given name and/or a target already exists.

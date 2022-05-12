@@ -566,7 +566,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd = ['-C', path, 'init']
         cmd.extend(ensure_list(init_options))
         lgr.debug(
-            "Initialize empty Git repository at '%s'%s",
+            "Initializing empty Git repository at '%s'%s",
             path,
             ' %s' % cmd[3:] if cmd[3:] else '')
 
