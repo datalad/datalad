@@ -65,3 +65,32 @@ def _get_non_existing_from_annex_output(output):
             unknown_paths.append(line[11:-10])
 
     return unknown_paths
+
+
+def _sanitize_key(key):
+    """Returns a sanitized key that is a suitable directory/file name
+
+    Documentation from the analog implementation in git-annex
+    Annex/Locations.hs
+
+    Converts a key into a filename fragment without any directory.
+
+    Escape "/" in the key name, to keep a flat tree of files and avoid
+    issues with keys containing "/../" or ending with "/" etc.
+
+    "/" is escaped to "%" because it's short and rarely used, and resembles
+        a slash
+    "%" is escaped to "&s", and "&" to "&a"; this ensures that the mapping
+        is one to one.
+    ":" is escaped to "&c", because it seemed like a good idea at the time.
+
+    Changing what this function escapes and how is not a good idea, as it
+    can cause existing objects to get lost.
+    """
+    esc = {
+        '/': '%',
+        '%': '&s',
+        '&': '&a',
+        ':': '&c',
+    }
+    return ''.join(esc.get(c, c) for c in key)

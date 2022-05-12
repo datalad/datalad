@@ -723,7 +723,7 @@ def clone_dataset(
     # must happen prior git-annex-init, where we can cheaply alter the repo
     # setup through safe re-init'ing
     if reckless and reckless.startswith('shared-'):
-        lgr.debug('Reinit %s to enable shared access permissions', destds)
+        lgr.debug('Reinitializing %s to enable shared access permissions', destds)
         destds.repo.call_git(['init', '--shared={}'.format(reckless[7:])])
 
     # In case of RIA stores we need to prepare *before* annex is called at all

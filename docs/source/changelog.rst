@@ -2,6 +2,103 @@
 
 Change log
 **********
+0.16.3 (Thu May 12 2022)
+========================
+
+Bug Fix
+-------
+
+-  No change for a PR to trigger release
+   `#6692 <https://github.com/datalad/datalad/pull/6692>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Sanitize keys before checking content availability to ensure correct
+   value for keys with URL or custom backend
+   `#6665 <https://github.com/datalad/datalad/pull/6665>`__
+   (`@adswa <https://github.com/adswa>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  Change a key-value pair in drop result record
+   `#6625 <https://github.com/datalad/datalad/pull/6625>`__
+   (`@mslw <https://github.com/mslw>`__)
+-  Link docs of datalad-next
+   `#6677 <https://github.com/datalad/datalad/pull/6677>`__
+   (`@mih <https://github.com/mih>`__)
+-  Fix ``GitRepo.get_branch_commits_()`` to handle branch names
+   conflicts with paths
+   `#6661 <https://github.com/datalad/datalad/pull/6661>`__
+   (`@mih <https://github.com/mih>`__)
+-  OPT: AnnexJsonProtocol - avoid dragging possibly long data around
+   `#6660 <https://github.com/datalad/datalad/pull/6660>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Remove two too prominent create() INFO log message that duplicate
+   DEBUG log and harmonize some other log messages
+   `#6638 <https://github.com/datalad/datalad/pull/6638>`__
+   (`@mih <https://github.com/mih>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  Remove unsupported parameter create_sibling_ria(existing=None)
+   `#6637 <https://github.com/datalad/datalad/pull/6637>`__
+   (`@mih <https://github.com/mih>`__)
+-  Add released plugin to .autorc to annotate PRs on when released
+   `#6639 <https://github.com/datalad/datalad/pull/6639>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 4
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Micha Szczepanik (`@mslw <https://github.com/mslw>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
+0.16.2 (Thu Apr 21 2022)
+========================
+
+.. _bug-fix-1:
+
+Bug Fix
+-------
+
+-  Demote (to level 1 from DEBUG) and speed-up API doc logging
+   (parseParameters)
+   `#6635 <https://github.com/datalad/datalad/pull/6635>`__
+   (`@mih <https://github.com/mih>`__)
+-  Factor out actual data transfer in push
+   `#6618 <https://github.com/datalad/datalad/pull/6618>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  ENH: include version of datalad in tests teardown Versions: report
+   `#6628 <https://github.com/datalad/datalad/pull/6628>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  MNT: Require importlib-metadata >=3.6 for Python < 3.10 for
+   entry_points taking kwargs
+   `#6631 <https://github.com/datalad/datalad/pull/6631>`__
+   (`@effigies <https://github.com/effigies>`__)
+-  Factor out credential handling of create-sibling-ghlike
+   `#6627 <https://github.com/datalad/datalad/pull/6627>`__
+   (`@mih <https://github.com/mih>`__)
+-  BF: Fix wrong key name of annex’ JSON records
+   `#6624 <https://github.com/datalad/datalad/pull/6624>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__)
+
+Pushed to ``maint``
+-------------------
+
+-  Fix typo in changelog (`@mih <https://github.com/mih>`__)
+-  [ci skip] minor typo fix
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 5
+----------
+
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Chris Markiewicz (`@effigies <https://github.com/effigies>`__)
+-  Christian Mnch
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.16.1 (Fr Apr 8 2022) – April Fools’ Release
 =============================================
 
@@ -86,7 +183,7 @@ Enhancements and new features
 -  A new ``foreach-dataset`` plumbing command allows to run commands on
    each (sub)dataset, similar to ``git submodule foreach``
    `#5517 <https://github.com/datalad/datalad/pull/5517>`__ (by
-   @yariktoptic)
+   @yarikoptic)
 -  The ``dataset`` parameter is not restricted to only locally
    resolvable file-URLs anymore
    `#6276 <https://github.com/datalad/datalad/pull/6276>`__ (by
@@ -686,6 +783,8 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
+.. _bug-fix-2:
+
 Bug Fix
 -------
 
@@ -719,7 +818,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-1:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -754,6 +853,8 @@ Bug Fix
    `#6319 <https://github.com/datalad/datalad/pull/6319>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _authors-5-1:
+
 Authors: 5
 ----------
 
@@ -768,7 +869,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -853,7 +954,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -888,6 +989,8 @@ Bug Fix
 -  Next wave of exc_str() removals
    `#6022 <https://github.com/datalad/datalad/pull/6022>`__
    (`@mih <https://github.com/mih>`__)
+
+.. _pushed-to-maint-1:
 
 Pushed to ``maint``
 -------------------
@@ -955,7 +1058,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -1006,7 +1109,7 @@ Tests
    `#6023 <https://github.com/datalad/datalad/pull/6023>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _authors-5-1:
+.. _authors-5-2:
 
 Authors: 5
 ----------
@@ -1022,7 +1125,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -1041,7 +1144,7 @@ Bug Fix
    `#5983 <https://github.com/datalad/datalad/pull/5983>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _pushed-to-maint-1:
+.. _pushed-to-maint-2:
 
 Pushed to ``maint``
 -------------------
@@ -1383,7 +1486,7 @@ Fixes
 -  ``save`` no longer saves unspecified subdatasets when called with an
    explicit path (list). The fix required a behavior change of
    ``GitRepo.get_content_info()`` in its interpretation of ``None``
-   vs. ``[]`` path argument values that now aligns the behavior of
+   vs. \ ``[]`` path argument values that now aligns the behavior of
    ``GitRepo.diff|status()`` with their respective documentation.
    (`#5693 <https://github.com/datalad/datalad/issues/5693>`__)
 
@@ -1435,7 +1538,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1482,7 +1585,7 @@ Bug Fix
    it for get `#5708 <https://github.com/datalad/datalad/pull/5708>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _pushed-to-maint-2:
+.. _pushed-to-maint-3:
 
 Pushed to ``maint``
 -------------------
@@ -1528,6 +1631,8 @@ Tests
    message `#5894 <https://github.com/datalad/datalad/pull/5894>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _authors-4-1:
+
 Authors: 4
 ----------
 
@@ -1541,7 +1646,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1605,7 +1710,7 @@ Tests
    `#5786 <https://github.com/datalad/datalad/pull/5786>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _authors-4-1:
+.. _authors-4-2:
 
 Authors: 4
 ----------
@@ -1641,7 +1746,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-8:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1722,7 +1827,7 @@ Bug Fix
    (`@kyleam <https://github.com/kyleam>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _pushed-to-maint-3:
+.. _pushed-to-maint-4:
 
 Pushed to ``maint``
 -------------------
@@ -1755,7 +1860,7 @@ Tests
    `#5651 <https://github.com/datalad/datalad/pull/5651>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _authors-4-2:
+.. _authors-4-3:
 
 Authors: 4
 ----------
@@ -1998,7 +2103,7 @@ Major refactoring and deprecations
    deprecated and will be removed in a later release.
    (`#4908 <https://github.com/datalad/datalad/issues/4908>`__)
 
--  The ``datalad.inteface.run`` module, which was deprecated in 0.12.0
+-  The ``datalad.interface.run`` module, which was deprecated in 0.12.0
    and kept as a compatibility shim for ``datalad.core.local.run``, has
    been removed.
    (`#4583 <https://github.com/datalad/datalad/issues/4583>`__)
@@ -2075,7 +2180,7 @@ Enhancements and new features
    default, has been improved. A core piece of the new approach is
    registering the commit of the primary branch, not its checked out
    adjusted branch, in the superdataset. Note: This means that
-   ``git   status`` will always consider a subdataset on an adjusted
+   ``git status`` will always consider a subdataset on an adjusted
    branch as dirty while ``datalad status`` will look more closely and
    see if the tip of the primary branch matches the registered commit.
    (`#5241 <https://github.com/datalad/datalad/issues/5241>`__)
@@ -2204,10 +2309,10 @@ Enhancements and new features
 
 -  The ``ConfigManager`` methods ``get``, ``getbool``, ``getfloat``, and
    ``getint`` now return a single value (with same precedence as
-   ``git   config --get``) when there are multiple values for the same
-   key (in the non-committed git configuration, if the key is present
-   there, or in the dataset configuration). For ``get``, the old
-   behavior can be restored by specifying ``get_all=True``.
+   ``git config --get``) when there are multiple values for the same key
+   (in the non-committed git configuration, if the key is present there,
+   or in the dataset configuration). For ``get``, the old behavior can
+   be restored by specifying ``get_all=True``.
    (`#4924 <https://github.com/datalad/datalad/issues/4924>`__)
 
 -  Command-line scripts are now defined via the ``entry_points``
@@ -2675,7 +2780,7 @@ Enhancements and new features
 
 -  ``datalad push`` now avoids unnecessary ``git push`` dry runs and
    pushes all refspecs with a single ``git push`` call rather than
-   invoking ``git   push`` for each one.
+   invoking ``git push`` for each one.
    (`#4692 <https://github.com/datalad/datalad/issues/4692>`__)
    (`#4675 <https://github.com/datalad/datalad/issues/4675>`__)
 
@@ -3028,9 +3133,8 @@ Fixes
 -  A longstanding regression in argcomplete-based command-line
    completion for Bash has been fixed. You can enable completion by
    configuring a Bash startup file to run
-   ``eval   "$(register-python-argcomplete datalad)"`` or source
-   DataLad’s ``tools/cmdline-completion``. The latter should work for
-   Zsh as well.
+   ``eval "$(register-python-argcomplete datalad)"`` or source DataLad’s
+   ``tools/cmdline-completion``. The latter should work for Zsh as well.
    (`#4477 <https://github.com/datalad/datalad/issues/4477>`__)
 
 -  `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
@@ -3111,13 +3215,12 @@ Fixes
 
 -  The default for the ``--jobs`` option, “auto”, instructed DataLad to
    pass a value to git-annex’s ``--jobs`` equal to
-   ``min(8, max(3, <number   of CPUs>))``, which could lead to issues
-   due to the large number of child processes spawned and file
-   descriptors opened. To avoid this behavior, ``--jobs=auto`` now
-   results in git-annex being called with ``--jobs=1`` by default.
-   Configure the new option ``datalad.runtime.max-annex-jobs`` to
-   control the maximum value that will be considered when
-   ``--jobs='auto'``.
+   ``min(8, max(3, <number of CPUs>))``, which could lead to issues due
+   to the large number of child processes spawned and file descriptors
+   opened. To avoid this behavior, ``--jobs=auto`` now results in
+   git-annex being called with ``--jobs=1`` by default. Configure the
+   new option ``datalad.runtime.max-annex-jobs`` to control the maximum
+   value that will be considered when ``--jobs='auto'``.
    (`#4409 <https://github.com/datalad/datalad/issues/4409>`__)
 
 -  Various commands have been adjusted to better handle the case where a
@@ -3901,7 +4004,7 @@ Enhancements and new features
    (`#3693 <https://github.com/datalad/datalad/issues/3693>`__)
 
 -  ``GitRepo`` now has a ``for_each_ref_`` method that wraps
-   ``git   for-each-ref``, which is used in various spots that used to
+   ``git for-each-ref``, which is used in various spots that used to
    rely on GitPython functionality.
    (`#3705 <https://github.com/datalad/datalad/issues/3705>`__)
 
@@ -4231,7 +4334,7 @@ Enhancements and new features
       (`#3334 <https://github.com/datalad/datalad/issues/3334>`__)
 
 -  Querying repository content is faster due to batching of
-   ``git   cat-file`` calls.
+   ``git cat-file`` calls.
    (`#3301 <https://github.com/datalad/datalad/issues/3301>`__)
 
 -  The dataset ID of a subdataset is now recorded in the superdataset.
@@ -5086,7 +5189,7 @@ Fixes
    command with a non-zero exit were incorrectly formatted.
    (`#2692 <https://github.com/datalad/datalad/issues/2692>`__)
 -  Decompression of zip files (e.g., through
-   ``datalad   add-archive-content``) failed on Python 3.
+   ``datalad add-archive-content``) failed on Python 3.
    (`#2702 <https://github.com/datalad/datalad/issues/2702>`__)
 -  Windows:
 
@@ -5188,15 +5291,15 @@ Enhancements and new features
    of each extension.
    (`#2741 <https://github.com/datalad/datalad/issues/2741>`__)
 -  The internal handling of gitattributes information has been improved.
-   A user-visible consequence is that ``datalad create   --force`` no
+   A user-visible consequence is that ``datalad create --force`` no
    longer duplicates existing attributes.
    (`#2744 <https://github.com/datalad/datalad/issues/2744>`__)
 -  The “annex” metadata extractor can now be used even when no content
    is present.
    (`#2724 <https://github.com/datalad/datalad/issues/2724>`__)
 -  The ``add_url_to_file`` method (called by commands like
-   ``datalad   download-url`` and ``datalad add-archive-content``)
-   learned how to display a progress bar.
+   ``datalad download-url`` and ``datalad add-archive-content``) learned
+   how to display a progress bar.
    (`#2738 <https://github.com/datalad/datalad/issues/2738>`__)
 
 0.10.2 (Jul 09, 2018) – Thesecuriestever
@@ -5302,7 +5405,7 @@ A number of fixes did not make it into the 0.9.x series:
 -  ``add`` now correctly saves staged subdataset additions.
 -  Running ``datalad save`` in a dataset no longer adds untracked
    content to the dataset. In order to add content a path has to be
-   given, e.g. ``datalad save .``
+   given, e.g. \ ``datalad save .``
 -  ``wtf`` now works reliably with a DataLad that wasn’t installed from
    Git (but, e.g., via pip)
 -  More robust URL handling in ``simple_with_archives`` crawler

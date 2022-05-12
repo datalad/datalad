@@ -173,8 +173,11 @@ def _parse_parameters(paramdoc):
     entries = __re_spliter1.split(paramdoc)
     result = [(__re_spliter2.split(e)[0].strip(), e)
               for e in entries if e != '']
-    lgr.debug('parseParameters: Given "%s", we split into %s' %
-              (paramdoc, result))
+    lgr.log(
+        1,
+        'parseParameters: Given "%s", we split into %s',
+        paramdoc, result,
+    )
     return result
 
 

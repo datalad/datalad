@@ -233,6 +233,23 @@ def test_report_absent_keys(path):
                 eval_availability=True)):
         assert_in(testfile, ai)
         assert_equal(ai[testfile]['has_content'], False)
+    # make sure files with URL keys are correctly reported:
+    from datalad import test_http_server
+    remote_file_name = 'imaremotefile.dat'
+    local_file_name = 'mehasurlkey'
+    (Path(test_http_server.path) / remote_file_name).write_text("weee")
+    remote_file_url = f'{test_http_server.url}/{remote_file_name}'
+    # we need to get a file with a URL key and check its local availability
+    ds.repo.call_annex(['addurl', '--relaxed', remote_file_url, '--file',
+                        local_file_name])
+    ds.save("URL keys!")
+    # should not be there
+    res = ds.repo.get_file_annexinfo(local_file_name, eval_availability=True)
+    assert_equal(res['has_content'], False)
+    ds.get(local_file_name)
+    # should be there
+    res = ds.repo.get_file_annexinfo(local_file_name, eval_availability=True)
+    assert_equal(res['has_content'], True)
 
 
 @with_tempfile

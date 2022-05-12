@@ -1,17 +1,14 @@
 Metadata-Version: 2.1
 Name: datalad
-Version: 0.16.1
+Version: 0.16.3
 Summary: data distribution geared toward scientific datasets
-Home-page: UNKNOWN
 Author: The DataLad Team and Contributors
 Author-email: team@datalad.org
-License: UNKNOWN
 Project-URL: Homepage, https://www.datalad.org
 Project-URL: Developer docs, https://docs.datalad.org/en/stable
 Project-URL: User handbook, https://handbook.datalad.org
 Project-URL: Source, https://github.com/datalad/datalad
 Project-URL: Bug Tracker, https://github.com/datalad/datalad/issues
-Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Environment :: Console
 Classifier: Intended Audience :: Developers
@@ -35,18 +32,18 @@ Classifier: Topic :: Utilities
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 Provides-Extra: core
-Provides-Extra: devel
-Provides-Extra: devel-docs
-Provides-Extra: devel-utils
 Provides-Extra: downloaders
 Provides-Extra: downloaders-extra
-Provides-Extra: duecredit
-Provides-Extra: full
+Provides-Extra: publish
+Provides-Extra: misc
+Provides-Extra: tests
 Provides-Extra: metadata
 Provides-Extra: metadata-extra
-Provides-Extra: misc
-Provides-Extra: publish
-Provides-Extra: tests
+Provides-Extra: duecredit
+Provides-Extra: full
+Provides-Extra: devel-docs
+Provides-Extra: devel-utils
+Provides-Extra: devel
 License-File: COPYING
 
      ____            _             _                   _ 
@@ -263,5 +260,3 @@ by [MacStadium](https://www.macstadium.com/).
 [enabling the ::science overlay]: https://github.com/gentoo/sci#manual-install-
 
 [DataLad Handbook: Installation]: http://handbook.datalad.org/en/latest/intro/installation.html
-
-

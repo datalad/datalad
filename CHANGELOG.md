@@ -1,3 +1,52 @@
+# 0.16.3 (Thu May 12 2022)
+
+#### 🐛 Bug Fix
+
+- No change for a PR to trigger release [#6692](https://github.com/datalad/datalad/pull/6692) ([@yarikoptic](https://github.com/yarikoptic))
+- Sanitize keys before checking content availability to ensure correct value for keys with URL or custom backend [#6665](https://github.com/datalad/datalad/pull/6665) ([@adswa](https://github.com/adswa) [@yarikoptic](https://github.com/yarikoptic))
+- Change a key-value pair in drop result record [#6625](https://github.com/datalad/datalad/pull/6625) ([@mslw](https://github.com/mslw))
+- Link docs of datalad-next [#6677](https://github.com/datalad/datalad/pull/6677) ([@mih](https://github.com/mih))
+- Fix `GitRepo.get_branch_commits_()` to handle branch names conflicts with paths [#6661](https://github.com/datalad/datalad/pull/6661) ([@mih](https://github.com/mih))
+- OPT: AnnexJsonProtocol - avoid dragging possibly long data around [#6660](https://github.com/datalad/datalad/pull/6660) ([@yarikoptic](https://github.com/yarikoptic))
+- Remove two too prominent create() INFO log message that duplicate DEBUG log and harmonize some other log messages [#6638](https://github.com/datalad/datalad/pull/6638) ([@mih](https://github.com/mih) [@yarikoptic](https://github.com/yarikoptic))
+- Remove unsupported parameter create_sibling_ria(existing=None) [#6637](https://github.com/datalad/datalad/pull/6637) ([@mih](https://github.com/mih))
+- Add released plugin to .autorc to annotate PRs on when released [#6639](https://github.com/datalad/datalad/pull/6639) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 4
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Michał Szczepanik ([@mslw](https://github.com/mslw))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.16.2 (Thu Apr 21 2022)
+
+#### 🐛 Bug Fix
+
+- Demote (to level 1 from DEBUG) and speed-up API doc logging (parseParameters) [#6635](https://github.com/datalad/datalad/pull/6635) ([@mih](https://github.com/mih))
+- Factor out actual data transfer in push [#6618](https://github.com/datalad/datalad/pull/6618) ([@christian-monch](https://github.com/christian-monch))
+- ENH: include version of datalad in tests teardown Versions: report [#6628](https://github.com/datalad/datalad/pull/6628) ([@yarikoptic](https://github.com/yarikoptic))
+- MNT: Require importlib-metadata >=3.6 for Python < 3.10 for entry_points taking kwargs [#6631](https://github.com/datalad/datalad/pull/6631) ([@effigies](https://github.com/effigies))
+- Factor out credential handling of create-sibling-ghlike [#6627](https://github.com/datalad/datalad/pull/6627) ([@mih](https://github.com/mih))
+- BF: Fix wrong key name of annex' JSON records [#6624](https://github.com/datalad/datalad/pull/6624) ([@bpoldrack](https://github.com/bpoldrack))
+
+#### ⚠️ Pushed to `maint`
+
+- Fix typo in changelog ([@mih](https://github.com/mih))
+- [ci skip] minor typo fix ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Chris Markiewicz ([@effigies](https://github.com/effigies))
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.1 (Fr Apr 8 2022) --  April Fools' Release
 
 - Fixes forgotten changelog in docs
@@ -25,7 +74,7 @@
 - A new switch allows to enable librarymode and queries for the effective API in use [#6213](https://github.com/datalad/datalad/pull/6213) (by @mih)
 - ``run`` and ``rerun`` now support parallel jobs via ``--jobs`` [#6279](https://github.com/datalad/datalad/pull/6279) (by @AKSoo)
 - A new ``foreach-dataset`` plumbing command allows to run commands on each (sub)dataset, similar to ``git submodule foreach``
-[#5517](https://github.com/datalad/datalad/pull/5517) (by @yariktoptic)
+[#5517](https://github.com/datalad/datalad/pull/5517) (by @yarikoptic)
 - The ``dataset`` parameter is not restricted to only locally resolvable file-URLs anymore [#6276](https://github.com/datalad/datalad/pull/6276) (by @christian-monch)
 - DataLad's credential system is now able to query `git-credential` by specifying credential type `git` in the respective provider configuration [#5796](https://github.com/datalad/datalad/pull/5796) (by @bpoldrack)
 - DataLad now comes with a git credential helper `git-credential-datalad` allowing Git to query DataLad's credential system [#5796](https://github.com/datalad/datalad/pull/5796) (by @bpoldrack and @mih)
@@ -972,7 +1021,7 @@
   aliases.  The `assure_*` variants are now marked as deprecated and
   will be removed in a later release.  ([#4908][])
 
-- The `datalad.inteface.run` module, which was deprecated in 0.12.0
+- The `datalad.interface.run` module, which was deprecated in 0.12.0
   and kept as a compatibility shim for `datalad.core.local.run`, has
   been removed.  ([#4583][])
 
