@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -eu
+
+to="$1"
+
+git annex fsck --quiet
+for f in .git/annex/objects/*/*/*; do
+    key=$(basename $f)
+    keydir=$(dirname $f)
+    newhashdir=$(git annex examinekey --format="\${$to}" "$key")
+    test -n "$newhashdir"
+    echo "$f -> $newhashdir"
+    targetdir=".git/annex/objects/$newhashdir"
+    if test -e "$targetdir"; then
+        echo "$targetdir already exists"
+        exit 1
+    fi
+    mkdir -p "$(dirname $targetdir)"
+    mv "$keydir" "${targetdir%/}"
+done
+git annex fsck --quiet
