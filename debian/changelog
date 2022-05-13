@@ -1,6 +1,9 @@
 datalad (0.16.3-1) unstable; urgency=medium
 
   * Fresh upstream release
+  * d/control
+    - python3-argcomplete minimal version should be 1.12.3
+      (as the first version available which works)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 12 May 2022 16:49:37 -0400
 

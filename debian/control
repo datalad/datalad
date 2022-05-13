@@ -13,7 +13,7 @@ Build-Depends: debhelper (>= 11),
                python3 (>= 3.7),
                python3-all,
                python3-annexremote,
-               python3-argcomplete,
+               python3-argcomplete (>= 1.12.3),
                python3-dateutil,
                python3-distro,
                python3-distutils | libpython3-stdlib (<= 3.6.4~rc1-2),
@@ -55,7 +55,7 @@ Package: datalad
 Architecture: all
 Section: science
 Depends: python3-datalad (= ${binary:Version}),
-         python3-argcomplete,
+         python3-argcomplete (>= 1.12.3),
          ${misc:Depends},
          ${python3:Depends}
 Suggests: datalad-container,
