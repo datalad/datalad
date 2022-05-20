@@ -792,8 +792,8 @@ class GitRepo(CoreGitRepo):
 
     # This is the least common denominator to claim that a user
     # used DataLad.
-    # For now citing Zenodo's all (i.e., latest) version
-    @due.dcite(Doi("10.5281/zenodo.808846"),
+    # Citing JOSS publication https://joss.theoj.org/papers/10.21105/joss.03262
+    @due.dcite(Doi("10.21105/joss.03262"),
                # override path since there is no need ATM for such details
                path="datalad",
                description="DataLad - Data management and distribution platform")
