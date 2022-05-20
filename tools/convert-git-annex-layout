@@ -17,10 +17,13 @@ for f in .git/annex/objects/*/*/*; do
         continue
     fi
     echo "  $f -> $newhashdir"
-    if test -e "$targetdir"; then
-        echo "$targetdir already exists"
-        exit 1
-    fi
+    # This was a wrong assumption - there could be multiple
+    # keys in the same directory so we might have it already.
+    # But I still feel we might need some test here
+    #if test -e "$targetdir"; then
+    #    echo "$targetdir already exists"
+    #    exit 1
+    #fi
     mkdir -p "$(dirname $targetdir)"
     mv "$keydir" "${targetdir%/}"
 done
