@@ -260,7 +260,7 @@ class CreateSiblingGitlab(Interface):
         # to avoid undesired level-1 recursion into subdatasets
         if any(p != ds.pathobj for p in (path or [])) or recursive:
             # also include any matching subdatasets
-            for subds in ds.subdatasets(
+            subds = ds.subdatasets(
                     path=path,
                     # we can only operate on present datasets
                     state='present',
@@ -270,12 +270,26 @@ class CreateSiblingGitlab(Interface):
                     bottomup=False,
                     result_xfm='datasets',
                     result_renderer='disabled',
-                    return_type='generator'):
-                for r in _proc_dataset(
-                        ds, subds,
-                        site, project, name, layout, existing, access,
-                        dry_run, siteobjs, publish_depends, description):
-                    yield r
+                    return_type='list')
+            if not subds:
+                # we didn't find anything to operate on, let the user know
+                for p in path:
+                    yield dict(
+                          action='create_sibling_gitlab',
+                          status='impossible',
+                          refds=ds.path,
+                          path=p,
+                          message=('No dataset found under %s' % p),
+                          type='dataset',
+                          logger=lgr,
+                    )
+            else:
+                for sub in subds:
+                    for r in _proc_dataset(
+                            ds, sub,
+                            site, project, name, layout, existing, access,
+                            dry_run, siteobjs, publish_depends, description):
+                        yield r
 
         return
 
