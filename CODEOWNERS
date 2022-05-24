@@ -1,0 +1,13 @@
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# they will be requested for review when someone opens a 
+# pull request.
+*       @datalad/developers
+
+# The Runner
+*cmd.py             christian.moench@web.de
+/datalad/runner/*   christian.moench@web.de
+
+*foreach_dataset.py @yarikoptic
+
+# See CODEOWNERS syntax here: https://help.github.com/articles/about-codeowners/#codeowners-syntax
