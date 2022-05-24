@@ -1137,6 +1137,16 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
             "sources, if possible (reckless)", ds.path)
         ds.config.set(
             'annex.hardlink', 'true', scope='local', reload=True)
+    elif reckless == 'ephemeral':
+        # In ephemeral clones we set annex.private=true. This would prevent the
+        # location itself being recorded in uuid.log. With a private repo,
+        # declaring dead (see below after annex-init) seems somewhat
+        # superfluous, but on the other hand:
+        # If an older annex that doesn't support private yet touches the
+        # repo, the entire purpose of ephemeral would be sabotaged if we did
+        # not declare dead in addition. Hence, keep it regardless of annex
+        # version.
+        ds.config.set('annex.private', 'true', scope='local')
 
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
@@ -1169,7 +1179,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
         ds.config.set(
             f'remote.{remote}.annex-ignore', 'true',
             scope='local')
-
         ds.repo.set_remote_dead('here')
 
         if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
