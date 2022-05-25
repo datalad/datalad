@@ -39,6 +39,7 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     require_dataset,
 )
+from datalad.distribution.utils import _yield_ds_w_matching_siblings
 from datalad.distributed.ora_remote import (
     LocalIO,
     RIARemoteError,
@@ -345,59 +346,26 @@ class CreateSiblingRia(Interface):
             # in recursive mode this check could take a substantial amount of
             # time: employ a progress bar (or rather a counter, because we don't
             # know the total in advance
-            pbar_id = 'check-siblings-{}'.format(id(ds))
-            log_progress(
-                lgr.info, pbar_id,
-                'Start checking pre-existing sibling configuration %s', ds,
-                label='Query siblings',
-                unit=' Siblings',
-            )
-            # even if we have to fail, let's report all conflicting siblings
-            # in subdatasets
             failed = False
-            for r in ds.siblings(result_renderer='disabled',
-                                 return_type='generator',
-                                 recursive=recursive,
-                                 recursion_limit=recursion_limit):
-                log_progress(
-                    lgr.info, pbar_id,
-                    'Discovered sibling %s in dataset at %s',
-                    r['name'], r['path'],
-                    update=1,
-                    increment=True)
-                if not r['type'] == 'sibling' or r['status'] != 'ok':
-                    # this is an internal status query that has not consequence
-                    # for the outside world. Be silent unless something useful
-                    # can be said
-                    #yield r
-                    continue
-                if r['name'] == name:
-                    res = get_status_dict(
-                        status='error',
-                        message="a sibling '{}' is already configured in "
-                        "dataset {}".format(name, r['path']),
-                        **res_kwargs,
-                    )
-                    failed = True
-                    yield res
-                    continue
-                if storage_name and r['name'] == storage_name:
-                    res = get_status_dict(
-                        status='error',
-                        message="a sibling '{}' is already configured in "
-                        "dataset {}".format(storage_name, r['path']),
-                        **res_kwargs,
-                    )
-                    failed = True
-                    yield res
-                    continue
-            log_progress(
-                lgr.info, pbar_id,
-                'Finished checking pre-existing sibling configuration %s', ds,
-            )
+            for dpath, sname in _yield_ds_w_matching_siblings(
+                    ds,
+                    (name, storage_name),
+                    recursive=recursive,
+                    recursion_limit=recursion_limit):
+                res = get_status_dict(
+                    status='error',
+                    message=(
+                        "a sibling %r is already configured in dataset %r",
+                        sname, dpath),
+                    type='sibling',
+                    name=sname,
+                    ds=ds,
+                    **res_kwargs,
+                )
+                failed = True
+                yield res
             if failed:
                 return
-
         # TODO: - URL parsing + store creation needs to be RF'ed based on
         #         command abstractions
         #       - more generally consider store creation a dedicated command or
