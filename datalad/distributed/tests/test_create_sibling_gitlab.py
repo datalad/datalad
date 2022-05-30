@@ -54,6 +54,15 @@ def test_dryrun(path=None):
     ctlg = _get_nested_collections(path)
     # no site config -> error
     assert_raises(ValueError, ctlg['root'].create_sibling_gitlab)
+    # wrong path specification -> impossible result
+    res = ctlg['root'].create_sibling_gitlab(
+        dry_run=True, on_failure='ignore',
+        site='dummy', path='imaghost'
+    )
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1, path=ctlg['root'].pathobj / 'imaghost', type='dataset',
+                          status='impossible')
     # single project vs multi-dataset call
     assert_raises(
         ValueError,
