@@ -57,7 +57,7 @@ class _UI_Switcher(object):
     def __init__(self, backend=None):
         self._backend = None
         self._ui = None
-        self.set_backend(backend)
+        self._requested_backend = backend
 
     def set_backend(self, backend):
         if backend and (backend == self._backend):
@@ -82,28 +82,32 @@ class _UI_Switcher(object):
                     backend = 'dialog'
             else:
                 backend = 'dialog' if is_interactive() else 'no-progress'
-        self._ui = KNOWN_BACKENDS[backend]()
-        lgr.debug("UI set to %s", self._ui)
         self._backend = backend
+        self._ui = None
 
     @property
     def backend(self):
+        if self._backend is None:
+            self.set_backend(self._requested_backend)
         return self._backend
 
     @property
     def ui(self):
+        if self._ui is None:
+            self._ui = KNOWN_BACKENDS[self.backend]()
+            lgr.debug("UI set to %s", self._ui)
         return self._ui
 
     # Delegate other methods to the actual UI
     def __getattribute__(self, key):
         if key.startswith('_') or key in {'set_backend', 'backend', 'ui'}:
             return super(_UI_Switcher, self).__getattribute__(key)
-        return getattr(self._ui, key)
+        return getattr(self.ui, key)
 
     def __setattr__(self, key, value):
         if key.startswith('_') or key in {'set_backend', 'backend', 'ui'}:
             return super(_UI_Switcher, self).__setattr__(key, value)
-        return setattr(self._ui, key, value)
+        return setattr(self.ui, key, value)
 
 lgr.log(5, "Initiating UI switcher")
 
