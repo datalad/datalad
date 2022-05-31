@@ -111,7 +111,9 @@ def _get_system_ssh_version():
     if out['stderr'].startswith('OpenSSH'):
         stdout = out['stderr']
     assert stdout.startswith('OpenSSH')  # that is the only one we care about atm
-    return stdout.split(' ', 1)[0].rstrip(',.').split('_')[1]
+    # The last item in _-separated list in the first word which could be separated
+    # from the rest by , or yet have another word after space
+    return stdout.split(',', 1)[0].split(' ')[0].rstrip('.').split('_')[-1]
 
 
 def _get_system_7z_version():
