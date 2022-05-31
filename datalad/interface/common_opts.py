@@ -178,10 +178,11 @@ reckless_opt = Parameter(
     Supported modes are:
     ['auto']: hard-link files between local clones. In-place
     modification in any clone will alter original annex content.
-    ['ephemeral']: symlink annex to origin's annex and discard local availability
-    info via git-annex-dead 'here'. Shares an annex between origin and clone
-    w/o git-annex being aware of it. In case of a change in origin you need to
-    update the clone before you're able to save new content on your end.
+    ['ephemeral']: symlink annex to origin's annex and discard local
+    availability info via git-annex-dead 'here' and declares this annex private.
+    Shares an annex between origin and clone w/o git-annex being aware of it.
+    In case of a change in origin you need to update the clone before you're
+    able to save new content on your end.
     Alternative to 'auto' when hardlinks are not an option, or number of consumed
     inodes needs to be minimized. Note that this mode can only be used with clones from
     non-bare repositories or a RIA store! Otherwise two different annex object tree
