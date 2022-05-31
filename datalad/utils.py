@@ -344,14 +344,6 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
-# unused in -core
-def sorted_files(path):
-    """Return a (sorted) list of files under path
-    """
-    return sorted(sum([[op.join(r, f)[len(path) + 1:] for f in files]
-                       for r, d, files in os.walk(path)
-                       if not '.git' in r], []))
-
 _encoded_dirsep = r'\\'  if on_windows else r'/'
 _VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (
     _encoded_dirsep, _encoded_dirsep)
