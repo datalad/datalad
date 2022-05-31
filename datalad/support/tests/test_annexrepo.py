@@ -2453,6 +2453,13 @@ def test_ro_operations(path):
         # Exception could be CommandError or IOError when there is no sudo
         raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
 
+    # recent git would refuse to run  git status  in repository owned by someone else
+    # which could lead to odd git-annex errors before 10.20220504-55-gaf0d85446 AKA 10.20220525~13
+    # see https://github.com/datalad/datalad/issues/5665 and after an informative error
+    # https://github.com/datalad/datalad/issues/6708
+    # To overcome - explicitly add the path into allowed
+    dl_cfg.add('safe.directory', repo2.path, scope='global')
+
     try:
         assert not repo2.get('file1')  # should work since file is here already
         repo2.status()  # should be Ok as well
