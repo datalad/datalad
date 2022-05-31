@@ -6,11 +6,120 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Definitions for ansi colors etc"""
+"""Helper for formatting text with ANSI color macros
 
-import os
-from .. import cfg
-from ..ui import ui
+This code is fully self-contained, except for an auto-detection of
+when to actually perform coloring, which is uses
+datalad.utils.is_interactive() as a minimum criterion.
+"""
+
+from enum import Enum
+
+
+class AnsiColors(Enum):
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    # the following are BOLD + a color
+    BLACK = '\033[1;30m'
+    RED = '\033[1;31m'
+    GREEN = '\033[1;32m'
+    YELLOW = '\033[1;33m'
+    BLUE = '\033[1;34m'
+    MAGENTA = '\033[1;35m'
+    CYAN = '\033[1;36m'
+    WHITE = '\033[1;37m'
+
+
+LOG_LEVEL_COLORS = {
+    'WARNING': AnsiColors.YELLOW,
+    'INFO': None,
+    'DEBUG': AnsiColors.BLUE,
+    'CRITICAL': AnsiColors.YELLOW,
+    'ERROR': AnsiColors.RED
+}
+
+RESULT_STATUS_COLORS = {
+    'ok': AnsiColors.GREEN,
+    'notneeded': AnsiColors.GREEN,
+    'impossible': AnsiColors.YELLOW,
+    'error': AnsiColors.RED
+}
+
+
+class AnsiFormatter:
+    def __init__(self):
+        self._enabled = None
+
+    # convenience access
+    color = AnsiColors
+
+    _RESET_SEQ = "\033[0m"
+
+    @property
+    def is_enabled(self):
+        """Check for whether color output is enabled
+
+        If the configuration value ``datalad.ui.color`` is ``'on'`` or ``'off'``,
+        that takes precedence.
+        If ``datalad.ui.color`` is ``'auto'``, and the environment variable
+        ``NO_COLOR`` is defined (see https://no-color.org), then color is disabled.
+        Otherwise, enable colors if a TTY is detected by ``datalad.ui.ui.is_interactive``.
+
+        Returns
+        -------
+        bool
+        """
+        if self._enabled is None:
+            from datalad import cfg
+            ui_color = cfg.obtain('datalad.ui.color')
+            if ui_color in ('on', 'yes'):
+                self._enabled = True
+            elif ui_color == ('off', 'no'):
+                self._enabled = False
+            else:
+                import os
+                from datalad.utils import is_interactive
+                self._enabled = ui_color == 'auto' \
+                    and os.getenv('NO_COLOR') is None \
+                    and is_interactive()
+        return self._enabled
+
+    def colorize(self, text, code):
+        if code is None or not self.is_enabled:
+            # nothing to do
+            return text
+
+        elif isinstance(code, AnsiColors):
+            seq = code.value
+        else:
+            seq = AnsiColors[code].value
+        return f"{seq}{text}{AnsiFormatter._RESET_SEQ}"
+
+    def color_status(self, status):
+        return self.colorize(status, RESULT_STATUS_COLORS.get(status))
+
+    def format(self, fmt, use_color=False):
+        """Replace $RESET and $BOLD with corresponding ANSI entries"""
+        # TODO this could replace much more placeholders. There could be
+        # $MAGENTA and all that, to largely avoid the use of `color_word()`
+        if use_color and self.is_enabled:
+            return fmt.replace(
+                "$RESET", AnsiFormatter._RESET_SEQ).replace(
+                "$BOLD", AnsiColors.BOLD.value)
+        else:
+            return fmt.replace(
+                "$RESET", "").replace(
+                "$BOLD", "")
+
+
+formatter = AnsiFormatter()
+
+
+#
+# Legacy API
+#
+
+import warnings
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(30, 38)
 BOLD = 1
@@ -20,51 +129,17 @@ RESET_SEQ = "\033[0m"
 COLOR_SEQ = "\033[1;%dm"
 BOLD_SEQ = "\033[1m"
 
-LOG_LEVEL_COLORS = {
-    'WARNING': YELLOW,
-    'INFO': None,
-    'DEBUG': BLUE,
-    'CRITICAL': YELLOW,
-    'ERROR': RED
-}
-
-RESULT_STATUS_COLORS = {
-    'ok': GREEN,
-    'notneeded': GREEN,
-    'impossible': YELLOW,
-    'error': RED
-}
-
-# Aliases for uniform presentation
-
 DATASET = UNDERLINE
 FIELD = BOLD
 
 
 def color_enabled():
-    """Check for whether color output is enabled
-
-    If the configuration value ``datalad.ui.color`` is ``'on'`` or ``'off'``,
-    that takes precedence.
-    If ``datalad.ui.color`` is ``'auto'``, and the environment variable
-    ``NO_COLOR`` is defined (see https://no-color.org), then color is disabled.
-    Otherwise, enable colors if a TTY is detected by ``datalad.ui.ui.is_interactive``.
-
-    Returns
-    -------
-    bool
-    """
-    ui_color = cfg.obtain('datalad.ui.color')
-    return (ui_color == 'on' or
-            ui_color == 'auto' and os.getenv('NO_COLOR') is None and ui.is_interactive)
+    return AnsiFormatter().is_enabled
 
 
 def format_msg(fmt, use_color=False):
     """Replace $RESET and $BOLD with corresponding ANSI entries"""
-    if color_enabled() and use_color:
-        return fmt.replace("$RESET", RESET_SEQ).replace("$BOLD", BOLD_SEQ)
-    else:
-        return fmt.replace("$RESET", "").replace("$BOLD", "")
+    return AnsiFormatter().format(fmt, use_color=use_color)
 
 
 def color_word(s, color, force=False):
@@ -83,9 +158,15 @@ def color_word(s, color, force=False):
     -------
     str
     """
-    if color and (force or color_enabled()):
-        return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ)
-    return s
+    if not color:
+        return s
+
+    f = AnsiFormatter()
+    # new API wants AnsiColors, recode via enum
+    color = f.color(COLOR_SEQ % color)
+    if force:
+        f.is_enabled = True
+    return f.colorize(s, color)
 
 
 def color_status(status):
