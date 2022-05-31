@@ -97,14 +97,14 @@ def _get_bundled_git_version():
         return out.split()[2]
 
 
-def _get_system_ssh_version():
+def _get_ssh_version(exe="ssh"):
     """Return version of ssh available system-wide
 
     Annex prior 20170302 was using bundled version, but now would use system one
     if installed
     """
     out = _runner.run(
-        'ssh -V'.split(),
+        [exe, '-V'],
         protocol=StdOutErrCapture)
     # apparently spits out to err but I wouldn't trust it blindly
     stdout = out['stdout']
@@ -114,6 +114,14 @@ def _get_system_ssh_version():
     # The last item in _-separated list in the first word which could be separated
     # from the rest by , or yet have another word after space
     return stdout.split(',', 1)[0].split(' ')[0].rstrip('.').split('_')[-1]
+
+
+_get_system_ssh_version = _get_ssh_version
+
+
+def _get_configured_ssh_version():
+    from datalad import cfg
+    return _get_ssh_version(cfg.obtain("datalad.ssh.executable"))
 
 
 def _get_system_7z_version():
@@ -153,6 +161,7 @@ class ExternalVersions(object):
         'cmd:git': _get_git_version,
         'cmd:bundled-git': _get_bundled_git_version,
         'cmd:system-git': _get_system_git_version,
+        'cmd:configured-ssh': _get_configured_ssh_version,
         'cmd:system-ssh': _get_system_ssh_version,
         'cmd:7z': _get_system_7z_version,
     }
