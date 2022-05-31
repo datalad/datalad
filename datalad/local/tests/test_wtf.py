@@ -126,6 +126,10 @@ def test_wtf(topdir):
         wtf(flavor='short', sections='*')
         assert_greater(len(cmo.out.splitlines()), 10)  #  many more
 
+    # check that wtf of an unavailable section yields impossible result (#6712)
+    res = wtf(sections=['murkie'], on_failure='ignore')
+    eq_(res[0]["status"], "impossible")
+
     # should result only in '# WTF'
     skip_if_no_module('pyperclip')
 
