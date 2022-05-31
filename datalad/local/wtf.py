@@ -494,8 +494,18 @@ class WTF(Interface):
                 raise ValueError(flavor)
 
         for s in sections:
-            infos[s] = section_callables[s]()
-
+            try:
+                infos[s] = section_callables[s]()
+            except KeyError:
+                yield get_status_dict(
+                    action='wtf',
+                    path=Path.cwd(),
+                    status='impossible',
+                    message=(
+                      'Requested section <%s> was not found among the '
+                      'available infos. Skipping report.', s),
+                    logger=lgr
+                    )
         if clipboard:
             external_versions.check(
                 'pyperclip', msg="It is needed to be able to use clipboard")

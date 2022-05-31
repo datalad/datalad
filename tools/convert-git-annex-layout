@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -eu
+
+to="$1"
+
+echo "Initial fsck:"
+git annex fsck --fast 2>&1 | python -m tqdm --null
+echo "Going through objects: "
+for f in .git/annex/objects/*/*/*; do
+    key=$(basename $f)
+    keydir=$(dirname $f)
+    newhashdir=$(git annex examinekey --format="\${$to}" "$key")
+    targetdir=".git/annex/objects/$newhashdir"
+    test -n "$newhashdir"
+    if [ "$keydir" = "${targetdir%/}" ]; then
+        continue
+    fi
+    echo "  $f -> $newhashdir"
+    # This was a wrong assumption - there could be multiple
+    # keys in the same directory so we might have it already.
+    # But I still feel we might need some test here
+    #if test -e "$targetdir"; then
+    #    echo "$targetdir already exists"
+    #    exit 1
+    #fi
+    mkdir -p "$(dirname $targetdir)"
+    mv "$keydir" "${targetdir%/}"
+done
+echo "Final fsck:"
+git annex fsck --fast 2>&1 | python -m tqdm --null

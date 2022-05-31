@@ -32,6 +32,7 @@ from datalad.core.distributed.clone import (
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import get_local_file_url
 from datalad.tests.utils_pytest import (
@@ -1367,6 +1368,7 @@ def test_ephemeral(origin_path=None, bare_path=None,
     origin.save()
     # 1. clone via path
     clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
+    eq_(clone1.config.get("annex.private"), "true")
 
     can_symlink = has_symlink_capability()
 
@@ -1382,6 +1384,7 @@ def test_ephemeral(origin_path=None, bare_path=None,
     # 2. clone via file-scheme URL
     clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
                    reckless='ephemeral')
+    eq_(clone2.config.get("annex.private"), "true")
 
     if can_symlink:
         clone2_annex = (clone2.repo.dot_git / 'annex')
@@ -1401,8 +1404,16 @@ def test_ephemeral(origin_path=None, bare_path=None,
                       scope="local")
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
-    clone1.push(to=DEFAULT_REMOTE,
-                   data='nothing' if can_symlink else 'auto')
+    clone1.push(to=DEFAULT_REMOTE, data='nothing' if can_symlink else 'auto')
+
+    if external_versions['cmd:annex'] >= "8.20210428":
+        # ephemeral clones are private (if supported by annex version). Despite
+        # the push, clone1's UUID doesn't show up in origin
+        recorded_locations = origin.repo.call_git(['cat-file', 'blob',
+                                                   'git-annex:uuid.log'],
+                                                  read_only=True)
+        assert_not_in(clone1.config.get("annex.uuid"), recorded_locations)
+
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
         eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())

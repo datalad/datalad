@@ -1,6 +1,15 @@
 # vim ft=yaml
 # travis-ci.org definition for DataLad build
 language: python
+
+# Do full clone (~10 extra seconds) to fetch all tags.
+# Otherwise we might be missing the tags for maint PRs
+# whenever those maint releases were not yet merged into master.
+# TODO: specify TRAVIS_BRANCH if ever would become possible
+#(support request was sent to Travis)
+git:
+  depth: false
+
 services:
   - docker
 

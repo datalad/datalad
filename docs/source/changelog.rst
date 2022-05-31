@@ -2,8 +2,59 @@
 
 Change log
 **********
+0.16.3 (Thu May 12 2022)
+========================
+
+Bug Fix
+-------
+
+-  No change for a PR to trigger release
+   `#6692 <https://github.com/datalad/datalad/pull/6692>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Sanitize keys before checking content availability to ensure correct
+   value for keys with URL or custom backend
+   `#6665 <https://github.com/datalad/datalad/pull/6665>`__
+   (`@adswa <https://github.com/adswa>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  Change a key-value pair in drop result record
+   `#6625 <https://github.com/datalad/datalad/pull/6625>`__
+   (`@mslw <https://github.com/mslw>`__)
+-  Link docs of datalad-next
+   `#6677 <https://github.com/datalad/datalad/pull/6677>`__
+   (`@mih <https://github.com/mih>`__)
+-  Fix ``GitRepo.get_branch_commits_()`` to handle branch names
+   conflicts with paths
+   `#6661 <https://github.com/datalad/datalad/pull/6661>`__
+   (`@mih <https://github.com/mih>`__)
+-  OPT: AnnexJsonProtocol - avoid dragging possibly long data around
+   `#6660 <https://github.com/datalad/datalad/pull/6660>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Remove two too prominent create() INFO log message that duplicate
+   DEBUG log and harmonize some other log messages
+   `#6638 <https://github.com/datalad/datalad/pull/6638>`__
+   (`@mih <https://github.com/mih>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  Remove unsupported parameter create_sibling_ria(existing=None)
+   `#6637 <https://github.com/datalad/datalad/pull/6637>`__
+   (`@mih <https://github.com/mih>`__)
+-  Add released plugin to .autorc to annotate PRs on when released
+   `#6639 <https://github.com/datalad/datalad/pull/6639>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 4
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Micha Szczepanik (`@mslw <https://github.com/mslw>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.16.2 (Thu Apr 21 2022)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -732,7 +783,7 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -767,7 +818,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -818,7 +869,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -903,7 +954,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -1007,7 +1058,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -1074,7 +1125,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -1487,7 +1538,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1580,6 +1631,8 @@ Tests
    message `#5894 <https://github.com/datalad/datalad/pull/5894>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _authors-4-1:
+
 Authors: 4
 ----------
 
@@ -1593,7 +1646,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-8:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1657,7 +1710,7 @@ Tests
    `#5786 <https://github.com/datalad/datalad/pull/5786>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _authors-4-1:
+.. _authors-4-2:
 
 Authors: 4
 ----------
@@ -1693,7 +1746,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-9:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1807,7 +1860,7 @@ Tests
    `#5651 <https://github.com/datalad/datalad/pull/5651>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _authors-4-2:
+.. _authors-4-3:
 
 Authors: 4
 ----------

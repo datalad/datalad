@@ -1,3 +1,26 @@
+# 0.16.3 (Thu May 12 2022)
+
+#### 🐛 Bug Fix
+
+- No change for a PR to trigger release [#6692](https://github.com/datalad/datalad/pull/6692) ([@yarikoptic](https://github.com/yarikoptic))
+- Sanitize keys before checking content availability to ensure correct value for keys with URL or custom backend [#6665](https://github.com/datalad/datalad/pull/6665) ([@adswa](https://github.com/adswa) [@yarikoptic](https://github.com/yarikoptic))
+- Change a key-value pair in drop result record [#6625](https://github.com/datalad/datalad/pull/6625) ([@mslw](https://github.com/mslw))
+- Link docs of datalad-next [#6677](https://github.com/datalad/datalad/pull/6677) ([@mih](https://github.com/mih))
+- Fix `GitRepo.get_branch_commits_()` to handle branch names conflicts with paths [#6661](https://github.com/datalad/datalad/pull/6661) ([@mih](https://github.com/mih))
+- OPT: AnnexJsonProtocol - avoid dragging possibly long data around [#6660](https://github.com/datalad/datalad/pull/6660) ([@yarikoptic](https://github.com/yarikoptic))
+- Remove two too prominent create() INFO log message that duplicate DEBUG log and harmonize some other log messages [#6638](https://github.com/datalad/datalad/pull/6638) ([@mih](https://github.com/mih) [@yarikoptic](https://github.com/yarikoptic))
+- Remove unsupported parameter create_sibling_ria(existing=None) [#6637](https://github.com/datalad/datalad/pull/6637) ([@mih](https://github.com/mih))
+- Add released plugin to .autorc to annotate PRs on when released [#6639](https://github.com/datalad/datalad/pull/6639) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 4
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Michał Szczepanik ([@mslw](https://github.com/mslw))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.2 (Thu Apr 21 2022)
 
 #### 🐛 Bug Fix
