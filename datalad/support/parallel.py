@@ -22,7 +22,7 @@ from collections import defaultdict
 from queue import Queue, Empty
 from threading import Thread
 
-from . import ansi_colors as colors
+from datalad.support.ansi_colors import formatter as ansi
 from ..log import log_progress
 from ..utils import path_is_subpath
 from datalad.support.exceptions import CapturedException
@@ -35,7 +35,7 @@ def _count_str(count, verb, omg=False):
     if count:
         msg = "{:d} {}".format(count, verb)
         if omg:
-            msg = colors.color_word(msg, colors.RED)
+            msg = ansi.colorize(msg, ansi.color.RED)
         return msg
 
 

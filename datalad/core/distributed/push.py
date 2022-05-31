@@ -305,13 +305,13 @@ class Push(Interface):
         hints = [hint for hint in hints if hint is not None]
         if hints:
             from datalad.ui import ui
-            from datalad.support import ansi_colors
-            intro = ansi_colors.color_word(
+            from datalad.support.ansi_colors import formatter as ansi
+            intro = ansi.colorize(
                 "Hints: ",
-                ansi_colors.YELLOW)
+                ansi.color.YELLOW)
             ui.message(intro)
             [ui.message("{}: {}".format(
-                ansi_colors.color_word(id + 1, ansi_colors.YELLOW), hint))
+                ansi.colorize(id + 1, ansi.color.YELLOW), hint))
                 for id, hint in enumerate(hints)]
 
 

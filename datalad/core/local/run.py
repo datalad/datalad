@@ -21,7 +21,7 @@ from pathlib import Path
 from tempfile import mkdtemp
 
 import datalad
-import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import formatter as ansi
 from datalad.config import anything2bool
 from datalad.core.local.save import Save
 from datalad.core.local.status import Status
@@ -339,11 +339,11 @@ class Run(Interface):
 
 
 def _display_basic(res):
-    ui.message(ac.color_word("Dry run information", ac.MAGENTA))
+    ui.message(ansi.colorize("Dry run information", ansi.color.MAGENTA))
 
     def fmt_line(key, value, multiline=False):
         return (" {key}:{sep}{value}"
-                .format(key=ac.color_word(key, ac.BOLD),
+                .format(key=ansi.colorize(key, ansi.color.BOLD),
                         sep=os.linesep + "  " if multiline else " ",
                         value=value))
 

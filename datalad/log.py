@@ -22,7 +22,10 @@ from os.path import basename, dirname
 from collections import defaultdict
 
 from .utils import is_interactive, optional_args
-from .support import ansi_colors as colors
+from datalad.support.ansi_colors import (
+    formatter as ansi,
+    LOG_LEVEL_COLORS,
+)
 
 __all__ = ['ColorFormatter']
 
@@ -152,8 +155,9 @@ class ColorFormatter(logging.Formatter):
             # if 'auto' - use color only if all streams are tty
             use_color = is_interactive()
         self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
-        msg = colors.format_msg(self._get_format(log_name, log_pid),
-                                self.use_color)
+        msg = ansi.format(
+            self._get_format(log_name, log_pid),
+            self.use_color)
         log_env = os.environ.get('DATALAD_LOG_TRACEBACK', '')
         collide = log_env == 'collide'
         limit = 100 if collide else int(log_env) if log_env.isdigit() else 100
@@ -188,11 +192,10 @@ class ColorFormatter(logging.Formatter):
 
         levelname = record.levelname
 
-        if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
-            record.levelname = colors.color_word(
+        if self.use_color and levelname in LOG_LEVEL_COLORS:
+            record.levelname = ansi.colorize(
                 "{:7}".format(levelname),
-                colors.LOG_LEVEL_COLORS[levelname],
-                force=True)
+                LOG_LEVEL_COLORS[levelname])
         record.msg = record.msg.replace("\n", "\n| ")
         if self._tb:
             if not getattr(record, 'notraceback', False):
@@ -365,7 +368,7 @@ def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
         if count:
             msg = "{:d} {}".format(count, verb)
             if omg:
-                msg = colors.color_word(msg, colors.RED)
+                msg = ansi.colorize(msg, ansi.color.RED)
             return msg
 
 

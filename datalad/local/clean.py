@@ -183,7 +183,7 @@ class Clean(Interface):
 
         from os import getcwd
 
-        import datalad.support.ansi_colors as ac
+        from datalad.support.ansi_colors import formatter as ansi
         from datalad.interface.utils import generic_result_renderer
         from datalad.utils import Path
 
@@ -211,7 +211,7 @@ class Clean(Interface):
                 else str(Path(res['path']).relative_to(refds))
 
             ui.message(u"{path}: {message}".format(
-                path=ac.color_word(path, ac.BOLD),
+                path=ansi.colorize(path, ansi.color.BOLD),
                 message=(res['message'][0] % res['message'][1:]
                          if isinstance(res['message'], tuple)
                          else res['message'])

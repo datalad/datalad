@@ -43,7 +43,10 @@ from datalad import cfg as dlcfg
 from datalad.dochelpers import single_or_plural
 
 from datalad.ui import ui
+# TODO the next import only exists, because the OSF extension
+# imports `ac` from here. Get that fixed and remove this import
 import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import formatter as ansi
 
 from datalad.interface.base import default_logchannels
 from datalad.interface.base import get_allargs_as_kwargs
@@ -462,23 +465,23 @@ def generic_result_renderer(res):
                 # drives. just go with the original path in this case
                 pass
         ui.message('{action}({status}):{path}{type}{msg}{err}'.format(
-            action=ac.color_word(
+            action=ansi.colorize(
                 res.get('action', '<action-unspecified>'),
-                ac.BOLD),
-            status=ac.color_status(res.get('status', '<status-unspecified>')),
+                ansi.color.BOLD),
+            status=ansi.color_status(res.get('status', '<status-unspecified>')),
             path=' {}'.format(path) if path else '',
             type=' ({})'.format(
-                ac.color_word(res['type'], ac.MAGENTA)
+                ansi.colorize(res['type'], ansi.color.MAGENTA)
             ) if 'type' in res else '',
             msg=' [{}]'.format(
                 res['message'][0] % res['message'][1:]
                 if isinstance(res['message'], tuple) else res[
                     'message'])
             if res.get('message', None) else '',
-            err=ac.color_word(' [{}]'.format(
+            err=ansi.colorize(' [{}]'.format(
                 res['error_message'][0] % res['error_message'][1:]
                 if isinstance(res['error_message'], tuple) else res[
-                    'error_message']), ac.RED)
+                    'error_message']), ansi.RED)
             if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
 
 

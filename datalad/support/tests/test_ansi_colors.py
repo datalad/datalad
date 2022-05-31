@@ -9,6 +9,7 @@
 """Test ANSI color tools """
 
 import os
+import pytest
 from unittest.mock import patch
 
 from datalad.support import ansi_colors as colors
@@ -19,6 +20,7 @@ from datalad.tests.utils_pytest import (
 import datalad.utils as du
 
 
+@pytest.mark.filterwarnings(r"ignore::DeprecationWarning")
 def test_color_enabled():
     # In the absence of NO_COLOR, follow ui.color, or ui.is_interactive if 'auto'
     with patch.dict(os.environ), \
@@ -50,7 +52,7 @@ def test_color_enabled():
 # In all other tests, just patch color_enabled
 #
 
-
+@pytest.mark.filterwarnings(r"ignore::DeprecationWarning")
 def test_format_msg():
     fmt = r'a$BOLDb$RESETc$BOLDd$RESETe'
     for enabled in (True, False):
@@ -67,6 +69,7 @@ def test_format_msg():
         assert_equal(colors.format_msg(fmt, use_color=True), 'a\033[1mb\033[0mc\033[1md\033[0me')
 
 
+@pytest.mark.filterwarnings(r"ignore::DeprecationWarning")
 def test_color_word():
     s = 'word'
     green_s = '\033[1;32mword\033[0m'
@@ -83,6 +86,7 @@ def test_color_word():
         assert_equal(colors.color_word(s, colors.GREEN, force=False), s)
 
 
+@pytest.mark.filterwarnings(r"ignore::DeprecationWarning")
 def test_color_status():
     # status -> (plain, colored)
     statuses = {

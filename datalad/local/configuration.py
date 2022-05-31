@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from textwrap import wrap
 
-import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import formatter as ansi
 from datalad import cfg as dlcfg
 from datalad.distribution.dataset import (
     Dataset,
@@ -281,7 +281,8 @@ class Configuration(Interface):
             if value in (True, False):
                 # normalize booleans for git-config syntax
                 value = str(value).lower()
-            ui.message(f'{prefix}{ac.color_word(name, ac.BOLD)}={value}')
+            ui.message(
+                f'{prefix}{ansi.colorize(name, ansi.color.BOLD)}={value}')
         else:
             ui.message('{}{}'.format(
                 prefix,

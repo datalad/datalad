@@ -134,11 +134,19 @@ FIELD = BOLD
 
 
 def color_enabled():
+    warnings.warn('color_enabled() is deprecated, use AnsiFormatter',
+                  DeprecationWarning)
     return AnsiFormatter().is_enabled
 
 
 def format_msg(fmt, use_color=False):
-    """Replace $RESET and $BOLD with corresponding ANSI entries"""
+    """Replace $RESET and $BOLD with corresponding ANSI entries
+
+    .. deprecated:: 0.17
+       Use AnsiFormatter.format() instead.
+    """
+    warnings.warn('format_msg() is deprecated, use AnsiFormatter.format()',
+                  DeprecationWarning)
     return AnsiFormatter().format(fmt, use_color=use_color)
 
 
@@ -157,7 +165,12 @@ def color_word(s, color, force=False):
     Returns
     -------
     str
+
+    .. deprecated:: 0.17
+       Use AnsiFormatter.colorize() instead.
     """
+    warnings.warn('color_word() is deprecated, use AnsiFormatter.colorize()',
+                  DeprecationWarning)
     if not color:
         return s
 
@@ -170,4 +183,11 @@ def color_word(s, color, force=False):
 
 
 def color_status(status):
-    return color_word(status, RESULT_STATUS_COLORS.get(status))
+    """
+    .. deprecated:: 0.17
+       Use AnsiFormatter.color_status() instead.
+    """
+    warnings.warn(
+        'color_status() is deprecated, use AnsiFormatter.color_status()',
+        DeprecationWarning)
+    return formatter.color_status(status)

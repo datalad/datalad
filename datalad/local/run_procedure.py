@@ -19,7 +19,7 @@ import sys
 from argparse import REMAINDER
 from glob import iglob
 
-import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import formatter as ansi
 from datalad import cfg
 from datalad.core.local.run import Run
 from datalad.distribution.dataset import (
@@ -490,7 +490,7 @@ class RunProcedure(Interface):
         if kwargs.get('discover', None):
             ui.message('{name} ({path}){msg}'.format(
                 # bold-faced name, if active
-                name=ac.color_word(res['procedure_name'], ac.BOLD)
+                name=ansi.colorize(res['procedure_name'], ansi.color.BOLD)
                 if res['state'] == 'executable' else res['procedure_name'],
                 path=res['path'],
                 msg=' [{}]'.format(
@@ -501,7 +501,7 @@ class RunProcedure(Interface):
 
         elif kwargs.get('help_proc', None):
             ui.message('{name} ({path}){help}'.format(
-                name=ac.color_word(res['procedure_name'], ac.BOLD),
+                name=ansi.colorize(res['procedure_name'], ansi.color.BOLD),
                 path=op.relpath(
                     res['path'],
                     res['refds'])

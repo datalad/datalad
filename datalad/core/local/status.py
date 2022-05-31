@@ -35,7 +35,7 @@ from datalad.interface.utils import (
     eval_results,
     generic_result_renderer,
 )
-import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import formatter as ansi
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureChoice,
@@ -100,11 +100,11 @@ _common_diffstatus_params = dict(
 
 
 STATE_COLOR_MAP = {
-    'untracked': ac.RED,
-    'modified': ac.RED,
-    'deleted': ac.RED,
-    'added': ac.GREEN,
-    'unknown': ac.YELLOW,
+    'untracked': ansi.color.RED,
+    'modified': ansi.color.RED,
+    'deleted': ansi.color.RED,
+    'added': ansi.color.GREEN,
+    'unknown': ansi.color.YELLOW,
 }
 
 
@@ -444,12 +444,12 @@ class Status(Interface):
         state = res.get('state', 'unknown')
         ui.message(u'{fill}{state}: {path}{type_}'.format(
             fill=' ' * max(0, max_len - len(state)),
-            state=ac.color_word(
+            state=ansi.colorize(
                 state,
                 STATE_COLOR_MAP.get(res.get('state', 'unknown'))),
             path=path,
             type_=' ({})'.format(
-                ac.color_word(type_, ac.MAGENTA) if type_ else '')))
+                ansi.colorize(type_, ansi.color.MAGENTA) if type_ else '')))
 
     @staticmethod
     def custom_result_summary_renderer(results):  # pragma: more cover

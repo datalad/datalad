@@ -16,7 +16,10 @@ import os
 import os.path as op
 from urllib.parse import urlparse
 
-import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import (
+    formatter as ansi,
+    LOG_LEVEL_COLORS,
+)
 from datalad.distribution.dataset import (
     Dataset,
     require_dataset,
@@ -328,7 +331,9 @@ class Siblings(Interface):
         if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
             ui.message(
                 '{warn}: No sibling "{name}" in dataset {path}'.format(
-                    warn=ac.color_word('Warning', ac.LOG_LEVEL_COLORS['WARNING']),
+                    warn=ansi.colorize(
+                        'Warning',
+                        LOG_LEVEL_COLORS['WARNING']),
                     **res)
             )
             return

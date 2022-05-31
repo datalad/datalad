@@ -40,7 +40,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CapturedException
 from datalad.support.param import Parameter
-import datalad.support.ansi_colors as ac
+from datalad.support.ansi_colors import formatter as ansi
 from datalad.support.json_py import (
     load as jsonload,
     load_xzstream,
@@ -1016,9 +1016,11 @@ class Metadata(Interface):
                        res['refds']) if res.get('refds', None) else res['path']
         meta = res.get('metadata', {})
         ui.message('{path}{type}:{spacer}{meta}{tags}'.format(
-            path=ac.color_word(path, ac.BOLD),
+            path=ansi.colorize(path, ansi.color.BOLD),
             type=' ({})'.format(
-                ac.color_word(res['type'], ac.MAGENTA)) if 'type' in res else '',
+                ansi.colorize(
+                    res['type'],
+                    ansi.color.MAGENTA)) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
             meta=','.join(k for k in sorted(meta.keys())
                           if k not in ('tag', '@context', '@id'))

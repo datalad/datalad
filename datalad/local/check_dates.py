@@ -67,7 +67,6 @@ class CheckDates(Interface):
     of annotated tags.
     """
     from datalad.interface.utils import eval_results
-    import datalad.support.ansi_colors as ac
     from datalad.support.constraints import EnsureChoice, EnsureNone, EnsureStr
     from datalad.support.param import Parameter
 
