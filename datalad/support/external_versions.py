@@ -97,12 +97,18 @@ def _get_bundled_git_version():
         return out.split()[2]
 
 
-def _get_ssh_version(exe="ssh"):
-    """Return version of ssh available system-wide
+def _get_ssh_version(exe=None):
+    """Return version of ssh
 
-    Annex prior 20170302 was using bundled version, but now would use system one
-    if installed
+    Annex prior 20170302 was using bundled version, then across all systems
+    we used system one if installed, and then switched to the one defined in
+    configuration, with system-wide (not default in PATH e.g. from conda)
+    "forced" on Windows.  If no specific executable provided in `exe`, we will
+    use the one in configuration
     """
+    if exe is None:
+        from datalad import cfg
+        exe = cfg.obtain("datalad.ssh.executable")
     out = _runner.run(
         [exe, '-V'],
         protocol=StdOutErrCapture)
@@ -116,12 +122,10 @@ def _get_ssh_version(exe="ssh"):
     return stdout.split(',', 1)[0].split(' ')[0].rstrip('.').split('_')[-1]
 
 
-_get_system_ssh_version = _get_ssh_version
-
-
-def _get_configured_ssh_version():
-    from datalad import cfg
-    return _get_ssh_version(cfg.obtain("datalad.ssh.executable"))
+def _get_system_ssh_version():
+    """Return version of the default on the system (in the PATH) ssh
+    """
+    return _get_ssh_version("ssh")
 
 
 def _get_system_7z_version():
@@ -161,7 +165,7 @@ class ExternalVersions(object):
         'cmd:git': _get_git_version,
         'cmd:bundled-git': _get_bundled_git_version,
         'cmd:system-git': _get_system_git_version,
-        'cmd:configured-ssh': _get_configured_ssh_version,
+        'cmd:ssh': _get_ssh_version,
         'cmd:system-ssh': _get_system_ssh_version,
         'cmd:7z': _get_system_7z_version,
     }
