@@ -186,7 +186,8 @@ class Unlock(Interface):
             ):
                 log_progress(
                     lgr.info, pbar_id,
-                    "Files to unlock %i", nfiles, update=1, increment=True,
+                    "Files to unlock %i", nfiles,
+                    update=1, increment=True,
                     noninteractive_level=logging.DEBUG)
                 nfiles -= 1
                 yield get_status_dict(
