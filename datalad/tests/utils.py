@@ -517,8 +517,8 @@ def skip_if(func, cond=True, msg=None, method='raise'):
 
 
 def skip_ssh(func):
-    """Skips SSH tests if on windows or if environment variable
-    DATALAD_TESTS_SSH was not set
+    """Skips SSH tests if datalad.tests.ssh (env var DATALAD_TESTS_SSH)
+    is not set at all or set to '0', 'false', or 'no'.
     """
 
     check_not_generatorfunction(func)
