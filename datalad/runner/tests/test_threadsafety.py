@@ -1,14 +1,17 @@
 import random
-import sys
 import threading
 import time
+from typing import (
+    List,
+    Optional,
+)
 
 import pytest
 
-from datalad.runner.coreprotocols import StdOutCapture
-from datalad.runner.nonasyncrunner import ThreadedRunner
-from datalad.runner.protocol import GeneratorMixIn
-from datalad.runner.tests.utils import py2cmd
+from ..coreprotocols import StdOutCapture
+from ..nonasyncrunner import ThreadedRunner
+from ..protocol import GeneratorMixIn
+from ..tests.utils import py2cmd
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
@@ -27,6 +30,52 @@ class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
 
 
 def test_thread_reentry_detection():
+    def run_on(runner: ThreadedRunner,
+               condition: threading.Condition,
+               wait_for_condition: bool):
+
+        if wait_for_condition:
+            condition.wait()
+
+        for _ in runner.run():
+            if not wait_for_condition:
+                condition.notify()
+            time.sleep(random.random())
+
+    # make exceptions visible to test thread
+    def new_hook(*args):
+        exceptions.append(args[0].exc_type)
+
+    threading.excepthook = new_hook
+
+    exceptions = []
+
+    shared_runner = ThreadedRunner(
+        cmd=py2cmd("for i in range(10): print(i)"),
+        protocol_class=MinimalGeneratorProtocol,
+        stdin=None)
+
+    enter_condition = threading.Condition()
+    thread_1 = threading.Thread(
+        name="thread_1",
+        target=run_on,
+        args=(shared_runner, enter_condition, False))
+
+    thread_2 = threading.Thread(
+        name="thread_2",
+        target=run_on,
+        args=(shared_runner, enter_condition, True))
+
+    thread_1.start()
+    thread_2.start()
+
+    thread_1.join()
+    thread_2.join()
+
+    assert exceptions == [RuntimeError]
+
+
+def test_thread_serialization():
     def run_on(runner: ThreadedRunner):
         for _ in runner.run():
             time.sleep(random.random())
@@ -41,7 +90,7 @@ def test_thread_reentry_detection():
 
     shared_runner = ThreadedRunner(
         cmd=py2cmd("for i in range(10): print(i)"),
-        protocol_class=MinimalGeneratorProtocol,
+        protocol_class=StdOutCapture,
         stdin=None)
 
     thread_1 = threading.Thread(
@@ -59,8 +108,7 @@ def test_thread_reentry_detection():
 
     thread_1.join()
     thread_2.join()
-
-    assert exceptions == [RuntimeError]
+    assert exceptions == []
 
 
 def test_reentry_detection():
@@ -84,7 +132,10 @@ def test_leave_handling():
 
     iteration_1_result = tuple(runner.run())
     iteration_2_result = tuple(runner.run())
-    assert iteration_1_result == iteration_2_result
+
+    str1 = "".join(e[1] for e in iteration_1_result)
+    str2 = "".join(e[1] for e in iteration_2_result)
+    assert str1 == str2
 
 
 def test_thread_leave_handling():
