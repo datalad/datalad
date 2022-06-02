@@ -154,7 +154,6 @@ def diff_dataset(
         untracked='normal',
         recursive=False,
         recursion_limit=None,
-        eval_file_type=True,
         reporting_order='depth-first',
         datasets_only=False,
 ):
@@ -185,10 +184,6 @@ def diff_dataset(
       Flag to enable recursive operation (see main diff() command).
     recursion_limit : int, optional
       Recursion limit (see main diff() command).
-    eval_file_type : bool, optional
-      Whether to perform file type discrimination between real symlinks
-      and symlinks representing annex'ed files. This can be expensive
-      in datasets with many files.
     reporting_order : {'depth-first', 'breadth-first', 'bottom-up'}, optional
       By default, subdataset content records are reported after the record
       on the subdataset's submodule in a superdataset (depth-first).
@@ -291,7 +286,6 @@ def diff_dataset(
             origpaths=None if not path else OrderedDict(path),
             untracked=untracked,
             annexinfo=annex,
-            eval_file_type=eval_file_type,
             cache=content_info_cache,
             order=reporting_order,
             datasets_only=datasets_only,
@@ -305,7 +299,7 @@ def diff_dataset(
 
 
 def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
-             annexinfo, eval_file_type, cache, order='depth-first', datasets_only=False):
+             annexinfo, cache, order='depth-first', datasets_only=False):
     if not ds.is_installed():
         # asked to query a subdataset that is not available
         lgr.debug("Skip diff of unavailable subdataset: %s", ds)
@@ -344,7 +338,6 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             to,
             paths=paths_arg,
             untracked=untracked,
-            # deprecated unused !!! eval_file_type=eval_file_type,
             eval_submodule_state='full' if to is None else 'commit',
             _cache=cache)
     except InvalidGitReferenceError as e:
@@ -434,7 +427,6 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     origpaths=origpaths,
                     untracked=untracked,
                     annexinfo=annexinfo,
-                    eval_file_type=eval_file_type,
                     cache=cache,
                     order=order,
                     datasets_only=datasets_only,
