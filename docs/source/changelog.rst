@@ -2,8 +2,49 @@
 
 Change log
 **********
+0.16.4 (Thu Jun 02 2022)
+========================
+
+Bug Fix
+-------
+
+-  BF(TST): RO operations - add test directory into git safe.directory
+   `#6726 <https://github.com/datalad/datalad/pull/6726>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  DOC: fixup of docstring for skip_ssh
+   `#6727 <https://github.com/datalad/datalad/pull/6727>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  DOC: Set language in Sphinx config to en
+   `#6727 <https://github.com/datalad/datalad/pull/6727>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  BF: Catch KeyErrors from unavailable WTF infos
+   `#6712 <https://github.com/datalad/datalad/pull/6712>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Add annex.private to ephemeral clones. That would make git-annex not
+   assign shared (in git-annex branch) annex uuid.
+   `#6702 <https://github.com/datalad/datalad/pull/6702>`__
+   (`@bpoldrack <https://github.com/bpoldrack>`__
+   `@adswa <https://github.com/adswa>`__)
+-  BF: require argcomplete version at least 1.12.3 to test/operate
+   correctly `#6693 <https://github.com/datalad/datalad/pull/6693>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Replace Zenodo DOI with JOSS for due credit
+   `#6725 <https://github.com/datalad/datalad/pull/6725>`__
+   (`@adswa <https://github.com/adswa>`__)
+
+Authors: 3
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Benjamin Poldrack (`@bpoldrack <https://github.com/bpoldrack>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.16.3 (Thu May 12 2022)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -54,7 +95,7 @@ Authors: 4
 0.16.2 (Thu Apr 21 2022)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -783,7 +824,7 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -818,7 +859,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -869,7 +910,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -954,7 +995,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -1058,7 +1099,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -1125,7 +1166,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1179,6 +1220,8 @@ Tests
    requiring network
    `#5986 <https://github.com/datalad/datalad/pull/5986>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _authors-3-1:
 
 Authors: 3
 ----------
@@ -1538,7 +1581,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-8:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1646,7 +1689,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-9:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1746,7 +1789,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-10:
+.. _bug-fix-11:
 
 Bug Fix
 -------
