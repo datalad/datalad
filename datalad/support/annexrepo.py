@@ -699,6 +699,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             default=False
         )
 
+    def set_remote_ignore(self, remote, ignored=False):
+        """Add or set an annex-ignore section for a given remote"""
+        # check if there is a section already
+        if self.config.has_section('remote.{}.annex-ignore'.format(remote)):
+            # overwrite (set) config
+            self.config.set('remote.{}.annex-ignore'.format(remote), ignored, scope='local')
+        else:
+            # add it
+            self.config.add('remote.{}.annex-ignore'.format(remote), ignored, scope='local')
+
     def is_special_annex_remote(self, remote, check_if_known=True):
         """Return whether remote is a special annex remote
 

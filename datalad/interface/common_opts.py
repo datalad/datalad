@@ -269,6 +269,11 @@ annex_groupwanted_opt = Parameter(
     See https://git-annex.branchable.com/git-annex-groupwanted/ for more information""",
     constraints=EnsureStr() | EnsureNone())
 
+annex_ignore_opt = Parameter(
+    args=("--annex-ignore",),
+    metavar='BOOL',
+    doc="Whether or not a remote shall be ignored or not",
+    constraints=EnsureChoice(None, True, False, 'true', 'false'))
 
 inherit_opt = Parameter(
     args=("--inherit",),

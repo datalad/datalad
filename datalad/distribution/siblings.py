@@ -32,6 +32,7 @@ from datalad.interface.common_opts import (
     annex_groupwanted_opt,
     annex_required_opt,
     annex_wanted_opt,
+    annex_ignore_opt,
     as_common_datasrc,
     inherit_opt,
     location_description,
@@ -191,6 +192,7 @@ class Siblings(Interface):
         annex_required=annex_required_opt,
         annex_group=annex_group_opt,
         annex_groupwanted=annex_groupwanted_opt,
+        annex_ignore=annex_ignore_opt,
         inherit=inherit_opt,
         get_annex_info=Parameter(
             args=("--no-annex-info",),
@@ -221,6 +223,7 @@ class Siblings(Interface):
             annex_required=None,
             annex_group=None,
             annex_groupwanted=None,
+            annex_ignore=None,
             inherit=False,
             get_annex_info=True,
             recursive=False,
@@ -277,6 +280,7 @@ class Siblings(Interface):
             annex_required=annex_required,
             annex_group=annex_group,
             annex_groupwanted=annex_groupwanted,
+            annex_ignore=annex_ignore,
             inherit=inherit,
             get_annex_info=get_annex_info,
             res_kwargs=res_kwargs,
@@ -428,7 +432,7 @@ def _configure_remote(
         ds, repo, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, res_kwargs, **unused_kwargs):
+        annex_ignore, inherit, res_kwargs, **unused_kwargs):
     result_props = dict(
         action='configure-sibling',
         path=ds.path,
@@ -553,6 +557,10 @@ def _configure_remote(
 
         assert isinstance(repo, GitRepo)  # just against silly code
         if isinstance(repo, AnnexRepo):
+            # before we try to enable special remotes, honour user-provided
+            # annex ignore configurations
+            if annex_ignore is not None:
+                repo.set_remote_ignore(name, annex_ignore)
             # we need to check if added sibling an annex, and try to enable it
             # another part of the fix for #463 and #432
             try:
