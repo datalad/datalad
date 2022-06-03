@@ -1,17 +1,14 @@
 import random
+import sys
 import threading
 import time
-from typing import (
-    List,
-    Optional,
-)
 
 import pytest
 
 from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
 from ..protocol import GeneratorMixIn
-from ..tests.utils import py2cmd
+from .utils import py2cmd
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
@@ -26,23 +23,16 @@ class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
         GeneratorMixIn.__init__(self)
 
     def pipe_data_received(self, fd, data):
-        self.send_result((fd, data.decode()))
+        for line in data.decode().splitlines():
+            print(fd, line, file=sys.stderr)
+            self.send_result((fd, line))
 
 
 def test_thread_reentry_detection():
-    def run_on(runner: ThreadedRunner,
-               condition: threading.Condition,
-               wait_for_condition: bool):
+    # expect that two run calls on the same runner with a generator-protocol
+    # and an active generator create a runtime error
 
-        if wait_for_condition:
-            condition.wait()
-
-        for _ in runner.run():
-            if not wait_for_condition:
-                condition.notify()
-            time.sleep(random.random())
-
-    # make exceptions visible to test thread
+    # make in-thread exceptions visible to test thread
     def new_hook(*args):
         exceptions.append(args[0].exc_type)
 
@@ -55,16 +45,8 @@ def test_thread_reentry_detection():
         protocol_class=MinimalGeneratorProtocol,
         stdin=None)
 
-    enter_condition = threading.Condition()
-    thread_1 = threading.Thread(
-        name="thread_1",
-        target=run_on,
-        args=(shared_runner, enter_condition, False))
-
-    thread_2 = threading.Thread(
-        name="thread_2",
-        target=run_on,
-        args=(shared_runner, enter_condition, True))
+    thread_1 = threading.Thread(target=shared_runner.run)
+    thread_2 = threading.Thread(target=shared_runner.run)
 
     thread_1.start()
     thread_2.start()
@@ -80,7 +62,7 @@ def test_thread_serialization():
         for _ in runner.run():
             time.sleep(random.random())
 
-    # make exceptions visible to test thread
+    # make in-thread exceptions visible to test thread
     def new_hook(*args):
         exceptions.append(args[0].exc_type)
 
@@ -93,15 +75,8 @@ def test_thread_serialization():
         protocol_class=StdOutCapture,
         stdin=None)
 
-    thread_1 = threading.Thread(
-        name="thread_1",
-        target=run_on,
-        args=(shared_runner,))
-
-    thread_2 = threading.Thread(
-        name="thread_2",
-        target=run_on,
-        args=(shared_runner,))
+    thread_1 = threading.Thread(target=run_on, args=(shared_runner,))
+    thread_2 = threading.Thread(target=run_on, args=(shared_runner,))
 
     thread_1.start()
     thread_2.start()
@@ -139,11 +114,14 @@ def test_leave_handling():
 
 
 def test_thread_leave_handling():
+    # expect no exception on repeated call to run of a runner with
+    # generator-protocol, if the generator was exhausted before the second call
+
     def run_on(runner: ThreadedRunner):
         for _ in runner.run():
             time.sleep(random.random())
 
-    # make exceptions visible to test thread
+    # make in-thread exceptions visible to test thread
     def new_hook(*args):
         exceptions.append(args[0].exc_type)
 
@@ -156,15 +134,8 @@ def test_thread_leave_handling():
         protocol_class=MinimalStdOutGeneratorProtocol,
         stdin=None)
 
-    thread_1 = threading.Thread(
-        name="thread_1",
-        target=run_on,
-        args=(shared_runner,))
-
-    thread_2 = threading.Thread(
-        name="thread_2",
-        target=run_on,
-        args=(shared_runner,))
+    thread_1 = threading.Thread(target=run_on, args=(shared_runner,))
+    thread_2 = threading.Thread(target=run_on, args=(shared_runner,))
 
     thread_1.start()
     thread_1.join()
