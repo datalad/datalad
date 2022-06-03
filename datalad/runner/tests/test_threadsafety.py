@@ -54,6 +54,8 @@ def test_thread_reentry_detection():
     thread_1.join()
     thread_2.join()
 
+    import sys
+    print("exceptions:", exceptions, file=sys.stderr)
     assert_in(RuntimeError, exceptions)
 
 
