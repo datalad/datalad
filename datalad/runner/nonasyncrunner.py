@@ -303,10 +303,11 @@ class ThreadedRunner:
                # get the return code of the process
                result = gen.return_code
         """
-        self.initialization_lock.acquire()
+        with self.initialization_lock:
+            return self._locked_run()
 
+    def _locked_run(self) -> Union[Any, Generator]:
         if self.generator is not None:
-            self.initialization_lock.release()
             raise RuntimeError("ThreadedRunner.run() was re-entered")
 
         if isinstance(self.stdin, (int, IO, type(None))):
@@ -363,7 +364,6 @@ class ThreadedRunner:
                     "https://github.com/datalad/datalad/issues/6106 for more "
                     "information."
                 )
-            self.initialization_lock.release()
             raise
 
         self.process_running = True
@@ -451,11 +451,9 @@ class ThreadedRunner:
 
         if issubclass(self.protocol_class, GeneratorMixIn):
             self.generator = _ResultGenerator(self, self.protocol.result_queue)
-            self.initialization_lock.release()
             return self.generator
 
         result = self.process_loop()
-        self.initialization_lock.release()
         return result
 
     def process_loop(self) -> Any:
