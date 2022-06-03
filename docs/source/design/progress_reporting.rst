@@ -25,11 +25,12 @@ Design and implementation
 
 This basic idea is to use an instance of datalad's loggers to emit log messages
 with particular attributes that are picked up by
-:py:class:`datalad.log.ProgressHandler`, and are acted on differently,
-depending on configuration and conditions of a session (e.g., interactive
-terminal sessions vs.  non-interactive usage in scripts). This variable
-behavior is implemented via the use of log filters and handlers.  Roughly
-speaking, :py:class:`datalad.log.ProgressHandler` will only be used for
+:py:class:`datalad.log.ProgressHandler` (derived from
+py:class:`logging.Handler`), and are acted on differently, depending on
+configuration and conditions of a session (e.g., interactive terminal sessions
+vs.  non-interactive usage in scripts). This variable behavior is implemented
+via the use of py:mod:`logging` standard library log filters and handlers.
+Roughly speaking, :py:class:`datalad.log.ProgressHandler` will only be used for
 interactive sessions. In non-interactive cases, progress log messages are
 inspected by :py:func:`datalad.log.filter_noninteractive_progress`, and are
 either discarded or treated like any other log message (see
@@ -80,7 +81,7 @@ unseen activity ``identifier``. It can be configured via the specification of
 a number of arguments, most notably a target ``total`` for the progress bar.
 See :py:func:`datalad.log.log_progress` for a complete overview.
 
-Starting a progress report must be done with a dedicate call. It cannot be combined
+Starting a progress report must be done with a dedicated call. It cannot be combined
 with a progress update.
 
 
@@ -89,7 +90,9 @@ with a progress update.
 
 Any subsequent call to :py:func:`datalad.log.log_progress` with an activity
 identifier that has already been seen either updates, or finishes the progress
-reporting for an activity. Updates must contain an ``update`` key
+reporting for an activity. Updates must contain an ``update`` key which either
+specifies a new value (if `increment=False`, the default) or an increment to
+previously known value (if `increment=True`):
 
 .. code-block:: python
 
@@ -115,8 +118,8 @@ initialized (see above).
 
 A progress bar will remain active until it is explicitly taken down, even if an
 initially declared ``total`` value may have been reached. Finishing a progress
-report requires a final log message with the corresponding identifiers which
-does NOT contain an ``update`` key.
+report requires a final log message with the corresponding identifiers which,
+like the first initializing message, does NOT contain an ``update`` key.
 
 .. code-block:: python
 
@@ -132,7 +135,7 @@ Progress reporting in non-interactive sessions
 ----------------------------------------------
 
 :py:func:`datalad.log.log_progress` takes a `noninteractive_level` argument
-that can be sued to control how progress reporting happens when no
+that can be used to specify a log level at which progress is logged when no
 progress bars can be used, but actual log messages are produced.
 
 .. code-block:: python
@@ -152,6 +155,9 @@ For example, it is possible to log the start or end of an activity at a higher
 level than intermediate updates. It is also possible to single out particular
 intermediate events, and report them at a higher level.
 
+If no `noninteractive_level` is specified, the progress update is unconditionally
+logged at the level implied by the given logger callable. 
+
 
 Output non-progress information without interfering with progress bars
 ======================================================================
@@ -159,7 +165,7 @@ Output non-progress information without interfering with progress bars
 :py:func:`~datalad.log.log_progress` can also be useful when not reporting
 progress, but ensuring that no other output is interfering with progress bars,
 and vice versa. The argument `maint` can be used in this case, with no
-particular activity identifier:
+particular activity identifier (it always impacts all active progress bars):
 
 
 .. code-block:: python
