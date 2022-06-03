@@ -1,6 +1,7 @@
 import random
 import threading
 import time
+from typing import List
 
 from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
@@ -32,21 +33,20 @@ def test_thread_reentry_detection():
     # expect that two run calls on the same runner with a generator-protocol
     # and an active generator create a runtime error
 
-    # make in-thread exceptions visible to test thread
-    def new_hook(*args):
-        exceptions.append(args[0].exc_type)
-
-    threading.excepthook = new_hook
-
-    exceptions = []
+    def run_on(runner: ThreadedRunner, exceptions: List):
+        try:
+            runner.run()
+        except Exception as e:
+            exceptions.append(e.__class__)
 
     shared_runner = ThreadedRunner(
         cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=MinimalGeneratorProtocol,
         stdin=None)
 
-    thread_1 = threading.Thread(target=shared_runner.run)
-    thread_2 = threading.Thread(target=shared_runner.run)
+    exceptions = []
+    thread_1 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
+    thread_2 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
 
     thread_1.start()
     thread_2.start()
@@ -58,31 +58,28 @@ def test_thread_reentry_detection():
 
 
 def test_thread_serialization():
-    def run_on(runner: ThreadedRunner):
-        for _ in runner.run():
-            time.sleep(random.random())
-
-    # make in-thread exceptions visible to test thread
-    def new_hook(*args):
-        exceptions.append(args[0].exc_type)
-
-    threading.excepthook = new_hook
-
-    exceptions = []
+    def run_on(runner: ThreadedRunner, exceptions: List):
+        try:
+            for _ in runner.run():
+                time.sleep(random.random())
+        except Exception as e:
+            exceptions.append(e.__class__)
 
     shared_runner = ThreadedRunner(
         cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=StdOutCapture,
         stdin=None)
 
-    thread_1 = threading.Thread(target=run_on, args=(shared_runner,))
-    thread_2 = threading.Thread(target=run_on, args=(shared_runner,))
+    exceptions = []
+    thread_1 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
+    thread_2 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
 
     thread_1.start()
     thread_2.start()
 
     thread_1.join()
     thread_2.join()
+
     assert exceptions == []
 
 
@@ -116,25 +113,21 @@ def test_thread_leave_handling():
     # expect no exception on repeated call to run of a runner with
     # generator-protocol, if the generator was exhausted before the second call
 
-    def run_on(runner: ThreadedRunner):
-        for _ in runner.run():
-            time.sleep(random.random())
-
-    # make in-thread exceptions visible to test thread
-    def new_hook(*args):
-        exceptions.append(args[0].exc_type)
-
-    threading.excepthook = new_hook
-
-    exceptions = []
+    def run_on(runner: ThreadedRunner, exceptions: List):
+        try:
+            for _ in runner.run():
+                time.sleep(random.random())
+        except Exception as e:
+            exceptions.append(e.__class__)
 
     shared_runner = ThreadedRunner(
         cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=MinimalStdOutGeneratorProtocol,
         stdin=None)
 
-    thread_1 = threading.Thread(target=run_on, args=(shared_runner,))
-    thread_2 = threading.Thread(target=run_on, args=(shared_runner,))
+    exceptions = []
+    thread_1 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
+    thread_2 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
 
     thread_1.start()
     thread_1.join()
