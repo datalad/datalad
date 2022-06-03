@@ -453,8 +453,7 @@ class ThreadedRunner:
             self.generator = _ResultGenerator(self, self.protocol.result_queue)
             return self.generator
 
-        result = self.process_loop()
-        return result
+        return self.process_loop()
 
     def process_loop(self) -> Any:
         # Process internal messages until no more active file descriptors
