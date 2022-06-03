@@ -160,6 +160,20 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
 
+    # smoke test for setting annex ignore: reconfigure remote with annex ignore
+    with chpwd(source.path):
+        res = siblings('configure', name="dl-test-remote", annex_ignore='true',
+                       **ca)
+        assert_result_count(
+            res, 1,
+            name="dl-test-remote", type='sibling')
+        assert res[0]['annex-ignore'] == True
+        res = siblings('configure', name="dl-test-remote", annex_ignore='false',
+                       **ca)
+        assert_result_count(
+            res, 1,
+            name="dl-test-remote", type='sibling')
+        assert res[0]['annex-ignore'] == 'false'
     # no longer a use case, I would need additional convincing that
     # this is anyhow useful other then triple checking other peoples
     # errors. for an actual check use 'query'
