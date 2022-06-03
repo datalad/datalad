@@ -1,5 +1,4 @@
 import random
-import sys
 import threading
 import time
 
@@ -7,7 +6,10 @@ from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
 from ..protocol import GeneratorMixIn
 from .utils import py2cmd
-from datalad.tests.utils import assert_raises
+from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
+)
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
@@ -23,7 +25,6 @@ class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
 
     def pipe_data_received(self, fd, data):
         for line in data.decode().splitlines():
-            print(fd, line, file=sys.stderr)
             self.send_result((fd, line))
 
 
@@ -40,7 +41,7 @@ def test_thread_reentry_detection():
     exceptions = []
 
     shared_runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(10): print(i)"),
+        cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=MinimalGeneratorProtocol,
         stdin=None)
 
@@ -53,7 +54,7 @@ def test_thread_reentry_detection():
     thread_1.join()
     thread_2.join()
 
-    assert exceptions == [RuntimeError]
+    assert_in(RuntimeError, exceptions)
 
 
 def test_thread_serialization():
@@ -70,7 +71,7 @@ def test_thread_serialization():
     exceptions = []
 
     shared_runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(10): print(i)"),
+        cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=StdOutCapture,
         stdin=None)
 
@@ -88,7 +89,7 @@ def test_thread_serialization():
 def test_reentry_detection():
 
     runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(10): print(i)"),
+        cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=MinimalGeneratorProtocol,
         stdin=None)
 
@@ -99,7 +100,7 @@ def test_reentry_detection():
 def test_leave_handling():
 
     runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(10): print(i)"),
+        cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=MinimalStdOutGeneratorProtocol,
         stdin=None)
 
@@ -128,7 +129,7 @@ def test_thread_leave_handling():
     exceptions = []
 
     shared_runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(10): print(i)"),
+        cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=MinimalStdOutGeneratorProtocol,
         stdin=None)
 
