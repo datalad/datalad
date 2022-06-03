@@ -140,7 +140,6 @@ def test_thread_leave_handling():
 
     thread_1.start()
     thread_1.join()
-
     thread_2.start()
     thread_2.join()
 
