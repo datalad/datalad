@@ -26,10 +26,10 @@ Design and implementation
 This basic idea is to use an instance of datalad's loggers to emit log messages
 with particular attributes that are picked up by
 :py:class:`datalad.log.ProgressHandler` (derived from
-py:class:`logging.Handler`), and are acted on differently, depending on
+:py:class:`logging.Handler`), and are acted on differently, depending on
 configuration and conditions of a session (e.g., interactive terminal sessions
 vs.  non-interactive usage in scripts). This variable behavior is implemented
-via the use of py:mod:`logging` standard library log filters and handlers.
+via the use of :py:mod:`logging` standard library log filters and handlers.
 Roughly speaking, :py:class:`datalad.log.ProgressHandler` will only be used for
 interactive sessions. In non-interactive cases, progress log messages are
 inspected by :py:func:`datalad.log.filter_noninteractive_progress`, and are
@@ -157,6 +157,24 @@ intermediate events, and report them at a higher level.
 
 If no `noninteractive_level` is specified, the progress update is unconditionally
 logged at the level implied by the given logger callable. 
+
+
+Reporting progress with `with_(result_)progress()`
+==================================================
+
+For cases were a list of items needs to be processes sequentially, and progress
+shall be communicated, two additional helpers could be used: the decorators
+:py:func:`datalad.log.with_progress` and
+:py:func:`datalad.log.with_result_progress`. They require a callable that takes
+a list (or more generally a sequence) of items to be processed as the first
+positional argument. They both set up and perform all necessary calls to
+:py:func:`~datalad.log.log_progress`.
+
+The difference between these helpers is that
+:py:func:`datalad.log.with_result_progress` expects a callable to produce
+DataLad result records, and supports customs filters to decide which particular
+result records to consider for progress reporting (e.g., only records for a
+particular `action` and `type`).
 
 
 Output non-progress information without interfering with progress bars
