@@ -3,12 +3,11 @@ import sys
 import threading
 import time
 
-import pytest
-
 from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
 from ..protocol import GeneratorMixIn
 from .utils import py2cmd
+from datalad.tests.utils import assert_raises
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
@@ -94,8 +93,7 @@ def test_reentry_detection():
         stdin=None)
 
     runner.run()
-    with pytest.raises(RuntimeError):
-        runner.run()
+    assert_raises(RuntimeError, runner.run)
 
 
 def test_leave_handling():
