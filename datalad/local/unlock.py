@@ -177,6 +177,7 @@ class Unlock(Interface):
                 unit=' Files',
                 label='Unlocking',
                 total=nfiles,
+                noninteractive_level=logging.INFO,
             )
             ds = Dataset(ds_path)
             for r in ds.repo._call_annex_records_items_(
@@ -184,7 +185,10 @@ class Unlock(Interface):
                     files=files,
             ):
                 log_progress(
-                    lgr.info, pbar_id, "Files to unlock %i", nfiles, update=1, increment=True)
+                    lgr.info, pbar_id,
+                    "Files to unlock %i", nfiles,
+                    update=1, increment=True,
+                    noninteractive_level=logging.DEBUG)
                 nfiles -= 1
                 yield get_status_dict(
                     path=op.join(ds.path, r['file']),
@@ -195,7 +199,12 @@ class Unlock(Interface):
                     # git-annex will spend considerable time after the last
                     # file record to finish things up, let this be known
                     log_progress(
-                        lgr.info, pbar_id, "Recording unlocked state in git", update=0, increment=True)
+                        lgr.info, pbar_id,
+                        "Recording unlocked state in git",
+                        update=0, increment=True,
+                        noninteractive_level=logging.INFO)
 
             log_progress(
-                lgr.info, pbar_id, "Completed unlocking files")
+                lgr.info, pbar_id,
+                "Completed unlocking files",
+                noninteractive_level=logging.INFO)
