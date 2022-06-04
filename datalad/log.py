@@ -6,6 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Logging setup and utilities, including progress reporting"""
 
 from functools import partial
 import inspect
@@ -24,16 +25,33 @@ from collections import defaultdict
 from .utils import is_interactive, optional_args
 from .support import ansi_colors as colors
 
-__all__ = ['ColorFormatter']
+__all__ = [
+    'ColorFormatter',
+    'LoggerHelper',
+    'filter_noninteractive_progress',
+    'log_progress',
+    'with_progress',
+    'with_result_progress',
+]
 
 # Snippets from traceback borrowed from duecredit which was borrowed from
 # PyMVPA upstream/2.4.0-39-g69ad545  MIT license (the same copyright as DataLad)
 
 
 def mbasename(s):
-    """Custom function to include directory name if filename is too common
+    """Returns an expanded basename, if the filename is deemed not informative
 
-    Also strip .py at the end
+    A '.py' extension is stripped from file name, and the containing directory
+    is prepended for too generic file names  like 'base', '__init__', and 'utils'
+
+    Parameters
+    ----------
+    s: str
+      Platform-native path
+
+    Returns
+    -------
+    str
     """
     base = basename(s)
     if base.endswith('.py'):
@@ -89,9 +107,16 @@ class TraceBack(object):
         # represent the entry into this utility rather than the traceback
         # relevant for the caller
         ftb = self._extract_stack(limit=self.limit + 10)[:-3]
-        entries = [[mbasename(x[0]), str(x[1])]
-                   for x in ftb if mbasename(x[0]) != 'logging.__init__']
-        entries = [e for e in entries if e[0] != 'unittest']
+        # each item in `ftb` is
+        # (filename, line, object, code-on-line)
+        # so entries is a list of (filename, line)
+        entries = [[mbasename(x[0]), str(x[1])] for x in ftb]
+        # remove "uninformative" levels of the stack, given the space
+        # constraints of a log message
+        entries = [
+            e for e in entries
+            if e[0] not in ('unittest', 'logging.__init__')
+        ]
 
         if len(entries) > self.limit:
             sftb = '…>'
@@ -102,14 +127,17 @@ class TraceBack(object):
         if not entries:
             return ""
 
-        # lets make it more consize
+        # let's make it more concise
         entries_out = [entries[0]]
         for entry in entries[1:]:
+            # if the current filename is the same as the last one on the stack
+            # only append the line number to save space
             if entry[0] == entries_out[-1][0]:
                 entries_out[-1][1] += ',%s' % entry[1]
             else:
                 entries_out.append(entry)
 
+        # format the traceback in a compact form
         sftb += '>'.join(
             ['%s:%s' % (mbasename(x[0]), x[1]) for x in entries_out]
         )
