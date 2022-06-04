@@ -44,17 +44,16 @@ def mbasename(s):
 
 
 class TraceBack(object):
-    """Customized traceback to be included in debug messages
+    """Customizable traceback for inclusion debug log messages
     """
 
     def __init__(self, limit=100, collide=False):
-        """Initialize TraceBack metric
-
+        """
         Parameters
         ----------
         collide : bool
-          if True then prefix common with previous invocation gets
-          replaced with ...
+          if True, deduplicate a subsequent message by replacing a common
+          prefix string with an ellipsis.
         """
         self.__prev = ""
         self.limit = limit
@@ -77,7 +76,7 @@ class TraceBack(object):
         entries = [e for e in entries if e[0] != 'unittest']
 
         if len(entries) > self.limit:
-            sftb = '...>'
+            sftb = '…>'
             entries = entries[-self.limit:]
         else:
             sftb = ''
@@ -104,7 +103,7 @@ class TraceBack(object):
             common_prefix2 = self.__prefix_re.sub('', common_prefix)
 
             if common_prefix2 != "":
-                sftb = '...' + sftb[len(common_prefix2):]
+                sftb = '…' + sftb[len(common_prefix2):]
             self.__prev = prev_next
 
         return sftb
