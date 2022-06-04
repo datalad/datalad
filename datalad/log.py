@@ -369,12 +369,30 @@ def filter_noninteractive_progress(logger, record):
 
 
 def log_progress(lgrcall, pid, *args, **kwargs):
-    """Helper to emit a log message on the progress of some process
+    """Emit progress log messages
 
-    Note: Whereas this helper reports on interim progress and is to be used
-    programmatically, :class:`~datalad.ui.progressbars.LogProgressBar` replaces
-    a progress bar with a single log message upon completion and can be chosen
-    by the user (config 'datalad.ui.progressbar' set to 'log').
+    This helper can be used to handle progress reporting without having
+    to maintain display mode specific code.
+
+    Typical progress reporting via this function involves three types of
+    calls:
+
+    1. Start reporting progress about a process
+    2. Update progress information about a process
+    3. Report completion of a process
+
+    In order to be able to associate all three steps with a particular process,
+    the `pid` identifier is used. This is an arbitrary string that must be
+    chosen to be unique across all different, but simultaneously running
+    progress reporting activities within a Python session. For many practical
+    purposes this can be achieved by, for example, including path information
+    in the identifier.
+
+    To initialize a progress report this function is called without an
+    `update` parameter. To report a progress update, this function is called
+    with an `update` parameter. To finish a reporting on a particular activity
+    a final call without an `update` parameter is required.
+
 
     Parameters
     ----------
@@ -393,22 +411,28 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       Progress report unit. Should be very brief, goes after the progress bar
       on the same line.
     update : int
-      To which quantity to advance the progress.
+      To (or by) which quantity to advance the progress. Also see `increment`.
     increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
     initial : int
       If set, start value for progress bar
     noninteractive_level : int, optional
-      When a level is specified here and progress is being logged
-      non-interactively (i.e. without progress bars), do not log the message if
-      logging is not enabled for the specified level. This is useful when you
-      want all calls to be "logged" via the progress bar, but non-interactively
-      showing a message at the `lgrcall` level for each step would be too much
-      noise. Note that the level here only determines if the record will be
-      dropped; it will still be logged at the level of `lgrcall`.
+      In a non-interactive session where progress bars are not displayed,
+      only log a progress report, if a logger's effective level includes the
+      specified level. This can be useful logging all progress is inappropriate
+      or too noisy for a log.
     maint : {'clear', 'refresh'}
+      This is a special attribute that can be used by callers that are not
+      actually reporting progress, but need to ensure that their (console)
+      output does not interfere with any possibly ongoing progress reporting.
+      Setting this attribute to 'clear' will cause the central ProgressHandler
+      to temporarily stop the display of any active progress bars. With
+      'refresh', all active progress bars will be redisplayed. After a 'clear'
+      individual progress bars would be reactivated upon the next update log
+      message, even without an explicit 'refresh'.
     """
     d = dict(
+        # inject progress-related result properties as extra data
         {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
          # initial progress might be zero, but not sending it further
          # would signal to destroy the progress bar, hence test for 'not None'
