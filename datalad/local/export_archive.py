@@ -12,8 +12,7 @@ __docformat__ = 'restructuredtext'
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-from datalad.support import path
-
+from pathlib import Path
 
 @build_doc
 class ExportArchive(Interface):
@@ -77,15 +76,11 @@ class ExportArchive(Interface):
                  archivetype='tar',
                  compression='gz',
                  missing_content='error'):
-        import os
         import tarfile
         import zipfile
         from unittest.mock import patch
-        from os.path import join as opj, dirname, normpath, isabs
-        import os.path as op
 
         from datalad.distribution.dataset import require_dataset
-        from datalad.utils import file_basename
         from datalad.support.annexrepo import AnnexRepo
 
         import logging
@@ -115,18 +110,20 @@ class ExportArchive(Interface):
                 compression) if archivetype == 'tar' else '')
 
         default_filename = "datalad_{.id}".format(dataset)
+        if filename is not None:
+            filename = Path(filename)
         if filename is None:
-            filename = default_filename  # in current directory
-        elif path.exists(filename) and path.isdir(filename):
-            filename = path.join(filename, default_filename) # under given directory
-        if not filename.endswith(file_extension):
-            filename += file_extension
+            filename = Path(default_filename)  # in current directory
+        elif filename.exists() and filename.is_dir():
+            filename = filename / default_filename # under given directory
+        if not filename.suffix == file_extension:
+            filename = filename.with_suffix(file_extension)
 
         root = dataset.path
-        # use dir inside matching the output filename
+        # use dir inside matching the output filename without suffix(es)
         # TODO: could be an option to the export plugin allowing empty value
         # for no leading dir
-        leading_dir = file_basename(filename)
+        leading_dir = filename.name[: -len(''.join(filename.suffixes))]
 
         # workaround for inability to pass down the time stamp
         with patch('time.time', return_value=committed_date), \
@@ -137,46 +134,32 @@ class ExportArchive(Interface):
                     zipfile.ZIP_STORED if not compression else zipfile.ZIP_DEFLATED) \
                 as archive:
             add_method = archive.add if archivetype == 'tar' else archive.write
-            repo_files = sorted(repo.get_indexed_files())
-            if isinstance(repo, AnnexRepo):
-                annexed = repo.is_under_annex(
-                    repo_files, allow_quick=True, batch=True)
-                # remember: returns False for files in Git!
-                has_content = repo.file_has_content(
-                    repo_files, allow_quick=True, batch=True)
-            else:
-                annexed = [False] * len(repo_files)
-                has_content = [True] * len(repo_files)
-            for i, rpath in enumerate(repo_files):
-                fpath = opj(root, rpath)
-                if annexed[i]:
-                    if not has_content[i]:
-                        if missing_content in ('ignore', 'continue'):
-                            (lgr.warning if missing_content == 'continue' else lgr.debug)(
-                                'File %s has no content available, skipped', fpath)
-                            continue
-                        else:
-                            raise IOError('File %s has no content available' % fpath)
 
-                    # resolve to possible link target
-                    if op.islink(fpath):
-                        link_target = os.readlink(fpath)
-                        if not isabs(link_target):
-                            link_target = normpath(opj(dirname(fpath), link_target))
-                        fpath = link_target
+
+            repo_files = repo.get_content_info(ref='HEAD', untracked='no')
+            if isinstance(repo, AnnexRepo):
+                # add availability (has_content) info
+                repo_files = repo.get_content_annexinfo(ref='HEAD',
+                                                        init=repo_files,
+                                                        eval_availability=True)
+            for p, props in repo_files.items():
+                if 'key' in props and not props.get('has_content', False):
+                    if missing_content in ('ignore', 'continue'):
+                        (lgr.warning if missing_content == 'continue' else lgr.debug)(
+                            'File %s has no content available, skipped', p)
+                        continue
+                    else:
+                        raise IOError('File %s has no content available' % p)
                 # name in the archive
-                aname = normpath(opj(leading_dir, rpath))
+                aname = Path(leading_dir) / p.relative_to(repo.pathobj)
                 add_method(
-                    fpath,
+                    p if 'key' not in props else props['objloc'],
                     arcname=aname,
                     **(tar_args if archivetype == 'tar' else {}))
 
-        if not isabs(filename):
-            filename = opj(os.getcwd(), filename)
-
         yield dict(
             status='ok',
-            path=filename,
+            path=filename.resolve(),
             type='file',
             action='export_archive',
             logger=lgr)

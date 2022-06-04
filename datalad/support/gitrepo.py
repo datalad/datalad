@@ -1468,7 +1468,7 @@ class GitRepo(CoreGitRepo):
             env=env,
         )
 
-    # TODO usage is primarily in the tests, consider making a test helper and
+    # TODO usage is only in the tests, consider making a test helper and
     # remove from GitRepo API
     def get_indexed_files(self):
         """Get a list of files in git's index
