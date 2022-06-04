@@ -340,6 +340,30 @@ class OnlyProgressLog(logging.Filter):
 
 
 def filter_noninteractive_progress(logger, record):
+    """Companion of log_progress() to suppress undesired progress logging
+
+    This filter is to be used with a log handler's addFilter() method
+    for the case of a non-interactive session (e.g., pipe to log file).
+
+    It inspects the log record for `dlm_progress_noninteractive_level`
+    keys that can be injected via log_progress(noninteractive_level=).
+
+    If a log-level was declared in this fashion, it will be evaluated
+    against the logger's effective level, and records are discarded
+    if their level is too low. If no log-level was declared, a log record
+    passes this filter unconditionally.
+
+    Parameters
+    ----------
+    logger: logging.Logger
+      The logger instance whose effective level to check against.
+    record:
+      The log record to inspect.
+
+    Returns
+    -------
+    bool
+    """
     level = getattr(record, "dlm_progress_noninteractive_level", None)
     return level is None or level >= logger.level
 
