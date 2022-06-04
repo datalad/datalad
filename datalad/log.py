@@ -270,16 +270,6 @@ class ProgressHandler(logging.Handler):
             pb.clear()
 
 
-class NoProgressLog(logging.Filter):
-    def filter(self, record):
-        return not hasattr(record, 'dlm_progress')
-
-
-class OnlyProgressLog(logging.Filter):
-    def filter(self, record):
-        return hasattr(record, 'dlm_progress')
-
-
 def filter_noninteractive_progress(logger, record):
     level = getattr(record, "dlm_progress_noninteractive_level", None)
     return level is None or level >= logger.level
