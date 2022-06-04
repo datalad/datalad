@@ -66,11 +66,29 @@ class TraceBack(object):
         else:
             self.__prefix_re = None
 
+
+    def _extract_stack(self, limit=None):
+        """Call traceback.extract_stack() with limit parameter
+
+        Parameters
+        ----------
+        limit: int, optional
+          Limit stack trace entries (starting from the invocation point)
+          if limit is positive, or to the last `abs(limit)` entries.
+          If limit is omitted or None, all entries are printed.
+
+        Returns
+        -------
+        traceback.StackSummary
+        """
         import traceback
-        self._extract_stack = traceback.extract_stack
+        return traceback.extract_stack(limit=limit)
 
     def __call__(self):
-        ftb = self._extract_stack(limit=self.limit+10)[:-2]
+        # get the stack description. All but the last three items, which
+        # represent the entry into this utility rather than the traceback
+        # relevant for the caller
+        ftb = self._extract_stack(limit=self.limit + 10)[:-3]
         entries = [[mbasename(x[0]), str(x[1])]
                    for x in ftb if mbasename(x[0]) != 'logging.__init__']
         entries = [e for e in entries if e[0] != 'unittest']
