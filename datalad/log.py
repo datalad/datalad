@@ -84,7 +84,6 @@ class TraceBack(object):
         else:
             self.__prefix_re = None
 
-
     def _extract_stack(self, limit=None):
         """Call traceback.extract_stack() with limit parameter
 
@@ -110,8 +109,17 @@ class TraceBack(object):
         # each item in `ftb` is
         # (filename, line, object, code-on-line)
         # so entries is a list of (filename, line)
-        entries = [[mbasename(x[0]), str(x[1])] for x in ftb]
-        # remove "uninformative" levels of the stack, given the space
+        entries = [
+            [mbasename(x[0]), str(x[1])] for x in ftb
+            # the last entry in the filtered list will always come from
+            # this datalad/log.py facility, where the log record
+            # was emitted, it is not meaningful to always show a constant
+            # trailing end of the traceback
+            # more generally, we are hardly ever interested in traceback
+            # pieces from this file
+            if x[0] != __file__
+        ]
+        # remove more "uninformative" levels of the stack, given the space
         # constraints of a log message
         entries = [
             e for e in entries
@@ -201,7 +209,13 @@ class ColorFormatter(logging.Formatter):
                                 self.use_color)
         log_env = os.environ.get('DATALAD_LOG_TRACEBACK', '')
         collide = log_env == 'collide'
-        limit = 100 if collide else int(log_env) if log_env.isdigit() else 100
+        # if an integer level is given, we add one level to make the behavior
+        # more natural. The last frame will always be where the log record
+        # was emitted by out handler. However, user is more interested in the
+        # location where the log message originates.
+        # Saying DATALAD_LOG_TRACEBACK=1 will give that in most cases, with
+        # this internal increment
+        limit = 100 if collide else int(log_env) + 1 if log_env.isdigit() else 100
         self._tb = TraceBack(collide=collide, limit=limit) if log_env else None
 
         self._mem = MemoryInfo() if os.environ.get('DATALAD_LOG_VMEM', '') else None

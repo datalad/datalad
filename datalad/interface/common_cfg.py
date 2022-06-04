@@ -460,7 +460,15 @@ _definitions = {
     },
     'datalad.log.traceback': {
         'ui': ('question', {
-               'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
+               'title': 'Includes a compact traceback in a log message, with '
+                        'generic components removed. '
+                        'This setting is only in effect when given as an '
+                        'environment variable DATALAD_LOG_TRACEBACK. '
+                        'An integer value specifies the maximum traceback '
+                        'depth to be considered. '
+                        'If set to "collide", a common traceback prefix '
+                        'between a current traceback and a previously logged '
+                        'traceback is replaced with "…" (maximum depth 100).'}),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
