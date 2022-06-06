@@ -150,19 +150,18 @@ class MemoryInfo(object):
 # prefixing of multiline log lines
 class ColorFormatter(logging.Formatter):
 
-    def __init__(self, use_color=None, log_name=False, log_pid=False):
+    def __init__(self, use_color=None, log_name=False, log_pid=False, log_traceback='', log_vmem=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
             use_color = is_interactive()
         self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
         msg = colors.format_msg(self._get_format(log_name, log_pid),
                                 self.use_color)
-        log_env = os.environ.get('DATALAD_LOG_TRACEBACK', '')
-        collide = log_env == 'collide'
-        limit = 100 if collide else int(log_env) if log_env.isdigit() else 100
-        self._tb = TraceBack(collide=collide, limit=limit) if log_env else None
+        collide = log_traceback == 'collide'
+        limit = 100 if collide else int(log_traceback) if log_traceback.isdigit() else 100
+        self._tb = TraceBack(collide=collide, limit=limit) if log_traceback else None
 
-        self._mem = MemoryInfo() if os.environ.get('DATALAD_LOG_VMEM', '') else None
+        self._mem = MemoryInfo() if log_vmem else None
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):
@@ -566,6 +565,8 @@ class LoggerHelper(object):
                            # TODO: config log.name, pid
                            log_name=self._get_config("name", False),
                            log_pid=self._get_config("pid", False),
+                           log_traceback=self._get_config("traceback", ''),
+                           log_vmem=self._get_config("vmem", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         if is_interactive():
