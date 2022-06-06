@@ -72,8 +72,12 @@ class TraceBack(object):
 
     def __call__(self):
         ftb = self._extract_stack(limit=self.limit+10)[:-2]
-        entries = [[mbasename(x[0]), str(x[1])]
-                   for x in ftb if mbasename(x[0]) not in ('logging.__init__', 'unittest')]
+        entries = [
+            [mbasename(x[0]), str(x[1])]
+            for x in ftb
+            if mbasename(x[0]) not in ('logging.__init__', 'unittest')
+                and not (x.name == 'emit' and x.filename == __file__)
+        ]
 
         if len(entries) > self.limit:
             sftb = '...>'
