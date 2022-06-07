@@ -31,3 +31,4 @@ subsystems in DataLad.
    standard_parameters
    pos_vs_kw_parameters
    docstrings
+   progress_reporting
