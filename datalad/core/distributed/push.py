@@ -337,8 +337,6 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             annex=None,
             recursive=recursive,
             recursion_limit=recursion_limit,
-            # make it as fast as possible
-            eval_file_type=False,
             # TODO?: expose order as an option for diff and push
             # since in some cases breadth-first would be sufficient
             # and result in "taking action faster"
