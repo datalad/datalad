@@ -1983,7 +1983,8 @@ class GitRepo(CoreGitRepo):
                 )
             )
         # note: above push_ should raise exception if errors out
-        if cfg.get_from_source('local', cfg_push_var) is not None:
+        if '--dry-run' not in git_options \
+            and cfg.get_from_source('local', cfg_push_var) is not None:
             lgr.debug("Removing %s variable from local git config after successful push", cfg_push_var)
             cfg.unset(cfg_push_var, 'local')
         return push_res
