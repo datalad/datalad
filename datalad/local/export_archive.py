@@ -81,6 +81,7 @@ class ExportArchive(Interface):
         from unittest.mock import patch
 
         from datalad.distribution.dataset import require_dataset
+        from datalad.utils import file_basename
         from datalad.support.annexrepo import AnnexRepo
 
         import logging
@@ -123,7 +124,7 @@ class ExportArchive(Interface):
         # use dir inside matching the output filename without suffix(es)
         # TODO: could be an option to the export plugin allowing empty value
         # for no leading dir
-        leading_dir = filename.name[: -len(''.join(filename.suffixes))]
+        leading_dir = file_basename(filename)
 
         # workaround for inability to pass down the time stamp
         with patch('time.time', return_value=committed_date), \
