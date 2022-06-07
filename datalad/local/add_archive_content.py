@@ -428,12 +428,23 @@ class AddArchiveContent(Interface):
             file_counter = 0
             # iterative over all files in the archive
             extracted_files = list(earchive.get_extracted_files())
+            # start a progress bar for extraction
+            pbar_id = f'add-archive-{archive_path}'
+            log_progress(
+                lgr.info, pbar_id, 'Extracting archive',
+                label="Extracting archive",
+                unit=' Files',
+                total = len(extracted_files),
+                noninteractive_level = logging.INFO)
             for extracted_file in extracted_files:
                 file_counter += 1
+                files_left = len(extracted_files) - file_counter
                 log_progress(
-                    lgr.info, 'archive-content', 'Extracting archive',
-                    label="Extracting archive",
-                    update=file_counter, total=len(extracted_files))
+                    lgr.info, pbar_id,
+                    "Files to extract %i ", files_left,
+                    update=1,
+                    increment=True,
+                    noninteractive_level=logging.DEBUG)
                 stats.files += 1
                 extracted_path = Path(earchive.path) / Path(extracted_file)
 
@@ -668,7 +679,9 @@ class AddArchiveContent(Interface):
         finally:
             # take down the progress bar
             log_progress(
-                lgr.info, 'archive-content', 'Finished extraction')
+                lgr.info, pbar_id,
+                'Finished extraction',
+                noninteractive_level=logging.INFO)
             # since we batched addurl, we should close those batched processes
             # if haven't done yet.  explicitly checked to avoid any possible
             # "double-action"
