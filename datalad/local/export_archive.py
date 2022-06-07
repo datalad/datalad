@@ -116,7 +116,7 @@ class ExportArchive(Interface):
             filename = Path(default_filename)  # in current directory
         elif filename.exists() and filename.is_dir():
             filename = filename / default_filename # under given directory
-        if not filename.suffix == file_extension:
+        if filename.suffix != file_extension:
             filename = filename.with_suffix(file_extension)
 
         root = dataset.path
