@@ -7,6 +7,9 @@ datalad (0.16.5-1) unstable; urgency=medium
     - updated year for the main part
     - removed copyright statements for components which were moved out
       into datalad-deprecated (not in Debian)
+  * d/rules
+    - python3-argcomplete now ships binary without "3" suffix -- we will try
+      both
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 08 Jun 2022 09:36:17 -0400
 
