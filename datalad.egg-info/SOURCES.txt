@@ -494,6 +494,7 @@ tools/bisect-git-annex
 tools/changelog-todo
 tools/checkpwd.py
 tools/cmdline-completion
+tools/convert-git-annex-layout
 tools/copy_urls_from_datalad.py
 tools/describegitannex
 tools/downgrade-annex

@@ -62,7 +62,7 @@ msgpack
 requests>=1.2
 requests_ftp
 python-gitlab
-argcomplete
+argcomplete>=1.12.3
 pyperclip
 python-dateutil
 BeautifulSoup4
@@ -137,7 +137,7 @@ msgpack
 requests>=1.2
 requests_ftp
 python-gitlab
-argcomplete
+argcomplete>=1.12.3
 pyperclip
 python-dateutil
 BeautifulSoup4
@@ -174,7 +174,7 @@ python-xmp-toolkit
 Pillow
 
 [misc]
-argcomplete
+argcomplete>=1.12.3
 pyperclip
 python-dateutil
 
