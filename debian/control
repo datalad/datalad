@@ -107,7 +107,6 @@ Depends: git-annex (>= 8.20200309~) | git-annex-standalone (>= 8.20200309~),
          ${python3:Depends}
 Recommends: python3-boto,
             python3-exif,
-            python3-gitlab,
             python3-html5lib,
             python3-httpretty,
             python3-jsmin,
