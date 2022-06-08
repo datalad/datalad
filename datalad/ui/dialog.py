@@ -108,18 +108,25 @@ class ConsoleLog(object):
         else:
             progressbars = ConsoleLog.progressbars
 
+        backend_src = 'backend option'
         if backend is None:
             # Resort to the configuration
             from .. import cfg
             backend = cfg.get('datalad.ui.progressbar', None)
+            backend_src = 'datalad.ui.progressbar config'
 
         if backend is None:
             try:
                 pbar = progressbars['tqdm']
             except KeyError:
                 pbar = progressbars.values()[0]  # any
-        else:
+        elif backend in progressbars:
             pbar = progressbars[backend]
+        else:
+            raise ValueError(
+                f"Got unknown value of {backend_src} {backend!r}. "
+                f"Known are: {', '.join(map(repr, progressbars))}"
+            )
         return pbar(*args, out=self.out, **kwargs)
 
     @property
