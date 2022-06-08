@@ -54,7 +54,6 @@ from datalad.tests.utils import (
     ignore_nose_capturing_stdout,
     known_failure_githubci_win,
     known_failure_windows,
-    local_testrepo_flavors,
     nok_startswith,
     ok_,
     ok_broken_symlink,
@@ -121,9 +120,8 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tree((('f1.txt', 'load'),))
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')
-@with_testrepos(flavors=local_testrepo_flavors, count=1)
 def check_nested_with_tempfile_parametrized_surrounded(
-        param, f0, tree, f1, f2, repo):
+        param, f0, tree, f1, f2):
     eq_(param, "param1")
     ok_(f0.endswith('big'), msg="got %s" % f0)
     ok_(os.path.basename(f0).startswith('TEST'), msg="got %s" % f0)
@@ -131,7 +129,6 @@ def check_nested_with_tempfile_parametrized_surrounded(
     ok_(f1 != f2)
     ok_(f1.endswith('.cfg'), msg="got %s" % f1)
     ok_(f2.endswith('.cfg.old'), msg="got %s" % f2)
-    ok_(repo)  # got some repo -- local or url
 
 
 def test_nested_with_tempfile_parametrized_surrounded():
