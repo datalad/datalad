@@ -64,7 +64,7 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - PYTEST_OPTS=( -v )
+  - PYTEST_OPTS=( -v -s )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"; then
@@ -121,18 +121,8 @@ script:
   # Run tests
   #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
   #  in effect, dumping too many logs.
-  - (set -e ; for s in `seq 1 100`; do http_proxy= PATH=$PWD/../tools/coverage-bin:$PATH $PYTEST_WRAPPER python -m pytest "${PYTEST_OPTS[@]}" -c ../tox.ini -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)" --doctest-modules --cov=datalad --pyargs $TESTS_TO_PERFORM; done; )
+  - (set -e ; for s in `seq 1 100`; do http_proxy= $PYTEST_WRAPPER python -m pytest "${PYTEST_OPTS[@]}" -c ../tox.ini -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)" --doctest-modules --pyargs $TESTS_TO_PERFORM; done; )
   - cd ..
-
-after_success:
-  # cron jobs test more and then PRs will be falling behind since they would not
-  # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
-  - cd __testhome__;
-  - python -m coverage combine -a /tmp/.coverage-entrypoints-*;
-  - python -m coverage report;
-  - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
-      codecov;
-    fi
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary
 # for a particular debugging
