@@ -236,6 +236,8 @@ def test_system_ssh_version():
 
     for s, v in [
         ('OpenSSH_7.4p1 Debian-6, OpenSSL 1.0.2k  26 Jan 2017', '7.4p1'),
+        ('OpenSSH_8.1p1, LibreSSL 2.7.3', '8.1p1'),
+        ('OpenSSH_for_Windows_8.1p1, LibreSSL 3.0.2', '8.1p1'),
     ]:
         ev = ExternalVersions()
         # TODO: figure out leaner way

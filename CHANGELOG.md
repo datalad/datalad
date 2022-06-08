@@ -1,3 +1,36 @@
+# 0.16.5 (Wed Jun 08 2022)
+
+#### 🐛 Bug Fix
+
+- BF: push to github - remove datalad-push-default-first config only in non-dry run to ensure we push default branch separately in next step [#6750](https://github.com/datalad/datalad/pull/6750) ([@yarikoptic](https://github.com/yarikoptic))
+- In addition to default (system) ssh version, report configured ssh; fix ssh version parsing on Windows [#6729](https://github.com/datalad/datalad/pull/6729) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.16.4 (Thu Jun 02 2022)
+
+#### 🐛 Bug Fix
+
+- BF(TST): RO operations - add test directory into git safe.directory [#6726](https://github.com/datalad/datalad/pull/6726) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: fixup of docstring for skip_ssh [#6727](https://github.com/datalad/datalad/pull/6727) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: Set language in Sphinx config to en [#6727](https://github.com/datalad/datalad/pull/6727) ([@adswa](https://github.com/adswa))
+- BF: Catch KeyErrors from unavailable WTF infos [#6712](https://github.com/datalad/datalad/pull/6712) ([@adswa](https://github.com/adswa))
+- Add annex.private to ephemeral clones. That would make git-annex not assign shared (in git-annex branch) annex uuid. [#6702](https://github.com/datalad/datalad/pull/6702) ([@bpoldrack](https://github.com/bpoldrack) [@adswa](https://github.com/adswa))
+- BF: require argcomplete version at least 1.12.3 to test/operate correctly [#6693](https://github.com/datalad/datalad/pull/6693) ([@yarikoptic](https://github.com/yarikoptic))
+- Replace Zenodo DOI with JOSS for due credit [#6725](https://github.com/datalad/datalad/pull/6725) ([@adswa](https://github.com/adswa))
+
+#### Authors: 3
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Benjamin Poldrack ([@bpoldrack](https://github.com/bpoldrack))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.3 (Thu May 12 2022)
 
 #### 🐛 Bug Fix
