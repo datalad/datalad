@@ -2,8 +2,32 @@
 
 Change log
 **********
+0.16.5 (Wed Jun 08 2022)
+========================
+
+Bug Fix
+-------
+
+-  BF: push to github - remove datalad-push-default-first config only in
+   non-dry run to ensure we push default branch separately in next step
+   `#6750 <https://github.com/datalad/datalad/pull/6750>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  In addition to default (system) ssh version, report configured ssh;
+   fix ssh version parsing on Windows
+   `#6729 <https://github.com/datalad/datalad/pull/6729>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 1
+----------
+
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.16.4 (Thu Jun 02 2022)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -44,7 +68,7 @@ Authors: 3
 0.16.3 (Thu May 12 2022)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -95,7 +119,7 @@ Authors: 4
 0.16.2 (Thu Apr 21 2022)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -824,7 +848,7 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -841,6 +865,8 @@ Bug Fix
 -  BF(TST): add another condition to skip under http_proxy set
    `#6459 <https://github.com/datalad/datalad/pull/6459>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _authors-1-1:
 
 Authors: 1
 ----------
@@ -859,7 +885,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -910,7 +936,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -995,7 +1021,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -1099,7 +1125,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1166,7 +1192,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-8:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1581,7 +1607,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-9:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1689,7 +1715,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-10:
+.. _bug-fix-11:
 
 Bug Fix
 -------
@@ -1789,7 +1815,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-11:
+.. _bug-fix-12:
 
 Bug Fix
 -------

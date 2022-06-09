@@ -1,3 +1,16 @@
+# 0.16.5 (Wed Jun 08 2022)
+
+#### 🐛 Bug Fix
+
+- BF: push to github - remove datalad-push-default-first config only in non-dry run to ensure we push default branch separately in next step [#6750](https://github.com/datalad/datalad/pull/6750) ([@yarikoptic](https://github.com/yarikoptic))
+- In addition to default (system) ssh version, report configured ssh; fix ssh version parsing on Windows [#6729](https://github.com/datalad/datalad/pull/6729) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.4 (Thu Jun 02 2022)
 
 #### 🐛 Bug Fix
