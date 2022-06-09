@@ -149,6 +149,20 @@ def _test_progress_bar(backend, len, increment):
 
 
 def test_progress_bar():
+    # ensure that we crash with informative message
+    with assert_raises(ValueError) as cme:
+        _test_progress_bar("unknown-backend", 0, True)
+    assert_in(', '.join(map(repr, progressbars)), str(cme.exception))
+
+    # we cannot really centralize "cheaply" setup of known backends but
+    # we can at least verify that they are consistent between those in
+    # common_cfg and progressbars
+
+    from datalad.interface.common_cfg import definitions
+    eq_(sorted(progressbars),
+        # some are internal or deprecated and should not be listed
+        sorted(definitions.get('datalad.ui.progressbar')['type']._allowed + ('annex-remote', 'silent')) )
+
     # More of smoke testing given various lengths of fill_text
     for backend in progressbars:
         for l in 0, 4, 10, 1000:
