@@ -632,7 +632,7 @@ _definitions = {
             'title': 'UI progress bars',
             'text': 'Default backend for progress reporting'}),
         'default': None,
-        'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
+        'type': EnsureChoice('tqdm', 'log', 'none'),
     },
     'datalad.ui.color': {
         'ui': ('question', {
