@@ -20,6 +20,9 @@ from datalad.cli.parser import (
 from datalad.cli.utils import setup_exceptionhook
 from datalad.ui import ui
 
+import logging
+lgr = logging.getLogger('datalad.customremotes')
+
 
 def setup_parser(remote_name, description):
     # setup cmdline args parser
@@ -74,6 +77,8 @@ def main(args=None, cls=None, remote_name=None, description=None):
         try:
             _main(args, cls)
         except Exception as exc:
+            lgr.debug('%s (%s) - passing ERROR to git-annex and exiting',
+                      str(exc), exc.__class__.__name__)
             # `SpecialRemote` classes are supposed to catch everything and
             # turn it into a `RemoteError` resulting in an ERROR message to
             # annex. If we end up here, something went wrong outside of the
