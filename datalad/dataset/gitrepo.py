@@ -366,7 +366,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         Internal helper to the call_git*() methods.
         Unlike call_git, _call_git returns both stdout and stderr.
         The parameters, return value, and raised exceptions match those
-        documented for `call_git`, with the exception of env, which is TODO?.
+        documented for `call_git`, with the exception of env, which allows to
+        specify the custom environment (variables) to be used.
         """
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
