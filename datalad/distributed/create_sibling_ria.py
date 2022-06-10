@@ -343,9 +343,6 @@ class CreateSiblingRia(Interface):
         #       local remotes with existence of the actual remote sibling
         #       in wording
         if existing == 'error':
-            # in recursive mode this check could take a substantial amount of
-            # time: employ a progress bar (or rather a counter, because we don't
-            # know the total in advance
             failed = False
             for dpath, sname in _yield_ds_w_matching_siblings(
                     ds,
