@@ -1,9 +1,11 @@
 import random
 import threading
 import time
+from threading import Thread
 from typing import (
     Any,
     List,
+    Tuple,
 )
 
 from ..coreprotocols import StdOutCapture
@@ -36,7 +38,10 @@ def _runner_with_protocol(protocol) -> ThreadedRunner:
         stdin=None)
 
 
-def _run_on(runner: ThreadedRunner, iterate: bool, exceptions: List):
+def _run_on(runner: ThreadedRunner,
+            iterate: bool,
+            exceptions: List
+            ):
     try:
         gen = runner.run()
         if iterate:
@@ -46,22 +51,31 @@ def _run_on(runner: ThreadedRunner, iterate: bool, exceptions: List):
         exceptions.append(e.__class__)
 
 
+def _get_run_on_threads(protocol: Any,
+                        iterate: bool
+                        ) -> Tuple[Thread, Thread, List]:
+
+    runner = _runner_with_protocol(protocol)
+
+    args = (runner, iterate, [])
+    thread_1 = threading.Thread(target=_run_on, args=args)
+    thread_2 = threading.Thread(target=_run_on, args=args)
+
+    return thread_1, thread_2, args[2]
+
+
 def _reentry_detection_run(protocol: Any,
                            iterate: bool
                            ) -> List:
 
-    runner = _runner_with_protocol(protocol)
-
-    exceptions = []
-    thread_1 = threading.Thread(target=_run_on, args=(runner, iterate, exceptions))
-    thread_2 = threading.Thread(target=_run_on, args=(runner, iterate, exceptions))
+    thread_1, thread_2, exception = _get_run_on_threads(protocol, iterate)
 
     thread_1.start()
     thread_2.start()
 
     thread_1.join()
     thread_2.join()
-    return exceptions
+    return exception
 
 
 def test_thread_reentry_detection():
@@ -74,7 +88,7 @@ def test_thread_reentry_detection():
 
 def test_thread_serialization():
     # expect that two run calls on the same runner with a non-generator-protocol
-    # do not create a runtime error
+    # do not create a runtime error (executions are serialized though)
 
     exceptions = _reentry_detection_run(StdOutCapture, True)
     assert exceptions == []
@@ -100,10 +114,10 @@ def test_thread_leave_handling():
     # expect no exception on repeated call to run of a runner with
     # generator-protocol, if the generator was exhausted before the second call
 
-    shared_runner = _runner_with_protocol(MinimalStdOutGeneratorProtocol)
-    exceptions = []
-    thread_1 = threading.Thread(target=_run_on, args=(shared_runner, True, exceptions))
-    thread_2 = threading.Thread(target=_run_on, args=(shared_runner, True, exceptions))
+    thread_1, thread_2, exception = _get_run_on_threads(
+        MinimalStdOutGeneratorProtocol,
+        True
+    )
 
     thread_1.start()
     thread_1.join()
@@ -111,4 +125,4 @@ def test_thread_leave_handling():
     thread_2.start()
     thread_2.join()
 
-    assert exceptions == []
+    assert exception == []
