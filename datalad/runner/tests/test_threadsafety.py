@@ -1,16 +1,16 @@
 import random
 import threading
 import time
-from typing import List
+from typing import (
+    Any,
+    List,
+)
 
 from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
 from ..protocol import GeneratorMixIn
 from .utils import py2cmd
-from datalad.tests.utils import (
-    assert_in,
-    assert_raises,
-)
+from datalad.tests.utils import assert_raises
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
@@ -29,105 +29,81 @@ class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
             self.send_result((fd, line))
 
 
+def _runner_with_protocol(protocol) -> ThreadedRunner:
+    return ThreadedRunner(
+        cmd=py2cmd("for i in range(5): print(i)"),
+        protocol_class=protocol,
+        stdin=None)
+
+
+def _run_on(runner: ThreadedRunner, iterate: bool, exceptions: List):
+    try:
+        gen = runner.run()
+        if iterate:
+            for _ in gen:
+                time.sleep(random.random())
+    except Exception as e:
+        exceptions.append(e.__class__)
+
+
+def _reentry_detection_run(protocol: Any,
+                           iterate: bool
+                           ) -> List:
+
+    runner = _runner_with_protocol(protocol)
+
+    exceptions = []
+    thread_1 = threading.Thread(target=_run_on, args=(runner, iterate, exceptions))
+    thread_2 = threading.Thread(target=_run_on, args=(runner, iterate, exceptions))
+
+    thread_1.start()
+    thread_2.start()
+
+    thread_1.join()
+    thread_2.join()
+    return exceptions
+
+
 def test_thread_reentry_detection():
     # expect that two run calls on the same runner with a generator-protocol
     # and an active generator create a runtime error
 
-    def run_on(runner: ThreadedRunner, exceptions: List):
-        try:
-            runner.run()
-        except Exception as e:
-            exceptions.append(e.__class__)
-
-    shared_runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(5): print(i)"),
-        protocol_class=MinimalGeneratorProtocol,
-        stdin=None)
-
-    exceptions = []
-    thread_1 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
-    thread_2 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
-
-    thread_1.start()
-    thread_2.start()
-
-    thread_1.join()
-    thread_2.join()
-
-    assert_in(RuntimeError, exceptions)
+    exceptions = _reentry_detection_run(MinimalGeneratorProtocol, False)
+    assert exceptions == [RuntimeError]
 
 
 def test_thread_serialization():
-    def run_on(runner: ThreadedRunner, exceptions: List):
-        try:
-            for _ in runner.run():
-                time.sleep(random.random())
-        except Exception as e:
-            exceptions.append(e.__class__)
+    # expect that two run calls on the same runner with a non-generator-protocol
+    # do not create a runtime error
 
-    shared_runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(5): print(i)"),
-        protocol_class=StdOutCapture,
-        stdin=None)
-
-    exceptions = []
-    thread_1 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
-    thread_2 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
-
-    thread_1.start()
-    thread_2.start()
-
-    thread_1.join()
-    thread_2.join()
-
+    exceptions = _reentry_detection_run(StdOutCapture, True)
     assert exceptions == []
 
 
 def test_reentry_detection():
-
-    runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(5): print(i)"),
-        protocol_class=MinimalGeneratorProtocol,
-        stdin=None)
-
+    runner = _runner_with_protocol(MinimalGeneratorProtocol)
     runner.run()
     assert_raises(RuntimeError, runner.run)
 
 
 def test_leave_handling():
+    runner = _runner_with_protocol(MinimalStdOutGeneratorProtocol)
+    all_results = [
+        "".join(e[1] for e in runner.run())
+        for _ in (0, 1)
+    ]
 
-    runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(5): print(i)"),
-        protocol_class=MinimalStdOutGeneratorProtocol,
-        stdin=None)
-
-    iteration_1_result = tuple(runner.run())
-    iteration_2_result = tuple(runner.run())
-
-    str1 = "".join(e[1] for e in iteration_1_result)
-    str2 = "".join(e[1] for e in iteration_2_result)
-    assert str1 == str2
+    assert all_results[0] == all_results[1]
 
 
 def test_thread_leave_handling():
     # expect no exception on repeated call to run of a runner with
     # generator-protocol, if the generator was exhausted before the second call
 
-    def run_on(runner: ThreadedRunner, exceptions: List):
-        try:
-            for _ in runner.run():
-                time.sleep(random.random())
-        except Exception as e:
-            exceptions.append(e.__class__)
-
-    shared_runner = ThreadedRunner(
-        cmd=py2cmd("for i in range(5): print(i)"),
-        protocol_class=MinimalStdOutGeneratorProtocol,
-        stdin=None)
-
+    shared_runner = _runner_with_protocol(MinimalStdOutGeneratorProtocol)
     exceptions = []
-    thread_1 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
-    thread_2 = threading.Thread(target=run_on, args=(shared_runner, exceptions))
+    thread_1 = threading.Thread(target=_run_on, args=(shared_runner, True, exceptions))
+    thread_2 = threading.Thread(target=_run_on, args=(shared_runner, True, exceptions))
 
     thread_1.start()
     thread_1.join()
