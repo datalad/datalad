@@ -140,7 +140,10 @@ class Credential(object):
 
     def _ask_and_set(self, f, instructions=None):
         v = self._ask_field_value(f, instructions=instructions)
-        self.set(**{f: v})
+        try:
+            self.set(**{f: v})
+        except Exception as e:
+            lgr.error("Failed to record credential field %r: %s", f, CapturedException(e))
         return v
 
     def enter_new(self, instructions=None, **kwargs):
