@@ -13,6 +13,7 @@ Thread based subprocess execution with stdout and stderr passed to protocol obje
 import enum
 import logging
 import subprocess
+import threading
 import time
 from collections import deque
 from collections.abc import Generator
@@ -115,6 +116,7 @@ class _ResultGenerator(Generator):
             # state: GeneratorState.process_exited.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
+            self.runner.generator = None
             raise StopIteration(self.return_code)
 
     def throw(self, exception_type, value=None, trace_back=None):
@@ -237,10 +239,13 @@ class ThreadedRunner:
         self.result = None
         self.process_removed = False
         self.return_code = None
+        self.generator = None
 
         self.last_touched = dict()
         self.active_file_numbers = set()
         self.stall_check_interval = 10
+
+        self.initialization_lock = threading.Lock()
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -261,6 +266,13 @@ class ThreadedRunner:
     def run(self) -> Union[Any, Generator]:
         """
         Run the command as specified in __init__.
+
+        This method is not re-entrant. Furthermore, if the protocol is a
+        subclass of `GeneratorMixIn`, and the generator has not been
+        exhausted, i.e. it has not raised `StopIteration`, this method should
+        not be called again. If it is called again before the generator is
+        exhausted, a `RuntimeError` is raised. In the non-generator case, a
+        second caller will be suspended until the first caller has returned.
 
         Returns
         -------
@@ -291,6 +303,13 @@ class ThreadedRunner:
                # get the return code of the process
                result = gen.return_code
         """
+        with self.initialization_lock:
+            return self._locked_run()
+
+    def _locked_run(self) -> Union[Any, Generator]:
+        if self.generator is not None:
+            raise RuntimeError("ThreadedRunner.run() was re-entered")
+
         if isinstance(self.stdin, (int, IO, type(None))):
             # We will not write anything to stdin. If the caller passed a
             # file-like he can write to it from a different thread.
@@ -346,6 +365,7 @@ class ThreadedRunner:
                     "information."
                 )
             raise
+
         self.process_running = True
         self.active_file_numbers.add(None)
 
@@ -430,7 +450,8 @@ class ThreadedRunner:
         self.process_waiting_thread.start()
 
         if issubclass(self.protocol_class, GeneratorMixIn):
-            return _ResultGenerator(self, self.protocol.result_queue)
+            self.generator = _ResultGenerator(self, self.protocol.result_queue)
+            return self.generator
 
         return self.process_loop()
 
