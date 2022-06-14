@@ -1,3 +1,19 @@
+# 0.16.6 (Tue Jun 14 2022)
+
+#### 🐛 Bug Fix
+
+- Prevent duplicated result rendering when searching in default datasets [#6765](https://github.com/datalad/datalad/pull/6765) ([@christian-monch](https://github.com/christian-monch))
+- BF(workaround): skip test_ria_postclonecfg on OSX for now ([@yarikoptic](https://github.com/yarikoptic))
+- BF(workaround to #6759): if saving credential failed, just log error and continue [#6762](https://github.com/datalad/datalad/pull/6762) ([@yarikoptic](https://github.com/yarikoptic))
+- Prevent reentry of a runner instance [#6737](https://github.com/datalad/datalad/pull/6737) ([@christian-monch](https://github.com/christian-monch))
+
+#### Authors: 2
+
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.5 (Wed Jun 08 2022)
 
 #### 🐛 Bug Fix
