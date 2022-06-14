@@ -161,7 +161,7 @@ def test_traceback():
 
     # we limit to the last 100
     tb1 = rec(TraceBack(collide=True), 110)
-    ok_endswith(tb1, "...>test_log:%s" % (",".join([str(tb_line)]*100)))
+    ok_endswith(tb1, "…>test_log:%s" % (",".join([str(tb_line)]*100)))
 
 
 @known_failure_githubci_win
