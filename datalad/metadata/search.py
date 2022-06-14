@@ -301,7 +301,7 @@ def _search_from_virgin_install(dataset, query):
             "Performing search using DataLad superdataset %r",
             default_ds.path
         )
-        for res in default_ds.search(query):
+        for res in default_ds.search(query, result_renderer="disabled"):
             yield res
         return
     else:
