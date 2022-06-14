@@ -2,8 +2,37 @@
 
 Change log
 **********
+0.16.6 (Tue Jun 14 2022)
+========================
+
+Bug Fix
+-------
+
+-  Prevent duplicated result rendering when searching in default
+   datasets `#6765 <https://github.com/datalad/datalad/pull/6765>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  BF(workaround): skip test_ria_postclonecfg on OSX for now
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF(workaround to #6759): if saving credential failed, just log error
+   and continue `#6762 <https://github.com/datalad/datalad/pull/6762>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Prevent reentry of a runner instance
+   `#6737 <https://github.com/datalad/datalad/pull/6737>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+
+Authors: 2
+----------
+
+-  Christian Mnch
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.16.5 (Wed Jun 08 2022)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -27,7 +56,7 @@ Authors: 1
 0.16.4 (Thu Jun 02 2022)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -68,7 +97,7 @@ Authors: 3
 0.16.3 (Thu May 12 2022)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -119,7 +148,7 @@ Authors: 4
 0.16.2 (Thu Apr 21 2022)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -848,7 +877,7 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -885,7 +914,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -936,7 +965,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -1021,7 +1050,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1125,7 +1154,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-8:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1192,7 +1221,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-9:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1607,7 +1636,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-10:
+.. _bug-fix-11:
 
 Bug Fix
 -------
@@ -1715,7 +1744,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-11:
+.. _bug-fix-12:
 
 Bug Fix
 -------
@@ -1804,6 +1833,8 @@ Internal
    (`@yarikoptic <https://github.com/yarikoptic>`__
    `@jwodder <https://github.com/jwodder>`__)
 
+.. _authors-2-1:
+
 Authors: 2
 ----------
 
@@ -1815,7 +1846,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-12:
+.. _bug-fix-13:
 
 Bug Fix
 -------
