@@ -325,3 +325,24 @@ def test_get_dot_git(emptycase, gitdircase, barecase, gitfilecase):
 
         eq_(_get_dot_git(gitfilecase, resolved=r),
             (gitfilecase.resolve() if r else gitfilecase) / 'subdir')
+
+
+@with_tree(tree={
+    "file1": "file1 content",
+    "file2": "file2 content"
+})
+def test_call_git_items(temp_dir):
+
+    repo = GitRepo(temp_dir)
+    repo.init()
+    repo.call_git(["add", "."])
+    repo.call_git(["commit", "-m", "test commit"])
+    print(temp_dir)
+
+    res1 = tuple(repo.call_git_items_(["ls-tree", "HEAD"]))
+    print(res1)
+
+    res2 = tuple(repo.call_git_items_(["ls-tree", "-z", "HEAD"], sep="\0"))
+    print(res2)
+
+    print(res1, res2)
