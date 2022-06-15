@@ -9,7 +9,7 @@
 """Test implementation of class GitRepo
 
 """
-
+import subprocess
 from datalad.tests.utils import assert_is_instance
 
 import logging
@@ -327,22 +327,57 @@ def test_get_dot_git(emptycase, gitdircase, barecase, gitfilecase):
             (gitfilecase.resolve() if r else gitfilecase) / 'subdir')
 
 
-@with_tree(tree={
-    "file1": "file1 content",
-    "file2": "file2 content"
-})
-def test_call_git_items(temp_dir):
+file1_content = "file1 content\n"
+file2_content = "file2 content\0"
+example_tree = {
+    "file1": file1_content,
+    "file2": file2_content
+}
 
+
+def _create_test_gitrepo(temp_dir):
     repo = GitRepo(temp_dir)
     repo.init()
     repo.call_git(["add", "."])
     repo.call_git(["commit", "-m", "test commit"])
-    print(temp_dir)
 
-    res1 = tuple(repo.call_git_items_(["ls-tree", "HEAD"]))
-    print(res1)
+    hash_keys = tuple(
+        repo.call_git(["hash-object", file_name]).strip()
+        for file_name in ("file1", "file2")
+    )
+    return repo, hash_keys
 
-    res2 = tuple(repo.call_git_items_(["ls-tree", "-z", "HEAD"], sep="\0"))
-    print(res2)
 
-    print(res1, res2)
+@with_tree(tree=example_tree)
+def test_call_git_items(temp_dir):
+    # check proper handling of separator in call_git_items_
+    repo, (hash1, hash2) = _create_test_gitrepo(temp_dir)
+
+    expected_tree_lines = (
+        f'100644 blob {hash1}\tfile1',
+        f'100644 blob {hash2}\tfile2'
+    )
+
+    assert_equal(
+        expected_tree_lines,
+        tuple(repo.call_git_items_(["ls-tree", "HEAD"]))
+    )
+
+    assert_equal(
+        expected_tree_lines,
+        tuple(repo.call_git_items_(["ls-tree", "-z", "HEAD"], sep="\0"))
+    )
+
+
+@with_tree(tree=example_tree)
+def test_call_git_call_git_items_identity(temp_dir):
+    # Ensure that git_call() and "".join(call_git_items_(..., keep_ends=True))
+    # yield the same result and that the result is identical to the file content
+
+    repo, hash_keys = _create_test_gitrepo(temp_dir)
+    args = ["cat-file", "-p"]
+    for hash_key, content in zip(hash_keys, (file1_content, file2_content)):
+        r_item = "".join(repo.call_git_items_(args + [hash_key], keep_ends=True))
+        r_no_item = repo.call_git(args, [hash_key])
+        assert_equal(r_item, r_no_item)
+        assert_equal(r_item, content)

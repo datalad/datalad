@@ -91,6 +91,52 @@ def test_line_splitter_continue():
     assert_is_none(line_splitter.finish_processing())
 
 
+def test_line_splitter_keep_ends():
+    line_splitter = LineSplitter(keep_ends=True)
+    lines = line_splitter.process(
+        "first line\n"
+        "second line\r\n"
+        "third line\n"
+        "fourth "
+    )
+
+    assert_equal(lines, [
+        "first line\n",
+        "second line\r\n",
+        "third line\n"
+    ])
+
+    assert_equal(line_splitter.remaining_data, "fourth ")
+
+    lines = line_splitter.process("line\n")
+    assert_equal(lines, ["fourth line\n"])
+    assert_is_none(line_splitter.finish_processing())
+
+
+def test_line_splitter_keep_ends_zero():
+    line_splitter = LineSplitter(separator="\x00", keep_ends=True)
+    lines = line_splitter.process(
+        "first line\x00"
+        "second line\x00"
+        "\r\n\x00"
+        "third line\n\x00"
+        "fourth "
+    )
+
+    assert_equal(lines, [
+        "first line\x00",
+        "second line\x00",
+        "\r\n\x00",
+        "third line\n\x00"
+    ])
+
+    assert_equal(line_splitter.remaining_data, "fourth ")
+
+    lines = line_splitter.process("line\x00")
+    assert_equal(lines, ["fourth line\x00"])
+    assert_is_none(line_splitter.finish_processing())
+
+
 def test_line_splitter_corner_cases():
     line_splitter = LineSplitter()
     lines = line_splitter.process("")
