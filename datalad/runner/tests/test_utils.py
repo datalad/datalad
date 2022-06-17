@@ -19,122 +19,83 @@ from ..utils import (
 )
 
 
+test_lines = [
+    "first line",
+    "second line",
+    "third line",
+    ""
+]
+
+
+def _check_splitting_endings_separator(endings: List[str],
+                                       separator: Optional[str] = None,
+                                       keep_ends: bool = False,
+                                       check_continuation: bool = False
+                                       ):
+    for line_ending in endings:
+        line_splitter = LineSplitter(separator=separator, keep_ends=keep_ends)
+        full_end = line_ending + separator if separator else line_ending
+        if separator:
+            expected_end = full_end if keep_ends else line_ending
+        else:
+            expected_end = line_ending if keep_ends else ""
+
+        lines = line_splitter.process(
+            full_end.join(test_lines)
+            + full_end
+            + ("fourth " if check_continuation else "")
+        )
+        assert_equal(
+            lines,
+            [line + expected_end for line in test_lines]
+        )
+
+        if check_continuation:
+            assert_equal(line_splitter.remaining_data, "fourth ")
+            lines = line_splitter.process("line" + full_end)
+            assert_equal(
+                lines,
+                ["fourth line" + expected_end])
+            assert_is_none(line_splitter.finish_processing())
+        else:
+            assert_is_none(line_splitter.finish_processing())
+
+
 def test_line_splitter_basic():
-    line_splitter = LineSplitter()
-    lines = line_splitter.process(
-        "first line\n"
-        "second line\r\n"
-        "third line\n"
-        "\n"
-    )
-
-    assert_equal(
-        lines,
-        [
-            "first line",
-            "second line",
-            "third line",
-            ""
-        ])
-
-    assert_is_none(line_splitter.finish_processing())
+    # expect lines without endings, split at standard line-endings
+    _check_splitting_endings_separator(["\n", "\r\n"])
+    _check_splitting_endings_separator(["\n", "\r\n"], check_continuation=True)
 
 
-def test_line_splitter_unterminated():
-    # Expect two lines split at "x", after the second process-call
-    line_splitter = LineSplitter("x")
-    lines = line_splitter.process("first line")
-    assert_equal(lines, [])
-    lines = line_splitter.process("xsecond linex")
-    assert_equal(lines, ["first line", "second line"])
-    assert_is_none(line_splitter.finish_processing())
+def test_line_splitter_basic_keep():
+    # expect lines without endings, split at standard line-endings
+    _check_splitting_endings_separator(["\n", "\r\n"], keep_ends=True)
+    _check_splitting_endings_separator(
+        ["\n", "\r\n"],
+        keep_ends=True,
+        check_continuation=True)
 
 
-def test_line_splitter_separator():
-    line_splitter = LineSplitter("X")
-    lines = line_splitter.process(
-        "first line\nX"
-        "second line\r\nX"
-        "third line\nX"
-        "\nX"
-    )
-
-    assert_equal(lines, [
-        "first line\n",
-        "second line\r\n",
-        "third line\n",
-        "\n"
-    ])
-
-    assert_is_none(line_splitter.finish_processing())
+def test_line_splitter_zero():
+    # expect lines without endings, split at standard line-endings
+    _check_splitting_endings_separator(["\n", "\r\n"], separator="\x00")
+    _check_splitting_endings_separator(
+        ["\n", "\r\n"],
+        separator="\x00",
+        check_continuation=True)
 
 
-def test_line_splitter_continue():
-    line_splitter = LineSplitter()
-    lines = line_splitter.process(
-        "first line\n"
-        "second line\r\n"
-        "third line\n"
-        "fourth "
-    )
-
-    assert_equal(lines, [
-        "first line",
-        "second line",
-        "third line"
-    ])
-
-    assert_equal(line_splitter.remaining_data, "fourth ")
-
-    lines = line_splitter.process("line\n")
-    assert_equal(lines, ["fourth line"])
-    assert_is_none(line_splitter.finish_processing())
-
-
-def test_line_splitter_keep_ends():
-    line_splitter = LineSplitter(keep_ends=True)
-    lines = line_splitter.process(
-        "first line\n"
-        "second line\r\n"
-        "third line\n"
-        "fourth "
-    )
-
-    assert_equal(lines, [
-        "first line\n",
-        "second line\r\n",
-        "third line\n"
-    ])
-
-    assert_equal(line_splitter.remaining_data, "fourth ")
-
-    lines = line_splitter.process("line\n")
-    assert_equal(lines, ["fourth line\n"])
-    assert_is_none(line_splitter.finish_processing())
-
-
-def test_line_splitter_keep_ends_zero():
-    line_splitter = LineSplitter(separator="\x00", keep_ends=True)
-    lines = line_splitter.process(
-        "first line\x00"
-        "second line\x00"
-        "\r\n\x00"
-        "third line\n\x00"
-        "fourth "
-    )
-
-    assert_equal(lines, [
-        "first line\x00",
-        "second line\x00",
-        "\r\n\x00",
-        "third line\n\x00"
-    ])
-
-    assert_equal(line_splitter.remaining_data, "fourth ")
-
-    lines = line_splitter.process("line\x00")
-    assert_equal(lines, ["fourth line\x00"])
-    assert_is_none(line_splitter.finish_processing())
+def test_line_splitter_zero_keep():
+    # expect lines without endings, split at standard line-endings
+    _check_splitting_endings_separator(
+        ["\n", "\r\n"],
+        separator="\x00",
+        keep_ends=True)
+    _check_splitting_endings_separator(
+        ["\n", "\r\n"],
+        separator="\x00",
+        keep_ends=True,
+        check_continuation=True)
 
 
 def test_line_splitter_corner_cases():
