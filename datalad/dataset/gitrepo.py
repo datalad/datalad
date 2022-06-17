@@ -430,12 +430,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        return self._call_git(
-            args,
-            files,
-            expect_stderr=expect_stderr,
-            expect_fail=expect_fail,
-            read_only=read_only)[0]
+        return "".join(
+            self.call_git_items_(args,
+                                 files,
+                                 expect_stderr=expect_stderr,
+                                 expect_fail=expect_fail,
+                                 read_only=read_only,
+                                 keep_ends=True))
 
     def call_git_items_(self,
                         args,
