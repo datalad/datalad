@@ -1041,7 +1041,7 @@ class Metadata(Interface):
                  ','.join(ensure_list(meta['tag'])))))
 
 
-def ng_query_aggregated_metadata(reporton: str,
+def gen4_query_aggregated_metadata(reporton: str,
                                  ds: Dataset,
                                  aps: List[Dict],
                                  recursive: bool = False,
