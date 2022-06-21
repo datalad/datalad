@@ -1316,12 +1316,12 @@ class Search(Interface):
             for debugging purposes."""),
         use_metadata=Parameter(
             args=('--use-metadata',),
-            choices=('old', 'new'),
+            choices=('legacy', 'gen4'),
             default=None,
             doc="""if given, defines which metadata should be used to search.
-            'old' will limit search to metadata in the old format, i.e. stored
-            in '$DATASET/.datalad/metadata'. 'new' will limit search to metadata
-            stored by the git-backend of 'datalad-metadata-model'.""")
+            'legacy' will limit search to metadata in the old format, i.e.
+            stored in '$DATASET/.datalad/metadata'. 'gen4' will limit search to
+            metadata stored by the git-backend of 'datalad-metadata-model'.""")
     )
 
     @staticmethod

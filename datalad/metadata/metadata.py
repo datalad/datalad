@@ -1146,7 +1146,7 @@ def query_aggregated_metadata(reporton: str,
       Of result dictionaries.
     """
 
-    if use_metadata in (None, "old"):
+    if use_metadata in (None, "legacy"):
         yield from legacy_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
@@ -1155,8 +1155,8 @@ def query_aggregated_metadata(reporton: str,
             **kwargs
         )
 
-    if use_metadata in (None, "new") and next_generation_metadata_available:
-        yield from ng_query_aggregated_metadata(
+    if use_metadata in (None, "gen4") and next_generation_metadata_available:
+        yield from gen4_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
             aps=aps,
