@@ -12,6 +12,7 @@
 
 from datalad.downloaders.credentials import (
     AWS_S3,
+    BrainLife_Token,
     LORIS_Token,
     NDA_S3,
     Token,
@@ -32,5 +33,6 @@ CREDENTIAL_TYPES = {
     'nda-s3': NDA_S3,
     'token': Token,
     'loris-token': LORIS_Token,
+    'brainlife-token': BrainLife_Token,
     'git': GitCredential,
 }

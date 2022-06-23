@@ -447,6 +447,23 @@ class LORIS_Token(CompositeCredential):
         super(CompositeCredential, self).__init__(name, url, keyring)
 
 
+def _brainlife_adapter(composite, user=None, password=None, **kwargs):
+    from datalad.support.third.loris_token_generator import LORISTokenGenerator
+
+    gen = LORISTokenGenerator(
+        url=composite.url, method="POST", data_how="urlencode", field="jwt")
+
+    return dict(token=gen.generate_token(user, password))
+
+
+class BrainLife_Token(CompositeCredential):
+    _CREDENTIAL_CLASSES = (UserPassword, Token)
+    _CREDENTIAL_ADAPTERS = (_brainlife_adapter,)
+
+    def __init__(self, name, url=None, keyring=None):
+        super(CompositeCredential, self).__init__(name, url, keyring)
+
+
 class GitCredential(Credential):
     """Credential to access git-credential
     """
