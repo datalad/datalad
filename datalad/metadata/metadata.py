@@ -79,8 +79,11 @@ from datalad.core.local.status import get_paths_by_ds
 # Check availability of new-generation metadata
 try:
     from datalad_metalad.dump import Dump
+    from datalad_metalad.exceptions import NoMetadataStoreFound
     next_generation_metadata_available = True
 except ImportError:
+    Dump = None
+    NoMetadataStoreFound = None
     next_generation_metadata_available = False
 
 
@@ -1137,6 +1140,11 @@ def query_aggregated_metadata(reporton: str,
     recursive : bool
       Whether or not to report metadata underneath all query paths
       recursively.
+    use_metadata : Optional[str]
+      Metadata generation that should be used. If set to "legacy", only
+      prior metalad version 0.3.0 metadata will be queried, if set to "gen4",
+      only metalad version 0.3.0 and beyond metadata will be queried, if set
+      to 'None', both will be queried.
     **kwargs
       Any other argument will be passed on to the query result dictionary.
 
@@ -1156,10 +1164,14 @@ def query_aggregated_metadata(reporton: str,
         )
 
     if use_metadata in (None, "gen4") and next_generation_metadata_available:
-        yield from gen4_query_aggregated_metadata(
-            reporton=reporton,
-            ds=ds,
-            aps=aps,
-            recursive=recursive,
-            **kwargs
-        )
+        try:
+            yield from gen4_query_aggregated_metadata(
+                reporton=reporton,
+                ds=ds,
+                aps=aps,
+                recursive=recursive,
+                **kwargs
+            )
+        except NoMetadataStoreFound:
+            lgr.debug(f"no next generation metadata in {ds}")
+            return
