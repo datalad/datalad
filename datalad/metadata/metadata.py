@@ -1108,6 +1108,7 @@ def gen4_query_aggregated_metadata(reporton: str,
                 continue
 
             yield {
+                **kwargs,
                 "status": "ok",
                 "type": metadata["type"],
                 "path": str(dump_result["path"]),
