@@ -82,8 +82,12 @@ try:
     from datalad_metalad.exceptions import NoMetadataStoreFound
     next_generation_metadata_available = True
 except ImportError:
-    Dump = None
-    NoMetadataStoreFound = None
+    class NoMetadataStoreFound(Exception):
+        pass
+
+    class Dump:
+        def __call__(self, *args, **kwargs):
+            return []
     next_generation_metadata_available = False
 
 
@@ -1094,30 +1098,41 @@ def gen4_query_aggregated_metadata(reporton: str,
         if matching_types is None:
             matching_types = (annotated_path["type"],)
 
-        for dump_result in Dump()(dataset=dataset.pathobj,
-                                  path=str(relative_path),
-                                  recursive=recursive,
-                                  result_renderer="disabled",
-                                  return_type="generator"):
+        try:
+            for dump_result in Dump()(dataset=dataset.pathobj,
+                                      path=str(relative_path),
+                                      recursive=recursive,
+                                      result_renderer="disabled",
+                                      return_type="generator"):
 
-            if dump_result["status"] != "ok":
-                continue
+                if dump_result["status"] != "ok":
+                    continue
 
-            metadata = dump_result["metadata"]
-            if metadata["type"] not in matching_types:
-                continue
+                metadata = dump_result["metadata"]
+                if metadata["type"] not in matching_types:
+                    continue
 
+                yield {
+                    **kwargs,
+                    "status": "ok",
+                    "type": metadata["type"],
+                    "path": str(dump_result["path"]),
+                    "dsid": metadata["dataset_id"],
+                    "refcommit": metadata["dataset_version"],
+                    "metadata": {
+                        metadata["extractor_name"]: metadata["extracted_metadata"]
+                    }
+                }
+        except NoMetadataStoreFound:
             yield {
                 **kwargs,
-                "status": "ok",
-                "type": metadata["type"],
-                "path": str(dump_result["path"]),
-                "dsid": metadata["dataset_id"],
-                "refcommit": metadata["dataset_version"],
-                "metadata": {
-                    metadata["extractor_name"]: metadata["extracted_metadata"]
-                }
+                'path': str(ds.pathobj / relative_path),
+                'status': 'impossible',
+                'message': f'Dataset at {ds.pathobj} does not contain gen4 '
+                           f'metadata',
+                'type': matching_types
             }
+
     return None
 
 
@@ -1165,14 +1180,10 @@ def query_aggregated_metadata(reporton: str,
         )
 
     if use_metadata in (None, "gen4") and next_generation_metadata_available:
-        try:
-            yield from gen4_query_aggregated_metadata(
-                reporton=reporton,
-                ds=ds,
-                aps=aps,
-                recursive=recursive,
-                **kwargs
-            )
-        except NoMetadataStoreFound:
-            lgr.debug(f"no next generation metadata in {ds}")
-            return
+        yield from gen4_query_aggregated_metadata(
+            reporton=reporton,
+            ds=ds,
+            aps=aps,
+            recursive=recursive,
+            **kwargs
+        )
