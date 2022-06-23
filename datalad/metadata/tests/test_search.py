@@ -53,7 +53,11 @@ from datalad.utils import (
 )
 
 from ..indexers.base import MetadataIndexer
-from ..metadata import gen4_query_aggregated_metadata
+from ..metadata import (
+    NoMetadataStoreFound,
+    gen4_query_aggregated_metadata,
+    query_aggregated_metadata,
+)
 from ..search import (
     _listdict2dictlist,
     _meta2autofield_dict,
@@ -490,14 +494,15 @@ def test_multiple_entry_points():
 
 def test_gen4_query_aggregated_metadata():
 
-    try:
-        from datalad_metalad.dump import Dump
-        from datalad_metalad.exceptions import NoMetadataStoreFound
-    except ImportError:
-        raise SkipTest("datalad-metalad gen4 seemingly not installed")
+    #try:
+    #    from datalad_metalad.dump import Dump
+    #    from datalad_metalad.exceptions import NoMetadataStoreFound
+    #except ImportError:
+    #    raise SkipTest("datalad-metalad gen4 seemingly not installed")
 
     class DatasetMock:
         def __init__(self, path: str):
+            self.path = path
             self.pathobj = Path(path)
 
     extractor_name = 'mocked_extractor'
@@ -546,6 +551,9 @@ def test_gen4_query_aggregated_metadata():
             }
         ]
 
+    def mocked_no_metadata(**kwargs):
+        raise NoMetadataStoreFound()
+
     mocked_annotated_paths = [
         {
             'path': 'ds/p1',
@@ -568,3 +576,37 @@ def test_gen4_query_aggregated_metadata():
             result[0]['metadata'],
             {extractor_name: extracted_metadata}
         )
+
+        # ensure gen4 code path selection
+        import datalad.metadata.metadata
+        datalad.metadata.metadata.next_generation_metadata_available = True
+
+        result = [
+            metadata_result
+            for metadata_result in query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths,
+            )
+            if metadata_result['status'] == 'ok'
+        ]
+        assert_equal(len(result), 1)
+        assert_equal(
+            result[0]['metadata'],
+            {extractor_name: extracted_metadata}
+        )
+
+        # check no metadata found-handling
+        dump_mock.reset_mock()
+        dump_mock.return_value = mocked_no_metadata
+
+        result = [
+            metadata_result
+            for metadata_result in query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths,
+            )
+            if metadata_result['status'] == 'impossible'
+        ]
+        assert_equal(len(result), 2)
