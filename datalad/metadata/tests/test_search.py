@@ -490,6 +490,12 @@ def test_multiple_entry_points():
 
 def test_gen4_query_aggregated_metadata():
 
+    try:
+        from datalad_metalad.dump import Dump
+        from datalad_metalad.exceptions import NoMetadataStoreFound
+    except ImportError:
+        raise SkipTest("datalad-metalad gen4 seemingly not installed")
+
     class DatasetMock:
         def __init__(self, path: str):
             self.pathobj = Path(path)
@@ -498,20 +504,47 @@ def test_gen4_query_aggregated_metadata():
     extracted_metadata = {'info': 'this is mocked metadata'}
 
     def mocked_dump(**kwargs):
-        print(kwargs)
-        yield {
-            'action': 'dump',
-            'status': 'ok',
-            'path': '/ds1',
-            'metadata': {
-                'type': 'file',
-                'dataset_id': str(UUID(int=1234)),
-                'dataset_version': '0000001111111',
-                'extractor_name': extractor_name,
-                'path': kwargs['path'],
-                'extracted_metadata': extracted_metadata
+        yield from [
+            {
+                'action': 'dump',
+                'status': 'ok',
+                'path': '/ds1',
+                'metadata': {
+                    'type': 'file',
+                    'dataset_id': str(UUID(int=1234)),
+                    'dataset_version': '0000001111111',
+                    'extractor_name': extractor_name,
+                    'path': kwargs['path'],
+                    'extracted_metadata': extracted_metadata
+                }
+            },
+            {
+                'action': 'dump',
+                'status': 'error',
+                'path': '/ds1',
+                'metadata': {
+                    'type': 'file',
+                    'dataset_id': str(UUID(int=12345)),
+                    'dataset_version': '0000002222222',
+                    'extractor_name': extractor_name,
+                    'path': kwargs['path'],
+                    'extracted_metadata': extracted_metadata
+                }
+            },
+            {
+                'action': 'dump',
+                'status': 'ok',
+                'path': '/ds1',
+                'metadata': {
+                    'type': 'something',
+                    'dataset_id': str(UUID(int=123456)),
+                    'dataset_version': '0000003333333',
+                    'extractor_name': extractor_name,
+                    'path': kwargs['path'],
+                    'extracted_metadata': extracted_metadata
+                }
             }
-        }
+        ]
 
     mocked_annotated_paths = [
         {
