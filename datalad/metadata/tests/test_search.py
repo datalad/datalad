@@ -14,7 +14,9 @@ import os
 from os import makedirs
 from os.path import dirname
 from os.path import join as opj
+from pathlib import Path
 from shutil import copy
+from uuid import UUID
 from pkg_resources import EntryPoint
 
 import pytest
@@ -51,6 +53,7 @@ from datalad.utils import (
 )
 
 from ..indexers.base import MetadataIndexer
+from ..metadata import gen4_query_aggregated_metadata
 from ..search import (
     _listdict2dictlist,
     _meta2autofield_dict,
@@ -483,3 +486,52 @@ def test_multiple_entry_points():
             'extr1.prop1': 'value'
         }
     )
+
+
+def test_gen4_query_aggregated_metadata():
+
+    class DatasetMock:
+        def __init__(self, path: str):
+            self.pathobj = Path(path)
+
+    extractor_name = 'mocked_extractor'
+    extracted_metadata = {'info': 'this is mocked metadata'}
+
+    def mocked_dump(**kwargs):
+        print(kwargs)
+        yield {
+            'action': 'dump',
+            'status': 'ok',
+            'path': '/ds1',
+            'metadata': {
+                'type': 'file',
+                'dataset_id': str(UUID(int=1234)),
+                'dataset_version': '0000001111111',
+                'extractor_name': extractor_name,
+                'path': kwargs['path'],
+                'extracted_metadata': extracted_metadata
+            }
+        }
+
+    mocked_annotated_paths = [
+        {
+            'path': 'ds/p1',
+            'types': ['file', 'dataset']
+        }
+    ]
+
+    with patch("datalad.metadata.metadata.Dump") as dump_mock:
+        dump_mock.return_value = mocked_dump
+
+        result = tuple(
+            gen4_query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths
+            )
+        )
+        assert_equal(len(result), 1)
+        assert_equal(
+            result[0]['metadata'],
+            {extractor_name: extracted_metadata}
+        )
