@@ -1045,10 +1045,10 @@ class Metadata(Interface):
 
 
 def gen4_query_aggregated_metadata(reporton: str,
-                                 ds: Dataset,
-                                 aps: List[Dict],
-                                 recursive: bool = False,
-                                 **kwargs):
+                                   ds: Dataset,
+                                   aps: List[Dict],
+                                   recursive: bool = False,
+                                   **kwargs):
     """Query metadata in a metadata store
 
     Query paths (`aps["path"]`) have to be contained in the poth of the ds.
