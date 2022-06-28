@@ -1,3 +1,17 @@
+# 0.17.0 ()
+
+#### 🐛 Bug Fix
+
+- Prevent reentry of a runner instance [#6737](https://github.com/datalad/datalad/pull/6737) (([@christian-monch](https://github.com/christian-monch)))
+- Preserve final character in ``call_git()`` output [#6754](https://github.com/datalad/datalad/pull/6754) (([@adswa](https://github.com/adswa))
+
+#### Authors: 2
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+
+
+
 # 0.16.6 (Tue Jun 14 2022)
 
 #### 🐛 Bug Fix
