@@ -364,9 +364,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """Allows for calling arbitrary commands.
 
         Internal helper to the call_git*() methods.
-
+        Unlike call_git, _call_git returns both stdout and stderr.
         The parameters, return value, and raised exceptions match those
-        documented for `call_git`.
+        documented for `call_git`, with the exception of env, which allows to
+        specify the custom environment (variables) to be used.
         """
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
@@ -429,12 +430,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        return "\n".join(
-            self.call_git_items_(args,
-                                 files,
-                                 expect_stderr=expect_stderr,
-                                 expect_fail=expect_fail,
-                                 read_only=read_only))
+
+        return self._call_git(args,
+                 files,
+                 expect_stderr=expect_stderr,
+                 expect_fail=expect_fail,
+                 read_only=read_only)[0]
 
     def call_git_items_(self,
                         args,
