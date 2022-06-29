@@ -26,7 +26,7 @@ from _datalad_build_support.setup import (
 requires = {
     'core': [
         'platformdirs',
-        'chardet>=3.0.4',      # rarely used but small/omnipresent
+        'chardet>=3.0.4, <5.0.0',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
