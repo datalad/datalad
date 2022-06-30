@@ -1314,14 +1314,16 @@ class Search(Interface):
             doc="""if given, the formal query that was generated from the given
             query string is shown, but not actually executed. This is mostly useful
             for debugging purposes."""),
-        use_metadata=Parameter(
-            args=('--use-metadata',),
+        metadata_source=Parameter(
+            args=('--metadata-source',),
             choices=('legacy', 'gen4'),
             default=None,
-            doc="""if given, defines which metadata should be used to search.
-            'legacy' will limit search to metadata in the old format, i.e.
-            stored in '$DATASET/.datalad/metadata'. 'gen4' will limit search to
-            metadata stored by the git-backend of 'datalad-metadata-model'.""")
+            doc="""if given, defines which metadata source will be used to
+            search. 'legacy' will limit search to metadata in the old format,
+            i.e. stored in '$DATASET/.datalad/metadata'. 'gen4' will limit
+            search to metadata stored by the git-backend of 
+            'datalad-metadata-model'. If not given, metadata from all supported
+            sources will be included in search.""")
     )
 
     @staticmethod
@@ -1336,7 +1338,7 @@ class Search(Interface):
                  full_record=False,
                  show_keys=None,
                  show_query=False,
-                 use_metadata=None):
+                 metadata_source=None):
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
@@ -1367,7 +1369,7 @@ class Search(Interface):
                 'unknown search mode "{}"'.format(mode))
 
         searcher = searcher(
-            ds, use_metadata=use_metadata, force_reindex=force_reindex)
+            ds, use_metadata=metadata_source, force_reindex=force_reindex)
 
         if show_keys:
             searcher.show_keys(show_keys, regexes=query)

@@ -1140,7 +1140,7 @@ def query_aggregated_metadata(reporton: str,
                               ds: Dataset,
                               aps: List[Dict],
                               recursive: bool = False,
-                              use_metadata: Optional[str] = None,
+                              metadata_source: Optional[str] = None,
                               **kwargs):
     """Query legacy and NG-metadata stored in a dataset or its metadata store
 
@@ -1156,11 +1156,11 @@ def query_aggregated_metadata(reporton: str,
     recursive : bool
       Whether or not to report metadata underneath all query paths
       recursively.
-    use_metadata : Optional[str]
-      Metadata generation that should be used. If set to "legacy", only
-      prior metalad version 0.3.0 metadata will be queried, if set to "gen4",
-      only metalad version 0.3.0 and beyond metadata will be queried, if set
-      to 'None', both will be queried.
+    metadata_source : Optional[str]
+      Metadata source that should be used. If set to "legacy", only metadata
+      prior metalad version 0.3.0 will be queried, if set to "gen4", only
+      metadata of metalad version 0.3.0 and beyond will be queried, if set
+      to 'None', all known metadata will be queried.
     **kwargs
       Any other argument will be passed on to the query result dictionary.
 
@@ -1170,7 +1170,7 @@ def query_aggregated_metadata(reporton: str,
       Of result dictionaries.
     """
 
-    if use_metadata in (None, "legacy"):
+    if metadata_source in (None, "legacy"):
         yield from legacy_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
@@ -1179,7 +1179,7 @@ def query_aggregated_metadata(reporton: str,
             **kwargs
         )
 
-    if use_metadata in (None, "gen4") and next_generation_metadata_available:
+    if metadata_source in (None, "gen4") and next_generation_metadata_available:
         yield from gen4_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
