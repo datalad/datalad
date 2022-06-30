@@ -411,7 +411,6 @@ def test_url_dicts():
     eq_(URL("http://host").query_dict, {})
 
 
-@skip_if_on_windows
 def test_get_url_path_on_fileurls():
     eq_(URL('file:///a').path, '/a')
     eq_(URL('file:///a/b').path, '/a/b')
