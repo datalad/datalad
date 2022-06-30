@@ -282,7 +282,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ----------
         sep : str, optional
           Use `sep` as line separator. Does not create an empty last line if
-          the input ends on sep.
+          the input ends on sep. The lines contain the separator, if it exists.
 
         All other parameters match those described for `call_git`.
 
@@ -338,14 +338,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 env=env)
 
         line_splitter = {
-            STDOUT_FILENO: LineSplitter(sep),
-            STDERR_FILENO: LineSplitter(sep)
+            STDOUT_FILENO: LineSplitter(sep, keep_ends=True),
+            STDERR_FILENO: LineSplitter(sep, keep_ends=True)
         }
 
         for file_no, content in generator:
             if file_no in (STDOUT_FILENO, STDERR_FILENO):
                 for line in line_splitter[file_no].process(content):
-                    yield file_no, line + "\n"
+                    yield file_no, line
             else:
                 raise ValueError(f"unknown file number: {file_no}")
 
@@ -430,12 +430,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-
-        return self._call_git(args,
-                 files,
-                 expect_stderr=expect_stderr,
-                 expect_fail=expect_fail,
-                 read_only=read_only)[0]
+        return "".join(
+            self.call_git_items_(args,
+                                 files,
+                                 expect_stderr=expect_stderr,
+                                 expect_fail=expect_fail,
+                                 read_only=read_only,
+                                 keep_ends=True))
 
     def call_git_items_(self,
                         args,
@@ -444,7 +445,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         expect_fail=False,
                         env=None,
                         read_only=False,
-                        sep=None):
+                        sep=None,
+                        keep_ends=False):
         """
         Call git, yield output lines when available. Output lines are split
         at line ends or `sep` if `sep` is not None.
@@ -459,7 +461,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Returns
         -------
-        Generator that yields stdout items.
+        Generator that yields stdout items, i.e. lines with the line ending or
+        separator removed.
+
+        Please note, this method is meant to be used to process output that is
+        meant for 'interactive' interpretation. It is not intended to return
+        stdout from a command like "git cat-file". The reason is that
+        it strips of the line endings (or separator) from the result lines,
+        unless 'keep_ends' is True. If 'keep_ends' is False, you will not know
+        which line ending was stripped (if 'separator' is None) or whether a
+        line ending (or separator) was stripped at all, because the last line
+        may not have a line ending (or separator).
+
+        If you want to reliably recreate the output set 'keep_ends' to True and
+        "".join() the result, or use 'GitRepo.call_git()' instead.
 
         Raises
         ------
@@ -482,7 +497,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                                     env=env,
                                                     sep=sep):
                 if file_no == STDOUT_FILENO:
-                    yield line.rstrip("\n")
+                    if keep_ends is True:
+                        yield line
+                    else:
+                        if sep:
+                            yield line.rstrip(sep)
+                        else:
+                            yield line.rstrip()
                 else:
                     stderr_lines.append(line)
 
