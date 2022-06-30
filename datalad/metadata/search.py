@@ -313,9 +313,9 @@ def _search_from_virgin_install(dataset, query):
 
 
 class _Search(object):
-    def __init__(self, ds, use_metadata=None, **kwargs):
+    def __init__(self, ds, metadata_source=None, **kwargs):
         self.ds = ds
-        self.use_metadata = use_metadata
+        self.metadata_source = metadata_source
         self.documenttype = self.ds.config.obtain(
             'datalad.search.index-{}-documenttype'.format(self._mode_label),
             default=self._default_documenttype)
@@ -350,8 +350,8 @@ class _Search(object):
 
 
 class _WhooshSearch(_Search):
-    def __init__(self, ds, use_metadata=None, force_reindex=False, **kwargs):
-        super(_WhooshSearch, self).__init__(ds, use_metadata, **kwargs)
+    def __init__(self, ds, metadata_source=None, force_reindex=False, **kwargs):
+        super(_WhooshSearch, self).__init__(ds, metadata_source, **kwargs)
 
         self.idx_obj = None
         # where does the bunny have the eggs?
@@ -511,7 +511,7 @@ class _WhooshSearch(_Search):
                 # MIH: I cannot see a case when we would not want recursion (within
                 # the metadata)
                 recursive=True,
-                use_metadata=self.use_metadata):
+                metadata_source=self.metadata_source):
             # this assumes that files are reported after each dataset report,
             # and after a subsequent dataset report no files for the previous
             # dataset will be reported again
@@ -631,7 +631,7 @@ class _WhooshSearch(_Search):
                         aps=annotated_hits,
                         # never recursive, we have direct hits already
                         recursive=False,
-                        use_metadata=self.use_metadata):
+                        metadata_source=self.metadata_source):
                     res.update(
                         refds=self.ds.path,
                         action='search',
@@ -736,7 +736,7 @@ class _AutofieldSearch(_WhooshSearch):
                 ds=self.ds,
                 aps=[dict(path=self.ds.path, type='dataset')],
                 recursive=True,
-                use_metadata=self.use_metadata):
+                metadata_source=self.metadata_source):
             meta = res.get('metadata', {})
             # no stringification of values for speed, we do not need/use the
             # actual values at this point, only the keys
@@ -773,8 +773,8 @@ class _EGrepCSSearch(_Search):
     _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
-    def __init__(self, ds, use_metadata=None, **kwargs):
-        super(_EGrepCSSearch, self).__init__(ds, use_metadata, **kwargs)
+    def __init__(self, ds, metadata_source=None, **kwargs):
+        super(_EGrepCSSearch, self).__init__(ds, metadata_source, **kwargs)
         self._queried_keys = None  # to be memoized by get_query
 
     # If there were custom "per-search engine" options, we could expose
@@ -794,7 +794,7 @@ class _EGrepCSSearch(_Search):
                 # MIH: I cannot see a case when we would not want recursion (within
                 # the metadata)
                 recursive=True,
-                use_metadata=self.use_metadata):
+                metadata_source=self.metadata_source):
             # this assumes that files are reported after each dataset report,
             # and after a subsequent dataset report no files for the previous
             # dataset will be reported again
@@ -923,7 +923,7 @@ class _EGrepCSSearch(_Search):
                 ds=self.ds,
                 aps=[dict(path=self.ds.path, type='dataset')],
                 recursive=True,
-                use_metadata=self.use_metadata):
+                metadata_source=self.metadata_source):
             meta = res.get('metadata', {})
             # inject a few basic properties into the dict
             # analog to what the other modes do in their index
@@ -1369,7 +1369,7 @@ class Search(Interface):
                 'unknown search mode "{}"'.format(mode))
 
         searcher = searcher(
-            ds, use_metadata=metadata_source, force_reindex=force_reindex)
+            ds, metadata_source=metadata_source, force_reindex=force_reindex)
 
         if show_keys:
             searcher.show_keys(show_keys, regexes=query)
