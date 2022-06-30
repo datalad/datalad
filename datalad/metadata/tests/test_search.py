@@ -493,13 +493,6 @@ def test_multiple_entry_points():
 
 
 def test_gen4_query_aggregated_metadata():
-
-    #try:
-    #    from datalad_metalad.dump import Dump
-    #    from datalad_metalad.exceptions import NoMetadataStoreFound
-    #except ImportError:
-    #    raise SkipTest("datalad-metalad gen4 seemingly not installed")
-
     class DatasetMock:
         def __init__(self, path: str):
             self.path = path
