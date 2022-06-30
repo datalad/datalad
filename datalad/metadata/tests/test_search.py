@@ -603,3 +603,54 @@ def test_gen4_query_aggregated_metadata():
             if metadata_result['status'] == 'impossible'
         ]
         assert_equal(len(result), 2)
+
+
+@with_tempfile(mkdir=True)
+def test_metadata_source_handling(temp_dir=None):
+    import datalad.metadata.metadata as metadata_module
+
+    temp_ds = Dataset(temp_dir).create()
+
+    gen4_result, legacy_result = (
+        {
+            "status": "ok",
+            "path": "/ds",
+            "action": "search",
+            "matches": {("x", "x"): True},
+            "metadata": {"k1": "v1", "k2": "v2"},
+            "metadata_source": source
+        }
+        for source in ("gen4", "legacy")
+    )
+
+    def reset_mock(mock, result):
+        mock.reset_mock()
+        mock.return_value = [result]
+
+    metadata_module.next_generation_metadata_available = True
+    with patch("datalad.metadata.metadata.gen4_query_aggregated_metadata") as gen4_mock, \
+         patch("datalad.metadata.metadata.legacy_query_aggregated_metadata") as legacy_mock:
+
+        reset_mock(gen4_mock, gen4_result)
+        reset_mock(legacy_mock, legacy_result)
+        r = tuple(
+            result["metadata_source"]
+            for result in search(dataset=temp_ds, query="v1")
+        )
+        assert_equal(r, ("legacy", "gen4"))
+
+        reset_mock(gen4_mock, gen4_result)
+        reset_mock(legacy_mock, legacy_result)
+        r = tuple(
+            result["metadata_source"]
+            for result in search(dataset=temp_ds, query="v1", metadata_source="gen4")
+        )
+        assert_equal(r, ("gen4",))
+
+        reset_mock(gen4_mock, gen4_result)
+        reset_mock(legacy_mock, legacy_result)
+        r = tuple(
+            result["metadata_source"]
+            for result in search(dataset=temp_ds, query="v1", metadata_source="legacy")
+        )
+        assert_equal(r, ("legacy",))
