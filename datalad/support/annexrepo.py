@@ -2683,24 +2683,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._batched.close()
         super(AnnexRepo, self).precommit()
 
-
-    @normalize_paths(match_return_type=False)
-    def remove(self, files, force=False, **kwargs):
-        """Remove files from git/annex
-
-        Parameters
-        ----------
-        files
-        force: bool, optional
-        """
-
-        # TODO: parameter 'force' unnecessary => kwargs / to_options
-        self.precommit()  # since might interfere
-
-        return super(AnnexRepo, self).remove(files, force=force,
-                                             normalize_paths=False,
-                                             **kwargs)
-
     def get_contentlocation(self, key, batch=False):
         """Get location of the key content
 

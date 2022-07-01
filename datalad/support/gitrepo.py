@@ -1305,6 +1305,12 @@ class GitRepo(CoreGitRepo):
         if recursive:
             kwargs['r'] = True
 
+        # the name is chosen badly, but the purpose is to make sure that
+        # any pending operations actually manifest themselves in the Git repo
+        # on disk (in case of an AnnexRepo, it could be pending batch
+        # processes that need closing)
+        self.precommit()
+
         # output per removed file is expected to be "rm 'PATH'":
         return [
             line.strip()[4:-1]
