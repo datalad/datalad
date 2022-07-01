@@ -73,7 +73,7 @@ matrix:
     env:
     - PYTEST_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
-    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20210310 -m conda"
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=10.20220525 -m conda"
   - python: 3.7
     env:
     - PYTEST_SELECTION_OP=""
