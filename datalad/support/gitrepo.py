@@ -3301,33 +3301,10 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
-        status = self._save_pre(paths, _status, **kwargs) or {}
+        status_state = _get_save_status_state(
+            self._save_pre(paths, _status, **kwargs) or {}
+        )
         amend = kwargs.get('amend', False)
-
-        # Sort status into status by state with explicit list of states
-        # (excluding clean we do not care about) we expect to be present
-        # and which we know of (unless None), and modified_or_untracked hybrid
-        # since it is used below
-        status_state = {
-            k: {}
-            for k in (None,  # not cared of explicitly here
-                      'added',  # not cared of explicitly here
-                      # 'clean'  # not even wanted since nothing to do about those
-                      'deleted',
-                      'modified',
-                      'untracked',
-                      'modified_or_untracked',  # hybrid group created here
-                      )}
-        for f, props in status.items():
-            state = props.get('state', None)
-            if state == 'clean':
-                # we don't care about clean
-                continue
-            status_state[state][f] = props
-            # The hybrid one to retain the same order as in original status
-            if state in ('modified', 'untracked'):
-                status_state['modified_or_untracked'][f] = props
-        del status  # to ensure it is no longer used
 
         # TODO: check on those None's -- may be those are also "nothing to worry about"
         # and we could just return?
@@ -3690,6 +3667,39 @@ class GitRepo(CoreGitRepo):
                     path=i['path'],
                     status='ok',
                     logger=lgr)
+
+
+def _get_save_status_state(status):
+    """
+    Returns
+    -------
+    dict
+      By status category by file path, mapped to status properties.
+    """
+    # Sort status into status by state with explicit list of states
+    # (excluding clean we do not care about) we expect to be present
+    # and which we know of (unless None), and modified_or_untracked hybrid
+    # since it is used below
+    status_state = {
+        k: {}
+        for k in (None,  # not cared of explicitly here
+                  'added',  # not cared of explicitly here
+                  # 'clean'  # not even wanted since nothing to do about those
+                  'deleted',
+                  'modified',
+                  'untracked',
+                  'modified_or_untracked',  # hybrid group created here
+                  )}
+    for f, props in status.items():
+        state = props.get('state', None)
+        if state == 'clean':
+            # we don't care about clean
+            continue
+        status_state[state][f] = props
+        # The hybrid one to retain the same order as in original status
+        if state in ('modified', 'untracked'):
+            status_state['modified_or_untracked'][f] = props
+    return status_state
 
 
 # used in in the get command and GitRepo.add_submodule(), the
