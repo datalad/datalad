@@ -27,7 +27,7 @@ from datalad.tests.utils_pytest import (
 
 @with_tempfile
 def test_save_basics(path=None):
-    ds = Dataset(path).create()
+    ds = Dataset(path).create(result_renderer='disabled')
     # nothing happens
     eq_(list(ds.repo.save(paths=[], _status={})),
         [])
@@ -80,7 +80,7 @@ def test_annexrepo_save_all(path=None):
 
 @with_tempfile
 def test_save_to_git(path=None):
-    ds = Dataset(path).create()
+    ds = Dataset(path).create(result_renderer='disabled')
     create_tree(
         ds.path,
         {
