@@ -18,6 +18,7 @@ from typing import (
     Optional,
 )
 
+__docformat__ = "numpy"
 
 logger = logging.getLogger("datalad.runner.utils")
 
@@ -27,14 +28,24 @@ class LineSplitter:
     A line splitter that handles 'streamed content' and is based
     on python's built-in splitlines().
     """
-    def __init__(self, separator: Optional[str] = None):
+    def __init__(self,
+                 separator: Optional[str] = None,
+                 keep_ends: bool = False):
         """
-        Create a line splitter that will split lines either on a
-        given separator, if 'separator' is not None, or on one of
-        the known line endings, if 'separator' is None. The
-        currently known line endings are "\n", and "\r\n".
+        Create a line splitter that will split lines either on a given
+        separator, if 'separator' is not None, or on one of the known line
+        endings, if 'separator' is None, the line endings are determined by
+        python, they include, for example, "\n", and "\r\n".
+
+        Parameters
+        ----------
+        separator: Optional[str]
+            If not None, the provided separator will be used to split lines.
+        keep_ends: bool
+            If True, the separator will be contained in the returned lines.
         """
         self.separator = separator
+        self.keep_ends = keep_ends
         self.remaining_data = None
 
     def process(self, data: str) -> List[str]:
@@ -63,10 +74,15 @@ class LineSplitter:
             # from the list of detected lines and keep it for the
             # next round
             if lines_with_ends[-1] == detected_lines[-1]:
-                self.remaining_data = detected_lines[-1]
+                self.remaining_data = lines_with_ends[-1]
+                del lines_with_ends[-1]
                 del detected_lines[-1]
             else:
                 self.remaining_data = None
+
+            if self.keep_ends:
+                return lines_with_ends
+            return detected_lines
 
         else:
             # Split lines on separator. This will create additional
@@ -87,7 +103,9 @@ class LineSplitter:
             # unterminated line.
             del detected_lines[-1]
 
-        return detected_lines
+            if self.keep_ends:
+                return [line + self.separator for line in detected_lines]
+            return detected_lines
 
     def finish_processing(self) -> Optional[str]:
         return self.remaining_data

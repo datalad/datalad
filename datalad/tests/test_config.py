@@ -643,7 +643,7 @@ def test_global_config():
 def test_bare(src=None, path=None):
     # create a proper datalad dataset with all bells and whistles
     ds = Dataset(src).create()
-    dlconfig_sha = ds.repo.call_git(['rev-parse', 'HEAD:.datalad/config'])
+    dlconfig_sha = ds.repo.call_git(['rev-parse', 'HEAD:.datalad/config']).strip()
     # can we handle a bare repo version of it?
     gr = AnnexRepo.clone(
         src, path, clone_options=['--bare', '-b', DEFAULT_BRANCH])

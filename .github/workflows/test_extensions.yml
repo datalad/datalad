@@ -38,7 +38,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-devel.txt
+        # we are using pytest here but extensions still tested with nose
         pip install nose
     - name: Install ${{ matrix.extension }} extension
       run: |
@@ -65,3 +66,9 @@ jobs:
         python -m nose -s -v --with-cov --cover-package datalad $(echo ${{ matrix.extension }} | tr '-' '_')
         # TODO: later whenever some extensions would migrate to pytest -- use pytest
         # python -m pytest -c ../tox.ini -s -v --cov=datalad --pyargs $(echo ${{ matrix.extension }} | tr '-' '_')
+        python -m coverage xml
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        directory: __testhome__
+        fail_ci_if_error: false
