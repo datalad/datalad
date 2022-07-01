@@ -548,7 +548,11 @@ def test_as_common_datasource(testbed=None, viapath=None, viaurl=None, remotepat
     res = ds_fromurl.siblings(
         'add',
         name='fresh',
-        url=url,
+        # we must amend the URL given by serve_path_via_http, because
+        # we are serving the root of a non-bare repository, but git-annex
+        # needs to talk to its .git (git-clone would also not eat
+        # `url` unmodified).
+        url=url + '.git',
         as_common_datasrc='fresh-sr',
         result_renderer='disabled',
     )
