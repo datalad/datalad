@@ -581,10 +581,11 @@ def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url, remotep
     # and the other one
     assert_status('ok', testbed.get('testfile2'))
 
-    # Let's get explicitly from 'fresh' remote which would not work if URL
-    # above is wrong etc
-    assert_status('ok', testbed.drop('testfile'))
-    assert_status('ok', testbed.get('testfile', source="fresh-sr"))
+    # Let's get explicitly from both remotes which would not work if URL
+    # above is wrong or one of the remotes not autoenabled
+    for remote in 'mike2', 'fresh-sr':
+        assert_status('ok', testbed.drop('testfile'))
+        assert_status('ok', testbed.get('testfile', source=remote))
 
 
 @with_tempfile(mkdir=True)
