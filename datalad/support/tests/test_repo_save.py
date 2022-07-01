@@ -45,7 +45,8 @@ def _test_save_all(path, repocls):
     # make sure we get a 'delete' result for each deleted file
     eq_(
         set(r['path'] for r in res if r['action'] == 'delete'),
-        {k for k, v in orig_status.items() if k.name == 'file_deleted'}
+        {k for k, v in orig_status.items()
+         if k.name in ('file_deleted', 'file_staged_deleted')}
     )
     saved_status = ds.repo.status(untracked='all')
     # we still have an entry for everything that did not get deleted

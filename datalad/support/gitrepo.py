@@ -3359,34 +3359,31 @@ class GitRepo(CoreGitRepo):
             if tofix:
                 self.call_annex(['pre-commit'], files=tofix)
 
-        # remove first, because removal of a subds would cause a
+        # removal first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list
-        to_remove = [
-            # TODO remove pathobj stringification when delete() can
-            # handle it
-            str(f.relative_to(self.pathobj))
-            for f, props in status_state['deleted'].items()
-            # staged deletions have a gitshasum reported for them
-            # those should not be processed as git rm will error
-            # due to them being properly gone already
-            if not props.get('gitshasum', None)]
         vanished_subds = any(
             props.get('type', None) == 'dataset'
             for props in status_state['deleted'].values())
-        if to_remove:
-            for r in self.remove(
-                    to_remove,
-                    # we would always see individual files
-                    recursive=False):
-                # TODO normalize result
+        if status_state['deleted']:
+            # remove anything from the index that was found to be gone
+            self._call_git(
+                ['update-index', '--remove'],
+                files=[
+                    str(f.relative_to(self.pathobj))
+                    for f in status_state['deleted']
+                    # do not update the index, if there is already
+                    # something staged for this path (e.g.,
+                    # a directory was removed and a file staged
+                    # in its place)
+                    if not props.get('gitshasum', None)
+                ]
+            )
+            for p, props in status_state['deleted'].items():
                 yield get_status_dict(
                     action='delete',
                     refds=self.pathobj,
-                    # TODO make remove() report the type
-                    # for now it claims to report on files only
-                    type='file',
-                    path=(self.pathobj / ut.PurePosixPath(r)),
-                    # make remove() report on failures too
+                    type=props.get('type'),
+                    path=p,
                     status='ok',
                     logger=lgr)
 
