@@ -49,6 +49,7 @@ from datalad.config import (
     write_config_section,
 )
 from datalad.consts import (
+    GIT_MODE_TYPE_MAP,
     ILLEGAL_CHARS_WIN,
     RESERVED_NAMES_WIN,
 )
@@ -2782,12 +2783,6 @@ class GitRepo(CoreGitRepo):
 
     def _get_content_info_line_helper(self, ref, info, lines, props_re):
         """Internal helper of get_content_info() to parse Git output"""
-        mode_type_map = {
-            '100644': 'file',
-            '100755': 'file',
-            '120000': 'symlink',
-            '160000': 'dataset',
-        }
         for line in lines:
             if not line:
                 continue
@@ -2812,7 +2807,7 @@ class GitRepo(CoreGitRepo):
             # revisit the file props after this path has not been rejected
             if props:
                 inf['gitshasum'] = props.group('sha')
-                inf['type'] = mode_type_map.get(
+                inf['type'] = GIT_MODE_TYPE_MAP.get(
                     props.group('type'), props.group('type'))
 
                 if ref and inf['type'] == 'file':
@@ -3157,6 +3152,35 @@ class GitRepo(CoreGitRepo):
                 state = 'clean' \
                     if against_commit or (f.exists() or f.is_symlink()) \
                     else 'deleted'
+        elif to_sha == from_sha and modified_in_worktree:
+            # this is a typechange
+            state = 'modified'
+            # the reported gitsha does not belong to the content now
+            # in the working tree
+            to_sha = None
+            # and we know that the reported type is wrong, because
+            # the report is based on `git-ls-files` not `git
+            del props['type']
+            from_type = from_state.get('type')
+            if from_type:
+                props['prev_type'] = from_type
+            # under the assumption that typechanges are a relatively rare
+            # thing, we permit ourselves to run a `diff-files` call for each
+            # occurrence, in other to be able to report on the type-change
+            # accurately
+            diff = self.call_git_oneline(
+                ['diff-files'], files=[str(f)]
+            ).split(' ')
+            if len(diff) > 1 and diff[0].startswith(':'):
+                # this is a format that we recognize as the "RAW OUTPUT FORMAT"
+                to_type = GIT_MODE_TYPE_MAP.get(diff[1])
+                if to_type:
+                    # we could map it onto a known type
+                    props['type'] = to_type
+                else:
+                    lgr.debug(
+                        'Failed to determine type of repository content '
+                        'after typechange')
         else:
             # change in git record, or on disk
             # for subdatasets leave the 'modified' judgement to the caller
@@ -3177,7 +3201,10 @@ class GitRepo(CoreGitRepo):
             # assign present gitsha to any record
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
-            props['gitshasum'] = to_sha
+            if to_sha:
+                # with a typechange there would be no gitsha
+                # for the new content, despite a known modification
+                props['gitshasum'] = to_sha
             if 'bytesize' in to_state:
                 # if we got this cheap, report it
                 props['bytesize'] = to_state['bytesize']
