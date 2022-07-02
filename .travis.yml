@@ -60,6 +60,9 @@ matrix:
     env:
       - NOSE_SELECTION=
       - NOSE_SELECTION_OP=not
+      # current "default" version of git-annex 8.20201007  is not co-installable
+      # with python 3.10, so let's just allow for any git-annex version
+      - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
   - if: type = cron
     python: 3.7
     # Single run for Python 3.7
