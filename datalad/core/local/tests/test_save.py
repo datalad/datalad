@@ -938,6 +938,19 @@ def test_save_diff_ignore_submodules_config(path):
     assert_repo_status(ds.path)
 
 
+@with_tree({"subdir": {"foo": "foocontent"}})
+def test_save_git_mv_fixup(path=None):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    assert_repo_status(ds.path)
+    ds.repo.call_git(["mv", op.join("subdir", "foo"), "foo"])
+    ds.save()
+    # Was link adjusted properly?  (gh-3686)
+    assert (ds.pathobj / 'foo').read_text() == "foocontent"
+    # all clean
+    assert_repo_status(ds.path)
+
+
 @with_tree(tree={'somefile': 'file content',
                  'subds': {'file_in_sub': 'other'}})
 def test_save_amend(dspath):

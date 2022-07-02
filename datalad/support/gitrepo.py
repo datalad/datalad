@@ -3352,7 +3352,22 @@ class GitRepo(CoreGitRepo):
         # - commit (with all paths that have been touched, to bypass
         #   potential pre-staged bits)
 
-        need_partial_commit = True if self.get_staged_paths() else False
+        staged_paths = self.get_staged_paths()
+        need_partial_commit = bool(staged_paths)
+        if need_partial_commit and hasattr(self, "call_annex"):
+            # so we have some staged content. let's check which ones
+            # are symlinks -- those could be annex key links that
+            # are broken after a `git-mv` operation
+            # https://github.com/datalad/datalad/issues/4967
+            # call `git-annex pre-commit` on them to rectify this before
+            # saving the wrong symlinks
+            added = status_state['added']
+            tofix = [
+                sp for sp in staged_paths
+                if added.get(self.pathobj / sp, {}).get("type") == "symlink"
+            ]
+            if tofix:
+                self.call_annex(['pre-commit'], files=tofix)
 
         # remove first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list
