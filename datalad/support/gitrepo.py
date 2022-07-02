@@ -3350,7 +3350,7 @@ class GitRepo(CoreGitRepo):
                 # sense to have a duplicate implementation.
                 # we do not yield here, but only altogether below -- we are just
                 # processing gone components, should always be quick.
-                self._call_git(['rm'], files=vanished_subds)
+                self._call_git(['rm', '-q'], files=vanished_subds)
                 submodule_change = True
             # remove anything from the index that was found to be gone
             self._call_git(
