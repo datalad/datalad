@@ -3666,7 +3666,8 @@ class GitRepo(CoreGitRepo):
                 # a subdataset
                 # TODO: we could update the URL, and branch info at this point,
                 # even for previously registered subdatasets
-                if i['type'] != 'dataset':
+                if i['type'] != 'dataset' or (
+                        i['type'] == 'dataset' and i['state'] == 'untracked'):
                     gmprops = dict(path=i['rpath'], url=i['url'])
                     if i['id']:
                         gmprops['datalad-id'] = i['id']
