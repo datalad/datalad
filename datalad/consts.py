@@ -81,3 +81,14 @@ RESERVED_NAMES_WIN = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3',
                       'LPT9'}
 # Characters that can't be a part of a file name on Windows
 ILLEGAL_CHARS_WIN = "[<>:/\\|?*\"]|[\0-\31]"
+
+# mode identifiers used by Git (ls-files, ls-tree), mapped to
+# type identifiers as used in command results
+GIT_MODE_TYPE_MAP = {
+    '100644': 'file',
+    # we do not distinguish executables
+    '100755': 'file',
+    '040000': 'directory',
+    '120000': 'symlink',
+    '160000': 'dataset',
+}

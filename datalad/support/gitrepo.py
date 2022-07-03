@@ -49,6 +49,7 @@ from datalad.config import (
     write_config_section,
 )
 from datalad.consts import (
+    GIT_MODE_TYPE_MAP,
     ILLEGAL_CHARS_WIN,
     RESERVED_NAMES_WIN,
 )
@@ -2788,12 +2789,6 @@ class GitRepo(CoreGitRepo):
 
     def _get_content_info_line_helper(self, ref, info, lines, props_re):
         """Internal helper of get_content_info() to parse Git output"""
-        mode_type_map = {
-            '100644': 'file',
-            '100755': 'file',
-            '120000': 'symlink',
-            '160000': 'dataset',
-        }
         for line in lines:
             if not line:
                 continue
@@ -2818,7 +2813,7 @@ class GitRepo(CoreGitRepo):
             # revisit the file props after this path has not been rejected
             if props:
                 inf['gitshasum'] = props.group('sha')
-                inf['type'] = mode_type_map.get(
+                inf['type'] = GIT_MODE_TYPE_MAP.get(
                     props.group('type'), props.group('type'))
 
                 if ref and inf['type'] == 'file':
