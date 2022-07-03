@@ -3414,6 +3414,12 @@ class GitRepo(CoreGitRepo):
                     if not props.get('gitshasum')
                     # we already did the submodules
                     and props.get('type') != 'dataset'
+                    # update-index only works for files.
+                    # a directory could end up here, when a previously
+                    # committed file was replaced by a directory and
+                    # a new file in it was added. this would automatically
+                    # stage a deletion for the previous file object
+                    and not f.is_dir()
                 ]
             )
             # now yield all deletions
