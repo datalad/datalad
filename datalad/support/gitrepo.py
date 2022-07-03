@@ -3083,20 +3083,51 @@ class GitRepo(CoreGitRepo):
             return status
 
     def _get_worktree_modifications(self, paths=None):
-        # from Git 2.31.0 onwards ls-files has --deduplicate
-        # by for backward compatibility keep doing deduplication here
-        modified = set(
-            self.pathobj.joinpath(ut.PurePosixPath(p))
-            for p in self.call_git_items_(
-                # we must also look for deleted files, for the logic
-                # below to work. Only from Git 2.31.0 would they be
-                # included with `-m` alone
-                ['ls-files', '-z', '-m', '-d'],
-                # low-level code cannot handle pathobjs
-                files=[str(p) for p in paths] if paths else None,
-                sep='\0',
-                read_only=True)
-            if p)
+        """Report working tree modifications
+
+        Parameters
+        ----------
+        paths : list or None
+          If given, limits the query to the specified paths. To query all
+          paths specify `None`, not an empty list.
+
+        Returns
+        -------
+        dict
+          Mapping of Paths to type labels from GIT_MODE_TYPE_MAP.
+          Deleted paths have type `None` assigned.
+        """
+        # ask diff-files, gives a list with interspersed diff info and
+        # filenames
+        mod = list(self.call_git_items_(
+            ['diff-files',
+             # without this, diff-files would run a full status (recursively)
+             # but we are at most interested in a subproject commit
+             # change within the scope of this repo
+             '--ignore-submodules=dirty',
+             # hopefully making things faster by turning off features
+             # we would not benefit from (at least for now)
+             '--no-renames',
+             '-z'
+            ],
+            # low-level code cannot handle pathobjs
+            files=[str(p) for p in paths] if paths else None,
+            sep='\0',
+            read_only=True))
+        # convert into a mapping path to type
+        modified = dict(zip(
+            # paths are every other element, starting from the second
+            mod[1::2],
+            # mark `None` for deletions, and give raw mode otherwise
+            (None if l.endswith('D') else l.split(' ', maxsplit=2)[1]
+             for l in mod[::2])
+        ))
+        # convenience-map to type labels, leave raw mode if unrecognized
+        # (which really should not happen)
+        modified = {
+            self.pathobj / ut.PurePosixPath(k):
+            GIT_MODE_TYPE_MAP.get(v, v) for k, v in modified.items()
+        }
         return modified
 
     def _diffstatus_get_state_props(self, f, from_state, to_state,
@@ -3108,12 +3139,14 @@ class GitRepo(CoreGitRepo):
         Parameters
         ----------
         f : Path
-        from_state : dict
-        to_state : dict
+        from_state : dict or None
+        to_state : dict or None
         against_commit : bool
           Flag whether `to_state` reflects a commit or the worktree.
-        modified_in_worktree : bool
-          Flag whether a worktree modification is reported. This is ignored
+        modified_in_worktree : False or str
+          False if there is no modification of `f` in the working tree,
+          or a type label from GIT_MODE_TYPE_MAP indicating the type
+          of the modified path `f`. This is ignored
           when `against_commit` is True.
         eval_submodule_state : {'commit', 'no', ...}
         """
