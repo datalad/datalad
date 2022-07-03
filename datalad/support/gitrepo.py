@@ -2965,20 +2965,7 @@ class GitRepo(CoreGitRepo):
             if key in _cache:
                 modified = _cache[key]
             else:
-                # from Git 2.31.0 onwards ls-files has --deduplicate
-                # by for backward compatibility keep doing deduplication here
-                modified = set(
-                    self.pathobj.joinpath(ut.PurePosixPath(p))
-                    for p in self.call_git_items_(
-                        # we must also look for deleted files, for the logic
-                        # below to work. Only from Git 2.31.0 would they be
-                        # included with `-m` alone
-                        ['ls-files', '-z', '-m', '-d'],
-                        # low-level code cannot handle pathobjs
-                        files=[str(p) for p in paths] if paths else None,
-                        sep='\0',
-                        read_only=True)
-                    if p)
+                modified = self._get_worktree_modifications(paths)
                 _cache[key] = modified
         else:
             key = _get_cache_key('ci', paths, to)
@@ -3094,6 +3081,23 @@ class GitRepo(CoreGitRepo):
             return 'clean'
         else:
             return status
+
+    def _get_worktree_modifications(self, paths=None):
+        # from Git 2.31.0 onwards ls-files has --deduplicate
+        # by for backward compatibility keep doing deduplication here
+        modified = set(
+            self.pathobj.joinpath(ut.PurePosixPath(p))
+            for p in self.call_git_items_(
+                # we must also look for deleted files, for the logic
+                # below to work. Only from Git 2.31.0 would they be
+                # included with `-m` alone
+                ['ls-files', '-z', '-m', '-d'],
+                # low-level code cannot handle pathobjs
+                files=[str(p) for p in paths] if paths else None,
+                sep='\0',
+                read_only=True)
+            if p)
+        return modified
 
     def _diffstatus_get_state_props(self, f, from_state, to_state,
                                     against_commit,
