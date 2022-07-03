@@ -89,15 +89,43 @@ def test_annexrepo_save_all(path=None):
 def test_save_typechange(path=None):
     ckwa = dict(result_renderer='disabled')
     ds = Dataset(path).create(**ckwa)
+    filelinktype = 'file' if ds.repo.is_managed_branch() else 'symlink'
+
     foo = ds.pathobj / 'foo'
     # save a file
     foo.write_text('some')
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        type='file',
+        state='untracked',
+    )
     ds.save(**ckwa)
     # now delete the file and replace with a directory and a file in it
     foo.unlink()
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        type=filelinktype,
+        state='deleted',
+    )
     foo.mkdir()
+    # a directory is not enough for git to change its minds just yet
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        type=filelinktype,
+        state='deleted',
+    )
     bar = foo / 'bar'
     bar.write_text('foobar')
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        type=filelinktype,
+        state='deleted',
+    )
+    assert_in_results(
+        ds.status(path=bar, **ckwa),
+        type='file',
+        state='untracked',
+    )
     res = ds.save(**ckwa)
     assert_in_results(res, path=str(bar), action='add', status='ok')
     assert_repo_status(ds.repo)
@@ -105,27 +133,68 @@ def test_save_typechange(path=None):
         # now replace file with subdataset
         # (this is https://github.com/datalad/datalad/issues/5418)
         bar.unlink()
-        Dataset(ds.pathobj / 'tmp').create(**ckwa)
+        subds = Dataset(ds.pathobj / 'tmp').create(**ckwa)
+        subdshexsha = subds.repo.get_hexsha(subds.repo.get_corresponding_branch())
         shutil.move(ds.pathobj / 'tmp', bar)
+        assert_in_results(
+            ds.status(path=bar, **ckwa),
+            type='dataset',
+            prev_type=filelinktype,
+            state='modified',
+        )
         res = ds.save(**ckwa)
         assert_repo_status(ds.repo)
         assert len(ds.subdatasets(**ckwa)) == 1
     # now replace directory with subdataset
     rmtree(foo)
-    Dataset(ds.pathobj / 'tmp').create(**ckwa)
+    assert_in_results(
+        ds.status(path=bar, **ckwa),
+        type='dataset',
+        prev_gitshasum=subdshexsha,
+        state='deleted',
+    )
+    newsubds = Dataset(ds.pathobj / 'tmp').create(**ckwa)
+    newsubdshexsha = newsubds.repo.get_hexsha(
+        subds.repo.get_corresponding_branch())
     shutil.move(ds.pathobj / 'tmp', foo)
-    # right now a first save() will save the subdataset removal only
+    # right now neither datalad not git recognize a repo that
+    # is inserted between the root repo and a known subdataset
+    # (still registered in index)
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        type='dataset',
+        prev_gitshasum=subdshexsha,
+        state='deleted',
+    )
+    # a first save() will save the subdataset removal only
     ds.save(**ckwa)
     # subdataset is gone
     assert len(ds.subdatasets(**ckwa)) == 0
-    # but it takes a second save() run to get a valid status report
-    # to understand that there is a new subdataset on a higher level
+    # this brings back the sanity of the status git (again for both
+    # git and datalad)
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        # not yet recognized as a dataset, a good thing, because it
+        # would be more expensive to figuure this out
+        type='directory',
+        state='untracked',
+    )
     ds.save(**ckwa)
     assert_repo_status(ds.repo)
     assert len(ds.subdatasets(**ckwa)) == 1
     # now replace subdataset with a file
     rmtree(foo)
     foo.write_text('some')
+    assert_in_results(
+        ds.status(path=foo, **ckwa),
+        # not yet recognized as a dataset, a good thing, because it
+        # would be more expensive to figuure this out
+        type='file',
+        prev_type='dataset',
+        state='modified',
+        prev_gitshasum=newsubdshexsha,
+
+    )
     ds.save(**ckwa)
     assert_repo_status(ds.repo)
 

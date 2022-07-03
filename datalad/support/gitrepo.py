@@ -3154,8 +3154,6 @@ class GitRepo(CoreGitRepo):
         # compile properties of the diff state
         # TODO sort out
         props = {}
-        if to_state and 'type' in to_state:
-            props['type'] = to_state['type']
 
         to_sha = to_state.get('gitshasum') if to_state else None
         from_sha = from_state.get('gitshasum') if from_state else None
@@ -3174,11 +3172,30 @@ class GitRepo(CoreGitRepo):
             elif state == 'clean' and 'bytesize' in from_state:
                 # no change, we can take this old size info
                 props['bytesize'] = from_state['bytesize']
+
         if state in ('clean', 'modified', 'deleted', None):
             # assign previous gitsha to any record
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
             props['prev_gitshasum'] = from_sha
+
+        # current type reporting
+        if modified_in_worktree is not False:
+            # we have a report of a modified type, include if
+            # not None (i.e. vanished)
+            if modified_in_worktree is not None:
+                props['type'] = modified_in_worktree
+        elif to_state and 'type' in to_state:
+            props['type'] = to_state['type']
+
+        if state == 'modified':
+            # for modifications we want to report types for both states
+            props['prev_type'] = from_state['type']
+
+        if state == 'deleted':
+            # report the type that was deleted
+            props['type'] = from_state['type']
+
         if state:
             # only report a state if we could determine any
             # outside code tests for existence of the property
@@ -3210,11 +3227,11 @@ class GitRepo(CoreGitRepo):
         if from_state is None:
             # this is new, or rather not known to the previous state
             return 'added' if to_state.get('gitshasum') else 'untracked'
-        elif to_state is None:
-            # this is new, or rather not known to the previous state
+        elif to_state is None or modified_in_worktree is None:
+            # now state anymore or vanished from worktree
             return 'deleted'
         # from here we know that neither to_state nor from_state are None
-        elif not modified_in_worktree \
+        elif modified_in_worktree is False \
                 and to_state.get('gitshasum') == from_state.get('gitshasum'):
             # something that is seemingly unmodified,
             if not against_commit:
@@ -3246,9 +3263,14 @@ class GitRepo(CoreGitRepo):
             # is not a deletion.
             # for subdatasets leave the 'modified' judgement to the caller
             # for supporting corner cases, such as adjusted branch
-            # which require inspection of a subdataset
+            # which require inspection of a subdataset,
+            # but if we have the working tree type not match the one
+            # on git-record, we know it is modified
             return 'modified' \
-                if against_commit or to_state['type'] != 'dataset' \
+                if against_commit \
+                or (modified_in_worktree is not False
+                    and to_state['type'] != modified_in_worktree) \
+                or to_state['type'] != 'dataset' \
                 else None
 
     def _save_pre(self, paths, _status, **kwargs):

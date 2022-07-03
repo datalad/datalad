@@ -97,6 +97,7 @@ def test_repo_diff(path=None, norepo=None):
         {ut.Path(ds.repo.pathobj / 'new'): {
             'state': 'modified',
             'type': 'file',
+            'prev_type': 'file',
             # the beast is modified, but no change in shasum -> not staged
             'gitshasum': '7b4d68d70fcae134d5348f5e118f5e9c9d3f05f6',
             'prev_gitshasum': '7b4d68d70fcae134d5348f5e118f5e9c9d3f05f6'}})
