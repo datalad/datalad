@@ -3142,67 +3142,32 @@ class GitRepo(CoreGitRepo):
             # comparing against a commit
             modified_in_worktree = False
 
-        props = {}
-        if 'type' in to_state:
-            props['type'] = to_state['type']
-
-        to_sha = to_state['gitshasum']
-        from_sha = from_state['gitshasum'] if from_state else None
-
         # determine the state of `f` from from_state and to_state records, if
         # it can be determined conclusively from it. If not, it will
         # stay None for now
-        state = None
-        if not from_state:
-            # this is new, or rather not known to the previous state
-            state = 'added' if to_sha else 'untracked'
-        elif to_sha == from_sha and not modified_in_worktree:
-            # something that is seemingly unmodified, based on the info
-            # gathered so far
-            if to_state['type'] == 'dataset':
-                if against_commit or eval_submodule_state == 'commit':
-                    # we compare against a recorded state, just based on
-                    # the shas we can be confident, otherwise the state
-                    # of a subdataset isn't fully known yet, because
-                    # `modified_in_worktree` will only reflect changes
-                    # in the commit of a subdataset without looking into
-                    # it for uncommitted changes. Such tests are done
-                    # later and based on further conditionals for
-                    # performance reasons
-                    state = 'clean'
-            else:
-                # no change in git record, and no change on disk
-                # at this point we know that the reported object ids
-                # for this file are identical in the to and from
-                # records.  If to is None, we're comparing to the
-                # working tree and a deleted file will still have an
-                # identical id, so we need to check whether the file is
-                # gone before declaring it clean. This working tree
-                # check is irrelevant and wrong if to is a ref.
-                state = 'clean' \
-                    if against_commit or (f.exists() or f.is_symlink()) \
-                    else 'deleted'
-        else:
-            # change in git record, or on disk
-            # for subdatasets leave the 'modified' judgement to the caller
-            # for supporting corner cases, such as adjusted branch
-            # which require inspection of a subdataset
-            # TODO we could have a new file that is already staged
-            # but had subsequent modifications done to it that are
-            # unstaged. Such file would presently show up as 'added'
-            # ATM I think this is OK, but worth stating...
-            state = ('modified'
-                     if against_commit or to_state['type'] != 'dataset'
-                     else None
-                    ) if f.exists() or f.is_symlink() else 'deleted'
-            # TODO record before and after state for diff-like use
-            # cases
+        state = self._diffstatus_get_state(
+            f, from_state, to_state,
+            modified_in_worktree,
+            against_commit, eval_submodule_state,
+        )
+
+        # compile properties of the diff state
+        # TODO sort out
+        props = {}
+        if to_state and 'type' in to_state:
+            props['type'] = to_state['type']
+
+        to_sha = to_state.get('gitshasum') if to_state else None
+        from_sha = from_state.get('gitshasum') if from_state else None
 
         if state in ('clean', 'added', 'modified', None):
             # assign present gitsha to any record
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
-            props['gitshasum'] = to_sha
+            if to_sha:
+                # with a typechange there would be no gitsha
+                # for the new content, despite a known modification
+                props['gitshasum'] = to_sha
             if 'bytesize' in to_state:
                 # if we got this cheap, report it
                 props['bytesize'] = to_state['bytesize']
@@ -3220,6 +3185,71 @@ class GitRepo(CoreGitRepo):
             # and not (always) for the value
             props['state'] = state
         return props
+
+    def _diffstatus_get_state(
+            self, f, from_state, to_state, modified_in_worktree,
+            against_commit, eval_submodule_state):
+        """Determine the state of `f` from from_state and to_state records
+
+        Parameters
+        ----------
+        f: Path
+        from_state: dict or None
+        to_state: dict or None
+        modified_in_worktree: bool
+        against_commit: bool
+        eval_submodule_state: str
+          See _diffstatus_get_state_props() for info.
+
+        Returns
+        -------
+        {'untracked', 'added', 'deleted', 'modified', 'clean', None}
+            If the state cannot be determined conclusively from the state
+            records, None is returned
+        """
+        if from_state is None:
+            # this is new, or rather not known to the previous state
+            return 'added' if to_state.get('gitshasum') else 'untracked'
+        elif to_state is None:
+            # this is new, or rather not known to the previous state
+            return 'deleted'
+        # from here we know that neither to_state nor from_state are None
+        elif not modified_in_worktree \
+                and to_state.get('gitshasum') == from_state.get('gitshasum'):
+            # something that is seemingly unmodified,
+            if not against_commit:
+                # but could also be an unstaged deletion!
+                try:
+                    f.lstat()
+                except FileNotFoundError:
+                    return 'deleted'
+
+            if to_state['type'] == 'dataset':
+                if against_commit or eval_submodule_state == 'commit':
+                    # we compare against a recorded state, just based on
+                    # the shas we can be confident, otherwise the state
+                    # of a subdataset isn't fully known yet, because
+                    # `modified_in_worktree` will only reflect changes
+                    # in the commit of a subdataset without looking into
+                    # it for uncommitted changes. Such tests are done
+                    # later and based on further conditionals for
+                    # performance reasons
+                    return 'clean'
+            else:
+                # no change in git record, and no change on disk
+                # at this point we know that the reported object ids
+                # for this file are identical in the to and from
+                # records, and we already checked for deletions
+                return 'clean'
+        else:
+            # change in git record or on disk, we already confirmed that it
+            # is not a deletion.
+            # for subdatasets leave the 'modified' judgement to the caller
+            # for supporting corner cases, such as adjusted branch
+            # which require inspection of a subdataset
+            return 'modified' \
+                if against_commit or to_state['type'] != 'dataset' \
+                else None
 
     def _save_pre(self, paths, _status, **kwargs):
         # helper to get an actionable status report
