@@ -2989,16 +2989,18 @@ class GitRepo(CoreGitRepo):
             _cache[key] = from_state
 
         status = OrderedDict()
-        for f, to_state_r in to_state.items():
+        # for all paths we know now or knew before
+        for f in set(from_state).union(to_state):
             props = self._diffstatus_get_state_props(
                 f,
-                from_state.get(f, None),
-                to_state_r,
+                from_state.get(f),
+                to_state.get(f),
                 # are we comparing against a recorded commit or the worktree
                 to is not None,
-                # if we have worktree modification info, report if
-                # path is reported as modified in it
-                modified and f in modified,
+                # if we have worktree modification info, pass type(change)
+                # report on, if there is any
+                False if modified is None
+                else modified.get(f, False),
                 eval_submodule_state)
             # potential early exit in "global" eval mode
             if eval_submodule_state == 'global' and \
@@ -3006,21 +3008,6 @@ class GitRepo(CoreGitRepo):
                 # any modification means globally 'modified'
                 return 'modified'
             status[f] = props
-
-        for f, from_state_r in from_state.items():
-            if f not in to_state:
-                # we new this, but now it is gone and Git is not complaining
-                # about it being missing -> properly deleted and deletion
-                # stages
-                status[f] = dict(
-                    state='deleted',
-                    type=from_state_r['type'],
-                    # report the shasum to distinguish from a plainly vanished
-                    # file
-                    gitshasum=from_state_r['gitshasum'],
-                )
-                if eval_submodule_state == 'global':
-                    return 'modified'
 
         if to is not None or eval_submodule_state == 'no':
             # if we have `to` we are specifically comparing against
