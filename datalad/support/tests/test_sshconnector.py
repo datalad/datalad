@@ -214,14 +214,18 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
 
-    # write to obscurely named file in sourcedir
-    obscure_file = opj(sourcedir, get_most_obscure_supported_name())
-    with open(obscure_file, 'w') as f:
+    # copy content of sourcefile3 to an obscurely named file in sourcedir
+    obscure_file = get_most_obscure_supported_name()
+    obscure_path = opj(sourcedir, obscure_file)
+    with open(obscure_path, 'w') as f:
         f.write("three")
 
-    # copy tempfile list to remote_url:sourcedir
-    sourcefiles = [sourcefile1, sourcefile2, obscure_file]
+    # copy first two temp files to remote_url:sourcedir
+    sourcefiles = [sourcefile1, sourcefile2]
     ssh.put(sourcefiles, opj(remote_url, sourcedir))
+    # copy obscure file to remote_url:sourcedir/'<obscure_file_name>.c opy'
+    ssh.put(obscure_path, opj(remote_url, sourcedir, obscure_file + ".c opy"))
+
     # docs promise that connection is auto-opened in case of multiplex
     if _ssh_manager_is_multiplex:
         ok_(ssh.is_open())
@@ -239,7 +243,8 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
     # check if targetfiles(and its content) exist in remote_url:targetdir,
     # this implies file(s) and recursive directory copying pass
-    for targetfile, content in zip(sourcefiles, ["one", "two", "three"]):
+    for targetfile, content in zip(sourcefiles + [obscure_file + ".c opy"],
+                                   ["one", "two", "three"]):
         targetpath = opj(targetdir, targetfile)
         ok_(exists(targetpath))
         with open(targetpath, 'r') as fp:
