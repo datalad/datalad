@@ -230,7 +230,7 @@ def test_ssh_copy(sourcedir=None, sourcefile1=None, sourcefile2=None):
     # We perform copy instead of just writing the content to the destination
     # file,  because ww want to ensure that the source file is picked up by
     # 'ssh.put()'.
-    ssh.put(obscure_path, opj(remote_url, sourcedir, obscure_file + '.c opy'))
+    ssh.put([obscure_path], opj(remote_url, sourcedir, obscure_file + '.c opy'))
 
     # docs promise that connection is auto-opened in case of multiplex
     if _ssh_manager_is_multiplex:
