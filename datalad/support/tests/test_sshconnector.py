@@ -224,6 +224,9 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     sourcefiles = [sourcefile1, sourcefile2]
     ssh.put(sourcefiles, opj(remote_url, sourcedir))
     # copy obscure file to remote_url:sourcedir/'<obscure_file_name>.c opy'
+    # we copy to a different name because the test setup maps local dir and
+    # remote dir to the same directory on the test machine. That means the file
+    # is copied onto itself. With ssh version 9 this leads to an empty file.
     ssh.put(obscure_path, opj(remote_url, sourcedir, obscure_file + ".c opy"))
 
     # docs promise that connection is auto-opened in case of multiplex
