@@ -1092,3 +1092,17 @@ def test_save_amend(dspath=None):
         )
     assert_not_in(last_sha, ds.repo.get_branch_commits_(branch))
     eq_(ds.repo.format_commit("%B", branch).strip(), "new initial commit")
+
+
+@with_tempfile
+def test_save_sub_trailing_sep_bf6547(path=None):
+    ds = Dataset(path).create()
+    # create not-yet-subdataset inside
+    subds = Dataset(ds.pathobj / 'sub').create()
+    ds.save(path='sub' + os.path.sep)
+    assert_in_results(
+        ds.subdatasets(result_renderer='disabled'),
+        path=subds.path,
+    )
+    # make sure it has the .gitmodules record
+    assert 'sub' in (ds.pathobj / '.gitmodules').read_text()

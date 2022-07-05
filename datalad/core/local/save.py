@@ -279,14 +279,16 @@ class Save(Interface):
                     sub_status = superds_status.get(subds_path, {})
                     if not (sub_status.get("state") == "clean" and
                             sub_status.get("type") == "dataset"):
-                        # TODO actually start from an entry that may already
-                        # exist in the status record
-                        superds_status[subds_path] = dict(
+                        # start from an entry that may already exist in the
+                        # status record
+                        superds_status[subds_path] = superds_status.get(
+                            subds_path,
+                            # if we got nothing yet:
                             # shot from the hip, some status config
                             # to trigger this specific super/sub
                             # relation to be saved
-                            state='untracked',
-                            type='dataset')
+                            dict(state='untracked', type='dataset')
+                        )
                 paths_by_ds[superds] = superds_status
 
         def save_ds(args, version_tag=None):
