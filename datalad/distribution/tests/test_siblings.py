@@ -513,7 +513,9 @@ def test_bf3733(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url, remotepath2, url2):
     ds = Dataset(remotepath).create()
     (ds.pathobj / 'testfile').write_text('likemagic')
     (ds.pathobj / 'testfile2').write_text('likemagic2')
@@ -521,6 +523,11 @@ def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
 
     # make clonable via HTTP
     ds.repo.call_git(['update-server-info'])
+
+    # populate location of the 2nd url, so we have two remotes with different UUIDs
+    ds2 = clone(source=remotepath, path=remotepath2)
+    ds2.get('testfile')
+    ds2.repo.call_git(['update-server-info'])
 
     # this does not work for remotes that have path URLs
     ds_frompath = clone(source=remotepath, path=viapath)
@@ -547,11 +554,19 @@ def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
         result_renderer='disabled',
     )
     assert_status('ok', res)
+
     # same thing should be possible by adding a fresh remote
+    # We need to do it on a different URL since some versions of git-annex
+    # such as 10.20220322-1~ndall+1 might refuse operate with multiple remotes
+    # with identical URLs, and otherwise just reuse the same UUID/remote
     res = ds_fromurl.siblings(
         'add',
         name='fresh',
-        url=url,
+        # we must amend the URL given by serve_path_via_http, because
+        # we are serving the root of a non-bare repository, but git-annex
+        # needs to talk to its .git (git-clone would also not eat
+        # `url` unmodified).
+        url=url2 + '.git',
         as_common_datasrc='fresh-sr',
         result_renderer='disabled',
     )
@@ -565,6 +580,12 @@ def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
     eq_('likemagic', (testbed.pathobj / 'testfile').read_text())
     # and the other one
     assert_status('ok', testbed.get('testfile2'))
+
+    # Let's get explicitly from both remotes which would not work if URL
+    # above is wrong or one of the remotes not autoenabled
+    for remote in 'mike2', 'fresh-sr':
+        assert_status('ok', testbed.drop('testfile'))
+        assert_status('ok', testbed.get('testfile', source=remote))
 
 
 @with_tempfile(mkdir=True)
