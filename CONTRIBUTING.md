@@ -122,6 +122,9 @@ we outline the workflow used by the developers:
 
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
+Our [Design Docs](http://docs.datalad.org/en/stable/design/index.html) provide a
+growing collection of insights on the command API principles and the design of
+particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
@@ -212,22 +215,6 @@ $ tributors update-lookup allcontrib
 
 And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
 look for new orcids as we did above.
-
-
-## Documentation
-
-### Docstrings
-
-We use [NumPy standard] for the description of parameters docstrings.  If you are using
-PyCharm, set your project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
-
-[NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
-
-In addition, we follow the guidelines of [Restructured Text] with the additional features and treatments
-provided by [Sphinx].
-
-[Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
-[Sphinx]: http://www.sphinx-doc.org/en/stable/
 
 ## Additional Hints
 
