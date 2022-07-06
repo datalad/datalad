@@ -251,7 +251,9 @@ script:
   # Run tests
   #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
   #  in effect, dumping too many logs.
-  - http_proxy=
+  - (set -e; for i in `seq 1 100`; do
+    echo $i;
+    http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
@@ -259,8 +261,7 @@ script:
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
       --cov=datalad
-      --pyargs
-      $TESTS_TO_PERFORM
+      --pyargs -k test_is_available ../datalad/support/tests/test_annexrepo.py; done; )
   - cd ..
 
 after_success:
