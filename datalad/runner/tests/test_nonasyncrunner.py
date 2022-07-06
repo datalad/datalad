@@ -377,8 +377,7 @@ def test_inside_async():
             (["cmd.exe", "/c"] if on_windows else []) + ["echo", "abc"],
             StdOutCapture)
 
-    loop = asyncio.get_event_loop()
-    result = loop.run_until_complete(main())
+    result = asyncio.run(main())
     eq_(result["stdout"], "abc" + os.linesep)
 
 
