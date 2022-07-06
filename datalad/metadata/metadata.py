@@ -19,6 +19,12 @@ import os.path as op
 from collections import (
     OrderedDict,
 )
+from pathlib import Path
+from typing import (
+    Dict,
+    List,
+    Optional,
+)
 
 from datalad import cfg
 from datalad.interface.annotate_paths import _minimal_annotate_paths
@@ -69,6 +75,21 @@ from datalad.consts import (
 )
 from datalad.log import log_progress
 from datalad.core.local.status import get_paths_by_ds
+
+# Check availability of new-generation metadata
+try:
+    from datalad_metalad.dump import Dump
+    from datalad_metalad.exceptions import NoMetadataStoreFound
+    next_generation_metadata_available = True
+except ImportError:
+    class NoMetadataStoreFound(Exception):
+        pass
+
+    class Dump:
+        def __call__(self, *args, **kwargs):
+            return []
+    next_generation_metadata_available = False
+
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -172,11 +193,11 @@ def _get_containingds_from_agginfo(info, rpath):
     return dspath
 
 
-def query_aggregated_metadata(reporton, ds, aps, recursive=False,
-                              **kwargs):
+def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
+                                     **kwargs):
     """Query the aggregated metadata in a dataset
 
-    Query paths (`aps`) have to be composed in an intelligent fashion
+    Query paths (`annotated_paths`) have to be composed in an intelligent fashion
     by the caller of this function, i.e. it should have been decided
     outside which dataset to query for any given path.
 
@@ -185,7 +206,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
 
     Parameters
     ----------
-    reporton : {None, 'none', 'dataset', 'files', 'all'}
+    reporton : {None, 'none', 'datasets', 'files', 'all'}
       If `None`, reporting will be based on the `type` property of the
       incoming annotated paths.
     ds : Dataset
@@ -1025,3 +1046,144 @@ class Metadata(Interface):
                  if meta else ' -' if 'metadata' in res else ' aggregated',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(ensure_list(meta['tag'])))))
+
+
+def gen4_query_aggregated_metadata(reporton: str,
+                                   ds: Dataset,
+                                   aps: List[Dict],
+                                   recursive: bool = False,
+                                   **kwargs):
+    """Query metadata in a metadata store
+
+    Query paths (`aps["path"]`) have to be contained in the poth of the ds.
+    This requirement is due to the colling conventions of the legacy
+    implementation.
+
+    This function doesn't cache anything, hence the caller must
+    make sure to only call this once per dataset to avoid waste.
+
+    Parameters
+    ----------
+    reporton : {None, 'none', 'datasets', 'files', 'all'}
+      If `None`, reporting will be based on the `type` property of the
+      incoming annotated paths.
+    ds : Dataset
+      Dataset to query
+    aps : list
+      Sequence of annotated paths to query metadata for.
+    recursive : bool
+      Whether or not to report metadata underneath all query paths
+      recursively.
+    **kwargs
+      Any other argument will be passed on to the query result dictionary.
+
+    Returns
+    -------
+    generator
+      Of result dictionaries.
+    """
+
+    annotated_paths = aps
+    dataset = ds
+
+    matching_types = {
+        None: None,
+        "files": ("file",),
+        "datasets": ("dataset",),
+        "all": ("dataset", "file")
+    }[reporton]
+
+    for annotated_path in annotated_paths:
+        relative_path = Path(annotated_path["path"]).relative_to(dataset.pathobj)
+        if matching_types is None:
+            matching_types = (annotated_path["type"],)
+
+        try:
+            for dump_result in Dump()(dataset=dataset.pathobj,
+                                      path=str(relative_path),
+                                      recursive=recursive,
+                                      result_renderer="disabled",
+                                      return_type="generator"):
+
+                if dump_result["status"] != "ok":
+                    continue
+
+                metadata = dump_result["metadata"]
+                if metadata["type"] not in matching_types:
+                    continue
+
+                yield {
+                    **kwargs,
+                    "status": "ok",
+                    "type": metadata["type"],
+                    "path": str(dump_result["path"]),
+                    "dsid": metadata["dataset_id"],
+                    "refcommit": metadata["dataset_version"],
+                    "metadata": {
+                        metadata["extractor_name"]: metadata["extracted_metadata"]
+                    }
+                }
+        except NoMetadataStoreFound:
+            yield {
+                **kwargs,
+                'path': str(ds.pathobj / relative_path),
+                'status': 'impossible',
+                'message': f'Dataset at {ds.pathobj} does not contain gen4 '
+                           f'metadata',
+                'type': matching_types
+            }
+
+    return None
+
+
+def query_aggregated_metadata(reporton: str,
+                              ds: Dataset,
+                              aps: List[Dict],
+                              recursive: bool = False,
+                              metadata_source: Optional[str] = None,
+                              **kwargs):
+    """Query legacy and NG-metadata stored in a dataset or its metadata store
+
+    Parameters
+    ----------
+    reporton : {None, 'none', 'datasets', 'files', 'all'}
+      If `None`, reporting will be based on the `type` property of the
+      incoming annotated paths.
+    ds : Dataset
+      Dataset to query
+    aps : list
+      Sequence of annotated paths to query metadata for.
+    recursive : bool
+      Whether or not to report metadata underneath all query paths
+      recursively.
+    metadata_source : Optional[str]
+      Metadata source that should be used. If set to "legacy", only metadata
+      prior metalad version 0.3.0 will be queried, if set to "gen4", only
+      metadata of metalad version 0.3.0 and beyond will be queried, if set
+      to 'None', all known metadata will be queried.
+    **kwargs
+      Any other argument will be passed on to the query result dictionary.
+
+    Returns
+    -------
+    generator
+      Of result dictionaries.
+    """
+
+    if metadata_source in (None, "legacy"):
+        yield from legacy_query_aggregated_metadata(
+            reporton=reporton,
+            ds=ds,
+            aps=aps,
+            recursive=recursive,
+            **kwargs
+        )
+
+    if metadata_source in (None, "gen4") and next_generation_metadata_available:
+        yield from gen4_query_aggregated_metadata(
+            reporton=reporton,
+            ds=ds,
+            aps=aps,
+            recursive=recursive,
+            **kwargs
+        )

@@ -11,7 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-import collections
 import logging
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
@@ -26,18 +25,29 @@ import sys
 from time import time
 
 from datalad import cfg
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
-from datalad.interface.utils import eval_results
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
-    require_dataset
-from datalad.support.gitrepo import GitRepo
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureInt
-
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
+from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import (
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
+from datalad.dochelpers import single_or_plural
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.utils import eval_results
+from datalad.support.constraints import (
+    EnsureInt,
+    EnsureNone,
+)
+from datalad.support.exceptions import (
+    CapturedException,
+    NoDatasetFound,
+)
+from datalad.support.param import Parameter
+from datalad.ui import ui
 from datalad.utils import (
     as_unicode,
     ensure_list,
@@ -46,12 +56,6 @@ from datalad.utils import (
     shortened_repr,
     unicode_srctypes,
 )
-from datalad.support.exceptions import (
-    CapturedException,
-    NoDatasetFound,
-)
-from datalad.ui import ui
-from datalad.dochelpers import single_or_plural
 from datalad.metadata.metadata import query_aggregated_metadata
 
 # TODO: consider using plain as_unicode, without restricting
@@ -309,8 +313,9 @@ def _search_from_virgin_install(dataset, query):
 
 
 class _Search(object):
-    def __init__(self, ds, **kwargs):
+    def __init__(self, ds, metadata_source=None, **kwargs):
         self.ds = ds
+        self.metadata_source = metadata_source
         self.documenttype = self.ds.config.obtain(
             'datalad.search.index-{}-documenttype'.format(self._mode_label),
             default=self._default_documenttype)
@@ -345,8 +350,8 @@ class _Search(object):
 
 
 class _WhooshSearch(_Search):
-    def __init__(self, ds, force_reindex=False, **kwargs):
-        super(_WhooshSearch, self).__init__(ds, **kwargs)
+    def __init__(self, ds, metadata_source=None, force_reindex=False, **kwargs):
+        super(_WhooshSearch, self).__init__(ds, metadata_source, **kwargs)
 
         self.idx_obj = None
         # where does the bunny have the eggs?
@@ -505,7 +510,8 @@ class _WhooshSearch(_Search):
                 aps=[dict(path=self.ds.path, type='dataset')],
                 # MIH: I cannot see a case when we would not want recursion (within
                 # the metadata)
-                recursive=True):
+                recursive=True,
+                metadata_source=self.metadata_source):
             # this assumes that files are reported after each dataset report,
             # and after a subsequent dataset report no files for the previous
             # dataset will be reported again
@@ -624,7 +630,8 @@ class _WhooshSearch(_Search):
                         ds=self.ds,
                         aps=annotated_hits,
                         # never recursive, we have direct hits already
-                        recursive=False):
+                        recursive=False,
+                        metadata_source=self.metadata_source):
                     res.update(
                         refds=self.ds.path,
                         action='search',
@@ -728,7 +735,8 @@ class _AutofieldSearch(_WhooshSearch):
                 reporton='datasets',
                 ds=self.ds,
                 aps=[dict(path=self.ds.path, type='dataset')],
-                recursive=True):
+                recursive=True,
+                metadata_source=self.metadata_source):
             meta = res.get('metadata', {})
             # no stringification of values for speed, we do not need/use the
             # actual values at this point, only the keys
@@ -765,8 +773,8 @@ class _EGrepCSSearch(_Search):
     _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
-    def __init__(self, ds, **kwargs):
-        super(_EGrepCSSearch, self).__init__(ds, **kwargs)
+    def __init__(self, ds, metadata_source=None, **kwargs):
+        super(_EGrepCSSearch, self).__init__(ds, metadata_source, **kwargs)
         self._queried_keys = None  # to be memoized by get_query
 
     # If there were custom "per-search engine" options, we could expose
@@ -785,7 +793,8 @@ class _EGrepCSSearch(_Search):
                 aps=[dict(path=self.ds.path, type='dataset')],
                 # MIH: I cannot see a case when we would not want recursion (within
                 # the metadata)
-                recursive=True):
+                recursive=True,
+                metadata_source=self.metadata_source):
             # this assumes that files are reported after each dataset report,
             # and after a subsequent dataset report no files for the previous
             # dataset will be reported again
@@ -913,7 +922,8 @@ class _EGrepCSSearch(_Search):
                 reporton='datasets',
                 ds=self.ds,
                 aps=[dict(path=self.ds.path, type='dataset')],
-                recursive=True):
+                recursive=True,
+                metadata_source=self.metadata_source):
             meta = res.get('metadata', {})
             # inject a few basic properties into the dict
             # analog to what the other modes do in their index
@@ -1304,6 +1314,16 @@ class Search(Interface):
             doc="""if given, the formal query that was generated from the given
             query string is shown, but not actually executed. This is mostly useful
             for debugging purposes."""),
+        metadata_source=Parameter(
+            args=('--metadata-source',),
+            choices=('legacy', 'gen4'),
+            default=None,
+            doc="""if given, defines which metadata source will be used to
+            search. 'legacy' will limit search to metadata in the old format,
+            i.e. stored in '$DATASET/.datalad/metadata'. 'gen4' will limit
+            search to metadata stored by the git-backend of 
+            'datalad-metadata-model'. If not given, metadata from all supported
+            sources will be included in search.""")
     )
 
     @staticmethod
@@ -1317,7 +1337,8 @@ class Search(Interface):
                  mode=None,
                  full_record=False,
                  show_keys=None,
-                 show_query=False):
+                 show_query=False,
+                 metadata_source=None):
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
@@ -1347,7 +1368,8 @@ class Search(Interface):
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
 
-        searcher = searcher(ds, force_reindex=force_reindex)
+        searcher = searcher(
+            ds, metadata_source=metadata_source, force_reindex=force_reindex)
 
         if show_keys:
             searcher.show_keys(show_keys, regexes=query)
