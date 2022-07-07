@@ -83,7 +83,11 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
     # References:
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
-    return md5(
+
+    # The "# nosec" below skips insecure hash checks by 'codeclimate'. The hash
+    # is not security critical, since it is only used as an "abbreviation" of
+    # the unique connection property string.
+    return md5(         # nosec
         '{lhost}{rhost}{port}{identity_file}{username}{force_ip}'.format(
             lhost=gethostname(),
             rhost=hostname,
