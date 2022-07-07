@@ -2,8 +2,66 @@
 
 Change log
 **********
+0.16.7 (Wed Jul 06 2022)
+========================
+
+Bug Fix
+-------
+
+-  Fix broken annex symlink after git-mv before saving + fix a race
+   condition in ssh copy test
+   `#6809 <https://github.com/datalad/datalad/pull/6809>`__
+   (`@christian-monch <https://github.com/christian-monch>`__
+   `@mih <https://github.com/mih>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  Do not ignore already known status info on submodules
+   `#6790 <https://github.com/datalad/datalad/pull/6790>`__
+   (`@mih <https://github.com/mih>`__)
+-  Fix “common data source” test to use a valid URL (maint-based &
+   extended edition)
+   `#6788 <https://github.com/datalad/datalad/pull/6788>`__
+   (`@mih <https://github.com/mih>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+-  Upload coverage from extension tests to Codecov
+   `#6781 <https://github.com/datalad/datalad/pull/6781>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  Clean up line end handling in GitRepo
+   `#6768 <https://github.com/datalad/datalad/pull/6768>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  Do not skip file-URL tests on windows
+   `#6772 <https://github.com/datalad/datalad/pull/6772>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  Fix test errors caused by updated chardet v5 release
+   `#6777 <https://github.com/datalad/datalad/pull/6777>`__
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  Preserve final trailing slash in ``call_git()`` output
+   `#6754 <https://github.com/datalad/datalad/pull/6754>`__
+   (`@adswa <https://github.com/adswa>`__
+   `@yarikoptic <https://github.com/yarikoptic>`__
+   `@christian-monch <https://github.com/christian-monch>`__)
+
+Pushed to ``maint``
+-------------------
+
+-  Make sure a subdataset is saved with a complete .gitmodules record
+   (`@mih <https://github.com/mih>`__)
+
+Authors: 5
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Christian Mnch
+   (`@christian-monch <https://github.com/christian-monch>`__)
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.16.6 (Tue Jun 14 2022)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -32,7 +90,7 @@ Authors: 2
 0.16.5 (Wed Jun 08 2022)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -56,7 +114,7 @@ Authors: 1
 0.16.4 (Thu Jun 02 2022)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -97,7 +155,7 @@ Authors: 3
 0.16.3 (Thu May 12 2022)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -148,7 +206,7 @@ Authors: 4
 0.16.2 (Thu Apr 21 2022)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -174,12 +232,16 @@ Bug Fix
    `#6624 <https://github.com/datalad/datalad/pull/6624>`__
    (`@bpoldrack <https://github.com/bpoldrack>`__)
 
+.. _pushed-to-maint-1:
+
 Pushed to ``maint``
 -------------------
 
 -  Fix typo in changelog (`@mih <https://github.com/mih>`__)
 -  [ci skip] minor typo fix
    (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _authors-5-1:
 
 Authors: 5
 ----------
@@ -877,7 +939,7 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -914,7 +976,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -949,7 +1011,7 @@ Bug Fix
    `#6319 <https://github.com/datalad/datalad/pull/6319>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _authors-5-1:
+.. _authors-5-2:
 
 Authors: 5
 ----------
@@ -965,7 +1027,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1050,7 +1112,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-8:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1086,7 +1148,7 @@ Bug Fix
    `#6022 <https://github.com/datalad/datalad/pull/6022>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _pushed-to-maint-1:
+.. _pushed-to-maint-2:
 
 Pushed to ``maint``
 -------------------
@@ -1154,7 +1216,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-9:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1205,7 +1267,7 @@ Tests
    `#6023 <https://github.com/datalad/datalad/pull/6023>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _authors-5-2:
+.. _authors-5-3:
 
 Authors: 5
 ----------
@@ -1221,7 +1283,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-10:
+.. _bug-fix-11:
 
 Bug Fix
 -------
@@ -1240,7 +1302,7 @@ Bug Fix
    `#5983 <https://github.com/datalad/datalad/pull/5983>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _pushed-to-maint-2:
+.. _pushed-to-maint-3:
 
 Pushed to ``maint``
 -------------------
@@ -1636,7 +1698,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-11:
+.. _bug-fix-12:
 
 Bug Fix
 -------
@@ -1683,7 +1745,7 @@ Bug Fix
    it for get `#5708 <https://github.com/datalad/datalad/pull/5708>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _pushed-to-maint-3:
+.. _pushed-to-maint-4:
 
 Pushed to ``maint``
 -------------------
@@ -1744,7 +1806,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-12:
+.. _bug-fix-13:
 
 Bug Fix
 -------
@@ -1846,7 +1908,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-13:
+.. _bug-fix-14:
 
 Bug Fix
 -------
@@ -1927,7 +1989,7 @@ Bug Fix
    (`@kyleam <https://github.com/kyleam>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _pushed-to-maint-4:
+.. _pushed-to-maint-5:
 
 Pushed to ``maint``
 -------------------

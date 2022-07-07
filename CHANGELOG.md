@@ -1,3 +1,30 @@
+# 0.16.7 (Wed Jul 06 2022)
+
+#### 🐛 Bug Fix
+
+- Fix broken annex symlink after git-mv before saving + fix a race condition in ssh copy test [#6809](https://github.com/datalad/datalad/pull/6809) ([@christian-monch](https://github.com/christian-monch) [@mih](https://github.com/mih) [@yarikoptic](https://github.com/yarikoptic))
+- Do not ignore already known status info on submodules [#6790](https://github.com/datalad/datalad/pull/6790) ([@mih](https://github.com/mih))
+- Fix "common data source" test to use a valid URL (maint-based & extended edition) [#6788](https://github.com/datalad/datalad/pull/6788) ([@mih](https://github.com/mih) [@yarikoptic](https://github.com/yarikoptic))
+- Upload coverage from extension tests to Codecov [#6781](https://github.com/datalad/datalad/pull/6781) ([@jwodder](https://github.com/jwodder))
+- Clean up line end handling in GitRepo [#6768](https://github.com/datalad/datalad/pull/6768) ([@christian-monch](https://github.com/christian-monch))
+- Do not skip file-URL tests on windows [#6772](https://github.com/datalad/datalad/pull/6772) ([@christian-monch](https://github.com/christian-monch))
+- Fix test errors caused by updated chardet v5 release [#6777](https://github.com/datalad/datalad/pull/6777) ([@christian-monch](https://github.com/christian-monch))
+- Preserve final trailing slash in ``call_git()`` output [#6754](https://github.com/datalad/datalad/pull/6754) ([@adswa](https://github.com/adswa) [@yarikoptic](https://github.com/yarikoptic) [@christian-monch](https://github.com/christian-monch))
+
+#### ⚠️ Pushed to `maint`
+
+- Make sure a subdataset is saved with a complete .gitmodules record ([@mih](https://github.com/mih))
+
+#### Authors: 5
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.16.6 (Tue Jun 14 2022)
 
 #### 🐛 Bug Fix
