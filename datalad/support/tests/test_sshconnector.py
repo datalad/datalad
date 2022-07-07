@@ -256,8 +256,7 @@ def test_ssh_copy(sourcedir=None, sourcefile1=None, sourcefile2=None):
 
     # and now a quick smoke test for get
     # but simplify the most obscure filename slightly to not trip `scp` itself
-    togetfile = Path(targetdir) / (
-        get_most_obscure_supported_name().replace('`', '') + '2')
+    togetfile = Path(targetdir) / (obscure_file.replace('`', '') + '2')
     togetfile.write_text(str('something'))
     ssh.get(opj(remote_url, str(togetfile)), sourcedir)
     ok_((Path(sourcedir) / togetfile.name).exists())
