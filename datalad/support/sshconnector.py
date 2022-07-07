@@ -16,6 +16,7 @@ git calls to a ssh remote without the need to reauthenticate.
 import fasteners
 import os
 import logging
+import re
 from socket import gethostname
 from hashlib import md5
 from subprocess import Popen
@@ -215,13 +216,39 @@ class BaseSSHConnection(object):
 
     @property
     def ssh_version(self):
+        """
+        Determine name and version of the ssh-client.
+
+        Returns
+        -------
+        Tuple[str, int, int, int]
+          - first element of the result is the name of the client or '?' if the
+            client is unknown
+          - second element of the result is the version number or 0 if the
+            client is unknown
+          - third element of the result is the sub-version number or 0 if the
+            client is unknown
+          - fourth element of the result is the patch number or 0 if the
+            client is unknown
+        """
         if self._ssh_version is None:
             result = self.runner.run(
                 [self.ssh_executable, "-V"],
-                protocol=StdErrCapture
-            )
-            version_string = result["stderr"].split(".")[0].split("_")[1]
-            self._ssh_version = int(version_string)
+                protocol=StdErrCapture)
+
+            version_string = result["stderr"].strip()
+            # Check for OpenSSH version
+            match = re.match(
+                "OpenSSH_([0-9][0-9]*)\\.([0-9][0-9]*)(p([0-9][0-9]*))?",
+                version_string)
+            if match:
+                self._ssh_version = (
+                    "OpenSSH",
+                    int(match.groups()[0] or "0"),
+                    int(match.groups()[1] or "0"),
+                    int(match.groups()[3] or "0"))
+            else:
+                self._ssh_version = ("?", 0, 0, 0)
         return self._ssh_version
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
@@ -269,9 +296,10 @@ class BaseSSHConnection(object):
         return ["scp"] + scp_options
 
     def _quote_filename(self, filename):
-        if self.ssh_version < 9:
-            return _quote_filename_for_scp(filename)
-        return filename
+        if self.ssh_version[0] == "OpenSSH" and self.ssh_version[1] >= 9:
+            # no filename quoting for OpenSSH version 9 and above
+            return filename
+        return _quote_filename_for_scp(filename)
 
     def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
