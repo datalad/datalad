@@ -39,6 +39,7 @@ from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
 )
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_equal,
@@ -59,6 +60,7 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     serve_path_via_http,
+    skip_if,
     skip_if_adjusted_branch,
     swallow_outputs,
     with_tempfile,
@@ -513,6 +515,12 @@ class TestAddArchiveOptions():
                                     delete=True)
         assert_false(lexists(self.ds.pathobj / '1.tar'))
 
+    # git-annex regression
+    # https://git-annex.branchable.com/bugs/regression__58___annex_add_of_moved_file_errors_out/
+    @skip_if(
+        '10.20220624' <= external_versions['cmd:annex'] < '10.20220706',  # approx when was fixed
+        msg="buggy git-annex release"
+    )
     def test_add_archive_leading_dir(self):
         import os
         os.mkdir(self.ds.pathobj / 'sub')
