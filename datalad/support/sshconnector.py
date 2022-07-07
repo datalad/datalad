@@ -45,6 +45,7 @@ from datalad.utils import (
 )
 from datalad.cmd import (
     NoCapture,
+    StdErrCapture,
     StdOutErrCapture,
     WitlessRunner,
 )
@@ -127,6 +128,7 @@ class BaseSSHConnection(object):
         """
         self._runner = None
         self._ssh_executable = None
+        self._ssh_version = None
 
         from datalad.support.network import SSHRI, is_ssh
         if not is_ssh(sshri):
@@ -207,6 +209,17 @@ class BaseSSHConnection(object):
             self._runner = WitlessRunner()
         return self._runner
 
+    @property
+    def ssh_version(self):
+        if self._ssh_version is None:
+            result = self.runner.run(
+                [self.ssh_executable, "-V"],
+                protocol=StdErrCapture
+            )
+            version_string = result["stderr"].split(".")[0].split("_")[1]
+            self._ssh_version = int(version_string)
+        return self._ssh_version
+
     def _adjust_cmd_for_bundle_execution(self, cmd):
         from datalad import cfg
         # locate annex and set the bundled vs. system Git machinery in motion
@@ -251,6 +264,11 @@ class BaseSSHConnection(object):
         scp_options += ["-p"] if preserve_attrs else []
         return ["scp"] + scp_options
 
+    def _quote_filename(self, filename):
+        if self.ssh_version < 9:
+            return _quote_filename_for_scp(filename)
+        return filename
+
     def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
@@ -285,7 +303,7 @@ class BaseSSHConnection(object):
         # add destination path
         scp_cmd += ['%s:%s' % (
             self.sshri.hostname,
-            _quote_filename_for_scp(destination),
+            self._quote_filename(destination),
         )]
         out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
         return out['stdout'], out['stderr']
@@ -320,7 +338,7 @@ class BaseSSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
-        scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
+        scp_cmd += ["%s:%s" % (self.sshri.hostname, self._quote_filename(s))
                     for s in ensure_list(source)]
         # add destination path
         scp_cmd += [destination]
