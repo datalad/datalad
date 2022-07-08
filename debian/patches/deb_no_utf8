@@ -12,7 +12,7 @@ Last-Update: 2018-06-05
 
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -64,7 +64,7 @@ novalue
+@@ -63,7 +63,7 @@ novalue
  empty =
  myint = 3
  
@@ -21,7 +21,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -137,16 +137,16 @@ def test_something(path, new_home):
+@@ -138,16 +138,16 @@ def test_something(path=None, new_home=N
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -41,7 +41,7 @@ Last-Update: 2018-06-05
           ('something.empty', ''),
           ('something.myint', '3'),
           ('something.novalue', None),
-@@ -166,7 +166,7 @@ def test_something(path, new_home):
+@@ -167,7 +167,7 @@ def test_something(path=None, new_home=N
          cfg.get('something.user', get_all=True),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -50,7 +50,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      # git demands a key without value at all to be used as a flag, thus True
-@@ -185,8 +185,8 @@ def test_something(path, new_home):
+@@ -186,8 +186,8 @@ def test_something(path=None, new_home=N
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -63,7 +63,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_section('unheard.of'))
 --- a/datalad/core/local/tests/test_run.py
 +++ b/datalad/core/local/tests/test_run.py
-@@ -184,29 +184,29 @@ def test_py2_unicode_command(path):
+@@ -184,29 +184,29 @@ def test_py2_unicode_command(path=None):
      touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
      cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                          touch_cmd,
@@ -103,7 +103,7 @@ Last-Update: 2018-06-05
  
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1527,7 +1527,9 @@ def with_parametric_batch(t):
+@@ -1787,7 +1787,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -118,7 +118,7 @@ Last-Update: 2018-06-05
 +++ b/datalad/runner/tests/test_witless_runner.py
 @@ -56,7 +56,7 @@ from .utils import py2cmd
  @with_tempfile
- def test_runner(tempfile):
+ def test_runner(tempfile=None):
      runner = Runner()
 -    content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
 +    content = 'Testing real run'

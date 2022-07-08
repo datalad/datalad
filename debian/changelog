@@ -1,3 +1,10 @@
+datalad (0.17.0-1) unstable; urgency=medium
+
+  * Fresh upstream release
+    - switched to pytest from nose, d/{control,rules} were adjusted
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 08 Jul 2022 15:10:03 -0400
+
 datalad (0.16.5-1) unstable; urgency=medium
 
   * Fresh upstream maintenance release

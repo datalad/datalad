@@ -6,7 +6,7 @@ export PYBUILD_NAME = datalad
 # Excluding 
 # - test_datalad_credential_helper since wants interaction
 #   https://github.com/datalad/datalad/issues/6623
-export PYBUILD_TEST_ARGS = -s -v -e test_datalad_credential_helper
+export PYBUILD_TEST_ARGS = -s -v 
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=
 export https_proxy=
@@ -37,7 +37,7 @@ override_dh_auto_test:
 #	# Since pybuild overrides HOME for its own purposes, we will rely on our
 #	# setup_package placing it back into HOME
 	PATH=$(CURDIR)/bin:$$PATH \
-	    dh_auto_test -- --test-nose
+	    dh_auto_test -- --test-pytest
 
 
 override_dh_auto_install:

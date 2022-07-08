@@ -11,6 +11,6 @@ Last-Modified: 2019-09-06
  
 -PYTHON ?= python
 +PYTHON ?= python3
- NOSETESTS ?= $(PYTHON) -m nose
  
  MODULE ?= datalad
+ 
