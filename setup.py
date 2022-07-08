@@ -26,7 +26,7 @@ from _datalad_build_support.setup import (
 requires = {
     'core': [
         'platformdirs',
-        'chardet>=3.0.4',      # rarely used but small/omnipresent
+        'chardet>=3.0.4, <5.0.0',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
@@ -58,7 +58,9 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
-        'nose>=1.3.4',
+        'pytest~=7.0',
+        'pytest-cov~=3.0',
+        'pytest-fail-slow~=0.2',
         'vcrpy',
     ],
     'metadata': [
@@ -82,6 +84,7 @@ requires['full'] = sum(list(requires.values()), [])
 # Now add additional ones useful for development
 requires.update({
     'devel-docs': [
+        'nose>=1.3.4',
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
@@ -91,7 +94,6 @@ requires.update({
     'devel-utils': [
         'asv',        # benchmarks
         'gprof2dot',  # rendering cProfile output as a graph image
-        'nose-timer',
         'psutil',
         'coverage',
         # disable for now, as it pulls in ipython 6, which is PY3 only

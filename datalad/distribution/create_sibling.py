@@ -695,8 +695,6 @@ class CreateSibling(Interface):
                     annex=None,
                     untracked='no',
                     recursive=True,
-                    # save cycles, we are only looking for datasets
-                    eval_file_type=False,
                     datasets_only=True,
                 )
                 # not installed subdatasets would be 'clean' so we would skip them

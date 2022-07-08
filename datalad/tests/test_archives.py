@@ -7,8 +7,11 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import itertools
 import os
 from unittest.mock import patch
+
+import pytest
 
 from datalad import cfg as dl_cfg
 from datalad.support import path as op
@@ -21,7 +24,7 @@ from datalad.support.archives import (
 )
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
     assert_false,
@@ -63,7 +66,7 @@ tree_simplearchive = dict(
 if on_windows:
 
     def test_unixify_path():
-        from ..tests.utils import eq_
+        from ..tests.utils_pytest import eq_
         eq_(unixify_path(r"a"), "a")
         eq_(unixify_path(r"c:\buga"), "/c/buga")
         eq_(unixify_path(r"c:\buga\duga.dat"), "/c/buga/duga.dat")
@@ -71,7 +74,7 @@ if on_windows:
 
 
 @with_tree(**tree_simplearchive)
-def check_decompress_file(leading_directories, path):
+def check_decompress_file(leading_directories, path=None):
     outdir = op.join(path, 'simple-extracted')
 
     with swallow_outputs() as cmo:
@@ -97,10 +100,14 @@ def check_decompress_file(leading_directories, path):
         eq_(f.read(), '3 load')
 
 
-def test_decompress_file():
-    yield check_decompress_file, None
-    yield check_decompress_file, 'strip'
-    yield assert_raises, NotImplementedError, check_decompress_file, "unknown"
+@pytest.mark.parametrize("leading", [None, 'strip'])
+def test_decompress_file(leading):
+    return check_decompress_file(leading)
+
+
+def test_decompress_file_unknown():
+    with pytest.raises(NotImplementedError):
+        check_decompress_file("unknown")
 
 
 @with_tree((('empty', ''),
@@ -110,7 +117,7 @@ def test_decompress_file():
                     ),),
             ))))
 @with_tempfile()
-def check_compress_dir(ext, path, name):
+def check_compress_dir(ext, path=None, name=None):
     archive = name + ext
     compress_files([os.path.basename(path)], archive,
                    path=os.path.dirname(path))
@@ -121,14 +128,19 @@ def check_compress_dir(ext, path, name):
     assert_true(op.exists(op.join(name_extracted, 'd1', 'd2', 'f1')))
 
 
-def test_compress_dir():
-    yield check_compress_dir, '.tar.xz'
-    yield check_compress_dir, '.tar.gz'
-    yield check_compress_dir, '.tgz'
-    yield check_compress_dir, '.tbz2'
-    yield check_compress_dir, '.tar'
-    yield check_compress_dir, '.zip'
-    yield check_compress_dir, '.7z'
+@pytest.mark.parametrize(
+    "ext",
+    ['.tar.xz',
+     '.tar.gz',
+     '.tgz',
+     '.tbz2',
+     '.tar',
+     '.zip',
+     '.7z',
+     ]
+)
+def test_compress_dir(ext):
+    return check_compress_dir(ext)
 
 
 # space in the filename to test for correct quotations etc
@@ -139,7 +151,7 @@ _filename = 'fi le.dat'
          msg="Known to fail if p7zip is not installed")
 @with_tree(((_filename, 'content'),))
 @with_tempfile()
-def check_compress_file(ext, annex, path, name):
+def check_compress_file(ext, annex, path=None, name=None):
     # we base the archive name on the filename, in order to also
     # be able to properly test compressors where the corresponding
     # archive format has no capability of storing a filename
@@ -167,16 +179,20 @@ def check_compress_file(ext, annex, path, name):
     ok_file_has_content(_filepath, 'content')
 
 
-def test_compress_file():
-    for annex in True, False:
-        yield check_compress_file, '.xz', annex
-        yield check_compress_file, '.gz', annex
-        yield check_compress_file, '.zip', annex
-        yield check_compress_file, '.7z', annex
+@pytest.mark.parametrize(
+    "ext,annex",
+    list(
+        itertools.product(
+            ['.xz', '.gz', '.zip', '.7z'],
+            [True, False])
+    )
+)
+def test_compress_file(ext, annex):
+    check_compress_file(ext, annex)
 
 
 @with_tree(**tree_simplearchive)
-def test_ExtractedArchive(path):
+def test_ExtractedArchive(path=None):
     archive = op.join(path, fn_archive_obscure_ext)
     earchive = ExtractedArchive(archive)
     assert_false(op.exists(earchive.path))
@@ -206,8 +222,7 @@ def test_ExtractedArchive(path):
     if not dl_cfg.get('datalad.tests.temp.keep'):
         assert_false(op.exists(earchive.path))
 
-#@with_tree(**tree_simplearchive)
-#@with_tree(**tree_simplearchive)
+
 def test_ArchivesCache():
     # we don't actually need to test archives handling itself
     path1 = "/zuba/duba"
@@ -233,23 +248,24 @@ def test_ArchivesCache():
     assert_false(op.exists(cache_path))
 
 
-def _test_get_leading_directory(ea, return_value, target_value, kwargs={}):
+@pytest.mark.parametrize(
+    "return_value,target_value,kwargs",
+    [
+        ([], None, {}),
+        (['file.txt'], None, {}),
+        (['file.txt', op.join('d', 'f')], None, {}),
+        ([op.join('d', 'f'), op.join('d', 'f2')], 'd', {}),
+        ([op.join('d', 'f'), op.join('d', 'f2')], 'd', {'consider': 'd'}),
+        ([op.join('d', 'f'), op.join('d', 'f2')], None, {'consider': 'dd'}),
+        ([op.join('d', 'f'), op.join('d2', 'f2')], None, {}),
+        ([op.join('d', 'd2', 'f'), op.join('d', 'd2', 'f2')], op.join('d', 'd2'), {}),
+        ([op.join('d', 'd2', 'f'), op.join('d', 'd2', 'f2')], 'd', {'depth': 1}),
+        # with some parasitic files
+        ([op.join('d', 'f'), op.join('._d')], 'd', {'exclude': [r'\._.*']}),
+        ([op.join('d', 'd1', 'f'), op.join('d', '._d'), '._x'], op.join('d', 'd1'), {'exclude': [r'\._.*']}),
+    ]
+)
+def test_get_leading_directory(return_value, target_value, kwargs):
+    ea = ExtractedArchive('/some/bogus', '/some/bogus')
     with patch.object(ExtractedArchive, 'get_extracted_files', return_value=return_value):
         eq_(ea.get_leading_directory(**kwargs), target_value)
-
-
-def test_get_leading_directory():
-    ea = ExtractedArchive('/some/bogus', '/some/bogus')
-    yield _test_get_leading_directory, ea, [], None
-    yield _test_get_leading_directory, ea, ['file.txt'], None
-    yield _test_get_leading_directory, ea, ['file.txt', op.join('d', 'f')], None
-    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('d', 'f2')], 'd'
-    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('d', 'f2')], 'd', {'consider': 'd'}
-    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('d', 'f2')], None, {'consider': 'dd'}
-    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('d2', 'f2')], None
-    yield _test_get_leading_directory, ea, [op.join('d', 'd2', 'f'), op.join('d', 'd2', 'f2')], op.join('d', 'd2')
-    yield _test_get_leading_directory, ea, [op.join('d', 'd2', 'f'), op.join('d', 'd2', 'f2')], 'd', {'depth': 1}
-    # with some parasitic files
-    yield _test_get_leading_directory, ea, [op.join('d', 'f'), op.join('._d')], 'd', {'exclude': [r'\._.*']}
-    yield _test_get_leading_directory, ea, [op.join('d', 'd1', 'f'), op.join('d', '._d'), '._x'], op.join('d', 'd1'), {'exclude': [r'\._.*']}
-

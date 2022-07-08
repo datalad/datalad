@@ -8,7 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test XMP extractor"""
 
-from datalad.tests.utils import (
+import pytest
+
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_repo_status,
     assert_result_count,
@@ -18,15 +20,16 @@ from datalad.tests.utils import (
     with_tempfile,
 )
 
-skip_if_no_module('libxmp')
+try:
+    import libxmp
+except Exception as e:
+    pytestmark = pytest.mark.skip(reason=f"Module 'libxmp' failed to load: {e}")
 
+from os.path import dirname
+from os.path import join as opj
 from shutil import copy
-from os.path import (
-    dirname,
-    join as opj,
-)
-from datalad.api import Dataset
 
+from datalad.api import Dataset
 
 target = {
     'dc:creator': 'Michael Hanke',
@@ -44,7 +47,7 @@ target = {
 
 
 @with_tempfile(mkdir=True)
-def test_xmp(path):
+def test_xmp(path=None):
     ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'xmp', scope='branch')
     copy(

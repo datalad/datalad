@@ -91,7 +91,6 @@ Miscellaneous commands
    :toctree: generated
 
    api.add_archive_content
-   api.test
    api.add_readme
    api.addurls
    api.check_dates

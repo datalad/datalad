@@ -9,21 +9,23 @@
 
 import logging
 import os.path as op
+from functools import wraps
 from unittest.mock import patch
 
 from datalad import cfg as dl_cfg
 from datalad.api import (
+    Dataset,
     clone,
-    Dataset
 )
-from datalad.tests.utils import (
-    attr,
+from datalad.support.network import get_local_file_url
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_status,
+    attr,
     chpwd,
     eq_,
     known_failure_githubci_win,
@@ -37,8 +39,6 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import Path
-from functools import wraps
-from datalad.support.network import get_local_file_url
 
 
 def with_store_insteadof(func):
@@ -66,7 +66,7 @@ def with_store_insteadof(func):
 
 
 @with_tempfile
-def test_invalid_calls(path):
+def test_invalid_calls(path=None):
 
     ds = Dataset(path).create()
 
@@ -93,7 +93,7 @@ def test_invalid_calls(path):
             'sub': {'other.txt': 'other'},
             'sub2': {'evenmore.txt': 'more'}})
 @with_tempfile(mkdir=True)
-def _test_create_store(host, base_path, ds_path, clone_path):
+def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
 
     ds = Dataset(ds_path).create(force=True)
 
@@ -192,9 +192,9 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 @slow  # 11 + 42 sec on travis
 def test_create_simple():
 
-    yield _test_create_store, None
+    _test_create_store(None)
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
+    skip_if_on_windows(skip_ssh(_test_create_store))('datalad-test')
 
 
 @skip_ssh
@@ -204,7 +204,7 @@ def test_create_simple():
             'sub': {'other.txt': 'other'},
             'sub2': {'evenmore.txt': 'more'}})
 @with_tempfile
-def test_create_push_url(detection_path, ds_path, store_path):
+def test_create_push_url(detection_path=None, ds_path=None, store_path=None):
 
     store_path = Path(store_path)
     ds_path = Path(ds_path)
@@ -264,7 +264,7 @@ def test_create_push_url(detection_path, ds_path, store_path):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_create_alias(ds_path, ria_path, clone_path):
+def test_create_alias(ds_path=None, ria_path=None, clone_path=None):
     ds_path = Path(ds_path)
     clone_path = Path(clone_path)
 
@@ -310,7 +310,7 @@ def test_create_alias(ds_path, ria_path, clone_path):
 @skip_if_on_windows  # ORA remote is incompatible with windows clients
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})
-def test_storage_only(base_path, ds_path):
+def test_storage_only(base_path=None, ds_path=None):
     store_url = 'ria+' + get_local_file_url(base_path)
 
     ds = Dataset(ds_path).create(force=True)
@@ -337,7 +337,7 @@ def test_storage_only(base_path, ds_path):
 @with_tempfile
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})
-def test_no_storage(store1, store2, ds_path):
+def test_no_storage(store1=None, store2=None, ds_path=None):
     store1_url = 'ria+' + get_local_file_url(store1)
     store2_url = 'ria+' + get_local_file_url(store2)
 
@@ -353,7 +353,7 @@ def test_no_storage(store1, store2, ds_path):
 
     # deprecated way of disabling storage still works
     res = ds.create_sibling_ria(store2_url, "datastore2",
-                                disable_storage__=True, new_store_ok=True)
+                                storage_sibling=False, new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_({'datastore2', 'datastore1', 'here'},
         {s['name'] for s in ds.siblings(result_renderer='disabled')})
@@ -372,7 +372,7 @@ def test_no_storage(store1, store2, ds_path):
 
 
 @with_tempfile
-def test_no_store(path):
+def test_no_store(path=None):
     ds = Dataset(path).create()
     # check that we fail without '--new-store-ok' when there is no store
     assert_result_count(

@@ -32,7 +32,7 @@ from datalad.distributed.tests.ria_utils import (
     populate_dataset,
 )
 from datalad.support.exceptions import CommandError
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_false,
@@ -164,7 +164,7 @@ def _test_initremote_basic(url, io, store, ds_path, link):
 @known_failure_windows
 @skip_ssh
 @with_tempfile
-def test_initremote_basic_sshurl(storepath):
+def test_initremote_basic_sshurl(storepath=None):
     _test_initremote_basic(
         'ria+ssh://datalad-test{}'.format(Path(storepath).as_posix()), \
         SSHRemoteIO('datalad-test'), \
@@ -175,7 +175,7 @@ def test_initremote_basic_sshurl(storepath):
 # ora remote cannot handle windows file:// URLs
 @known_failure_windows
 @with_tempfile
-def test_initremote_basic_fileurl(storepath):
+def test_initremote_basic_fileurl(storepath=None):
     _test_initremote_basic(
         "ria+{}".format(Path(storepath).as_uri()),
         LocalIO(),
@@ -187,7 +187,7 @@ def test_initremote_basic_fileurl(storepath):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_initremote_basic_httpurl(storepath, storeurl):
+def test_initremote_basic_httpurl(storepath=None, storeurl=None):
     _test_initremote_basic(
         f"ria+{storeurl}",
         LocalIO(),
@@ -197,7 +197,7 @@ def test_initremote_basic_httpurl(storepath, storeurl):
 
 @with_tempfile(mkdir=True)
 @serve_path_via_http(use_ssl=True)
-def test_initremote_basic_httpsurl(storepath, storeurl):
+def test_initremote_basic_httpsurl(storepath=None, storeurl=None):
     _test_initremote_basic(
         f"ria+{storeurl}",
         LocalIO(),
@@ -240,9 +240,8 @@ def _test_initremote_alias(host, ds_path, store):
 def test_initremote_alias():
 
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_initremote_alias)), \
-          'datalad-test'
-    yield _test_initremote_alias, None
+    known_failure_windows(skip_ssh(_test_initremote_alias))('datalad-test')
+    _test_initremote_alias(None)
 
 
 
@@ -297,9 +296,8 @@ def _test_initremote_rewrite(host, ds_path, store):
 
 def test_initremote_rewrite():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_initremote_rewrite)), \
-          'datalad-test'
-    yield _test_initremote_rewrite, None
+    known_failure_windows(skip_ssh(_test_initremote_rewrite))('datalad-test')
+    _test_initremote_rewrite(None)
 
 
 @known_failure_windows  # see gh-4469
@@ -337,7 +335,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
     ds.repo.init_remote('store', options=init_opts)
 
     # copy files into the RIA store
-    ds.repo.copy_to('.', 'store')
+    ds.push('.', to='store')
 
     # we should see the exact same annex object tree
     dsgit_dir, archive_dir, dsobj_dir = \
@@ -388,10 +386,14 @@ def _test_remote_layout(host, dspath, store, archiv_store):
 
 
 @slow  # 12sec + ? on travis
+# TODO: Skipped due to gh-4436
+@known_failure_windows
+@skip_ssh
+def test_remote_layout_ssh():
+    _test_remote_layout('datalad-test')
+
 def test_remote_layout():
-    # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_remote_layout)), 'datalad-test'
-    yield _test_remote_layout, None
+    _test_remote_layout(None)
 
 
 @known_failure_windows  # see gh-4469
@@ -423,7 +425,7 @@ def _test_version_check(host, dspath, store):
     # add special remote
     init_opts = common_init_opts + ['url={}'.format(store_url)]
     ds.repo.init_remote('store', options=init_opts)
-    ds.repo.copy_to('.', 'store')
+    ds.push('.', to='store')
 
     # check version files
     remote_ds_tree_version_file = store / 'ria-layout-version'
@@ -470,19 +472,23 @@ def _test_version_check(host, dspath, store):
 
     # TODO: use self.annex.error in special remote and see whether we get an
     #       actual error result
-    assert_raises(CommandError,
-                  ds.repo.copy_to, 'new_file', 'store')
+    with assert_raises(CommandError):
+        ds.push('new_file', to='store')
 
     # However, we can force it by configuration
     ds.config.add("annex.ora-remote.store.force-write", "true", scope='local')
-    ds.repo.copy_to('new_file', 'store')
+    ds.push('new_file', to='store')
 
 
 @slow  # 17sec + ? on travis
-def test_version_check():
+@skip_ssh
+@known_failure_windows
+def test_version_check_ssh():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_version_check)), 'datalad-test'
-    yield _test_version_check, None
+    _test_version_check('datalad-test')
+
+def test_version_check():
+    _test_version_check(None)
 
 
 # git-annex-testremote is way too slow on crippled FS.
@@ -601,15 +607,15 @@ def _test_binary_data(host, store, dspath):
 
 def test_binary_data():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_binary_data)), 'datalad-test'
-    yield skip_if_no_network(_test_binary_data), None
+    known_failure_windows(skip_ssh(_test_binary_data))('datalad-test')
+    skip_if_no_network(_test_binary_data)(None)
 
 
 @known_failure_windows
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_push_url(storepath, dspath, blockfile):
+def test_push_url(storepath=None, dspath=None, blockfile=None):
 
     dspath = Path(dspath)
     store = Path(storepath)
@@ -667,7 +673,7 @@ def test_push_url(storepath, dspath, blockfile):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-def test_url_keys(dspath, storepath, httppath, httpurl):
+def test_url_keys(dspath=None, storepath=None, httppath=None, httpurl=None):
     ds = Dataset(dspath).create()
     repo = ds.repo
     filename = 'url_no_size.html'
@@ -787,6 +793,10 @@ def _test_permission(host, storepath, dspath):
     assert_false(file_key_in_store.exists())
 
 
-def test_obtain_permission():
-    yield skip_ssh(_test_permission), 'datalad-test'
-    yield skip_if_root(_test_permission), None
+@skip_ssh
+def test_obtain_permission_ssh():
+    _test_permission('datalad-test')
+
+@skip_if_root
+def test_obtain_permission_root():
+    _test_permission(None)

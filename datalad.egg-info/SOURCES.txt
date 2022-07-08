@@ -35,6 +35,7 @@ datalad/_version.py
 datalad/api.py
 datalad/cmd.py
 datalad/config.py
+datalad/conftest.py
 datalad/consts.py
 datalad/coreapi.py
 datalad/dochelpers.py
@@ -204,7 +205,6 @@ datalad/interface/rerun.py
 datalad/interface/results.py
 datalad/interface/run_procedure.py
 datalad/interface/shell_completion.py
-datalad/interface/test.py
 datalad/interface/unlock.py
 datalad/interface/utils.py
 datalad/interface/tests/__init__.py
@@ -319,6 +319,7 @@ datalad/runner/tests/test_exception.py
 datalad/runner/tests/test_generatormixin.py
 datalad/runner/tests/test_gitrunner.py
 datalad/runner/tests/test_nonasyncrunner.py
+datalad/runner/tests/test_threadsafety.py
 datalad/runner/tests/test_utils.py
 datalad/runner/tests/test_witless_runner.py
 datalad/runner/tests/utils.py
@@ -388,8 +389,6 @@ datalad/support/tests/utils.py
 datalad/support/third/__init__.py
 datalad/support/third/loris_token_generator.py
 datalad/support/third/nda_aws_token_generator.py
-datalad/support/third/noseclasses.py
-datalad/support/third/nosetester.py
 datalad/tests/__init__.py
 datalad/tests/heavyoutput.py
 datalad/tests/test__main__.py
@@ -409,12 +408,14 @@ datalad/tests/test_s3.py
 datalad/tests/test_strings.py
 datalad/tests/test_testrepos.py
 datalad/tests/test_tests_utils.py
+datalad/tests/test_tests_utils_pytest.py
 datalad/tests/test_utils.py
 datalad/tests/test_utils_cached_dataset.py
 datalad/tests/test_utils_testrepos.py
 datalad/tests/test_version.py
 datalad/tests/utils.py
 datalad/tests/utils_cached_dataset.py
+datalad/tests/utils_pytest.py
 datalad/tests/utils_testdatasets.py
 datalad/tests/utils_testrepos.py
 datalad/tests/ca/README
@@ -480,6 +481,7 @@ docs/source/design/index.rst
 docs/source/design/log_levels.rst
 docs/source/design/miscpatterns.rst
 docs/source/design/pos_vs_kw_parameters.rst
+docs/source/design/progress_reporting.rst
 docs/source/design/provenance_capture.rst
 docs/source/design/python_imports.rst
 docs/source/design/result_records.rst

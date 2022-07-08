@@ -14,20 +14,23 @@ import os
 from os import makedirs
 from os.path import dirname
 from os.path import join as opj
+from pathlib import Path
 from shutil import copy
+from uuid import UUID
+from pkg_resources import EntryPoint
+
+import pytest
 from unittest.mock import (
     MagicMock,
     patch,
 )
-
-from pkg_resources import EntryPoint
 
 from datalad.api import (
     Dataset,
     search,
 )
 from datalad.support.exceptions import NoDatasetFound
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,
@@ -50,6 +53,11 @@ from datalad.utils import (
 )
 
 from ..indexers.base import MetadataIndexer
+from ..metadata import (
+    NoMetadataStoreFound,
+    gen4_query_aggregated_metadata,
+    query_aggregated_metadata,
+)
 from ..search import (
     _listdict2dictlist,
     _meta2autofield_dict,
@@ -58,17 +66,17 @@ from ..search import (
 
 @with_testsui(interactive=False)
 @with_tempfile(mkdir=True)
-def test_search_outside1_noninteractive_ui(tdir):
+def test_search_outside1_noninteractive_ui(tdir=None):
     # we should raise an informative exception
     with chpwd(tdir):
         with assert_raises(NoDatasetFound) as cme:
             list(search("bu"))
-        assert_in('run interactively', str(cme.exception))
+        assert_in('run interactively', str(cme.value))
 
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_search_outside1(tdir, newhome):
+def test_search_outside1(tdir=None, newhome=None):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
@@ -85,7 +93,7 @@ def test_search_outside1(tdir, newhome):
 @with_testsui(responses='yes')
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_search_outside1_install_default_ds(tdir, default_dspath):
+def test_search_outside1_install_default_ds(tdir=None, default_dspath=None):
     with chpwd(tdir):
         # let's mock out even actual install/search calls
         with \
@@ -157,18 +165,18 @@ def _check_mocked_install(default_dspath, mock_install):
 
 
 @with_tempfile
-def test_search_non_dataset(tdir):
+def test_search_non_dataset(tdir=None):
     from datalad.support.gitrepo import GitRepo
     GitRepo(tdir, create=True)
     with assert_raises(NoDatasetFound) as cme:
         list(search('smth', dataset=tdir))
     # Should instruct user how that repo could become a datalad dataset
-    assert_in("datalad create --force", str(cme.exception))
+    assert_in("datalad create --force", str(cme.value))
 
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_within_ds_file_search(path):
+def test_within_ds_file_search(path=None):
     try:
         import mutagen
     except ImportError:
@@ -262,7 +270,7 @@ type
         ds.search('*wrong')
     assert_re_in(
         r"regular expression '\(\?i\)\*wrong' \(original: '\*wrong'\) is incorrect: ",
-        str(cme.exception))
+        str(cme.value))
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:
@@ -482,3 +490,167 @@ def test_multiple_entry_points():
             'extr1.prop1': 'value'
         }
     )
+
+
+def test_gen4_query_aggregated_metadata():
+    class DatasetMock:
+        def __init__(self, path: str):
+            self.path = path
+            self.pathobj = Path(path)
+
+    extractor_name = 'mocked_extractor'
+    extracted_metadata = {'info': 'this is mocked metadata'}
+
+    def mocked_dump(**kwargs):
+        yield from [
+            {
+                'action': 'dump',
+                'status': 'ok',
+                'path': '/ds1',
+                'metadata': {
+                    'type': 'file',
+                    'dataset_id': str(UUID(int=1234)),
+                    'dataset_version': '0000001111111',
+                    'extractor_name': extractor_name,
+                    'path': kwargs['path'],
+                    'extracted_metadata': extracted_metadata
+                }
+            },
+            {
+                'action': 'dump',
+                'status': 'error',
+                'path': '/ds1',
+                'metadata': {
+                    'type': 'file',
+                    'dataset_id': str(UUID(int=12345)),
+                    'dataset_version': '0000002222222',
+                    'extractor_name': extractor_name,
+                    'path': kwargs['path'],
+                    'extracted_metadata': extracted_metadata
+                }
+            },
+            {
+                'action': 'dump',
+                'status': 'ok',
+                'path': '/ds1',
+                'metadata': {
+                    'type': 'something',
+                    'dataset_id': str(UUID(int=123456)),
+                    'dataset_version': '0000003333333',
+                    'extractor_name': extractor_name,
+                    'path': kwargs['path'],
+                    'extracted_metadata': extracted_metadata
+                }
+            }
+        ]
+
+    def mocked_no_metadata(**kwargs):
+        raise NoMetadataStoreFound()
+
+    mocked_annotated_paths = [
+        {
+            'path': 'ds/p1',
+            'types': ['file', 'dataset']
+        }
+    ]
+
+    with patch("datalad.metadata.metadata.Dump") as dump_mock:
+        dump_mock.return_value = mocked_dump
+
+        result = tuple(
+            gen4_query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths
+            )
+        )
+        assert_equal(len(result), 1)
+        assert_equal(
+            result[0]['metadata'],
+            {extractor_name: extracted_metadata}
+        )
+
+        # ensure gen4 code path selection
+        import datalad.metadata.metadata
+        datalad.metadata.metadata.next_generation_metadata_available = True
+
+        result = [
+            metadata_result
+            for metadata_result in query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths,
+            )
+            if metadata_result['status'] == 'ok'
+        ]
+        assert_equal(len(result), 1)
+        assert_equal(
+            result[0]['metadata'],
+            {extractor_name: extracted_metadata}
+        )
+
+        # check no metadata found-handling
+        dump_mock.reset_mock()
+        dump_mock.return_value = mocked_no_metadata
+
+        result = [
+            metadata_result
+            for metadata_result in query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths,
+            )
+            if metadata_result['status'] == 'impossible'
+        ]
+        assert_equal(len(result), 2)
+
+
+@with_tempfile(mkdir=True)
+def test_metadata_source_handling(temp_dir=None):
+    import datalad.metadata.metadata as metadata_module
+
+    temp_ds = Dataset(temp_dir).create()
+
+    gen4_result, legacy_result = (
+        {
+            "status": "ok",
+            "path": "/ds",
+            "action": "search",
+            "matches": {("x", "x"): True},
+            "metadata": {"k1": "v1", "k2": "v2"},
+            "metadata_source": source
+        }
+        for source in ("gen4", "legacy")
+    )
+
+    def reset_mock(mock, result):
+        mock.reset_mock()
+        mock.return_value = [result]
+
+    metadata_module.next_generation_metadata_available = True
+    with patch("datalad.metadata.metadata.gen4_query_aggregated_metadata") as gen4_mock, \
+         patch("datalad.metadata.metadata.legacy_query_aggregated_metadata") as legacy_mock:
+
+        reset_mock(gen4_mock, gen4_result)
+        reset_mock(legacy_mock, legacy_result)
+        r = tuple(
+            result["metadata_source"]
+            for result in search(dataset=temp_ds, query="v1")
+        )
+        assert_equal(r, ("legacy", "gen4"))
+
+        reset_mock(gen4_mock, gen4_result)
+        reset_mock(legacy_mock, legacy_result)
+        r = tuple(
+            result["metadata_source"]
+            for result in search(dataset=temp_ds, query="v1", metadata_source="gen4")
+        )
+        assert_equal(r, ("gen4",))
+
+        reset_mock(gen4_mock, gen4_result)
+        reset_mock(legacy_mock, legacy_result)
+        r = tuple(
+            result["metadata_source"]
+            for result in search(dataset=temp_ds, query="v1", metadata_source="legacy")
+        )
+        assert_equal(r, ("legacy",))

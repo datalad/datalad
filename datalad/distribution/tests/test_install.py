@@ -11,82 +11,90 @@
 
 import logging
 import os
-
 from os.path import (
-    join as opj,
-    isdir,
-    exists,
     basename,
     dirname,
+    exists,
+    isdir,
 )
+from os.path import join as opj
 from unittest.mock import patch
+
+import pytest
+
+from datalad import cfg as dl_cfg
 from datalad.api import (
     create,
-    install,
     get,
+    install,
 )
-from datalad.utils import (
-    chpwd,
-    on_windows,
-    getpwd,
-    _path_,
-    rmtree,
-    Path,
-)
-from datalad.support import path as op
+from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.results import YieldDatasets
+from datalad.support import path as op
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
-    InsufficientArgumentsError,
     IncompleteResultsError,
+    InsufficientArgumentsError,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import WitlessRunner as Runner
-from datalad.tests.utils import (
-    skip_ssh,
-    create_tree,
-    with_tempfile,
-    assert_in,
-    with_tree,
-    with_testrepos,
-    eq_,
-    ok_,
+from datalad.support.network import get_local_file_url
+from datalad.tests.utils_testdatasets import (
+    _make_dataset_hierarchy,
+    _mk_submodule_annex,
+)
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     assert_false,
-    ok_file_has_content,
+    assert_in,
+    assert_in_results,
+    assert_is_instance,
     assert_not_in,
     assert_raises,
-    assert_is_instance,
     assert_repo_status,
     assert_result_count,
     assert_status,
-    assert_in_results,
-    DEFAULT_BRANCH,
-    DEFAULT_REMOTE,
+    create_tree,
+    eq_,
+    get_datasets_topdir,
+    integration,
+    known_failure_githubci_win,
+    known_failure_windows,
+    ok_,
+    ok_file_has_content,
     ok_startswith,
+    put_file_under_git,
     serve_path_via_http,
-    swallow_logs,
-    use_cassette,
     skip_if_no_network,
     skip_if_on_windows,
-    put_file_under_git,
-    integration,
+    skip_ssh,
     slow,
+    swallow_logs,
+    use_cassette,
     usecase,
-    get_datasets_topdir,
-    known_failure_windows,
-    known_failure_githubci_win,
+    with_tempfile,
+    with_tree,
 )
+from datalad.utils import (
+    Path,
+    _path_,
+    chpwd,
+    getpwd,
+    on_windows,
+    rmtree,
+)
+
 from ..dataset import Dataset
 
 ###############
 # Test helpers:
 ###############
 
-
+@pytest.mark.parametrize("annex", [False, True])
 @with_tree(tree={'file.txt': '123'})
 @serve_path_via_http
 @with_tempfile
-def _test_guess_dot_git(annex, path, url, tdir):
+def test_guess_dot_git(path=None, url=None, tdir=None, *, annex):
     repo = (AnnexRepo if annex else GitRepo)(path, create=True)
     repo.add('file.txt', git=not annex)
     repo.commit()
@@ -106,11 +114,6 @@ def _test_guess_dot_git(annex, path, url, tdir):
     assert_repo_status(tdir, annex=annex)
 
 
-def test_guess_dot_git():
-    for annex in False, True:
-        yield _test_guess_dot_git, annex
-
-
 ######################
 # Test actual Install:
 ######################
@@ -124,7 +127,7 @@ def test_insufficient_args():
 # ValueError: path is on mount 'D:', start on mount 'C:
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_invalid_args(path):
+def test_invalid_args(path=None):
     assert_raises(IncompleteResultsError, install, 'Zoidberg', source='Zoidberg')
     # install to an invalid URL
     assert_raises(ValueError, install, 'ssh://mars:Zoidberg', source='Zoidberg')
@@ -149,7 +152,7 @@ def test_invalid_args(path):
 #@use_cassette('test_install_crcns')
 #@with_tempfile(mkdir=True)
 #@with_tempfile(mkdir=True)
-#def test_install_crcns(tdir, ds_path):
+#def test_install_crcns(tdir=None, ds_path=None):
 #    with chpwd(tdir):
 #        with swallow_logs(new_level=logging.INFO) as cml:
 #            install("all-nonrecursive", source='///')
@@ -181,7 +184,7 @@ def test_invalid_args(path):
 
 @skip_if_no_network
 @with_tree(tree={'sub': {}})
-def test_install_datasets_root(tdir):
+def test_install_datasets_root(tdir=None):
     with chpwd(tdir):
         ds = install("///")
         ok_(ds.is_installed())
@@ -198,68 +201,117 @@ def test_install_datasets_root(tdir):
 
         with assert_raises(IncompleteResultsError) as cme:
             install("sub", source='///')
-        assert_in("already exists and not empty", str(cme.exception))
+        assert_in("already exists and not empty", str(cme.value))
 
 
-@with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
+@pytest.mark.parametrize("type_", ["git", "annex"])
+@with_tree(tree={'test.dat': "doesn't matter",
+                 'INFO.txt': "some info",
+                 'test-annex.dat': "irrelevant"})
 @with_tempfile(mkdir=True)
-def test_install_simple_local(src, path):
-    origin = Dataset(path)
+def test_install_simple_local(src_repo=None, path=None, *, type_):
 
-    # now install it somewhere else
-    ds = install(path, source=src, description='mydummy')
-    eq_(ds.path, path)
-    ok_(ds.is_installed())
-    if not isinstance(origin.repo, AnnexRepo):
-        # this means it is a GitRepo
-        ok_(isinstance(origin.repo, GitRepo))
-        # stays plain Git repo
-        ok_(isinstance(ds.repo, GitRepo))
-        ok_(not isinstance(ds.repo, AnnexRepo))
-        ok_(GitRepo.is_valid_repo(ds.path))
-        eq_(set(ds.repo.get_indexed_files()),
-            {'test.dat', 'INFO.txt'})
-        assert_repo_status(path, annex=False)
+    src_ds = Dataset(src_repo).create(result_renderer='disabled', force=True,
+                                      annex=(type_ == "annex"))
+    src_ds.save(['INFO.txt', 'test.dat'], to_git=True)
+    if type_ == 'annex':
+        src_ds.save('test-annex.dat', to_git=False)
+    elif type_ == 'git':
+        pass
     else:
-        # must be an annex
-        ok_(isinstance(ds.repo, AnnexRepo))
-        ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
-        eq_(set(ds.repo.get_indexed_files()),
-            {'test.dat', 'INFO.txt', 'test-annex.dat'})
-        assert_repo_status(path, annex=True)
-        # no content was installed:
-        ok_(not ds.repo.file_has_content('test-annex.dat'))
-        uuid_before = ds.repo.uuid
-        ok_(uuid_before)  # we actually have an uuid
-        eq_(ds.repo.get_description(), 'mydummy')
+        raise ValueError("'type' must be 'git' or 'annex'")
+    # equivalent repo on github:
+    url = "https://github.com/datalad/testrepo--basic--r1.git"
+    sources = [src_ds.path,
+               get_local_file_url(src_ds.path, compatibility='git')]
+    if not dl_cfg.get('datalad.tests.nonetwork'):
+        sources.append(url)
 
-    # installing it again, shouldn't matter:
-    res = install(path, source=src, result_xfm=None, return_type='list')
-    assert_status('notneeded', res)
-    ok_(ds.is_installed())
-    if isinstance(origin.repo, AnnexRepo):
-        eq_(uuid_before, ds.repo.uuid)
+    for src in sources:
+        origin = Dataset(path)
+
+        # now install it somewhere else
+        ds = install(path, source=src, description='mydummy')
+        eq_(ds.path, path)
+        ok_(ds.is_installed())
+        if not isinstance(origin.repo, AnnexRepo):
+            # this means it is a GitRepo
+            ok_(isinstance(origin.repo, GitRepo))
+            # stays plain Git repo
+            ok_(isinstance(ds.repo, GitRepo))
+            ok_(not isinstance(ds.repo, AnnexRepo))
+            ok_(GitRepo.is_valid_repo(ds.path))
+            files = ds.repo.get_indexed_files()
+            assert_in('test.dat', files)
+            assert_in('INFO.txt', files)
+            assert_repo_status(path, annex=False)
+        else:
+            # must be an annex
+            ok_(isinstance(ds.repo, AnnexRepo))
+            ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
+            files = ds.repo.get_indexed_files()
+            assert_in('test.dat', files)
+            assert_in('INFO.txt', files)
+            assert_in('test-annex.dat', files)
+            assert_repo_status(path, annex=True)
+            # no content was installed:
+            ok_(not ds.repo.file_has_content('test-annex.dat'))
+            uuid_before = ds.repo.uuid
+            ok_(uuid_before)  # we actually have an uuid
+            eq_(ds.repo.get_description(), 'mydummy')
+
+        # installing it again, shouldn't matter:
+        res = install(path, source=src, result_xfm=None, return_type='list')
+        assert_status('notneeded', res)
+        ok_(ds.is_installed())
+        if isinstance(origin.repo, AnnexRepo):
+            eq_(uuid_before, ds.repo.uuid)
+
+        # cleanup before next iteration
+        rmtree(path)
 
 
 @known_failure_githubci_win
-@with_testrepos(flavors=['local-url', 'network', 'local'])
+@with_tree(tree={'test.dat': "doesn't matter",
+                 'INFO.txt': "some info",
+                 'test-annex.dat': "irrelevant"})
 @with_tempfile
-def test_install_dataset_from_just_source(url, path):
-    with chpwd(path, mkdir=True):
-        ds = install(source=url)
+def test_install_dataset_from_just_source(src_repo=None, path=None):
 
-    ok_startswith(ds.path, path)
-    ok_(ds.is_installed())
-    ok_(GitRepo.is_valid_repo(ds.path))
-    assert_repo_status(ds.path, annex=None)
-    assert_in('INFO.txt', ds.repo.get_indexed_files())
+    src_ds = Dataset(src_repo).create(result_renderer='disabled', force=True)
+    src_ds.save(['INFO.txt', 'test.dat'], to_git=True)
+    src_ds.save('test-annex.dat', to_git=False)
+    # equivalent repo on github:
+    src_url = "https://github.com/datalad/testrepo--basic--r1.git"
+    sources = [src_ds.path,
+               get_local_file_url(src_ds.path, compatibility='git')]
+    if not dl_cfg.get('datalad.tests.nonetwork'):
+        sources.append(src_url)
+
+    for url in sources:
+
+        with chpwd(path, mkdir=True):
+            ds = install(source=url)
+
+        ok_startswith(ds.path, path)
+        ok_(ds.is_installed())
+        ok_(GitRepo.is_valid_repo(ds.path))
+        assert_repo_status(ds.path, annex=None)
+        assert_in('INFO.txt', ds.repo.get_indexed_files())
+
+        # cleanup before next iteration
+        rmtree(path)
 
 
-@slow   # 25sec on Yarik's laptop
-@with_testrepos(flavors=['local'])
+@with_tree(tree={'test.dat': "doesn't matter",
+                 'INFO.txt': "some info",
+                 'test-annex.dat': "irrelevant"})
 @with_tempfile(mkdir=True)
-def test_install_dataset_from_instance(src, dst):
-    origin = Dataset(src)
+def test_install_dataset_from_instance(src=None, dst=None):
+    origin = Dataset(src).create(result_renderer='disabled', force=True)
+    origin.save(['INFO.txt', 'test.dat'], to_git=True)
+    origin.save('test-annex.dat', to_git=False)
+
     clone = install(source=origin, path=dst)
 
     assert_is_instance(clone, Dataset)
@@ -271,12 +323,13 @@ def test_install_dataset_from_instance(src, dst):
 
 
 @known_failure_githubci_win
-@with_testrepos(flavors=['network'])
+@skip_if_no_network
 @with_tempfile
-def test_install_dataset_from_just_source_via_path(url, path):
+def test_install_dataset_from_just_source_via_path(path=None):
     # for remote urls only, the source could be given to `path`
     # to allows for simplistic cmdline calls
-    # Q (ben): remote urls only? Sure? => TODO
+
+    url = "https://github.com/datalad/testrepo--basic--r1.git"
 
     with chpwd(path, mkdir=True):
         ds = install(url)
@@ -293,7 +346,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
     })
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_install_dataladri(src, topurl, path):
+def test_install_dataladri(src=None, topurl=None, path=None):
     # make plain git repo
     ds_path = opj(src, 'ds')
     gr = GitRepo(ds_path, create=True)
@@ -309,11 +362,13 @@ def test_install_dataladri(src, topurl, path):
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
-@slow   # 46sec on Yarik's laptop and tripped Travis CI
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_install_recursive(src, path_nr, path_r):
+@with_tempfile(mkdir=True)
+def test_install_recursive(src=None, path_nr=None, path_r=None):
+
+    _make_dataset_hierarchy(src)
+
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
     ok_(ds.is_installed())
@@ -322,14 +377,14 @@ def test_install_recursive(src, path_nr, path_r):
             "Unintentionally installed: %s" % (sub,))
     # this also means, subdatasets to be listed as absent:
     eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
-        {'subm 1', '2'})
+        {'sub1'})
 
     # now recursively:
     # don't filter implicit results so we can inspect them
     res = install(path_r, source=src, recursive=True,
                   result_xfm=None, result_filter=None)
-    # installed a dataset and two subdatasets
-    assert_result_count(res, 3, action='install', type='dataset')
+    # installed a dataset and four subdatasets
+    assert_result_count(res, 5, action='install', type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
     eq_(res[0]['path'], path_r)
@@ -339,10 +394,16 @@ def test_install_recursive(src, path_nr, path_r):
     # the subdatasets are contained in returned list:
     # (Note: Until we provide proper (singleton) instances for Datasets,
     # need to check for their paths)
-    assert_in_results(res, path=opj(top_ds.path, 'subm 1'), type='dataset')
-    assert_in_results(res, path=opj(top_ds.path, '2'), type='dataset')
+    assert_in_results(res, path=opj(top_ds.path, 'sub1'), type='dataset')
+    assert_in_results(res, path=opj(top_ds.path, 'sub1', 'sub2'),
+                      type='dataset')
+    assert_in_results(res, path=opj(top_ds.path, 'sub1', 'sub2', 'sub3'),
+                      type='dataset')
+    assert_in_results(res, path=opj(top_ds.path, 'sub1', 'sub2', 'sub3',
+                                    'sub4'),
+                      type='dataset')
 
-    eq_(len(top_ds.subdatasets(recursive=True)), 2)
+    eq_(len(top_ds.subdatasets(recursive=True)), 4)
 
     for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subds.is_installed(),
@@ -366,9 +427,11 @@ def test_install_recursive(src, path_nr, path_r):
     eq_(subds, ds.install('recursive-in-ds'))
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_recursive_with_data(src, path):
+@with_tempfile(mkdir=True)
+def test_install_recursive_with_data(src=None, path=None):
+
+    _make_dataset_hierarchy(src)
 
     # now again; with data:
     res = install(path, source=src, recursive=True, get_data=True,
@@ -376,8 +439,8 @@ def test_install_recursive_with_data(src, path):
     assert_status('ok', res)
     # installed a dataset and two subdatasets, and one file with content in
     # each
-    assert_result_count(res, 3, type='dataset', action='install')
-    assert_result_count(res, 3, type='file', action='get')
+    assert_result_count(res, 5, type='dataset', action='install')
+    assert_result_count(res, 2, type='file', action='get')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
     eq_(res[0]['path'], path)
@@ -397,14 +460,18 @@ def test_install_recursive_with_data(src, path):
             ok_(all_have_content(subds.repo))
 
 
-@slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
-@with_testrepos('.*annex.*', flavors=['local'])
+@with_tree(tree={'test.dat': "doesn't matter",
+                 'INFO.txt': "some info",
+                 'test-annex.dat': "irrelevant"})
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-def test_install_into_dataset(source, top_path):
+def test_install_into_dataset(source=None, top_path=None):
+    src_ds = Dataset(source).create(result_renderer='disabled', force=True)
+    src_ds.save(['INFO.txt', 'test.dat'], to_git=True)
+    src_ds.save('test-annex.dat', to_git=False)
 
     ds = create(top_path)
     assert_repo_status(ds.path)
@@ -442,7 +509,7 @@ def test_install_into_dataset(source, top_path):
 @usecase  # 39.3074s
 @skip_if_no_network
 @with_tempfile
-def test_failed_install_multiple(top_path):
+def test_failed_install_multiple(top_path=None):
     ds = create(top_path)
 
     create(_path_(top_path, 'ds1'))
@@ -461,13 +528,15 @@ def test_failed_install_multiple(top_path):
     # those which succeeded should be saved now
     eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed
-    eq_(set(r.get('source_url', r['path']) for r in cme.exception.failed),
+    eq_(set(r.get('source_url', r['path']) for r in cme.value.failed),
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-def test_install_known_subdataset(src, path):
+@with_tempfile(mkdir=True)
+def test_install_known_subdataset(src=None, path=None):
+
+    _mk_submodule_annex(src, fname="test-annex.dat", fcontent="whatever")
 
     # get the superdataset:
     ds = install(path, source=src)
@@ -482,8 +551,7 @@ def test_install_known_subdataset(src, path):
     ok_(AnnexRepo.is_valid_repo(subds.path, allow_noninitialized=False))
     # Verify that it is the correct submodule installed and not
     # new repository initiated
-    eq_(set(subds.repo.get_indexed_files()),
-        {'test.dat', 'INFO.txt', 'test-annex.dat'})
+    assert_in("test-annex.dat", subds.repo.get_indexed_files()),
     assert_not_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
     assert_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
 
@@ -499,7 +567,7 @@ def test_install_known_subdataset(src, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_implicit_install(src, dst):
+def test_implicit_install(src=None, dst=None):
 
     origin_top = create(src)
     origin_sub = origin_top.create("sub")
@@ -561,7 +629,7 @@ def test_implicit_install(src, dst):
 
 
 @with_tempfile(mkdir=True)
-def test_failed_install(dspath):
+def test_failed_install(dspath=None):
     ds = create(dspath)
     assert_raises(IncompleteResultsError,
                   ds.install,
@@ -569,9 +637,11 @@ def test_failed_install(dspath):
                   source="http://nonexistingreallyanything.datalad.org/bla")
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_list(path, top_path):
+@with_tempfile(mkdir=True)
+def test_install_list(path=None, top_path=None):
+
+    _mk_submodule_annex(path, fname="test-annex.dat", fcontent="whatever")
 
     # we want to be able to install several things, if these are known
     # (no 'source' allowed). Therefore first toplevel:
@@ -598,9 +668,11 @@ def test_install_list(path, top_path):
     assert_status('notneeded', get_result)
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_reckless(path, top_path):
+@with_tempfile(mkdir=True)
+def test_reckless(path=None, top_path=None):
+    _mk_submodule_annex(path, fname="test-annex.dat", fcontent="whatever")
+
     ds = install(top_path, source=path, reckless=True)
     eq_(ds.config.get('annex.hardlink', None), 'true')
     eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
@@ -615,7 +687,7 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-def test_install_recursive_repeat(src, path):
+def test_install_recursive_repeat(src=None, path=None):
     top_src = Dataset(src).create(force=True)
     sub1_src = top_src.create('sub 1', force=True)
     sub2_src = top_src.create('sub 2', force=True)
@@ -651,10 +723,12 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_install_skip_list_arguments(src, path, path_outside):
+def test_install_skip_list_arguments(src=None, path=None, path_outside=None):
+    _mk_submodule_annex(src, fname="test-annex.dat", fcontent="whatever")
+
     ds = install(path, source=src)
     ok_(ds.is_installed())
 
@@ -690,9 +764,10 @@ def test_install_skip_list_arguments(src, path, path_outside):
         ds.get(path=['subm 1', 'not_existing'])
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_install_skip_failed_recursive(src, path):
+@with_tempfile(mkdir=True)
+def test_install_skip_failed_recursive(src=None, path=None):
+    _mk_submodule_annex(src, fname="test-annex.dat", fcontent="whatever")
 
     # install top level:
     ds = install(path, source=src)
@@ -726,7 +801,7 @@ def test_install_skip_failed_recursive(src, path):
                            }
                  })
 @with_tempfile(mkdir=True)
-def test_install_noautoget_data(src, path):
+def test_install_noautoget_data(src=None, path=None):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
@@ -746,7 +821,7 @@ def test_install_noautoget_data(src, path):
 
 @with_tempfile
 @with_tempfile
-def test_install_source_relpath(src, dest):
+def test_install_source_relpath(src=None, dest=None):
     ds1 = create(src)
     src_ = basename(src)
     with chpwd(dirname(src)):
@@ -759,7 +834,7 @@ def test_install_source_relpath(src, dest):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_install_consistent_state(src, dest, dest2, dest3):
+def test_install_consistent_state(src=None, dest=None, dest2=None, dest3=None):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
     # then it is desired to get that default installed branch to get to the
@@ -818,7 +893,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 @skip_ssh
 @with_tempfile
 @with_tempfile
-def test_install_subds_with_space(opath, tpath):
+def test_install_subds_with_space(opath=None, tpath=None):
     ds = create(opath)
     ds.create('sub ds')
     # works even now, boring
@@ -836,7 +911,7 @@ def test_install_subds_with_space(opath, tpath):
 # https://github.com/datalad/datalad/issues/2232
 @with_tempfile
 @with_tempfile
-def test_install_from_tilda(opath, tpath):
+def test_install_from_tilda(opath=None, tpath=None):
     ds = create(opath)
     ds.create('sub ds')
     orelpath = os.path.join(
@@ -852,7 +927,7 @@ def test_install_from_tilda(opath, tpath):
 @skip_ssh
 @usecase
 @with_tempfile(mkdir=True)
-def test_install_subds_from_another_remote(topdir):
+def test_install_subds_from_another_remote(topdir=None):
     # https://github.com/datalad/datalad/issues/1905
     from datalad.support.network import PathRI
     with chpwd(topdir):
@@ -879,9 +954,10 @@ def test_install_subds_from_another_remote(topdir):
 
 # Takes > 2 sec
 # Do not use cassette
+@pytest.mark.parametrize("suffix", ["", "/.git"])
 @skip_if_no_network
 @with_tempfile
-def check_datasets_datalad_org(suffix, tdir):
+def test_datasets_datalad_org(tdir=None, *, suffix):
     # Test that git annex / datalad install, get work correctly on our datasets.datalad.org
     # Apparently things can break, especially with introduction of the
     # smart HTTP backend for apache2 etc
@@ -899,14 +975,9 @@ def check_datasets_datalad_org(suffix, tdir):
     assert_status('ok', ds.drop(what='all', reckless='kill', recursive=True))
 
 
-def test_datasets_datalad_org():
-    yield check_datasets_datalad_org, ''
-    yield check_datasets_datalad_org, '/.git'
-
-
 # https://github.com/datalad/datalad/issues/3469
 @with_tempfile(mkdir=True)
-def test_relpath_semantics(path):
+def test_relpath_semantics(path=None):
     with chpwd(path):
         super = create('super')
         create('subsrc')
@@ -916,7 +987,7 @@ def test_relpath_semantics(path):
 
 
 @with_tempfile
-def test_install_branch(path):
+def test_install_branch(path=None):
     path = Path(path)
     ds_a = create(path / "ds_a")
     ds_a.create("sub")
@@ -960,7 +1031,7 @@ def _create_test_install_recursive_github(path):  # pragma: no cover
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_install_recursive_github(path):
+def test_install_recursive_github(path=None):
     # test recursive installation of a hierarchy of datasets created on github
     # using datalad create-sibling-github.  Following invocation was used to poplate it
     #

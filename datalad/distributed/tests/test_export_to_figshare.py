@@ -9,21 +9,22 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test export_to_figshare"""
 
-from datalad.api import export_archive
-from datalad.support import path as op
-
-from datalad.tests.utils import with_tree, eq_
-
-from datalad.support.gitrepo import GitRepo
-from datalad.api import Dataset
-
-from ..export_to_figshare import (
-    _get_default_title,
+from datalad.api import (
+    Dataset,
+    export_archive,
 )
+from datalad.support import path as op
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
+    eq_,
+    with_tree,
+)
+
+from ..export_to_figshare import _get_default_title
 
 
 @with_tree({})
-def test_get_default_title(path):
+def test_get_default_title(path=None):
     repo = GitRepo(path)
     ds = Dataset(path)
     # There is no dataset initialized yet, so only path will be the title

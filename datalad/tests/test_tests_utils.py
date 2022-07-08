@@ -8,11 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import base64
-import platform
-import sys
-import os
-import random
 import logging
+import os
+import platform
+import random
+import sys
 
 try:
     # optional direct dependency we might want to kick out
@@ -21,21 +21,25 @@ except ImportError:  # pragma: no cover
     bs4 = None
 
 from glob import glob
-from os.path import exists, join as opj, basename
-
-from urllib.request import (
-    urlopen,
-    Request,
+from os.path import (
+    basename,
+    exists,
 )
-from urllib.parse import quote as url_quote
-
+from os.path import join as opj
 from unittest.mock import patch
-from datalad.utils import (
-    chpwd,
-    getpwd,
-    Path,
+from urllib.parse import quote as url_quote
+from urllib.request import (
+    Request,
+    urlopen,
 )
+
+from datalad import cfg as dl_cfg
+from datalad.support import path as op
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import (
+    OBSCURE_FILENAMES,
+    OBSCURE_PREFIX,
+    SkipTest,
     assert_cwd_unchanged,
     assert_dict_equal,
     assert_false,
@@ -50,10 +54,7 @@ from datalad.tests.utils import (
     ignore_nose_capturing_stdout,
     known_failure_githubci_win,
     known_failure_windows,
-    local_testrepo_flavors,
     nok_startswith,
-    OBSCURE_FILENAMES,
-    OBSCURE_PREFIX,
     ok_,
     ok_broken_symlink,
     ok_file_has_content,
@@ -73,18 +74,20 @@ from datalad.tests.utils import (
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
-    SkipTest,
     skip_wo_symlink_capability,
     swallow_logs,
     with_tempfile,
-    with_testrepos, with_tree,
+    with_testrepos,
     with_testsui,
+    with_tree,
     without_http_proxy,
 )
+from datalad.utils import (
+    Path,
+    chpwd,
+    getpwd,
+)
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support import path as op
-from datalad import cfg as dl_cfg
 #
 # Test with_tempfile, especially nested invocations
 #
@@ -117,9 +120,8 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tree((('f1.txt', 'load'),))
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')
-@with_testrepos(flavors=local_testrepo_flavors, count=1)
 def check_nested_with_tempfile_parametrized_surrounded(
-        param, f0, tree, f1, f2, repo):
+        param, f0, tree, f1, f2):
     eq_(param, "param1")
     ok_(f0.endswith('big'), msg="got %s" % f0)
     ok_(os.path.basename(f0).startswith('TEST'), msg="got %s" % f0)
@@ -127,7 +129,6 @@ def check_nested_with_tempfile_parametrized_surrounded(
     ok_(f1 != f2)
     ok_(f1.endswith('.cfg'), msg="got %s" % f1)
     ok_(f2.endswith('.cfg.old'), msg="got %s" % f2)
-    ok_(repo)  # got some repo -- local or url
 
 
 def test_nested_with_tempfile_parametrized_surrounded():

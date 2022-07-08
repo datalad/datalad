@@ -10,12 +10,13 @@
 
 """
 
-from packaging.version import Version
 from os.path import join as opj
+
+from packaging.version import Version
 
 import datalad
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -51,7 +52,7 @@ _dataset_config_template = {
 
 @with_tree(tree=_dataset_config_template)
 @with_tempfile(mkdir=True)
-def test_something(path, new_home):
+def test_something(path=None, new_home=None):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save()
 

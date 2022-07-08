@@ -1,14 +1,17 @@
 Metadata-Version: 2.1
 Name: datalad
-Version: 0.16.5
+Version: 0.17.0
 Summary: data distribution geared toward scientific datasets
+Home-page: UNKNOWN
 Author: The DataLad Team and Contributors
 Author-email: team@datalad.org
+License: UNKNOWN
 Project-URL: Homepage, https://www.datalad.org
 Project-URL: Developer docs, https://docs.datalad.org/en/stable
 Project-URL: User handbook, https://handbook.datalad.org
 Project-URL: Source, https://github.com/datalad/datalad
 Project-URL: Bug Tracker, https://github.com/datalad/datalad/issues
+Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Environment :: Console
 Classifier: Intended Audience :: Developers
@@ -32,18 +35,18 @@ Classifier: Topic :: Utilities
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 Provides-Extra: core
-Provides-Extra: downloaders
-Provides-Extra: downloaders-extra
-Provides-Extra: publish
-Provides-Extra: misc
-Provides-Extra: tests
-Provides-Extra: metadata
-Provides-Extra: metadata-extra
-Provides-Extra: duecredit
-Provides-Extra: full
+Provides-Extra: devel
 Provides-Extra: devel-docs
 Provides-Extra: devel-utils
-Provides-Extra: devel
+Provides-Extra: downloaders
+Provides-Extra: downloaders-extra
+Provides-Extra: duecredit
+Provides-Extra: full
+Provides-Extra: metadata
+Provides-Extra: metadata-extra
+Provides-Extra: misc
+Provides-Extra: publish
+Provides-Extra: tests
 License-File: COPYING
 
      ____            _             _                   _ 
@@ -65,9 +68,9 @@ License-File: COPYING
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5624980.svg)](https://doi.org/10.5281/zenodo.5624980)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-39-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-40-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -242,6 +245,7 @@ by [MacStadium](https://www.macstadium.com/).
     <td align="center"><a href="https://github.com/mslw"><img src="https://avatars.githubusercontent.com/u/11985212?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Michał Szczepanik</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mslw" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/bpinsard"><img src="https://avatars.githubusercontent.com/u/1155388?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Basile</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bpinsard" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/taylols"><img src="https://avatars.githubusercontent.com/u/28018084?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Taylor Olson</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=taylols" title="Code">💻</a></td>
+    <td align="center"><a href="https://jdkent.github.io/"><img src="https://avatars.githubusercontent.com/u/12564882?v=4?s=100" width="100px;" alt=""/><br /><sub><b>James Kent</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=jdkent" title="Code">💻</a></td>
   </tr>
 </table>
 
@@ -260,3 +264,5 @@ by [MacStadium](https://www.macstadium.com/).
 [enabling the ::science overlay]: https://github.com/gentoo/sci#manual-install-
 
 [DataLad Handbook: Installation]: http://handbook.datalad.org/en/latest/intro/installation.html
+
+

@@ -1305,6 +1305,12 @@ class GitRepo(CoreGitRepo):
         if recursive:
             kwargs['r'] = True
 
+        # the name is chosen badly, but the purpose is to make sure that
+        # any pending operations actually manifest themselves in the Git repo
+        # on disk (in case of an AnnexRepo, it could be pending batch
+        # processes that need closing)
+        self.precommit()
+
         # output per removed file is expected to be "rm 'PATH'":
         return [
             line.strip()[4:-1]
@@ -1468,7 +1474,7 @@ class GitRepo(CoreGitRepo):
             env=env,
         )
 
-    # TODO usage is primarily in the tests, consider making a test helper and
+    # TODO usage is only in the tests, consider making a test helper and
     # remove from GitRepo API
     def get_indexed_files(self):
         """Get a list of files in git's index
@@ -2653,8 +2659,7 @@ class GitRepo(CoreGitRepo):
                         attrline += ' {}={}'.format(a, val)
                 f.write('{}\n'.format(attrline))
 
-    def get_content_info(self, paths=None, ref=None, untracked='all',
-                         eval_file_type=None):
+    def get_content_info(self, paths=None, ref=None, untracked='all'):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2682,9 +2687,6 @@ class GitRepo(CoreGitRepo):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        eval_file_type :
-          THIS FUNCTIONALITY IS NO LONGER SUPPORTED.
-          Setting this flag has no effect.
 
         Returns
         -------
@@ -2709,10 +2711,6 @@ class GitRepo(CoreGitRepo):
           repository)
         """
         lgr.debug('%s.get_content_info(...)', self)
-        if eval_file_type is not None:
-            warnings.warn(
-                "GitRepo.get_content_info(eval_file_type=) no longer supported",
-                DeprecationWarning)
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
@@ -2929,22 +2927,14 @@ class GitRepo(CoreGitRepo):
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   eval_submodule_state='full', eval_file_type=None,
-                   _cache=None):
+                   eval_submodule_state='full', _cache=None):
         """Like diff(), but reports the status of 'clean' content too.
 
         It supports an additional submodule evaluation state 'global'.
         If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
         it can.
-
-        The eval_file_type parameter is ignored.
         """
-        if eval_file_type is not None:
-            warnings.warn(
-                "GitRepo.diffstatus(eval_file_type=) no longer supported",
-                DeprecationWarning)
-
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
                 ref, untracked
@@ -3352,7 +3342,22 @@ class GitRepo(CoreGitRepo):
         # - commit (with all paths that have been touched, to bypass
         #   potential pre-staged bits)
 
-        need_partial_commit = True if self.get_staged_paths() else False
+        staged_paths = self.get_staged_paths()
+        need_partial_commit = bool(staged_paths)
+        if need_partial_commit and hasattr(self, "call_annex"):
+            # so we have some staged content. let's check which ones
+            # are symlinks -- those could be annex key links that
+            # are broken after a `git-mv` operation
+            # https://github.com/datalad/datalad/issues/4967
+            # call `git-annex pre-commit` on them to rectify this before
+            # saving the wrong symlinks
+            added = status_state['added']
+            tofix = [
+                sp for sp in staged_paths
+                if added.get(self.pathobj / sp, {}).get("type") == "symlink"
+            ]
+            if tofix:
+                self.call_annex(['pre-commit'], files=tofix)
 
         # remove first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list
@@ -3666,7 +3671,8 @@ class GitRepo(CoreGitRepo):
                 # a subdataset
                 # TODO: we could update the URL, and branch info at this point,
                 # even for previously registered subdatasets
-                if i['type'] != 'dataset':
+                if i['type'] != 'dataset' or (
+                        i['type'] == 'dataset' and i['state'] == 'untracked'):
                     gmprops = dict(path=i['rpath'], url=i['url'])
                     if i['id']:
                         gmprops['datalad-id'] = i['id']

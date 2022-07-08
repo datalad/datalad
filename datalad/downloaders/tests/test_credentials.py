@@ -9,31 +9,33 @@
 """Tests for credentials"""
 
 from unittest.mock import patch
-from datalad.tests.utils import (
+
+from datalad import cfg as dlcfg
+from datalad.api import Dataset
+from datalad.support.external_versions import external_versions
+from datalad.support.keyring_ import (
+    Keyring,
+    MemoryKeyring,
+)
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_equal,
     assert_false,
     assert_in,
     assert_raises,
     assert_true,
     ok_file_has_content,
-    SkipTest,
     skip_if,
     with_tempfile,
     with_testsui,
 )
-from datalad.support.external_versions import external_versions
-from datalad.api import Dataset
-from datalad.support.keyring_ import (
-    Keyring,
-    MemoryKeyring,
-)
+
 from ..credentials import (
     AWS_S3,
     CompositeCredential,
     GitCredential,
     UserPassword,
 )
-from datalad import cfg as dlcfg
 
 
 @with_testsui(responses=[
@@ -58,7 +60,7 @@ def test_cred1_enter_new():
     with assert_raises(ValueError) as cme:
         cred.enter_new(username='user')
     assert_in('field(s): username.  Known but not specified: password, user',
-              str(cme.exception))
+              str(cme.value))
 
     # Test that if user is provided, it is not asked
     cred.enter_new(user='user2')
@@ -172,7 +174,7 @@ def test_credentials_from_env():
 
 @skip_if(not external_versions['keyrings.alt'])
 @with_tempfile
-def test_delete_not_crashing(path):
+def test_delete_not_crashing(path=None):
     # although in above test we just use/interact with Keyring without specifying
     # any custom one, there we do not change it so I guess it is ok. Here we want
     # a real keyring backend which we will alter
@@ -199,7 +201,7 @@ def test_delete_not_crashing(path):
 
 
 @with_tempfile
-def test_gitcredential_read(path):
+def test_gitcredential_read(path=None):
 
     matching_url = "https://example.datalad.org"
     non_matching_url = "http://some.other.org"
@@ -215,9 +217,9 @@ def test_gitcredential_read(path):
         "!f() { test \"$1\" = get && echo \"password=apassword\"; }; f"
 
     ds.config.add(f"credential.{matching_url}.username", "auser",
-                  where="local")
+                  scope="local")
     ds.config.add(f"credential.{matching_url}.helper", cred_helper,
-                  where="local")
+                  scope="local")
 
     # we can get those credentials when the context is right:
     cred = GitCredential("some", auth_url=matching_url,
@@ -271,7 +273,7 @@ def test_gitcredential_read(path):
 
 
 @with_tempfile
-def test_gitcredential(path):
+def test_gitcredential(path=None):
 
     # Note, that credential labels are irrelevant in context of the to be tested
     # Object here.
@@ -280,7 +282,7 @@ def test_gitcredential(path):
     non_matching_url = "http://some.other.org"
     ds = Dataset(path).create()
     # use git native credential store
-    ds.config.add("credential.helper", "store", where='local')
+    ds.config.add("credential.helper", "store", scope='local')
 
     # store credentials
     cred = GitCredential("cred_label", auth_url=matching_url, dataset=ds)

@@ -11,24 +11,25 @@
 
 
 from os.path import join as opj
+
 from datalad.api import (
     create,
     no_annex,
 )
-from datalad.utils import Path
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_repo_status,
     create_tree,
     eq_,
     known_failure_githubci_win,
-    SkipTest,
     with_tempfile,
 )
+from datalad.utils import Path
 
 
 @known_failure_githubci_win
 @with_tempfile(mkdir=True)
-def test_no_annex(path):
+def test_no_annex(path=None):
     ds = create(path)
     assert_repo_status(ds.path)
     create_tree(

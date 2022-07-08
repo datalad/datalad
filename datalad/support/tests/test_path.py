@@ -8,6 +8,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+
+from ...tests.utils_pytest import (
+    SkipTest,
+    assert_raises,
+    eq_,
+    with_tempfile,
+)
+from ...utils import (
+    chpwd,
+    rmtree,
+)
 from ..path import (
     abspath,
     curdir,
@@ -15,20 +26,10 @@ from ..path import (
     robust_abspath,
     split_ext,
 )
-from ...utils import (
-    chpwd,
-    rmtree,
-)
-from ...tests.utils import (
-    assert_raises,
-    eq_,
-    with_tempfile,
-    SkipTest,
-)
 
 
 @with_tempfile(mkdir=True)
-def test_robust_abspath(tdir):
+def test_robust_abspath(tdir=None):
     with chpwd(tdir):
         eq_(robust_abspath(curdir), tdir)
         try:

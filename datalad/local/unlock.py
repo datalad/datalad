@@ -34,6 +34,7 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
+from datalad.log import log_progress
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
@@ -133,7 +134,6 @@ class Unlock(Interface):
                 dataset=dataset,
                 path=paths_lexist,
                 untracked="normal" if res_paths_nondir else "no",
-                report_filetype=False,
                 annex="availability",
                 recursive=recursive,
                 recursion_limit=recursion_limit,
@@ -168,12 +168,43 @@ class Unlock(Interface):
 
         # Do the actual unlocking.
         for ds_path, files in to_unlock.items():
+            # register for final orderly take down
+            pbar_id = f'unlock-{ds_path}'
+            nfiles = len(files)
+            log_progress(
+                lgr.info, pbar_id,
+                'Unlocking files',
+                unit=' Files',
+                label='Unlocking',
+                total=nfiles,
+                noninteractive_level=logging.INFO,
+            )
             ds = Dataset(ds_path)
-            for r in ds.repo._call_annex_records(
+            for r in ds.repo._call_annex_records_items_(
                     ["unlock"],
-                    files=files):
+                    files=files,
+            ):
+                log_progress(
+                    lgr.info, pbar_id,
+                    "Files to unlock %i", nfiles,
+                    update=1, increment=True,
+                    noninteractive_level=logging.DEBUG)
+                nfiles -= 1
                 yield get_status_dict(
                     path=op.join(ds.path, r['file']),
                     status='ok' if r['success'] else 'error',
                     type='file',
                     **res_kwargs)
+                if nfiles < 1:
+                    # git-annex will spend considerable time after the last
+                    # file record to finish things up, let this be known
+                    log_progress(
+                        lgr.info, pbar_id,
+                        "Recording unlocked state in git",
+                        update=0, increment=True,
+                        noninteractive_level=logging.INFO)
+
+            log_progress(
+                lgr.info, pbar_id,
+                "Completed unlocking files",
+                noninteractive_level=logging.INFO)

@@ -13,11 +13,11 @@ import unittest.mock
 from subprocess import TimeoutExpired
 
 from datalad.cmd import (
-    readline_rstripped,
     BatchedCommand,
+    readline_rstripped,
 )
 from datalad.runner.tests.utils import py2cmd
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_is_none,
     assert_is_not_none,

@@ -9,9 +9,10 @@
 """Test BIDS metadata extractor """
 
 from simplejson import dumps
+
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.extractors.datalad_rfc822 import MetadataExtractor
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     with_tree,
 )
@@ -41,7 +42,7 @@ Cite-As: Cool (2016)
 DOI: 10.5281/zenodo.48421
 
 """}})
-def test_get_metadata(path):
+def test_get_metadata(path=None):
 
     ds = Dataset(path).create(force=True)
     ds.save()

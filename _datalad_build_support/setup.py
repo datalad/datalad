@@ -25,7 +25,7 @@ from packaging.version import Version
 from setuptools import (
     Command,
     DistutilsOptionError,
-    find_packages,
+    find_namespace_packages,
     findall,
     setup,
 )
@@ -438,7 +438,9 @@ def datalad_setup(name, **kwargs):
     # packages = find_packages('.', include=['datalad*'])
     # so we will filter manually for maximal compatibility
     if kwargs.get('packages') is None:
-        kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
+        # Use find_namespace_packages() in order to include folders that
+        # contain data files but no Python code
+        kwargs['packages'] = [pkg for pkg in find_namespace_packages('.') if pkg.startswith(name)]
     if kwargs.get('long_description') is None:
         kwargs.update(get_long_description_from_README())
 

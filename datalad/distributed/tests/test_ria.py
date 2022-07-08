@@ -4,18 +4,18 @@ from datalad.api import (
     Dataset,
     clone,
 )
-from datalad.utils import Path
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    DEFAULT_REMOTE,
     assert_equal,
     assert_result_count,
     assert_true,
-    DEFAULT_REMOTE,
     has_symlink_capability,
     skip_if,
     skip_if_on_windows,
     with_tempfile,
     with_tree,
 )
+from datalad.utils import Path
 
 
 @skip_if_on_windows  # currently all tests re RIA/ORA don't run on windows
@@ -25,7 +25,7 @@ from datalad.tests.utils import (
             'sub': {'other.txt': 'other'}})
 @with_tempfile
 @with_tempfile
-def test_ephemeral(ds_path, store_path, clone_path):
+def test_ephemeral(ds_path=None, store_path=None, clone_path=None):
 
     dspath = Path(ds_path)
     store = Path(store_path)

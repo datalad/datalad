@@ -122,6 +122,9 @@ we outline the workflow used by the developers:
 
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
+Our [Design Docs](http://docs.datalad.org/en/stable/design/index.html) provide a
+growing collection of insights on the command API principles and the design of
+particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
@@ -141,7 +144,7 @@ and additionally, for development we suggest to use tox and new
 versions of dependencies from pypy:
 
 ```sh
-apt-get install -y -q python3-{dev,httpretty,nose,pip,vcr,virtualenv} python3-tox
+apt-get install -y -q python3-{dev,httpretty,pytest,pip,vcr,virtualenv} python3-tox
 # Some libraries which might be needed for installing via pip
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
@@ -213,22 +216,6 @@ $ tributors update-lookup allcontrib
 And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
 look for new orcids as we did above.
 
-
-## Documentation
-
-### Docstrings
-
-We use [NumPy standard] for the description of parameters docstrings.  If you are using
-PyCharm, set your project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
-
-[NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
-
-In addition, we follow the guidelines of [Restructured Text] with the additional features and treatments
-provided by [Sphinx].
-
-[Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
-[Sphinx]: http://www.sphinx-doc.org/en/stable/
-
 ## Additional Hints
 
 ### Merge commits
@@ -276,13 +263,7 @@ python setup.py develop
 and then use that virtual environment to run the tests, via
 
 ```sh
-python -m nose -s -v datalad
-```
-
-or similarly,
-
-```sh
-nosetests -s -v datalad
+pytest datalad
 ```
 
 then to later deactivate the virtualenv just simply enter
@@ -290,9 +271,6 @@ then to later deactivate the virtualenv just simply enter
 ```sh
 deactivate
 ```
-
-**Note**: on Windows, please add `--traverse-namespace` option to the `nose`
-call, or otherwise `nose` would not discover tests.
 
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
@@ -305,6 +283,24 @@ release of Debian or Ubuntu) with all dependencies listed in README.md pre-insta
 
 [datalad/tests/utils.py]() defines many useful decorators. Some of those just to annotate tests
 for various aspects to allow for easy sub-selection.
+
+#### Migration from `nose` to `pytest` in downstream code
+
+`datalad.tests.utils` remains providing `nose`-based utils and `datalad.__init__` provides `nose`-based
+fixtures to not break extensions which still use `nose` for testing. For a typical migration of a DataLad
+extension to use `pytest` instead of `nose`:
+
+- keep all the `assert_*` and `ok_` helpers but import them from `datalad.tests.utils_pytest`
+  instead
+- for `@with_*` and other decorators populating positional arguments, convert corresponding
+  posarg to kwarg by adding `=None`
+- convert all generator-based parametric tests into direct invocation or, preferably,
+  `@pytest.mark.parametrized` tests
+- address DeprecationWarnings in the code. Only where desired to test deprecation,
+  add `@pytest.mark.filterwarnings("ignore: BEGINNING OF WARNING")` decorator to the test.
+
+For an example, see a "migrate to pytest" PR against datalad-deprecated:
+https://github.com/datalad/datalad-deprecated/pull/51 .
 
 ##### Speed
 
@@ -359,8 +355,8 @@ You can also check for common programming errors with the following tools:
 
 - Code with good unittest coverage (at least 80%), check with:
 
-          pip install nose coverage
-          nosetests --with-coverage path/to/tests_for_package
+          pip install pytest coverage
+          pytest --cov=datalad path/to/tests_for_package
 
 - We rely on https://codecov.io to provide convenient view of code coverage.
   Installation of the codecov extension for Firefox/Iceweasel or Chromium

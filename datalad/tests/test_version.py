@@ -8,19 +8,21 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import re
+
 from packaging.version import Version
 
-from .. import __version__
 from datalad.support import path as op
-from datalad.utils import ensure_unicode
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_equal,
     assert_greater,
     assert_in,
     assert_not_in,
     ok_startswith,
-    SkipTest,
 )
+from datalad.utils import ensure_unicode
+
+from .. import __version__
 
 
 def test__version__():

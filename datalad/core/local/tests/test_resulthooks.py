@@ -8,24 +8,22 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test result hooks"""
 
-from datalad.utils import (
-    on_windows,
+from datalad.api import (
+    Dataset,
+    install,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_result_count,
     eq_,
     ok_,
     with_tempfile,
 )
-from datalad.api import (
-    Dataset,
-    install,
-)
+from datalad.utils import on_windows
 
 
 @with_tempfile()
 @with_tempfile()
-def test_basics(src, dst):
+def test_basics(src=None, dst=None):
     # dataset with subdataset, not specific configuration
     ds = Dataset(src).create()
     (ds.pathobj / 'file1').write_text('some')

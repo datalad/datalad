@@ -9,14 +9,17 @@
 
 """
 
+import pytest
+
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     with_tempfile,
 )
 
 
+@pytest.mark.filterwarnings("ignore: The `uninstall` command is deprecated")
 @with_tempfile()
-def test_uninstall_uninstalled(path):
+def test_uninstall_uninstalled(path=None):
     ds = Dataset(path)
     assert_raises(ValueError, ds.uninstall)

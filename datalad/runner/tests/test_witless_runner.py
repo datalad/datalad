@@ -19,9 +19,9 @@ from time import (
     time,
 )
 
-from nose.tools import timed
+import pytest
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
     assert_cwd_unchanged,
@@ -54,7 +54,7 @@ from .utils import py2cmd
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_runner(tempfile):
+def test_runner(tempfile=None):
     runner = Runner()
     content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
     cmd = 'echo %s > %s' % (content, tempfile)
@@ -89,17 +89,17 @@ def test_runner_stdout_capture():
 
 
 @with_tempfile(mkdir=True)
-def test_runner_failure(dir_):
+def test_runner_failure(dir_=None):
     runner = Runner()
     with assert_raises(CommandError) as cme:
         runner.run(
             py2cmd('import sys; sys.exit(53)')
         )
-    eq_(53, cme.exception.code)
+    eq_(53, cme.value.code)
 
 
 @with_tempfile(mkdir=True)
-def test_runner_fix_PWD(path):
+def test_runner_fix_PWD(path=None):
     env = os.environ.copy()
     env['PWD'] = orig_cwd = os.getcwd()
     runner = Runner(cwd=path, env=env)
@@ -112,7 +112,7 @@ def test_runner_fix_PWD(path):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_cwd_encoding(path):
+def test_runner_cwd_encoding(path=None):
     env = os.environ.copy()
     # Add PWD to env so that runner will temporarily adjust it to point to cwd.
     env['PWD'] = os.getcwd()
@@ -126,7 +126,7 @@ def test_runner_cwd_encoding(path):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_stdin(path):
+def test_runner_stdin(path=None):
     runner = Runner()
     fakestdin = Path(path) / 'io'
     # go for difficult content
@@ -148,7 +148,7 @@ def test_runner_stdin(path):
     assert_in(OBSCURE_FILENAME, res['stdout'])
 
 
-@timed(3)
+@pytest.mark.fail_slow(3)
 def test_runner_stdin_no_capture():
     # Ensure that stdin writing alone progresses
     runner = Runner()
@@ -159,7 +159,7 @@ def test_runner_stdin_no_capture():
     )
 
 
-@timed(3)
+@pytest.mark.fail_slow(3)
 def test_runner_no_stdin_no_capture():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
@@ -170,7 +170,7 @@ def test_runner_no_stdin_no_capture():
     )
 
 
-@timed(3)
+@pytest.mark.fail_slow(3)
 def test_runner_empty_stdin():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
@@ -205,7 +205,7 @@ def test_runner_parametrized_protocol():
 @integration  # ~3 sec
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_asyncio_loop_noninterference1(path1, path2):
+def test_asyncio_loop_noninterference1(path1=None, path2=None):
     if on_windows and sys.version_info < (3, 8):
         raise SkipTest(
             "get_event_loop() raises "
@@ -230,7 +230,7 @@ ds.status()
 
 
 @with_tempfile
-def test_asyncio_forked(temp):
+def test_asyncio_forked(temp=None):
     # temp will be used to communicate from child either it succeeded or not
     temp = Path(temp)
     runner = Runner()

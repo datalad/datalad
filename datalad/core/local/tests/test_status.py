@@ -9,13 +9,20 @@
 """Test status command"""
 
 import os.path as op
-import datalad.utils as ut
 
-from datalad.utils import (
-    chpwd,
-    on_windows,
+import datalad.utils as ut
+from datalad.api import status
+from datalad.core.local.status import get_paths_by_ds
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+    NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_dict_equal,
     assert_in,
     assert_in_results,
@@ -26,25 +33,16 @@ from datalad.tests.utils import (
     eq_,
     get_deeply_nested_structure,
     has_symlink_capability,
-    OBSCURE_FILENAME,
-    SkipTest,
     with_tempfile,
 )
-from datalad.support.exceptions import (
-    CommandError,
-    IncompleteResultsError,
-    NoDatasetFound,
+from datalad.utils import (
+    chpwd,
+    on_windows,
 )
-from datalad.distribution.dataset import Dataset
-from datalad.support.annexrepo import AnnexRepo
-from datalad.api import (
-    status,
-)
-from datalad.core.local.status import get_paths_by_ds
 
 
 @with_tempfile(mkdir=True)
-def test_runnin_on_empty(path):
+def test_runnin_on_empty(path=None):
     # empty repo
     repo = AnnexRepo(path, create=True)
     # just wrap with a dataset
@@ -56,7 +54,7 @@ def test_runnin_on_empty(path):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile(mkdir=True)
-def test_status_basics(path, linkpath, otherdir):
+def test_status_basics(path=None, linkpath=None, otherdir=None):
     if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(path, target_is_directory=True)
@@ -86,7 +84,7 @@ def test_status_basics(path, linkpath, otherdir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_status_nods(path, otherpath):
+def test_status_nods(path=None, otherpath=None):
     ds = Dataset(path).create()
     assert_result_count(
         ds.status(path=otherpath, on_failure='ignore', result_renderer='disabled'),
@@ -104,7 +102,7 @@ def test_status_nods(path, otherpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_status(_path, linkpath):
+def test_status(_path=None, linkpath=None):
     # do the setup on the real path, not the symlink, to have its
     # bugs not affect this test of status()
     ds = get_deeply_nested_structure(str(_path))
@@ -229,7 +227,7 @@ def test_status(_path, linkpath):
 # https://github.com/datalad/datalad-revolution/issues/64
 # breaks when the tempdir is a symlink
 @with_tempfile(mkdir=True)
-def test_subds_status(path):
+def test_subds_status(path=None):
     ds = Dataset(path).create()
     subds = ds.create('subds')
     assert_repo_status(ds.path)
@@ -280,7 +278,7 @@ def test_subds_status(path):
 
 
 @with_tempfile
-def test_status_symlinked_dir_within_repo(path):
+def test_status_symlinked_dir_within_repo(path=None):
     if not has_symlink_capability():
         raise SkipTest("Can't create symlinks")
     # <path>
@@ -325,7 +323,7 @@ def test_status_symlinked_dir_within_repo(path):
 
 @with_tempfile
 @with_tempfile
-def test_get_paths_by_ds(path, otherdspath):
+def test_get_paths_by_ds(path=None, otherdspath=None):
     otherds = Dataset(otherdspath).create()
     ds = get_deeply_nested_structure(path)
 

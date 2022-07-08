@@ -5,9 +5,9 @@ If there are git-annex'ed files already, git annex uninit and this procedure wil
 
 """
 
+from datalad import lgr
 from datalad.distribution.dataset import require_dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad import lgr
 
 
 def no_annex(ds):

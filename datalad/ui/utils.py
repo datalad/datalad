@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Various utils oriented to UI"""
 
+from datalad.support import ansi_colors
 from datalad.utils import on_windows
 import struct
 
@@ -65,3 +66,11 @@ def get_console_width(default_min=20):
         # to prevent crashes below guarantee that it is at least 20
         console_width = 20
     return console_width
+
+
+def show_hint(msg):
+    from datalad.ui import ui
+    ui.message("{}".format(
+            ansi_colors.color_word(
+                msg,
+                ansi_colors.YELLOW)))
