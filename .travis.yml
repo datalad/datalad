@@ -254,13 +254,11 @@ script:
   - (set -e; for i in `seq 1 100`; do
     echo $i;
     http_proxy=
-    PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
       -c ../tox.ini
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
-      --cov=datalad
       --pyargs -k test_is_available ../datalad/support/tests/test_annexrepo.py; done; )
   - cd ..
 
@@ -268,8 +266,6 @@ after_success:
   # cron jobs test more and then PRs will be falling behind since they would not
   # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
   - cd __testhome__;
-  - python -m coverage combine -a /tmp/.coverage-entrypoints-*;
-  - python -m coverage report;
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
       codecov;
     fi
