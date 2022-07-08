@@ -8,17 +8,19 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import join as opj
-from ..digests import Digester
-from datalad.tests.utils import (
+
+from datalad.tests.utils_pytest import (
     assert_equal,
     with_tree,
 )
+
+from ..digests import Digester
 
 
 @with_tree(tree={'sample.txt': '123',
                  '0': chr(0),
                  'long.txt': '123abz\n'*1000000})
-def test_digester(path):
+def test_digester(path=None):
     digester = Digester()
     assert_equal(
         digester(opj(path, 'sample.txt')),

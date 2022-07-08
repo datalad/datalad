@@ -14,6 +14,7 @@ import logging
 import os
 import os.path as op
 import sys
+import tempfile
 from functools import partial
 from collections import OrderedDict
 
@@ -138,7 +139,37 @@ def _describe_system():
                                   _t2s(pl.win32_ver())]).rstrip(),
         'max_path_length': get_max_path_length(getpwd()),
         'encoding': get_encoding_info(),
+        'filesystem': {l: _get_fs_type(l, p) for l, p in
+                       [('CWD', Path.cwd()),
+                        ('TMP', Path(tempfile.gettempdir())),
+                        ('HOME', Path.home())]}
     }
+
+
+def _get_fs_type(loc, path):
+    """Return file system info for given Paths. Provide pathlib path as input"""
+    res = {'path': path}
+    try:
+        from psutil import disk_partitions
+        parts = {Path(p.mountpoint): p  for p in disk_partitions()}
+        match = None
+        for mp in parts:
+            # if the mountpoint is the test path or its parent
+            # take it, whenever there is no match, or a longer match
+            if (mp == path or mp in path.parents) and (
+                    match is None or len(p.parents) > len(match.parents)):
+                match = mp
+        match = parts[match]
+        for sattr, tattr in (('fstype', 'type'),
+                             ('maxpath', 'max_pathlength'),
+                             ('opts', 'mount_opts')):
+            if hasattr(match, sattr):
+                res[tattr] = getattr(match, sattr)
+    except Exception as exc:
+        ce = CapturedException(exc)
+        # if an exception occurs, leave out the fs type. The result renderer can
+        # display a hint based on its lack in the report
+    return res
 
 
 def _describe_environment():
@@ -491,6 +522,23 @@ class WTF(Interface):
         from datalad.ui import ui
         out = _render_report(res)
         ui.message(out)
+        # add any necessary hints afterwards
+        maybe_show_hints(res)
+
+
+def maybe_show_hints(res):
+    """Helper to add hints to custom result rendering"""
+    # check for missing file system info
+    # if the system record lacks file system information, hint at a psutil
+    # problem. Query for TMP should be safe, is included in system info
+    from datalad.ui.utils import show_hint
+
+    if 'system' in res.get('infos', {}) and \
+        'type' not in res['infos']['system']['filesystem']['TMP']:
+        try:
+            import psutil
+        except ImportError:
+            show_hint('Hint: install psutil to get filesystem information')
 
 
 def _render_report(res):

@@ -7,9 +7,9 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from .utils import *
-
 from ..support.strings import apply_replacement_rules
+from .utils_pytest import *
+
 
 def test_apply_replacement_rules():
     # replacement rule should be at least 3 char long

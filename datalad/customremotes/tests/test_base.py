@@ -11,13 +11,15 @@
 
 from os.path import isabs
 
+import pytest
+
 from datalad.api import (
     Dataset,
     clone,
 )
 from datalad.consts import DATALAD_SPECIAL_REMOTE
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_not_in,
@@ -38,7 +40,7 @@ from ..base import (
 # PermissionError: [WinError 32] The process cannot access the file because it is being used by another process:
 @known_failure_githubci_win
 @with_tree(tree={'file.dat': ''})
-def test_get_contentlocation(tdir):
+def test_get_contentlocation(tdir=None):
     repo = AnnexRepo(tdir, create=True, init=True)
     repo.add('file.dat')
     repo.commit('added file.dat')
@@ -61,7 +63,7 @@ def test_ensure_datalad_remote_unkown_remote():
 
 
 @with_tempfile
-def test_ensure_datalad_remote_init_and_enable_needed(path):
+def test_ensure_datalad_remote_init_and_enable_needed(path=None):
     from datalad.consts import DATALAD_SPECIAL_REMOTE
     ds = Dataset(path).create(force=True)
     repo = ds.repo
@@ -70,8 +72,9 @@ def test_ensure_datalad_remote_init_and_enable_needed(path):
     assert_in(DATALAD_SPECIAL_REMOTE, repo.get_remotes())
 
 
+@pytest.mark.parametrize("autoenable", [False, True])
 @with_tempfile
-def check_ensure_datalad_remote_maybe_enable(autoenable, path):
+def test_ensure_datalad_remote_maybe_enable(path=None, *, autoenable):
     path = Path(path)
     ds_a = Dataset(path / "a").create(force=True)
     init_datalad_remote(ds_a.repo, DATALAD_SPECIAL_REMOTE,
@@ -83,8 +86,3 @@ def check_ensure_datalad_remote_maybe_enable(autoenable, path):
         assert_not_in("datalad", repo.get_remotes())
     ensure_datalad_remote(repo)
     assert_in("datalad", repo.get_remotes())
-
-
-def test_ensure_datalad_remote_maybe_enable():
-    yield check_ensure_datalad_remote_maybe_enable, False
-    yield check_ensure_datalad_remote_maybe_enable, True

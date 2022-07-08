@@ -1,23 +1,20 @@
 """Utils for cached test datasets"""
 
 from datalad import cfg
-from datalad.core.distributed.clone import (
-    Clone,
-)
+from datalad.core.distributed.clone import Clone
 from datalad.distribution.dataset import Dataset
-from datalad.utils import (
-    better_wraps,
-    ensure_list,
-    optional_args,
-    Path,
-    rmtree
-)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_REMOTE,
     with_tempfile,
 )
-
+from datalad.utils import (
+    Path,
+    better_wraps,
+    ensure_list,
+    optional_args,
+    rmtree,
+)
 
 DATALAD_TESTS_CACHE = cfg.obtain("datalad.tests.cache")
 

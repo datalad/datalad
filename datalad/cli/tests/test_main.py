@@ -13,6 +13,8 @@ import re
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 import datalad
 from datalad import __version__
 from datalad.api import (
@@ -21,7 +23,8 @@ from datalad.api import (
 )
 from datalad.cmd import StdOutErrCapture
 from datalad.cmd import WitlessRunner as Runner
-from datalad.tests.utils import (
+from datalad.interface.base import get_interface_groups
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,
@@ -33,21 +36,18 @@ from datalad.tests.utils import (
     ok_,
     ok_startswith,
     on_windows,
-    slow,
     skip_if_no_module,
+    slow,
     with_tempfile,
 )
 from datalad.ui.utils import (
     get_console_width,
     get_terminal_size,
 )
-from datalad.utils import (
-    chpwd,
-)
-from datalad.interface.base import get_interface_groups
+from datalad.utils import chpwd
 
-from ..main import main
 from ..helpers import get_commands_from_groups
+from ..main import main
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -73,13 +73,14 @@ def run_main(args, exit_code=0, expect_stderr=False):
         # sys.stdout but also from the UI, which insists on holding
         # a dedicated handle
         fakeout = StringIO()
-        with patch('sys.stderr', new_callable=StringIO) as cmerr, \
+        fakeerr = StringIO()
+        with patch('sys.stderr', new=fakeerr) as cmerr, \
              patch('sys.stdout', new=fakeout) as cmout, \
              patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
             with assert_raises(SystemExit) as cm:
                 main(["datalad"] + list(args))
             eq_('cmdline', datalad.get_apimode())
-            assert_equal(cm.exception.code, exit_code)
+            assert_equal(cm.value.code, exit_code)
             stdout = cmout.getvalue()
             stderr = cmerr.getvalue()
             if expect_stderr is False:
@@ -203,7 +204,21 @@ def test_combined_short_option():
     assert_in("too few arguments", stderr)
 
 
-def check_incorrect_option(opts, err_str):
+# apparently a bit different if following a good one so let's do both
+err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
+err_insufficient = err_invalid  # "specify"
+
+
+@pytest.mark.parametrize(
+    "opts,err_str",
+    [
+        (('--buga',), err_invalid),
+        (('--dbg', '--buga'), err_invalid),
+        (('--dbg',), err_insufficient),
+        (tuple(), err_insufficient),
+    ]
+)
+def test_incorrect_option(opts, err_str):
     # The first line used to be:
     # stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
     # But: what do we expect to be in sys.argv[0] here?
@@ -225,18 +240,15 @@ def check_incorrect_option(opts, err_str):
     assert_re_in(err_str, out, match=False)
 
 
-def test_incorrect_options():
-    # apparently a bit different if following a good one so let's do both
-    err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
-    yield check_incorrect_option, ('--buga',), err_invalid
-    yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
-
-    err_insufficient = err_invalid  # "specify"
-    yield check_incorrect_option, ('--dbg',), err_insufficient
-    yield check_incorrect_option, tuple(), err_insufficient
-
-
-def check_script_shims(script):
+@pytest.mark.parametrize(
+    "script",
+    [
+        'datalad',
+        'git-annex-remote-datalad-archives',
+        'git-annex-remote-datalad',
+    ]
+)
+def test_script_shims(script):
     runner = Runner()
     if not on_windows:
 
@@ -257,18 +269,9 @@ def check_script_shims(script):
                  get_numeric_portion(version))
 
 
-def test_script_shims():
-    for script in [
-        'datalad',
-        'git-annex-remote-datalad-archives',
-        'git-annex-remote-datalad',
-    ]:
-        yield check_script_shims, script
-
-
 @slow  # 11.2591s
 @with_tempfile(mkdir=True)
-def test_cfg_override(path):
+def test_cfg_override(path=None):
     with chpwd(path):
         cmd = ['datalad', 'wtf', '-s', 'some']
         # control
@@ -311,7 +314,7 @@ def test_incorrect_cfg_override():
 
 
 @with_tempfile
-def test_librarymode(path):
+def test_librarymode(path=None):
     Dataset(path).create()
     was_mode = datalad.__runtime_mode
     try:
@@ -329,7 +332,7 @@ def test_librarymode(path):
 
 
 @with_tempfile
-def test_completion(out_fn):
+def test_completion(out_fn=None):
     skip_if_no_module('argcomplete')
 
     from datalad.cmd import WitlessRunner

@@ -11,27 +11,26 @@ import logging
 import os.path as op
 
 from datalad.support.json_py import (
+    JSONDecodeError,
     dump,
     dump2stream,
     dump2xzstream,
+    load,
     load_stream,
     load_xzstream,
-    load,
     loads,
-    JSONDecodeError,
 )
-
-from datalad.tests.utils import (
-    with_tempfile,
-    eq_,
-    assert_raises,
+from datalad.tests.utils_pytest import (
     assert_in,
+    assert_raises,
+    eq_,
     swallow_logs,
+    with_tempfile,
 )
 
 
 @with_tempfile(content=b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
-def test_load_screwy_unicode(fname):
+def test_load_screwy_unicode(fname=None):
     # test that we can tollerate some screwy unicode embeddings within json
     assert_raises(JSONDecodeError, load, fname, fixup=False)
     with swallow_logs(new_level=logging.WARNING) as cml:
@@ -42,7 +41,7 @@ def test_load_screwy_unicode(fname):
 @with_tempfile(content=u"""\
 {"key0": "a b"}
 {"key1": "plain"}""".encode("utf-8"))
-def test_load_unicode_line_separator(fname):
+def test_load_unicode_line_separator(fname=None):
     # See gh-3523.
     result = list(load_stream(fname))
     eq_(len(result), 2)
@@ -59,7 +58,7 @@ def test_loads():
 
 
 @with_tempfile(mkdir=True)
-def test_compression(path):
+def test_compression(path=None):
     fname = op.join(path, 'test.json.xz')
     content = 'dummy'
     # dump compressed
@@ -73,7 +72,7 @@ def test_compression(path):
 
 
 @with_tempfile
-def test_dump(path):
+def test_dump(path=None):
     assert(not op.exists(path))
     # dump is nice and create the target directory
     dump('some', op.join(path, 'file.json'))
@@ -82,7 +81,7 @@ def test_dump(path):
 
 # at least a smoke test
 @with_tempfile
-def test_dump2stream(path):
+def test_dump2stream(path=None):
     stream = [dict(a=5), dict(b=4)]
     dump2stream([dict(a=5), dict(b=4)], path)
     eq_(list(load_stream(path)), stream)

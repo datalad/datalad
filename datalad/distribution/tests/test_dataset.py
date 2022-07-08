@@ -11,34 +11,30 @@
 
 import os
 import os.path as op
+from os.path import abspath
+from os.path import join as opj
 from os.path import (
-    abspath,
-    join as opj,
     lexists,
     relpath,
 )
-from ..dataset import (
-    Dataset,
-    EnsureDataset,
-    require_dataset,
-    resolve_path,
-)
+
+import pytest
+
+import datalad.utils as ut
 from datalad import cfg as dl_cfg
 from datalad.api import (
+    clone,
     create,
     get,
 )
-import datalad.utils as ut
-from datalad.utils import (
-    _path_,
-    chpwd,
-    on_windows,
-    Path,
-    rmtree,
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    NoDatasetFound,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_equal,
     assert_false,
     assert_is,
@@ -54,16 +50,23 @@ from datalad.tests.utils import (
     assert_true,
     eq_,
     known_failure_windows,
-    OBSCURE_FILENAME,
     ok_,
-    SkipTest,
     swallow_logs,
     with_tempfile,
-    with_testrepos,
 )
-from datalad.support.exceptions import (
-    InsufficientArgumentsError,
-    NoDatasetFound,
+from datalad.utils import (
+    Path,
+    _path_,
+    chpwd,
+    on_windows,
+    rmtree,
+)
+
+from ..dataset import (
+    Dataset,
+    EnsureDataset,
+    require_dataset,
+    resolve_path,
 )
 
 
@@ -88,19 +91,22 @@ def test_EnsureDataset():
 
 # TODO: test remember/recall more extensive?
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:531
-@known_failure_windows
-@with_testrepos('submodule_annex')
 @with_tempfile(mkdir=True)
-def test_is_installed(src, path):
+@with_tempfile(mkdir=True)
+def test_is_installed(src=None, path=None):
+    ca = dict(result_renderer='disabled')
+    # a remote dataset with a subdataset underneath
+    origds = Dataset(src).create(**ca)
+    _ = origds.create('subm 1', **ca)
+
     ds = Dataset(path)
     assert_false(ds.is_installed())
 
     # get a clone:
-    AnnexRepo.clone(src, path)
+    clone(src, path, **ca)
     ok_(ds.is_installed())
     # submodule still not installed:
-    subds = Dataset(opj(path, 'subm 1'))
+    subds = Dataset(ds.pathobj / 'subm 1')
     assert_false(subds.is_installed())
     # We must not be able to create a new repository under a known
     # subdataset path.
@@ -110,20 +116,16 @@ def test_is_installed(src, path):
     res = subds.create(on_failure='ignore',
                        return_type='list',
                        result_filter=None,
-                       result_xfm=None)
+                       result_xfm=None,
+                       **ca)
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, status='error', path=subds.path,
         message=('collision with %s (dataset) in dataset %s',
                  subds.path, ds.path))
     # get the submodule
-    # This would init so there is a .git file with symlink info, which is
-    # as we agreed is more pain than gain, so let's use our install which would
-    # do it right, after all we are checking 'is_installed' ;)
-    # from datalad.cmd import Runner
-    # Runner().run(['git', 'submodule', 'update', '--init', 'subm 1'], cwd=path)
-    with chpwd(path):
-        get('subm 1')
+    with chpwd(ds.path):
+        get('subm 1', **ca)
     ok_(subds.is_installed())
     # wipe it out
     rmtree(ds.path)
@@ -131,7 +133,7 @@ def test_is_installed(src, path):
 
 
 @with_tempfile(mkdir=True)
-def test_dataset_constructor(path):
+def test_dataset_constructor(path=None):
     # dataset needs a path
     assert_raises(TypeError, Dataset)
     assert_raises(ValueError, Dataset, None)
@@ -153,7 +155,7 @@ def test_dataset_constructor(path):
 
 
 @with_tempfile(mkdir=True)
-def test_repo_cache(path):
+def test_repo_cache(path=None):
     ds = Dataset(path)
     # none by default
     eq_(ds.repo, None)
@@ -172,7 +174,7 @@ def test_repo_cache(path):
 
 
 @with_tempfile(mkdir=True)
-def test_subdatasets(path):
+def test_subdatasets(path=None):
     # from scratch
     ds = Dataset(path)
     assert_false(ds.is_installed())
@@ -251,7 +253,7 @@ def test_subdatasets(path):
 
 
 @with_tempfile(mkdir=True)
-def test_hat_dataset_more(path):
+def test_hat_dataset_more(path=None):
     # from scratch
     ds = Dataset(path).create()
     # add itself as a subdataset (crazy, isn't it?)
@@ -265,8 +267,9 @@ def test_hat_dataset_more(path):
         eq_(Dataset('^'), ds)
 
 
+@pytest.mark.parametrize("ds_path", ["simple-path", OBSCURE_FILENAME])
 @with_tempfile(mkdir=True)
-def check_require_dataset(ds_path, topdir):
+def test_require_dataset(topdir=None, *, ds_path):
     path = opj(topdir, ds_path)
     os.mkdir(path)
     with chpwd(path):
@@ -290,13 +293,8 @@ def check_require_dataset(ds_path, topdir):
             check_installed=True)
 
 
-def test_require_dataset():
-    yield check_require_dataset, "simple-path"
-    yield check_require_dataset, OBSCURE_FILENAME
-
-
 @with_tempfile(mkdir=True)
-def test_dataset_id(path):
+def test_dataset_id(path=None):
 
     ds = Dataset(path)
     assert_equal(ds.id, None)
@@ -345,7 +343,7 @@ def test_dataset_id(path):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_Dataset_flyweight(path1, path2):
+def test_Dataset_flyweight(path1=None, path2=None):
 
     import gc
     import sys
@@ -436,7 +434,7 @@ def test_Dataset_flyweight(path1, path2):
 
 
 @with_tempfile
-def test_property_reevaluation(repo1):
+def test_property_reevaluation(repo1=None):
     ds = Dataset(repo1)
     assert_is_none(ds.repo)
     assert_is_not_none(ds.config)
@@ -491,7 +489,7 @@ def test_property_reevaluation(repo1):
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
+def test_symlinked_dataset_properties(repo1=None, repo2=None, repo3=None, non_repo=None, symlink=None):
 
     ds = Dataset(repo1).create()
 
@@ -541,7 +539,7 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
 
 @with_tempfile(mkdir=True)
-def test_resolve_path(path):
+def test_resolve_path(path=None):
     if str(Path(path).resolve()) != path:
         raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
@@ -603,7 +601,7 @@ def test_resolve_path(path):
 # little brother of the test above, but actually (must) run
 # under any circumstances
 @with_tempfile(mkdir=True)
-def test_resolve_path_symlink_edition(path):
+def test_resolve_path_symlink_edition(path=None):
     deepest = ut.Path(path) / 'one' / 'two' / 'three'
     deepest_str = str(deepest)
     os.makedirs(deepest_str)
@@ -626,7 +624,7 @@ def test_resolve_path_symlink_edition(path):
 
 
 @with_tempfile(mkdir=True)
-def test_hashable(path):
+def test_hashable(path=None):
     path = ut.Path(path)
     tryme = set()
     # is it considered hashable at all

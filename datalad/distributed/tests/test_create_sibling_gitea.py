@@ -9,7 +9,7 @@
 
 
 from datalad.api import create_sibling_gitea
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     skip_if_no_network,
     with_tempfile,
 )
@@ -19,7 +19,7 @@ from .test_create_sibling_ghlike import check4real
 
 @skip_if_no_network
 @with_tempfile
-def test_gitea(path):
+def test_gitea(path=None):
     check4real(
         create_sibling_gitea,
         path,

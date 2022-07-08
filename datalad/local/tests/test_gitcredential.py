@@ -10,7 +10,7 @@
 from datalad.api import Dataset
 from datalad.downloaders.credentials import UserPassword
 from datalad.local.gitcredential import GitCredentialInterface
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_is_instance,
     assert_not_in,
@@ -19,22 +19,22 @@ from datalad.tests.utils import (
     with_tempfile,
 )
 from datalad.utils import (
-    chpwd,
     Path,
+    chpwd,
 )
 
 
 @with_tempfile
-def test_gitcredential_interface(path):
+def test_gitcredential_interface(path=None):
     # use a dataset as a local configuration vehicle
     ds = Dataset(path).create()
 
     # preserve credentials between git processes for a brief time
     # credential-cache is not supported on windows (needs UNIX sockets)
-    # ds.config.set('credential.helper', 'cache', where='local')
+    # ds.config.set('credential.helper', 'cache', scope='local')
     # However, first set an empty helper in order to disable already set helpers
-    ds.config.set('credential.helper', '', where='local')
-    ds.config.set('credential.helper', 'store', where='local')
+    ds.config.set('credential.helper', '', scope='local')
+    ds.config.set('credential.helper', 'store', scope='local')
 
     # git manages credentials by target URL
     credurl = 'https://example.datalad.org/somepath'
@@ -71,14 +71,14 @@ def test_gitcredential_interface(path):
 
 
 @with_tempfile
-def test_datalad_credential_helper(path):
+def test_datalad_credential_helper(path=None):
 
     ds = Dataset(path).create()
 
     # tell git to use git-credential-datalad
-    ds.config.add('credential.helper', 'datalad', where='local')
+    ds.config.add('credential.helper', 'datalad', scope='local')
     ds.config.add('datalad.credentials.githelper.noninteractive', 'true',
-                  where='global')
+                  scope='global')
 
     from datalad.downloaders.providers import Providers
 
@@ -154,7 +154,7 @@ def test_datalad_credential_helper(path):
 
 
 @with_tempfile
-def test_credential_cycle(path):
+def test_credential_cycle(path=None):
 
     # Test that we break a possible cycle when DataLad is configured to query
     # git-credential and Git is configured to query Datalad.
@@ -165,14 +165,14 @@ def test_credential_cycle(path):
     ds = Dataset(path).create()
 
     # tell git to use git-credential-datalad
-    ds.config.add('credential.helper', 'datalad', where='local')
+    ds.config.add('credential.helper', 'datalad', scope='local')
     ds.config.add('datalad.credentials.githelper.noninteractive', 'true',
-                  where='global')
+                  scope='global')
 
     provider_dir = ds.pathobj / '.datalad' / 'providers'
     provider_dir.mkdir(parents=True, exist_ok=True)
     provider_cfg = provider_dir / 'test_cycle.cfg'
-    provider_cfg.write_text("""
+    provider_cfg.write_text(r"""
 [provider:test_cycle]
     url_re = http.*://.*data\.example\.com
     authentication_type = http_basic_auth

@@ -2,7 +2,6 @@
 # Ideas borrowed from scikit-learn's and PyMVPA Makefiles  -- thanks!
 
 PYTHON ?= python
-NOSETESTS ?= $(PYTHON) -m nose
 
 MODULE ?= datalad
 
@@ -17,16 +16,6 @@ clean:
 bin:
 	mkdir -p $@
 	PYTHONPATH="bin:$(PYTHONPATH)" $(PYTHON) setup.py develop --install-dir $@
-
-test-code: bin
-	PATH="bin:$(PATH)" PYTHONPATH="bin:$(PYTHONPATH)" $(NOSETESTS) -s -v $(MODULE)
-
-test-coverage:
-	rm -rf coverage .coverage
-	$(NOSETESTS) -s -v --with-coverage $(MODULE)
-
-test: test-code
-
 
 trailing-spaces:
 	find $(MODULE) -name "*.py" -exec perl -pi -e 's/[ \t]*$$//' {} \;

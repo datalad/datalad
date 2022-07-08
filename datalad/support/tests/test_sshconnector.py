@@ -15,15 +15,11 @@ from os.path import (
     exists,
     getmtime,
     isdir,
-    join as opj,
 )
+from os.path import join as opj
 
-from datalad.tests.utils import SkipTest
-
-
-from datalad.utils import Path
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_false,
     assert_in,
     assert_is_instance,
@@ -40,15 +36,17 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
+from datalad.utils import Path
+
 from ..sshconnector import (
+    MultiplexSSHConnection,
+    MultiplexSSHManager,
+    NoMultiplexSSHConnection,
     SSHConnection,
     SSHManager,
-    MultiplexSSHManager,
-    MultiplexSSHConnection,
-    NoMultiplexSSHConnection,
+    get_connection_hash,
     sh_quote,
 )
-from ..sshconnector import get_connection_hash
 
 # Some tests test the internals and assumptions of multiplex connections
 _ssh_manager_is_multiplex = SSHManager is MultiplexSSHManager
@@ -97,7 +95,7 @@ def test_ssh_get_connection():
 @with_tree(tree={'f0': 'f0', 'f1': 'f1'})
 @with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
-def test_ssh_open_close(tmp_path, tfile1):
+def test_ssh_open_close(tmp_path=None, tfile1=None):
 
     manager = SSHManager()
 
@@ -178,7 +176,7 @@ def test_ssh_manager_close():
 
 
 @with_tempfile
-def test_ssh_manager_close_no_throw(bogus_socket):
+def test_ssh_manager_close_no_throw(bogus_socket=None):
     manager = MultiplexSSHManager()
 
     class bogus:
@@ -319,7 +317,7 @@ def test_ssh_git_props():
 @skip_if_on_windows
 @skip_ssh
 @with_tempfile(mkdir=True)
-def test_bundle_invariance(path):
+def test_bundle_invariance(path=None):
     remote_url = 'ssh://datalad-test'
     manager = SSHManager()
     testfile = Path(path) / 'dummy'

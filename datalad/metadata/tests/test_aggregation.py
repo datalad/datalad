@@ -15,8 +15,7 @@ from os.path import join as opj
 
 from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_false,
     assert_not_in,
@@ -64,7 +63,7 @@ _dataset_hierarchy_template = {
 @slow  # 20sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-def test_basic_aggregate(path):
+def test_basic_aggregate(path=None):
     # TODO give datasets some more metadata to actually aggregate stuff
     base = Dataset(opj(path, 'origin')).create(force=True)
     sub = base.create('sub', force=True)
@@ -127,7 +126,7 @@ def test_basic_aggregate(path):
 }
 """}}},
 })
-def test_aggregate_query(path):
+def test_aggregate_query(path=None):
     ds = Dataset(path).create(force=True)
     # no magic change to actual dataset metadata due to presence of
     # aggregated metadata
@@ -149,7 +148,7 @@ def test_aggregate_query(path):
 @slow  # 23sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-def test_reaggregate_with_unavailable_objects(path):
+def test_reaggregate_with_unavailable_objects(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -167,7 +166,7 @@ def test_reaggregate_with_unavailable_objects(path):
     eq_(len(objs), 6)
     eq_(all(base.repo.file_has_content(objs)), True)
     # drop all object content
-    base.drop(objs, check=False)
+    base.drop(objs, reckless='kill')
     eq_(all(base.repo.file_has_content(objs)), False)
     assert_repo_status(base.path)
     # now re-aggregate, the state hasn't changed, so the file names will
@@ -185,7 +184,7 @@ def test_reaggregate_with_unavailable_objects(path):
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
-def test_aggregate_with_unavailable_objects_from_subds(path, target):
+def test_aggregate_with_unavailable_objects_from_subds(path=None, target=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -224,7 +223,7 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree=_dataset_hierarchy_template)
-def test_publish_aggregated(path):
+def test_publish_aggregated(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -274,7 +273,7 @@ def _get_referenced_objs(ds):
 
 @known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
 @with_tree(tree=_dataset_hierarchy_template)
-def test_aggregate_removal(path):
+def test_aggregate_removal(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -292,7 +291,7 @@ def test_aggregate_removal(path):
     eq_(_get_contained_objs(base), _get_referenced_objs(base))
     # now delete the deepest subdataset to test cleanup of aggregated objects
     # in the top-level ds
-    base.remove(opj('sub', 'subsub'), check=False)
+    base.remove(opj('sub', 'subsub'), reckless='kill')
     # now aggregation has to detect that subsub is not simply missing, but gone
     # for good
     base.aggregate_metadata(recursive=True, update_mode='all')
@@ -313,7 +312,7 @@ def test_aggregate_removal(path):
 @slow  # 22sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-def test_update_strategy(path):
+def test_update_strategy(path=None):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
     with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
@@ -373,7 +372,7 @@ def test_update_strategy(path):
     'this': 'that',
     'sub1': {'here': 'there'},
     'sub2': {'down': 'under'}})
-def test_partial_aggregation(path):
+def test_partial_aggregation(path=None):
     ds = Dataset(path).create(force=True)
     sub1 = ds.create('sub1', force=True)
     sub2 = ds.create('sub2', force=True)

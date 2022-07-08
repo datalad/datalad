@@ -230,7 +230,6 @@ class Save(Interface):
                 dataset=dataset,
                 path=path,
                 untracked=untracked_mode,
-                report_filetype=False,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',

@@ -1,17 +1,18 @@
-from ..interface import (
-    alter_interface_docs_for_cmdline,
-    get_cmdline_command_name,
+from datalad.interface.tests.test_docs import (
+    demo_argdoc,
+    demo_doc,
+    demo_paramdoc,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_not_in,
     eq_,
 )
-from datalad.interface.tests.test_docs import (
-    demo_doc,
-    demo_argdoc,
-    demo_paramdoc,
+
+from ..interface import (
+    alter_interface_docs_for_cmdline,
+    get_cmdline_command_name,
 )
 
 

@@ -7,12 +7,17 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from ..stats import ActivityStats, _COUNTS
+from ...tests.utils_pytest import (
+    assert_equal,
+    assert_in,
+    assert_not_equal,
+    assert_raises,
+)
+from ..stats import (
+    _COUNTS,
+    ActivityStats,
+)
 
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_not_equal
-from ...tests.utils import assert_raises
-from ...tests.utils import assert_in
 
 def test_ActivityStats_basic():
     stats = ActivityStats()

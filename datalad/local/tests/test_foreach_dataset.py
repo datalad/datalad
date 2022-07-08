@@ -8,12 +8,13 @@
 """Test foreach-dataset command"""
 
 import sys
-
 from pathlib import Path
+
+import pytest
 
 from datalad.api import create
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_greater,
     assert_in,
@@ -39,7 +40,7 @@ def _without_command(results):
 
 
 @with_tempfile(mkdir=True)
-def check_basic_resilience(populator, path):
+def check_basic_resilience(populator, path=None):
     ds = populator(path)
     ds.save()
     kwargs = dict(recursive=True)
@@ -86,11 +87,14 @@ def check_basic_resilience(populator, path):
         ok_clean_git(ds.path)
 
 
-def test_basic_resilience():
+@pytest.mark.parametrize("populator", [
     # empty dataset
-    yield check_basic_resilience, create
+    create,
     # ver much not empty dataset
-    yield check_basic_resilience, get_deeply_nested_structure
+    get_deeply_nested_structure,
+])
+def test_basic_resilience(populator):
+    check_basic_resilience(populator)
 
 
 @with_tempfile(mkdir=True)
@@ -120,12 +124,12 @@ def check_python_exec(cmd, path):
 
 
 def test_python():
-    yield check_python_eval, "dir()"
-    yield check_python_exec, "dir()"
+    check_python_eval("dir()")
+    check_python_exec("dir()")
 
     def dummy_dir(*args, **kwargs):
         """Ensure that we pass all placeholders as kwargs"""
         assert not args
         return kwargs
 
-    yield check_python_eval, dummy_dir  # direct function invocation
+    check_python_eval(dummy_dir)  # direct function invocation

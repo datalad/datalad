@@ -10,31 +10,33 @@
 """
 
 from os import curdir
-from os.path import (
-    join as opj,
-    basename,
-)
+from os.path import basename
+from os.path import join as opj
 from unittest.mock import patch
 
+import pytest
+
 from datalad.api import (
+    clone,
     create,
     get,
     install,
 )
+from datalad.distribution.get import (
+    _get_flexible_source_candidates_for_submodule,
+)
 from datalad.interface.results import only_matching_paths
-from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
     RemoteNotAvailableError,
 )
 from datalad.support.network import get_local_file_url
-from datalad.tests.utils import (
-    ok_,
-    eq_,
-    with_tempfile,
-    with_testrepos,
-    with_tree,
+from datalad.tests.utils_testdatasets import (
+    _make_dataset_hierarchy,
+    _mk_submodule_annex,
+)
+from datalad.tests.utils_pytest import (
     create_tree,
     assert_false,
     assert_raises,
@@ -46,41 +48,32 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_message,
     DEFAULT_REMOTE,
+    eq_,
+    known_failure_windows,
+    known_failure_githubci_win,
+    ok_,
     serve_path_via_http,
     skip_if_adjusted_branch,
     skip_ssh,
     skip_if_on_windows,
     slow,
-    known_failure_windows,
-    known_failure_githubci_win,
+    with_tempfile,
+    with_tree,
 )
 from datalad.utils import (
-    with_pathsep,
-    chpwd,
     Path,
+    chpwd,
     rmtree,
+    with_pathsep,
 )
+
 from ..dataset import Dataset
 
 
-def _make_dataset_hierarchy(path):
-    origin = Dataset(path).create()
-    origin_sub1 = origin.create('sub1')
-    origin_sub2 = origin_sub1.create('sub2')
-    with open(opj(origin_sub2.path, 'file_in_annex.txt'), "w") as f:
-        f.write('content2')
-    origin_sub3 = origin_sub2.create('sub3')
-    with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
-        f.write('content3')
-    origin_sub4 = origin_sub3.create('sub4')
-    origin.save(recursive=True)
-    return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
-
-
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
+def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
     f = _get_flexible_source_candidates_for_submodule
     # for now without mocking -- let's just really build a dataset
     ds = create(t)
@@ -196,7 +189,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(content="doesntmatter")
-def test_get_invalid_call(path, file_outside):
+def test_get_invalid_call(path=None, file_outside=None):
 
     # no argument at all:
     assert_raises(InsufficientArgumentsError, get, None)
@@ -225,9 +218,9 @@ def test_get_invalid_call(path, file_outside):
     create_tree(path, {'annexed.dat': 'some'})
     ds.save("annexed.dat")
     ds.repo.drop("annexed.dat", options=['--force'])
-    with assert_raises(RemoteNotAvailableError) as ce:
+    with assert_raises(RemoteNotAvailableError) as cme:
         ds.get("annexed.dat", source='MysteriousRemote')
-    eq_("MysteriousRemote", ce.exception.remote)
+    eq_("MysteriousRemote", cme.value.remote)
 
     res = ds.get("NotExistingFile.txt", on_failure='ignore')
     assert_status('impossible', res)
@@ -240,13 +233,19 @@ def test_get_invalid_call(path, file_outside):
         message=('path not associated with dataset %s', ds))
 
 
-@with_testrepos('basic_annex', flavors='clone')
-def test_get_single_file(path):
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_single_file(src=None, path=None):
+    ca = dict(result_renderer='disabled')
+    test_fname = 'test-annex.dat'
+    orig = Dataset(src).create(**ca)
+    (orig.pathobj / test_fname).write_text('some')
+    orig.save(**ca)
 
-    ds = Dataset(path)
+    ds = clone(src, path, **ca)
     ok_(ds.is_installed())
     ok_(ds.repo.file_has_content('test-annex.dat') is False)
-    result = ds.get("test-annex.dat")
+    result = ds.get("test-annex.dat", **ca)
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
@@ -256,8 +255,9 @@ def test_get_single_file(path):
     ok_(annexprops['has_content'])
 
 
+@pytest.mark.parametrize("override", [False, True])
 @with_tempfile(mkdir=True)
-def check_get_subdataset_inherit_reckless(override, path):
+def test_get_subdataset_inherit_reckless(path=None, *, override):
     src = Dataset(opj(path, "a")).create()
     src_subds = src.create("sub")
     src_subds.create("subsub")
@@ -280,19 +280,15 @@ def check_get_subdataset_inherit_reckless(override, path):
             None if override else "true")
 
 
-def test_get_subdataset_inherit_reckless():
-    yield check_get_subdataset_inherit_reckless, False
-    yield check_get_subdataset_inherit_reckless, True
-
-
 @with_tree(tree={'file1.txt': 'whatever 1',
                  'file2.txt': 'whatever 2',
                  'file3.txt': 'whatever 3',
                  'file4.txt': 'whatever 4'})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-def test_get_multiple_files(path, url, ds_dir):
+def test_get_multiple_files(path=None, url=None, ds_dir=None):
     from os import listdir
+
     from datalad.support.network import RI
 
     file_list = [f for f in listdir(path) if not f.startswith('.')]
@@ -337,7 +333,7 @@ def test_get_multiple_files(path, url, ds_dir):
                                 'file4.txt': 'something'
                             }}})
 @with_tempfile(mkdir=True)
-def test_get_recurse_dirs(o_path, c_path):
+def test_get_recurse_dirs(o_path=None, c_path=None):
 
     # prepare source:
     origin = Dataset(o_path).create(force=True)
@@ -374,12 +370,13 @@ def test_get_recurse_dirs(o_path, c_path):
 
 
 @slow  # 15.1496s
-@with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
-def test_get_recurse_subdatasets(src, path):
+@with_tempfile(mkdir=True)
+def test_get_recurse_subdatasets(src=None, path=None):
+    _mk_submodule_annex(src, 'test-annex.dat', 'irrelevant')
 
-    ds = install(
-        path, source=src,
+    ds = clone(
+        src, path,
         result_xfm='datasets', return_type='item-or-list')
 
     # ask for the two subdatasets specifically. This will obtain them,
@@ -460,9 +457,10 @@ def test_get_recurse_subdatasets(src, path):
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
 
-@with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
-def test_get_greedy_recurse_subdatasets(src, path):
+@with_tempfile(mkdir=True)
+def test_get_greedy_recurse_subdatasets(src=None, path=None):
+    _mk_submodule_annex(src, 'test-annex.dat', 'irrelevant')
 
     ds = install(
         path, source=src,
@@ -478,9 +476,10 @@ def test_get_greedy_recurse_subdatasets(src, path):
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
 
 
-@with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
-def test_get_install_missing_subdataset(src, path):
+@with_tempfile(mkdir=True)
+def test_get_install_missing_subdataset(src=None, path=None):
+    _mk_submodule_annex(src, 'test-annex.dat', 'irrelevant')
 
     ds = install(
         path=path, source=src,
@@ -510,7 +509,7 @@ def test_get_install_missing_subdataset(src, path):
 #                  'subds': {'file_in_annex.txt': 'content'}})
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_get_mixed_hierarchy(src, path):
+def test_get_mixed_hierarchy(src=None, path=None):
 
     origin = Dataset(src).create(annex=False)
     origin_sub = origin.create('subds')
@@ -540,7 +539,7 @@ def test_get_mixed_hierarchy(src, path):
 @slow  # 20 sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_get_autoresolve_recurse_subdatasets(src, path):
+def test_get_autoresolve_recurse_subdatasets(src=None, path=None):
 
     origin = Dataset(src).create()
     origin_sub = origin.create('sub')
@@ -568,7 +567,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
 @slow  # 92sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_recurse_existing(src, path):
+def test_recurse_existing(src=None, path=None):
     origin_ds = _make_dataset_hierarchy(src)
 
     # make sure recursion_limit works as expected across a range of depths
@@ -610,7 +609,7 @@ def test_recurse_existing(src, path):
 @slow  # 33sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_get_in_unavailable_subdataset(src, path):
+def test_get_in_unavailable_subdataset(src=None, path=None):
     _make_dataset_hierarchy(src)
     root = install(
         path, source=src,
@@ -635,7 +634,7 @@ def test_get_in_unavailable_subdataset(src, path):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_gh3356(src, path):
+def test_gh3356(src=None, path=None):
     # create toy version of gh-3356 scenario
     origin = Dataset(src).create()
     origin_sub = origin.create(origin.pathobj / 'subdir'/ 'subds')
@@ -657,7 +656,7 @@ def test_gh3356(src, path):
     assert_result_count(res, 2, action='get', type='file', status='ok')
     # status must report content for two files
     assert_result_count(
-        clone.status(recursive=True, annex='all', report_filetype='eval'), 2,
+        clone.status(recursive=True, annex='all'), 2,
         action='status', has_content=True)
 
 
@@ -667,7 +666,7 @@ def test_gh3356(src, path):
 @skip_if_on_windows
 @skip_ssh
 @with_tempfile(mkdir=True)
-def test_get_subdataset_direct_fetch(path):
+def test_get_subdataset_direct_fetch(path=None):
     path = Path(path)
     origin = Dataset(path / "origin").create()
     for sub in ["s0", "s1"]:
@@ -705,18 +704,18 @@ def test_get_subdataset_direct_fetch(path):
 
 
 @with_tempfile()
-def test_get_relays_command_errors(path):
+def test_get_relays_command_errors(path=None):
     ds = Dataset(path).create()
     (ds.pathobj / "foo").write_text("foo")
     ds.save()
-    ds.drop("foo", check=False)
+    ds.drop("foo", reckless='kill')
     assert_result_count(
         ds.get("foo", on_failure="ignore", result_renderer='disabled'),
         1, action="get", type="file", status="error")
 
 
 @with_tempfile()
-def test_missing_path_handling(path):
+def test_missing_path_handling(path=None):
     ds = Dataset(path).create()
     ds.save()
 
@@ -761,8 +760,8 @@ def test_missing_path_handling(path):
                  'sub2': {'file2.txt': 'content 2'}})
 @with_tempfile
 @with_tempfile
-def test_source_candidate_subdataset(store1, store2, intermediate,
-                                     super, clone):
+def test_source_candidate_subdataset(store1=None, store2=None, intermediate=None,
+                                     super=None, clone=None):
 
     # This tests the scenario of gh-6159.
     # However, the actual point is to test that `get` does not overwrite a

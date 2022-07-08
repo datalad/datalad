@@ -1,30 +1,30 @@
+from datalad.customremotes.ria_utils import (
+    UnknownLayoutVersion,
+    create_ds_in_store,
+    create_store,
+    verify_ria_url,
+)
 from datalad.distributed.ora_remote import (
     LocalIO,
-    SSHRemoteIO
+    SSHRemoteIO,
 )
-from datalad.customremotes.ria_utils import (
-    create_store,
-    create_ds_in_store,
-    verify_ria_url,
-    UnknownLayoutVersion
-)
-from datalad.utils import (
-    on_windows,
-    Path,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_equal,
     assert_raises,
     assert_true,
     rmtree,
     skip_ssh,
     with_tempfile,
-    SkipTest,
+)
+from datalad.utils import (
+    Path,
+    on_windows,
 )
 
 
 @with_tempfile
-def _test_setup_store(io_cls, io_args, store):
+def _test_setup_store(io_cls, io_args, store=None):
     io = io_cls(*io_args)
     store = Path(store)
     version_file = store / 'ria-layout-version'
@@ -60,16 +60,16 @@ def _test_setup_store(io_cls, io_args, store):
 
 def test_setup_store():
 
-    yield _test_setup_store, LocalIO, []
+    _test_setup_store(LocalIO, [])
 
     if on_windows:
         raise SkipTest('ora_remote.SSHRemoteIO stalls on Windows')
 
-    yield skip_ssh(_test_setup_store), SSHRemoteIO, ['datalad-test']
+    skip_ssh(_test_setup_store)(SSHRemoteIO, ['datalad-test'])
 
 
 @with_tempfile
-def _test_setup_ds_in_store(io_cls, io_args, store):
+def _test_setup_ds_in_store(io_cls, io_args, store=None):
     io = io_cls(*io_args)
     store = Path(store)
     # ATM create_ds_in_store doesn't care what kind of ID is provided
@@ -117,12 +117,12 @@ def _test_setup_ds_in_store(io_cls, io_args, store):
 
 def test_setup_ds_in_store():
 
-    yield _test_setup_ds_in_store, LocalIO, []
+    _test_setup_ds_in_store(LocalIO, [])
 
     if on_windows:
         raise SkipTest('ora_remote.SSHRemoteIO stalls on Windows')
 
-    yield skip_ssh(_test_setup_ds_in_store), SSHRemoteIO, ['datalad-test']
+    skip_ssh(_test_setup_ds_in_store)(SSHRemoteIO, ['datalad-test'])
 
 
 def test_verify_ria_url():

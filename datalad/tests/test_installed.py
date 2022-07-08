@@ -10,19 +10,18 @@
 """
 
 import os
-
 from unittest.mock import patch
-from datalad.tests.utils import (
-    ok_startswith,
-    eq_,
-    assert_cwd_unchanged,
-)
 
 from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
 from datalad.support.exceptions import CommandError
+from datalad.tests.utils_pytest import (
+    assert_cwd_unchanged,
+    eq_,
+    ok_startswith,
+)
 
 
 def check_run_and_get_output(cmd):

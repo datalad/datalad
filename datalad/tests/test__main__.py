@@ -8,19 +8,22 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import sys
-
-from unittest.mock import patch
 from io import StringIO
-from datalad.tests.utils import (
+from unittest.mock import patch
+
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_raises,
 )
 
-from .. import __main__, __version__
+from .. import (
+    __main__,
+    __version__,
+)
 
 
 @patch('sys.stdout', new_callable=StringIO)
-def test_main_help(stdout):
+def test_main_help(stdout=None):
     assert_raises(SystemExit, __main__.main, ['__main__.py', '--help'])
     assert(
         stdout.getvalue().startswith(
@@ -28,6 +31,6 @@ def test_main_help(stdout):
     ))
 
 @patch('sys.stdout', new_callable=StringIO)
-def test_main_version(stdout):
+def test_main_version(stdout=None):
     assert_raises(SystemExit, __main__.main, ['__main__.py', '--version'])
     assert_equal(stdout.getvalue().rstrip(), "datalad %s" % __version__)

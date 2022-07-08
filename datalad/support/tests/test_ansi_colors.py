@@ -10,12 +10,12 @@
 
 import os
 from unittest.mock import patch
-from datalad.tests.utils import (
+
+from datalad.support import ansi_colors as colors
+from datalad.tests.utils_pytest import (
     assert_equal,
     patch_config,
 )
-
-from datalad.support import ansi_colors as colors
 
 
 def test_color_enabled():

@@ -9,34 +9,34 @@
 
 
 import os
+from os.path import join as opj
 from os.path import (
-    join as opj,
-    relpath,
     pardir,
+    relpath,
 )
 
-from datalad.distribution.dataset import Dataset
 from datalad.api import (
     clone,
     create,
     subdatasets,
 )
-from datalad.utils import (
-    chpwd,
-    Path,
-    PurePosixPath,
-)
-from datalad.tests.utils import (
-    assert_true,
+from datalad.distribution.dataset import Dataset
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_in,
     assert_not_in,
     assert_repo_status,
     assert_result_count,
     assert_status,
+    assert_true,
     eq_,
     slow,
     with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    chpwd,
 )
 
 
@@ -47,7 +47,7 @@ def _p(rpath):
 @slow  # 13sec on travis
 @with_tempfile
 @with_tempfile
-def test_get_subdatasets(origpath, path):
+def test_get_subdatasets(origpath=None, path=None):
     # setup
     orig = Dataset(origpath).create()
     orig_sub = orig.create('sub dataset1')
@@ -285,7 +285,7 @@ def test_get_subdatasets(origpath, path):
 
 
 @with_tempfile
-def test_state(path):
+def test_state(path=None):
     ds = Dataset.create(path)
     sub = ds.create('sub')
     assert_result_count(
@@ -307,7 +307,7 @@ def test_state(path):
 
 
 @with_tempfile
-def test_get_subdatasets_types(path):
+def test_get_subdatasets_types(path=None):
     ds = create(path)
     ds.create('1')
     ds.create('true')
@@ -316,7 +316,7 @@ def test_get_subdatasets_types(path):
 
 
 @with_tempfile
-def test_parent_on_unborn_branch(path):
+def test_parent_on_unborn_branch(path=None):
     from datalad.support.gitrepo import GitRepo
     ds = Dataset(GitRepo(path, create=True).path)
     assert_false(ds.repo.get_hexsha())
@@ -331,7 +331,7 @@ def test_parent_on_unborn_branch(path):
 
 @with_tempfile
 @with_tempfile
-def test_name_starts_with_hyphen(origpath, path):
+def test_name_starts_with_hyphen(origpath=None, path=None):
     ds = Dataset.create(origpath)
     # create
     dash_sub = ds.create('-sub')

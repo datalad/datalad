@@ -9,17 +9,17 @@
 """Tests for test repositories
 
 """
-from datalad.tests.utils_testrepos import (
-    BasicAnnexTestRepo,
-    BasicGitTestRepo,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_repo_status,
     ok_,
     ok_file_under_git,
     skip_if_on_windows,
     swallow_outputs,
     with_tempfile,
+)
+from datalad.tests.utils_testrepos import (
+    BasicAnnexTestRepo,
+    BasicGitTestRepo,
 )
 
 
@@ -47,12 +47,12 @@ def test_BasicAnnexTestRepo_random_location_generated():
 
 
 @with_tempfile()
-def test_BasicAnnexTestRepo(path):
+def test_BasicAnnexTestRepo(path=None):
     _test_BasicAnnexTestRepo(path)
 
 
 @with_tempfile()
-def test_BasicGitTestRepo(path):
+def test_BasicGitTestRepo(path=None):
     trepo = BasicGitTestRepo(path)
     trepo.create()
     assert_repo_status(trepo.path, annex=False)

@@ -21,11 +21,11 @@ from typing import (
     Optional,
 )
 from unittest.mock import (
-    patch,
     MagicMock,
+    patch,
 )
 
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_false,
     assert_raises,
     assert_true,
@@ -48,9 +48,7 @@ from ..nonasyncrunner import (
     ThreadedRunner,
     run_command,
 )
-from ..protocol import (
-    GeneratorMixIn,
-)
+from ..protocol import GeneratorMixIn
 from ..runnerthreads import (
     ReadThread,
     WriteThread,
@@ -388,7 +386,7 @@ def test_inside_async():
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_popen_invocation(src_path, dest_path):
+def test_popen_invocation(src_path=None, dest_path=None):
     # https://github.com/ReproNim/testkraken/issues/93
     from multiprocessing import Process
 

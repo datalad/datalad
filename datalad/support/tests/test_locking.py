@@ -9,33 +9,34 @@
 import os
 import os.path as op
 import sys
-
-from fasteners import InterProcessLock
 from pathlib import Path
 from time import time
+
+from fasteners import InterProcessLock
+
+from datalad.tests.utils_pytest import (
+    assert_false,
+    assert_greater,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_true,
+    eq_,
+    ok_,
+    ok_exists,
+    on_osx,
+    with_tempfile,
+)
 
 from ...cmd import (
     CommandError,
     StdOutErrCapture,
     WitlessRunner,
 )
+from ...utils import ensure_unicode
 from ..locking import (
     lock_if_check_fails,
     try_lock_informatively,
-)
-from ...utils import ensure_unicode
-from datalad.tests.utils import (
-    assert_false,
-    assert_greater,
-    assert_true,
-    assert_in,
-    assert_not_in,
-    assert_raises,
-    eq_,
-    ok_,
-    ok_exists,
-    on_osx,
-    with_tempfile,
 )
 
 
@@ -55,7 +56,7 @@ class Subproc:
 
 
 @with_tempfile
-def test_lock_if_check_fails(tempfile):
+def test_lock_if_check_fails(tempfile=None):
     # basic test, should never try to lock so filename is not important
     with lock_if_check_fails(True, None) as (check, lock):
         assert check is True
@@ -80,7 +81,10 @@ def test_lock_if_check_fails(tempfile):
         ok_exists(tempfile + '.get-lck')
     assert not op.exists(tempfile + '.get-lck')  # and it gets removed after
 
-    from multiprocessing import Queue, Process
+    from multiprocessing import (
+        Process,
+        Queue,
+    )
     q = Queue()
     p = Process(target=Subproc(tempfile), args=(q,))
 
@@ -107,7 +111,7 @@ def test_lock_if_check_fails(tempfile):
 
 
 @with_tempfile
-def test_try_lock_informatively(tempfile):
+def test_try_lock_informatively(tempfile=None):
     lock = InterProcessLock(tempfile + '.lck')
     lock_path = ensure_unicode(lock.path)  # can be bytes, complicates string formattingetc
     t0 = time()
@@ -148,6 +152,7 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
         try:
             import psutil
+
             # PID does not correspond
             assert_in('Check following process: PID=', res['stderr'])
             assert_in(f'CWD={os.getcwd()} CMDLINE=', res['stderr'])
@@ -166,11 +171,11 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         t0 = time()
         with assert_raises(CommandError) as cme:
             runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
-        assert_in(f"Failed to acquire lock at {lock_path} in 2 attempts.", str(cme.exception))
-        assert_in(f"RuntimeError", str(cme.exception))
-        assert_false(cme.exception.stdout)  # nothing there since print should not happen
-        assert_in(f'Failed to acquire lock at {lock_path} in 0.05', cme.exception.stderr)
-        assert_in(f'Failed to acquire lock at {lock_path} in 0.15', cme.exception.stderr)
+        assert_in(f"Failed to acquire lock at {lock_path} in 2 attempts.", str(cme.value))
+        assert_in(f"RuntimeError", str(cme.value))
+        assert_false(cme.value.stdout)  # nothing there since print should not happen
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.05', cme.value.stderr)
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.15', cme.value.stderr)
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
 
     # now that we left context, should work out just fine
