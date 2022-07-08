@@ -373,7 +373,7 @@ class ConfigManager(object):
             # The caller didn't specify a repository. Unset the git directory
             # when calling 'git config' to prevent a repository in the current
             # working directory from leaking configuration into the output.
-            self._config_cmd = ['git', '--git-dir=', 'config']
+            self._config_cmd = ['git', '--git-dir=/dev/null', 'config']
 
         self._src_mode = source
         run_kwargs = dict()
