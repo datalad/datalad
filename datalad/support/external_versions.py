@@ -118,15 +118,14 @@ def _get_ssh_version(exe=None):
     if out['stderr'].startswith('OpenSSH'):
         stdout = out['stderr']
     match = re.match(
-        "OpenSSH_([0-9][0-9]*)\\.([0-9][0-9]*)(p([0-9][0-9]*))?",
+        "OpenSSH.*_([0-9][0-9]*)\\.([0-9][0-9]*)(p([0-9][0-9]*))?",
         stdout)
     if match:
-        return "OPEN_SSH{}.{}.{}".format(
+        return "{}.{}p{}".format(
             match.groups()[0],
             match.groups()[1],
             match.groups()[3])
-    else:
-        return "UNKNOWN0.0.0"
+    raise AssertionError(f"no OpenSSH client found: {stdout}")
 
 
 def _get_system_ssh_version():
