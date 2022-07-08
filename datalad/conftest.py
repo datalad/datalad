@@ -2,13 +2,16 @@ import logging
 import os
 import re
 
+from pathlib import Path
 import pytest
+
 
 from datalad.support.exceptions import CapturedException
 from datalad.utils import (
     get_encoding_info,
     get_envvars_info,
     get_home_envvars,
+    rmtree,
 )
 
 from . import (
@@ -212,6 +215,27 @@ def capture_logs(caplog, monkeypatch):
         # And we should also set it within environ so underlying commands also
         # stay silent
         monkeypatch.setenv('DATALAD_LOG_LEVEL', '100')
+
+
+@pytest.fixture()
+def passwordless_keyring():
+    # Note: it probably would not reload an already loaded keyring and would be
+    # in effect only for subprocesses
+    from keyring.util.platform_ import config_root, data_root
+    data = Path(data_root())
+    config = Path(config_root())
+    assert not config.exists()  # should not exist yet since we will be overwriting
+    try:
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(f"""
+[backend]
+default-keyring=keyrings.alt.file.PlaintextKeyring
+""")
+        yield config
+    finally:
+        rmtree(config)
+        if data.exists():
+            data.unlink()
 
 
 def pytest_ignore_collect(path):

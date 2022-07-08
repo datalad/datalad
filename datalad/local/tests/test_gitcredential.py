@@ -70,10 +70,9 @@ def test_gitcredential_interface(path=None):
     assert_false(cred['password'])
 
 
-@with_tempfile
-def test_datalad_credential_helper(path=None):
+def test_datalad_credential_helper(tmp_path, passwordless_keyring):
 
-    ds = Dataset(path).create()
+    ds = Dataset(tmp_path).create()
 
     # tell git to use git-credential-datalad
     ds.config.add('credential.helper', 'datalad', scope='local')
