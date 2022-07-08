@@ -1,0 +1,61 @@
+From 78b4391b947d617863c00cf910d1822f806c07e6 Mon Sep 17 00:00:00 2001
+From: "John T. Wodder II" <git@varonathe.org>
+Date: Fri, 8 Jul 2022 14:20:28 -0400
+Subject: [PATCH 1/2] Remove a remaining import of nose-based
+ datalad.tests.utils
+
+---
+ datalad/runner/tests/test_threadsafety.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/datalad/runner/tests/test_threadsafety.py b/datalad/runner/tests/test_threadsafety.py
+index 1758cb6fc7..d6632f4ef9 100644
+--- a/datalad/runner/tests/test_threadsafety.py
++++ b/datalad/runner/tests/test_threadsafety.py
+@@ -8,11 +8,12 @@
+     Tuple,
+ )
+ 
++from datalad.tests.utils_pytest import assert_raises
++
+ from ..coreprotocols import StdOutCapture
+ from ..nonasyncrunner import ThreadedRunner
+ from ..protocol import GeneratorMixIn
+ from .utils import py2cmd
+-from datalad.tests.utils import assert_raises
+ 
+ 
+ class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
+
+From 0224e271708382bbb6232c3cf1f9d88e0875b4bb Mon Sep 17 00:00:00 2001
+From: "John T. Wodder II" <git@varonathe.org>
+Date: Fri, 8 Jul 2022 14:27:11 -0400
+Subject: [PATCH 2/2] Allow skip_if_no_module() and skip_if_no_network() to be
+ called at module-level
+
+---
+ datalad/tests/utils_pytest.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/datalad/tests/utils_pytest.py b/datalad/tests/utils_pytest.py
+index bd8776c498..c21d1636aa 100644
+--- a/datalad/tests/utils_pytest.py
++++ b/datalad/tests/utils_pytest.py
+@@ -209,7 +209,7 @@ def skip_if_no_module(module):
+     try:
+         imp = __import__(module)
+     except Exception as exc:
+-        pytest.skip("Module %s fails to load" % module)
++        pytest.skip("Module %s fails to load" % module, allow_module_level=True)
+ 
+ 
+ def skip_if_scrapy_without_selector():
+@@ -252,7 +252,7 @@ def skip_if_no_network(func=None):
+ 
+     def check_and_raise():
+         if dl_cfg.get('datalad.tests.nonetwork'):
+-            pytest.skip("Skipping since no network settings")
++            pytest.skip("Skipping since no network settings", allow_module_level=True)
+ 
+     if func:
+         @wraps(func)

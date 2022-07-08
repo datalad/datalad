@@ -3,10 +3,13 @@
 
 export DH_VERBOSE = 1
 export PYBUILD_NAME = datalad
-# Excluding 
+
 # - test_datalad_credential_helper since wants interaction
 #   https://github.com/datalad/datalad/issues/6623
-export PYBUILD_TEST_ARGS = -s -v 
+export PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring
+# test_test would be removed as 0.17.1
+# test_subprocess_return_code_capture - https://github.com/datalad/datalad/issues/6109
+export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture'
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=
 export https_proxy=
@@ -36,7 +39,7 @@ override_dh_auto_configure:
 override_dh_auto_test:
 #	# Since pybuild overrides HOME for its own purposes, we will rely on our
 #	# setup_package placing it back into HOME
-	PATH=$(CURDIR)/bin:$$PATH \
+	PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring PATH=$(CURDIR)/bin:$$PATH \
 	    dh_auto_test -- --test-pytest
 
 
