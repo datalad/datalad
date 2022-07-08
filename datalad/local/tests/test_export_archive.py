@@ -10,20 +10,16 @@
 """Test archive exporter"""
 
 import os
-import time
-from os.path import join as opj
-from os.path import isabs
 import tarfile
+import time
+from os.path import isabs
+from os.path import join as opj
 
 from datalad.api import (
     Dataset,
     export_archive,
 )
-from datalad.utils import (
-    chpwd,
-    md5sum,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_false,
     assert_not_equal,
@@ -33,6 +29,10 @@ from datalad.tests.utils import (
     assert_true,
     ok_startswith,
     with_tree,
+)
+from datalad.utils import (
+    chpwd,
+    md5sum,
 )
 
 _dataset_template = {
@@ -44,14 +44,14 @@ _dataset_template = {
 
 
 @with_tree(_dataset_template)
-def test_failure(path):
+def test_failure(path=None):
     # non-existing dataset
     with assert_raises(ValueError):
         export_archive(dataset=Dataset('nowhere'))
 
 
 @with_tree(_dataset_template)
-def test_archive(path):
+def test_archive(path=None):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save()
     committed_date = ds.repo.get_commit_date()
@@ -95,14 +95,14 @@ def test_archive(path):
     check_contents(custom_outname, 'myexport')
 
     # now loose some content
-    ds.drop('file_up', check=False)
+    ds.drop('file_up', reckless='kill')
     assert_raises(IOError, ds.export_archive, filename=opj(path, 'my'))
     ds.export_archive(filename=opj(path, 'partial'), missing_content='ignore')
     assert_true(os.path.exists(opj(path, 'partial.tar.gz')))
 
 
 @with_tree(_dataset_template)
-def test_zip_archive(path):
+def test_zip_archive(path=None):
     ds = Dataset(opj(path, 'ds')).create(force=True, annex=False)
     ds.save()
     with chpwd(path):

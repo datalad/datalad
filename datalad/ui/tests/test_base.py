@@ -10,20 +10,21 @@
 
 __docformat__ = 'restructuredtext'
 
+from unittest.mock import patch
+
+from ...tests.utils_pytest import (
+    assert_equal,
+    assert_false,
+    assert_not_equal,
+    assert_raises,
+    with_testsui,
+)
 from .. import _UI_Switcher
 from ..dialog import (
     ConsoleLog,
     DialogUI,
     IPythonUI,
 )
-from ...tests.utils import (
-    assert_equal, assert_not_equal,
-    assert_raises,
-    assert_false,
-    with_testsui,
-)
-
-from unittest.mock import patch
 
 
 def test_ui_switcher():

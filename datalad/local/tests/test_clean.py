@@ -21,7 +21,7 @@ from datalad.consts import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_false,
     assert_status,
@@ -35,7 +35,7 @@ from datalad.utils import (
 
 
 @with_tempfile(mkdir=True)
-def test_clean(d):
+def test_clean(d=None):
     AnnexRepo(d, create=True)
     ds = Dataset(d)
     assert_status('notneeded', clean(dataset=ds))

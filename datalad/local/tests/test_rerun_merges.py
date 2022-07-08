@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     assert_false,
     eq_,
@@ -42,7 +42,7 @@ from datalad.tests.utils import (
 
 @slow
 @with_tempfile(mkdir=True)
-def test_rerun_fastforwardable(path):
+def test_rerun_fastforwardable(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -88,7 +88,7 @@ def test_rerun_fastforwardable(path):
 
 @slow
 @with_tempfile(mkdir=True)
-def test_rerun_fastforwardable_mutator(path):
+def test_rerun_fastforwardable_mutator(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -128,7 +128,7 @@ def test_rerun_fastforwardable_mutator(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_left_right_runs(path):
+def test_rerun_left_right_runs(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -185,7 +185,7 @@ def test_rerun_left_right_runs(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_run_left_mutator_right(path):
+def test_rerun_run_left_mutator_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -218,7 +218,7 @@ def test_rerun_run_left_mutator_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_nonrun_left_run_right(path):
+def test_rerun_nonrun_left_run_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -280,7 +280,7 @@ def test_rerun_nonrun_left_run_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_run_left_nonrun_right(path):
+def test_rerun_run_left_nonrun_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -335,7 +335,7 @@ def test_rerun_run_left_nonrun_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_mutator_left_nonrun_right(path):
+def test_rerun_mutator_left_nonrun_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -371,7 +371,7 @@ def test_rerun_mutator_left_nonrun_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_mutator_stem_nonrun_merges(path):
+def test_rerun_mutator_stem_nonrun_merges(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -436,7 +436,7 @@ def test_rerun_mutator_stem_nonrun_merges(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_exclude_side(path):
+def test_rerun_exclude_side(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -471,7 +471,7 @@ def test_rerun_exclude_side(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_unrelated_run_left_nonrun_right(path):
+def test_rerun_unrelated_run_left_nonrun_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -522,7 +522,7 @@ def test_rerun_unrelated_run_left_nonrun_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_unrelated_mutator_left_nonrun_right(path):
+def test_rerun_unrelated_mutator_left_nonrun_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -552,7 +552,7 @@ def test_rerun_unrelated_mutator_left_nonrun_right(path):
 
 @slow
 @with_tempfile(mkdir=True)
-def test_rerun_unrelated_nonrun_left_run_right(path):
+def test_rerun_unrelated_nonrun_left_run_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -609,7 +609,7 @@ def test_rerun_unrelated_nonrun_left_run_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_unrelated_nonrun_left_mutator_right(path):
+def test_rerun_unrelated_nonrun_left_mutator_right(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -654,7 +654,7 @@ def test_rerun_unrelated_nonrun_left_mutator_right(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_multifork(path):
+def test_rerun_multifork(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo
@@ -736,7 +736,7 @@ def test_rerun_multifork(path):
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def test_rerun_octopus(path):
+def test_rerun_octopus(path=None):
     ds = Dataset(path).create()
     # keep direct repo accessor to speed things up
     ds_repo = ds.repo

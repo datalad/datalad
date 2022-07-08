@@ -11,14 +11,13 @@
 
 import re
 
-from datalad.support.param import Parameter
-from datalad.support import constraints as cnstr
 from datalad.interface.base import (
-    get_api_name,
     Interface,
+    get_api_name,
 )
-
-from datalad.tests.utils import (
+from datalad.support import constraints as cnstr
+from datalad.support.param import Parameter
+from datalad.tests.utils_pytest import (
     assert_equal,
     assert_in,
     assert_is,
@@ -77,7 +76,7 @@ def test_param():
     with assert_raises(ValueError) as cmr:
         Parameter(unknown_arg=123)
     assert_in('Detected unknown argument(s) for the Parameter: unknown_arg',
-              str(cmr.exception))
+              str(cmr.value))
 
 
 def test_interface():

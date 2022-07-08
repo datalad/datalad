@@ -15,7 +15,7 @@ from datalad.api import (
     create,
     create_sibling_gitlab,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -50,10 +50,19 @@ def _get_nested_collections(path):
 
 # doesn't actually need gitlab and exercises most of the decision logic
 @with_tempfile
-def test_dryrun(path):
+def test_dryrun(path=None):
     ctlg = _get_nested_collections(path)
     # no site config -> error
     assert_raises(ValueError, ctlg['root'].create_sibling_gitlab)
+    # wrong path specification -> impossible result
+    res = ctlg['root'].create_sibling_gitlab(
+        dry_run=True, on_failure='ignore',
+        site='dummy', path='imaghost'
+    )
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1, path=ctlg['root'].pathobj / 'imaghost', type='dataset',
+                          status='impossible')
     # single project vs multi-dataset call
     assert_raises(
         ValueError,
@@ -300,7 +309,7 @@ class _CreateFailureGitLab(_FakeGitLab):
 
 
 @with_tempfile
-def test_fake_gitlab(path):
+def test_fake_gitlab(path=None):
     from unittest.mock import patch
     ds = Dataset(path).create()
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _NewProjectGitLab):

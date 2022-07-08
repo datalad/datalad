@@ -12,15 +12,15 @@ This one to be effective should be tested first or in isolation from other
 test files
 """
 
-from ..dataset import Dataset
-from ...tests.utils import (
+from ...tests.utils_pytest import (
     assert_raises,
     with_tempfile,
 )
+from ..dataset import Dataset
 
 
 @with_tempfile(mkdir=True)
-def test_datasetmethod_bound(path):
+def test_datasetmethod_bound(path=None):
     ds = Dataset(path)
     # should be automagically imported/picked up if not bound already
     assert ds.create  # simplest, intfspec only 2 entries

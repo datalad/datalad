@@ -11,7 +11,7 @@ from datalad.api import (
     Dataset,
     create_sibling_gogs,
 )
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_raises,
     skip_if_no_network,
     with_tempfile,
@@ -21,7 +21,7 @@ from .test_create_sibling_ghlike import check4real
 
 
 @with_tempfile
-def test_invalid_call(path):
+def test_invalid_call(path=None):
     ds = Dataset(path).create()
     # no API url given
     assert_raises(ValueError, ds.create_sibling_gogs, 'bogus')
@@ -29,7 +29,7 @@ def test_invalid_call(path):
 
 @skip_if_no_network
 @with_tempfile
-def test_gogs(path):
+def test_gogs(path=None):
     # try.gogs.io will only handle 10 repos, but we need one
     # and could handle 10 concurrent test runs
     check4real(

@@ -3,11 +3,11 @@ from typing import (
     List,
 )
 
-from datalad.tests.utils import assert_equal
+from datalad.tests.utils_pytest import assert_equal
 
 from ..exception import (
-    _format_json_error_messages,
     CommandError,
+    _format_json_error_messages,
 )
 
 

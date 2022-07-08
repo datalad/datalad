@@ -13,11 +13,9 @@
 __docformat__ = 'restructuredtext'
 
 # Not really worth to be there but it is ATM, so let's use that
-from datalad.api import (
-    shell_completion
-)
+from datalad.api import shell_completion
 from datalad.cmd import WitlessRunner
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     eq_,
     skip_if_on_windows,

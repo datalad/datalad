@@ -10,16 +10,26 @@
 
 """
 
-from contextlib import contextmanager
 import logging
-from time import sleep
-from os.path import (
-    exists,
-    join as opj,
-)
 import re
+from contextlib import contextmanager
+from os.path import exists
+from os.path import join as opj
+from time import sleep
 
-from datalad.tests.utils import (
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+)
+from datalad.interface.base import build_doc
+from datalad.support.constraints import (
+    EnsureKeyChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.param import Parameter
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_equal,
     assert_in,
@@ -35,28 +45,18 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.utils import swallow_logs
-from datalad.utils import swallow_outputs
-from datalad.distribution.dataset import (
-    Dataset,
-    datasetmethod,
-    EnsureDataset,
+from datalad.utils import (
+    swallow_logs,
+    swallow_outputs,
 )
-from datalad.support.param import Parameter
-from datalad.support.constraints import (
-    EnsureKeyChoice,
-    EnsureNone,
-    EnsureStr,
-)
+
 from ..base import Interface
+from ..results import get_status_dict
 from ..utils import (
     discover_dataset_trace_to_targets,
     eval_results,
     handle_dirty_dataset,
 )
-from ..results import get_status_dict
-from datalad.interface.base import build_doc
-
 
 __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.interface.tests.test_utils')
@@ -82,7 +82,7 @@ def _check_auto_save(ds, orig_state):
 
 
 @with_tempfile(mkdir=True)
-def test_dirty(path):
+def test_dirty(path=None):
     for mode in _dirty_modes:
         # does nothing without a dataset
         handle_dirty_dataset(None, mode)
@@ -153,7 +153,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
 
 @slow  # 74.4509s
 @with_tree(demo_hierarchy)
-def test_save_hierarchy(path):
+def test_save_hierarchy(path=None):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
     ds.save(recursive=True)
@@ -340,7 +340,7 @@ def test_result_filter():
 
 @with_tree({k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
 @with_tempfile(mkdir=True)
-def test_discover_ds_trace(path, otherdir):
+def test_discover_ds_trace(path=None, otherdir=None):
     ds = make_demo_hierarchy_datasets(
         path,
         {k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
@@ -509,7 +509,7 @@ def test_incorrect_msg_interpolation():
     with assert_raises(TypeError) as cme:
         TestUtils2().__call__()
     # this must be our custom exception
-    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.exception))
+    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.value))
 
     # there should be no exception if reported in the record path contains %
     TestUtils2().__call__("%eatthis")

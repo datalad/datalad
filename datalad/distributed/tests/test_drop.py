@@ -26,7 +26,7 @@ from datalad.support.exceptions import (
     NoDatasetFound,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     OBSCURE_FILENAME,
@@ -47,7 +47,7 @@ from datalad.utils import chpwd
 
 @with_tempfile
 @with_tempfile
-def test_drop_file_content(path, outside_path):
+def test_drop_file_content(path=None, outside_path=None):
     # see docstring for test data structure
     ds = get_deeply_nested_structure(path)
     axfile_rootds = op.join("subdir", "annexed_file.txt")
@@ -65,7 +65,7 @@ def test_drop_file_content(path, outside_path):
     with assert_raises(IncompleteResultsError) as cme:
         ds.drop(axfile_rootds)
     # The --force suggestion from git-annex-drop is translated to --reckless.
-    assert_in("--reckless", str(cme.exception))
+    assert_in("--reckless", str(cme.value))
 
     # error on non-existing paths
     non_existant_relpaths = ['funky', op.join('subds_modified', 'subfunky')]
@@ -159,7 +159,7 @@ def test_drop_file_content(path, outside_path):
 
 @with_tempfile
 @with_tempfile
-def test_drop_allkeys(origpath, clonepath):
+def test_drop_allkeys(origpath=None, clonepath=None):
     # create a dataset with two keys, belonging to two files,
     # in two different branches
     ds = Dataset(origpath).create()
@@ -217,7 +217,7 @@ def test_drop_allkeys(origpath, clonepath):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_undead_annex_detection(gitpath, origpath, clonepath):
+def test_undead_annex_detection(gitpath=None, origpath=None, clonepath=None):
     gitds = Dataset(gitpath).create(annex=False)
     # a gitrepo can be inspected too, it might just not know anything
     eq_([], _detect_nondead_annex_at_remotes(gitds.repo, 'someid'))
@@ -257,7 +257,7 @@ def test_undead_annex_detection(gitpath, origpath, clonepath):
 
 
 @with_tempfile
-def test_uninstall_recursive(path):
+def test_uninstall_recursive(path=None):
     ds = Dataset(path)
     assert_raises(ValueError, ds.drop)
 
@@ -293,7 +293,7 @@ def test_uninstall_recursive(path):
 
 @with_tempfile
 @with_tempfile
-def test_unpushed_state_detection(origpath, clonepath):
+def test_unpushed_state_detection(origpath=None, clonepath=None):
     origds = Dataset(origpath).create()
     # always test in annex mode
     tester = lambda x: _detect_unpushed_revs(x, True)
@@ -341,7 +341,7 @@ def test_unpushed_state_detection(origpath, clonepath):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
-def test_safetynet(otherpath, origpath, clonepath):
+def test_safetynet(otherpath=None, origpath=None, clonepath=None):
     # we start with a dataset that is hosted somewhere
     origds = Dataset(origpath).create()
     # a clone is made to work on the dataset
@@ -434,7 +434,7 @@ def test_safetynet(otherpath, origpath, clonepath):
 
 
 @with_tempfile
-def test_kill(path):
+def test_kill(path=None):
     # create a complicated and dirty mess
     ds = get_deeply_nested_structure(path)
     # cannot use kill without recursion enabled, because there will be no
@@ -456,7 +456,7 @@ def test_kill(path):
 
 
 @with_tempfile()
-def test_refuse_to_drop_cwd(path):
+def test_refuse_to_drop_cwd(path=None):
     ds = Dataset(path).create()
     (ds.pathobj / 'deep' / 'down').mkdir(parents=True)
     for p in (ds.pathobj, ds.pathobj / 'deep', ds.pathobj / 'deep' / 'down'):
@@ -472,7 +472,7 @@ def test_refuse_to_drop_cwd(path):
 
 
 @with_tempfile()
-def test_careless_subdataset_uninstall(path):
+def test_careless_subdataset_uninstall(path=None):
     # nested datasets
     ds = Dataset(path).create()
     subds1 = ds.create('deep1')
@@ -490,7 +490,7 @@ def test_careless_subdataset_uninstall(path):
 
 
 @with_tempfile(mkdir=True)
-def test_drop_nocrash_absent_subds(path):
+def test_drop_nocrash_absent_subds(path=None):
     parent = Dataset(path).create()
     parent.create('sub')
     parent.drop('sub', reckless='availability')
@@ -500,7 +500,7 @@ def test_drop_nocrash_absent_subds(path):
 
 
 @with_tempfile(mkdir=True)
-def test_uninstall_without_super(path):
+def test_uninstall_without_super(path=None):
     # a parent dataset with a proper subdataset, and another dataset that
     # is just placed underneath the parent, but not an actual subdataset
     parent = Dataset(path).create()
@@ -529,7 +529,7 @@ def test_uninstall_without_super(path):
 
 
 @with_tempfile
-def test_drop_from_git(path):
+def test_drop_from_git(path=None):
     ds = Dataset(path).create(annex=False)
     res = ds.drop()
     assert_in_results(res, action='drop', status='notneeded')
@@ -542,7 +542,7 @@ def test_drop_from_git(path):
 # https://github.com/datalad/datalad/issues/6180
 @with_tempfile
 @with_tempfile
-def test_drop_uninit_annexrepo(origpath, path):
+def test_drop_uninit_annexrepo(origpath=None, path=None):
     Dataset(origpath).create()
     # just git-clone to bypass `git annex init`
     GitRepo.clone(origpath, path)
@@ -553,7 +553,7 @@ def test_drop_uninit_annexrepo(origpath, path):
 
 # https://github.com/datalad/datalad/issues/6577
 @with_tempfile
-def test_drop_allkeys_result_contains_annex_error_messages(path):
+def test_drop_allkeys_result_contains_annex_error_messages(path=None):
     # when calling drop with allkeys, expect git-annex error
     # message(s) to be present in the result record error_message
     ds = Dataset(path).create()

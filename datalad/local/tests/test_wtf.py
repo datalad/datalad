@@ -12,6 +12,7 @@
 
 from os.path import join as opj
 
+from datalad import __version__
 from datalad.api import (
     create,
     wtf,
@@ -20,27 +21,25 @@ from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
 )
-from datalad import __version__
-
-from datalad.utils import ensure_unicode
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_greater,
     assert_in,
     assert_not_in,
     chpwd,
     eq_,
-    OBSCURE_FILENAME,
     ok_startswith,
     skip_if_no_module,
-    SkipTest,
     swallow_outputs,
     with_tree,
-    DEFAULT_BRANCH
 )
+from datalad.utils import ensure_unicode
 
 
 @with_tree({OBSCURE_FILENAME: {}})
-def test_wtf(topdir):
+def test_wtf(topdir=None):
     path = opj(topdir, OBSCURE_FILENAME)
     # smoke test for now
     with swallow_outputs() as cmo:

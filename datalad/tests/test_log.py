@@ -26,7 +26,7 @@ from datalad.log import (
 )
 from datalad.support import ansi_colors as colors
 from datalad.support.constraints import EnsureBool
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
     assert_in,
@@ -47,7 +47,7 @@ from datalad.utils import on_windows
 # disabled
 @patch("datalad.log.is_interactive", lambda: True)
 @with_tempfile
-def test_logging_to_a_file(dst):
+def test_logging_to_a_file(dst=None):
     ok_(not exists(dst))
 
     lgr = LoggerHelper("dataladtest-1").get_initialized_logger(logtarget=dst)
@@ -88,7 +88,7 @@ def test_logging_to_a_file(dst):
 
 
 @with_tempfile
-def test_logtarget_via_env_variable(dst):
+def test_logtarget_via_env_variable(dst=None):
     with patch.dict('os.environ', {'DATALADTEST_LOG_TARGET': dst}):
         ok_(not exists(dst))
         lgr = LoggerHelper("dataladtest-2").get_initialized_logger()
@@ -99,7 +99,7 @@ def test_logtarget_via_env_variable(dst):
 
 @with_tempfile
 @with_tempfile
-def test_mutliple_targets(dst1, dst2):
+def test_mutliple_targets(dst1=None, dst2=None):
     ok_(not exists(dst1))
     ok_(not exists(dst2))
     lgr = LoggerHelper("dataladtest-3").get_initialized_logger(
@@ -161,7 +161,7 @@ def test_traceback():
 
     # we limit to the last 100
     tb1 = rec(TraceBack(collide=True), 110)
-    ok_endswith(tb1, "...>test_log:%s" % (",".join([str(tb_line)]*100)))
+    ok_endswith(tb1, "…>test_log:%s" % (",".join([str(tb_line)]*100)))
 
 
 @known_failure_githubci_win

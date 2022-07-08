@@ -10,16 +10,13 @@
 """Test metadata """
 
 import logging
-
-from os.path import (
-    join as opj,
-    relpath,
-)
 import os.path as op
+from os.path import join as opj
+from os.path import relpath
 
 from datalad.api import (
-    aggregate_metadata,
     Dataset,
+    aggregate_metadata,
     install,
     metadata,
 )
@@ -28,11 +25,13 @@ from datalad.metadata.metadata import (
     get_metadata_type,
     query_aggregated_metadata,
 )
-from datalad.utils import (
-    chpwd,
-    ensure_unicode,
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
 )
-from datalad.tests.utils import (
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_equal,
     assert_in,
@@ -50,13 +49,10 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad.support.exceptions import (
-    InsufficientArgumentsError,
-    NoDatasetFound,
+from datalad.utils import (
+    chpwd,
+    ensure_unicode,
 )
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-
 
 _dataset_hierarchy_template = {
     'origin': {
@@ -78,7 +74,7 @@ _dataset_hierarchy_template = {
 
 
 @with_tempfile(mkdir=True)
-def test_get_metadata_type(path):
+def test_get_metadata_type(path=None):
     ds = Dataset(path).create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(ds), [])
@@ -115,7 +111,7 @@ def _compare_metadata_helper(origres, compds):
 @known_failure_githubci_win
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
-def test_aggregation(path):
+def test_aggregation(path=None):
     with chpwd(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
@@ -212,7 +208,7 @@ def test_aggregation(path):
 
 
 @with_tempfile(mkdir=True)
-def test_ignore_nondatasets(path):
+def test_ignore_nondatasets(path=None):
     # we want to ignore the version/commits for this test
     def _kill_time(meta):
         for m in meta:
@@ -242,7 +238,7 @@ def test_ignore_nondatasets(path):
 
 
 @with_tempfile(mkdir=True)
-def test_get_aggregates_fails(path):
+def test_get_aggregates_fails(path=None):
     with chpwd(path), assert_raises(NoDatasetFound):
         metadata(get_aggregates=True)
     ds = Dataset(path).create()
@@ -252,7 +248,7 @@ def test_get_aggregates_fails(path):
 
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
-def test_bf2458(src, dst):
+def test_bf2458(src=None, dst=None):
     ds = Dataset(src).create(force=True)
     ds.save(to_git=False)
 

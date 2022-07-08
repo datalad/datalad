@@ -28,6 +28,9 @@ each consumption scenario.
 Formatting overview and guidelines
 ==================================
 
+In general, the docstring format follows the `NumPy standard <https://numpydoc.readthedocs.io/en/latest/format.html#docstring-standard>`_.
+In addition, we follow the guidelines of `Restructured Text <https://docutils.sourceforge.io/docs/user/rst/quickstart.html>`_ with the additional features and treatments provided by `Sphinx <https://www.sphinx-doc.org/en/master>`_, and some custom formatting outlined below.
+
 Version information
 -------------------
 

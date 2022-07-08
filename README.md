@@ -17,9 +17,9 @@
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5624980.svg)](https://doi.org/10.5281/zenodo.5624980)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-39-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-40-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -194,6 +194,7 @@ by [MacStadium](https://www.macstadium.com/).
     <td align="center"><a href="https://github.com/mslw"><img src="https://avatars.githubusercontent.com/u/11985212?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Michał Szczepanik</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mslw" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/bpinsard"><img src="https://avatars.githubusercontent.com/u/1155388?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Basile</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bpinsard" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/taylols"><img src="https://avatars.githubusercontent.com/u/28018084?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Taylor Olson</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=taylols" title="Code">💻</a></td>
+    <td align="center"><a href="https://jdkent.github.io/"><img src="https://avatars.githubusercontent.com/u/12564882?v=4?s=100" width="100px;" alt=""/><br /><sub><b>James Kent</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=jdkent" title="Code">💻</a></td>
   </tr>
 </table>
 

@@ -9,38 +9,37 @@
 
 
 import subprocess
-from datalad.interface.results import annexjson2result
-from datalad.tests.utils import (
-    assert_result_count,
-    eq_,
-)
+
 from datalad.api import (
     Dataset,
     clone,
 )
-from datalad.utils import (
-    Path,
-    quote_cmdlinearg
-)
-from datalad.tests.utils import (
-    assert_status,
-    known_failure_windows,
-    skip_ssh,
-    slow,
-    with_tempfile
+from datalad.customremotes.ria_utils import (
+    create_ds_in_store,
+    create_store,
+    get_layout_locations,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
-    SSHRemoteIO
+    SSHRemoteIO,
 )
 from datalad.distributed.tests.ria_utils import (
+    common_init_opts,
     populate_dataset,
-    common_init_opts
 )
-from datalad.customremotes.ria_utils import (
-    create_store,
-    create_ds_in_store,
-    get_layout_locations
+from datalad.interface.results import annexjson2result
+from datalad.tests.utils_pytest import (
+    assert_result_count,
+    assert_status,
+    eq_,
+    known_failure_windows,
+    skip_ssh,
+    slow,
+    with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    quote_cmdlinearg,
 )
 
 
@@ -91,7 +90,7 @@ def _test_bare_git_version_1(host, dspath, store):
     ds.repo.enable_remote('bare-git')
 
     # copy files to the remote
-    ds.repo.copy_to('.', 'bare-git')
+    ds.push('.', to='bare-git')
     eq_(len(ds.repo.whereis('one.txt')), 2)
 
     # now we can drop all content locally, reobtain it, and survive an
@@ -133,7 +132,7 @@ def _test_bare_git_version_1(host, dspath, store):
     eq_(len(ds.repo.whereis('one.txt')), 1)
     # and the other way around: upload via ora-remote and have it available via
     # git-remote:
-    ds.repo.copy_to('.', 'ora-remote')
+    ds.push('.', to='ora-remote')
     # fsck to make availability known
     assert_status(
         'ok',
@@ -145,9 +144,8 @@ def _test_bare_git_version_1(host, dspath, store):
 @slow  # 12sec + ? on travis
 def test_bare_git_version_1():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_bare_git_version_1)), \
-          'datalad-test'
-    yield _test_bare_git_version_1, None
+    known_failure_windows(skip_ssh(_test_bare_git_version_1))('datalad-test')
+    _test_bare_git_version_1(None)
 
 
 @known_failure_windows  # see gh-4469
@@ -199,7 +197,7 @@ def _test_bare_git_version_2(host, dspath, store):
     # and the ORA remote in addition:
     ds.repo.init_remote('ora-remote', options=init_opts)
     # upload keys via ORA:
-    ds.repo.copy_to('.', 'ora-remote')
+    ds.push('.', to='ora-remote')
     # bare-git doesn't know yet:
     eq_(len(ds.repo.whereis('one.txt')), 2)
     # fsck to make availability known
@@ -232,9 +230,8 @@ def _test_bare_git_version_2(host, dspath, store):
 @slow  # 13sec + ? on travis
 def test_bare_git_version_2():
     # TODO: Skipped due to gh-4436
-    yield known_failure_windows(skip_ssh(_test_bare_git_version_2)), \
-          'datalad-test'
-    yield _test_bare_git_version_2, None
+    known_failure_windows(skip_ssh(_test_bare_git_version_2))('datalad-test')
+    _test_bare_git_version_2(None)
 
 # TODO: Outcommented "old" test from git-annex-ria-remote. This one needs to be
 #       revisited after RF'ing to base ORA on proper command abstractions for
@@ -247,8 +244,8 @@ def test_bare_git_version_2():
 # @with_tempfile
 # @with_tempfile
 # @with_tempfile(mkdir=True)
-# def test_create_as_bare(origin, remote_base_path, remote_base_url, public,
-#                         consumer, tmp_location):
+# def test_create_as_bare(origin=None, remote_base_path=None, remote_base_url=None, public=None,
+#                         consumer=None, tmp_location=None):
 #
 #     # Note/TODO: Do we need things like:
 #     #    git config receive.denyCurrentBranch updateInstead
@@ -284,7 +281,7 @@ def test_bare_git_version_2():
 #
 #     assert remote_base_path.exists()
 #     assert remote_dataset_path.exists()
-#     ds.repo.copy_to('.', 'riaremote')
+#     ds.push('.', to='riaremote')
 #
 #     # Now, let's make the remote end a valid, bare git repository
 #     eq_(subprocess.run(['git', 'init', '--bare'], cwd=str(remote_dataset_path)).returncode,

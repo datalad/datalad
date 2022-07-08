@@ -11,13 +11,14 @@
 
 import os
 from os.path import join as opj
+
 from datalad.distribution.utils import _get_flexible_source_candidates
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import (
-    with_tempfile,
-    eq_,
+from datalad.tests.utils_pytest import (
     assert_raises,
+    eq_,
     known_failure_windows,
+    with_tempfile,
 )
 from datalad.utils import (
     on_windows,

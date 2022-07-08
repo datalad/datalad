@@ -694,7 +694,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
             # loose them for other branches, and earlier tags
             # TODO evaluate whether this should be exposed as a switch
             # to run an explicit force-drop prior to calling remove()
-            check=False,
+            reckless='kill',
             result_renderer='disabled',
             return_type='list')
         if not objs2add and not refds_path == ds_path:

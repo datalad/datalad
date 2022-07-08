@@ -1,15 +1,16 @@
-from ..extensions import (
-    has_config,
-    register_config,
-)
-
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_raises,
     eq_,
     nok_,
     ok_,
 )
+
+from ..extensions import (
+    has_config,
+    register_config,
+)
+
 
 def test_register_config():
     nok_(has_config('datalad.testdummies.invalid'))

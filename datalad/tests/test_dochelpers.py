@@ -11,16 +11,16 @@
 
 from unittest.mock import patch
 
-from ..dochelpers import (
-    single_or_plural,
-    borrowdoc,
-    borrowkwargs,
+from datalad.tests.utils_pytest import (
+    assert_equal,
+    assert_re_in,
+    assert_true,
 )
 
-from datalad.tests.utils import (
-    assert_equal,
-    assert_true,
-    assert_re_in,
+from ..dochelpers import (
+    borrowdoc,
+    borrowkwargs,
+    single_or_plural,
 )
 
 

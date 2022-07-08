@@ -373,7 +373,7 @@ class Status(Interface):
             report_filetype=None):
         if report_filetype is not None:
             warnings.warn(
-                "status(repor_filetype=) no longer supported, and will be removed "
+                "status(report_filetype=) no longer supported, and will be removed "
                 "in a future release",
                 DeprecationWarning)
 

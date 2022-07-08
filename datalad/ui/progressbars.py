@@ -125,6 +125,11 @@ class LogProgressBar(ProgressBarBase):
             if x > 2 \
             else LogProgressBar._naturalfloat(x) + ' sec'
 
+    def start(self, initial=0):
+        super().start(initial=initial)
+        msg = " with initial specified to be {initial}" if initial else ''
+        lgr.info("Start %s%s", self.label, msg)
+
     def finish(self, partial=False):
         msg, args = ' %s ', [self.label]
 

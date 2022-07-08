@@ -1,10 +1,9 @@
-from datalad.tests.utils import (
-    eq_,
-)
+from datalad.tests.utils_pytest import eq_
+
 from ..renderer import (
+    NA_STRING,
     nadict,
     nagen,
-    NA_STRING,
 )
 
 

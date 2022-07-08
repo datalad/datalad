@@ -8,17 +8,20 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """"""
 
+import importlib.util
 from io import StringIO as SIO
-from datalad.tests.utils import (
-    ok_,
-    ok_startswith,
+from pathlib import Path
+
+import pytest
+
+from datalad.tests.utils_pytest import (
+    SkipTest,
     assert_in,
     assert_not_in,
-    SkipTest,
+    ok_,
+    ok_startswith,
 )
 
-import importlib.util
-from pathlib import Path
 file_path = \
     Path(__file__).parents[3] / '_datalad_build_support' / 'formatters.py'
 if not file_path.exists():

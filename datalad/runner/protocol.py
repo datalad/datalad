@@ -9,7 +9,6 @@
 """Base class of a protocol to be used with the DataLad runner
 """
 
-import asyncio
 import logging
 import warnings
 from collections import deque
@@ -46,7 +45,7 @@ class GeneratorMixIn:
         self.result_queue.append(result)
 
 
-class WitlessProtocol(asyncio.SubprocessProtocol):
+class WitlessProtocol:
     """Subprocess communication protocol base class for `run_async_cmd`
 
     This class implements basic subprocess output handling. Derived classes
@@ -119,9 +118,24 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             # fd_name prefix
             lgr.log(5, "%s| %s ", fd_name, log_data)
 
+    def connection_lost(self, exc):
+        """Called when the connection is lost or closed.
+
+        The argument is an exception object or None (the latter
+        meaning a regular EOF is received or the connection was
+        aborted or closed).
+        """
+
     def connection_made(self, process):
         self.process = process
         lgr.log(8, 'Process %i started', self.process.pid)
+
+    def pipe_connection_lost(self, fd, exc):
+        """Called when a file descriptor associated with the child process is
+        closed.
+
+        fd is the int file descriptor that was closed.
+        """
 
     def pipe_data_received(self, fd, data):
         self._log(fd, data)

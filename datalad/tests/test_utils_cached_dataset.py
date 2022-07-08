@@ -1,36 +1,36 @@
 """Testing cached test dataset utils"""
 
+from unittest.mock import patch
+
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_cached_dataset import (
-    get_cached_dataset,
     cached_dataset,
     cached_url,
-    url2filename
+    get_cached_dataset,
+    url2filename,
 )
-from datalad.utils import (
-    ensure_list,
-    opj,
-    Path,
-)
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    DEFAULT_REMOTE,
     assert_equal,
     assert_false,
     assert_in,
     assert_is,
     assert_is_instance,
-    assert_not_in,
     assert_not_equal,
+    assert_not_in,
     assert_raises,
     assert_result_count,
     assert_true,
-    DEFAULT_REMOTE,
     skip_if_no_network,
-    with_tempfile
+    with_tempfile,
 )
-from unittest.mock import patch
-
+from datalad.utils import (
+    Path,
+    ensure_list,
+    opj,
+)
 
 CACHE_PATCH_STR = "datalad.tests.utils_cached_dataset.DATALAD_TESTS_CACHE"
 CLONE_PATCH_STR = "datalad.tests.utils_cached_dataset.Clone.__call__"
@@ -38,7 +38,7 @@ CLONE_PATCH_STR = "datalad.tests.utils_cached_dataset.Clone.__call__"
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_get_cached_dataset(cache_dir):
+def test_get_cached_dataset(cache_dir=None):
 
     # patch DATALAD_TESTS_CACHE to not use the actual cache with
     # the test testing that very cache.
@@ -155,7 +155,7 @@ def test_get_cached_dataset(cache_dir):
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_cached_dataset(cache_dir):
+def test_cached_dataset(cache_dir=None):
 
     # patch DATALAD_TESTS_CACHE to not use the actual cache with
     # the test testing that very cache.
@@ -256,7 +256,7 @@ def test_cached_dataset(cache_dir):
 
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def test_cached_url(cache_dir):
+def test_cached_url(cache_dir=None):
 
     # patch DATALAD_TESTS_CACHE to not use the actual cache with
     # the test testing that very cache.

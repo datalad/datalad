@@ -20,17 +20,23 @@ from io import StringIO
 from unittest.mock import patch
 from urllib.parse import urlparse
 
+import pytest
+
 import datalad.local.addurls as au
+from datalad import cfg as dl_cfg
 from datalad.api import (
-    addurls,
     Dataset,
+    addurls,
     subdatasets,
 )
 from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
+    HTTPPath,
+    SkipTest,
     assert_dict_equal,
     assert_false,
     assert_in,
@@ -44,22 +50,21 @@ from datalad.tests.utils import (
     chpwd,
     create_tree,
     eq_,
-    HTTPPath,
     known_failure_githubci_win,
     ok_exists,
     ok_file_has_content,
     ok_startswith,
+    on_windows,
     skip_if,
-    SkipTest,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,
-    on_windows,
-    DEFAULT_BRANCH,
 )
-from datalad.utils import get_tempfile_kwargs, rmtemp
-from datalad import cfg as dl_cfg
+from datalad.utils import (
+    get_tempfile_kwargs,
+    rmtemp,
+)
 
 
 def test_formatter():
@@ -96,7 +101,7 @@ def test_formatter_no_mapping_arg():
     with assert_raises(ValueError) as cme:
         fmt.format("{0}", "not a mapping")
     # we provide that detail/element in a message
-    assert_in("not a mapping", str(cme.exception))
+    assert_in("not a mapping", str(cme.value))
 
 
 def test_formatter_placeholder_with_spaces():
@@ -322,7 +327,8 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-def check_extract_csv_json_equal(input_type):
+@pytest.mark.parametrize("input_type", ["csv", "tsv"])
+def test_extract_csv_json_equal(input_type):
     delim = "\t" if input_type == "tsv" else ","
 
     keys = ST_DATA["header"]
@@ -342,66 +348,61 @@ def check_extract_csv_json_equal(input_type):
     eq_(json_output, csv_output)
 
 
-def test_extract_csv_tsv_json_equal():
-    yield check_extract_csv_json_equal, "csv"
-    yield check_extract_csv_json_equal, "tsv"
-
-
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
                   au._read, None, "invalid_input_type")
 
 
 @with_tempfile(mkdir=True)
-def test_registerurl_constructor(path):
+def test_registerurl_constructor(path=None):
     ds = Dataset(path).create(force=True, annex=True)
     au.RegisterUrl(ds)
 
 
 @with_tempfile(mkdir=True)
-def test_addurls_nonannex_repo(path):
+def test_addurls_nonannex_repo(path=None):
     ds = Dataset(path).create(force=True, annex=False)
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2",
                    result_renderer='disabled')
-    assert_in("not an annex repo", str(raised.exception))
+    assert_in("not an annex repo", str(raised.value))
 
 
 @with_tree({"in.csv": "linky,abcd\nhttps://datalad.org,f"})
-def test_addurls_unknown_placeholder(path):
+def test_addurls_unknown_placeholder(path=None):
     ds = Dataset(path).create(force=True)
     # Close but wrong URL placeholder
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{link}", "{abcd}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("linky", str(exc.exception))
+    assert_in("linky", str(exc.value))
     # Close but wrong file name placeholder
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{abc}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("abcd", str(exc.exception))
+    assert_in("abcd", str(exc.value))
     # Out-of-bounds index.
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{3}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("index", str(exc.exception))
+    assert_in("index", str(exc.value))
 
     # Suggestions also work for automatic file name placeholders
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{_url_hostnam}", dry_run=True,
                    result_renderer='disabled')
-    assert_in("_url_hostname", str(exc.exception))
+    assert_in("_url_hostname", str(exc.value))
     # ... though if you whiff on the beginning prefix, we don't suggest
     # anything because we decide to generate those fields based on detecting
     # the prefix.
     with assert_raises(IncompleteResultsError) as exc:
         ds.addurls("in.csv", "{linky}", "{_uurl_hostnam}", dry_run=True,
                    result_renderer='disabled')
-    assert_not_in("_url_hostname", str(exc.exception))
+    assert_not_in("_url_hostname", str(exc.value))
 
 
 @with_tempfile(mkdir=True)
-def test_addurls_dry_run(path):
+def test_addurls_dry_run(path=None):
     ds = Dataset(path).create(force=True)
 
     json_file = "links.json"
@@ -480,7 +481,7 @@ class TestAddurls(object):
         rmtemp(cls.temp_dir)
 
     @with_tempfile(mkdir=True)
-    def test_addurls(self, path):
+    def test_addurls(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         def get_annex_commit_counts():
@@ -547,7 +548,7 @@ class TestAddurls(object):
                       result_renderer='disabled')
 
     @with_tempfile(mkdir=True)
-    def test_addurls_unbound_dataset(self, path):
+    def test_addurls_unbound_dataset(self=None, path=None):
         def check(ds, dataset_arg, url_file, fname_format):
             subdir = op.join(ds.path, "subdir")
             os.mkdir(subdir)
@@ -575,7 +576,7 @@ class TestAddurls(object):
         check(ds2, None, "in.json", "./{name}")
 
     @with_tempfile(mkdir=True)
-    def test_addurls_create_newdataset(self, path):
+    def test_addurls_create_newdataset(self=None, path=None):
         dspath = os.path.join(path, "ds")
         addurls(self.json_file, "{url}", "{name}",
                 dataset=dspath,
@@ -584,14 +585,14 @@ class TestAddurls(object):
             ok_exists(os.path.join(dspath, fname))
 
     @with_tempfile
-    def test_addurls_from_list(self, path):
+    def test_addurls_from_list(self=None, path=None):
         ds = Dataset(path).create()
         ds.addurls(self.data, "{url}", "{name}", result_renderer='disabled')
         for fname in ["a", "b", "c"]:
             ok_exists(op.join(path, fname))
 
     @with_tempfile(mkdir=True)
-    def test_addurls_subdataset(self, path):
+    def test_addurls_subdataset(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         for save in True, False:
@@ -641,13 +642,13 @@ class TestAddurls(object):
             assert_in("Not creating subdataset at existing path", cml.out)
 
     @with_tempfile(mkdir=True)
-    def test_addurls_repindex(self, path):
+    def test_addurls_repindex(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         with assert_raises(IncompleteResultsError) as raised:
             ds.addurls(self.json_file, "{url}", "{subdir}",
                        result_renderer='disabled')
-        assert_in("collided", str(raised.exception))
+        assert_in("collided", str(raised.value))
 
         ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}",
                    result_renderer='disabled')
@@ -656,7 +657,7 @@ class TestAddurls(object):
             ok_exists(op.join(ds.path, fname))
 
     @with_tempfile(mkdir=True)
-    def test_addurls_url_on_collision_error_if_different(self, path):
+    def test_addurls_url_on_collision_error_if_different(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         data = [self.data[0].copy(), self.data[0].copy()]
@@ -684,7 +685,7 @@ class TestAddurls(object):
         ok_exists(op.join(ds.path, "a"))
 
     @with_tempfile(mkdir=True)
-    def test_addurls_url_on_collision_choose(self, path):
+    def test_addurls_url_on_collision_choose(self=None, path=None):
         ds = Dataset(path).create(force=True)
         data = deepcopy(self.data)
         for row in data:
@@ -716,7 +717,7 @@ class TestAddurls(object):
                             strip=True)
 
     @with_tempfile(mkdir=True)
-    def test_addurls_url_parts(self, path):
+    def test_addurls_url_parts(self=None, path=None):
         ds = Dataset(path).create(force=True)
         ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}",
                    result_renderer='disabled')
@@ -725,7 +726,7 @@ class TestAddurls(object):
             ok_exists(op.join(ds.path, "udir", fname))
 
     @with_tempfile(mkdir=True)
-    def test_addurls_url_filename(self, path):
+    def test_addurls_url_filename(self=None, path=None):
         ds = Dataset(path).create(force=True)
         ds.addurls(self.json_file, "{url}", "{_url0}/{_url_filename}",
                    result_renderer='disabled')
@@ -733,7 +734,7 @@ class TestAddurls(object):
             ok_exists(op.join(ds.path, "udir", fname))
 
     @with_tempfile(mkdir=True)
-    def test_addurls_url_filename_fail(self, path):
+    def test_addurls_url_filename_fail(self=None, path=None):
         ds = Dataset(path).create(force=True)
         assert_raises(IncompleteResultsError,
                       ds.addurls,
@@ -743,7 +744,7 @@ class TestAddurls(object):
                       result_renderer='disabled')
 
     @with_tempfile(mkdir=True)
-    def test_addurls_url_special_key_fail(self, path):
+    def test_addurls_url_special_key_fail(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         res1 = ds.addurls(self.json_file, "{url}", "{_url4}/{_url_filename}",
@@ -758,7 +759,7 @@ class TestAddurls(object):
         assert_in("Special key", res2[0]["message"])
 
     @with_tempfile(mkdir=True)
-    def test_addurls_metafail(self, path):
+    def test_addurls_metafail(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         # Force failure by passing a non-existent file name to annex.
@@ -774,7 +775,7 @@ class TestAddurls(object):
                            result_renderer='disabled')
 
     @with_tempfile(mkdir=True)
-    def test_addurls_dropped_urls(self, path):
+    def test_addurls_dropped_urls(self=None, path=None):
         ds = Dataset(path).create(force=True)
         with swallow_logs(new_level=logging.WARNING) as cml:
             ds.addurls(self.json_file, "", "{subdir}//{name}",
@@ -783,7 +784,7 @@ class TestAddurls(object):
                          str(cml.out))
 
     @with_tempfile(mkdir=True)
-    def test_addurls_version(self, path):
+    def test_addurls_version(self=None, path=None):
         ds = Dataset(path).create(force=True)
 
         def version_fn(url):
@@ -807,7 +808,7 @@ class TestAddurls(object):
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
 
     @with_tempfile(mkdir=True)
-    def test_addurls_deeper(self, path):
+    def test_addurls_deeper(self=None, path=None):
         ds = Dataset(path).create(force=True)
         ds.addurls(
             self.json_file, "{url}",
@@ -824,19 +825,19 @@ class TestAddurls(object):
             ds.path, "foo", "adir", "foo-again", "other-ds", "bdir", "a"))
 
     @with_tree({"in": ""})
-    def test_addurls_invalid_input(self, path):
+    def test_addurls_invalid_input(self=None, path=None):
         ds = Dataset(path).create(force=True)
         in_file = op.join(path, "in")
         for in_type in au.INPUT_TYPES:
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type,
                            result_renderer='disabled')
-            assert_in("Failed to read", str(exc.exception))
+            assert_in("Failed to read", str(exc.value))
 
     @with_tree({"in.csv": "url,name,subdir",
                 "in.tsv": "url\tname\tsubdir",
                 "in.json": "[]"})
-    def test_addurls_no_rows(self, path):
+    def test_addurls_no_rows(self=None, path=None):
         ds = Dataset(path).create(force=True)
         for fname in ["in.csv", "in.tsv", "in.json"]:
             with swallow_logs(new_level=logging.WARNING) as cml:
@@ -855,18 +856,12 @@ class TestAddurls(object):
         for fname in ["a", "b", "c"]:
             ok_exists(op.join(ds.path, fname))
 
-    def test_addurls_stdin_input(self):
-        def make_test(text, input_type, description):
-            def fn():
-                self.check_addurls_stdin_input(json_text, "ext")
-            fn.description = description
-            return fn
-
+    def test_addurls_stdin_input(self=None):
         with open(self.json_file) as jfh:
             json_text = jfh.read()
 
-        yield make_test(json_text, "ext", "json,default input type")
-        yield make_test(json_text, "json", "json,json input type")
+        self.check_addurls_stdin_input(json_text, "ext")
+        self.check_addurls_stdin_input(json_text, "json")
 
         def make_delim_text(delim):
             row = "{name}" + delim + "{url}"
@@ -874,11 +869,11 @@ class TestAddurls(object):
                 [row.format(name="name", url="url")] +
                 [row.format(**rec) for rec in json.loads(json_text)])
 
-        yield make_test(make_delim_text(","), "csv", "csv,csv input type")
-        yield make_test(make_delim_text("\t"), "tsv", "tsv,tsv input type")
+        self.check_addurls_stdin_input(make_delim_text(","), "csv")
+        self.check_addurls_stdin_input(make_delim_text("\t"), "tsv")
 
     @with_tempfile(mkdir=True)
-    def test_addurls_stdin_input_command_line(self, path):
+    def test_addurls_stdin_input_command_line(self=None, path=None):
         # The previous test checks all the cases, but it overrides sys.stdin.
         # Do a simple check that's closer to a command line call.
         Dataset(path).create(force=True)
@@ -890,7 +885,7 @@ class TestAddurls(object):
             ok_exists(op.join(path, fname))
 
     @with_tempfile(mkdir=True)
-    def test_drop_after(self, path):
+    def test_drop_after(self=None, path=None):
         ds = Dataset(path).create(force=True)
         ds.repo.set_gitattributes([('a*', {'annex.largefiles': 'nothing'})])
         # make some files go to git, so we could test that we do not blow
@@ -902,7 +897,7 @@ class TestAddurls(object):
         assert_result_count(res, 2, action='drop', status='ok')  # b, c
 
     @with_tempfile(mkdir=True)
-    def test_addurls_from_key_invalid_format(self, path):
+    def test_addurls_from_key_invalid_format(self=None, path=None):
         ds = Dataset(path).create(force=True)
         for fmt in ["{name}-which-has-no-double-dash",
                     # Invalid hash length.
@@ -936,18 +931,18 @@ class TestAddurls(object):
         get_res = ds.get(paths, result_renderer='disabled', on_failure="ignore")
         assert_result_count(get_res, 2, action="get", status="ok")
 
-    def test_addurls_from_key(self):
+    def test_addurls_from_key(self=None):
         fn = self.check_addurls_from_key
-        for case in [
+        for testfunc, arg1, arg2 in [
                 (fn, "MD5-s{size}--{md5sum}", "MD5"),
                 (fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"),
                 (skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"),
                 (skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
-            yield case + (False,)
-            yield case + (True,)
+            testfunc(arg1, arg2, False)
+            testfunc(arg1, arg2, True)
 
     @with_tempfile(mkdir=True)
-    def test_addurls_row_missing_key_fields(self, path):
+    def test_addurls_row_missing_key_fields(self=None, path=None):
         ds = Dataset(path).create(force=True)
         if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
             raise SkipTest("Adjusted branch functionality requires "

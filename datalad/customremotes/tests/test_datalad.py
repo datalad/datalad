@@ -8,15 +8,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the universal datalad's annex customremote"""
 
-import logging
 import glob
+import logging
 import os.path as op
 
 from datalad.distribution.dataset import Dataset
 from datalad.downloaders.tests.utils import get_test_providers
 from datalad.support.exceptions import CommandError
 from datalad.support.external_versions import external_versions
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
     assert_in,
     assert_raises,
     eq_,
@@ -30,7 +30,7 @@ from datalad.tests.utils import (
 
 @with_tempfile()
 @skip_if_no_network
-def check_basic_scenario(url, d):
+def check_basic_scenario(url, d=None):
     ds = Dataset(d).create()
     annex = ds.repo
 
@@ -67,6 +67,7 @@ def check_basic_scenario(url, d):
     # whereis command succeeding
     # https://github.com/datalad/datalad/issues/6453#issuecomment-1047533276
     from datalad.runner import StdOutErrCapture
+
     # we need to swallow logs since if DATALAD_LOG_LEVEL is set low, we
     # would get all the git-annex debug output in stderr
     with swallow_logs(new_level=logging.INFO) as cml:
@@ -75,15 +76,15 @@ def check_basic_scenario(url, d):
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output
     with assert_raises(CommandError) as cme:
-        annex.add_urls([url + '_bogus'])
-    assert_in('addurl: 1 failed', cme.exception.stderr)
+        annex.add_url_to_file('bogus', url + '_bogus')
+    assert_in('addurl: 1 failed', cme.value.stderr)
 
 
 # unfortunately with_tree etc decorators aren't generators friendly thus
 # this little adapters to test both on local and s3 urls
 @with_tree(tree={'3versions-allversioned.txt': "somefile"})
 @serve_path_via_http
-def test_basic_scenario_local_url(p, local_url):
+def test_basic_scenario_local_url(p=None, local_url=None):
     check_basic_scenario("%s3versions-allversioned.txt" % local_url)
 
 

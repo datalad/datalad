@@ -14,9 +14,24 @@ import logging
 import os
 from os.path import exists
 from os.path import join as opj
-
 from unittest.mock import patch
-from datalad.tests.utils import (
+
+import pytest
+
+from datalad import cfg as dl_cfg
+from datalad.api import create
+from datalad.cmd import CommandError
+from datalad.config import (
+    ConfigManager,
+    _where_to_scope,
+    parse_gitconfig_dump,
+    rewrite_url,
+    write_config_section,
+)
+from datalad.distribution.dataset import Dataset
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
     assert_equal,
@@ -33,26 +48,10 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import (
+    Path,
     get_home_envvars,
     swallow_logs,
-    Path
 )
-
-from datalad.distribution.dataset import Dataset
-from datalad.api import create
-from datalad.config import (
-    _where_to_scope,
-    ConfigManager,
-    parse_gitconfig_dump,
-    rewrite_url,
-    write_config_section,
-)
-from datalad.cmd import CommandError
-
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad import cfg as dl_cfg
-
 
 # XXX tabs are intentional (part of the format)!
 # XXX put back! confuses pep8
@@ -121,9 +120,11 @@ def test_parse_gitconfig_dump():
     assert_equal(gitcfg_parsetarget, parsed)
 
 
+@pytest.mark.filterwarnings("ignore: 'where=\"dataset\"' is deprecated")
+@pytest.mark.filterwarnings("ignore: 'source=\"dataset\"' is deprecated")
 @with_tree(tree=_dataset_config_template)
 @with_tempfile(mkdir=True)
-def test_something(path, new_home):
+def test_something(path=None, new_home=None):
     # will refuse to work on dataset without a dataset
     assert_raises(ValueError, ConfigManager, source='branch')
     # now read the example config
@@ -298,7 +299,7 @@ def test_something(path, new_home):
     ptdry = !git testremotes | tr ' ' '\\n'  | xargs -r -l1 -I R git push -f --dry-run R master
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
-def test_crazy_cfg(path):
+def test_crazy_cfg(path=None):
     cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='branch')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
@@ -313,7 +314,7 @@ def test_crazy_cfg(path):
 
 
 @with_tempfile
-def test_obtain(path):
+def test_obtain(path=None):
     ds = create(path)
     cfg = ConfigManager(ds)
     dummy = 'datalad.test.dummy'
@@ -549,7 +550,7 @@ def test_rewrite_url():
 # https://github.com/datalad/datalad/issues/4071
 @with_tempfile()
 @with_tempfile()
-def test_no_leaks(path1, path2):
+def test_no_leaks(path1=None, path2=None):
     ds1 = Dataset(path1).create()
     ds1.config.set('i.was.here', 'today', scope='local')
     assert_in('i.was.here', ds1.config.keys())
@@ -579,7 +580,7 @@ def test_no_leaks(path1, path2):
 
 
 @with_tempfile()
-def test_no_local_write_if_no_dataset(path):
+def test_no_local_write_if_no_dataset(path=None):
     Dataset(path).create()
     with chpwd(path):
         cfg = ConfigManager()
@@ -588,7 +589,7 @@ def test_no_local_write_if_no_dataset(path):
 
 
 @with_tempfile
-def test_dataset_local_mode(path):
+def test_dataset_local_mode(path=None):
     ds = create(path)
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', ds.config)
@@ -605,7 +606,7 @@ def test_dataset_local_mode(path):
 
 # https://github.com/datalad/datalad/issues/4071
 @with_tempfile
-def test_dataset_systemglobal_mode(path):
+def test_dataset_systemglobal_mode(path=None):
     ds = create(path)
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', ds.config)
@@ -636,12 +637,13 @@ def test_global_config():
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
 
 
+@pytest.mark.filterwarnings(r"ignore: status\(report_filetype=\) no longer supported")
 @with_tempfile()
 @with_tempfile()
-def test_bare(src, path):
+def test_bare(src=None, path=None):
     # create a proper datalad dataset with all bells and whistles
     ds = Dataset(src).create()
-    dlconfig_sha = ds.repo.call_git(['rev-parse', 'HEAD:.datalad/config'])
+    dlconfig_sha = ds.repo.call_git(['rev-parse', 'HEAD:.datalad/config']).strip()
     # can we handle a bare repo version of it?
     gr = AnnexRepo.clone(
         src, path, clone_options=['--bare', '-b', DEFAULT_BRANCH])
@@ -697,7 +699,7 @@ def test_bare(src, path):
 
 
 @with_tempfile()
-def test_write_config_section(path):
+def test_write_config_section(path=None):
     # can we handle a bare repo?
     gr = GitRepo(path, create=True, bare=True)
 
@@ -731,7 +733,7 @@ def test_write_config_section(path):
 
 
 @with_tempfile()
-def test_external_modification(path):
+def test_external_modification(path=None):
     from datalad.cmd import WitlessRunner as Runner
     runner = Runner(cwd=path)
     repo = GitRepo(path, create=True)
@@ -755,7 +757,9 @@ def test_external_modification(path):
     assert_equal(config[key], '11')
 
 
-# TODO: remove along with the removal of deprecated 'where'
+# TODO: remove test along with the removal of deprecated 'where'
+@pytest.mark.filterwarnings("ignore: 'where' is deprecated")
+@pytest.mark.filterwarnings("ignore: 'where=\"dataset\"' is deprecated")
 def test_where_to_scope():
 
     @_where_to_scope

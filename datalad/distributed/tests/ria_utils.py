@@ -7,19 +7,17 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os
 import inspect
-from glob import glob
+import os
 from functools import wraps
+from glob import glob
 
-
-from datalad.utils import Path
-from datalad.tests.utils import (
+from datalad.tests.utils_pytest import (
+    SkipTest,
     attr,
     create_tree,
-    SkipTest,
 )
-
+from datalad.utils import Path
 
 common_init_opts = ["encryption=none", "type=external", "externaltype=ora",
                     "autoenable=true"]
