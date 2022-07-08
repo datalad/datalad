@@ -266,7 +266,7 @@ class BaseSSHConnection(object):
         return ["scp"] + scp_options
 
     def _quote_filename(self, filename):
-        if self.ssh_version[0] >= 9:
+        if self.ssh_version[0] == "OPEN_SSH" and self.ssh_version[1] >= 9:
             # no filename quoting for OpenSSH version 9 and above
             return filename
         return _quote_filename_for_scp(filename)
