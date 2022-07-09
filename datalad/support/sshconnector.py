@@ -218,7 +218,8 @@ class BaseSSHConnection(object):
     @property
     def ssh_version(self):
         if self._ssh_version is None:
-            self._ssh_version = external_versions["cmd:ssh"].version
+            ssh_version = external_versions["cmd:ssh"]
+            self._ssh_version = ssh_version.version if ssh_version else None
         return self._ssh_version
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
@@ -266,10 +267,11 @@ class BaseSSHConnection(object):
         return ["scp"] + scp_options
 
     def _quote_filename(self, filename):
-        if self.ssh_version[0] >= 9:
-            # no filename quoting for OpenSSH version 9 and above
-            return filename
-        return _quote_filename_for_scp(filename)
+        if self.ssh_version and self.ssh_version[0] < 9:
+            return _quote_filename_for_scp(filename)
+
+        # no filename quoting for OpenSSH version 9 and above
+        return filename
 
     def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
