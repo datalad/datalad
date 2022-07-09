@@ -3,3 +3,4 @@ deb_setup_no_msgpack_and_duecredit
 deb_no_utf8
 python3.patch
 6817.patch
+0001-BF-TMP-workaround-do-allow-for-distutils-to-be-used.patch

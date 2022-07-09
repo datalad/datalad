@@ -1,0 +1,26 @@
+From 38705c0d55cf7641974245b1f509894cbb8f08f0 Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Fri, 8 Jul 2022 15:35:11 -0400
+Subject: [PATCH] BF(TMP workaround): do allow for distutils to be used
+
+Needs to be gone for 3.12: https://github.com/datalad/datalad/issues/6307
+---
+ tox.ini | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tox.ini b/tox.ini
+index a2a6b87b4..7230ad0f9 100644
+--- a/tox.ini
++++ b/tox.ini
+@@ -36,6 +36,8 @@ filterwarnings =
+     ignore:distutils Version classes are deprecated:DeprecationWarning
+     # comes from boto
+     ignore:the imp module is deprecated
++    # workaround for https://github.com/datalad/datalad/issues/6307
++    ignore:The distutils package is deprecated
+ markers =
+     fail_slow
+     githubci_osx
+-- 
+2.35.1
+
