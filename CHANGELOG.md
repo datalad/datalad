@@ -1,3 +1,24 @@
+# 0.17.1 (Mon Jul 11 2022)
+
+#### 🐛 Bug Fix
+
+- DOC: minor fix - consistent DataLad (not Datalad) in docs and CHANGELOG [#6830](https://github.com/datalad/datalad/pull/6830) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: fixup/harmonize Changelog for 0.17.0 a little [#6828](https://github.com/datalad/datalad/pull/6828) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: use --python-match minor option in new datalad-installer release to match outside version of Python [#6827](https://github.com/datalad/datalad/pull/6827) ([@christian-monch](https://github.com/christian-monch) [@yarikoptic](https://github.com/yarikoptic))
+- Do not quote paths for ssh >= 9 [#6826](https://github.com/datalad/datalad/pull/6826) ([@christian-monch](https://github.com/christian-monch) [@yarikoptic](https://github.com/yarikoptic))
+- Suppress DeprecationWarning to allow for distutils to be used [#6819](https://github.com/datalad/datalad/pull/6819) ([@yarikoptic](https://github.com/yarikoptic))
+- RM(TST): remove testing of datalad.test which was removed from 0.17.0 [#6822](https://github.com/datalad/datalad/pull/6822) ([@yarikoptic](https://github.com/yarikoptic))
+- Avoid import of nose-based tests.utils, make  skip_if_no_module() and skip_if_no_network() allowed at module level [#6817](https://github.com/datalad/datalad/pull/6817) ([@jwodder](https://github.com/jwodder))
+- BF(TST): use higher level asyncio.run instead of asyncio.get_event_loop in test_inside_async [#6808](https://github.com/datalad/datalad/pull/6808) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.17.0 (Thu Jul 7 2022) -- pytest migration
 
 #### 💫 Enhancements and new features
