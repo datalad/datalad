@@ -15,4 +15,3 @@ exif = datalad.metadata.extractors.exif:MetadataExtractor
 frictionless_datapackage = datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor
 image = datalad.metadata.extractors.image:MetadataExtractor
 xmp = datalad.metadata.extractors.xmp:MetadataExtractor
-

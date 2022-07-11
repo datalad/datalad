@@ -12,7 +12,7 @@ extractors that have to be enabled in a dataset's configuration. Extractors
 yield metadata in a JSON-LD_-like structure that can be arbitrarily complex and
 deeply nested. Metadata from each extractor is kept unmodified, unmangled, and
 separate from metadata of other extractors. This design enables tailored
-applications using particular metadata that can use Datalad as a
+applications using particular metadata that can use DataLad as a
 content-agnostic aggregation and transport layer without being limited or
 impacted by other metadata sources and schemas.
 
@@ -186,10 +186,10 @@ identified at the moment.
 
 .. _metadata-datalad_core:
 
-Datalad's internal metadata storage (``datalad_core``)
+DataLad's internal metadata storage (``datalad_core``)
 ------------------------------------------------------
 
-This extractor can express Datalad's internal metadata representation, such
+This extractor can express DataLad's internal metadata representation, such
 as the relationship of a super- and a subdataset. It uses DataLad's own
 constrained vocabulary.
 

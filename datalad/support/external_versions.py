@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Module to help maintain a registry of versions for external modules etc
 """
+import re
 import sys
 import os.path as op
 from os import linesep
@@ -116,10 +117,15 @@ def _get_ssh_version(exe=None):
     stdout = out['stdout']
     if out['stderr'].startswith('OpenSSH'):
         stdout = out['stderr']
-    assert stdout.startswith('OpenSSH')  # that is the only one we care about atm
-    # The last item in _-separated list in the first word which could be separated
-    # from the rest by , or yet have another word after space
-    return stdout.split(',', 1)[0].split(' ')[0].rstrip('.').split('_')[-1]
+    match = re.match(
+        "OpenSSH.*_([0-9][0-9]*)\\.([0-9][0-9]*)(p([0-9][0-9]*))?",
+        stdout)
+    if match:
+        return "{}.{}p{}".format(
+            match.groups()[0],
+            match.groups()[1],
+            match.groups()[3])
+    raise AssertionError(f"no OpenSSH client found: {stdout}")
 
 
 def _get_system_ssh_version():
