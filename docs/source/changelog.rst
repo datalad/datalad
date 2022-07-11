@@ -2751,7 +2751,7 @@ Enhancements and new features
 -  The credential helper no longer asks the user to repeat tokens or AWS
    keys. (`#5219 <https://github.com/datalad/datalad/issues/5219>`__)
 
--  The new option ``datalad.locations.sockets`` controls where Datalad
+-  The new option ``datalad.locations.sockets`` controls where DataLad
    stores SSH sockets, allowing users to more easily work around file
    system and path length restrictions.
    (`#5238 <https://github.com/datalad/datalad/issues/5238>`__)
@@ -4824,7 +4824,7 @@ Enhancements and new features
    unknown field.
    (`#3594 <https://github.com/datalad/datalad/issues/3594>`__)
 
--  Shared logic used in the setup.py files of Datalad and its extensions
+-  Shared logic used in the setup.py files of DataLad and its extensions
    has been moved to modules in the \_datalad_build_support/ directory.
    (`#3600 <https://github.com/datalad/datalad/issues/3600>`__)
 

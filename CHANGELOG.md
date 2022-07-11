@@ -1383,7 +1383,7 @@
 - The credential helper no longer asks the user to repeat tokens or
   AWS keys.  ([#5219][])
 
-- The new option `datalad.locations.sockets` controls where Datalad
+- The new option `datalad.locations.sockets` controls where DataLad
   stores SSH sockets, allowing users to more easily work around file
   system and path length restrictions.  ([#5238][])
 
@@ -2842,7 +2842,7 @@ Primarily bugfixes with some optimizations and refactorings.
 - [addurls][] now suggests close matches when the URL or file format
   contains an unknown field.  ([#3594][])
 
-- Shared logic used in the setup.py files of Datalad and its
+- Shared logic used in the setup.py files of DataLad and its
   extensions has been moved to modules in the _datalad_build_support/
   directory.  ([#3600][])
 
