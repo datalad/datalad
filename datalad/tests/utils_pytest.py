@@ -209,7 +209,7 @@ def skip_if_no_module(module):
     try:
         imp = __import__(module)
     except Exception as exc:
-        pytest.skip("Module %s fails to load" % module)
+        pytest.skip("Module %s fails to load" % module, allow_module_level=True)
 
 
 def skip_if_scrapy_without_selector():
@@ -252,7 +252,7 @@ def skip_if_no_network(func=None):
 
     def check_and_raise():
         if dl_cfg.get('datalad.tests.nonetwork'):
-            pytest.skip("Skipping since no network settings")
+            pytest.skip("Skipping since no network settings", allow_module_level=True)
 
     if func:
         @wraps(func)
@@ -1603,7 +1603,7 @@ with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
-OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
