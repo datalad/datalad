@@ -10,7 +10,7 @@ The appointment of an RM ends with the declaration of the respective release's e
 
 ## Responsibilities
 
-Immediately after the previous release was made, the RM takes over decision making regarding merges into the integration branch for all developments targeting the respective release. Such merges can be made as soon as, but no earlier, than the RM indicating approval.
+Immediately after the previous release was made, the RM takes over decision making regarding merges into the integration branch for all developments targeting the respective release. Such merges can be made as soon as, but no earlier than, the RM indicates approval.
 
 It is the RM's responsibility to act on any merge request in a timely manner.
 
@@ -36,7 +36,7 @@ The assistant RM role is identical to the RM, with the same responsibilities. 
 
 The assistant RM (aRM) becomes the RM when the current RM completed a release cycle and took over the new maintenance series. 
 
-The aRM becomes the RM when the current RM steps down prior completion of the release cycle.
+The aRM becomes the RM when the current RM steps down prior to completion of the release cycle.
 
 The RM of an upcoming release serves as the aRM of the current maintenance series.
 
