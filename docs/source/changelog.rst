@@ -24,7 +24,7 @@ Enhancements and new features
 -  ``datalad wtf`` includes a report on file system types of commonly
    used paths. `#6664 <https://github.com/datalad/datalad/pull/6664>`__
    (by @adswa)
--  use next generation metadata code in search, if it is available
+-  Use next generation metadata code in search, if it is available.
    `#6518 <https://github.com/datalad/datalad/pull/6518>`__ (by
    @christian-monch)
 
@@ -47,8 +47,12 @@ Deprecations and removals
    `#6667 <https://github.com/datalad/datalad/pull/6667>`__ (by @mih)
 -  ``datalad test`` command and supporting functionality (e.g.,
    ``datalad.test``) were removed.
-   `# <https://github.com/datalad/datalad/pull/6273>`__ (by @jwodder) ##
-   Bug Fixes
+   `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
+   @jwodder)
+
+Bug Fixes
+---------
+
 -  ``export-archive`` does not rely on ``normalize_path()`` methods
    anymore and became more robust when called from subdirectories.
    `#6745 <https://github.com/datalad/datalad/pull/6745>`__ (by @adswa)
@@ -85,7 +89,7 @@ Internal
    core to modularize the code base further.
    `#6706 <https://github.com/datalad/datalad/pull/6706>`__ (by @adswa)
 -  ``get_initialized_logger`` now lets a given ``logtarget`` take
-   precendence over ``datalad.log.target``.
+   precedence over ``datalad.log.target``.
    `#6675 <https://github.com/datalad/datalad/pull/6675>`__ (by
    @bpoldrack)
 -  Many uses of deprecated call options were replaced with the
@@ -679,6 +683,8 @@ Deprecations and removals
    (previously INFO) level to avoid polluting output of higher-level
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
+
+.. _bug-fixes-1:
 
 Bug Fixes
 ---------

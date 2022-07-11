@@ -6,14 +6,15 @@
 - `datalad unlock` gained a progress bar. [#6704](https://github.com/datalad/datalad/pull/6704) (by @adswa)
 - When `create-sibling-gitlab` is called on non-existing subdatasets or paths it now returns an impossible result instead of no feedback at all. [#6701](https://github.com/datalad/datalad/pull/6701) (by @adswa)
 - `datalad wtf` includes a report on file system types of commonly used paths. [#6664](https://github.com/datalad/datalad/pull/6664) (by @adswa)
-- use next generation metadata code in search, if it is available [#6518](https://github.com/datalad/datalad/pull/6518) (by @christian-monch) 
+- Use next generation metadata code in search, if it is available. [#6518](https://github.com/datalad/datalad/pull/6518) (by @christian-monch)
 
 #### 🪓 Deprecations and removals
 - Remove unused and untested log helpers `NoProgressLog` and `OnlyProgressLog`. [#6747](https://github.com/datalad/datalad/pull/6747) (by @mih)
 - Remove unused `sorted_files()` helper. [#6722](https://github.com/datalad/datalad/pull/6722) (by @adswa)
 - Discontinued the value `stdout` for use with the config variable `datalad.log.target` as its use would inevitably break special remote implementations. [#6675](https://github.com/datalad/datalad/pull/6675) (by @bpoldrack)
 - `AnnexRepo.add_urls()` is deprecated in favor of `AnnexRepo.add_url_to_file()` or a direct call to `AnnexRepo.call_annex()`. [#6667](https://github.com/datalad/datalad/pull/6667) (by @mih)
-- `datalad test` command and supporting functionality (e.g., `datalad.test`) were removed. [#](https://github.com/datalad/datalad/pull/6273) (by @jwodder)
+- `datalad test` command and supporting functionality (e.g., `datalad.test`) were removed. [#6273](https://github.com/datalad/datalad/pull/6273) (by @jwodder)
+
 #### 🐛 Bug Fixes
 - `export-archive` does not rely on `normalize_path()` methods anymore and became more robust when called from subdirectories. [#6745](https://github.com/datalad/datalad/pull/6745) (by @adswa)
 - Sanitize keys before checking content availability to ensure that the content availability of files with URL- or custom backend keys is correctly determined and marked. [#6663](https://github.com/datalad/datalad/pull/6663) (by @adswa)
@@ -27,7 +28,7 @@
 
 #### 🏠 Internal
 - Inline code of `create-sibling-ria` has been refactored to an internal helper to check for siblings with particular names across dataset hierarchies in `datalad-next`, and is reintroduced into core to modularize the code base further. [#6706](https://github.com/datalad/datalad/pull/6706) (by @adswa)
-- `get_initialized_logger` now lets a given `logtarget` take precendence over `datalad.log.target`. [#6675](https://github.com/datalad/datalad/pull/6675) (by @bpoldrack)
+- `get_initialized_logger` now lets a given `logtarget` take precedence over `datalad.log.target`. [#6675](https://github.com/datalad/datalad/pull/6675) (by @bpoldrack)
 - Many uses of deprecated call options were replaced with the recommended ones. [#6273](https://github.com/datalad/datalad/pull/6273) (by @jwodder)
 - Get rid of `asyncio` import by defining few noops methods from `asyncio.protocols.SubprocessProtocol` directly in `WitlessProtocol`. [#6648](https://github.com/datalad/datalad/pull/6648) (by @yarikoptic)
 - Consolidate `GitRepo.remove()` and `AnnexRepo.remove()` into a single implementation. [#6783](https://github.com/datalad/datalad/pull/6783) (by @mih)
