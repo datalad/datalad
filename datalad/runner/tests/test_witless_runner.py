@@ -199,7 +199,13 @@ def test_runner_parametrized_protocol():
         # value passed to protocol constructor
         value=b'5',
     )
-    eq_(res['stdout'], '5')
+    try:
+        eq_(res['stdout'], '5')
+    except AssertionError:
+        # TODO: remove when dropping support for python3.8
+        if res['stdout'] == '55' and sys.version_info[:2] == (3, 8):
+            pytest.xfail("got 55 and not 5, see https://github.com/datalad/datalad/issues/4921")
+        raise
 
 
 @integration  # ~3 sec
