@@ -2,7 +2,7 @@
 
 ## Appointment
 
-A release manager (RM) is appointed for a specific upcoming release.
+A release manager (RM) is appointed for a specific upcoming major or minor release (i.e., x.y.z -> x.y+1.0 or x.y.z -> x+1.0.0).
 
 A RM may and should step down at any time, when they cannot fulfill the associated obligations. In this case, a new RM is appointed.
 
