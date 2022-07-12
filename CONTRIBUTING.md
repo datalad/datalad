@@ -692,3 +692,15 @@ organized by label.  `auto` recognizes the following PR labels:
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
 [contrib_emoji]: https://allcontributors.org/docs/en/emoji-key
+
+
+### Filing issues with git-annex
+
+Even though git-annex is a separate project, DataLad's and git-annex's development is often intertwined.
+It is not uncommon to discover potential git-annex bugs or git-annex feature request while working on DataLad.
+In those cases, it is common for developers and contributors to file an issue in git-annex's public bug tracker at [git-annex.branchable.com](https://git-annex.branchable.com/).
+Here are a few hints on how to go about it:
+
+- You can report a new bug or browse through existing bug reports at [git-annex.branchable.com/bugs](https://git-annex.branchable.com/bugs/))
+- In order to associate a bug report with the DataLad you can add the following mark up into the description: ``[[!tag projects/datalad]]``
+- You can add author metadata with the following mark up: ``[[!meta author=yoh]]``. Some authors will be automatically associated with the DataLad project by git-annex's bug tracker.
