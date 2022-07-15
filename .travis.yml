@@ -204,6 +204,8 @@ before_install:
       PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow 30 );
       export DATALAD_TESTS_SETUP_TESTREPOS=1;
     fi
+  # Show git describe output to ensure that we did fetch all the tags etc
+  - git describe
   # Just in case we need to check if nfs is there etc
   - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
