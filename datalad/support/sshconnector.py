@@ -37,6 +37,9 @@ from datalad.support.exceptions import (
     CommandError,
     ConnectionOpenFailedError,
 )
+from datalad.support.external_versions import (
+    external_versions,
+)
 from datalad.utils import (
     auto_repr,
     Path,
@@ -82,7 +85,11 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
     # References:
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
-    return md5(
+
+    # The "# nosec" below skips insecure hash checks by 'codeclimate'. The hash
+    # is not security critical, since it is only used as an "abbreviation" of
+    # the unique connection property string.
+    return md5(         # nosec
         '{lhost}{rhost}{port}{identity_file}{username}{force_ip}'.format(
             lhost=gethostname(),
             rhost=hostname,
@@ -127,6 +134,7 @@ class BaseSSHConnection(object):
         """
         self._runner = None
         self._ssh_executable = None
+        self._ssh_version = None
 
         from datalad.support.network import SSHRI, is_ssh
         if not is_ssh(sshri):
@@ -207,6 +215,13 @@ class BaseSSHConnection(object):
             self._runner = WitlessRunner()
         return self._runner
 
+    @property
+    def ssh_version(self):
+        if self._ssh_version is None:
+            ssh_version = external_versions["cmd:ssh"]
+            self._ssh_version = ssh_version.version if ssh_version else None
+        return self._ssh_version
+
     def _adjust_cmd_for_bundle_execution(self, cmd):
         from datalad import cfg
         # locate annex and set the bundled vs. system Git machinery in motion
@@ -251,6 +266,13 @@ class BaseSSHConnection(object):
         scp_options += ["-p"] if preserve_attrs else []
         return ["scp"] + scp_options
 
+    def _quote_filename(self, filename):
+        if self.ssh_version and self.ssh_version[0] < 9:
+            return _quote_filename_for_scp(filename)
+
+        # no filename quoting for OpenSSH version 9 and above
+        return filename
+
     def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
@@ -285,7 +307,7 @@ class BaseSSHConnection(object):
         # add destination path
         scp_cmd += ['%s:%s' % (
             self.sshri.hostname,
-            _quote_filename_for_scp(destination),
+            self._quote_filename(destination),
         )]
         out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
         return out['stdout'], out['stderr']
@@ -320,7 +342,7 @@ class BaseSSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
-        scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
+        scp_cmd += ["%s:%s" % (self.sshri.hostname, self._quote_filename(s))
                     for s in ensure_list(source)]
         # add destination path
         scp_cmd += [destination]

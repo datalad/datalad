@@ -8,11 +8,12 @@ from typing import (
     Tuple,
 )
 
+from datalad.tests.utils_pytest import assert_raises
+
 from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
 from ..protocol import GeneratorMixIn
 from .utils import py2cmd
-from datalad.tests.utils import assert_raises
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):

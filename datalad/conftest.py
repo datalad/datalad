@@ -1,6 +1,8 @@
 import logging
 import os
 import re
+from contextlib import ExitStack
+from unittest.mock import patch
 
 import pytest
 
@@ -49,13 +51,22 @@ def setup_package():
         # enforce honoring TMPDIR (see gh-5307)
         tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
 
-    with pytest.MonkeyPatch().context() as m:
-        m.setattr(consts, "DATASETS_TOPURL", 'https://datasets-tests.datalad.org/')
-        m.setenv('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
+    # Use unittest's patch instead of pytest.MonkeyPatch for compatibility with
+    # old pytests
+    with ExitStack() as m:
+        m.enter_context(patch.object(consts, "DATASETS_TOPURL", 'https://datasets-tests.datalad.org/'))
+        m.enter_context(patch.dict(os.environ, {'DATALAD_DATASETS_TOPURL': consts.DATASETS_TOPURL}))
 
-        m.setenv("GIT_CONFIG_PARAMETERS",
-                 "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
-                 .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
+        m.enter_context(
+            patch.dict(
+                os.environ,
+                {
+                    "GIT_CONFIG_PARAMETERS":
+                    "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
+                    .format(DEFAULT_BRANCH, DEFAULT_REMOTE)
+                }
+            )
+        )
 
         def prep_tmphome():
             # re core.askPass:
@@ -96,15 +107,14 @@ def setup_package():
             # To overcome pybuild overriding HOME but us possibly wanting our
             # own HOME where we pre-setup git for testing (name, email)
             if 'GIT_HOME' in os.environ:
-                m.setenv('HOME', os.environ['GIT_HOME'])
+                m.enter_context(patch.dict(os.environ, {'HOME': os.environ['GIT_HOME']}))
             else:
                 # we setup our own new HOME, the BEST and HUGE one
                 new_home, _ = prep_tmphome()
-                for v, val in get_home_envvars(new_home).items():
-                    m.setenv(v, val)
+                m.enter_context(patch.dict(os.environ, get_home_envvars(new_home)))
         else:
             _, cfg_file = prep_tmphome()
-            m.setenv('GIT_CONFIG_GLOBAL', str(cfg_file))
+            m.enter_context(patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': str(cfg_file)}))
 
         # Re-load ConfigManager, since otherwise it won't consider global config
         # from new $HOME (see gh-4153
@@ -124,7 +134,7 @@ def setup_package():
 
         # Prevent interactive credential entry (note "true" is the command to run)
         # See also the core.askPass setting above
-        m.setenv('GIT_ASKPASS', 'true')
+        m.enter_context(patch.dict(os.environ, {'GIT_ASKPASS': 'true'}))
 
         # Set to non-interactive UI
         _test_states['ui_backend'] = ui.backend

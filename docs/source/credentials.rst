@@ -9,7 +9,7 @@ Both directions are independent of each other and none is necessarily required.
 Either direction can be configured based on URL matching patterns.
 In addition, Git can be configured to always query DataLad for credentials without any URL matching.
 
-Let Git query Datalad
+Let Git query DataLad
 =====================
 
 In order to allow Git to query credentials from DataLad, Git needs to be configured to use the git credential helper delivered with DataLad (an executable called `git-credential-datalad`).

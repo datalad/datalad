@@ -30,16 +30,3 @@ def test_get_response_stamp():
     eq_(r['size'], 101)
     eq_(r['mtime'], 1367377320)
     eq_(r['url'], "http://www.example.com/1.dat")
-
-
-def test_test():
-    try:
-        import numpy
-        assert Version(numpy.__version__) >= Version('1.2')
-    except:
-        raise SkipTest("Need numpy 1.2")
-
-    # we need to avoid running global teardown
-    with patch.dict('os.environ', {'DATALAD_TESTS_NOTEARDOWN': '1'}):
-        # we can't swallow outputs due to all the nosetests dances etc
-        datalad.test('datalad.support.tests.test_status', verbose=0)
