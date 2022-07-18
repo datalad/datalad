@@ -1,3 +1,21 @@
+# 0.17.2 (Sat Jul 16 2022)
+
+#### 🐛 Bug Fix
+
+- BF(TST): do proceed to proper test for error being caught for recent git-annex on windows with symlinks [#6850](https://github.com/datalad/datalad/pull/6850) ([@yarikoptic](https://github.com/yarikoptic))
+- Addressing problem testing against python 3.10 on Travis (skip more annex versions) [#6842](https://github.com/datalad/datalad/pull/6842) ([@yarikoptic](https://github.com/yarikoptic))
+- XFAIL test_runner_parametrized_protocol on python3.8 when getting duplicate output [#6837](https://github.com/datalad/datalad/pull/6837) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: Make create's check for procedures work with several again [#6841](https://github.com/datalad/datalad/pull/6841) ([@adswa](https://github.com/adswa))
+- Support older pytests [#6836](https://github.com/datalad/datalad/pull/6836) ([@jwodder](https://github.com/jwodder))
+
+#### Authors: 3
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.17.1 (Mon Jul 11 2022)
 
 #### 🐛 Bug Fix

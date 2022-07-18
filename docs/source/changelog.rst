@@ -2,8 +2,44 @@
 
 Change log
 **********
+0.17.2 (Sat Jul 16 2022)
+========================
+
+Bug Fix
+-------
+
+-  BF(TST): do proceed to proper test for error being caught for recent
+   git-annex on windows with symlinks
+   `#6850 <https://github.com/datalad/datalad/pull/6850>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  Addressing problem testing against python 3.10 on Travis (skip more
+   annex versions)
+   `#6842 <https://github.com/datalad/datalad/pull/6842>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  XFAIL test_runner_parametrized_protocol on python3.8 when getting
+   duplicate output
+   `#6837 <https://github.com/datalad/datalad/pull/6837>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: Make create’s check for procedures work with several again
+   `#6841 <https://github.com/datalad/datalad/pull/6841>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Support older pytests
+   `#6836 <https://github.com/datalad/datalad/pull/6836>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+
+Authors: 3
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.17.1 (Mon Jul 11 2022)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -37,6 +73,8 @@ Bug Fix
    asyncio.get_event_loop in test_inside_async
    `#6808 <https://github.com/datalad/datalad/pull/6808>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _authors-3-1:
 
 Authors: 3
 ----------
@@ -181,7 +219,7 @@ Authors: 7
 0.16.7 (Wed Jul 06 2022)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -239,7 +277,7 @@ Authors: 5
 0.16.6 (Tue Jun 14 2022)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -268,7 +306,7 @@ Authors: 2
 0.16.5 (Wed Jun 08 2022)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -292,7 +330,7 @@ Authors: 1
 0.16.4 (Thu Jun 02 2022)
 ========================
 
-.. _bug-fix-4:
+.. _bug-fix-5:
 
 Bug Fix
 -------
@@ -321,7 +359,7 @@ Bug Fix
    `#6725 <https://github.com/datalad/datalad/pull/6725>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _authors-3-1:
+.. _authors-3-2:
 
 Authors: 3
 ----------
@@ -335,7 +373,7 @@ Authors: 3
 0.16.3 (Thu May 12 2022)
 ========================
 
-.. _bug-fix-5:
+.. _bug-fix-6:
 
 Bug Fix
 -------
@@ -386,7 +424,7 @@ Authors: 4
 0.16.2 (Thu Apr 21 2022)
 ========================
 
-.. _bug-fix-6:
+.. _bug-fix-7:
 
 Bug Fix
 -------
@@ -1129,7 +1167,7 @@ Authors: 11
 0.15.6 (Sun Feb 27 2022)
 ========================
 
-.. _bug-fix-7:
+.. _bug-fix-8:
 
 Bug Fix
 -------
@@ -1166,7 +1204,7 @@ Enhancement
    `#6364 <https://github.com/datalad/datalad/pull/6364>`__
    (`@adswa <https://github.com/adswa>`__)
 
-.. _bug-fix-8:
+.. _bug-fix-9:
 
 Bug Fix
 -------
@@ -1217,7 +1255,7 @@ Authors: 5
 0.15.4 (Thu Dec 16 2021)
 ========================
 
-.. _bug-fix-9:
+.. _bug-fix-10:
 
 Bug Fix
 -------
@@ -1302,7 +1340,7 @@ Authors: 6
 0.15.3 (Sat Oct 30 2021)
 ========================
 
-.. _bug-fix-10:
+.. _bug-fix-11:
 
 Bug Fix
 -------
@@ -1408,7 +1446,7 @@ Authors: 7
 0.15.2 (Wed Oct 06 2021)
 ========================
 
-.. _bug-fix-11:
+.. _bug-fix-12:
 
 Bug Fix
 -------
@@ -1475,7 +1513,7 @@ Authors: 5
 0.15.1 (Fri Sep 24 2021)
 ========================
 
-.. _bug-fix-12:
+.. _bug-fix-13:
 
 Bug Fix
 -------
@@ -1530,7 +1568,7 @@ Tests
    `#5986 <https://github.com/datalad/datalad/pull/5986>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _authors-3-2:
+.. _authors-3-3:
 
 Authors: 3
 ----------
@@ -1890,7 +1928,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-13:
+.. _bug-fix-14:
 
 Bug Fix
 -------
@@ -1998,7 +2036,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-14:
+.. _bug-fix-15:
 
 Bug Fix
 -------
@@ -2100,7 +2138,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-15:
+.. _bug-fix-16:
 
 Bug Fix
 -------
