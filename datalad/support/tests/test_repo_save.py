@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test saveds function"""
 
+import shutil
 
 from datalad.api import create
 from datalad.distribution.dataset import Dataset
@@ -25,7 +26,10 @@ from datalad.tests.utils_pytest import (
     slow,
     with_tempfile,
 )
-from datalad.utils import rmtree
+from datalad.utils import (
+    on_windows,
+    rmtree,
+)
 
 
 @with_tempfile
@@ -79,6 +83,51 @@ def test_gitrepo_save_all(path=None):
 @with_tempfile
 def test_annexrepo_save_all(path=None):
     _test_save_all(path, AnnexRepo)
+
+
+@with_tempfile
+def test_save_typechange(path=None):
+    ckwa = dict(result_renderer='disabled')
+    ds = Dataset(path).create(**ckwa)
+    foo = ds.pathobj / 'foo'
+    # save a file
+    foo.write_text('some')
+    ds.save(**ckwa)
+    # now delete the file and replace with a directory and a file in it
+    foo.unlink()
+    foo.mkdir()
+    bar = foo / 'bar'
+    bar.write_text('foobar')
+    res = ds.save(**ckwa)
+    assert_in_results(res, path=str(bar), action='add', status='ok')
+    assert_repo_status(ds.repo)
+    if not on_windows:
+        # now replace file with subdataset
+        # (this is https://github.com/datalad/datalad/issues/5418)
+        bar.unlink()
+        Dataset(ds.pathobj / 'tmp').create(**ckwa)
+        shutil.move(ds.pathobj / 'tmp', bar)
+        res = ds.save(**ckwa)
+        assert_repo_status(ds.repo)
+        assert len(ds.subdatasets(**ckwa)) == 1
+    # now replace directory with subdataset
+    rmtree(foo)
+    Dataset(ds.pathobj / 'tmp').create(**ckwa)
+    shutil.move(ds.pathobj / 'tmp', foo)
+    # right now a first save() will save the subdataset removal only
+    ds.save(**ckwa)
+    # subdataset is gone
+    assert len(ds.subdatasets(**ckwa)) == 0
+    # but it takes a second save() run to get a valid status report
+    # to understand that there is a new subdataset on a higher level
+    ds.save(**ckwa)
+    assert_repo_status(ds.repo)
+    assert len(ds.subdatasets(**ckwa)) == 1
+    # now replace subdataset with a file
+    rmtree(foo)
+    foo.write_text('some')
+    ds.save(**ckwa)
+    assert_repo_status(ds.repo)
 
 
 @with_tempfile
