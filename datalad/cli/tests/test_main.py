@@ -305,6 +305,24 @@ def test_cfg_override(path=None):
                            protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
 
+        # set a config
+        run_main([
+            'configuration', '--scope', 'local', 'set', 'mike.item=some'])
+        # verify it is successfully set
+        assert 'some' == run_main([
+            'configuration', 'get', 'mike.item'])[0].strip()
+        # verify that an override can unset the config
+        # we need to use an ephemeral override dict, because otherwise
+        # run_main() would have the sideeffect of permanently modifying
+        # this session's global config manager
+        with patch('datalad.cfg.overrides', {}):
+            assert '' == run_main([
+                '-c', ':mike.item', 'configuration', 'get', 'mike.item'])[0].strip()
+        # verify the effect is not permanent
+        assert 'some' == run_main([
+            'configuration', 'get', 'mike.item'])[0].strip()
+
+
 
 def test_incorrect_cfg_override():
     run_main(['-c', 'some', 'wtf'], exit_code=3)
