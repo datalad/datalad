@@ -84,6 +84,26 @@ class CreateSiblingRia(Interface):
     The store's base path is expected to not exist, be an empty directory,
     or a valid RIA store.
 
+    RIA URL format
+    ~~~~~~~~~~~~~~
+
+    Interactions with new or existing RIA stores require RIA URLs to identify
+    the store or specific datasets inside of it.
+
+    The general structure of a RIA URL pointing to a store takes the form
+    'ria+[protocol]://<storelocation>' (e.g.,
+    ria+ssh://[user@]hostname:/absolute/path/to/ria-store, or
+    ria+file:///absolute/path/to/ria-store)
+
+    The general structure of a RIA URL pointing to a dataset in a store (for
+    example for cloning) takes a similar form, but appends either the datasets
+    UUID or a ~ symbold followed by the dataset's alias name:
+    'ria+[protocol]://<storelocation>#<dataset-UUID' or
+    'ria+[protocol]://<storelocation>#~<aliasname>'.
+    In addition, specific version identifiers can be appended to the URL like
+    this:
+    'TODO'
+
     RIA store layout
     ~~~~~~~~~~~~~~~~
 
