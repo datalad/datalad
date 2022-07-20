@@ -269,11 +269,12 @@ def test_script_shims(script):
                  get_numeric_portion(version))
 
 
-@slow  # 11.2591s
 @with_tempfile(mkdir=True)
 def test_cfg_override(path=None):
     with chpwd(path):
-        cmd = ['datalad', 'wtf', '-s', 'some']
+        # use 'wtf' to dump the config
+        # should be rewritten to use `configuration`
+        cmd = ['datalad', 'wtf', '-S', 'configuration', '-s', 'some']
         # control
         out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
         assert_not_in('datalad.dummy: this', out)
