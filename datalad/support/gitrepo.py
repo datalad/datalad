@@ -3705,6 +3705,17 @@ def _get_save_status_state(status):
         if state == 'clean':
             # we don't care about clean
             continue
+        if state == 'modified' and props.get('gitshasum') \
+                and props.get('gitshasum') == props.get('prev_gitshasum'):
+            # reported as modified, but with identical shasums -> typechange
+            # a subdataset maybe? do increasingly expensive tests for
+            # speed reasons
+            if props.get('type') != 'dataset' and f.is_dir() \
+                    and GitRepo.is_valid_repo(f):
+                # it was not a dataset, but now there is one.
+                # we declare it untracked to engage the discovery tooling.
+                state = 'untracked'
+                props = dict(type='dataset', state='untracked')
         status_state[state][f] = props
         # The hybrid one to retain the same order as in original status
         if state in ('modified', 'untracked'):
