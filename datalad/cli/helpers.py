@@ -266,7 +266,7 @@ def _parse_overrides_from_cmdline(cmdlineargs):
         lgr.error(
             "Configuration override without section/variable "
             "or unset marker or value assignment "
-            "(must be '[:]section.variable[=value]'): %s",
+            "(must be '(:section.variable|section.variable=value)'): %s",
             noassign)
         sys.exit(3)
     overrides = dict(
