@@ -313,16 +313,19 @@ def test_cfg_override(path=None):
         assert 'some' == run_main([
             'configuration', 'get', 'mike.item'])[0].strip()
         # verify that an override can unset the config
-        # we need to use an ephemeral override dict, because otherwise
-        # run_main() would have the sideeffect of permanently modifying
-        # this session's global config manager
-        with patch('datalad.cfg.overrides', {}):
-            assert '' == run_main([
-                '-c', ':mike.item', 'configuration', 'get', 'mike.item'])[0].strip()
+        # we cannot use run_main(), because the "singleton" instance of the
+        # dataset we are in is still around in this session, and with it
+        # also its config managers that we will not be able to post-hoc
+        # overwrite with this method. Instead, we'll execute in a subprocess.
+        assert '' == Runner().run([
+            'datalad', '-c', ':mike.item',
+            'configuration', 'get', 'mike.item'],
+            protocol=StdOutErrCapture)['stdout'].strip()
         # verify the effect is not permanent
-        assert 'some' == run_main([
-            'configuration', 'get', 'mike.item'])[0].strip()
-
+        assert 'some' == Runner().run([
+            'datalad',
+            'configuration', 'get', 'mike.item'],
+            protocol=StdOutErrCapture)['stdout'].strip()
 
 
 def test_incorrect_cfg_override():
