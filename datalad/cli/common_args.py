@@ -38,7 +38,7 @@ common_args = dict(
              help="""specify configuration setting overrides. They override any
              configuration read from a file. A configuration can also be
              unset temporarily by prefixing its name with a colon (':'), e.g. ':user.name'.
-             Overrides specified here may be overriden themselves by
+             Overrides specified here may be overridden themselves by
              configuration settings declared as environment variables.
              """)),
     change_path=(
