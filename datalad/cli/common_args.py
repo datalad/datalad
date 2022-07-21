@@ -34,10 +34,12 @@ common_args = dict(
         ('-c',),
         dict(action='append',
              dest='cfg_overrides',
-             metavar='KEY=VALUE',
-             help="""configuration variable setting. Overrides any
-             configuration read from a file, but is potentially overridden
-             itself by configuration variables in the process environment.
+             metavar='(:name|name=value)',
+             help="""specify configuration setting overrides. They override any
+             configuration read from a file. A configuration can also be
+             unset temporarily by prefixing its name with a colon (':'), e.g. ':user.name'.
+             Overrides specified here may be overridden themselves by
+             configuration settings declared as environment variables.
              """)),
     change_path=(
         ('-C',),
