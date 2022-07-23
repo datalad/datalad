@@ -3081,11 +3081,18 @@ class GitRepo(CoreGitRepo):
         Returns
         -------
         dict
-          Mapping of Paths to type labels from GIT_MODE_TYPE_MAP.
+          Mapping of modified Paths to type labels from GIT_MODE_TYPE_MAP.
           Deleted paths have type `None` assigned.
         """
-        # ask diff-files, gives a list with interspersed diff info and
-        # filenames
+        # because of the way git considers smudge filters in modification
+        # detection we have to consult two commands to get a full picture, see
+        # https://github.com/datalad/datalad/issues/6791#issuecomment-1193145967
+
+        # low-level code cannot handle pathobjs
+        consider_paths = [str(p) for p in paths] if paths else None
+
+        # first ask diff-files which can report typechanges. it gives a list with
+        # interspersed diff info and filenames
         mod = list(self.call_git_items_(
             ['diff-files',
              # without this, diff-files would run a full status (recursively)
@@ -3097,18 +3104,39 @@ class GitRepo(CoreGitRepo):
              '--no-renames',
              '-z'
             ],
-            # low-level code cannot handle pathobjs
-            files=[str(p) for p in paths] if paths else None,
-            sep='\0',
-            read_only=True))
+            files=consider_paths, sep='\0', read_only=True))
         # convert into a mapping path to type
         modified = dict(zip(
             # paths are every other element, starting from the second
             mod[1::2],
-            # mark `None` for deletions, and give raw mode otherwise
-            (None if l.endswith('D') else l.split(' ', maxsplit=2)[1]
-             for l in mod[::2])
+            # mark `None` for deletions, and take mode reports otherwise
+            # (for simplicity keep leading ':' in prev mode for now)
+            (None if spec.endswith('D') else spec.split(' ', maxsplit=2)[:2]
+             for spec in mod[::2])
         ))
+        # `diff-files` cannot give us the full answer to "what is modified"
+        # because it won't consider what smudge filters could do, for this
+        # we need `ls-files --modified` to exclude any paths that are not
+        # actually modified
+        modified_files = set(
+            p for p in self.call_git_items_(
+                # we need not look for deleted files, diff-files did that
+                ['ls-files', '-z', '-m'],
+                files=consider_paths, sep='\0', read_only=True)
+                # skip empty lines
+                if p)
+        modified = {
+            # map to the current type, in case of a typechange
+            # keep None for a deletion
+            k: v if v is None else v[1]
+            for k, v in modified.items()
+            # a deletion
+            if v is None
+            # a typechange, strip the leading ":" for a valid comparison
+            or v[0][1:] != v[1]
+            # a plain modification after running possible smudge filters
+            or k in modified_files
+        }
         # convenience-map to type labels, leave raw mode if unrecognized
         # (which really should not happen)
         modified = {
