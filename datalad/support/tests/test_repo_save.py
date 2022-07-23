@@ -129,7 +129,9 @@ def test_save_typechange(path=None):
     res = ds.save(**ckwa)
     assert_in_results(res, path=str(bar), action='add', status='ok')
     assert_repo_status(ds.repo)
-    if not on_windows:
+    # AKA not on crippled FS
+    # https://github.com/datalad/datalad/issues/6857
+    if filelinktype == 'symlink':
         # now replace file with subdataset
         # (this is https://github.com/datalad/datalad/issues/5418)
         bar.unlink()
@@ -147,25 +149,29 @@ def test_save_typechange(path=None):
         assert len(ds.subdatasets(**ckwa)) == 1
     # now replace directory with subdataset
     rmtree(foo)
-    assert_in_results(
-        ds.status(path=bar, **ckwa),
-        type='dataset',
-        prev_gitshasum=subdshexsha,
-        state='deleted',
-    )
+    # AKA not on crippled FS, need to make conditional, because we did it above too
+    if filelinktype == 'symlink':
+        assert_in_results(
+            ds.status(path=bar, **ckwa),
+            type='dataset',
+            prev_gitshasum=subdshexsha,
+            state='deleted',
+        )
     newsubds = Dataset(ds.pathobj / 'tmp').create(**ckwa)
     newsubdshexsha = newsubds.repo.get_hexsha(
-        subds.repo.get_corresponding_branch())
+        newsubds.repo.get_corresponding_branch())
     shutil.move(ds.pathobj / 'tmp', foo)
-    # right now neither datalad not git recognize a repo that
-    # is inserted between the root repo and a known subdataset
-    # (still registered in index)
-    assert_in_results(
-        ds.status(path=foo, **ckwa),
-        type='dataset',
-        prev_gitshasum=subdshexsha,
-        state='deleted',
-    )
+    # AKA not on crippled FS, need to make conditional, because we did it above too
+    if filelinktype == 'symlink':
+        # right now neither datalad not git recognize a repo that
+        # is inserted between the root repo and a known subdataset
+        # (still registered in index)
+        assert_in_results(
+            ds.status(path=foo, **ckwa),
+            type='dataset',
+            prev_gitshasum=subdshexsha,
+            state='deleted',
+        )
     # a first save() will save the subdataset removal only
     ds.save(**ckwa)
     # subdataset is gone
@@ -182,6 +188,10 @@ def test_save_typechange(path=None):
     ds.save(**ckwa)
     assert_repo_status(ds.repo)
     assert len(ds.subdatasets(**ckwa)) == 1
+    if filelinktype == 'file':
+        # no point in continuing when on crippled FS due to
+        # https://github.com/datalad/datalad/issues/6857
+        return
     # now replace subdataset with a file
     rmtree(foo)
     foo.write_text('some')
