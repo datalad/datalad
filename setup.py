@@ -37,6 +37,7 @@ requires = {
         'patool>=1.7',
         'tqdm',
         'annexremote',
+        'looseversion',
     ],
     'downloaders': [
         'boto',
