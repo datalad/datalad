@@ -3182,8 +3182,13 @@ class GitRepo(CoreGitRepo):
         if state in ('clean', 'added', 'modified', None):
             # assign present gitsha to any record
             # state==None can only happen for subdatasets that
-            # already existed, so also assign a sha for them
-            props['gitshasum'] = to_sha
+            # already existed, so also assign a sha for them.
+            # However, for any worktree modification we do not want to report
+            # the gitsha that we have on record as "current", just like
+            # `git diff-files` would not
+            # https://github.com/datalad/datalad/issues/6875
+            if modified_in_worktree is False:
+                props['gitshasum'] = to_sha
             if 'bytesize' in to_state:
                 # if we got this cheap, report it
                 props['bytesize'] = to_state['bytesize']
