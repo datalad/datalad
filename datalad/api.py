@@ -57,6 +57,11 @@ def _generate_extension_api():
         for intfspec in interfaces:
             # turn the interface spec into an instance
             intf = load_interface(intfspec[:2])
+            if intf is None:
+                lgr.error(
+                    "Skipping unusable command interface '%s.%s' from extension %r",
+                    intfspec[0], intfspec[1], ename)
+                continue
             api_name = get_api_name(intfspec)
             if api_name in globals():
                 lgr.debug(
