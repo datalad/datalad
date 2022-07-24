@@ -3222,7 +3222,7 @@ class GitRepo(CoreGitRepo):
 
         if state == 'deleted':
             # report the type that was deleted
-            props['type'] = from_state['type']
+            props['prev_type'] = from_state['type']
 
         if state:
             # only report a state if we could determine any

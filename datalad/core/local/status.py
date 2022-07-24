@@ -439,7 +439,7 @@ class Status(Interface):
             or refds == os.getcwd() else None
         path = res['path'] if refds is None \
             else str(ut.Path(res['path']).relative_to(refds))
-        type_ = res.get('type', res.get('type_src', ''))
+        type_ = res.get('type', res.get('prev_type', ''))
         max_len = len('untracked')
         state = res.get('state', 'unknown')
         ui.message(u'{fill}{state}: {path}{type_}'.format(
