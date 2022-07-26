@@ -499,13 +499,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     depvar = 'remote.{}.datalad-publish-depends'.format(target)
     # list of remotes that are publication dependencies for the
     # target remote
-    # multiple dependencies could come from multiple declarations
-    # of such a config items, but each declaration could also
-    # contain a white-space separated list of remote names
-    # see https://github.com/datalad/datalad/issues/6867
-    publish_depends = list(chain.from_iterable(
-        d.split() for d in ensure_list(
-            ds.config.get(depvar, [], get_all=True))))
+    publish_depends = ensure_list(ds.config.get(depvar, [], get_all=True))
     if publish_depends:
         lgr.debug("Discovered publication dependencies for '%s': %s'",
                   target, publish_depends)
