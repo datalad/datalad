@@ -211,7 +211,7 @@ def test_url_base():
 
     assert_raises(ValueError, url._set_from_fields, unknown='1')
 
-    with swallow_logs(new_level=logging.WARNING) as cml:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
         # we don't "care" about params ATM so there is a warning if there are any
         purl = URL("http://example.com/;param")
         eq_(str(purl), 'http://example.com/;param')  # but we do maintain original string
