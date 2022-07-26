@@ -176,3 +176,6 @@ if str(__version__) == '0' or __version__.startswith('0+'):
     )
 
 lgr.log(5, "Done importing main __init__")
+
+from . import _version
+__version__ = _version.get_versions()['version']
