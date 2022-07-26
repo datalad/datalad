@@ -56,7 +56,7 @@ class SignalingThread(threading.Thread):
             try:
                 signal_queue.put(content, block=True, timeout=.1)
             except Full:
-                lgr.debug(f"timeout while trying to signal: {content}")
+                lgr.debug("timeout while trying to signal: %s", content)
                 error_occurred = True
         return not error_occurred
 
