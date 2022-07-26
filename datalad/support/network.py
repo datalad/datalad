@@ -323,7 +323,7 @@ def _guess_ri_cls(ri):
 
     # We assume that it is a URL and parse it. Depending on the result
     # we might decide that it was something else ;)
-    fields = URL._pr_to_fields(urlparse(ri))
+    fields = URL._pr_to_fields(urlparse(ri), guessing=True)
     lgr.log(5, "Parsed ri %s into fields %s", ri, fields)
     type_ = 'url'
     # Special treatments
@@ -625,14 +625,14 @@ class URL(RI):
         return ParseResult(**pr_fields)
 
     @classmethod
-    def _pr_to_fields(cls, pr):
+    def _pr_to_fields(cls, pr, guessing=False):
         """ParseResult is a tuple so immutable, which complicates adjusting it
 
         This function converts ParseResult into dict"""
-
         if pr.params:
-            lgr.debug("ParseResults contains params %r, which will be ignored"
-                        % (pr.params,))
+            (lgr.debug if guessing else lgr.warning)(
+                "ParseResults contains params %s, which will be ignored",
+                repr(pr.params),)
 
         hostname_port = pr.netloc.split('@')[-1]
         is_ipv6 = hostname_port.count(':') >= 2
