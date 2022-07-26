@@ -135,6 +135,9 @@ from datalad.utils import (
 )
 
 
+_GIT_ANNEX_VERSIONS_INFO = AnnexRepo.check_repository_versions()
+
+
 @assert_cwd_unchanged
 @with_tempfile
 @with_tempfile
@@ -1290,30 +1293,38 @@ def test_annex_remove(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_repo_version(path1=None, path2=None, path3=None):
+def test_repo_version_upgrade(path1=None, path2=None, path3=None):
     with swallow_logs(new_level=logging.INFO) as cm:
-        annex = AnnexRepo(path1, create=True, version=6)
+        # Since git-annex 7.20181031, v6 repos upgrade to v7.
+        # Future proofing: We will test on v6 as long as it is upgradeable,
+        # but would switch to first upgradeable after
+        Uversion = 6 if 6 in _GIT_ANNEX_VERSIONS_INFO["upgradable"] \
+            else _GIT_ANNEX_VERSIONS_INFO["upgradeable"][0]
+        vU_lands_on = next(i for i in _GIT_ANNEX_VERSIONS_INFO["supported"] if i >= Uversion)
+
+        annex = AnnexRepo(path1, create=True, version=Uversion)
         assert_repo_status(path1, annex=True)
         version = int(annex.config.get('annex.version'))
-        # Since git-annex 7.20181031, v6 repos upgrade to v7.
-        supported_versions = AnnexRepo.check_repository_versions()["supported"]
-        v6_lands_on = next(i for i in supported_versions if i >= 6)
-        eq_(version, v6_lands_on)
 
+        eq_(version, vU_lands_on)
         assert_in("will be upgraded to 8", cm.out)
 
     # default from config item (via env var):
-    with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
+    with patch.dict('os.environ', {'DATALAD_REPO_VERSION': str(Uversion)}):
         annex = AnnexRepo(path2, create=True)
         version = int(annex.config.get('annex.version'))
-        eq_(version, v6_lands_on)
+        eq_(version, vU_lands_on)
 
-        # Assuming specified version is a supported version...
-        if 5 in supported_versions:
+
+@pytest.mark.parametrize("version", _GIT_ANNEX_VERSIONS_INFO["supported"])
+def test_repo_version_supported(version, tmp_path):
+        # default from config item (via env var):
+        Uversion = _GIT_ANNEX_VERSIONS_INFO["upgradable"][0]
+        with patch.dict('os.environ', {'DATALAD_REPO_VERSION': str(Uversion)}):
             # ...parameter `version` still has priority over default config:
-            annex = AnnexRepo(path3, create=True, version=5)
-            version = int(annex.config.get('annex.version'))
-            eq_(version, 5)
+            annex = AnnexRepo(str(tmp_path), create=True, version=version)
+            # There is no "upgrade" for any of the supported versions.
+            eq_(int(annex.config.get('annex.version')), version)
 
 
 @skip_if(external_versions['cmd:annex'] > '8.20210428', "Stopped showing if too quick")
