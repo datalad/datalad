@@ -631,7 +631,7 @@ class URL(RI):
         This function converts ParseResult into dict"""
 
         if pr.params:
-            lgr.warning("ParseResults contains params %r, which will be ignored"
+            lgr.debug("ParseResults contains params %r, which will be ignored"
                         % (pr.params,))
 
         hostname_port = pr.netloc.split('@')[-1]
