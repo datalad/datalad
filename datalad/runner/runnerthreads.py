@@ -15,14 +15,14 @@ from typing import (
     Any,
     IO,
     List,
-    Union,
+    Optional,
 )
 
 
 lgr = logging.getLogger("datalad.runner.runnerthreads")
 
 
-def _try_close(file_object: IO):
+def _try_close(file_object: Optional[IO]):
     if file_object is not None:
         try:
             file_object.close()
@@ -38,7 +38,8 @@ class IOState(Enum):
 class SignalingThread(threading.Thread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue]):
+                 signal_queues: List[Queue]
+                 ):
 
         super().__init__(daemon=True)
         self.identifier = identifier
@@ -50,7 +51,9 @@ class SignalingThread(threading.Thread):
     def __str__(self):
         return self.__repr__()
 
-    def signal(self, content):
+    def signal(self,
+               content: Any
+               ) -> bool:
         error_occurred = False
         for signal_queue in self.signal_queues:
             try:
@@ -74,7 +77,7 @@ class WaitThread(SignalingThread):
         super().__init__(identifier, signal_queues)
         self.process = process
 
-    def run(self):
+    def run(self) -> None:
 
         lgr.log(5, "%s (%s) started", self.identifier, self)
 
@@ -113,20 +116,20 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
         super().__init__(identifier, signal_queues)
         self.user_info = user_info
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Thread<({self.identifier}, {self.user_info})>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
     def signal_event(self,
                      state: IOState,
-                     data: Union[bytes, None]
+                     data: Optional[bytes]
                      ) -> bool:
         return self.signal((self.user_info, state, data))
 
     @abstractmethod
-    def read(self) -> Union[bytes, None]:
+    def read(self) -> Optional[bytes]:
         """
         Read data from source return None, if source is close,
         or destination close is required.
@@ -135,21 +138,22 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
 
     @abstractmethod
     def write(self,
-              data: Union[bytes, None]):
+              data: bytes
+              ) -> bool:
         """
         Write given data to destination, return True if data is
         written successfully, False otherwise.
         """
         raise NotImplementedError
 
-    def run(self):
+    def run(self) -> None:
 
         lgr.log(5, "%s (%s) started", self.identifier, self)
 
         # Copy data from source queue to destination queue
         # until exit is requested. If timeouts arise, signal
         # them to the receiver via the signal queue.
-        data = b""
+        data: Optional[bytes] = b""
         while not self.exit_requested:
 
             data = self.read()
@@ -192,7 +196,7 @@ class ReadThread(TransportThread):
         self.destination_queue = destination_queue
         self.length = length
 
-    def read(self) -> Union[bytes, None]:
+    def read(self) -> Optional[bytes]:
         try:
             data = os.read(self.source.fileno(), self.length)
         except (ValueError, OSError):
@@ -203,7 +207,8 @@ class ReadThread(TransportThread):
         return data or None
 
     def write(self,
-              data: Union[bytes, None]) -> bool:
+              data: bytes
+              ) -> bool:
 
         # We write to an unlimited queue, no need for timeout checking.
         self.destination_queue.put((self.user_info, IOState.ok, data))
@@ -223,7 +228,7 @@ class WriteThread(TransportThread):
         self.source_queue = source_queue
         self.destination = destination
 
-    def read(self) -> Union[bytes, None]:
+    def read(self) -> Optional[bytes]:
         data = self.source_queue.get()
         if data is None:
             # Close stdin file descriptor here, since we know that no more
@@ -232,7 +237,8 @@ class WriteThread(TransportThread):
         return data
 
     def write(self,
-              data: bytes) -> bool:
+              data: bytes,
+              ) -> bool:
         try:
             written = 0
             while written < len(data):
