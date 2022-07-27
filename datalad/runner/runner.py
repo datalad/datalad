@@ -168,7 +168,12 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        lgr.debug('Run %r (cwd=%s)', cmd, cwd)
+        lgr.debug(
+            'Run %r (protocol_class=%s) (cwd=%s)',
+            cmd,
+            protocol.__name__,
+            cwd
+        )
 
         self.threaded_runner = ThreadedRunner(
             cmd=cmd,
