@@ -10,6 +10,7 @@
 Thread based subprocess execution with stdout and stderr passed to protocol objects
 """
 
+
 import enum
 import logging
 import subprocess
@@ -21,12 +22,14 @@ from queue import (
     Empty,
     Queue,
 )
+from subprocess import Popen
 from typing import (
     Any,
     Dict,
     IO,
     List,
     Optional,
+    Set,
     Type,
     Union,
 )
@@ -46,12 +49,22 @@ from .runnerthreads import (
     WriteThread,
 )
 
-
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1
 STDERR_FILENO = 2
+
+
+# A helper to type-safe retrieval of a Popen-fileno, if data exchange was
+# requested.
+def _get_fileno(active: bool,
+                popen_std_x: Optional[IO]
+                ) -> Optional[int]:
+    if active:
+        assert popen_std_x is not None
+        return popen_std_x.fileno()
+    return None
 
 
 class _ResultGenerator(Generator):
@@ -218,33 +231,36 @@ class ThreadedRunner:
         self.catch_stdout = self.protocol_class.proc_out
         self.catch_stderr = self.protocol_class.proc_err
 
-        self.write_stdin = False
-        self.stdin_queue = None
-        self.protocol = None
-        self.process = None
-        self.process_stdin_fileno = None
-        self.process_stdout_fileno = None
-        self.process_stderr_fileno = None
-        self.stderr_enqueueing_thread = None
-        self.stdout_enqueueing_thread = None
-        self.stdin_enqueueing_thread = None
-        self.process_waiting_thread = None
+        self.write_stdin: bool = False
+        self.stdin_queue: Optional[Queue] = None
+        self.process_stdin_fileno: Optional[int] = None
+        self.process_stdout_fileno: Optional[int] = None
+        self.process_stderr_fileno: Optional[int] = None
+        self.stderr_enqueueing_thread: Optional[ReadThread] = None
+        self.stdout_enqueueing_thread: Optional[ReadThread] = None
+        self.stdin_enqueueing_thread: Optional[WriteThread] = None
+        self.process_waiting_thread: Optional[WaitThread] = None
 
-        self.process_running = False
-        self.fileno_mapping = None
-        self.fileno_to_file = None
-        self.file_to_fileno = None
-        self.output_queue = Queue()
-        self.result = None
-        self.process_removed = False
-        self.return_code = None
-        self.generator = None
+        self.process_running: bool = False
+        self.output_queue: Queue = Queue()
+        self.process_removed: bool = False
+        self.generator: Optional[_ResultGenerator] = None
 
-        self.last_touched = dict()
-        self.active_file_numbers = set()
+        self.last_touched: Dict[Optional[int], float] = dict()
+        self.active_file_numbers: Set[Optional[int]] = set()
         self.stall_check_interval = 10
 
         self.initialization_lock = threading.Lock()
+
+        # Pure declarations
+        self.protocol: WitlessProtocol
+        self.process: Popen[Any]
+        self.fileno_mapping: Dict[Optional[int], int]
+        self.fileno_to_file: Dict[Optional[int], Optional[IO]]
+        self.file_to_fileno: Dict[IO, int]
+        self.result: Dict
+        self.return_code: int
+
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -351,7 +367,7 @@ class ThreadedRunner:
         try:
             # The following command is generated internally by datalad
             # and trusted. Security check is therefore skipped.
-            self.process = subprocess.Popen(self.cmd, **kwargs)         # nosec
+            self.process = Popen(self.cmd, **kwargs)         # nosec
 
         except OSError as e:
             if not on_windows and "argument list too long" in str(e).lower():
@@ -368,9 +384,9 @@ class ThreadedRunner:
         self.process_running = True
         self.active_file_numbers.add(None)
 
-        self.process_stdin_fileno = self.process.stdin.fileno() if self.write_stdin else None
-        self.process_stdout_fileno = self.process.stdout.fileno() if self.catch_stdout else None
-        self.process_stderr_fileno = self.process.stderr.fileno() if self.catch_stderr else None
+        self.process_stdin_fileno = _get_fileno(self.write_stdin, self.process.stdin)
+        self.process_stdout_fileno = _get_fileno(self.catch_stdout, self.process.stdout)
+        self.process_stderr_fileno = _get_fileno(self.catch_stderr, self.process.stderr)
 
         # We pass process as transport-argument. It does not have the same
         # semantics as the asyncio-signature, but since it is only used in
@@ -384,12 +400,16 @@ class ThreadedRunner:
             self.process_stderr_fileno: STDERR_FILENO,
             self.process_stdin_fileno: STDIN_FILENO,
         }
+        if None in self.fileno_mapping:
+            self.fileno_mapping.pop(None)
 
         self.fileno_to_file = {
             self.process_stdout_fileno: self.process.stdout,
             self.process_stderr_fileno: self.process.stderr,
             self.process_stdin_fileno: self.process.stdin
         }
+        if None in self.fileno_to_file:
+            self.fileno_to_file.pop(None)
 
         self.file_to_fileno = {
             f: f.fileno()
@@ -410,6 +430,7 @@ class ThreadedRunner:
                 self.last_touched[self.process_stderr_fileno] = current_time
             self.active_file_numbers.add(self.process_stderr_fileno)
             self.last_touched[self.process_stderr_fileno] = current_time
+            assert self.process.stderr is not None
             self.stderr_enqueueing_thread = ReadThread(
                 identifier="STDERR: " + cmd_string[:20],
                 signal_queues=[self.output_queue],
@@ -423,6 +444,7 @@ class ThreadedRunner:
                 self.last_touched[self.process_stdout_fileno] = current_time
             self.active_file_numbers.add(self.process_stdout_fileno)
             self.last_touched[self.process_stdout_fileno] = current_time
+            assert self.process.stdout is not None
             self.stdout_enqueueing_thread = ReadThread(
                 identifier="STDOUT: " + cmd_string[:20],
                 signal_queues=[self.output_queue],
@@ -434,6 +456,8 @@ class ThreadedRunner:
         if self.write_stdin:
             # No timeouts for stdin
             self.active_file_numbers.add(self.process_stdin_fileno)
+            assert self.stdin_queue is not None
+            assert self.process.stdin is not None
             self.stdin_enqueueing_thread = WriteThread(
                 identifier="STDIN: " + cmd_string[:20],
                 user_info=self.process_stdin_fileno,
@@ -448,8 +472,11 @@ class ThreadedRunner:
             self.process)
         self.process_waiting_thread.start()
 
-        if issubclass(self.protocol_class, GeneratorMixIn):
-            self.generator = _ResultGenerator(self, self.protocol.result_queue)
+        if isinstance(self.protocol, GeneratorMixIn):
+            self.generator = _ResultGenerator(
+                self,
+                self.protocol.result_queue
+            )
             return self.generator
 
         return self.process_loop()
@@ -514,8 +541,8 @@ class ThreadedRunner:
             or not self.output_queue.empty())
 
     def is_stalled(self) -> bool:
-        # If all threads have exited and the queue is empty, we might have a
-        # stall condition.
+        # If all queue-filling threads have exited and the queue is empty, we
+        # might have a stall condition.
         live_threads = [
             thread.is_alive()
             for thread in (
