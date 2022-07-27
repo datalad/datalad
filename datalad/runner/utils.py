@@ -46,7 +46,7 @@ class LineSplitter:
         """
         self.separator = separator
         self.keep_ends = keep_ends
-        self.remaining_data = None
+        self.remaining_data: Optional[str] = None
 
     def process(self, data: str) -> List[str]:
 
