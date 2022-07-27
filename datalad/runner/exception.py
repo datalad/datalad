@@ -82,7 +82,7 @@ class CommandError(RuntimeError):
         return self.to_str()
 
 
-def _format_json_error_messages(recs: List[Dict]):
+def _format_json_error_messages(recs: List[Dict]) -> str:
     # there could be many, condense
     msgs: Dict[str, Union[str, int]] = {}
     for r in recs:
