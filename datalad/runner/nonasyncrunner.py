@@ -215,9 +215,8 @@ class ThreadedRunner:
         self.exception_on_error = exception_on_error
         self.popen_kwargs = popen_kwargs
 
-        self.catch_stdout = self.protocol_class.proc_out is not None
-        self.catch_stderr = self.protocol_class.proc_err is not None
-        self.generator = self.protocol_class.generator is not None
+        self.catch_stdout = self.protocol_class.proc_out
+        self.catch_stderr = self.protocol_class.proc_err
 
         self.write_stdin = False
         self.stdin_queue = None

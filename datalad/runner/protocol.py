@@ -36,8 +36,6 @@ class GeneratorMixIn:
             # do something, for example write to stdin of the subprocess
 
     """
-    generator = True
-
     def __init__(self):
         self.result_queue = deque()
 
@@ -59,10 +57,8 @@ class WitlessProtocol:
     and a list with bytestrings of all captured output streams.
     """
 
-    proc_out = None
-    proc_err = None
-
-    generator = None
+    proc_out = False
+    proc_err = False
 
     def __init__(self, done_future=None, encoding=None):
         """
@@ -155,8 +151,8 @@ class WitlessProtocol:
         stdin timeouts are only caught when the type of the `stdin`-
         parameter to WitlessRunner.run() is either a `Queue`,
         a `str`, or `bytes`. `Stdout` or `stderr` timeouts
-        are only caught of proc_out and proc_err are
-        not None in the protocol class. Process wait timeouts are
+        are only caught of proc_out and proc_err are `True` in the
+        protocol class. Process wait timeouts are
         always caught if `timeout` is not `None`. In this case the
         `fd`-argument will be `None`.
 
