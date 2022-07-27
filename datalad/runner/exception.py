@@ -13,6 +13,7 @@ import logging
 from typing import (
     Dict,
     List,
+    Union,
 )
 
 
@@ -83,7 +84,7 @@ class CommandError(RuntimeError):
 
 def _format_json_error_messages(recs: List[Dict]):
     # there could be many, condense
-    msgs = {}
+    msgs: Dict[str, Union[str, int]] = {}
     for r in recs:
         if r.get('success'):
             continue
@@ -93,6 +94,7 @@ def _format_json_error_messages(recs: List[Dict]):
         )
         if 'file' in r or 'key' in r:
             occur = msgs.get(msg, 0)
+            assert isinstance(occur, int)
             occur += 1
             msgs[msg] = occur
 
@@ -104,7 +106,8 @@ def _format_json_error_messages(recs: List[Dict]):
             '{}{}'.format(
                 m,
                 ' [{} times]'.format(n) if n > 1 else '',
-            )
+            ) if isinstance(n, int) else
+            '{}'.format(m)
             for m, n in msgs.items()
         )
     )
