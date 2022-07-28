@@ -8,6 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test the thread based runner (aka. non asyncio based runner).
 """
+from __future__ import annotations
+
 import asyncio
 import os
 import queue
@@ -16,10 +18,7 @@ import subprocess
 import sys
 from itertools import count
 from time import sleep
-from typing import (
-    List,
-    Optional,
-)
+from typing import Optional
 from unittest.mock import (
     MagicMock,
     patch,
@@ -434,7 +433,7 @@ def test_timeout_nothing():
     # if the specified timeout is short enough.
     class TestProtocol(NoCapture):
         def __init__(self,
-                     timeout_queue: List):
+                     timeout_queue: list):
             NoCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
@@ -465,7 +464,7 @@ def test_timeout_stdout_stderr():
     # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
-                     timeout_queue: List):
+                     timeout_queue: list):
             StdOutErrCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
@@ -500,7 +499,7 @@ def test_timeout_process():
     # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
-                     timeout_queue: List):
+                     timeout_queue: list):
             StdOutErrCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()

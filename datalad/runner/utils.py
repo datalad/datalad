@@ -11,12 +11,11 @@
 All runner-related code imports from here, so this is a comprehensive declaration
 of utility dependencies.
 """
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
-from typing import (
-    List,
-    Optional,
-)
+from typing import Optional
 
 __docformat__ = "numpy"
 
@@ -30,7 +29,8 @@ class LineSplitter:
     """
     def __init__(self,
                  separator: Optional[str] = None,
-                 keep_ends: bool = False):
+                 keep_ends: bool = False
+                 ):
         """
         Create a line splitter that will split lines either on a given
         separator, if 'separator' is not None, or on one of the known line
@@ -46,9 +46,11 @@ class LineSplitter:
         """
         self.separator = separator
         self.keep_ends = keep_ends
-        self.remaining_data = None
+        self.remaining_data: str | None = None
 
-    def process(self, data: str) -> List[str]:
+    def process(self,
+                data: str
+                ) -> list[str]:
 
         assert isinstance(data, str), f"data ({data}) is not of type str"
 
@@ -124,7 +126,11 @@ class AssemblingDecoderMixIn:
     def __init__(self):
         self.remaining_data = defaultdict(bytes)
 
-    def decode(self, fd: int, data: bytes, encoding: str) -> str:
+    def decode(self,
+               fd: int,
+               data: bytes,
+               encoding: str
+               ) -> str:
         assembled_data = self.remaining_data[fd] + data
         try:
             unicode_str = assembled_data.decode(encoding)

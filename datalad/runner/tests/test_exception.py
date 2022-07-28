@@ -1,7 +1,4 @@
-from typing import (
-    Dict,
-    List,
-)
+from __future__ import annotations
 
 from datalad.tests.utils_pytest import assert_equal
 
@@ -11,7 +8,7 @@ from ..exception import (
 )
 
 
-def get_json_objects(object_count, message_count) -> List[Dict]:
+def get_json_objects(object_count, message_count) -> list[dict]:
     return [
         {
             "success": index % 2 == 0,
