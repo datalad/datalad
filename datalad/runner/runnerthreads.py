@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import threading
@@ -14,7 +16,6 @@ from subprocess import Popen
 from typing import (
     Any,
     IO,
-    List,
     Optional,
 )
 
@@ -38,7 +39,7 @@ class IOState(Enum):
 class SignalingThread(threading.Thread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue]
+                 signal_queues: list[Queue]
                  ):
 
         super().__init__(daemon=True)
@@ -71,7 +72,7 @@ class WaitThread(SignalingThread):
     """
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue],
+                 signal_queues: list[Queue],
                  process: Popen
                  ):
         super().__init__(identifier, signal_queues)
@@ -90,7 +91,7 @@ class WaitThread(SignalingThread):
 class ExitingThread(SignalingThread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue]
+                 signal_queues: list[Queue]
                  ):
 
         super().__init__(identifier, signal_queues)
@@ -109,7 +110,7 @@ class ExitingThread(SignalingThread):
 class TransportThread(ExitingThread, metaclass=ABCMeta):
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue],
+                 signal_queues: list[Queue],
                  user_info: Any
                  ):
 
@@ -184,7 +185,7 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
 class ReadThread(TransportThread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue],
+                 signal_queues: list[Queue],
                  user_info: Any,
                  source: IO,
                  destination_queue: Queue,
@@ -218,7 +219,7 @@ class ReadThread(TransportThread):
 class WriteThread(TransportThread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: List[Queue],
+                 signal_queues: list[Queue],
                  user_info: Any,
                  source_queue: Queue,
                  destination: IO

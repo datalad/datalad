@@ -9,6 +9,8 @@
 """Base class of a protocol to be used with the DataLad runner
 """
 
+from __future__ import annotations
+
 import logging
 import warnings
 from collections import deque

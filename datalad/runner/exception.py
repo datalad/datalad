@@ -8,13 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Exception raise on a failed runner command execution
 """
+from __future__ import annotations
 
 import logging
-from typing import (
-    Dict,
-    List,
-    Union,
-)
 
 
 lgr = logging.getLogger('datalad.runner.exception')
@@ -82,9 +78,9 @@ class CommandError(RuntimeError):
         return self.to_str()
 
 
-def _format_json_error_messages(recs: List[Dict]) -> str:
+def _format_json_error_messages(recs: list[dict]) -> str:
     # there could be many, condense
-    msgs: Dict[str, Union[str, int]] = {}
+    msgs: dict[str, str | int] = {}
     for r in recs:
         if r.get('success'):
             continue

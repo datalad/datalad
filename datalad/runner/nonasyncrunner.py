@@ -10,6 +10,7 @@
 Thread based subprocess execution with stdout and stderr passed to protocol objects
 """
 
+from __future__ import annotations
 
 import enum
 import logging
@@ -25,13 +26,9 @@ from queue import (
 from subprocess import Popen
 from typing import (
     Any,
-    Dict,
     IO,
-    List,
     Optional,
-    Set,
     Type,
-    Union,
 )
 
 from datalad.utils import on_windows
@@ -79,7 +76,7 @@ class _ResultGenerator(Generator):
         waiting_for_process = 3
 
     def __init__(self,
-                 runner: "ThreadedRunner",
+                 runner: ThreadedRunner,
                  result_queue: deque
                  ):
 
@@ -150,10 +147,10 @@ class ThreadedRunner:
     timeout_resolution = 0.2
 
     def __init__(self,
-                 cmd: Union[str, List],
+                 cmd: str | list,
                  protocol_class: Type[WitlessProtocol],
                  stdin: Any,
-                 protocol_kwargs: Optional[Dict] = None,
+                 protocol_kwargs: Optional[dict] = None,
                  timeout: Optional[float] = None,
                  exception_on_error: bool = True,
                  **popen_kwargs
@@ -246,8 +243,8 @@ class ThreadedRunner:
         self.process_removed: bool = False
         self.generator: Optional[_ResultGenerator] = None
 
-        self.last_touched: Dict[Optional[int], float] = dict()
-        self.active_file_numbers: Set[Optional[int]] = set()
+        self.last_touched: dict[Optional[int], float] = dict()
+        self.active_file_numbers: set[Optional[int]] = set()
         self.stall_check_interval = 10
 
         self.initialization_lock = threading.Lock()
@@ -255,10 +252,10 @@ class ThreadedRunner:
         # Pure declarations
         self.protocol: WitlessProtocol
         self.process: Popen[Any]
-        self.fileno_mapping: Dict[Optional[int], int]
-        self.fileno_to_file: Dict[Optional[int], Optional[IO]]
-        self.file_to_fileno: Dict[IO, int]
-        self.result: Dict
+        self.fileno_mapping: dict[Optional[int], int]
+        self.fileno_to_file: dict[Optional[int], Optional[IO]]
+        self.file_to_fileno: dict[IO, int]
+        self.result: dict
         self.return_code: int
 
 
@@ -278,7 +275,7 @@ class ThreadedRunner:
                                    stdout=decoded_output.get("stdout", None),
                                    stderr=decoded_output.get("stderr", None))
 
-    def run(self) -> Union[Any, Generator]:
+    def run(self) -> dict | Generator:
         """
         Run the command as specified in __init__.
 
@@ -321,7 +318,7 @@ class ThreadedRunner:
         with self.initialization_lock:
             return self._locked_run()
 
-    def _locked_run(self) -> Union[Any, Generator]:
+    def _locked_run(self) -> dict | Generator:
         if self.generator is not None:
             raise RuntimeError("ThreadedRunner.run() was re-entered")
 
@@ -481,7 +478,7 @@ class ThreadedRunner:
 
         return self.process_loop()
 
-    def process_loop(self) -> Any:
+    def process_loop(self) -> dict:
         # Process internal messages until no more active file descriptors
         # are present. This works because active file numbers are only
         # removed when an EOF is received in `self.process_queue`.
@@ -682,13 +679,13 @@ class ThreadedRunner:
                 thread.request_exit()
 
 
-def run_command(cmd: Union[str, List],
+def run_command(cmd: str | list,
                 protocol: Type[WitlessProtocol],
                 stdin: Any,
-                protocol_kwargs: Optional[Dict] = None,
+                protocol_kwargs: Optional[dict] = None,
                 timeout: Optional[float] = None,
                 exception_on_error: bool = True,
-                **popen_kwargs) -> Union[Any, Generator]:
+                **popen_kwargs) -> dict | Generator:
     """
     Run a command in a subprocess
 

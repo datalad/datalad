@@ -11,12 +11,11 @@
 All runner-related code imports from here, so this is a comprehensive declaration
 of utility dependencies.
 """
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
-from typing import (
-    List,
-    Optional,
-)
+from typing import Optional
 
 __docformat__ = "numpy"
 
@@ -46,9 +45,9 @@ class LineSplitter:
         """
         self.separator = separator
         self.keep_ends = keep_ends
-        self.remaining_data: Optional[str] = None
+        self.remaining_data: str | None = None
 
-    def process(self, data: str) -> List[str]:
+    def process(self, data: str) -> list[str]:
 
         assert isinstance(data, str), f"data ({data}) is not of type str"
 
