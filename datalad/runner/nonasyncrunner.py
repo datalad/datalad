@@ -28,7 +28,6 @@ from typing import (
     Any,
     IO,
     Optional,
-    Type,
 )
 
 from datalad.utils import on_windows
@@ -148,7 +147,7 @@ class ThreadedRunner:
 
     def __init__(self,
                  cmd: str | list,
-                 protocol_class: Type[WitlessProtocol],
+                 protocol_class: type[WitlessProtocol],
                  stdin: Any,
                  protocol_kwargs: Optional[dict] = None,
                  timeout: Optional[float] = None,
@@ -682,7 +681,7 @@ class ThreadedRunner:
 
 
 def run_command(cmd: str | list,
-                protocol: Type[WitlessProtocol],
+                protocol: type[WitlessProtocol],
                 stdin: Any,
                 protocol_kwargs: Optional[dict] = None,
                 timeout: Optional[float] = None,

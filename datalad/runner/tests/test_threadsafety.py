@@ -4,7 +4,6 @@ import random
 import threading
 import time
 from threading import Thread
-from typing import Type
 
 from datalad.tests.utils_pytest import assert_raises
 
@@ -33,7 +32,7 @@ class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
             self.send_result((fd, line))
 
 
-def _runner_with_protocol(protocol: Type[WitlessProtocol]) -> ThreadedRunner:
+def _runner_with_protocol(protocol: type[WitlessProtocol]) -> ThreadedRunner:
     return ThreadedRunner(
         cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=protocol,
@@ -53,7 +52,7 @@ def _run_on(runner: ThreadedRunner,
         exceptions.append(e.__class__)
 
 
-def _get_run_on_threads(protocol: Type[WitlessProtocol],
+def _get_run_on_threads(protocol: type[WitlessProtocol],
                         iterate: bool
                         ) -> tuple[Thread, Thread, list]:
 
@@ -66,7 +65,7 @@ def _get_run_on_threads(protocol: Type[WitlessProtocol],
     return thread_1, thread_2, args[2]
 
 
-def _reentry_detection_run(protocol: Type[WitlessProtocol],
+def _reentry_detection_run(protocol: type[WitlessProtocol],
                            iterate: bool
                            ) -> list:
 
