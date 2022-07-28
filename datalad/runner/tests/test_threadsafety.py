@@ -58,7 +58,7 @@ def _get_run_on_threads(protocol: Any,
 
     runner = _runner_with_protocol(protocol)
 
-    args = (runner, iterate, [])
+    args: tuple[ThreadedRunner, bool, list] = (runner, iterate, [])
     thread_1 = threading.Thread(target=_run_on, args=args)
     thread_2 = threading.Thread(target=_run_on, args=args)
 

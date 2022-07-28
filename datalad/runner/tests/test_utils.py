@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import (
     List,
     Optional,
@@ -137,7 +139,7 @@ def _decode_multiple(adm: AssemblingDecoderMixIn,
                      fixed_index: Optional[int] = None) -> List[str]:
 
     # Interleave decoding of multiple strings
-    decoded_chars = [list() for _ in range(len(encoded_strings))]
+    decoded_chars: list[list] = [list() for _ in range(len(encoded_strings))]
     for data_index in range(max([len(es) for es in encoded_strings])):
         for string_index in range(len(encoded_strings)):
             if data_index < len(encoded_strings[string_index]):
