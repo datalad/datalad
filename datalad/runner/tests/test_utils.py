@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import (
-    List,
-    Optional,
-)
+from typing import Optional
 from unittest.mock import (
     call,
     patch,
@@ -29,7 +26,7 @@ test_lines = [
 ]
 
 
-def _check_splitting_endings_separator(endings: List[str],
+def _check_splitting_endings_separator(endings: list[str],
                                        separator: Optional[str] = None,
                                        keep_ends: bool = False,
                                        check_continuation: bool = False
@@ -134,9 +131,9 @@ def test_assembling_decoder_mix_in_basic():
 
 
 def _decode_multiple(adm: AssemblingDecoderMixIn,
-                     encoded_strings: List[bytes],
+                     encoded_strings: list[bytes],
                      encoding: str,
-                     fixed_index: Optional[int] = None) -> List[str]:
+                     fixed_index: Optional[int] = None) -> list[str]:
 
     # Interleave decoding of multiple strings
     decoded_chars: list[list] = [list() for _ in range(len(encoded_strings))]
