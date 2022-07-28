@@ -29,7 +29,8 @@ class LineSplitter:
     """
     def __init__(self,
                  separator: Optional[str] = None,
-                 keep_ends: bool = False):
+                 keep_ends: bool = False
+                 ):
         """
         Create a line splitter that will split lines either on a given
         separator, if 'separator' is not None, or on one of the known line
@@ -47,7 +48,9 @@ class LineSplitter:
         self.keep_ends = keep_ends
         self.remaining_data: str | None = None
 
-    def process(self, data: str) -> list[str]:
+    def process(self,
+                data: str
+                ) -> list[str]:
 
         assert isinstance(data, str), f"data ({data}) is not of type str"
 
@@ -123,7 +126,11 @@ class AssemblingDecoderMixIn:
     def __init__(self):
         self.remaining_data = defaultdict(bytes)
 
-    def decode(self, fd: int, data: bytes, encoding: str) -> str:
+    def decode(self,
+               fd: int,
+               data: bytes,
+               encoding: str
+               ) -> str:
         assembled_data = self.remaining_data[fd] + data
         try:
             unicode_str = assembled_data.decode(encoding)

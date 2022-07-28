@@ -270,10 +270,12 @@ class ThreadedRunner:
                         ("stderr", protocol.stderr_fileno))
                     if protocol.fd_infos[fileno][1] is not None
                 }
-                raise CommandError(cmd=self.cmd,
-                                   code=self.return_code,
-                                   stdout=decoded_output.get("stdout", None),
-                                   stderr=decoded_output.get("stderr", None))
+                raise CommandError(
+                    cmd=self.cmd,
+                    code=self.return_code,
+                    stdout=decoded_output.get("stdout", None),
+                    stderr=decoded_output.get("stderr", None)
+                )
 
     def run(self) -> dict | Generator:
         """
