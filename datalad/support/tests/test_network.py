@@ -190,7 +190,6 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         eq_(ri_.localpath, opj(old_localpath, 'sub'))
 
 
-
 def test_url_base():
     # Basic checks
     assert_raises(ValueError, URL, "http://example.com", hostname='example.com')
@@ -217,6 +216,17 @@ def test_url_base():
         eq_(str(purl), 'http://example.com/;param')  # but we do maintain original string
         assert_in('ParseResults contains params', cml.out)
         eq_(purl.as_str(), 'http://example.com/')
+
+
+@with_tempfile
+def test_pathri_guessing(filename=None):
+    # Complaining about ;param only at DEBUG level
+    # see https://github.com/datalad/datalad/issues/6872
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        # we don't "care" about params ATM so there is a warning if there are any
+        ri = RI(f"{filename};param")
+        assert isinstance(ri, PathRI)
+        assert_in('ParseResults contains params', cml.out)
 
 
 @known_failure_githubci_win
