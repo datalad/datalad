@@ -1300,20 +1300,27 @@ def test_repo_version_upgrade(path1=None, path2=None, path3=None):
         # but would switch to first upgradeable after
         Uversion = 6 if 6 in _GIT_ANNEX_VERSIONS_INFO["upgradable"] \
             else _GIT_ANNEX_VERSIONS_INFO["upgradeable"][0]
-        vU_lands_on = next(i for i in _GIT_ANNEX_VERSIONS_INFO["supported"] if i >= Uversion)
-
+        v_first_supported = next(i for i in _GIT_ANNEX_VERSIONS_INFO["supported"] if i >= Uversion)
         annex = AnnexRepo(path1, create=True, version=Uversion)
         assert_repo_status(path1, annex=True)
-        version = int(annex.config.get('annex.version'))
+        v_upgraded_to = int(annex.config.get('annex.version'))
 
-        eq_(version, vU_lands_on)
-        assert_in("will be upgraded to 8", cm.out)
+        if external_versions['cmd:annex'] <= '10.20220724':
+            eq_(v_upgraded_to, v_first_supported)
+            assert_in("will be upgraded to 8", cm.out)
+        else:
+            # 10.20220724-5-g63cef2ae0 started to auto-upgrade to 10, although 8 was the
+            # lowest supported. In general we can only assert that we upgrade into one
+            # of the supported
+            assert_in(v_upgraded_to, _GIT_ANNEX_VERSIONS_INFO["supported"])
+            assert_in("will be upgraded to %s or later version" % v_first_supported, cm.out)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': str(Uversion)}):
+        # and check consistency of upgrading to the default version:
         annex = AnnexRepo(path2, create=True)
         version = int(annex.config.get('annex.version'))
-        eq_(version, vU_lands_on)
+        eq_(version, v_upgraded_to)
 
 
 @pytest.mark.parametrize("version", _GIT_ANNEX_VERSIONS_INFO["supported"])
