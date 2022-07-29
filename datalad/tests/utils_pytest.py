@@ -209,7 +209,7 @@ def skip_if_no_module(module):
     try:
         imp = __import__(module)
     except Exception as exc:
-        pytest.skip("Module %s fails to load" % module)
+        pytest.skip("Module %s fails to load" % module, allow_module_level=True)
 
 
 def skip_if_scrapy_without_selector():
@@ -252,7 +252,7 @@ def skip_if_no_network(func=None):
 
     def check_and_raise():
         if dl_cfg.get('datalad.tests.nonetwork'):
-            pytest.skip("Skipping since no network settings")
+            pytest.skip("Skipping since no network settings", allow_module_level=True)
 
     if func:
         @wraps(func)
@@ -1603,7 +1603,7 @@ with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
-OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
@@ -1817,6 +1817,7 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
 
 def get_convoluted_situation(path, repocls=AnnexRepo):
     from datalad.api import create
+    ckwa = dict(result_renderer='disabled')
 
     #if 'APPVEYOR' in os.environ:
     #    # issue only happens on appveyor, Python itself implodes
@@ -1826,7 +1827,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     #        'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).create(force=True, **ckwa)
     # base content
     create_tree(
         ds.path,
@@ -1856,7 +1857,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
                 'file_dropped_clean': 'file_dropped_clean',
             }
         )
-    ds.save()
+    ds.save(**ckwa)
     if isinstance(ds.repo, AnnexRepo):
         # some files straight in git
         create_tree(
@@ -1870,42 +1871,42 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
                 'file_ingit_modified': 'file_ingit_clean',
             }
         )
-        ds.save(to_git=True)
+        ds.save(to_git=True, **ckwa)
         ds.drop([
             'file_dropped_clean',
             opj('subdir', 'file_dropped_clean')],
-            reckless='kill')
+            reckless='kill', **ckwa)
     # clean and proper subdatasets
-    ds.create('subds_clean')
-    ds.create(opj('subdir', 'subds_clean'))
-    ds.create('subds_unavailable_clean')
-    ds.create(opj('subdir', 'subds_unavailable_clean'))
+    ds.create('subds_clean', **ckwa)
+    ds.create(opj('subdir', 'subds_clean'), **ckwa)
+    ds.create('subds_unavailable_clean', **ckwa)
+    ds.create(opj('subdir', 'subds_unavailable_clean'), **ckwa)
     # uninstall some subdatasets (still clean)
     ds.drop([
         'subds_unavailable_clean',
         opj('subdir', 'subds_unavailable_clean')],
-        what='all', reckless='kill', recursive=True)
+        what='all', reckless='kill', recursive=True, **ckwa)
     assert_repo_status(ds.path)
     # make a dirty subdataset
-    ds.create('subds_modified')
-    ds.create(opj('subds_modified', 'someds'))
-    ds.create(opj('subds_modified', 'someds', 'dirtyds'))
+    ds.create('subds_modified', **ckwa)
+    ds.create(opj('subds_modified', 'someds'), **ckwa)
+    ds.create(opj('subds_modified', 'someds', 'dirtyds'), **ckwa)
     # make a subdataset with additional commits
-    ds.create(opj('subdir', 'subds_modified'))
+    ds.create(opj('subdir', 'subds_modified'), **ckwa)
     pdspath = opj(ds.path, 'subdir', 'subds_modified', 'progressedds')
-    ds.create(pdspath)
+    ds.create(pdspath, **ckwa)
     create_tree(
         pdspath,
         {'file_clean': 'file_ingit_clean'}
     )
-    Dataset(pdspath).save()
+    Dataset(pdspath).save(**ckwa)
     assert_repo_status(pdspath)
     # staged subds, and files
-    create(opj(ds.path, 'subds_added'))
+    create(opj(ds.path, 'subds_added'), **ckwa)
     # use internal helper to get subdataset into an 'added' state
     # that would not happen in standard datalad workflows
     list(ds.repo._save_add_submodules([ds.pathobj / 'subds_added']))
-    create(opj(ds.path, 'subdir', 'subds_added'))
+    create(opj(ds.path, 'subdir', 'subds_added'), **ckwa)
     list(ds.repo._save_add_submodules([ds.pathobj / 'subdir' / 'subds_added']))
     # some more untracked files
     create_tree(
@@ -1931,8 +1932,8 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     )
     ds.repo.add(['file_added', opj('subdir', 'file_added')])
     # untracked subdatasets
-    create(opj(ds.path, 'subds_untracked'))
-    create(opj(ds.path, 'subdir', 'subds_untracked'))
+    create(opj(ds.path, 'subds_untracked'), **ckwa)
+    create(opj(ds.path, 'subdir', 'subds_untracked'), **ckwa)
     # deleted files
     os.remove(opj(ds.path, 'file_deleted'))
     os.remove(opj(ds.path, 'subdir', 'file_deleted'))

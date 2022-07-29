@@ -11,7 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from distutils.version import LooseVersion
 import logging
 import os
 from os.path import (
@@ -20,6 +19,8 @@ from os.path import (
     normpath,
     relpath,
 )
+
+from looseversion import LooseVersion
 
 from datalad import ssh_manager
 

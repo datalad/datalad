@@ -622,7 +622,7 @@ def _install_targetpath(
             yield res
         return
     lgr.info(
-        "Installing %s%s recursively",
+        "Ensuring presence of %s%s",
         ds,
         (" to get %s" % target_path
          if ds.path != target_path

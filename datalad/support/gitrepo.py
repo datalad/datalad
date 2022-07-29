@@ -3301,33 +3301,10 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
-        status = self._save_pre(paths, _status, **kwargs) or {}
+        status_state = _get_save_status_state(
+            self._save_pre(paths, _status, **kwargs) or {}
+        )
         amend = kwargs.get('amend', False)
-
-        # Sort status into status by state with explicit list of states
-        # (excluding clean we do not care about) we expect to be present
-        # and which we know of (unless None), and modified_or_untracked hybrid
-        # since it is used below
-        status_state = {
-            k: {}
-            for k in (None,  # not cared of explicitly here
-                      'added',  # not cared of explicitly here
-                      # 'clean'  # not even wanted since nothing to do about those
-                      'deleted',
-                      'modified',
-                      'untracked',
-                      'modified_or_untracked',  # hybrid group created here
-                      )}
-        for f, props in status.items():
-            state = props.get('state', None)
-            if state == 'clean':
-                # we don't care about clean
-                continue
-            status_state[state][f] = props
-            # The hybrid one to retain the same order as in original status
-            if state in ('modified', 'untracked'):
-                status_state['modified_or_untracked'][f] = props
-        del status  # to ensure it is no longer used
 
         # TODO: check on those None's -- may be those are also "nothing to worry about"
         # and we could just return?
@@ -3359,34 +3336,44 @@ class GitRepo(CoreGitRepo):
             if tofix:
                 self.call_annex(['pre-commit'], files=tofix)
 
-        # remove first, because removal of a subds would cause a
-        # modification of .gitmodules to be added to the todo list
-        to_remove = [
-            # TODO remove pathobj stringification when delete() can
-            # handle it
-            str(f.relative_to(self.pathobj))
-            for f, props in status_state['deleted'].items()
-            # staged deletions have a gitshasum reported for them
-            # those should not be processed as git rm will error
-            # due to them being properly gone already
-            if not props.get('gitshasum', None)]
-        vanished_subds = any(
-            props.get('type', None) == 'dataset'
-            for props in status_state['deleted'].values())
-        if to_remove:
-            for r in self.remove(
-                    to_remove,
-                    # we would always see individual files
-                    recursive=False):
-                # TODO normalize result
+        submodule_change = False
+
+        if status_state['deleted']:
+            vanished_subds = [
+                str(f.relative_to(self.pathobj))
+                for f, props in status_state['deleted'].items()
+                if props.get('type') == 'dataset'
+            ]
+            if vanished_subds:
+                # we submodule removal we use `git-rm`, because the clean-up
+                # is more complex than just an index update -- make no
+                # sense to have a duplicate implementation.
+                # we do not yield here, but only altogether below -- we are just
+                # processing gone components, should always be quick.
+                self._call_git(['rm', '-q'], files=vanished_subds)
+                submodule_change = True
+            # remove anything from the index that was found to be gone
+            self._call_git(
+                ['update-index', '--remove'],
+                files=[
+                    str(f.relative_to(self.pathobj))
+                    for f, props in status_state['deleted'].items()
+                    # do not update the index, if there is already
+                    # something staged for this path (e.g.,
+                    # a directory was removed and a file staged
+                    # in its place)
+                    if not props.get('gitshasum')
+                    # we already did the submodules
+                    and props.get('type') != 'dataset'
+                ]
+            )
+            # now yield all deletions
+            for p, props in status_state['deleted'].items():
                 yield get_status_dict(
                     action='delete',
                     refds=self.pathobj,
-                    # TODO make remove() report the type
-                    # for now it claims to report on files only
-                    type='file',
-                    path=(self.pathobj / ut.PurePosixPath(r)),
-                    # make remove() report on failures too
+                    type=props.get('type'),
+                    path=p,
                     status='ok',
                     logger=lgr)
 
@@ -3396,7 +3383,6 @@ class GitRepo(CoreGitRepo):
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
-        submodule_change = False
         untracked_dirs = [
             f.relative_to(self.pathobj)
             for f, props in status_state['untracked'].items()
@@ -3433,25 +3419,25 @@ class GitRepo(CoreGitRepo):
                     submodule_change = True
                 yield r
 
-        if submodule_change or vanished_subds:
-            # the config has changed too
+        if submodule_change:
+            # this will alter the config, reload
             self.config.reload()
-            # need to include .gitmodules in what needs saving
+            # need to include .gitmodules in what needs committing
             f = self.pathobj.joinpath('.gitmodules')
             status_state['modified_or_untracked'][f] = \
                 status_state['modified'][f] = \
                 dict(type='file', state='modified')
-            if hasattr(self, 'uuid') and not kwargs.get('git', False):
-                # we cannot simply hook into the coming add-call
-                # as this would go to annex, so make a dedicted git-add
-                # call to ensure .gitmodules is not annexed
-                # in any normal DataLad dataset .gitattributes will
-                # prevent this, but in a plain repo it won't
-                # https://github.com/datalad/datalad/issues/3306
-                for r in GitRepo._save_add(
-                        self,
-                        {op.join(self.path, '.gitmodules'): None}):
-                    yield r
+            # now stage .gitmodules
+            self._call_git(['update-index', '--add'], files=['.gitmodules'])
+            # and report on it
+            yield get_status_dict(
+                action='add',
+                refds=self.pathobj,
+                type='file',
+                path=f,
+                status='ok',
+                logger=lgr)
+
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
@@ -3686,13 +3672,55 @@ class GitRepo(CoreGitRepo):
                 yield get_status_dict(
                     action='add',
                     refds=self.pathobj,
-                    # should become type='dataset'
-                    # https://github.com/datalad/datalad/pull/4793#discussion_r464515331
-                    type='file',
+                    type='dataset',
                     key=None,
                     path=i['path'],
                     status='ok',
                     logger=lgr)
+
+
+def _get_save_status_state(status):
+    """
+    Returns
+    -------
+    dict
+      By status category by file path, mapped to status properties.
+    """
+    # Sort status into status by state with explicit list of states
+    # (excluding clean we do not care about) we expect to be present
+    # and which we know of (unless None), and modified_or_untracked hybrid
+    # since it is used below
+    status_state = {
+        k: {}
+        for k in (None,  # not cared of explicitly here
+                  'added',  # not cared of explicitly here
+                  # 'clean'  # not even wanted since nothing to do about those
+                  'deleted',
+                  'modified',
+                  'untracked',
+                  'modified_or_untracked',  # hybrid group created here
+                  )}
+    for f, props in status.items():
+        state = props.get('state', None)
+        if state == 'clean':
+            # we don't care about clean
+            continue
+        if state == 'modified' and props.get('gitshasum') \
+                and props.get('gitshasum') == props.get('prev_gitshasum'):
+            # reported as modified, but with identical shasums -> typechange
+            # a subdataset maybe? do increasingly expensive tests for
+            # speed reasons
+            if props.get('type') != 'dataset' and f.is_dir() \
+                    and GitRepo.is_valid_repo(f):
+                # it was not a dataset, but now there is one.
+                # we declare it untracked to engage the discovery tooling.
+                state = 'untracked'
+                props = dict(type='dataset', state='untracked')
+        status_state[state][f] = props
+        # The hybrid one to retain the same order as in original status
+        if state in ('modified', 'untracked'):
+            status_state['modified_or_untracked'][f] = props
+    return status_state
 
 
 # used in in the get command and GitRepo.add_submodule(), the
