@@ -12,6 +12,7 @@ via stdin. For each instruction send over stdin, a response is read and
 returned. The response structure is determined by "output_proc"
 
 """
+from __future__ import annotations
 
 import logging
 import os
@@ -29,7 +30,7 @@ from typing import (
 )
 from datetime import datetime
 from operator import attrgetter
-from weakref import WeakValueDictionary
+from weakref import WeakValueDictionary, ReferenceType, ref
 
 # start of legacy import block
 # to avoid breakage of code written before datalad.runner
@@ -174,7 +175,7 @@ class BatchedCommand(SafeDelCloseMixin):
 
     # Collection of active BatchedCommands as a mapping from object IDs to
     # instances
-    _active_instances = WeakValueDictionary()
+    _active_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
 
     def __init__(self,
                  cmd: Union[str, Tuple, List],
@@ -185,15 +186,15 @@ class BatchedCommand(SafeDelCloseMixin):
                  ):
 
         command = cmd
-        self.command = [command] if not isinstance(command, List) else command
-        self.path = path
-        self.output_proc = output_proc
-        self.timeout = timeout
-        self.exception_on_timeout = exception_on_timeout
+        self.command: list = [command] if not isinstance(command, List) else command
+        self.path: Optional[str] = path
+        self.output_proc: Optional[Callable] = output_proc
+        self.timeout: Optional[float] = timeout
+        self.exception_on_timeout: bool = exception_on_timeout
 
         self.stdin_queue = None
         self.stderr_output = b""
-        self.runner = None
+        self.runner: Optional[WitlessRunner] = None
         self.generator = None
         self.encoding = None
         self.wait_timed_out = None

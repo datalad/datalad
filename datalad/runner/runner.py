@@ -8,8 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Base DataLad command execution runner
 """
+from __future__ import annotations
 
 import logging
+from typing import Generator
 
 from .coreprotocols import NoCapture
 from .exception import CommandError
@@ -70,7 +72,7 @@ class WitlessRunner(object):
             env=None,
             timeout=None,
             exception_on_error=True,
-            **kwargs):
+            **kwargs) -> dict | Generator:
         """Execute a command and communicate with it.
 
         Parameters
