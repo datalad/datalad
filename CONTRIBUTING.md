@@ -503,6 +503,50 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+## Maintenace teams coordination
+
+We distinguish particular aspects of DataLad's functionality, each corresponding
+to parts of the code base in this repository, and loosely maintain teams assigned
+to these aspects.
+While any contributor can tackle issues on any aspect, you may want to refer to
+members of such teams (via GitHub tagging or review requests) or the team itself
+(via GitHub issue label ``team-<area>``) when creating a PR, feature request, or bug report.
+Members of a team are encouraged to respond to PRs or issues within the given area,
+and pro-actively improve robustness, user experience, documentation, and
+performance of the code.
+
+New and existing contributors are invited to join teams:
+
+- **core**: core API/commands
+    - @mih
+    - @adswa
+    - @christian-monch
+    - @yarikoptic
+
+- **git**: Git interface (e.g. GitRepo, protocols, helpers, compatibility)
+    - @mih
+    - @bpoldrack
+    - @christian-monch
+    - @yarikoptic
+
+- **gitannex**: git-annex interface (e.g. AnnexRepo, protocols, helpers, compatibility)
+    - @mih
+    - @bpoldrack
+    - @yarikoptic
+
+- **remotes**: (special) remote implementations
+    - @bpoldrack
+    - @yarikoptic
+
+- **runner**: sub-process execution and IO
+    - @christian-monch
+
+- **services**: interaction with 3rd-party services (create-sibling*, downloaders, credentials, etc.)
+    - @adswa
+    - @mslw
+    - @jsheunis
+    - @yarikoptic
+
 ## Recognizing contributions
 
 We welcome and recognize all contributions from documentation to testing to code development.
