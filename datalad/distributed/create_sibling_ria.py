@@ -102,7 +102,7 @@ class CreateSiblingRia(Interface):
     'ria+[scheme]://<storelocation>#~<aliasname>'.
     In addition, specific version identifiers can be appended to the URL with an
     additional @ symbol:
-    'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>'
+    'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>', where 'dataset-version' refers to a branch or tag.
 
     RIA store layout
     ~~~~~~~~~~~~~~~~
