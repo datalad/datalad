@@ -91,18 +91,18 @@ class CreateSiblingRia(Interface):
     the store or specific datasets inside of it.
 
     The general structure of a RIA URL pointing to a store takes the form
-    'ria+[protocol]://<storelocation>' (e.g.,
+    'ria+[scheme]://<storelocation>' (e.g.,
     ria+ssh://[user@]hostname:/absolute/path/to/ria-store, or
     ria+file:///absolute/path/to/ria-store)
 
     The general structure of a RIA URL pointing to a dataset in a store (for
     example for cloning) takes a similar form, but appends either the datasets
-    UUID or a ~ symbold followed by the dataset's alias name:
-    'ria+[protocol]://<storelocation>#<dataset-UUID' or
-    'ria+[protocol]://<storelocation>#~<aliasname>'.
-    In addition, specific version identifiers can be appended to the URL like
-    this:
-    'TODO'
+    UUID or a ~ symbol followed by the dataset's alias name:
+    'ria+[scheme]://<storelocation>#<dataset-UUID>' or
+    'ria+[scheme]://<storelocation>#~<aliasname>'.
+    In addition, specific version identifiers can be appended to the URL with an
+    additional @ symbol:
+    'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>'
 
     RIA store layout
     ~~~~~~~~~~~~~~~~
@@ -121,7 +121,17 @@ class CreateSiblingRia(Interface):
     store. However, instead of using the 'dirhashlower' naming scheme for
     the object directories, like Git-annex would do, a 'dirhashmixed'
     layout is used -- the same as for non-bare Git repositories or regular
-    DataLad datasets.
+    DataLad datasets. This implies, that the bare git repository is NOT aware
+    if its `annex/` subdirectory! It is meant to be used via the ORA special
+    remote only. Do not run git-annex on the repositories in-store!
+
+    Note, that both - the bare git repository and the 'annex/'
+    subdirectory - are optional. The `create-sibling-ria` command supports
+    different modes of operation in that regard, determined by its
+    'storage-sibling' option. Enabling a storage sibling will create the
+    git-annex object tree for use with the ORA special remote, and disabling the
+    standard git-remote ('storage-sibling=only') will result in not having the
+    bare git repository.
 
     Optionally, there can be a further subdirectory 'archives' with
     (compressed) 7z archives of annex objects. The storage remote is able to
