@@ -105,10 +105,6 @@ from .exceptions import (
 
 lgr = logging.getLogger('datalad.annex')
 
-# This is a map between an auto-upgradeable version and the version that it
-# upgrades to. It should track autoUpgradeableVersions in Annex.Version.
-_AUTO_UPGRADEABLE_VERSIONS = {v: 8 for v in range(3, 8)}
-
 
 class AnnexRepo(GitRepo, RepoInterface):
     """Representation of an git-annex repository.
@@ -1438,10 +1434,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         if description is not None:
             opts += [description]
         if version is not None:
-            upgraded_version = _AUTO_UPGRADEABLE_VERSIONS.get(version)
-            if upgraded_version:
-                lgr.info("Annex repository version %s will be upgraded to %s",
-                         version, upgraded_version)
+            version = str(version)
+            supported_versions = AnnexRepo.check_repository_versions()['supported']
+            if version not in supported_versions:
+                first_supported_version = int(supported_versions[0])
+                if int(version) < first_supported_version:
+                    lgr.info("Annex repository version %s will be upgraded to %s or later version",
+                             version, first_supported_version)
+                    # and if it is higher than any supported -- we will just let git-annex to do
+                    # what it wants to do
             opts += ['--version', '{0}'.format(version)]
 
         # TODO: RM DIRECT?  or RF at least ?
