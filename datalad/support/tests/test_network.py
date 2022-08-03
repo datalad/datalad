@@ -226,7 +226,10 @@ def test_pathri_guessing(filename=None):
         # we don't "care" about params ATM so there is a warning if there are any
         ri = RI(f"{filename};param")
         assert isinstance(ri, PathRI)
-        assert_in('ParseResults contains params', cml.out)
+        if not on_windows:
+            # Does not happen on Windows since paths with \ instead of / do not
+            # look like possible URLs
+            assert_in('ParseResults contains params', cml.out)
 
 
 @known_failure_githubci_win
