@@ -272,6 +272,7 @@ script:
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
       --cov=datalad
+      --cov-report=
       --pyargs
       $TESTS_TO_PERFORM
   - cd ..
