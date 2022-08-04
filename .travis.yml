@@ -105,6 +105,9 @@ before_install:
 install:
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
+  # we are pip sudo install  below and versioneer needs to run git. recent git needs to
+  # be made certain it is safe to do
+  - sudo git config --global --add safe.directory $PWD
   - cd ..; pip install -q codecov; cd -
   - pip install -v -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
