@@ -47,6 +47,7 @@ jobs:
     - name: Setup ${{ matrix.extension }} extension specific variables
       run: |
         DL_PIP_INSTALLS=mock
+        DL_APT_INSTALLS=dcm2niix
         DL_REPO=datalad/${{ matrix.extension }}
         DL_TESTER=nose
         DL_NEED_SINGULARITY=
@@ -65,6 +66,7 @@ jobs:
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
+        echo "DL_APT_INSTALLS=$DL_APT_INSTALLS"
         echo "DL_REPO=$DL_REPO"
         echo "DL_TESTER=$DL_TESTER"
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
@@ -80,9 +82,10 @@ jobs:
       run: sudo eatmydata apt-get install singularity-container
       if: env.DL_NEED_SINGULARITY == '1'
 
-    - name: Install additional pypi dependencies and prepare for testing
+    - name: Install additional dependencies and prepare for testing
       run: |
         pip install $DL_PIP_INSTALLS
+        [ -z "$DL_APT_INSTALLS" ] || sudo apt-get install $DL_APT_INSTALLS
         mkdir -p __testhome__
 
     - name: WTF!?
