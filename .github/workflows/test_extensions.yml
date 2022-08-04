@@ -98,7 +98,11 @@ jobs:
     - name: ${{ matrix.extension }} tests using pytest
       run: |
         cd __testhome__
-        python -m pytest -c ../__extension__/tox.ini -s -v --cov=datalad --pyargs ${DL_PACKAGE}
+        # -crawler's tox.ini points to itself (but without full path) for coverage
+        # configuration.  So far attempts to "fix" by somehow providing full path did not work.
+        # That is why just symlink it here.
+        ln -s ../__extension__/tox.ini .
+        python -m pytest -c ./tox.ini -s -v --cov=datalad --pyargs ${DL_PACKAGE}
       if: env.DL_TESTER == 'pytest'
 
     - name: Prepare coverage
