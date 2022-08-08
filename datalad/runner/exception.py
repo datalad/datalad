@@ -8,12 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Exception raise on a failed runner command execution
 """
+from __future__ import annotations
 
 import logging
-from typing import (
-    Dict,
-    List,
-)
 
 
 lgr = logging.getLogger('datalad.runner.exception')
@@ -81,9 +78,9 @@ class CommandError(RuntimeError):
         return self.to_str()
 
 
-def _format_json_error_messages(recs: List[Dict]):
+def _format_json_error_messages(recs: list[dict]) -> str:
     # there could be many, condense
-    msgs = {}
+    msgs: dict[str, str | int] = {}
     for r in recs:
         if r.get('success'):
             continue
@@ -93,6 +90,7 @@ def _format_json_error_messages(recs: List[Dict]):
         )
         if 'file' in r or 'key' in r:
             occur = msgs.get(msg, 0)
+            assert isinstance(occur, int)
             occur += 1
             msgs[msg] = occur
 
@@ -104,7 +102,8 @@ def _format_json_error_messages(recs: List[Dict]):
             '{}{}'.format(
                 m,
                 ' [{} times]'.format(n) if n > 1 else '',
-            )
+            ) if isinstance(n, int) else
+            '{}'.format(m)
             for m, n in msgs.items()
         )
     )

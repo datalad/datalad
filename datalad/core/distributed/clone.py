@@ -930,19 +930,19 @@ def postclonecfg_ria(ds, props, remote="origin"):
             # changed with command abstractions). So we need to get that part to
             # have a valid path to the remote's config file:
             cfg_path = PurePosixPath(URL(store_url).path) / 'config'
-            op = SSHRemoteIO(store_url)
+            io = SSHRemoteIO(store_url)
             try:
-                config_content = op.read_file(cfg_path)
+                config_content = io.read_file(cfg_path)
             except RIARemoteError as e:
                 ce = CapturedException(e)
                 lgr.debug("Failed to get config file from source: %s", ce)
 
         elif scheme == 'file':
             # TODO: switch the following to proper command abstraction:
-            op = LocalIO()
+            io = LocalIO()
             cfg_path = Path(URL(store_url).localpath) / 'config'
             try:
-                config_content = op.read_file(cfg_path)
+                config_content = io.read_file(cfg_path)
             except (RIARemoteError, OSError) as e:
                 ce = CapturedException(e)
                 lgr.debug("Failed to get config file from source: %s", ce)

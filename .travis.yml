@@ -55,13 +55,21 @@ matrix:
     env:
     - PYTEST_SELECTION=
     - PYTEST_SELECTION_OP=not
+  # Two matrix runs for "recent python and git-annex with the recent supported by git annex
+  # new version of repo"
   - python: '3.10'
     dist: focal
     env:
       - PYTEST_SELECTION=
       - PYTEST_SELECTION_OP=not
-      # current "default" version of git-annex 8.20201007  is not co-installable
-      # with python 3.10, so let's just allow for any git-annex version
+      - DATALAD_REPO_VERSION=10
+      - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
+  - python: '3.10'
+    dist: focal
+    env:
+      - PYTEST_SELECTION=
+      - PYTEST_SELECTION_OP=
+      - DATALAD_REPO_VERSION=10
       - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
   - if: type = cron
     python: 3.7
@@ -237,6 +245,9 @@ before_install:
 install:
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
+  # we are pip sudo install  below and versioneer needs to run git. recent git needs to
+  # be made certain it is safe to do
+  - sudo git config --global --add safe.directory $PWD
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
@@ -264,6 +275,7 @@ script:
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
       --cov=datalad
+      --cov-report=
       --pyargs
       $TESTS_TO_PERFORM
   - cd ..

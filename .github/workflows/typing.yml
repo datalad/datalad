@@ -1,0 +1,32 @@
+# This workflow is running types checks using `tox -e typing` you could do locally.
+# As type hinting is not yet fully and consistently done through out the project only
+# some (randomly) selected files (listed in tox.ini) will be checked.  Feel welcome
+# to add extra files to the list there. See https://github.com/datalad/datalad/issues/6884
+# for the overall goal/progress towards type hints coverage in DataLad.
+name: Type-check
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  typing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade tox
+
+      - name: Run type checker
+        run: tox -e typing
