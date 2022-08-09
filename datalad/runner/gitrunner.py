@@ -13,9 +13,13 @@ import logging
 import os
 import os.path as op
 
-from datalad.dochelpers import borrowdoc
-from datalad.utils import generate_file_chunks
+from typing import Optional
 
+from datalad.dochelpers import borrowdoc
+from datalad.utils import (
+    generate_file_chunks,
+    make_tempfile,
+)
 from .runner import (
     GeneratorMixIn,
     WitlessRunner,
@@ -139,14 +143,31 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
     def _get_chunked_results(self,
                              cmd,
                              files,
+                             *,
                              protocol=None,
                              cwd=None,
                              env=None,
+                             pathspec_from_file: Optional[bool] = False,
                              **kwargs):
 
         assert isinstance(cmd, list)
 
-        file_chunks = generate_file_chunks(files, cmd)
+        file_chunks = list(generate_file_chunks(files, cmd))
+
+        if pathspec_from_file and len(file_chunks) > 1:
+            # if git supports pathspec---from-file and we need multiple chunks to do,
+            # just use --pathspec-from-file
+            with make_tempfile(content=b'\x00'.join(f.encode() for f in files)) as tf:
+                cmd += ['--pathspec-file-nul', f'--pathspec-from-file={tf}']
+                yield self.run(
+                    cmd=cmd,
+                    protocol=protocol,
+                    cwd=cwd,
+                    env=env,
+                    **kwargs)
+                return
+
+        # "classical" chunking
         for i, file_chunk in enumerate(file_chunks):
             # do not pollute with message when there only ever is a single chunk
             if len(file_chunk) < len(files):
@@ -163,9 +184,11 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
     def run_on_filelist_chunks(self,
                                 cmd,
                                 files,
+                                *,
                                 protocol=None,
                                 cwd=None,
                                 env=None,
+                                pathspec_from_file: Optional[bool] = False,
                                 **kwargs):
         """
         Run a git-style command multiple times if `files` is too long,
@@ -192,6 +215,10 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
           This must be a complete environment definition, no values
           from the current environment will be inherited. Overrides
           any `env` given to the constructor.
+        pathspec_from_file : bool, optional
+          Could be set to True for a `git` command which supports
+          --pathspec-from-file and --pathspec-file-nul options. Then pathspecs
+          would be passed through a temporary file.
         kwargs :
           Passed to the Protocol class constructor.
 
@@ -224,6 +251,7 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
                                              protocol=protocol,
                                              cwd=cwd,
                                              env=env,
+                                             pathspec_from_file=pathspec_from_file,
                                              **kwargs):
             if results is None:
                 results = res
@@ -235,9 +263,11 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
     def run_on_filelist_chunks_items_(self,
                                       cmd,
                                       files,
+                                      *,
                                       protocol=None,
                                       cwd=None,
                                       env=None,
+                                      pathspec_from_file: Optional[bool] = False,
                                       **kwargs):
         """
         Run a git-style command multiple times if `files` is too long,
@@ -264,5 +294,6 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
                                                          protocol=protocol,
                                                          cwd=cwd,
                                                          env=env,
+                                                         pathspec_from_file=pathspec_from_file,
                                                          **kwargs):
             yield from chunk_generator
