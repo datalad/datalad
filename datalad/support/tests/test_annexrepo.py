@@ -1330,8 +1330,15 @@ def test_repo_version_supported(version, tmp_path):
         with patch.dict('os.environ', {'DATALAD_REPO_VERSION': str(Uversion)}):
             # ...parameter `version` still has priority over default config:
             annex = AnnexRepo(str(tmp_path), create=True, version=version)
-            # There is no "upgrade" for any of the supported versions.
-            eq_(int(annex.config.get('annex.version')), version)
+            annex_version = int(annex.config.get('annex.version'))
+            if not annex.is_managed_branch():
+                # There is no "upgrade" for any of the supported versions.
+                # if we are not in adjusted branch
+                eq_(annex_version, version)
+            else:
+                print("HERE")
+                # some annex command might have ran to trigger the update
+                assert annex_version in {v for v in _GIT_ANNEX_VERSIONS_INFO["supported"] if v >= version}
 
 
 @skip_if(external_versions['cmd:annex'] > '8.20210428', "Stopped showing if too quick")
