@@ -125,6 +125,9 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
     See GitRunnerBase it mixes in for more details
     """
 
+    # Behavior option to load up from config upon demand
+    _CFG_PATHSPEC_FROM_FILE = None
+
     @borrowdoc(WitlessRunner)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -152,9 +155,13 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
 
         assert isinstance(cmd, list)
 
+        if self._CFG_PATHSPEC_FROM_FILE is None:
+            from datalad import cfg  # avoid circular import
+            GitWitlessRunner._CFG_PATHSPEC_FROM_FILE = cfg.obtain('datalad.runtime.pathspec-from-file')
+            assert GitWitlessRunner._CFG_PATHSPEC_FROM_FILE in ('multi-chunk', 'always')
         file_chunks = list(generate_file_chunks(files, cmd))
 
-        if pathspec_from_file and len(file_chunks) > 1:
+        if pathspec_from_file and (len(file_chunks) > 1 or GitWitlessRunner._CFG_PATHSPEC_FROM_FILE == 'always'):
             # if git supports pathspec---from-file and we need multiple chunks to do,
             # just use --pathspec-from-file
             with make_tempfile(content=b'\x00'.join(f.encode() for f in files)) as tf:
