@@ -269,7 +269,7 @@ script:
   # Run tests
   #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
   #  in effect, dumping too many logs.
-  - http_proxy=
+  - set -x; http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
