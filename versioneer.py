@@ -1826,6 +1826,8 @@ def get_cmdclass(cmdclass=None):
             cfg = get_config_from_root(root)
             versions = get_versions()
             _build_py.run(self)
+            if self.editable_mode:
+                return
             # now locate _version.py in the new build/ directory and replace
             # it with an updated value
             if cfg.versionfile_build:
