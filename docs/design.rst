@@ -349,7 +349,7 @@ Move/Rename/Delete
 ~~~~~~~~~~~~~~~~~~
 
 Just move/rename/delete some files around e.g. for a custom view of
-the dataset (e.g. to conform openfmri layout). Key would simply be
+the dataset (e.g. to conform to OpenfMRI layout). Key would simply be
 reused ;)
 
 Q: should it be 'Within-branch' filter?
@@ -541,7 +541,7 @@ a URI should be associated with an "Hosting" (many-to-one), so we could
 e.g. provide authentication information per actual "Hosting" as the
 entity.  But now we are getting back to DataProvider, which is the
 Hosting, or actually also a part of it (since Hosting could serve
-multiple Providers, e.g. openfmri -> providers per each dataset?)
+multiple Providers, e.g. OpenfMRI -> providers per each dataset?)
 But also Provider might use/point to multiple Hostings (e.g. mirrors
 listed on nitp-2013).
 

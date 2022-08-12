@@ -99,7 +99,7 @@ desired data redundancy across the network of dataset, or to prevent
 publication of sensitive data to publicly accessible repositories. Individual
 datasets in a hierarchy of (sub)datasets need not be stored at the same location.
 Continuing with an earlier example, it is possible to post a curated
-collection of datasets, as a superdataset, on Github, while the actual datasets
+collection of datasets, as a superdataset, on GitHub, while the actual datasets
 live on different servers all around the world.
 
 Basic command line usage
