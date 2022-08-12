@@ -98,7 +98,7 @@ class Install(Interface):
     result_filter = is_result_matching_pathsource_argument
 
     _examples_ = [
-        dict(text="Install a dataset from Github into the current directory",
+        dict(text="Install a dataset from GitHub into the current directory",
              code_py="install("
              "source='https://github.com/datalad-datasets/longnow"
              "-podcasts.git')",

@@ -163,7 +163,7 @@ class Clone(Interface):
     result_xfm = 'successdatasets-or-none'
 
     _examples_ = [
-        dict(text="Install a dataset from Github into the current directory",
+        dict(text="Install a dataset from GitHub into the current directory",
              code_py="clone("
              "source='https://github.com/datalad-datasets/longnow"
              "-podcasts.git')",
