@@ -11,7 +11,7 @@ File URL handling
 
    This specification describes the current implementation.
 
-Datalad datasets can record URLs for file content access as metadata. This is a
+DataLad datasets can record URLs for file content access as metadata. This is a
 feature provided by git-annex and is available for any annexed file. DataLad
 improves upon the git-annex functionality in two ways:
 
