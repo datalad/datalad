@@ -16,7 +16,7 @@ body:
 
   - type: textarea
     attributes:
-      label: Datalad information
+      label: DataLad information
       description: |
         What version of DataLad and git-annex do you use (run `datalad --version`)? 
 

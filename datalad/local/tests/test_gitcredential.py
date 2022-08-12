@@ -157,7 +157,7 @@ def test_datalad_credential_helper(path=None):
 def test_credential_cycle(path=None):
 
     # Test that we break a possible cycle when DataLad is configured to query
-    # git-credential and Git is configured to query Datalad.
+    # git-credential and Git is configured to query DataLad.
     # This may happen in a not-so-obvious fashion, if git-credential-datalad
     # was configured generally rather than for a specific URL, while there's a
     # datalad provider config pointing to Git for a particular URL.

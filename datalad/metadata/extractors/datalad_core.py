@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata extractor for Datalad's own core storage"""
+"""Metadata extractor for DataLad's own core storage"""
 
 from datalad.metadata.extractors.base import BaseMetadataExtractor
 
