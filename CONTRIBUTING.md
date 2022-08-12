@@ -576,7 +576,7 @@ Refer datalad/config.py for information on how to add these environment variable
   It is used by tests to create a temporary git directory while testing git annex archives etc
 - *DATALAD_TESTS_NONETWORK*: 
   Skips network tests completely if this flag is set
-  Examples include test for s3, git_repositories, openfmri etc
+  Examples include test for S3, git_repositories, OpenfMRI, etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set.  If you enable this,
   you need to set up a "datalad-test" and "datalad-test2" target in
