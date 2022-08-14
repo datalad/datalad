@@ -2344,7 +2344,10 @@ class GitRepo(CoreGitRepo):
         Parameters
         ----------
         paths : list(pathlib.PurePath), optional
-            Restrict submodules to those under `paths`.
+            Restrict submodules to those under `paths`. Paths must be relative
+            to the resolved repository root, and must be normed to match the
+            reporting done by Git, i.e. no parent dir components
+            (ala "some/../this").
 
         Returns
         -------
@@ -2355,17 +2358,67 @@ class GitRepo(CoreGitRepo):
             return
 
         modinfo = self._parse_gitmodules()
-        for path, props in self.get_content_info(
-                paths=paths,
-                ref=None,
-                untracked='no').items():
-            if props.get('type', None) != 'dataset':
+        if not modinfo:
+            # we exit early, if there is nothing on record (even though
+            # a .gitmodules file exists).
+            # without this conditional exit, we would be able to discover
+            # subprojects even when they are not recorded in .gitmodules,
+            # but at the cost of running an unconstrained ls-files call
+            # below
+            return
+
+        # taken from 3.9's pathlib, can be removed once the minimally
+        # supported python version
+        def is_relative_to(self, *other):
+            """Return True if the path is relative to another path or False.
+            """
+            try:
+                self.relative_to(*other)
+                return True
+            except ValueError:
+                return False
+
+        if paths:
+            # ease comparison
+            paths = [self.pathobj / p for p in paths]
+            # contrain the report by the given paths
+            modinfo = {
+                # modpath is absolute
+                modpath: modprobs
+                for modpath, modprobs in modinfo.items()
+                # is_relative_to() also match equal paths
+                if any(is_relative_to(modpath, p) for p in paths)
+            }
+        for r in self.call_git_items_(
+            ['ls-files', '--stage', '-z'],
+            sep='\0',
+            files=[str(p.relative_to(self.pathobj)) for p in modinfo.keys()],
+            read_only=True,
+            keep_ends=True,
+        ):
+            if not r.startswith('160000'):
                 # make sure this method never talks about non-dataset
                 # content
                 continue
-            props["path"] = path
-            props.update(modinfo.get(path, {}))
-            yield props
+            props, rpath = r.split('\t')
+            mode, gitsha, stage = props.split(' ')
+            if stage not in ('0', '2'):
+                # we either have non-merge situation, or a simple merge
+                # situation (i.e. stage=0). the reported gitsha always
+                # matches what we have locally.
+                # or we are in a three-way merge, in which case stage=2
+                # is what we want to report, because it matches the
+                # current HEAD (see git-read-tree manpage).
+                # there is either a stage 2 or stage 0, never both
+                continue
+            # remove the expected line separator from the path
+            path = self.pathobj / PurePosixPath(rpath[:-1])
+            yield dict(
+                path=path,
+                type='dataset',
+                gitshasum=gitsha,
+                **modinfo.get(path, {})
+            )
 
     def get_submodules(self, sorted_=True, paths=None):
         """Return list of submodules.
