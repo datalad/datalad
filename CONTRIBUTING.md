@@ -517,35 +517,18 @@ performance of the code.
 
 New and existing contributors are invited to join teams:
 
-- **core**: core API/commands
-    - @mih
-    - @adswa
-    - @christian-monch
-    - @yarikoptic
+- **core**: core API/commands (@datalad/team-core)
 
-- **git**: Git interface (e.g. GitRepo, protocols, helpers, compatibility)
-    - @mih
-    - @bpoldrack
-    - @christian-monch
-    - @yarikoptic
+- **git**: Git interface (e.g. GitRepo, protocols, helpers, compatibility) (@datalad/team-git)
 
-- **gitannex**: git-annex interface (e.g. AnnexRepo, protocols, helpers, compatibility)
-    - @mih
-    - @bpoldrack
-    - @yarikoptic
 
-- **remotes**: (special) remote implementations
-    - @bpoldrack
-    - @yarikoptic
+- **gitannex**: git-annex interface (e.g. AnnexRepo, protocols, helpers, compatibility) (@datalad/team-gitannex)
 
-- **runner**: sub-process execution and IO
-    - @christian-monch
+- **remotes**: (special) remote implementations (@datalad/team-remotes)
 
-- **services**: interaction with 3rd-party services (create-sibling*, downloaders, credentials, etc.)
-    - @adswa
-    - @mslw
-    - @jsheunis
-    - @yarikoptic
+- **runner**: sub-process execution and IO (@datalad/team-runner)
+
+- **services**: interaction with 3rd-party services (create-sibling*, downloaders, credentials, etc.) (@datalad/team-services)
 
 ## Recognizing contributions
 
