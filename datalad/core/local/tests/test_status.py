@@ -25,6 +25,7 @@ from datalad.tests.utils_pytest import (
     SkipTest,
     assert_dict_equal,
     assert_in,
+    assert_not_in,
     assert_in_results,
     assert_raises,
     assert_repo_status,
@@ -77,7 +78,8 @@ def test_status_basics(path=None, linkpath=None, otherdir=None):
         eq_(s['action'], 'status')
         eq_(s['state'], 'clean')
         eq_(s['type'], 'file')
-        assert_in('gitshasum', s)
+        # should not report shasum (see #6875)
+        assert_not_in('gitshasum', s)
         assert_in('bytesize', s)
         eq_(s['refds'], ds.path)
 
