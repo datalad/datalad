@@ -59,6 +59,7 @@ from datalad.dataset.gitrepo import (
     path_based_str_repr,
 )
 from datalad.log import log_progress
+from datalad.support.path import get_parent_paths
 from datalad.support.due import (
     Doi,
     due,
@@ -2367,32 +2368,16 @@ class GitRepo(CoreGitRepo):
             # below
             return
 
-        # taken from 3.9's pathlib, can be removed once the minimally
-        # supported python version
-        def is_relative_to(self, *other):
-            """Return True if the path is relative to another path or False.
-            """
-            try:
-                self.relative_to(*other)
-                return True
-            except ValueError:
-                return False
-
+        posix_mod_paths = [m.relative_to(self.pathobj).as_posix() for m in modinfo]
         if paths:
-            # ease comparison
-            paths = [self.pathobj / p for p in paths]
-            # contrain the report by the given paths
-            modinfo = {
-                # modpath is absolute
-                modpath: modprobs
-                for modpath, modprobs in modinfo.items()
-                # is_relative_to() also match equal paths
-                if any(is_relative_to(modpath, p) for p in paths)
-            }
+            # constrain the report by the given paths, make sure all paths are POSIX
+            posix_mod_paths = get_parent_paths(
+                [ut.PurePath(p).as_posix() for p in paths],
+                posix_mod_paths, only_with_parents=True)
         for r in self.call_git_items_(
             ['ls-files', '--stage', '-z'],
             sep='\0',
-            files=[str(p.relative_to(self.pathobj)) for p in modinfo.keys()],
+            files=posix_mod_paths,
             read_only=True,
             keep_ends=True,
         ):
