@@ -254,7 +254,7 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
     In the simplest scenario -- just grab all arguments from parent class::
 
            @borrowkwargs(A)
-           def met1(self, bu, **kwargs):
+           def met1(self, desc, **kwargs):
                pass
 
     Parameters

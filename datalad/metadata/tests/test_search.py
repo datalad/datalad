@@ -70,7 +70,7 @@ def test_search_outside1_noninteractive_ui(tdir=None):
     # we should raise an informative exception
     with chpwd(tdir):
         with assert_raises(NoDatasetFound) as cme:
-            list(search("bu"))
+            list(search("irrelevant"))
         assert_in('run interactively', str(cme.value))
 
 
@@ -81,13 +81,13 @@ def test_search_outside1(tdir=None, newhome=None):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
         with patch_config({'datalad.locations.default-dataset': newhome}):
-            gen = search("bu", return_type='generator')
+            gen = search("irrelevant", return_type='generator')
             assert_is_generator(gen)
             assert_raises(NoDatasetFound, next, gen)
 
         # and if we point to some non-existing dataset
         with assert_raises(ValueError):
-            next(search("bu", dataset=newhome))
+            next(search("irrelevant", dataset=newhome))
 
 
 @with_testsui(responses='yes')

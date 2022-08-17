@@ -1186,9 +1186,9 @@ def test_dlabspath(path=None):
         eq_(d, dlabspath(d))
         # in the root of ds
         with chpwd(d):
-            eq_(dlabspath("bu"), opj(d, "bu"))
-            eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
-            eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
+            eq_(dlabspath("path"), opj(d, "path"))
+            eq_(dlabspath("./path"), opj(d, "./path"))  # we do not normpath by default
+            eq_(dlabspath("./path", norm=True), opj(d, "path"))
 
 
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
