@@ -194,7 +194,7 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
             ui=have_webui())
         assert_not_in('enableremote local_target failed', cml.out)
 
-    GitRepo(target_path, create=False)  # raises if not a git repo
+    target_gitrepo = GitRepo(target_path, create=False)  # raises if not a git repo
     assert_in("local_target", source.repo.get_remotes())
     # Both must be annex or git repositories
     src_is_annex = AnnexRepo.is_valid_repo(src_path)
@@ -202,6 +202,7 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
     # And target one should be known to have a known UUID within the source if annex
     if src_is_annex:
         lclcfg = AnnexRepo(src_path).config
+        target_aversion = target_gitrepo.config['annex.version']
         # basic config in place
         eq_(lclcfg.get('remote.local_target.annex-ignore'), 'false')
         ok_(lclcfg.get('remote.local_target.annex-uuid'))
@@ -217,14 +218,26 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
     ok_(str(cm.value).startswith(
         "Target path %s already exists." % target_path))
     if src_is_annex:
-        target_description = AnnexRepo(target_path, create=False).get_description()
-        assert_not_equal(target_description, None)
-        assert_not_equal(target_description, target_path)
-        # on yoh's laptop TMPDIR is under HOME, so things start to become
-        # tricky since then target_path is shortened and we would need to know
-        # remote $HOME.  To not over-complicate and still test, test only for
-        # the basename of the target_path
-        ok_endswith(target_description, basename(target_path))
+        # Before we "talk" to it with git-annex directly -- we must prevent auto-upgrades
+        # since the git-annex on "remote server" (e.g. docker container) could be outdated
+        # and not support new git-annex repo version
+        target_gitrepo.config.set('annex.autoupgraderepository', "false", scope='local')
+        try:
+            target_description = AnnexRepo(target_path, create=False).get_description()
+        except CommandError as e:
+            if 'is at unsupported version' not in str(e.stderr):
+                raise
+            # we just would skip this part of the test and avoid future similar query
+            target_description = None
+        else:
+            assert target_gitrepo.config['annex.version'] == target_aversion
+            assert_not_equal(target_description, None)
+            assert_not_equal(target_description, target_path)
+            # on yoh's laptop TMPDIR is under HOME, so things start to become
+            # tricky since then target_path is shortened and we would need to know
+            # remote $HOME.  To not over-complicate and still test, test only for
+            # the basename of the target_path
+            ok_endswith(target_description, basename(target_path))
     # now, with force and correct url, which is also used to determine
     # target_dir
     # Note: on windows absolute path is not url conform. But this way it's easy
@@ -261,13 +274,15 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
             eq_(lclcfg.get('remote.local_target.push'), DEFAULT_BRANCH)
 
         # again, by explicitly passing urls. Since we are on datalad-test, the
-        # local path should work:
+        # could use local path, but then it would not use "remote" git-annex
+        # and thus potentially lead to incongruent result. So make URLs a bit
+        # different by adding trailing /. to regular target_url
         cpkwargs = dict(
             dataset=source,
             name="local_target",
             sshurl="ssh://datalad-test",
             target_dir=target_path,
-            target_url=target_path,
+            target_url="ssh://datalad-test" + target_path + "/.",
             target_pushurl="ssh://datalad-test" + target_path,
             ui=have_webui(),
         )
@@ -277,12 +292,12 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
             assert_create_sshwebserver(existing='replace', **cpkwargs)
         interactive_assert_create_sshwebserver()
 
-        if src_is_annex:
+        if src_is_annex and target_description:
             target_description = AnnexRepo(target_path,
                                            create=False).get_description()
             eq_(target_description, target_path)
 
-        eq_(target_path,
+        eq_("ssh://datalad-test" + target_path + "/.",
             source.repo.get_remote_url("local_target"))
         eq_("ssh://datalad-test" + target_path,
             source.repo.get_remote_url("local_target", push=True))
