@@ -855,6 +855,7 @@ def test_as_unicode():
     assert_in("1 is not of any of known or provided", str(cme.value))
 
 
+@skip_if_on_windows  # logic might indeed need fix up on Windows
 @with_tempfile(mkdir=True)
 def test_path_prefix(path=None):
     eq_(get_path_prefix(_path_('/d1/d2'), _path_('/d1/d2')), _path_(''))
@@ -922,35 +923,47 @@ def test_get_dataset_root(path=None):
         eq_(get_dataset_root(fname), os.curdir)
 
 
-def test_path__startswith():
-    ok_(path_startswith(_path_('/a/b'), _path_('/a')))
-    ok_(path_startswith(_path_('/a/b'), _path_('/a/b')))
-    ok_(path_startswith(_path_('/a/b'), _path_('/a/b/')))
-    ok_(path_startswith(_path_('/a/b/'), _path_('/a/b')))
-    ok_(path_startswith(_path_('/a/b'), _path_('/')))
-    ok_(path_startswith(_path_('/aaa/b/c'), _path_('/aaa')))
-    nok_(path_startswith(_path_('/aaa/b/c'), _path_('/aa')))
-    nok_(path_startswith(_path_('/a/b'), _path_('/a/c')))
-    nok_(path_startswith(_path_('/a/b/c'), _path_('/a/c')))
-    # must not mix relative and abs
-    assert_raises(ValueError, path_startswith, _path_('a/b'), _path_('/a'))
-    assert_raises(ValueError, path_startswith, _path_('/a/b'), _path_('a'))
+def _p(p: str) -> str:
+    """A helper to code paths as POSIX paths in tests  below. Would prepend fake drive
+       C: to absolute paths on Windows"""
+    if on_windows:
+        pm = p.replace('/', os.sep)
+        if p.startswith('/'):
+            return "C:{pm}"
+        else:
+            return pm
+    return p
 
 
-def test_path__is_subpath():
-    ok_(path_is_subpath(_path_('/a/b'), _path_('/a')))
-    ok_(path_is_subpath(_path_('/a/b/c'), _path_('/a')))
-    nok_(path_is_subpath(_path_('/a/b'), _path_('/a/b')))
-    nok_(path_is_subpath(_path_('/a/b'), _path_('/a/b/')))
-    nok_(path_is_subpath(_path_('/a/b/'), _path_('/a/b')))
-    ok_(path_is_subpath(_path_('/a/b'), _path_('/')))
-    ok_(path_is_subpath(_path_('/aaa/b/c'), _path_('/aaa')))
-    nok_(path_is_subpath(_path_('/aaa/b/c'), _path_('/aa')))
-    nok_(path_is_subpath(_path_('/a/b'), _path_('/a/c')))
-    nok_(path_is_subpath(_path_('/a/b/c'), _path_('/a/c')))
+def test_path_startswith():
+    ok_(path_startswith(_p('/a/b'), _p('/a')))
+    ok_(path_startswith(_p('/a/b'), _p('/a/b')))
+    ok_(path_startswith(_p('/a/b'), _p('/a/b/')))
+    ok_(path_startswith(_p('/a/b/'), _p('/a/b')))
+    ok_(path_startswith(_p('/a/b'), _p('/')))
+    ok_(path_startswith(_p('/aaa/b/c'), _p('/aaa')))
+    nok_(path_startswith(_p('/aaa/b/c'), _p('/aa')))
+    nok_(path_startswith(_p('/a/b'), _p('/a/c')))
+    nok_(path_startswith(_p('/a/b/c'), _p('/a/c')))
     # must not mix relative and abs
-    assert_raises(ValueError, path_is_subpath, _path_('a/b'), _path_('/a'))
-    assert_raises(ValueError, path_is_subpath, _path_('/a/b'), _path_('a'))
+    assert_raises(ValueError, path_startswith, _p('a/b'), _p('/a'))
+    assert_raises(ValueError, path_startswith, _p('/a/b'), _p('a'))
+
+
+def test_path_is_subpath():
+    ok_(path_is_subpath(_p('/a/b'), _p('/a')))
+    ok_(path_is_subpath(_p('/a/b/c'), _p('/a')))
+    nok_(path_is_subpath(_p('/a/b'), _p('/a/b')))
+    nok_(path_is_subpath(_p('/a/b'), _p('/a/b/')))
+    nok_(path_is_subpath(_p('/a/b/'), _p('/a/b')))
+    ok_(path_is_subpath(_p('/a/b'), _p('/')))
+    ok_(path_is_subpath(_p('/aaa/b/c'), _p('/aaa')))
+    nok_(path_is_subpath(_p('/aaa/b/c'), _p('/aa')))
+    nok_(path_is_subpath(_p('/a/b'), _p('/a/c')))
+    nok_(path_is_subpath(_p('/a/b/c'), _p('/a/c')))
+    # must not mix relative and abs
+    assert_raises(ValueError, path_is_subpath, _p('a/b'), _p('/a'))
+    assert_raises(ValueError, path_is_subpath, _p('/a/b'), _p('a'))
 
 
 def test_probe_known_failure():
