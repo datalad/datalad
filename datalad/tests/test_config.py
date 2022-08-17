@@ -704,7 +704,7 @@ def test_write_config_section(path=None):
     # can we handle a bare repo?
     gr = GitRepo(path, create=True, bare=True)
 
-    obscure = "ds-;&%b5{}'ΔЙקم๗あ.datc"
+    obscure = "ds-; &%b5{}# some % "
     # test cases
     # first 3 args are write_config_section() parameters
     # 4th arg is a list with key/value pairs that should end up in a
@@ -721,16 +721,13 @@ def test_write_config_section(path=None):
         ('short', ' s p a c e ', {"a123": ' space all over '}, [
             ('short. s p a c e .a123', ' space all over '),
         ]),
+        ('submodule', obscure, {
+            'path': obscure,
+            'url': f"./{obscure}"}, [
+            (f"submodule.{obscure}.path", obscure),
+            (f"submodule.{obscure}.url", f"./{obscure}"),
+        ]),
     ]
-    if not on_windows:
-        # on windows our test setup lacks the full unicode fancy
-        testcfg.append(
-            ('submodule', obscure, {
-                'path': obscure,
-                'url': f"./{obscure}"}, [
-                (f"submodule.{obscure}.path", obscure),
-                (f"submodule.{obscure}.url", f"./{obscure}"),
-            ]))
 
     for tc in testcfg:
         # using append mode to provoke potential interference by
