@@ -74,6 +74,9 @@ def test_get_parent_paths(sep):
     eq_(gpp([], []), [])
     eq_(gpp([], ['a']), [])
     eq_(gpp(['a'], ['a']), ['a'])
+    # Presence of . decides early in the process
+    eq_(gpp(['a'], ['.', 'a']), ['.'])
+    eq_(gpp(['a'], ['.', 'a'], return_paths=True), ['a'])
 
     # Helper to provide testing across different seps and platforms while
     # specifying only POSIX paths here in the test
@@ -98,19 +101,43 @@ def test_get_parent_paths(sep):
 
     paths = _pp(['a', 'a/b', 'a/b/file', 'c', 'd/sub/123'])
 
+    # No restrictions, although could have been taken as
+    # there is no parent to fall under
     eq_(gpp(paths, []), paths)
     eq_(gpp(paths, [], True), [])
+    eq_(gpp(paths, [], return_paths=True), paths)
+
+    # presence of curdir somewhere among parents pretty much immediately
+    # matches all the paths
+    for sel in ([os.curdir],
+                ["nonexisting", os.curdir],
+                ):
+        eq_(gpp(paths, sel), [os.curdir])
+        eq_(gpp(paths, sel, True), [os.curdir])  # all are under curdir
+        eq_(gpp(paths, sel, return_paths=True), paths)
 
     # actually a tricky one!  we should check in descending lengths etc
     eq_(gpp(paths, paths), paths)
     # every path is also its own parent
     eq_(gpp(paths, paths, True), paths)
+    eq_(gpp(paths, paths, True, return_paths=True), paths)
+    # Duplicate parents and paths should not matter
+    eq_(gpp(paths, paths + paths, True), paths)
+    eq_(gpp(paths + paths, paths, True), paths)
+    # Order is preserved, although not promised since duplicates are removed anyways
+    # but since assumption is there -- test for it
+    eq_(gpp(paths[::-1], paths, True), paths[::-1])
+    eq_(gpp(paths, paths[::-1], True), paths)
+    eq_(gpp(paths[::-1], paths, True, return_paths=True), paths[::-1])
 
     # subdatasets not for every path -- multiple paths hitting the same parent,
     # and we will be getting only a single entry
     # to mimic how git ls-tree operates
     eq_(gpp(paths, ['a']), ['a', 'c', _p('d/sub/123')])
+    # and since we do not limit with only_with_parents -- should be all paths
+    eq_(gpp(paths, ['a'], return_paths=True), paths)
     eq_(gpp(paths, ['a'], True), ['a'])
+    eq_(gpp(paths, ['a'], True, return_paths=True), ['a', _p('a/b'), _p('a/b/file')])
 
     # and we get the deepest parent
     eq_(gpp(_pp(['a/b/file', 'a/b/file2']), _pp(['a', 'a/b'])), _pp(['a/b']))

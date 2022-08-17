@@ -964,6 +964,11 @@ def test_GitRepo_get_submodules(path=None):
          for s in repo.get_submodules(paths=["s_abc"])],
         ["s_abc"])
 
+    # top level should list all submodules
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=[repo.path])],
+        ["s_abc", "s_xyz"])
+
     # Limit by non-existing/non-matching path
     eq_([s["gitmodule_name"]
          for s in repo.get_submodules(paths=["s_unknown"])],

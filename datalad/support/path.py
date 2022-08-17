@@ -21,6 +21,7 @@ from collections import defaultdict as _defaultdict
 from functools import wraps
 from itertools import dropwhile
 
+from typing import List
 from ..utils import (
     ensure_bytes,
     getpwd,
@@ -116,7 +117,8 @@ def split_ext(filename):
     return ".".join(file_parts), "." + ".".join(ext_parts)
 
 
-def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
+def get_parent_paths(paths: List[str], parents: List[str], only_with_parents: bool=False,
+                     *, sep: str='/', return_paths: bool=False) -> List[str]:
     """Given a list of children paths, return their parent paths among parents
     or their own path if there is no known parent. A path is also considered its
     own parent (haven't you watched Predestination?) ;)
@@ -135,12 +137,15 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
     for paths within submodules.
     It is coded, so it could later be applied even whenever there are nested
     parents, e.g. parents = ['sub', 'sub/sub'] and then the "deepest" parent
-    is selected
+    is selected.
+
+    With `return_paths=True` and `only_with_parents=True` this function could
+    used to effectively subselect `paths` which have any of the `parents`.
 
     Parameters
     ----------
-    parents: list of str
     paths: list of str
+    parents: list of str
     only_with_parents: bool, optional
       If set to True, return a list of only parent paths where that path had
       a parent
@@ -148,17 +153,25 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
       Path separator.  By default - '/' and thus treating paths as POSIX.
       If you are processing OS-specific paths (for both `parents` and `paths`),
       specify `sep=os.sep`.
+    return_paths: bool, optional
+      Instead of returning parents, return actual paths which "matched" (or not
+      if not only_with_parents) the parents.
 
     Returns
     -------
     A list of paths (without duplicates), where some entries replaced with
-    their "parents" without duplicates.  So for 'a/b' and 'a/c' with a being
+    their "parents" without duplicates.  So for 'a/b' and 'a/c' with 'a' being
     among parents, there will be a single 'a'
     """
     # Let's do an early check even though then we would skip the checks on paths
     # being relative etc
     if not parents:
         return [] if only_with_parents else paths
+
+    # Another shortcut -- if parent has curdir (.) as returned by .relative_to
+    # it means that it would match everything
+    if any(p == os.curdir for p in parents):
+        return paths if return_paths else [os.curdir]
 
     # We will create a lookup for known parent lengths
     parents = set(parents)  # O(log(len(parents))) lookup
@@ -194,9 +207,10 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
                 continue  # no directory deep enough
             candidate_parent = path[:parent_length]
             if candidate_parent in parents_:  # O(log(len(parents))) but expected one less due to per length handling
-                if candidate_parent not in seen:
-                    res.append(candidate_parent)
-                    seen.add(candidate_parent)
+                to_add = path if return_paths else candidate_parent
+                if to_add not in seen:
+                    res.append(to_add)
+                    seen.add(to_add)
                 break  # it is!
         else:  # no hits
             if not only_with_parents:

@@ -2358,34 +2358,35 @@ class GitRepo(CoreGitRepo):
             # below
             return
 
-        # taken from 3.9's pathlib, can be removed once the minimally
-        # supported python version
-        def is_relative_to(self, *other):
-            """Return True if the path is relative to another path or False.
-            """
-            try:
-                self.relative_to(*other)
-                return True
-            except ValueError:
-                return False
-
+        posix_mod_paths = [m.relative_to(self.pathobj).as_posix() for m in modinfo]
         if paths:
-            # ease comparison
-            paths = [self.pathobj / p for p in paths]
-            # constrain the report by the given paths
+            # harmonize them into relative to the repository
+            posix_paths = []
+            for path in paths:
+                path = ut.PurePath(path)
+                if path.is_absolute():
+                    try:
+                        path = path.relative_to(self.pathobj)
+                    except ValueError as exc:
+                        lgr.debug(
+                            "Path %s it not relative to %s, skipping since nothing should match it: %s",
+                            path, self.pathobj, CapturedException(exc)
+                        )
+                        continue
+                posix_paths.append(path.as_posix())
 
-            modinfo = {
-                # modpath is absolute
-                modpath: modprobs
-                for modpath, modprobs in modinfo.items()
-                # is_relative_to() also match equal paths
-                if (any(is_relative_to(p, modpath) for p in paths) or
-                    any(is_relative_to(modpath, p) for p in paths))
-            }
+            # constrain the report by the given paths, make sure all paths are POSIX
+            posix_mod_paths = get_parent_paths(
+                posix_mod_paths,
+                posix_paths,
+                return_paths=True,
+                only_with_parents=True,
+            )
+
         for r in self.call_git_items_(
             ['ls-files', '--stage', '-z'],
             sep='\0',
-            files=[str(p.relative_to(self.pathobj)) for p in modinfo.keys()],
+            files=posix_mod_paths,
             read_only=True,
             keep_ends=True,
         ):
