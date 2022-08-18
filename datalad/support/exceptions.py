@@ -78,7 +78,7 @@ class CapturedException(object):
         str
         """
         # TODO: Intended for introducing a decent debug mode later when this
-        #       can be used fromm within log formatter / result renderer.
+        #       can be used from within log formatter / result renderer.
         #       For now: a one-liner is free
         return ''.join(self.tb.format())
 

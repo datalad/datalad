@@ -317,7 +317,7 @@ def test_bf1886(path=None):
         op.join(parent.path, 'subdir', 'subsubdir', 'upup'))
     parent.save(op.join('subdir', 'subsubdir', 'upup'))
     assert_repo_status(parent.path)
-    # simulatenously add a subds and a symlink pointing to it
+    # simultaneously add a subds and a symlink pointing to it
     # create subds, but don't register it
     create(op.join(parent.path, 'sub2'))
     os.symlink(

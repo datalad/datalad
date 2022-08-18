@@ -75,12 +75,12 @@ def test_borrow_kwargs():
     class B(object):
 
         @borrowkwargs(A)
-        def met1(self, bu, **kwargs):
+        def met1(self, desc, **kwargs):
             """B.met1 doc
 
             Parameters
             ----------
-            bu
+            desc
               description
             **kwargs
               Same as in A.met1
