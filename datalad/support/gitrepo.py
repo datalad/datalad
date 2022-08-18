@@ -2734,6 +2734,7 @@ class GitRepo(CoreGitRepo):
             # and ls-tree listed the submodule. Now they both return no output.
             submodules = [str(s["path"].relative_to(self.pathobj))
                           for s in self.get_submodules_()]
+            # `paths` get normalized into PurePosixPath above, submodules are POSIX as well
             path_strs = get_parent_paths(path_strs, submodules)
 
         # this will not work in direct mode, but everything else should be
