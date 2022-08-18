@@ -503,6 +503,33 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+## Maintenace teams coordination
+
+We distinguish particular aspects of DataLad's functionality, each corresponding
+to parts of the code base in this repository, and loosely maintain teams assigned
+to these aspects.
+While any contributor can tackle issues on any aspect, you may want to refer to
+members of such teams (via GitHub tagging or review requests) or the team itself
+(via GitHub issue label ``team-<area>``) when creating a PR, feature request, or bug report.
+Members of a team are encouraged to respond to PRs or issues within the given area,
+and pro-actively improve robustness, user experience, documentation, and
+performance of the code.
+
+New and existing contributors are invited to join teams:
+
+- **core**: core API/commands (@datalad/team-core)
+
+- **git**: Git interface (e.g. GitRepo, protocols, helpers, compatibility) (@datalad/team-git)
+
+
+- **gitannex**: git-annex interface (e.g. AnnexRepo, protocols, helpers, compatibility) (@datalad/team-gitannex)
+
+- **remotes**: (special) remote implementations (@datalad/team-remotes)
+
+- **runner**: sub-process execution and IO (@datalad/team-runner)
+
+- **services**: interaction with 3rd-party services (create-sibling*, downloaders, credentials, etc.) (@datalad/team-services)
+
 ## Recognizing contributions
 
 We welcome and recognize all contributions from documentation to testing to code development.
@@ -576,7 +603,7 @@ Refer datalad/config.py for information on how to add these environment variable
   It is used by tests to create a temporary git directory while testing git annex archives etc
 - *DATALAD_TESTS_NONETWORK*: 
   Skips network tests completely if this flag is set
-  Examples include test for s3, git_repositories, openfmri etc
+  Examples include test for S3, git_repositories, OpenfMRI, etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set.  If you enable this,
   you need to set up a "datalad-test" and "datalad-test2" target in

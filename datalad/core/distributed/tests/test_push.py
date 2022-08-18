@@ -62,6 +62,10 @@ from datalad.utils import (
 
 DEFAULT_REFSPEC = "refs/heads/{0}:refs/heads/{0}".format(DEFAULT_BRANCH)
 
+ckwa = dict(
+    result_renderer='disabled',
+)
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -589,22 +593,26 @@ def test_publish_target_url(src=None, desttop=None, desturl=None):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
-def test_gh1763(src=None, target1=None, target2=None):
+@with_tempfile()
+def test_gh1763(src=None, target1=None, target2=None, target3=None):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763
-    src = Dataset(src).create(force=True)
-    target1 = mk_push_target(src, 'target1', target1, bare=False)
-    target2 = mk_push_target(src, 'target2', target2, bare=False)
-    src.siblings('configure', name='target2', publish_depends='target1',
-                 result_renderer='disabled')
+    src = Dataset(src).create(force=True, **ckwa)
+    targets = [
+        mk_push_target(src, f'target{i}', t, bare=False)
+        for i, t in enumerate([target1, target2, target3])
+    ]
+    src.siblings('configure', name='target0',
+                 publish_depends=['target1', 'target2'],
+                 **ckwa)
     # a file to annex
     (src.pathobj / 'probe1').write_text('probe1')
-    src.save('probe1', to_git=False)
+    src.save('probe1', to_git=False, **ckwa)
     # make sure the probe is annexed, not straight in Git
     assert_in('probe1', src.repo.get_annexed_files(with_content_only=True))
-    # publish to target2, must handle dependency
-    src.push(to='target2')
-    for target in (target1, target2):
+    # publish to target0, must handle dependency
+    src.push(to='target0', **ckwa)
+    for target in targets:
         # with a managed branch we are pushing into the corresponding branch
         # and do not see a change in the worktree
         if not target.is_managed_branch():
@@ -613,7 +621,8 @@ def test_gh1763(src=None, target1=None, target2=None):
                 'probe1',
                 target.get_annexed_files(with_content_only=True))
         # ensure git-annex knows this target has the file
-        assert_in(target.config.get('annex.uuid'), src.repo.whereis(['probe1'])[0])
+        assert_in(target.config.get('annex.uuid'),
+                  src.repo.whereis(['probe1'])[0])
 
 
 @with_tempfile()

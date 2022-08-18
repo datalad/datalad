@@ -356,7 +356,6 @@ class CreateSiblingRia(Interface):
                         sname, dpath),
                     type='sibling',
                     name=sname,
-                    ds=ds,
                     **res_kwargs,
                 )
                 failed = True

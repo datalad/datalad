@@ -211,12 +211,18 @@ def test_ExtractedArchive(path=None):
 
     extracted_files = earchive.get_extracted_files()
     ok_generator(extracted_files)
-    eq_(sorted(extracted_files),
-        sorted([
-            # ['bbc/3.txt', 'bbc/abc']
-            op.join(fn_archive_obscure, fn_in_archive_obscure),
-            op.join(fn_archive_obscure, '3.txt')
-        ]))
+    try:
+        eq_(sorted(extracted_files),
+            sorted([
+                # ['bbc/3.txt', 'bbc/abc']
+                op.join(fn_archive_obscure, fn_in_archive_obscure),
+                op.join(fn_archive_obscure, '3.txt')
+            ]))
+    except AssertionError:
+        if 'nfsmount' in fpath:
+            pytest.xfail("Archive was created before NFS startede to behave. "
+                         "https://github.com/datalad/datalad/issues/4101")
+        raise
 
     earchive.clean()
     if not dl_cfg.get('datalad.tests.temp.keep'):

@@ -13,7 +13,7 @@ Credential management
 
 Various components of DataLad need to be passed credentials to interact with services that require authentication. 
 This includes downloading files, but also things like REST API usage or authenticated cloning.
-Key components of Datalad's credential management are credentials types, providers, authenticators and downloaders.
+Key components of DataLad's credential management are credentials types, providers, authenticators and downloaders.
 
 Credentials
 ===========
@@ -80,7 +80,7 @@ However, providers don't talk to a backend, credentials do.
 Hence, a more seamless integration requires some changes in the design of datalad's credential system as a whole.
 
 In the opposite direction - making Git aware of datalad's credentials, there's no special casing, though.
-Datalad comes with a `git-credential-datalad` executable.
+DataLad comes with a `git-credential-datalad` executable.
 Whenever Git is configured to use it by setting `credential.helper=datalad`, it will be able to query datalad's credential system for a provider matching the URL in question and retrieve the referenced by this provider credentials.
 This helper can also store a new provider+credentials when asked to do so by Git.
 It can do this interactively, asking a user to confirm/change that config or - if `credential.helper='datalad --non-interactive'` - try to non-interactively store with its defaults.
