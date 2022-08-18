@@ -277,12 +277,13 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
         # could use local path, but then it would not use "remote" git-annex
         # and thus potentially lead to incongruent result. So make URLs a bit
         # different by adding trailing /. to regular target_url
+        target_url = "ssh://datalad-test" + target_path + "/."
         cpkwargs = dict(
             dataset=source,
             name="local_target",
             sshurl="ssh://datalad-test",
             target_dir=target_path,
-            target_url="ssh://datalad-test" + target_path + "/.",
+            target_url=target_url,
             target_pushurl="ssh://datalad-test" + target_path,
             ui=have_webui(),
         )
@@ -295,9 +296,9 @@ def test_target_ssh_simple(origin=None, src_path=None, target_rootpath=None):
         if src_is_annex and target_description:
             target_description = AnnexRepo(target_path,
                                            create=False).get_description()
-            eq_(target_description, target_path)
+            eq_(target_description, target_url)
 
-        eq_("ssh://datalad-test" + target_path + "/.",
+        eq_(target_url,
             source.repo.get_remote_url("local_target"))
         eq_("ssh://datalad-test" + target_path,
             source.repo.get_remote_url("local_target", push=True))
