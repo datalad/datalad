@@ -2732,7 +2732,7 @@ class GitRepo(CoreGitRepo):
             # Before Git 2.29.0, ls-tree and ls-files differed in how they
             # reported paths within submodules: ls-files provided no output,
             # and ls-tree listed the submodule. Now they both return no output.
-            submodules = [str(s["path"].relative_to(self.pathobj))
+            submodules = [str(ut.PurePosixPath(s["path"].relative_to(self.pathobj)))
                           for s in self.get_submodules_()]
             # `paths` get normalized into PurePosixPath above, submodules are POSIX as well
             path_strs = get_parent_paths(path_strs, submodules)
