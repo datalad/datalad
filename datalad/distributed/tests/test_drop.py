@@ -9,6 +9,7 @@
 
 import os
 import os.path as op
+from pathlib import Path
 from unittest.mock import patch
 
 from datalad.api import (
@@ -43,6 +44,9 @@ from datalad.tests.utils_pytest import (
     with_tempfile,
 )
 from datalad.utils import chpwd
+
+
+ckwa = dict(result_renderer='disabled')
 
 
 @with_tempfile
@@ -567,3 +571,46 @@ def test_drop_allkeys_result_contains_annex_error_messages(path=None):
             ds.drop(what='allkeys', on_failure='ignore'),
             error_message='git-annex error message here',
         )
+
+
+# https://github.com/datalad/datalad/issues/6948
+@with_tempfile
+@with_tempfile
+def test_nodrop_symlinked_annex(origpath=None, clonepath=None):
+    # create a dataset with a key
+    ds = Dataset(origpath).create(**ckwa)
+    testfile = ds.pathobj / 'file1'
+    testcontent = 'precious'
+    testfile.write_text(testcontent)
+    ds.save(**ckwa)
+    rec = ds.status(testfile, annex='availability',
+                    return_type='item-or-list', **ckwa)
+    eq_(testcontent, Path(rec['objloc']).read_text())
+
+    def _droptest(_ds):
+        # drop refuses to drop from a symlinked annex
+        if (_ds.repo.dot_git / 'annex').is_symlink():
+            assert_raises(AssertionError, _ds.drop, **ckwa)
+            for what in ('all', 'allkeys', 'filecontent', 'datasets'):
+                assert_raises(AssertionError, _ds.drop, what=what, **ckwa)
+        # but a reckless kill works without crashing
+        _ds.drop(what='all', recursive=True, reckless='kill', **ckwa)
+        nok_(_ds.is_installed())
+        # nothing has made the original file content vanish
+        _rec = ds.status(
+            testfile, annex='availability',
+            return_type='item-or-list', **ckwa)
+        eq_(testcontent, Path(_rec['objloc']).read_text())
+
+    # test on a clone that does not know it has key access
+    dsclone1 = clone(ds.path, clonepath, reckless='ephemeral', **ckwa)
+    _droptest(dsclone1)
+
+    # test again on a clone that does think it has a key copy
+    dsclone2 = clone(ds.path, clonepath, reckless='ephemeral', **ckwa)
+    if not dsclone2.repo.is_managed_branch():
+        # it really should not matter, but 'origin' is set to annex.ignore=true
+        # on crippledFS
+        # https://github.com/datalad/datalad/issues/6960
+        dsclone2.get('.')
+    _droptest(dsclone2)
