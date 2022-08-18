@@ -1114,12 +1114,14 @@ def quote_config(v):
       To-be-quoted string
     """
     white = (' ', '\t')
+    comment = ('#', ';')
     # backslashes need to be quoted in any case
     v = v.replace('\\', '\\\\')
     # must not have additional unquoted quotes
     v = v.replace('"', '\\"')
-    if v[0] in white or v[-1] in white:
+    if v[0] in white or v[-1] in white or any(c in v for c in comment):
         # quoting the value due to leading/trailing whitespace
+        # or occurrence of comment char
         v = '"{}"'.format(v)
     return v
 
