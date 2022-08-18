@@ -191,9 +191,11 @@ class CreateSiblingRia(Interface):
             With `recursive=True`, only the top dataset will be aliased.""",
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
-            args=("--post-update-hook",),
-            doc="""Enable git's default post-update-hook for the created
-            sibling.""",
+            args=("--post-update-hook", "--update-server-info"),
+            doc="""Enable Git's default post-update-hook for the created
+            sibling. This is useful when the sibling is made accessible via a
+            "dumb server" that requires running 'git update-server-info'
+            to let Git interact properly with it.""",
             action="store_true"),
         shared=Parameter(
             args=("--shared",),
