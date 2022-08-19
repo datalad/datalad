@@ -929,7 +929,7 @@ def _p(p: str) -> str:
     if on_windows:
         pm = p.replace('/', os.sep)
         if p.startswith('/'):
-            return "C:{pm}"
+            return f"C:{pm}"
         else:
             return pm
     return p
