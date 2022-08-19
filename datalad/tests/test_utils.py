@@ -855,15 +855,14 @@ def test_as_unicode():
     assert_in("1 is not of any of known or provided", str(cme.value))
 
 
-@skip_if_on_windows  # logic might indeed need fix up on Windows
 @with_tempfile(mkdir=True)
 def test_path_prefix(path=None):
-    eq_(get_path_prefix(_path_('/d1/d2'), _path_('/d1/d2')), _path_(''))
+    eq_(get_path_prefix(_p('/d1/d2'), _p('/d1/d2')), _p(''))
     # so we are under /d1/d2 so path prefix is ..
-    eq_(get_path_prefix(_path_('/d1/d2'), _path_('/d1/d2/d3')), _path_('..'))
-    eq_(get_path_prefix(_path_('/d1/d2/d3'), _path_('/d1/d2')), _path_('d3'))
+    eq_(get_path_prefix(_p('/d1/d2'), _p('/d1/d2/d3')), _p('..'))
+    eq_(get_path_prefix(_p('/d1/d2/d3'), _p('/d1/d2')), _p('d3'))
     # but if outside -- full path
-    eq_(get_path_prefix(_path_('/d1/d2'), _path_('/d1/d20/d3')), _path_('/d1/d2'))
+    eq_(get_path_prefix(_p('/d1/d2'), _p('/d1/d20/d3')), _p('/d1/d2'))
     with chpwd(path):
         eq_(get_path_prefix('.'), '')
         eq_(get_path_prefix('d1'), 'd1')
