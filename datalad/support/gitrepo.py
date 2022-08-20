@@ -1239,6 +1239,7 @@ class GitRepo(CoreGitRepo):
                 ensure_list(git_options) +
                 to_options(update=update) + ['--verbose'],
                 files=files,
+                pathspec_from_file=True,
                 read_only=False,
             )
             # get all the entries
@@ -1315,7 +1316,7 @@ class GitRepo(CoreGitRepo):
         return [
             line.strip()[4:-1]
             for line in self.call_git_items_(
-                ['rm'] + to_options(**kwargs), files=files)
+                ['rm'] + to_options(**kwargs), files=files, pathspec_from_file=True)
         ]
 
     def precommit(self):
@@ -1373,7 +1374,7 @@ class GitRepo(CoreGitRepo):
         self.precommit()
 
         # assemble commandline
-        cmd = self._git_cmd_prefix + ['commit']
+        cmd = ['commit']
         options = ensure_list(options)
 
         if date:
@@ -1406,30 +1407,22 @@ class GitRepo(CoreGitRepo):
 
         lgr.debug("Committing via direct call of git: %s", cmd)
 
-        file_chunks = generate_file_chunks(files, cmd) if files else [[]]
-
-        # store pre-commit state to be able to check if anything was committed
         prev_sha = self.get_hexsha()
 
+        # Old code was doing clever --amend'ing of chunked series of commits manually
+        # here, but with pathspec_from_file it is no longer needed.
+        # store pre-commit state to be able to check if anything was committed
         try:
-            for i, chunk in enumerate(file_chunks):
-                cur_cmd = cmd.copy()
-                # if this is an explicit dry-run, there is no point in
-                # amending, because no commit was ever made
-                # otherwise, amend the first commit, and prevent
-                # leaving multiple commits behind
-                if i > 0 and '--dry-run' not in cmd:
-                    if '--amend' not in cmd:
-                        cur_cmd.append('--amend')
-                    if '--no-edit' not in cmd:
-                        cur_cmd.append('--no-edit')
-                cur_cmd += ['--'] + chunk
-                self._git_runner.run(
-                    cur_cmd,
-                    protocol=StdOutErrCapture,
-                    stdin=None,
+            # Note: call_git operates via joining call_git_items_ and that one wipes out
+            # .stdout from exception and collects/repopulates stderr only. Let's use
+            # _call_git which returns both outputs and collects/re-populates both stdout
+            # **and** stderr
+            _ = self._call_git(
+                    cmd,
+                    files=files,
                     env=env,
-                )
+                    pathspec_from_file=True,
+            )
         except CommandError as e:
             # real errors first
             if "did not match any file(s) known to git" in e.stderr:
@@ -1453,7 +1446,6 @@ class GitRepo(CoreGitRepo):
                 lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
-
         if orig_msg \
                 or '--dry-run' in cmd \
                 or prev_sha == self.get_hexsha() \
@@ -3571,6 +3563,7 @@ class GitRepo(CoreGitRepo):
                 ['-c', 'annex.largefiles=nothing', 'add'] +
                 ensure_list(git_opts) + ['--verbose'],
                 files=list(files.keys()),
+                pathspec_from_file=True,
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):

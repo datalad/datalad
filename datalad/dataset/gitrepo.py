@@ -27,6 +27,7 @@ from contextlib import contextmanager
 from locale import getpreferredencoding
 from os import environ
 from os.path import lexists
+from typing import Optional
 from weakref import (
     finalize,
     WeakValueDictionary
@@ -271,8 +272,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def _generator_call_git(self,
                             args,
+                            *,
                             files=None,
                             env=None,
+                            pathspec_from_file: Optional[bool]=False,
                             sep=None):
         """
         Call git, yield stdout and stderr lines when available. Output lines
@@ -330,7 +333,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 cmd,
                 files,
                 protocol=GeneratorStdOutErrCapture,
-                env=env)
+                env=env,
+                pathspec_from_file=pathspec_from_file,
+            )
         else:
             generator = self._git_runner.run(
                 cmd,
@@ -360,6 +365,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                   expect_stderr=False,
                   expect_fail=False,
                   env=None,
+                  pathspec_from_file: Optional[bool] = False,
                   read_only=False):
         """Allows for calling arbitrary commands.
 
@@ -386,7 +392,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
             for file_no, line in self._generator_call_git(args,
                                                           files=files,
-                                                          env=env):
+                                                          env=env,
+                                                          pathspec_from_file=pathspec_from_file,
+                                                          ):
                 output[file_no].append(line)
 
         for line in output[STDERR_FILENO]:
@@ -397,7 +405,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             "".join(output[STDERR_FILENO]))
 
     def call_git(self, args, files=None,
-                 expect_stderr=False, expect_fail=False, read_only=False):
+                 expect_stderr=False, expect_fail=False,
+                 env=None,
+                 pathspec_from_file: Optional[bool] = False,
+                 read_only=False):
         """Call git and return standard output.
 
         Parameters
@@ -414,6 +425,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool, optional
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
+        pathspec_from_file : bool, optional
+          Could be set to True for a `git` command which supports
+          --pathspec-from-file and --pathspec-file-nul options. Then pathspecs
+          would be passed through a temporary file.
         read_only : bool, optional
           By setting this to True, the caller indicates that the command does
           not write to the repository, which lets this function skip some
@@ -435,6 +450,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                  files,
                                  expect_stderr=expect_stderr,
                                  expect_fail=expect_fail,
+                                 env=env,
+                                 pathspec_from_file=pathspec_from_file,
                                  read_only=read_only,
                                  keep_ends=True))
 
@@ -444,6 +461,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         expect_stderr=False,
                         expect_fail=False,
                         env=None,
+                        pathspec_from_file: Optional[bool] = False,
                         read_only=False,
                         sep=None,
                         keep_ends=False):
@@ -495,6 +513,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                                     args,
                                                     files=files,
                                                     env=env,
+                                                    pathspec_from_file=pathspec_from_file,
                                                     sep=sep):
                 if file_no == STDOUT_FILENO:
                     if keep_ends is True:
@@ -511,7 +530,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         for line in stderr_lines:
             lgr.log(stderr_log_level, "stderr| " + line.strip("\n"))
 
-    def call_git_oneline(self, args, files=None, expect_stderr=False, read_only=False):
+    def call_git_oneline(self, args, files=None, expect_stderr=False,
+                         pathspec_from_file: Optional[bool] = False,
+                         read_only=False):
         """Call git for a single line of output.
 
         All other parameters match those described for `call_git`.
@@ -523,6 +544,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         lines = list(self.call_git_items_(args, files=files,
                                           expect_stderr=expect_stderr,
+                                          pathspec_from_file=pathspec_from_file,
                                           read_only=read_only))
         if len(lines) > 1:
             raise AssertionError(
@@ -530,7 +552,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 .format(["git"] + args, lines))
         return lines[0]
 
-    def call_git_success(self, args, files=None, expect_stderr=False, read_only=False):
+    def call_git_success(self, args, files=None, expect_stderr=False,
+                         pathspec_from_file: Optional[bool] = False,
+                         read_only=False):
         """Call git and return true if the call exit code of 0.
 
         All parameters match those described for `call_git`.
@@ -542,6 +566,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         try:
             self._call_git(
                 args, files, expect_fail=True, expect_stderr=expect_stderr,
+                pathspec_from_file=pathspec_from_file,
                 read_only=read_only)
 
         except CommandError:

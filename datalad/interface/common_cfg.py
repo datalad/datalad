@@ -605,6 +605,17 @@ _definitions = {
         'type': EnsureInt(),
         'default': 1,
     },
+    'datalad.runtime.pathspec-from-file': {
+        'ui': ('question', {
+            'title': 'Provide list of files to git commands via --pathspec-from-file',
+            'text': "Instructs when DataLad will provide list of paths to 'git' commands which "
+                    "support --pathspec-from-file option via some temporary file. If set to "
+                    "'multi-chunk' it will be done only if multiple invocations of the command "
+                    "on chunks of files list is needed. If set to 'always', DataLad will always "
+                    "use --pathspec-from-file."}),
+        'type': EnsureChoice('multi-chunk', 'always'),
+        'default': 'multi-chunk',
+    },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
                'title': 'Error behavior',
