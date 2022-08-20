@@ -2720,21 +2720,23 @@ class GitRepo(CoreGitRepo):
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
             # note: will be list-ified below
-            paths = map(ut.PurePosixPath,  paths)
+            posix_paths = [ut.PurePath(p).as_posix() for p in paths]
         elif paths is not None:
             return info
+        else:
+            posix_paths = None
 
-        path_strs = list(map(str, paths)) if paths else None
-        if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
+        if posix_paths and (not ref or external_versions["cmd:git"] >= "2.29.0"):
             # If a path points within a submodule, we need to map it to the
             # containing submodule before feeding it to ls-files or ls-tree.
             #
             # Before Git 2.29.0, ls-tree and ls-files differed in how they
             # reported paths within submodules: ls-files provided no output,
             # and ls-tree listed the submodule. Now they both return no output.
-            submodules = [str(s["path"].relative_to(self.pathobj))
+            submodules = [s["path"].relative_to(self.pathobj).as_posix()
                           for s in self.get_submodules_()]
-            path_strs = get_parent_paths(path_strs, submodules)
+            # `paths` get normalized into PurePosixPath above, submodules are POSIX as well
+            posix_paths = get_parent_paths(posix_paths, submodules)
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -2768,7 +2770,7 @@ class GitRepo(CoreGitRepo):
         try:
             stdout = self.call_git(
                 cmd,
-                files=path_strs,
+                files=posix_paths,
                 expect_fail=True,
                 read_only=True)
         except CommandError as exc:

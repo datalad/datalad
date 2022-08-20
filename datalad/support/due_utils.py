@@ -103,7 +103,7 @@ def duecredit_dataset(dataset):
         desc = get_field(metadata, desc_field) if desc_field else None
         desc = desc or "DataLad dataset %s" % dataset.id
 
-        # DueCredit's path defines groupping of entries, so with
+        # DueCredit's path defines grouping of entries, so with
         # "datalad." we bring them all under datalad's roof!
         # And as for unique suffix, there is no better one but the ID,
         # but that one is too long so let's take the first part of UUID
