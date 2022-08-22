@@ -330,6 +330,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 files,
                 protocol=GeneratorStdOutErrCapture,
                 env=env)
+        elif files is not None:
+            # it was an empty structure, so we did provide paths but "empty",
+            # then we must not return anything. For more reasoning see
+            # ec0243c92822f36ada5e87557eb9f5f53929c9ff which added similar code pattern
+            # within get_content_info
+            return
         else:
             generator = self._git_runner.run(
                 cmd,

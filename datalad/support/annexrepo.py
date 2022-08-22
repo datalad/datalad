@@ -3370,7 +3370,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             cmd = ['find'] + cmd
             # stringify any pathobjs
-            if paths:
+            if paths is not None:
                 files = [str(p) for p in paths]
             else:
                 cmd += ['--include', '*']
