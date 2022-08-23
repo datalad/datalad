@@ -2369,11 +2369,14 @@ class GitRepo(CoreGitRepo):
             return
 
         posix_mod_paths = [m.relative_to(self.pathobj).as_posix() for m in modinfo]
-        if paths:
+        if paths is not None:
             # constrain the report by the given paths, make sure all paths are POSIX
             posix_mod_paths = get_parent_paths(
                 [ut.PurePath(p).as_posix() for p in paths],
                 posix_mod_paths, only_with_parents=True)
+            if not posix_mod_paths:
+                # if no paths "survived", nothing to report
+                return
         for r in self.call_git_items_(
             ['ls-files', '--stage', '-z'],
             sep='\0',
