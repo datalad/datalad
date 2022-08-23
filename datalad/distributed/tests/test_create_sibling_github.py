@@ -26,4 +26,5 @@ def test_github(path=None):
         'github',
         'https://api.github.com',
         'repos/dataladtester/{reponame}',
+        access_protocol='https',
     )
