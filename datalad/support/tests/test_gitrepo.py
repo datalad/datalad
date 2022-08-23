@@ -959,6 +959,16 @@ def test_GitRepo_get_submodules(path=None):
          for s in repo.get_submodules(sorted_=True)],
         ["s_abc", "s_xyz"])
 
+    # Limit by path
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=["s_abc"])],
+        ["s_abc"])
+
+    # Limit by non-existing/non-matching path
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=["s_unknown"])],
+        [])
+
 
 @with_tempfile
 def test_get_submodules_parent_on_unborn_branch(path=None):
