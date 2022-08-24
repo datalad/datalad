@@ -2434,7 +2434,7 @@ def test_files_split(topdir=None, *, cls):
         os.unlink(f)
         with open(f, 'w') as f:
             f.write('1')
-    dl.save(dataset=r.path, path=dirs)
+    dl.save(dataset=r.path, path=dirs, result_renderer="disabled")
 
 
 @skip_if_on_windows
