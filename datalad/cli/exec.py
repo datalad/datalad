@@ -80,18 +80,18 @@ def call_from_parser(cls, args):
         # that are tailored towards the the Python API
         kwargs['return_type'] = 'generator'
         kwargs['result_xfm'] = None
-        # allow commands to override the default, unless something other
-        # than the default 'tailored' is requested
-        kwargs['result_renderer'] = \
-            args.common_result_renderer \
-            if args.common_result_renderer != 'tailored' \
-            else getattr(cls, 'result_renderer', 'generic')
         if '{' in args.common_result_renderer:
             from .renderer import DefaultOutputRenderer
             # stupid hack, could and should become more powerful
             kwargs['result_renderer'] = DefaultOutputRenderer(
                 args.common_result_renderer)
-
+        else:
+            # allow commands to override the default, unless something other
+            # than the default 'tailored' is requested
+            kwargs['result_renderer'] = \
+                args.common_result_renderer \
+                    if args.common_result_renderer != 'tailored' \
+                    else getattr(cls, 'result_renderer', 'generic')
         if args.common_on_failure:
             kwargs['on_failure'] = args.common_on_failure
         # compose filter function from to be invented cmdline options
