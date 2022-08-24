@@ -1711,6 +1711,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         list of dict or dict
         """
+
         return list(self.add_(
             files, git=git, backend=backend, options=options, jobs=jobs,
             git_options=git_options, annex_options=annex_options, update=update
@@ -1800,16 +1801,38 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _maybe_batched_add(self, files, options, jobs, expected_additions, batch=None):
         # Common code to be reused across existing implementations of "annex add" invocation
-        if batch or (batch is None and len(files) > 1):
-            # TODO: interfacing total_nbytes etc
-            # Note: took the same-ish 144s here and 169s on master for AnnexRepo only of
-            # python -m nose -s -v datalad/support/tests/test_annexrepo.py:test_files_split
-            yield from self._batched.get(
+        do_batch = batch or (batch is None and len(files) > 1)
+        if do_batch:
+            # git-annex add --batch does not (yet) descend into directories, see
+            # https://git-annex.branchable.com/todo/make_add_--batch_add_directories_content/
+            # Fall back to non-batched invocation if any path is a directory.
+            # Higher-level interfaces typically pass individual files, so this
+            # check is mostly a safety net for direct low-level callers.
+            do_batch = not any(isdir(opj(self.path, f)) for f in files)
+            if batch and not do_batch:
+                lgr.debug("Not using git annex --batch since some of the given paths are "
+                          "directories and git-annex add --batch does not support that yet")
+
+        if do_batch:
+            # TODO: interfacing total_nbytes for a progress bar with batch mode
+            # NB: `git annex add --batch` buffers annex-branch state internally
+            # and only fully commits it on process exit. Callers that query
+            # annex state (e.g. get_annexed_files -> git annex find) right after
+            # a batched add would otherwise see stale info. So we do NOT retain
+            # the process across _maybe_batched_add calls: we spawn one, feed
+            # all files, and close it — still avoiding per-file process startup
+            # within the call, without introducing cross-call state leakage.
+            batched_add = BatchedAnnex(
                 'add',
                 json=True,
                 annex_options=options + self._get_annex_options(jobs),
-                path=self.path
-            ).yield_(files)
+                path=self.path,
+            )
+            try:
+                for f in files:
+                    yield batched_add.proc1(f)
+            finally:
+                batched_add.close()
         else:
             yield from self._call_annex_records(
                     ['add'] + options,
