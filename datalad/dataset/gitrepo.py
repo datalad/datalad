@@ -306,8 +306,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                         AssemblingDecoderMixIn,
                                         StdOutErrCapture):
             """
-            Generator-runner protocol that yields stdout and captures stderr
-            in the provided stderr_buffer.
+            Generator-runner protocol that captures and yields stdout and stderr.
             """
             def __init__(self):
                 GeneratorMixIn.__init__(self)
