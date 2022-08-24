@@ -204,6 +204,15 @@ def test_combined_short_option():
     assert_in("too few arguments", stderr)
 
 
+# https://github.com/datalad/datalad/issues/6814
+@with_tempfile(mkdir=True)
+def test_conflicting_short_option(tempdir=None):
+    # datalad -f|--format   requires a value. regression made parser ignore command
+    # and its options
+    with chpwd(tempdir):  # can't just use -C tempdir since we do "in process" run_main
+        run_main(['create', '-f'])
+
+
 # apparently a bit different if following a good one so let's do both
 err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
 err_insufficient = err_invalid  # "specify"
