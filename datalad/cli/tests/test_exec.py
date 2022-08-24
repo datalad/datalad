@@ -53,31 +53,6 @@ def _new_args(**kwargs):
     )
 
 
-
-
-def test_call_from_parser_old_style():
-    # test that old style commands are invoked without any additional arguments
-    class DummyOne(Interface):
-        @staticmethod
-        def __call__(arg=None):
-            eq_(arg, "nothing")
-            return "magical"
-    val = call_from_parser(DummyOne, _args(arg="nothing"))
-    eq_(val, "magical")
-
-
-def test_call_from_parser_old_style_generator():
-    # test that old style commands are invoked without any additional arguments
-    class DummyOne(Interface):
-        @staticmethod
-        def __call__(arg=None):
-            eq_(arg, "nothing")
-            yield "nothing is"
-            yield "magical"
-    val = call_from_parser(DummyOne, _args(arg="nothing"))
-    eq_(val, ["nothing is", "magical"])
-
-
 def test_call_from_parser_default_args():
     class DummyOne(Interface):
         # explicitly without @eval_results
@@ -99,27 +74,6 @@ def test_call_from_parser_default_args():
     # just to be sure no evil spirits chase away our Dummy
     val = call_from_parser(DummyOne, _new_args(arg="nothing"))
     eq_(val, ["nothing is", "magical"])
-
-
-def test_call_from_parser_result_filter():
-    class DummyOne(Interface):
-        @staticmethod
-        def __call__(**kwargs):
-            yield kwargs
-
-    # call_from_parser doesn't add result_filter to the keyword arguments
-    assert_not_in("result_filter",
-                  call_from_parser(DummyOne, _new_args())[0])
-    # with dissolution of _OLD_STYLE_COMMANDS and just relying on having
-    # @eval_results, no result_filter is added, since those commands are
-    # not guaranteed to return/yield any record suitable for filtering.
-    # The effect is the same -- those "common" options are not really applicable
-    # to Interface's which do not return/yield expected records
-    assert_not_in(
-        "result_filter",
-        call_from_parser(
-            DummyOne,
-            _new_args(common_report_type="dataset"))[0])
 
 
 def test_get_result_filter_arg_vs_config():

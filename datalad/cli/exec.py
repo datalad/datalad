@@ -22,7 +22,6 @@ from datalad.utils import (
 )
 
 # only imported during command execution
-# .interface._has_eval_results_call
 # from .utils import EnsureKeyChoice
 
 # special-case imports
@@ -50,7 +49,6 @@ def call_from_parser(cls, args):
     """
     # XXX needs safety check for name collisions
     import inspect
-    from datalad.interface.base import _has_eval_results_call
 
     argspec = getargspec(cls.__call__, include_kwonlyargs=True)
     if argspec.keywords is None:
@@ -72,35 +70,32 @@ def call_from_parser(cls, args):
               # parser Namespace
               if hasattr(args, k) and is_api_arg(k)}
     # we are coming from the entry point, this is the toplevel command,
-    # let it run like generator so we can act on partial results quicker
-    # TODO remove following condition test when transition is complete and
-    # run indented code unconditionally
-    if _has_eval_results_call(cls):
-        # set all common args explicitly  to override class defaults
-        # that are tailored towards the the Python API
-        kwargs['return_type'] = 'generator'
-        kwargs['result_xfm'] = None
-        # allow commands to override the default, unless something other
-        # than the default 'tailored' is requested
-        kwargs['result_renderer'] = \
-            args.common_result_renderer \
-            if args.common_result_renderer != 'tailored' \
-            else getattr(cls, 'result_renderer', 'generic')
-        if '{' in args.common_result_renderer:
-            from .renderer import DefaultOutputRenderer
-            # stupid hack, could and should become more powerful
-            kwargs['result_renderer'] = DefaultOutputRenderer(
-                args.common_result_renderer)
+    # let it run like generator so we can act on partial results quicker.
+    # Set all common args explicitly  to override class defaults
+    # that are tailored towards the the Python API
+    kwargs['return_type'] = 'generator'
+    kwargs['result_xfm'] = None
+    # allow commands to override the default, unless something other
+    # than the default 'tailored' is requested
+    kwargs['result_renderer'] = \
+        args.common_result_renderer \
+        if args.common_result_renderer != 'tailored' \
+        else getattr(cls, 'result_renderer', 'generic')
+    if '{' in args.common_result_renderer:
+        from .renderer import DefaultOutputRenderer
+        # stupid hack, could and should become more powerful
+        kwargs['result_renderer'] = DefaultOutputRenderer(
+            args.common_result_renderer)
 
-        if args.common_on_failure:
-            kwargs['on_failure'] = args.common_on_failure
-        # compose filter function from to be invented cmdline options
-        res_filter = _get_result_filter(args)
-        if res_filter is not None:
-            # Don't add result_filter if it's None because then
-            # eval_results can't distinguish between --report-{status,type}
-            # not specified via the CLI and None passed via the Python API.
-            kwargs['result_filter'] = res_filter
+    if args.common_on_failure:
+        kwargs['on_failure'] = args.common_on_failure
+    # compose filter function from to be invented cmdline options
+    res_filter = _get_result_filter(args)
+    if res_filter is not None:
+        # Don't add result_filter if it's None because then
+        # eval_results can't distinguish between --report-{status,type}
+        # not specified via the CLI and None passed via the Python API.
+        kwargs['result_filter'] = res_filter
 
     ret = cls.__call__(**kwargs)
     if inspect.isgenerator(ret):

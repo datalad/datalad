@@ -415,12 +415,9 @@ def build_doc(cls, **kwargs):
 
 
     # update class attributes that may override defaults
-    if not _has_eval_results_call(cls):
-        add_args = None
-    else:
-        # defaults for all common parameters are guaranteed to be available
-        # from the class
-        add_args = {k: getattr(cls, k) for k in eval_params}
+    # Defaults for all common parameters are guaranteed to be available
+    # from the class
+    add_args = {k: getattr(cls, k) for k in eval_params}
 
     # ATTN: An important consequence of this update() call is that it
     # fulfills the docstring's promise of overriding any existing
@@ -631,11 +628,3 @@ def get_allargs_as_kwargs(call, args, kwargs):
     # from their signature...
     #assert (nargs == len(kwargs_))
     return kwargs_
-
-
-# Only needed to support command implementations before the introduction
-# of @eval_results
-def _has_eval_results_call(cls):
-    """Return True if cls has a __call__ decorated with @eval_results
-    """
-    return getattr(getattr(cls, '__call__', None), '_eval_results', False)

@@ -446,9 +446,7 @@ def eval_results(wrapped):
             lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
             return return_func(*args, **kwargs)
 
-    ret = eval_func
-    ret._eval_results = True
-    return ret
+    return eval_func
 
 
 def generic_result_renderer(res):
