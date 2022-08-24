@@ -1802,16 +1802,35 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _maybe_batched_add(self, files, options, jobs, expected_additions, batch=None):
         # Common code to be reused across existing implementations of "annex add" invocation
-        if batch or (batch is None and len(files) > 1):
+        do_batch = False
+        if True: #  TEMP: always batch! batch or (batch is None and len(files) > 1):
+            # workaround to not use batch on directory paths, see:
+            # https://git-annex.branchable.com/todo/make_add_--batch_add_directories_content/ :
+            # We do use directories in tests directly but if used from higher level interfaces,
+            # we are unlikely to be passed folders here
+            do_batch = not any(isdir(opj(self.path, f)) for f in files)
+            if batch and not do_batch:  # batch mode requested but could not be used since we got directories!
+                lgr.debug("Not using git annex --batch since was given directories and "
+                          "git-annex add --batch does not support that yet ")
+
+        if do_batch:
             # TODO: interfacing total_nbytes etc
             # Note: took the same-ish 144s here and 169s on master for AnnexRepo only of
             # python -m nose -s -v datalad/support/tests/test_annexrepo.py:test_files_split
-            yield from self._batched.get(
+            #
+            # It seems that BatchedCommand lost `yield_` in
+            # 9f066efa6a0b316a133b6d6d0d4e4c2e1b856ce0 and ability to be used as a
+            # generator over a list of files (at least directly), so we would do it "manually"
+            # for now although that is very inefficient due to all the prep/finalize overheads etc
+            # TODO: ask @christian-monch on how to do it properly
+            batched_get = self._batched.get(
                 'add',
                 json=True,
                 annex_options=options + self._get_annex_options(jobs),
                 path=self.path
-            ).yield_(files)
+            )
+            for f in files:
+                yield batched_get.proc1(f)
         else:
             yield from self._call_annex_records(
                     ['add'] + options,
