@@ -194,18 +194,12 @@ def test_runner_parametrized_protocol():
             super().pipe_data_received(fd, self.value)
 
     res = runner.run(
-        py2cmd('print(1)'),
+        py2cmd('print(1, end="")'),
         protocol=ProtocolInt,
         # value passed to protocol constructor
         value=b'5',
     )
-    try:
-        eq_(res['stdout'], '5')
-    except AssertionError:
-        # TODO: remove when dropping support for python3.8
-        if res['stdout'] == '55' and sys.version_info[:2] == (3, 8):
-            pytest.xfail("got 55 and not 5, see https://github.com/datalad/datalad/issues/4921")
-        raise
+    eq_(res['stdout'], '5')
 
 
 @integration  # ~3 sec
