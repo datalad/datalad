@@ -77,8 +77,8 @@ def git_ignore_check(expect_fail,
     try:
         yield None
     except CommandError as e:
-        e.stdout = "".join(stdout_buffer) if stdout_buffer else ""
-        e.stderr = "".join(stderr_buffer) if stderr_buffer else ""
+        e.stdout = "".join(stdout_buffer) if stdout_buffer else (e.stdout or "")
+        e.stderr = "".join(stderr_buffer) if stderr_buffer else (e.stderr or "")
         ignore_exception = _get_git_ignore_exception(e)
         if ignore_exception:
             raise ignore_exception
@@ -309,8 +309,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                         AssemblingDecoderMixIn,
                                         StdOutErrCapture):
             """
-            Generator-runner protocol that yields stdout and captures stderr
-            in the provided stderr_buffer.
+            Generator-runner protocol that captures and yields stdout and stderr.
             """
             def __init__(self):
                 GeneratorMixIn.__init__(self)
