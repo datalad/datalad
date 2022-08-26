@@ -32,6 +32,7 @@ from datalad.runner import (
     KillOutput,
     StdOutErrCapture,
 )
+from datalad.utils import on_windows
 
 lgr = logging.getLogger('datalad.config')
 
@@ -370,10 +371,16 @@ class ConfigManager(object):
                 raise ValueError(
                     'ConfigManager configured to read from a branch of a dataset only, '
                     'but no dataset given')
-            # The caller didn't specify a repository. Unset the git directory
-            # when calling 'git config' to prevent a repository in the current
+            # The caller didn't specify a repository. Unfortunately there is
+            # no known way to tell git to ignore possible local git repository,
+            # and unsetting of --git-dir could cause other problems.
+            # See https://lore.kernel.org/git/YscCKuoDPBbs4iPX@lena.dartmouth.edu/T/ .
+            # Setting the git directory to /dev/null or on Windows analogous nul file
+            # (could be anywhere, see https://stackoverflow.com/a/27773642/1265472)
+            # see allow to achieve the goal to prevent a repository in the current
             # working directory from leaking configuration into the output.
-            self._config_cmd = ['git', '--git-dir=/dev/null', 'config']
+            nul = 'b:\\nul' if on_windows else '/dev/null'
+            self._config_cmd = ['git', f'--git-dir={nul}', 'config']
 
         self._src_mode = source
         run_kwargs = dict()
