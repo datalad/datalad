@@ -15,7 +15,7 @@ jobs:
   add:
     runs-on: ubuntu-latest
     if: >
-      github.repository == 'datalad/datalad'
+      github.repository_owner == 'datalad'
         && contains(github.event.pull_request.labels.*.name, 'CHANGELOG-missing')
     steps:
       - name: Check out repository
