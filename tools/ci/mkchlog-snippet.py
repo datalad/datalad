@@ -177,6 +177,9 @@ def get_pr_info(repo_owner: str, repo_name: str, prnum: int, token: str) -> Pull
     labels: set[str] = set()
     with requests.Session() as s:
         s.headers["Authorization"] = f"bearer {token}"
+        # We need to loop in order to get all pages of closed issues & labels.
+        # The other PR details will be the same in every response, so we just
+        # grab the last set of details once the pagination is done.
         while True:
             r = s.post(GRAPHQL_API_URL, json={"query": q, "variables": variables})
             r.raise_for_status()
