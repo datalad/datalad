@@ -79,14 +79,14 @@ class PullRequest:
         item = self.title.strip()
         if not item.endswith((".", "!", "?")):
             item += "."
+        item += "  "
         if self.closed_issues:
             item += (
-                "  Fixes "
+                "Fixes "
                 + ", ".join(i.as_link() for i in self.closed_issues)
-                + f" via {self.as_link()} (by {self.author.as_link()})"
+                + " via "
             )
-        else:
-            item += f"  {self.as_link()} (by {self.author.as_link()})"
+        item += f"{self.as_link()} (by {self.author.as_link()})"
         item = textwrap.fill(
             item,
             width=79,
