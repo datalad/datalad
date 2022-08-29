@@ -26,8 +26,8 @@ jobs:
 
       - name: Configure Git identity
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@users.noreply.github.com"
+          git config --global user.name "DataLad Bot"
+          git config --global user.email "bot@datalad.org"
 
       - name: Set up Python
         uses: actions/setup-python@v4
