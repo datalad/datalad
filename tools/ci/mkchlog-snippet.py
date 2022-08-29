@@ -39,11 +39,30 @@ GRAPHQL_API_URL = os.environ.get("GITHUB_GRAPHQL_URL", "https://api.github.com/g
 
 
 @dataclass
+class Actor:
+    login: str
+    url: str
+
+    def as_link(self) -> str:
+        return f"[@{self.login}]({self.url})"
+
+
+@dataclass
+class Issue:
+    number: int
+    url: str
+
+    def as_link(self) -> str:
+        return f"[#{self.number}]({self.url})"
+
+
+@dataclass
 class PullRequest:
     title: str
+    number: str
     url: str
-    author: str
-    closed_issues: list[str]
+    author: Actor
+    closed_issues: list[Issue]
     labels: set[str]
 
     @property
@@ -53,14 +72,21 @@ class PullRequest:
                 return cat
         sys.exit("Pull request lacks semver labels")
 
+    def as_link(self) -> str:
+        return f"[PR #{self.number}]({self.url})"
+
     def as_snippet(self) -> str:
         item = self.title.strip()
         if not item.endswith((".", "!", "?")):
             item += "."
         if self.closed_issues:
-            item += f"  Fixes {', '.join(self.closed_issues)} via {self.url} (by @{self.author})"
+            item += (
+                "  Fixes "
+                + ", ".join(i.as_link() for i in self.closed_issues)
+                + f" via {self.as_link()} (by {self.author.as_link()})"
+            )
         else:
-            item += f"  {self.url} (by @{self.author})"
+            item += f"  {self.as_link()} (by {self.author.as_link()})"
         item = textwrap.fill(
             item,
             width=79,
@@ -107,9 +133,11 @@ def get_pr_info(repo_owner: str, repo_name: str, prnum: int, token: str) -> Pull
         "  repository(owner: $repo_owner, name: $repo_name) {\n"
         "    pullRequest(number: $prnum) {\n"
         "      title\n"
+        "      number\n"
         "      url\n"
         "      author {\n"
         "        login\n"
+        "        url\n"
         "      }\n"
         "      closingIssuesReferences(\n"
         "        first: 50,\n"
@@ -117,6 +145,7 @@ def get_pr_info(repo_owner: str, repo_name: str, prnum: int, token: str) -> Pull
         "        after: $closing_cursor\n"
         "      ) {\n"
         "        nodes {\n"
+        "          number\n"
         "          url\n"
         "        }\n"
         "        pageInfo {\n"
@@ -158,7 +187,7 @@ def get_pr_info(repo_owner: str, repo_name: str, prnum: int, token: str) -> Pull
                 )
             data = resp["data"]["repository"]["pullRequest"]
             issue_page = data["closingIssuesReferences"]
-            closed_issues.extend(n["url"] for n in issue_page["nodes"])
+            closed_issues.extend(Issue(**n) for n in issue_page["nodes"])
             variables["closing_cursor"] = issue_page["pageInfo"]["endCursor"]
             label_page = data["labels"]
             labels.update([n["name"] for n in label_page["nodes"]])
@@ -169,8 +198,9 @@ def get_pr_info(repo_owner: str, repo_name: str, prnum: int, token: str) -> Pull
             ):
                 return PullRequest(
                     title=data["title"],
+                    number=data["number"],
                     url=data["url"],
-                    author=data["author"]["login"],
+                    author=Actor(**data["author"]),
                     closed_issues=closed_issues,
                     labels=labels,
                 )
