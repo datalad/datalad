@@ -54,7 +54,7 @@ class PullRequest:
         sys.exit("Pull request lacks semver labels")
 
     def as_snippet(self) -> str:
-        item = self.title
+        item = self.title.strip()
         if not item.endswith((".", "!", "?")):
             item += "."
         if self.closed_issues:
