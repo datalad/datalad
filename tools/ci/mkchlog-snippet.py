@@ -67,6 +67,7 @@ class PullRequest:
             initial_indent="- ",
             subsequent_indent="  ",
             break_long_words=False,
+            break_on_hyphens=False,
         )
         return f"### {self.category}\n\n{item}\n"
 

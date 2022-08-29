@@ -2,7 +2,14 @@ name: Add changelog.d snippet
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
+    # "labeled" is also triggered when a PR is created with one or more labels
+    types: [synchronize, labeled]
+
+# Prevent the workflow from running multiple jobs at once when a PR is created
+# with multiple labels:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   add:
