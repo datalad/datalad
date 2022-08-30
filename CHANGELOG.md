@@ -1,3 +1,28 @@
+# 0.17.4 (Tue Aug 30 2022)
+
+#### 🐛 Bug Fix
+
+- BF: make logic more consistent for files=[] argument (which is False but not None) [#6976](https://github.com/datalad/datalad/pull/6976) ([@yarikoptic](https://github.com/yarikoptic))
+- Run pytests in parallel (-n 2) on appveyor [#6987](https://github.com/datalad/datalad/pull/6987) ([@yarikoptic](https://github.com/yarikoptic))
+- Add workflow for autogenerating changelog snippets [#6981](https://github.com/datalad/datalad/pull/6981) ([@jwodder](https://github.com/jwodder))
+- Provide "/dev/null" (b:\nul on 💾 Windows) instead of empty string as a git-repo to avoid reading local repo configuration [#6986](https://github.com/datalad/datalad/pull/6986) ([@yarikoptic](https://github.com/yarikoptic))
+- RF: call_from_parser - move code into "else" to simplify reading etc [#6982](https://github.com/datalad/datalad/pull/6982) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: if early attempt to parse resulted in error, setup subparsers [#6980](https://github.com/datalad/datalad/pull/6980) ([@yarikoptic](https://github.com/yarikoptic))
+- Run pytests in parallel (-n 2) on Travis [#6915](https://github.com/datalad/datalad/pull/6915) ([@yarikoptic](https://github.com/yarikoptic))
+- Send one character (no newline) to stdout in protocol test to guarantee a single "message" and thus a single custom value [#6978](https://github.com/datalad/datalad/pull/6978) ([@christian-monch](https://github.com/christian-monch))
+
+#### 🧪 Tests
+
+- TST: test_stalling -- wait x10 not just x5 time [#6995](https://github.com/datalad/datalad/pull/6995) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.17.3 (Tue Aug 23 2022)
 
 #### 🐛 Bug Fix
