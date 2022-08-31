@@ -7,7 +7,9 @@
 
 import argparse
 import datetime
+import os
 import re
+import time
 from textwrap import wrap
 
 
@@ -34,7 +36,9 @@ class ManPageFormatter(argparse.HelpFormatter):
 
         self._prog = prog
         self._section = 1
-        self._today = datetime.date.today().strftime('%Y\\-%m\\-%d')
+        self._today = datetime.datetime.utcfromtimestamp(
+            int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))
+        ).strftime('%Y\\-%m\\-%d')
         self._ext_sections = ext_sections
         self._version = version
 
