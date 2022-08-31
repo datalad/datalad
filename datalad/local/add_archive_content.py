@@ -630,7 +630,7 @@ class AddArchiveContent(Interface):
 
                 if delete_after:
                     # we count the removal here, but don't yet perform it
-                    # to not interfer with batched processes - any pure Git
+                    # to not interfere with batched processes - any pure Git
                     # action invokes precommit which closes batched processes.
                     stats.removed += 1
 

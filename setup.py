@@ -58,9 +58,12 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
+        'mypy~=0.900',
         'pytest~=7.0',
         'pytest-cov~=3.0',
         'pytest-fail-slow~=0.2',
+        'types-python-dateutil',
+        'types-requests',
         'vcrpy',
     ],
     'metadata': [
@@ -93,9 +96,10 @@ requires.update({
     ],
     'devel-utils': [
         'asv',        # benchmarks
+        'coverage',
         'gprof2dot',  # rendering cProfile output as a graph image
         'psutil',
-        'coverage',
+        'pytest-xdist',  # parallelize pytest runs etc
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome

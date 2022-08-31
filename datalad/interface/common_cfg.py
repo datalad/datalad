@@ -327,18 +327,18 @@ _definitions = {
     },
     'datalad.github.token-note': {
         'ui': ('question', {
-            'title': 'Github token note',
+            'title': 'GitHub token note',
             'text': 'Description for a Personal access token to generate.'}),
         'default': 'DataLad',
     },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
-               'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),
+               'title': 'Skips network tests completely if this flag is set, Examples include test for S3, git_repositories, OpenfMRI, etc'}),
         'type': EnsureBool(),
     },
     'datalad.tests.nonlo': {
         'ui': ('question', {
-               'title': 'Specifies network interfaces to bring down/up for testing. Currently used by travis.'}),
+               'title': 'Specifies network interfaces to bring down/up for testing. Currently used by Travis CI.'}),
     },
     'datalad.tests.noteardown': {
         'ui': ('yesno', {

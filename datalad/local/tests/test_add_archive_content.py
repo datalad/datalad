@@ -518,7 +518,7 @@ class TestAddArchiveOptions():
     # git-annex regression
     # https://git-annex.branchable.com/bugs/regression__58___annex_add_of_moved_file_errors_out/
     @skip_if(
-        '10.20220624' <= external_versions['cmd:annex'] < '10.20220706',  # approx when was fixed
+        '10.20220525' <= external_versions['cmd:annex'] < '10.20220706',  # approx when was fixed
         msg="buggy git-annex release"
     )
     def test_add_archive_leading_dir(self):

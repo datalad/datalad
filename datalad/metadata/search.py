@@ -1272,7 +1272,7 @@ class Search(Interface):
             documenttype configuration has changed."""),
         max_nresults=Parameter(
             args=("--max-nresults",),
-            doc="""maxmimum number of search results to report. Setting this
+            doc="""maximum number of search results to report. Setting this
             to 0 will report all search matches. Depending on the mode this
             can search substantially slower. If not specified, a
             mode-specific default setting will be used.""",

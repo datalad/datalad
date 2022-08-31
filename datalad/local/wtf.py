@@ -146,7 +146,7 @@ def _describe_system():
     }
 
 
-def _get_fs_type(loc, path):
+def _get_fs_type(loc, path, _was_warned=[]):
     """Return file system info for given Paths. Provide pathlib path as input"""
     res = {'path': path}
     try:
@@ -157,7 +157,7 @@ def _get_fs_type(loc, path):
             # if the mountpoint is the test path or its parent
             # take it, whenever there is no match, or a longer match
             if (mp == path or mp in path.parents) and (
-                    match is None or len(p.parents) > len(match.parents)):
+                    match is None or len(mp.parents) > len(match.parents)):
                 match = mp
         match = parts[match]
         for sattr, tattr in (('fstype', 'type'),
@@ -169,6 +169,11 @@ def _get_fs_type(loc, path):
         ce = CapturedException(exc)
         # if an exception occurs, leave out the fs type. The result renderer can
         # display a hint based on its lack in the report
+        if not _was_warned:
+            (lgr.debug if isinstance(exc, ImportError) else lgr.warning) (
+                "Could not determine filesystem types due to %s", ce)
+            # Rely on side-effect of [] as default arg
+            _was_warned.append("warned")
     return res
 
 

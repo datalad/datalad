@@ -11,16 +11,6 @@
 # the build completes successfully.
 
 set -eu
-SINGULARITY_IMAGE="$1"
-# The rest of cmdline is to execute
-shift
-
-if [ ! -e "$SINGULARITY_IMAGE" ]; then
-    echo "I: trying to fetch singularity image with build env"
-    singularity pull --name "$SINGULARITY_IMAGE" shub://datalad/datalad:git-annex-dev
-fi
-
-SINGULARITY_IMAGE=$(readlink -f "$SINGULARITY_IMAGE")
 annex_gitver=$(git describe)
 logfile=$(mktemp -p '' git-annex-build-${annex_gitver}-XXXXXX.log)
 
@@ -29,7 +19,7 @@ echo "I: cleaning $PWD"
 git clean -dfx >/dev/null 2>&1
 
 echo "I: building $annex_gitver"
-if ! singularity exec -e $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
+if ! make linuxstandalone 1>"$logfile" 2>&1; then
     echo "E: failed to build, can't test this one. See $logfile"
     exit 125
 fi

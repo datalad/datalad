@@ -2714,27 +2714,29 @@ class GitRepo(CoreGitRepo):
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
-        if paths:
+        if paths:  # is not None separate after
             # path matching will happen against what Git reports
             # and Git always reports POSIX paths
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
             # note: will be list-ified below
-            paths = map(ut.PurePosixPath,  paths)
+            posix_paths = [ut.PurePath(p).as_posix() for p in paths]
         elif paths is not None:
             return info
+        else:
+            posix_paths = None
 
-        path_strs = list(map(str, paths)) if paths else None
-        if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
+        if posix_paths and (not ref or external_versions["cmd:git"] >= "2.29.0"):
             # If a path points within a submodule, we need to map it to the
             # containing submodule before feeding it to ls-files or ls-tree.
             #
             # Before Git 2.29.0, ls-tree and ls-files differed in how they
             # reported paths within submodules: ls-files provided no output,
             # and ls-tree listed the submodule. Now they both return no output.
-            submodules = [str(s["path"].relative_to(self.pathobj))
+            submodules = [s["path"].relative_to(self.pathobj).as_posix()
                           for s in self.get_submodules_()]
-            path_strs = get_parent_paths(path_strs, submodules)
+            # `paths` get normalized into PurePosixPath above, submodules are POSIX as well
+            posix_paths = get_parent_paths(posix_paths, submodules)
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -2768,7 +2770,7 @@ class GitRepo(CoreGitRepo):
         try:
             stdout = self.call_git(
                 cmd,
-                files=path_strs,
+                files=posix_paths,
                 expect_fail=True,
                 read_only=True)
         except CommandError as exc:
@@ -2871,7 +2873,7 @@ class GitRepo(CoreGitRepo):
             Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
         lgr.debug('Query status of %r for %s paths',
-                  self, len(paths) if paths else 'all')
+                  self, len(paths) if paths is not None else 'all')
         return self.diffstatus(
             fr='HEAD' if self.get_hexsha() else None,
             to=None,
@@ -2942,7 +2944,7 @@ class GitRepo(CoreGitRepo):
         if _cache is None:
             _cache = {}
 
-        if paths:
+        if paths is not None:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
             paths = map(ut.Path, paths)
@@ -2980,7 +2982,7 @@ class GitRepo(CoreGitRepo):
                         # included with `-m` alone
                         ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
-                        files=[str(p) for p in paths] if paths else None,
+                        files=[str(p) for p in paths] if paths is not None else None,
                         sep='\0',
                         read_only=True)
                     if p)
@@ -3323,6 +3325,17 @@ class GitRepo(CoreGitRepo):
             if state == 'clean':
                 # we don't care about clean
                 continue
+            if state == 'modified' and props.get('gitshasum') \
+                    and props.get('gitshasum') == props.get('prev_gitshasum'):
+                # reported as modified, but with identical shasums -> typechange
+                # a subdataset maybe? do increasingly expensive tests for
+                # speed reasons
+                if props.get('type') != 'dataset' and f.is_dir() \
+                        and GitRepo.is_valid_repo(f):
+                    # it was not a dataset, but now there is one.
+                    # we declare it untracked to engage the discovery tooling.
+                    state = 'untracked'
+                    props = dict(type='dataset', state='untracked')
             status_state[state][f] = props
             # The hybrid one to retain the same order as in original status
             if state in ('modified', 'untracked'):

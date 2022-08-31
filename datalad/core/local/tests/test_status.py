@@ -297,9 +297,11 @@ def test_status_symlinked_dir_within_repo(path=None):
         return ds.status(path=[bar_f], annex="availability",
                          on_failure="ignore", result_renderer='disabled')
 
-    if ds.repo.git_annex_version < "8.20200522" or on_windows:
-        # TODO: on windows even with a recent annex -- no CommandError is
-        # raised, TODO
+    if ds.repo.git_annex_version < "8.20200522" \
+        or (on_windows and ds.repo.git_annex_version < "10.20220525"):
+        # version for windows is an approx guess, but stopped happening
+        # somewhere around 10.20220505-g3b83224e5 may be.
+        # see https://github.com/datalad/datalad/issues/6849
         assert_result_count(call(), 0)
     elif ds.repo.git_annex_version < '10.20220222':
         # As of 2a8fdfc7d (Display a warning message when asked to operate on a

@@ -76,8 +76,8 @@ def git_ignore_check(expect_fail,
     try:
         yield None
     except CommandError as e:
-        e.stdout = "".join(stdout_buffer) if stdout_buffer else ""
-        e.stderr = "".join(stderr_buffer) if stderr_buffer else ""
+        e.stdout = "".join(stdout_buffer) if stdout_buffer else (e.stdout or "")
+        e.stderr = "".join(stderr_buffer) if stderr_buffer else (e.stderr or "")
         ignore_exception = _get_git_ignore_exception(e)
         if ignore_exception:
             raise ignore_exception
@@ -306,8 +306,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                         AssemblingDecoderMixIn,
                                         StdOutErrCapture):
             """
-            Generator-runner protocol that yields stdout and captures stderr
-            in the provided stderr_buffer.
+            Generator-runner protocol that captures and yields stdout and stderr.
             """
             def __init__(self):
                 GeneratorMixIn.__init__(self)
@@ -331,6 +330,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 files,
                 protocol=GeneratorStdOutErrCapture,
                 env=env)
+        elif files is not None:
+            # it was an empty structure, so we did provide paths but "empty",
+            # then we must not return anything. For more reasoning see
+            # ec0243c92822f36ada5e87557eb9f5f53929c9ff which added similar code pattern
+            # within get_content_info
+            return
         else:
             generator = self._git_runner.run(
                 cmd,

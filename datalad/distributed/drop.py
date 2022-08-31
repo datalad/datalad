@@ -727,6 +727,9 @@ def _kill_dataset(ds):
 def _drop_allkeys(ds, repo, force=False, jobs=None):
     """
     """
+    assert not (repo.dot_git / 'annex').is_symlink(), \
+        "Dropping from a symlinked annex is unsupported to prevent data-loss"
+
     cmd = ['drop', '--all']
     if force:
         cmd.append('--force')
@@ -757,6 +760,8 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
     ------
     dict
     """
+    assert not (repo.dot_git / 'annex').is_symlink(), \
+        "Dropping from a symlinked annex is unsupported to prevent data-loss"
     cmd = ['drop']
     if force:
         cmd.append('--force')

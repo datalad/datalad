@@ -204,6 +204,15 @@ def test_combined_short_option():
     assert_in("too few arguments", stderr)
 
 
+# https://github.com/datalad/datalad/issues/6814
+@with_tempfile(mkdir=True)
+def test_conflicting_short_option(tempdir=None):
+    # datalad -f|--format   requires a value. regression made parser ignore command
+    # and its options
+    with chpwd(tempdir):  # can't just use -C tempdir since we do "in process" run_main
+        run_main(['create', '-f'])
+
+
 # apparently a bit different if following a good one so let's do both
 err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
 err_insufficient = err_invalid  # "specify"
@@ -269,11 +278,12 @@ def test_script_shims(script):
                  get_numeric_portion(version))
 
 
-@slow  # 11.2591s
 @with_tempfile(mkdir=True)
 def test_cfg_override(path=None):
     with chpwd(path):
-        cmd = ['datalad', 'wtf', '-s', 'some']
+        # use 'wtf' to dump the config
+        # should be rewritten to use `configuration`
+        cmd = ['datalad', 'wtf', '-S', 'configuration', '-s', 'some']
         # control
         out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
         assert_not_in('datalad.dummy: this', out)
@@ -304,6 +314,27 @@ def test_cfg_override(path=None):
         out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
                            protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
+
+        # set a config
+        run_main([
+            'configuration', '--scope', 'local', 'set', 'mike.item=some'])
+        # verify it is successfully set
+        assert 'some' == run_main([
+            'configuration', 'get', 'mike.item'])[0].strip()
+        # verify that an override can unset the config
+        # we cannot use run_main(), because the "singleton" instance of the
+        # dataset we are in is still around in this session, and with it
+        # also its config managers that we will not be able to post-hoc
+        # overwrite with this method. Instead, we'll execute in a subprocess.
+        assert '' == Runner().run([
+            'datalad', '-c', ':mike.item',
+            'configuration', 'get', 'mike.item'],
+            protocol=StdOutErrCapture)['stdout'].strip()
+        # verify the effect is not permanent
+        assert 'some' == Runner().run([
+            'datalad',
+            'configuration', 'get', 'mike.item'],
+            protocol=StdOutErrCapture)['stdout'].strip()
 
 
 def test_incorrect_cfg_override():
