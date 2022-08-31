@@ -18,8 +18,8 @@ Bug Fix
 -  Add workflow for autogenerating changelog snippets
    `#6981 <https://github.com/datalad/datalad/pull/6981>`__
    (`@jwodder <https://github.com/jwodder>`__)
--  Provide “/dev/null” (b::raw-latex:`\nul `on Windows) instead of empty
-   string as a git-repo to avoid reading local repo configuration
+-  Provide ``/dev/null`` (``b:\nul`` on Windows) instead of empty string
+   as a git-repo to avoid reading local repo configuration
    `#6986 <https://github.com/datalad/datalad/pull/6986>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 -  RF: call_from_parser - move code into “else” to simplify reading etc
