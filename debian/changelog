@@ -1,3 +1,11 @@
+datalad (0.17.4-2) UNRELEASED; urgency=medium
+
+  * d/patches/bullseye-dsc-patch to be applied to bullseye (11.0) to use
+    appdirs instead of platformdirs.  Not really needed for neurodebian but
+    needed for any other backports since platformdirs would be missing.
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 31 Aug 2022 09:21:43 -0400
+
 datalad (0.17.4-1) unstable; urgency=medium
 
   * Fresh upstream release
