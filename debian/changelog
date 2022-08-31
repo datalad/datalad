@@ -1,6 +1,9 @@
 datalad (0.17.4-1) unstable; urgency=medium
 
   * Fresh upstream release
+  * d/patches/reproducible-build.patch by Chris Lamb to make manpage dates
+    follow SOURCE_DATE_EPOCH if available for reproducible builds.
+    (Closes: #1010318)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 30 Aug 2022 22:11:19 -0400
 
