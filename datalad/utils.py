@@ -501,7 +501,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
         if on_windows:
             # shutil fails to remove paths that exceed 260 characters on Windows machines
             # that did not enable long path support. A workaround to remove long paths
-            # anyway is to preprend \\?\ to the path.
+            # anyway is to prepend \\?\ to the path.
             # https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file?redirectedfrom=MSDN#win32-file-namespaces
             path = r'\\?\ '.strip() + path
         _rmtree(path, *args, **kwargs)

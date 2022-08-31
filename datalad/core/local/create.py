@@ -349,7 +349,7 @@ class Create(Interface):
             discovered_procs = tbds.run_procedure(
                 discover=True,
                 result_renderer='disabled',
-                return_type='generator',
+                return_type='list',
             )
             for cfg_proc_ in cfg_proc:
                 for discovered_proc in discovered_procs:

@@ -194,7 +194,7 @@ def test_runner_parametrized_protocol():
             super().pipe_data_received(fd, self.value)
 
     res = runner.run(
-        py2cmd('print(1)'),
+        py2cmd('print(1, end="")'),
         protocol=ProtocolInt,
         # value passed to protocol constructor
         value=b'5',

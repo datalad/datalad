@@ -11,7 +11,7 @@
 # identifiers that defines an ontology as a whole
 vocabulary_id = 'http://purl.org/dc/dcam/VocabularyEncodingScheme'
 
-# this is the canonical version string of Datalad's current metadata scheme
+# this is the canonical version string of DataLad's current metadata scheme
 version = '2.0'
 
 # for maximum compatibility with git-annex' metadata setup, _keys_ in this

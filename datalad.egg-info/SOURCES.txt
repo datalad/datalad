@@ -501,6 +501,7 @@ tools/copy_urls_from_datalad.py
 tools/describegitannex
 tools/downgrade-annex
 tools/dtime
+tools/eval_under_nfs
 tools/eval_under_testloopfs
 tools/git-web-submodules.sh
 tools/link_issues_CHANGELOG
@@ -529,6 +530,7 @@ tools/ci/gpg-90F7E9EB.pub
 tools/ci/install-annex.sh
 tools/ci/install-minimum-git.sh
 tools/ci/install-upstream-git.sh
+tools/ci/mkchlog-snippet.py
 tools/ci/prep-travis-devel-annex.sh
 tools/ci/prep-travis-forssh.sh
 tools/coverage-bin/datalad

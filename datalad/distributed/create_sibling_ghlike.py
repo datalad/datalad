@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Tooling for creating a publication target on Github-like systems
+"""Tooling for creating a publication target on GitHub-like systems
 """
 
 import logging
@@ -200,7 +200,7 @@ class _GitHubLike(object):
 
     # TODO what are the actual constraints?
     def normalize_reponame(self, path):
-        """Turn name into a Github-like service compliant repository name
+        """Turn name into a GitHub-like service compliant repository name
 
         Useful for sanitizing directory names.
         """

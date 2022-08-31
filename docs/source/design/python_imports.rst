@@ -38,11 +38,11 @@ The following rules apply to any ``import`` statement in the code base:
 
   - 3rd-party packages
 
-  - Datalad core (absolute imports)
+  - DataLad core (absolute imports)
 
-  - Datalad extensions
+  - DataLad extensions
   
-  - Datalad core ("local" relative imports)
+  - DataLad core ("local" relative imports)
   
   Sorting imports can be aided by https://github.com/PyCQA/isort (e.g. ``python -m isort -m3 --fgw 2 --tc <filename>``).
 

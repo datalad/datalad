@@ -245,7 +245,7 @@ def test_stalling(kill=False):
     with concurrent.futures.ThreadPoolExecutor(1) as executor:
         # print("submitting")
         future = executor.submit(worker)
-        dt2_limit = dt1 * 5
+        dt2_limit = dt1 * 10
         # print("waiting for up to %.2f sec" % dt2_limit)
         while not future.done():
             # print("not yet")
@@ -259,7 +259,7 @@ def test_stalling(kill=False):
                     import os
                     import signal
                     os.kill(os.getpid(), signal.SIGTERM)
-                raise AssertionError("Future has not finished in 5x time")
+                raise AssertionError("Future has not finished in 10x time")
         v2 = future.result()
     assert_equal(v1, v2)
 

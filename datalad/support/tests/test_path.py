@@ -17,6 +17,7 @@ from ...tests.utils_pytest import (
 )
 from ...utils import (
     chpwd,
+    on_windows,
     rmtree,
 )
 from ..path import (
@@ -26,6 +27,8 @@ from ..path import (
     robust_abspath,
     split_ext,
 )
+
+import pytest
 
 
 @with_tempfile(mkdir=True)
@@ -59,16 +62,41 @@ def test_split_ext():
     eq_(split_ext("file.a.b..c"), ("file", ".a.b..c"))
 
 
-def test_get_parent_paths():
-    gpp = get_parent_paths
+@pytest.mark.parametrize("sep", [None, '/', '\\'])
+def test_get_parent_paths(sep):
+    if sep is None:
+        gpp = get_parent_paths
+    else:
+        from functools import partial
+        gpp = partial(get_parent_paths, sep=sep)
 
     # sanity/border checks
     eq_(gpp([], []), [])
     eq_(gpp([], ['a']), [])
     eq_(gpp(['a'], ['a']), ['a'])
-    assert_raises(ValueError, gpp, '/a', ['a'])
 
-    paths = ['a', 'a/b', 'a/b/file', 'c', 'd/sub/123']
+    # Helper to provide testing across different seps and platforms while
+    # specifying only POSIX paths here in the test
+    def _p(path):
+        if sep is None:
+            return path
+        else:
+            return path.replace('/', sep)
+    _pp = lambda paths: list(map(_p, paths))
+
+    # no absolute paths anywhere
+    if on_windows:
+        assert_raises(ValueError, gpp, 'C:\\a', ['a'])
+        assert_raises(ValueError, gpp, ['a'], 'C:\\a')
+    elif sep != '\\':  # \ does not make it absolute
+        assert_raises(ValueError, gpp, _p('/a'), ['a'])
+        assert_raises(ValueError, gpp, ['a'], [_p('/a')])
+    assert_raises(ValueError, gpp, [_p('a//a')], ['a'])
+    # dups the actual code but there is no other way AFAIK
+    asep = {'/': '\\', None: '\\', '\\': '/'}[sep]
+    assert_raises(ValueError, gpp, [f'a{asep}a'], ['a'])
+
+    paths = _pp(['a', 'a/b', 'a/b/file', 'c', 'd/sub/123'])
 
     eq_(gpp(paths, []), paths)
     eq_(gpp(paths, [], True), [])
@@ -81,8 +109,8 @@ def test_get_parent_paths():
     # subdatasets not for every path -- multiple paths hitting the same parent,
     # and we will be getting only a single entry
     # to mimic how git ls-tree operates
-    eq_(gpp(paths, ['a']), ['a', 'c', 'd/sub/123'])
+    eq_(gpp(paths, ['a']), ['a', 'c', _p('d/sub/123')])
     eq_(gpp(paths, ['a'], True), ['a'])
 
     # and we get the deepest parent
-    eq_(gpp(['a/b/file', 'a/b/file2'], ['a', 'a/b']), ['a/b'])
+    eq_(gpp(_pp(['a/b/file', 'a/b/file2']), _pp(['a', 'a/b'])), _pp(['a/b']))

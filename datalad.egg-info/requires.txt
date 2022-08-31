@@ -67,9 +67,12 @@ pyperclip
 python-dateutil
 BeautifulSoup4
 httpretty>=0.9.4
+mypy~=0.900
 pytest~=7.0
 pytest-cov~=3.0
 pytest-fail-slow~=0.2
+types-python-dateutil
+types-requests
 vcrpy
 simplejson
 whoosh
@@ -84,9 +87,10 @@ pypandoc
 sphinx>=4.3.0
 sphinx-rtd-theme>=0.5.1"
 asv
+coverage
 gprof2dot
 psutil
-coverage
+pytest-xdist
 
 [devel-docs]
 nose>=1.3.4
@@ -96,9 +100,10 @@ sphinx-rtd-theme>=0.5.1"
 
 [devel-utils]
 asv
+coverage
 gprof2dot
 psutil
-coverage
+pytest-xdist
 
 [devel:platform_system == "Windows"]
 colorama
@@ -144,9 +149,12 @@ pyperclip
 python-dateutil
 BeautifulSoup4
 httpretty>=0.9.4
+mypy~=0.900
 pytest~=7.0
 pytest-cov~=3.0
 pytest-fail-slow~=0.2
+types-python-dateutil
+types-requests
 vcrpy
 simplejson
 whoosh
@@ -188,7 +196,10 @@ python-gitlab
 [tests]
 BeautifulSoup4
 httpretty>=0.9.4
+mypy~=0.900
 pytest~=7.0
 pytest-cov~=3.0
 pytest-fail-slow~=0.2
+types-python-dateutil
+types-requests
 vcrpy

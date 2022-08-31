@@ -192,8 +192,10 @@ class CreateSiblingRia(Interface):
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
-            doc="""Enable git's default post-update-hook for the created
-            sibling.""",
+            doc="""Enable Git's default post-update-hook for the created
+            sibling. This is useful when the sibling is made accessible via a
+            "dumb server" that requires running 'git update-server-info'
+            to let Git interact properly with it.""",
             action="store_true"),
         shared=Parameter(
             args=("--shared",),
@@ -356,7 +358,6 @@ class CreateSiblingRia(Interface):
                         sname, dpath),
                     type='sibling',
                     name=sname,
-                    ds=ds,
                     **res_kwargs,
                 )
                 failed = True

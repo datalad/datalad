@@ -1,18 +1,18 @@
+from __future__ import annotations
+
 import random
 import threading
 import time
 from threading import Thread
-from typing import (
-    Any,
-    List,
-    Tuple,
-)
 
 from datalad.tests.utils_pytest import assert_raises
 
 from ..coreprotocols import StdOutCapture
 from ..nonasyncrunner import ThreadedRunner
-from ..protocol import GeneratorMixIn
+from ..protocol import (
+    GeneratorMixIn,
+    WitlessProtocol,
+)
 from .utils import py2cmd
 
 
@@ -32,7 +32,7 @@ class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
             self.send_result((fd, line))
 
 
-def _runner_with_protocol(protocol) -> ThreadedRunner:
+def _runner_with_protocol(protocol: type[WitlessProtocol]) -> ThreadedRunner:
     return ThreadedRunner(
         cmd=py2cmd("for i in range(5): print(i)"),
         protocol_class=protocol,
@@ -41,7 +41,7 @@ def _runner_with_protocol(protocol) -> ThreadedRunner:
 
 def _run_on(runner: ThreadedRunner,
             iterate: bool,
-            exceptions: List
+            exceptions: list
             ):
     try:
         gen = runner.run()
@@ -52,22 +52,22 @@ def _run_on(runner: ThreadedRunner,
         exceptions.append(e.__class__)
 
 
-def _get_run_on_threads(protocol: Any,
+def _get_run_on_threads(protocol: type[WitlessProtocol],
                         iterate: bool
-                        ) -> Tuple[Thread, Thread, List]:
+                        ) -> tuple[Thread, Thread, list]:
 
     runner = _runner_with_protocol(protocol)
 
-    args = (runner, iterate, [])
+    args: tuple[ThreadedRunner, bool, list] = (runner, iterate, [])
     thread_1 = threading.Thread(target=_run_on, args=args)
     thread_2 = threading.Thread(target=_run_on, args=args)
 
     return thread_1, thread_2, args[2]
 
 
-def _reentry_detection_run(protocol: Any,
+def _reentry_detection_run(protocol: type[WitlessProtocol],
                            iterate: bool
-                           ) -> List:
+                           ) -> list:
 
     thread_1, thread_2, exception = _get_run_on_threads(protocol, iterate)
 
