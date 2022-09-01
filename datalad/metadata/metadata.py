@@ -1142,7 +1142,7 @@ def query_aggregated_metadata(reporton: str,
                               recursive: bool = False,
                               metadata_source: Optional[str] = None,
                               **kwargs):
-    """Query legacy and NG-metadata stored in a dataset or its metadata store
+    """Query legacy and gen4-metadata stored in a dataset or its metadata store
 
     Parameters
     ----------
