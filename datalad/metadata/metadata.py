@@ -1124,13 +1124,19 @@ def gen4_query_aggregated_metadata(reporton: str,
                     }
                 }
         except NoMetadataStoreFound:
+            if len(matching_types) == 2:
+                matching_type = "all"
+            elif len(matching_types) == 0:
+                matching_type = "none"
+            else:
+                matching_type = matching_types[0]
             yield {
                 **kwargs,
                 'path': str(ds.pathobj / relative_path),
                 'status': 'impossible',
                 'message': f'Dataset at {ds.pathobj} does not contain gen4 '
                            f'metadata',
-                'type': matching_types
+                'type': matching_type
             }
 
     return None
