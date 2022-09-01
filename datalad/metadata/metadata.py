@@ -347,7 +347,7 @@ def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
 def _query_aggregated_metadata_singlepath(
         ds, agginfos, agg_base_path, qap, reporton, cache, dsmeta,
         contentinfo_objloc):
-    """This is the workhorse of query_aggregated_metadata() for querying for a
+    """This is the workhorse of legacy_query_aggregated_metadata() for querying for a
     single path"""
     rpath = qap['rpath']
     containing_ds = qap['metaprovider']
@@ -1010,7 +1010,7 @@ class Metadata(Interface):
             if not query_agg:
                 continue
             # report from aggregated metadata
-            for r in query_aggregated_metadata(
+            for r in legacy_query_aggregated_metadata(
                     reporton,
                     # by default query the reference dataset, only if there is none
                     # try our luck in the dataset that contains the queried path
