@@ -41,7 +41,8 @@ requires = {
     ],
     'downloaders': [
         'boto',
-        'keyring>=20.0', 'keyrings.alt',
+        'keyring>=20.0,!=23.9.0',
+        'keyrings.alt',
         'msgpack',
         'requests>=1.2',
     ],
