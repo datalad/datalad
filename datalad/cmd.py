@@ -19,6 +19,7 @@ import os
 import queue
 import sys
 import warnings
+from queue import Queue
 from subprocess import TimeoutExpired
 from typing import (
     Any,
@@ -56,6 +57,7 @@ from datalad.runner.coreprotocols import StdOutErrCapture
 from datalad.runner.nonasyncrunner import (
     STDERR_FILENO,
     STDOUT_FILENO,
+    _ResultGenerator,
 )
 from datalad.runner.protocol import GeneratorMixIn
 from datalad.runner.runner import WitlessRunner
@@ -192,10 +194,8 @@ class BatchedCommand(SafeDelCloseMixin):
         self.timeout: Optional[float] = timeout
         self.exception_on_timeout: bool = exception_on_timeout
 
-        self.stdin_queue = None
         self.stderr_output = b""
         self.runner: Optional[WitlessRunner] = None
-        self.generator = None
         self.encoding = None
         self.wait_timed_out = None
         self.return_code = None
@@ -206,6 +206,10 @@ class BatchedCommand(SafeDelCloseMixin):
         self.clean_inactive()
         assert id(self) not in self._active_instances
         self._active_instances[id(self)] = self
+
+        # pure declarations
+        self.stdin_queue: Queue
+        self.generator: _ResultGenerator
 
     @classmethod
     def clean_inactive(cls):
