@@ -25,6 +25,8 @@ import requests
 
 SEMVER_LABELS = [
     # (Label name, category name) in descending order of precedence
+    # The categories must align with the category names in
+    # changelog.d/scriv.ini
     ("semver-major", "Breaking Changes"),
     ("semver-minor", "Enhancements and New Features"),
     ("semver-patch", "Bug Fixes"),
