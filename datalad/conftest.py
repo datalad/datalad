@@ -82,6 +82,10 @@ def setup_package():
         email = test@example.com
 [core]
 	askPass =
+	# "display" unicode filenames in status etc.
+	# discovered at https://stackoverflow.com/questions/34549040/git-not-displaying-unicode-file-names
+	# TODO: make this parametric in the testing, but depending on what?
+	quotePath = false
 [datalad "log"]
         exc = 1
 [annex "security"]
