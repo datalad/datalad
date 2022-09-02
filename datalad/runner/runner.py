@@ -11,11 +11,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Generator
+from typing import cast
 
 from .coreprotocols import NoCapture
 from .exception import CommandError
-from .nonasyncrunner import ThreadedRunner
+from .nonasyncrunner import (
+    ThreadedRunner,
+    _ResultGenerator,
+)
 from .protocol import GeneratorMixIn
 
 
@@ -49,7 +52,6 @@ class WitlessRunner(object):
 
         self.threaded_runner = None
 
-
     def _get_adjusted_env(self, env=None, cwd=None, copy=True):
         """Return an adjusted copy of an execution environment
 
@@ -72,7 +74,7 @@ class WitlessRunner(object):
             env=None,
             timeout=None,
             exception_on_error=True,
-            **kwargs) -> dict | Generator:
+            **kwargs) -> dict | _ResultGenerator:
         """Execute a command and communicate with it.
 
         Parameters
@@ -193,7 +195,7 @@ class WitlessRunner(object):
         if issubclass(protocol, GeneratorMixIn):
             return results_or_iterator
         else:
-            results = results_or_iterator
+            results = cast(dict, results_or_iterator)
 
         # log before any exception is raised
         lgr.debug("Finished %r with status %s", cmd, results['code'])
