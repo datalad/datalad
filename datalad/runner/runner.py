@@ -126,13 +126,14 @@ class WitlessRunner(object):
 
         Returns
         -------
-          Union[Any, Generator]
+          dict | _ResultGenerator
 
             If the protocol is not a subclass of `GeneratorMixIn`, the
             result of protocol._prepare_result will be returned.
 
-            If the protocol is a subclass of `GeneratorMixIn`, a Generator
-            will be returned. This allows to use this method in constructs like:
+            If the protocol is a subclass of `GeneratorMixIn`, a Generator, i.e.
+            a `_ResultGenerator`, will be returned. This allows to use this
+            method in constructs like:
 
                 for protocol_output in runner.run():
                     ...
