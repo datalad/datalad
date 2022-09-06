@@ -48,9 +48,13 @@ jobs:
           then echo "[ERROR] Auto version does not equal changelog version"
                exit 1
           fi
-          scriv collect --add --version "$changelog_version"
-          git commit -m '[skip ci] Update CHANGELOG' CHANGELOG.md
+          scriv collect --version "$changelog_version"
+          make update-changelog
+          git add CHANGELOG.md docs/source/changelog.rst
+          git commit -m '[skip ci] Update CHANGELOG'
           ~/auto shipit -vv --no-changelog
+          python -m build
+          twine upload dist/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TWINE_USERNAME: __token__
