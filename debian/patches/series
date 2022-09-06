@@ -2,4 +2,3 @@ deb_loosenup_setup_requires
 deb_setup_no_msgpack_and_duecredit
 deb_no_utf8
 python3.patch
-reproducible-build.patch
