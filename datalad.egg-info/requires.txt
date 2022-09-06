@@ -8,7 +8,7 @@ patool>=1.7
 tqdm
 annexremote
 boto
-keyring>=20.0
+keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
 requests>=1.2
@@ -56,7 +56,7 @@ patool>=1.7
 tqdm
 annexremote
 boto
-keyring>=20.0
+keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
 requests>=1.2
@@ -116,7 +116,7 @@ distro
 
 [downloaders]
 boto
-keyring>=20.0
+keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
 requests>=1.2
@@ -138,7 +138,7 @@ patool>=1.7
 tqdm
 annexremote
 boto
-keyring>=20.0
+keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
 requests>=1.2
