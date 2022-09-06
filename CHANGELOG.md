@@ -1,3 +1,19 @@
+# 0.17.5 (Fri Sep 02 2022)
+
+#### 🐛 Bug Fix
+
+- BF: blacklist 23.9.0 of keyring as introduces regression [#7003](https://github.com/datalad/datalad/pull/7003) ([@yarikoptic](https://github.com/yarikoptic))
+- Make the manpages build reproducible via datalad.source.epoch (to be used in Debian packaging) [#6997](https://github.com/datalad/datalad/pull/6997) ([@lamby](https://github.com/lamby) bot@datalad.org [@yarikoptic](https://github.com/yarikoptic))
+- BF: backquote path/drive in Changelog [#6997](https://github.com/datalad/datalad/pull/6997) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- Chris Lamb ([@lamby](https://github.com/lamby))
+- DataLad Bot (bot@datalad.org)
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.17.4 (Tue Aug 30 2022)
 
 #### 🐛 Bug Fix
@@ -5,7 +21,7 @@
 - BF: make logic more consistent for files=[] argument (which is False but not None) [#6976](https://github.com/datalad/datalad/pull/6976) ([@yarikoptic](https://github.com/yarikoptic))
 - Run pytests in parallel (-n 2) on appveyor [#6987](https://github.com/datalad/datalad/pull/6987) ([@yarikoptic](https://github.com/yarikoptic))
 - Add workflow for autogenerating changelog snippets [#6981](https://github.com/datalad/datalad/pull/6981) ([@jwodder](https://github.com/jwodder))
-- Provide "/dev/null" (b:\nul on 💾 Windows) instead of empty string as a git-repo to avoid reading local repo configuration [#6986](https://github.com/datalad/datalad/pull/6986) ([@yarikoptic](https://github.com/yarikoptic))
+- Provide `/dev/null` (`b:\nul` on 💾 Windows) instead of empty string as a git-repo to avoid reading local repo configuration [#6986](https://github.com/datalad/datalad/pull/6986) ([@yarikoptic](https://github.com/yarikoptic))
 - RF: call_from_parser - move code into "else" to simplify reading etc [#6982](https://github.com/datalad/datalad/pull/6982) ([@yarikoptic](https://github.com/yarikoptic))
 - BF: if early attempt to parse resulted in error, setup subparsers [#6980](https://github.com/datalad/datalad/pull/6980) ([@yarikoptic](https://github.com/yarikoptic))
 - Run pytests in parallel (-n 2) on Travis [#6915](https://github.com/datalad/datalad/pull/6915) ([@yarikoptic](https://github.com/yarikoptic))
