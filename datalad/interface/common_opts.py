@@ -298,12 +298,6 @@ with_plugin_opt = Parameter(
     PY][CMD: This option can be given more than once to run multiple plugins
     in the order in which they are given. CMD]""")
 
-reporton_opt = Parameter(
-    args=('--reporton',),
-    metavar='TYPE',
-    doc="""choose on what type result to report on: 'datasets',
-    'files', 'all' (both datasets and files), or 'none' (no report).""",
-    constraints=EnsureChoice('all', 'datasets', 'files', 'none'))
 # define parameters to be used by eval_results to tune behavior
 # Note: This is done outside eval_results in order to be available when building
 # docstrings for the decorated functions
