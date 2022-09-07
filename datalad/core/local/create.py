@@ -546,10 +546,7 @@ def _setup_annex_repo(path, initopts=None, fake_dates=False,
     # make sure that v6 annex repos never commit content under .datalad
     attrs_cfg = (
         ('config', 'annex.largefiles', 'nothing'),
-        ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
-        ('metadata/objects/**', 'annex.largefiles',
-         '({})'.format(cfg.obtain(
-             'datalad.metadata.create-aggregate-annex-limit'))))
+    )
     attrs = tbrepo.get_gitattributes(
         [op.join('.datalad', i[0]) for i in attrs_cfg])
     set_attrs = []
