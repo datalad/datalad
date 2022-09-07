@@ -16,6 +16,7 @@ jobs:
             datalad-metalad,
             datalad-crawler,
             datalad-deprecated,
+            datalad-next,
         ]
 
     steps:
@@ -65,6 +66,8 @@ jobs:
             DL_TESTER=pytest;;
           datalad-container)
             DL_NEED_SINGULARITY=1;;
+          datalad-next)
+            DL_TESTER=pytest;;
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
