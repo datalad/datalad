@@ -283,7 +283,6 @@ def _describe_dependencies():
 
 def _describe_dataset(ds, sensitive):
     from datalad.interface.results import success_status_map
-    from datalad.api import metadata
 
     try:
         infos = {
@@ -296,20 +295,6 @@ def _describe_dataset(ds, sensitive):
             '%s@%s' % (b, next(ds.repo.get_branch_commits_(branch=b))[:7])
             for b in ds.repo.get_branches()]
         infos['branches'] = branches
-        if not sensitive:
-            infos['metadata'] = _HIDDEN
-        elif ds.id:
-            ds_meta = metadata(
-                dataset=ds, reporton='datasets', return_type='list',
-                result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
-                result_renderer='disabled', on_failure='ignore')
-            if ds_meta:
-                ds_meta = [dm['metadata'] for dm in ds_meta]
-                if len(ds_meta) == 1:
-                    ds_meta = ds_meta.pop()
-                infos['metadata'] = ds_meta
-            else:
-                infos['metadata'] = None
         return infos
     except InvalidGitRepositoryError as e:
         ce = CapturedException(e)
@@ -360,8 +345,6 @@ SECTION_CALLABLES = {
     'configuration': None,
     'location': None,
     'extensions': _describe_extensions,
-    'metadata_extractors': lambda: _describe_metadata_elements('datalad.metadata.extractors'),
-    'metadata_indexers': lambda: _describe_metadata_elements('datalad.metadata.indexers'),
     'dependencies': _describe_dependencies,
     'dataset': None,
     'credentials': _describe_credentials,
