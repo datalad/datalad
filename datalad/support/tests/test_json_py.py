@@ -9,9 +9,9 @@
 
 import logging
 import os.path as op
+from json import JSONDecodeError
 
 from datalad.support.json_py import (
-    JSONDecodeError,
     dump,
     dump2stream,
     dump2xzstream,

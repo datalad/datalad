@@ -20,13 +20,7 @@ from os.path import (
 from os import makedirs
 import os
 import os.path as op
-
-# wrapped below
-from simplejson import load as jsonload
-from simplejson import dump as jsondump
-# simply mirrored for now
-from simplejson import loads as json_loads
-from simplejson import JSONDecodeError
+import json
 
 from datalad.support.exceptions import CapturedException
 
@@ -36,8 +30,7 @@ json_dump_kwargs = dict(
     indent=0,
     separators=(',', ':\n'),
     sort_keys=True,
-    ensure_ascii=False,
-    encoding='utf-8', )
+    ensure_ascii=False,)
 
 # achieve minimal representation, but still deterministic
 compressed_json_dump_kwargs = dict(
@@ -90,7 +83,7 @@ def dump2fileobj(obj, fileobj, **kwargs):
     **kwargs
       Keyword arguments to be passed on to simplejson.dump()
     """
-    return jsondump(
+    return json.dump(
         obj,
         codecs.getwriter('utf-8')(fileobj),
         **kwargs)
@@ -122,7 +115,7 @@ def dump2stream(obj, fname, compressed=False):
     with _open(fname, mode='wb') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
-            jsondump(o, jwriter, **compressed_json_dump_kwargs)
+            json.dump(o, jwriter, **compressed_json_dump_kwargs)
             f.write(b'\n')
 
 
@@ -156,7 +149,7 @@ def load_xzstream(fname):
 def loads(s, *args, **kwargs):
     """Helper to log actual value which failed to be parsed"""
     try:
-        return json_loads(s, *args, **kwargs)
+        return json.loads(s, *args, **kwargs)
     except:
         lgr.error(
             "Failed to load content from %r with args=%r kwargs=%r"
@@ -183,8 +176,8 @@ def load(fname, fixup=True, compressed=None, **kw):
     with _suitable_open(fname, compressed)(fname, 'rb') as f:
         try:
             jreader = codecs.getreader('utf-8')(f)
-            return jsonload(jreader, **kw)
-        except JSONDecodeError as exc:
+            return json.load(jreader, **kw)
+        except json.JSONDecodeError as exc:
             if not fixup:
                 raise
             ce = CapturedException(exc)

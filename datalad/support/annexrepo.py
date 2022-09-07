@@ -54,8 +54,6 @@ from datalad.runner.utils import (
     AssemblingDecoderMixIn,
     LineSplitter,
 )
-# must not be loads, because this one would log, and we need to log ourselves
-from datalad.support.json_py import json_loads
 from datalad.support.exceptions import CapturedException
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
@@ -3677,14 +3675,12 @@ class AnnexJsonProtocol(WitlessProtocol):
             data = self._unprocessed + data
             self._unprocessed = None
         # this is where the JSON records come in
-        # json_loads() is already logging any error, which is OK, because
-        # under no circumstances we would expect broken JSON
         lines = data.splitlines()
         data_ends_with_eol = data.endswith(os.linesep.encode())
         del data
         for iline, line in enumerate(lines):
             try:
-                j = json_loads(line)
+                j = json.loads(line)
             except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
