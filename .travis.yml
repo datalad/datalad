@@ -231,8 +231,6 @@ before_install:
   # needed for tests of patool compression fall-back solution
   - travis_retry sudo eatmydata apt-get install xz-utils
   - travis_retry sudo eatmydata apt-get install shunit2
-  # for metadata support
-  - travis_retry sudo eatmydata apt-get install exempi
   # Configure _DL_TMPDIR before trying install git-annex -- script might use it
   - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi

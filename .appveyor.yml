@@ -111,7 +111,6 @@ environment:
           datalad.downloaders
           datalad.interface
           datalad.local
-          datalad.metadata
           datalad.runner
           datalad.support
           datalad.tests
@@ -131,8 +130,6 @@ environment:
           datalad.downloaders
           datalad.interface
           datalad.tests
-      # TODO: datalad.metadata (this is completely non-functional on Windows,
-      #       either tests only, or actual code too)
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
     - ID: WinP39a2
@@ -193,7 +190,6 @@ environment:
           datalad.downloaders
           datalad.interface
           datalad.local
-          datalad.metadata
           datalad.runner
           datalad.support
           datalad.tests

@@ -139,7 +139,6 @@ def test_help_np():
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
     sections = [l[1:-1] for l in filter(re.compile(r'^\*.*\*$').match, stdout.split('\n'))]
     for s in {'Essential',
-              'Metadata',
               'Miscellaneous',
               'General information',
               'Global options',
