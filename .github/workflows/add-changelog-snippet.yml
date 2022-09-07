@@ -50,7 +50,7 @@ jobs:
         run: |
           git add changelog.d
           if ! git diff --quiet --cached
-          then git commit -m '[skip ci] Autogenerate changelog.d snippet for pull request'
+          then git commit -m 'Autogenerate changelog.d snippet for pull request'
                git push origin HEAD:${{ github.head_ref }}
           else echo "No changes to commit"
           fi
