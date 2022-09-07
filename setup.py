@@ -19,7 +19,6 @@ import versioneer
 from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
-    BuildSchema,
     datalad_setup,
 )
 
@@ -116,7 +115,6 @@ cmdclass = {
     'build_manpage': BuildManPage,
     # 'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
-    'build_schema': BuildSchema,
     # 'build_py': DataladBuild
 }
 
