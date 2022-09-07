@@ -25,7 +25,7 @@ from datalad.api import (
 from datalad.cmd import GitWitlessRunner
 from datalad.cmd import WitlessRunner as Runner
 from datalad.config import ConfigManager
-from datalad.core.distributed.clone import (
+from datalad.core.distributed.clone_utils import (
     _get_installationpath_from_url,
     decode_source_spec,
 )
@@ -1708,7 +1708,7 @@ _windows_map = {
 
 
 def test_url_mapping_specs():
-    from datalad.core.distributed.clone import _map_urls
+    from datalad.core.distributed.clone_utils import _map_urls
     cfg = ConfigManager()
     for m, i, o in (
             # path redirect on windows
