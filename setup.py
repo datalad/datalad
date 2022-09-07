@@ -37,7 +37,6 @@ requires = {
         'tqdm',
         'annexremote',
         'looseversion',
-        'simplejson',  # used by support.json_py, used by core commands
     ],
     'downloaders': [
         'boto',
