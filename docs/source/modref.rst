@@ -41,18 +41,6 @@ Dataset operations
    api.update
    api.unlock
 
-Metadata handling
------------------
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   api.search
-   api.metadata
-   api.aggregate_metadata
-   api.extract_metadata
-
 
 Reproducible execution
 ----------------------
