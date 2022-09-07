@@ -9,7 +9,13 @@ _known_extension_commands = {
         'containers-list', 'containers-remove', 'containers-add',
         'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
-    'datalad-deprecated': ('ls',),
+    'datalad-deprecated': (
+        'ls',
+        'metadata',
+        'search',
+        'aggregate-metadata',
+        'extract-metadata',
+    ),
     'datalad-neuroimaging': ('bids2scidata',)
 }
 
