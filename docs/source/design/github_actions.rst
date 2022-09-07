@@ -3,9 +3,9 @@
 
 .. _chap_design_github_action:
 
-*******************************
+*************
 GitHub Action
-*******************************
+*************
 
 .. topic:: Specification scope and status
 
@@ -59,7 +59,7 @@ Options
 ``datalad`` version to install. Defaults to the latest release.
 
 ``add_datalad_to_path``
--------------------
+-----------------------
 
 Add ``datalad`` to the ``PATH`` for manual invocation in subsequent steps.
 
@@ -90,7 +90,7 @@ Jobs to use for ``datalad install``.
 Defaults to ``auto``.
 
 ``install_get_data``
-----------------
+--------------------
 
 Get all the data in the dataset by passing ``--get-data`` to ``datalad install``.
 
@@ -111,7 +111,7 @@ Integer defining limits to recursion.
 If not defined, there is no limit.
 
 ``get_jobs``
-----------------
+------------
 
 Jobs to use for ``datalad get``.
 
@@ -119,7 +119,7 @@ Defaults to ``auto``.
 
 
 ``get_paths``
--------------------
+-------------
 
 A list of paths in the dataset to download with ``datalad get``.
 
