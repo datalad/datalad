@@ -3990,4 +3990,9 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 def readline_json(stdout):
     toload = stdout.readline().strip()
-    return json_loads(toload) if toload else {}
+    try:
+        return json.loads(toload) if toload else {}
+    except json.JSONDecodeError:
+        lgr.error('Received undecodable JSON output: %s', line)
+        raise
+
