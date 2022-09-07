@@ -449,6 +449,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/12564882?v=4"
             ]
+        },
+        {
+            "login": "kimsin98",
+            "name": "Sin Kim",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://orcid.org/0000-0003-4652-3758",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/7570456?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
