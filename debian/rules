@@ -18,6 +18,11 @@ export https_proxy=
 # to generate then per-Python version since some module requirements differ
 export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py develop --install-dir bin/ && cp -rp datalad.egg-info {build_dir}/;
 
+# Set SOURCE_DATE_EPOCH based on changelog in a most portable (older dpkg) way
+# following https://reproducible-builds.org/docs/source-date-epoch/
+export SOURCE_DATE_EPOCH ?= $(shell dpkg-parsechangelog | grep -Po '^Date: \K.*' | date -f- +%s)
+export DATALAD_SOURCE_EPOCH=$(SOURCE_DATE_EPOCH)
+
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
@@ -49,7 +54,7 @@ override_dh_auto_install:
 	# Building manpages. Overcoming #532 which creates some config file.
 	# Setting DATALAD_SOURCE_EPOCH to use that date in manpages for reproducible builds.
 	mkdir -p build/man
-	DATALAD_SOURCE_EPOCH=$${SOURCE_DATE_EPOCH:-$$(date +%s)} HOME=$(CURDIR)/build python3 setup.py build_manpage
+	HOME=$(CURDIR)/build python3 setup.py build_manpage
 	# Generating argcomplete helper for bash_completion.d
 	{ register-python-argcomplete3 datalad || register-python-argcomplete datalad; } > debian/datalad/usr/share/bash-completion/completions/datalad
 
