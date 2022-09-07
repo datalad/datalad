@@ -9,56 +9,54 @@
 """Plumbing command for dataset installation"""
 
 
-from argparse import REMAINDER
 import logging
-from typing import (
-    Dict,
-)
+from argparse import REMAINDER
+from typing import Dict
 
+from datalad.cmd import CommandError
 from datalad.config import ConfigManager
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+    resolve_path,
+)
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
 )
-from datalad.cmd import CommandError
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import eval_results
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
+    EnsureKeyChoice,
     EnsureNone,
     EnsureStr,
-    EnsureKeyChoice,
 )
 from datalad.support.exceptions import CapturedException
-from datalad.support.param import Parameter
 from datalad.support.network import (
-    PathRI,
     RI,
+    PathRI,
 )
+from datalad.support.param import Parameter
 from datalad.utils import (
     knows_annex,
     rmtree,
 )
 
-from datalad.distribution.dataset import (
-    Dataset,
-    datasetmethod,
-    resolve_path,
-    require_dataset,
-    EnsureDataset,
-)
-
-from .clone_utils import (
-    # needed because other code imports it from here
-    decode_source_spec,
+from .clone_utils import (  # needed because other code imports it from here
     _check_autoenable_special_remotes,
-    _get_remote,
     _format_clone_errors,
-    _try_clone_candidates,
-    _test_existing_clone_target,
     _generate_candidate_clone_sources,
+    _get_remote,
+    _test_existing_clone_target,
+    _try_clone_candidates,
+    decode_source_spec,
 )
 
 __docformat__ = 'restructuredtext'
@@ -427,8 +425,10 @@ def clone_dataset(
       DataLad result records
     """
     # apply the two in-house patches, do local to avoid circular imports
-    from . import clone_ria
-    from . import clone_ephemeral
+    from . import (
+        clone_ephemeral,
+        clone_ria,
+    )
 
     if not result_props:
         # in case the caller had no specific idea on how results should look

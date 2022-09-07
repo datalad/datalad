@@ -3,9 +3,9 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from pathlib import Path
 import re
 from os.path import expanduser
+from pathlib import Path
 from typing import (
     Dict,
     List,
@@ -15,22 +15,22 @@ from urllib.parse import unquote as urlunquote
 
 from datalad.config import ConfigManager
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.utils import _get_flexible_source_candidates
 from datalad.dochelpers import single_or_plural
 from datalad.log import log_progress
+from datalad.runner.exception import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CapturedException
-from datalad.support.strings import get_replacement_dict
-from datalad.runner.exception import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import (
-    DataLadRI,
     RI,
     SSHRI,
     URL,
+    DataLadRI,
     get_local_file_url,
     is_url,
 )
-from datalad.distribution.utils import _get_flexible_source_candidates
+from datalad.support.strings import get_replacement_dict
 from datalad.utils import (
     ensure_bool,
     ensure_list,

@@ -5,7 +5,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from typing import Dict
 
-from datalad.distribution.dataset import Dataset
 from datalad.cmd import (
     CommandError,
     GitWitlessRunner,
@@ -16,6 +15,7 @@ from datalad.distributed.ora_remote import (
     RIARemoteError,
     SSHRemoteIO,
 )
+from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CapturedException,
     DownloadError,
