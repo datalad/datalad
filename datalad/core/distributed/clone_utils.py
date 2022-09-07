@@ -520,7 +520,7 @@ def _format_clone_errors(
     Returns
     -------
     (str, list)
-      Message body and string formating arguments for it.
+      Message body and string formatting arguments for it.
     """
     if len(error_msgs):
         if all(not e.stdout and not e.stderr for e in error_msgs.values()):
@@ -571,7 +571,7 @@ def _get_remote(repo: GitRepo) -> str:
 
 
 def _check_autoenable_special_remotes(repo: AnnexRepo):
-    """Check and report on misconfigured/disfunctional special remotes
+    """Check and report on misconfigured/dysfunctional special remotes
     """
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
