@@ -139,10 +139,6 @@ Here are three common examples in command line notation:
     and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data, too.
     It does so by using 3 parallel download processes (``-J3`` flag).
 
-:ref:`datalad search <man_datalad-search>` command, if ran outside of any dataset,
-will install this default superdataset under a path specified in
-``datalad.locations.default-dataset`` :ref:`configuration <configuration>`
-variable (by default ``$HOME/datalad``).
 
 Downloading datasets via http
 -----------------------------
