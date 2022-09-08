@@ -77,9 +77,7 @@ Dataset siblings and 3rd-party platform support
    datalad create-sibling-gogs: Create a sibling on GOGS <generated/man/datalad-create-sibling-gogs>
    datalad create-sibling-gitea: Create a sibling on Gitea <generated/man/datalad-create-sibling-gitea>
    datalad create-sibling-gin: Create a sibling on GIN (with content hosting) <generated/man/datalad-create-sibling-gin>
-   datalad create-sibling-ria: Create a sibling in a RIA store <generated/man/datalad-create-sibling-ria>
    datalad export-archive: Export dataset content as a TAR/ZIP archive <generated/man/datalad-export-archive>
-   datalad export-archive-ora: Export a local dataset annex for the ORA remote <generated/man/datalad-export-archive-ora>
    datalad export-to-figshare: Export dataset content as a ZIP archive to figshare <generated/man/datalad-export-to-figshare>
    datalad update: Obtain and incorporate updates from dataset siblings <generated/man/datalad-update>
 

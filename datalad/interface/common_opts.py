@@ -185,7 +185,7 @@ reckless_opt = Parameter(
     able to save new content on your end.
     Alternative to 'auto' when hardlinks are not an option, or number of consumed
     inodes needs to be minimized. Note that this mode can only be used with clones from
-    non-bare repositories or a RIA store! Otherwise two different annex object tree
+    non-bare repositories! Otherwise two different annex object tree
     structures (dirhashmixed vs dirhashlower) will be used simultaneously, and annex keys
     using the respective other structure will be inaccessible.
     ['shared-<mode>']: set up repository and annex permission to enable multi-user

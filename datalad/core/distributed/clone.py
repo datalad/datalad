@@ -28,26 +28,14 @@ from datalad.log import log_progress
 from datalad.support.gitrepo import (
     GitRepo,
 )
-from datalad.cmd import (
-    CommandError,
-    GitWitlessRunner,
-    StdOutCapture,
-)
-from datalad.distributed.ora_remote import (
-    LocalIO,
-    RIARemoteError,
-    SSHRemoteIO,
-)
+from datalad.cmd import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
     EnsureKeyChoice,
 )
-from datalad.support.exceptions import (
-    CapturedException,
-    DownloadError,
-)
+from datalad.support.exceptions import CapturedException
 from datalad.support.param import Parameter
 from datalad.support.strings import get_replacement_dict
 from datalad.support.network import (
@@ -56,7 +44,6 @@ from datalad.support.network import (
     RI,
     SSHRI,
     URL,
-    download_url,
     get_local_file_url,
     is_url,
 )
@@ -67,9 +54,7 @@ from datalad.utils import (
     ensure_bool,
     ensure_list,
     knows_annex,
-    make_tempfile,
     Path,
-    PurePosixPath,
     rmtree,
 )
 
@@ -109,17 +94,16 @@ class Clone(Interface):
     supported); 2) automatic registration of the newly obtained dataset as a
     subdataset (submodule), if a parent dataset is specified; 3) support
     for additional resource identifiers (DataLad resource identifiers as used
-    on datasets.datalad.org, and RIA store URLs as used for store.datalad.org
-    - optionally in specific versions as identified by a branch or a tag; see
-    examples); and 4) automatic configurable generation of alternative access
-    URL for common cases (such as appending '.git' to the URL in case the
-    accessing the base URL failed).
+    on datasets.datalad.orh - optionally in specific versions as identified by
+    a branch or a tag; see examples); and 4) automatic configurable generation
+    of alternative access URL for common cases (such as appending '.git' to
+    the URL in case the accessing the base URL failed).
 
     In case the clone is registered as a subdataset, the original URL passed to
     `clone` is recorded in `.gitmodules` of the parent dataset in addition
     to the resolved URL used internally for git-clone. This allows to preserve
-    datalad specific URLs like ria+ssh://... for subsequent calls to `get` if
-    the subdataset was locally removed later on.
+    datalad specific URLs for subsequent calls to `get` if the subdataset was
+    locally removed later on.
 
     || PYTHON >>By default, the command returns a single Dataset instance for
     an installed dataset, regardless of whether it was newly installed ('ok'
@@ -145,11 +129,6 @@ class Clone(Interface):
     have no particular order, each matching series will result in a candidate
     clone URL. Consequently, the initial match specification in a series should
     be as precise as possible to prevent inflation of candidate URLs.
-
-    .. seealso::
-
-      :ref:`handbook:3-001`
-        More information on Remote Indexed Archive (RIA) stores
     """
     # by default ignore everything but install results
     # i.e. no "add to super dataset"
@@ -185,14 +164,6 @@ class Clone(Interface):
         dict(text="Install the main superdataset from datasets.datalad.org",
              code_py="clone(source='///')",
              code_cmd="datalad clone ///"),
-        dict(text="Install a dataset identified by a literal alias from store.datalad.org",
-             code_py="clone(source='ria+http://store.datalad.org#~hcp-openaccess')",
-             code_cmd="datalad clone ria+http://store.datalad.org#~hcp-openaccess"),
-        dict(
-            text="Install a dataset in a specific version as identified by a "
-                 "branch or tag name from store.datalad.org",
-            code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier')",
-            code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier"),
         dict(
             text="Install a dataset with group-write access permissions",
             code_py=\
@@ -232,8 +203,7 @@ class Clone(Interface):
             that not all options will lead to viable results. For example
             '--single-branch' will not result in a functional annex repository
             because both a regular branch and the git-annex branch are
-            required. Note that a version in a RIA URL takes precedence over
-            '--branch'."""),
+            required."""),
         description=location_description,
         reckless=reckless_opt,
     )
@@ -511,9 +481,7 @@ def clone_dataset(
       cause a detached HEAD, the previously active branch will be reset to the
       target commit.
     clone_opts : list of str, optional
-      Options passed to git-clone. Note that for RIA URLs, the version is
-      translated to a --branch argument, and that will take precedence over a
-      --branch argument included in this value.
+      Options passed to git-clone.
 
     Yields
     ------
@@ -726,10 +694,6 @@ def clone_dataset(
         lgr.debug('Reinitializing %s to enable shared access permissions', destds)
         destds.repo.call_git(['init', '--shared={}'.format(reckless[7:])])
 
-    # In case of RIA stores we need to prepare *before* annex is called at all
-    if result_props['source']['type'] == 'ria':
-        postclone_preannex_cfg_ria(destds, remote=remote)
-
     yield from postclonecfg_annexdataset(
         destds,
         reckless,
@@ -759,12 +723,6 @@ def clone_dataset(
             # or if PY35 is no longer supported
             rmtree(str(dest_path), children_only=dest_path_existed)
             return
-
-    # perform any post-processing that needs to know details of the clone
-    # source
-    if result_props['source']['type'] == 'ria':
-        yield from postclonecfg_ria(destds, result_props['source'],
-                                    remote=remote)
 
     if reckless:
         # store the reckless setting in the dataset to make it
@@ -885,238 +843,6 @@ def postclone_check_head(ds, remote="origin"):
             return
         lgr.warning("Cloned %s but could not find a branch "
                     "with commits", ds.path)
-
-
-def postclone_preannex_cfg_ria(ds, remote="origin"):
-
-    # We need to annex-ignore the remote before annex-init is called on the clone,
-    # due to issues 5186 and 5253 (and we would have done it afterwards anyway).
-    # annex/objects in RIA stores is special for several reasons.
-    # 1. the remote doesn't know about it (no actual local annex for the remote)
-    # 2. RIA may use hashdir mixed, copying data to it via git-annex (if cloned
-    #    via ssh or local) would make it see a bare repo and establish a
-    #    hashdir lower annex object tree.
-    # 3. We want the ORA remote to receive all data for the store, so its
-    #    objects could be moved into archives (the main point of a RIA store).
-
-    # Note, that this function might need an enhancement as theoretically a RIA
-    # store could also hold simple standard annexes w/o an intended ORA remote.
-    # This needs the introduction of a new version label in RIA datasets, making
-    # the following call conditional.
-    ds.config.set(f'remote.{remote}.annex-ignore', 'true', scope='local')
-
-
-def postclonecfg_ria(ds, props, remote="origin"):
-    """Configure a dataset freshly cloned from a RIA store"""
-    repo = ds.repo
-
-    def get_uuid_from_store(store_url):
-        # First figure whether we cloned via SSH, HTTP or local path and then
-        # get that config file the same way:
-        config_content = None
-        scheme = store_url.split(':', 1)[0]
-        if scheme in ['http', 'https']:
-            try:
-                config_content = download_url(
-                    "{}{}config".format(
-                        store_url,
-                        '/' if not store_url.endswith('/') else ''))
-            except DownloadError as e:
-                ce = CapturedException(e)
-                lgr.debug("Failed to get config file from source:\n%s", ce)
-        elif scheme == 'ssh':
-            # TODO: switch the following to proper command abstraction:
-            # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
-            # changed with command abstractions). So we need to get that part to
-            # have a valid path to the remote's config file:
-            cfg_path = PurePosixPath(URL(store_url).path) / 'config'
-            io = SSHRemoteIO(store_url)
-            try:
-                config_content = io.read_file(cfg_path)
-            except RIARemoteError as e:
-                ce = CapturedException(e)
-                lgr.debug("Failed to get config file from source: %s", ce)
-
-        elif scheme == 'file':
-            # TODO: switch the following to proper command abstraction:
-            io = LocalIO()
-            cfg_path = Path(URL(store_url).localpath) / 'config'
-            try:
-                config_content = io.read_file(cfg_path)
-            except (RIARemoteError, OSError) as e:
-                ce = CapturedException(e)
-                lgr.debug("Failed to get config file from source: %s", ce)
-        else:
-            lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
-                      "FILE scheme URLs.", scheme, props['source'])
-
-        # And read it
-        uuid = None
-        if config_content:
-            # TODO: We might be able to spare the saving to a file.
-            #       "git config -f -" is not explicitly documented but happens
-            #       to work and would read from stdin. Make sure we know this
-            #       works for required git versions and on all platforms.
-            with make_tempfile(content=config_content) as cfg_file:
-                runner = GitWitlessRunner()
-                try:
-                    result = runner.run(
-                        ['git', 'config', '-f', cfg_file,
-                         'datalad.ora-remote.uuid'],
-                        protocol=StdOutCapture
-                    )
-                    uuid = result['stdout'].strip()
-                except CommandError as e:
-                    ce = CapturedException(e)
-                    # doesn't contain what we are looking for
-                    lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", remote, ce)
-
-        return uuid
-
-
-
-
-    # chances are that if this dataset came from a RIA store, its subdatasets
-    # may live there too. Place a subdataset source candidate config that makes
-    # get probe this RIA store when obtaining subdatasets
-    ria_store_url = props['source'].split('#', maxsplit=1)[0]
-    ds.config.set(
-        # we use the label 'origin' for this candidate in order to not have to
-        # generate a complicated name from the actual source specification.
-        # we pick a cost of 200 to sort it before datalad's default candidates
-        # for non-RIA URLs, because they prioritize hierarchical layouts that
-        # cannot be found in a RIA store
-        'datalad.get.subdataset-source-candidate-200origin',
-        # use the entire original URL, up to the fragment + plus dataset ID
-        # placeholder, this should make things work with any store setup we
-        # support (paths, ports, ...)
-        ria_store_url + '#{id}',
-        scope='local')
-
-    # setup publication dependency, if a corresponding special remote exists
-    # and was enabled (there could be RIA stores that actually only have repos)
-    # make this function be a generator
-    ora_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
-                   if s.get('annex-externaltype') == 'ora']
-    # get full special remotes' config for access to stored URL
-    srs = repo.get_special_remotes() \
-        if hasattr(repo, 'get_special_remotes') else dict()
-
-    has_only_disabled_ora = \
-        not ora_remotes and \
-        any(r.get('externaltype') == 'ora' for r in srs.values())
-
-    def match_in_urls(special_remote_cfg, url_to_match):
-        # Figure whether either `url` or `push-url` in an ORA remote's config
-        # match a given URL (to a RIA store).
-        return special_remote_cfg['url'].startswith(url_to_match) or \
-               (special_remote_cfg['push-url'].startswith(url_to_match)
-                if 'push-url' in special_remote_cfg else False)
-
-    no_enabled_ora_matches_url = \
-        all(not match_in_urls(srs[r['annex-uuid']], ria_store_url)
-            for r in ora_remotes)
-
-    if has_only_disabled_ora or no_enabled_ora_matches_url:
-
-        # No ORA remote autoenabled, but configuration known about at least one,
-        # or enabled ORA remotes seem to not match clone URL.
-        # Let's check the remote's config for datalad.ora-remote.uuid as stored
-        # by create-sibling-ria and try enabling that one.
-        lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
-                  "up in source config ...")
-
-        org_uuid = get_uuid_from_store(props['giturl'])
-
-        # Now, enable it. If annex-init didn't fail to enable it as stored, we
-        # wouldn't end up here, so enable with store URL as suggested by the URL
-        # we cloned from.
-        if org_uuid:
-            if org_uuid in srs.keys():
-                # TODO: - Double-check autoenable value and only do this when
-                #         true?
-                #       - What if still fails? -> Annex shouldn't change config
-                #         in that case
-
-                # we only need the store:
-                new_url = props['source'].split('#')[0]
-                try:
-                    repo.enable_remote(srs[org_uuid]['name'],
-                                       options=['url={}'.format(new_url)]
-                                       )
-                    lgr.info("Reconfigured %s for %s",
-                             srs[org_uuid]['name'], new_url)
-                    # update ora_remotes for considering publication dependency
-                    # below
-                    ora_remotes = [s for s in
-                                   ds.siblings('query',
-                                               result_renderer='disabled')
-                                   if s.get('annex-externaltype', None) ==
-                                   'ora']
-                except CommandError as e:
-                    ce = CapturedException(e)
-                    lgr.debug("Failed to reconfigure ORA special remote: %s", ce)
-            else:
-                lgr.debug("Unknown ORA special remote uuid at '%s': %s",
-                          remote, org_uuid)
-
-    # Set publication dependency for `remote` on the respective ORA remote:
-    if ora_remotes:
-        url_matching_remotes = [r for r in ora_remotes
-                                if srs[r['annex-uuid']]['url'] == ria_store_url]
-
-        if len(url_matching_remotes) == 1:
-            # We have exactly one ORA remote with the same store URL we used for
-            # cloning (includes previously reconfigured remote).
-            # Set publication dependency:
-            yield from ds.siblings('configure',
-                                   name=remote,
-                                   publish_depends=url_matching_remotes[0]['name'],
-                                   result_filter=None,
-                                   result_renderer='disabled')
-
-        elif not url_matching_remotes:
-            # No matches but we have successfully autoenabled ORA remotes. Could
-            # be the same store accessed by different method (cloning via HTTP
-            # but special remote access via SSH). We can confidently set
-            # publication dependency if the store knows the UUID.
-            org_uuid = get_uuid_from_store(props['giturl'])
-            uuid_matching_remotes = [r for r in ora_remotes
-                                     if r['annex-uuid'] == org_uuid]
-            if uuid_matching_remotes:
-                # Multiple uuid matches are actually possible via same-as.
-                # However, in that case we can't decide which one is supposed to
-                # be used with publishing to `remote`.
-                if len(uuid_matching_remotes) == 1:
-                    yield from ds.siblings(
-                        'configure',
-                        name=remote,
-                        publish_depends=uuid_matching_remotes[0]['name'],
-                        result_filter=None,
-                        result_renderer='disabled')
-                else:
-                    lgr.warning(
-                        "Found multiple matching ORA remotes. Couldn't decide "
-                        "which one publishing to '%s' should depend on: %s."
-                        " Consider running 'datalad siblings configure -s "
-                        "%s --publish-depends ORAREMOTENAME' to set "
-                        "publication dependency manually.",
-                        remote,
-                        [r['name'] for r in uuid_matching_remotes],
-                        remote)
-
-        else:
-            # We have multiple ORA remotes with the same store URL we cloned
-            # from.
-            lgr.warning("Found multiple matching ORA remotes. Couldn't decide "
-                        "which one publishing to '%s' should depend on: %s."
-                        " Consider running 'datalad siblings configure -s "
-                        "%s --publish-depends ORAREMOTENAME' to set "
-                        "publication dependency manually.",
-                        remote,
-                        [r['name'] for r in url_matching_remotes],
-                        remote)
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
@@ -1435,7 +1161,7 @@ def decode_source_spec(spec, cfg=None):
     dict
       The value of each decoded property is stored under its own key in this
       dict. By default the following keys are return: 'type', a specification
-      type label {'giturl', 'dataladri', 'ria'}; 'source' the original
+      type label {'giturl', 'dataladri'}; 'source' the original
       source specification; 'giturl' a URL for the source that is a suitable
       source argument for git-clone; 'version' a version-identifer, if present
       (None else); 'default_destpath' a relative path that that can be used as
@@ -1465,39 +1191,6 @@ def decode_source_spec(spec, cfg=None):
         # we have got our DataLadRI as the source, so expand it
         props['type'] = 'dataladri'
         props['giturl'] = source_ri.as_git_url()
-    elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
-        # parse a RIA URI
-        dsid, version = source_ri.fragment.split('@', maxsplit=1) \
-            if '@' in source_ri.fragment else (source_ri.fragment, None)
-        uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
-        if re.match(uuid_regex, dsid):
-            trace = '{}/{}'.format(dsid[:3], dsid[3:])
-            default_destpath = dsid
-        elif dsid.startswith('~'):
-            trace = 'alias/{}'.format(dsid[1:])
-            default_destpath = dsid[1:]
-        else:
-            raise ValueError(
-                'RIA URI not recognized, no valid dataset ID or other supported '
-                'scheme: {}'.format(spec))
-        # now we cancel the fragment in the original URL, but keep everything else
-        # in order to be able to support the various combinations of ports, paths,
-        # and everything else
-        source_ri.fragment = ''
-        # strip the custom protocol and go with standard one
-        source_ri.scheme = source_ri.scheme[4:]
-        # take any existing path, and add trace to dataset within the store
-        source_ri.path = '{urlpath}{urldelim}{trace}'.format(
-            urlpath=source_ri.path if source_ri.path else '',
-            urldelim='' if not source_ri.path or source_ri.path.endswith('/') else '/',
-            trace=trace,
-        )
-        props.update(
-            type='ria',
-            giturl=str(source_ri),
-            version=version,
-            default_destpath=default_destpath,
-        )
     else:
         # let's assume that anything else is a URI that Git can handle
         props['type'] = 'giturl'
