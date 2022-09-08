@@ -3999,6 +3999,6 @@ def readline_json(stdout):
     try:
         return json.loads(toload) if toload else {}
     except json.JSONDecodeError:
-        lgr.error('Received undecodable JSON output: %s', line)
+        lgr.error('Received undecodable JSON output: %s', toload)
         raise
 
