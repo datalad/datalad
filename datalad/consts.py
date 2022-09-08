@@ -35,8 +35,6 @@ ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
 ANNEX_TRANSFER_DIR = join('.git', 'annex', 'transfer')
 
-SEARCH_INDEX_DOTGITDIR = join('datalad', 'search_index')
-
 DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
                   or "https://datasets.datalad.org/"
 # safeguard
