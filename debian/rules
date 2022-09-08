@@ -52,8 +52,8 @@ override_dh_auto_install:
 	mv debian/python3-datalad/usr/bin/* debian/datalad/usr/bin
 	rm -f debian/python*-datalad/usr/bin/*
 	# Building manpages. Overcoming #532 which creates some config file.
-	# Setting DATALAD_SOURCE_EPOCH to use that date in manpages for reproducible builds.
 	mkdir -p build/man
+	echo "DEBUG: DATALAD_SOURCE_EPOCH=$$DATALAD_SOURCE_EPOCH"
 	HOME=$(CURDIR)/build python3 setup.py build_manpage
 	# Generating argcomplete helper for bash_completion.d
 	{ register-python-argcomplete3 datalad || register-python-argcomplete datalad; } > debian/datalad/usr/share/bash-completion/completions/datalad
