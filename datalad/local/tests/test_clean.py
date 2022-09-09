@@ -110,12 +110,3 @@ def test_clean(d=None):
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
                      "Removed empty annex temporary transfer directory")
         assert_false(annex_trans_path.exists())
-
-    index_path.mkdir(parents=True)
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(index_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed empty metadata search index directory")
-        assert_false(index_path.exists())
