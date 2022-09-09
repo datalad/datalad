@@ -1,26 +1,26 @@
 name: Auto-release on PR merge
 
 on:
-  # ATM, this is the closest trigger to a PR merging
-  push:
+  pull_request:
     branches:
       - maint
+    types:
+      - closed
 
 jobs:
   auto-release:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      - name: Download latest auto
+      - name: Configure Git
         run: |
-          auto_download_url="$(curl -fsSL https://api.github.com/repos/intuit/auto/releases/latest | jq -r '.assets[] | select(.name == "auto-linux.gz") | .browser_download_url')"
-          wget -O- "$auto_download_url" | gunzip > ~/auto
-          chmod a+x ~/auto
+          git config --global user.name "DataLad Bot"
+          git config --global user.email "bot@datalad.org"
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -36,27 +36,20 @@ jobs:
       - name: Create release
         run: |
           set -x
-          auto_version="$(~/auto shipit --dry-run --quiet)"
-          if [ -z "$auto_version" ]
-          then echo "Nothing to release"
-               exit
-          fi
-          echo "[INFO] Auto version: $auto_version"
-          changelog_version="$(git tag --merged HEAD --sort v:refname | perl -nle 'print "$1.$2.", $3+1 if /^(\d+)\.(\d+)\.(\d+)$/' | tail -n1)"
-          echo "[INFO] Changelog version: $changelog_version"
-          if [ "$auto_version" != "$changelog_version" ]
-          then echo "[ERROR] Auto version does not equal changelog version"
-               exit 1
-          fi
-          scriv collect --version "$changelog_version"
+          new_version="$(git tag --merged HEAD --sort v:refname | perl -nle 'print "$1.$2.", $3+1 if /^(\d+)\.(\d+)\.(\d+)$/' | tail -n1)"
+          echo "[INFO] New version: $new_version"
+          scriv collect --add --version "$new_version"
           make update-changelog
-          git add CHANGELOG.md docs/source/changelog.rst
+          git add docs/source/changelog.rst
           git commit -m '[skip ci] Update CHANGELOG'
-          ~/auto shipit -vv --no-changelog
+          git tag "$new_version"
+          git push
+          git push --tags
+          scriv github-release
           python -m build
           twine upload dist/*
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
