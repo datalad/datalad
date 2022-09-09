@@ -67,8 +67,6 @@ from time import sleep
 from datalad.consts import TIMESTAMP_FMT
 from datalad.support.exceptions import CapturedException
 
-unicode_srctypes = str, bytes
-
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -875,34 +873,6 @@ def ensure_bool(s):
         else:
             raise ValueError("Do not know how to treat %r as a boolean" % s)
     return bool(s)
-
-
-def as_unicode(val, cast_types=object):
-    """Given an arbitrary value, would try to obtain unicode value of it
-    
-    For unicode it would return original value, for python2 str or python3
-    bytes it would use ensure_unicode, for None - an empty (unicode) string,
-    and for any other type (see `cast_types`) - would apply the unicode 
-    constructor.  If value is not an instance of `cast_types`, TypeError
-    is thrown
-    
-    Parameters
-    ----------
-    cast_types: type
-      Which types to cast to unicode by providing to constructor
-    """
-    if val is None:
-        return u''
-    elif isinstance(val, str):
-        return val
-    elif isinstance(val, unicode_srctypes):
-        return ensure_unicode(val)
-    elif isinstance(val, cast_types):
-        return str(val)
-    else:
-        raise TypeError(
-            "Value %r is not of any of known or provided %s types"
-            % (val, cast_types))
 
 
 def unique(seq, key=None, reverse=False):

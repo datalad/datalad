@@ -96,7 +96,6 @@ from datalad.utils import (
 from .utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
-    as_unicode,
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
@@ -815,21 +814,6 @@ def test_assure_unicode():
 def test_pathlib_unicode():
     eq_(str(Path("a")), u"a")
     eq_(str(Path(u"β")), u"β")
-
-
-def test_as_unicode():
-    eq_(as_unicode('grandchild_äöü東'), u'grandchild_äöü東')
-    eq_(as_unicode(None), u"")
-    eq_(as_unicode(1), u"1")
-    # NOTE: u? is because result is different between PY2 (prefixes unicode repr
-    # while in PY3 is no longer needed!  So aggregation result would differ between
-    # PY2 and PY3
-    # Didn't manage to make it work in PY2
-    #TODO assert_re_in(u'\[1, .s., u?.東.\]', as_unicode([1, "s", u"東"]))
-    eq_(as_unicode("01"), u"01")  # no some kind of conversion/stripping of numerals
-    with assert_raises(TypeError) as cme:
-        as_unicode(1, list)
-    assert_in("1 is not of any of known or provided", str(cme.value))
 
 
 @with_tempfile(mkdir=True)
