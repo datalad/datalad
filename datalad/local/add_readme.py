@@ -246,18 +246,17 @@ def _get_dataset_metadata(dataset):
         Can contain keys like 'description', 'shortdescription', 'author',
         'homepage', 'citation', 'license', 'tag', 'fundedby'
     """
-    if False:
-        # TODO make conditional on the presence of datalad-deprecated
+
+    meta = {}
+    if hasattr(dataset, 'metadata'):
         dsinfo = dataset.metadata(
             '.',
             reporton='datasets',
             return_type='item-or-list',
             result_renderer='disabled',
             on_failure='ignore')
-        meta = {}
         if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
             lgr.warning("Could not obtain dataset metadata, proceeding without")
-            dsinfo = {}
         else:
             # flatten possibly existing multiple metadata sources
             for src in dsinfo['metadata']:
@@ -265,6 +264,4 @@ def _get_dataset_metadata(dataset):
                     # not a source
                     continue
                 meta.update(dsinfo['metadata'][src])
-        return meta
-
-    return {}
+    return meta
