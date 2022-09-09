@@ -941,27 +941,6 @@ def unique(seq, key=None, reverse=False):
     return out[::-1] if reverse else out
 
 
-def all_same(items):
-    """Quick check if all items are the same.
-
-    Identical to a check like len(set(items)) == 1 but
-    should be more efficient while working on generators, since would
-    return False as soon as any difference detected thus possibly avoiding
-    unnecessary evaluations
-    """
-    first = True
-    first_item = None
-    for item in items:
-        if first:
-            first = False
-            first_item = item
-        else:
-            if item != first_item:
-                return False
-    # So we return False if was empty
-    return not first
-
-
 def map_items(func, v):
     """A helper to apply `func` to all elements (keys and values) within dict
 
