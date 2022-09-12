@@ -149,6 +149,14 @@ def test_help_np():
         # should be present only one time!
         eq_(stdout.count(s), 1)
 
+    # check that we have global options actually listed after "Global options"
+    # ATM -c is the first such option
+    assert re.search(r"Global options\W*-c ", stdout, flags=re.MULTILINE)
+    # and -c should be listed only once - i.e. that we do not duplicate sections
+    # and our USAGE summary has only [global-opts]
+    assert re.match("Usage: .*datalad.* \[global-opts\] command \[command-opts\]", stdout)
+    assert stdout.count(' -c ') == 1
+
     assert_all_commands_present(stdout)
 
     if not get_terminal_size()[0] or 0:
