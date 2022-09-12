@@ -1,10 +1,11 @@
 datalad (0.17.5-2) neurodebian; urgency=medium
 
-  * d/patches/bullseye-dsc-patch to be applied to bullseye (11.0) to use
-    appdirs instead of platformdirs.  Also enable it for focal (nd20.04)
-    as used on github actions.
+  * d/{control,patches/revert_platformdirs} to make compatible also with appdirs.
+    Applied to all releases to not mess with .dsc patching per release and
+    complicating update of the patch. ATM needed for bullseye (11.0) and focal
+    (20.04, used on github actions e.g. ReproNim/containers).
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 31 Aug 2022 09:21:43 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 12 Sep 2022 13:52:29 -0400
 
 datalad (0.17.5-1) unstable; urgency=medium
 
