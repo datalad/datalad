@@ -1,8 +1,6 @@
-diff --git a/datalad/cli/helpers.py b/datalad/cli/helpers.py
-index b657b6558..8d6a227f6 100644
 --- a/datalad/cli/helpers.py
 +++ b/datalad/cli/helpers.py
-@@ -25,7 +25,7 @@ from datalad.support.exceptions import CapturedException
+@@ -25,7 +25,7 @@ from datalad.support.exceptions import C
  from datalad.ui.utils import get_console_width
  from datalad.utils import is_interactive
  
@@ -11,8 +9,6 @@ index b657b6558..8d6a227f6 100644
  
  dirs = AppDirs("datalad", "datalad.org")
  
-diff --git a/datalad/downloaders/tests/test_providers.py b/datalad/downloaders/tests/test_providers.py
-index 36f8a692f..57c4706c5 100644
 --- a/datalad/downloaders/tests/test_providers.py
 +++ b/datalad/downloaders/tests/test_providers.py
 @@ -122,7 +122,7 @@ url_re = https?://crcns\\.org/.*
@@ -24,7 +20,7 @@ index 36f8a692f..57c4706c5 100644
  def test_Providers_from_config__files(sysdir=None, userdir=None, dsdir=None):
      """Test configuration file precedence
  
-@@ -146,14 +146,14 @@ def test_Providers_from_config__files(sysdir=None, userdir=None, dsdir=None):
+@@ -146,14 +146,14 @@ def test_Providers_from_config__files(sy
  
          # Test that the system defaults take precedence over the dataset
          # defaults (we're still within the dsdir)
@@ -41,7 +37,7 @@ index 36f8a692f..57c4706c5 100644
              providers = Providers.from_config_files(reload=True)
              provider = providers.get_provider('https://crcns.org/data....')
              assert_equal(provider.name, 'usercrcns')
-@@ -161,7 +161,7 @@ def test_Providers_from_config__files(sysdir=None, userdir=None, dsdir=None):
+@@ -161,7 +161,7 @@ def test_Providers_from_config__files(sy
  
  @with_tempfile(mkdir=True)
  def test_providers_enter_new(path=None):
@@ -50,21 +46,17 @@ index 36f8a692f..57c4706c5 100644
                          user_config_dir=path):
          providers_dir = op.join(path, "providers")
          providers = Providers.from_config_files(reload=True)
-diff --git a/datalad/interface/common_cfg.py b/datalad/interface/common_cfg.py
-index 5ceb6fb53..b5b8e415e 100644
 --- a/datalad/interface/common_cfg.py
 +++ b/datalad/interface/common_cfg.py
-@@ -18,7 +18,7 @@ from os import environ
- from os.path import expanduser
+@@ -19,7 +19,7 @@ from os.path import expanduser
  from os.path import join as opj
+ import time
  
 -from platformdirs import AppDirs
 +from appdirs import AppDirs
  
  from datalad.support.constraints import (
      EnsureBool,
-diff --git a/datalad/local/run_procedure.py b/datalad/local/run_procedure.py
-index 4d195b1de..8732fc851 100644
 --- a/datalad/local/run_procedure.py
 +++ b/datalad/local/run_procedure.py
 @@ -219,10 +219,10 @@ class RunProcedure(Interface):
@@ -80,8 +72,6 @@ index 4d195b1de..8732fc851 100644
        GNU/Linux systems)
      - 'datalad.locations.dataset-procedures'
  
-diff --git a/datalad/support/cookies.py b/datalad/support/cookies.py
-index add967d08..cb40e88b0 100644
 --- a/datalad/support/cookies.py
 +++ b/datalad/support/cookies.py
 @@ -11,7 +11,7 @@
@@ -102,8 +92,6 @@ index add967d08..cb40e88b0 100644
              filename = os.path.join(cookies_dir, 'cookies')
  
          # TODO: guarantee restricted permissions
-diff --git a/datalad/support/external_versions.py b/datalad/support/external_versions.py
-index 03baeaefd..ab5e0dc3f 100644
 --- a/datalad/support/external_versions.py
 +++ b/datalad/support/external_versions.py
 @@ -182,7 +182,7 @@ class ExternalVersions(object):
@@ -115,11 +103,9 @@ index 03baeaefd..ab5e0dc3f 100644
          'boto',
          'exifread',
          'git',
-diff --git a/setup.py b/setup.py
-index d736ff577..d9d74cbb6 100755
 --- a/setup.py
 +++ b/setup.py
-@@ -25,7 +25,7 @@ from _datalad_build_support.setup import (
+@@ -25,7 +25,7 @@ from _datalad_build_support.setup import
  
  requires = {
      'core': [
