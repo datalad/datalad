@@ -97,7 +97,6 @@ def setup_parser(
         prog='datalad',
         # usage="%(prog)s ...",
         description=help_gist,
-        epilog='"Be happy!"',
         formatter_class=formatter_class,
         add_help=False,
         # TODO: when dropping support for Python 3.8: uncomment below
