@@ -201,5 +201,10 @@
         "email": "jamesdkent21@gmail.com",
         "bio": "Postdoc",
         "blog": "https://jdkent.github.io/"
+    },
+    "kimsin98": {
+        "name": "Sin Kim",
+        "bio": "I like coding, data, and open science. Current interests are adolescent development and psychiatry.",
+        "blog": "https://orcid.org/0000-0003-4652-3758"
     }
 }
