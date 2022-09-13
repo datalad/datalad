@@ -42,7 +42,6 @@ if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
-WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
 
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
