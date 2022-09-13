@@ -28,7 +28,7 @@ jobs:
           python-version: '^3.8'
 
       - name: Install Python dependencies
-        run: python -m pip install build scriv twine
+        run: python -m pip install build requests scriv twine
 
       - name: Install pandoc
         run: sudo apt-get update && sudo apt-get install -y pandoc
@@ -38,6 +38,14 @@ jobs:
           set -x
           new_version="$(git tag --merged HEAD --sort v:refname | perl -nle 'print "$1.$2.", $3+1 if /^(\d+)\.(\d+)\.(\d+)$/' | tail -n1)"
           echo "[INFO] New version: $new_version"
+
+          shopt -s nullglob
+          python3 tools/ci/release-comment.py \
+            ${{ github.repository_owner }} \
+            ${{ github.event.repository.name }} \
+            "$new_version" \
+            changelog.d/pr-*
+
           scriv collect --add --version "$new_version"
           make update-changelog
           git add docs/source/changelog.rst
