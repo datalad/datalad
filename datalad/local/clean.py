@@ -16,6 +16,7 @@ from datalad.consts import (
     ANNEX_TEMP_DIR,
     ANNEX_TRANSFER_DIR,
     ARCHIVES_TEMP_DIR,
+    SEARCH_INDEX_DOTGITDIR,
 )
 from datalad.distribution.dataset import (
     EnsureDataset,
@@ -132,6 +133,8 @@ class Clean(Interface):
                  "temporary annex", FILES_PLURAL),
                 (Path(ANNEX_TRANSFER_DIR), "annex-transfer",
                  "annex temporary transfer", DIRS_PLURAL),
+                (gitdir / Path(SEARCH_INDEX_DOTGITDIR), 'search-index',
+                 "metadata search index", FILES_PLURAL),
             ]:
                 topdir = wds.pathobj / dirpath
                 lgr.debug("Considering to clean %s:%s", d, dirpath)
