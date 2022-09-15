@@ -140,7 +140,7 @@ def test_help_np():
     sections = [l[1:-1] for l in filter(re.compile(r'^\*.*\*$').match, stdout.split('\n'))]
     for s in {'Essential commands',
               'Commands for metadata handling',
-              'Miscellaneous commands',
+              'Miscellaneous',
               'General information',
               'Global options',
               'Plumbing commands',
