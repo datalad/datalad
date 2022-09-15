@@ -66,7 +66,6 @@ _common_diffstatus_params = dict(
         constraints=EnsureDataset() | EnsureNone()),
     annex=Parameter(
         args=('--annex',),
-        metavar='MODE',
         # the next two enable a sole `--annex` that auto-translates to
         # `--annex basic`
         const='basic',
@@ -88,7 +87,6 @@ _common_diffstatus_params = dict(
         """),
     untracked=Parameter(
         args=('--untracked',),
-        metavar='MODE',
         constraints=EnsureChoice('no', 'normal', 'all'),
         doc="""If and how untracked content is reported when comparing
         a revision to the state of the working tree. 'no': no untracked
