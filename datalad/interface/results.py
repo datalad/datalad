@@ -107,6 +107,8 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
             if isinstance(exception, CapturedException) \
             else format_oneline_tb(
                 exception, include_str=False)
+        if error_message is None and isinstance(exception, CapturedException):
+            d['error_message'] = exception.message
         if isinstance(exception, CommandError):
             d['exit_code'] = exception.code
     if kwargs:
