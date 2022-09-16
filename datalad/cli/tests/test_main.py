@@ -147,7 +147,7 @@ def test_help_np():
               }:
         assert_in(s, sections)
         # should be present only one time!
-        eq_(stdout.count(f"*{s}*"), 1)
+        eq_(stdout.count(f'*{s}*'), 1)
 
     assert_all_commands_present(stdout)
 
