@@ -450,6 +450,12 @@ class Create(Interface):
                 return_type='generator',
                 result_renderer='disabled',
             )
+        else:
+            # if we do not save, we touch the root directory of the new
+            # dataset to signal a change in the nature of the directory.
+            # this is useful for apps like datalad-gooey (or other
+            # inotify consumers) to pick up on such changes.
+            tbds.pathobj.touch()
 
         res.update({'status': 'ok'})
         yield res
