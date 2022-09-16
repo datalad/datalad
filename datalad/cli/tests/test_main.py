@@ -138,16 +138,16 @@ def test_help_np():
     ok_startswith(stdout, 'Usage: datalad')
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
     sections = [l[1:-1] for l in filter(re.compile(r'^\*.*\*$').match, stdout.split('\n'))]
-    for s in {'Essential commands',
-              'Commands for metadata handling',
-              'Miscellaneous commands',
+    for s in {'Essential',
+              'Metadata',
+              'Miscellaneous',
               'General information',
               'Global options',
-              'Plumbing commands',
+              'Plumbing',
               }:
         assert_in(s, sections)
         # should be present only one time!
-        eq_(stdout.count(s), 1)
+        eq_(stdout.count(f'*{s}*'), 1)
 
     assert_all_commands_present(stdout)
 
