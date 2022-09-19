@@ -44,7 +44,12 @@ jobs:
             ${{ github.event.repository.name }} \
             ${{ github.event.pull_request.number }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+
+      - name: Remove CHANGELOG-missing label
+        uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: CHANGELOG-missing
 
       - name: Commit
         run: |
@@ -54,10 +59,5 @@ jobs:
                git push origin HEAD:${{ github.head_ref }}
           else echo "No changes to commit"
           fi
-
-      - name: Remove CHANGELOG-missing label
-        uses: actions-ecosystem/action-remove-labels@v1
-        with:
-          labels: CHANGELOG-missing
 
 # vim:set et sts=2:
