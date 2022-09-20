@@ -461,11 +461,19 @@ class Status(Interface):
         # fish out sizes of annexed files. those will only be present
         # with --annex ...
         annexed = [
-            (int(r.get('bytesize', 0)), r.get('has_content', None))
+            (r.get('bytesize', None), r.get('has_content', None), r['path'])
             for r in results
             if r.get('action', None) == 'status' \
             and 'key' in r]
         if annexed:
+            # convert to int and interrogate files with content but
+            # with unknown size (e.g. for --relaxed URLs), and drop 'path'
+            annexed = [
+                (int(bytesize) if bytesize is not None else (
+                    int(os.stat(path).st_size) if has_content else 0
+                 ), has_content)
+                for bytesize, has_content, path in annexed
+            ]
             have_availability = any(a[1] is not None for a in annexed)
             total_size = bytes2human(sum(a[0] for a in annexed))
             # we have availability info encoded in the results
