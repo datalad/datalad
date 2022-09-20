@@ -461,10 +461,10 @@ class Status(Interface):
         # fish out sizes of annexed files. those will only be present
         # with --annex ...
         annexed = [
-            (int(r['bytesize']), r.get('has_content', None))
+            (int(r.get('bytesize', 0)), r.get('has_content', None))
             for r in results
             if r.get('action', None) == 'status' \
-            and 'key' in r and 'bytesize' in r]
+            and 'key' in r]
         if annexed:
             have_availability = any(a[1] is not None for a in annexed)
             total_size = bytes2human(sum(a[0] for a in annexed))
