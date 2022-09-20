@@ -134,6 +134,9 @@ def main():
         token = os.environ["GITHUB_TOKEN"]
     except KeyError:
         sys.exit("GITHUB_TOKEN not set")
+    if not token:
+        sys.exit("GITHUB_TOKEN is set to an empty value")
+    print(f"GITHUB_TOKEN begins with {token[:6]}")
     with ReleaseCommenter(
         repo_owner=args.repo_owner,
         repo_name=args.repo_name,
@@ -141,12 +144,14 @@ def main():
         token=token,
     ) as rc:
         for name in args.pr_snippets:
+            print(f"Processing {name}")
             basename = os.path.basename(name)
             m = re.fullmatch(r"pr-(\d+)(?:\.[a-z]+)?", basename)
             if m:
                 prnum = int(m[1])
                 rc.comment_on_pr(prnum)
                 for issue in rc.get_closed_issues(prnum):
+                    print(f" commenting on issue {issue}")
                     rc.comment_on_issue(issue)
             else:
                 print(
