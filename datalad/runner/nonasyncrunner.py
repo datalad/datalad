@@ -276,7 +276,7 @@ class ThreadedRunner:
                     stderr=decoded_output.get("stderr", None)
                 )
 
-    def run(self) -> dict | Generator:
+    def run(self) -> dict | _ResultGenerator:
         """
         Run the command as specified in __init__.
 
@@ -319,7 +319,7 @@ class ThreadedRunner:
         with self.initialization_lock:
             return self._locked_run()
 
-    def _locked_run(self) -> dict | Generator:
+    def _locked_run(self) -> dict | _ResultGenerator:
         if self.generator is not None:
             raise RuntimeError("ThreadedRunner.run() was re-entered")
 
@@ -686,7 +686,7 @@ def run_command(cmd: str | list,
                 protocol_kwargs: Optional[dict] = None,
                 timeout: Optional[float] = None,
                 exception_on_error: bool = True,
-                **popen_kwargs) -> dict | Generator:
+                **popen_kwargs) -> dict | _ResultGenerator:
     """
     Run a command in a subprocess
 
