@@ -888,7 +888,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         else:
             file_list += bytes(Path(c['path']).relative_to(ds.pathobj))
             file_list += b'\0'
-            nbytes += c['bytesize']
+            nbytes += c.get('bytesize', 0)
             seen_keys.add(key)
     lgr.debug('Counted %d bytes of annex data to transfer',
               nbytes)
