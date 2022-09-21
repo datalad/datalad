@@ -105,12 +105,11 @@
          'git',
 --- a/setup.py
 +++ b/setup.py
-@@ -25,7 +25,7 @@ from _datalad_build_support.setup import
+@@ -25,7 +25,6 @@ from _datalad_build_support.setup import
  
  requires = {
      'core': [
 -        'platformdirs',
-+        'appdirs',
-         'chardet>=3.0.4, <5.0.0',      # rarely used but small/omnipresent
+         'chardet>=3.0.4',      # rarely used but small/omnipresent
          'colorama; platform_system=="Windows"',
          'distro; python_version >= "3.8"',
