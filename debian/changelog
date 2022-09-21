@@ -1,6 +1,8 @@
 datalad (0.17.6-1) unstable; urgency=medium
 
   * Fresh upstream bugfix release
+  * d/control -- add minimal version for the alternative of
+    importlib-metadata to be 3.6, needed since 0.16.2~6^2.
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 21 Sep 2022 16:27:57 -0400
 
