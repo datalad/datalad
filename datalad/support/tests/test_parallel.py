@@ -135,7 +135,6 @@ def test_creatsubdatasets(topds_path=None, n=2):
     assert_repo_status(ds.repo)
 
 
-@known_failure_osx  # https://github.com/datalad/datalad/issues/5309
 def test_gracefull_death():
 
     def assert_provides_and_raises(pc, exception, target=None):
@@ -220,7 +219,11 @@ def test_gracefull_death():
         pc = iter(ProducerConsumer(range(1000), consumer, jobs=2))
         yield next(pc)
         yield next(pc)
-    assert_equal(sorted(inner()), [0, 1])
+    # typically it should be [0, 1] but it does happen some times that
+    # one other worker gets ahead and we get [0, 2]. As it is not per se the
+    # purpose of this test to ensure absence of such race, we just allow for any
+    # two from first 3 possible.
+    assert len(set(inner()).intersection({0, 1, 2})) == 2
     consumed = sorted(consumed)
     assert_equal(consumed, list(range(len(consumed))))
     assert_greater_equal(len(consumed), 4)  # we should wait for that 2nd batch to finish

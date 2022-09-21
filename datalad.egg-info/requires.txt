@@ -1,5 +1,5 @@
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -27,7 +27,7 @@ distro
 
 [core]
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -47,7 +47,7 @@ distro
 
 [devel]
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -129,7 +129,7 @@ duecredit
 
 [full]
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
