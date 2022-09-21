@@ -2,8 +2,56 @@
 
 Change log
 **********
-0.17.5 (Fri Sep 02 2022)
-========================
+# 0.17.6 (2022-09-21)
+
+Bug Fixes
+---------
+
+-  UX: push - provide specific error with details if push failed due to
+   permission issue. `PR
+   #7011 <https://github.com/datalad/datalad/pull/7011>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Fix datalad –help to not have *Global options* empty with python 3.10
+   and list options in “options:” section. `PR
+   #7028 <https://github.com/datalad/datalad/pull/7028>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Let ``create`` touch the dataset root, if not saving in parent
+   dataset. `PR #7036 <https://github.com/datalad/datalad/pull/7036>`__
+   (by `@mih <https://github.com/mih>`__)
+
+-  Let get_status_dict() use exception message if none is passed. `PR
+   #7037 <https://github.com/datalad/datalad/pull/7037>`__ (by
+   `@mih <https://github.com/mih>`__)
+
+-  Make choices for ``status|diff --annex`` and
+   ``status|diff --untracked`` visible. `PR
+   #7039 <https://github.com/datalad/datalad/pull/7039>`__ (by
+   `@mih <https://github.com/mih>`__)
+
+-  push: Assume 0 bytes pushed if git-annex does not provide bytesize.
+   `PR #7049 <https://github.com/datalad/datalad/pull/7049>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+Internal
+--------
+
+-  Use scriv for CHANGELOG generation in release workflow. `PR
+   #7009 <https://github.com/datalad/datalad/pull/7009>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+-  Stop using auto. `PR
+   #7024 <https://github.com/datalad/datalad/pull/7024>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+Tests
+-----
+
+-  Allow for any 2 from first 3 to be consumed in test_gracefull_death.
+   `PR #7041 <https://github.com/datalad/datalad/pull/7041>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__) # 0.17.5 (Fri Sep 02
+   2022)
 
 Bug Fix
 -------
@@ -64,6 +112,8 @@ Bug Fix
    guarantee a single “message” and thus a single custom value
    `#6978 <https://github.com/datalad/datalad/pull/6978>`__
    (`@christian-monch <https://github.com/christian-monch>`__)
+
+.. _tests-1:
 
 Tests
 -----
@@ -228,7 +278,7 @@ Pushed to ``maint``
 -  DOC: fix capitalization of service names
    (`@aqw <https://github.com/aqw>`__)
 
-.. _tests-1:
+.. _tests-2:
 
 Tests
 -----
@@ -385,6 +435,8 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
+.. _bug-fixes-1:
+
 Bug Fixes
 ---------
 
@@ -414,6 +466,8 @@ Documentation
 -  Explain downstream consequences of using ``--fast`` option in
    ``addurls``. `#6684 <https://github.com/datalad/datalad/pull/6684>`__
    (by @jdkent)
+
+.. _internal-1:
 
 Internal
 --------
@@ -1027,7 +1081,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-1:
+.. _bug-fixes-2:
 
 Bug Fixes
 ---------
@@ -1211,7 +1265,7 @@ Documentation
    now `#6436 <https://github.com/datalad/datalad/pull/6436>`__ (by
    @yarikoptic)
 
-.. _internal-1:
+.. _internal-2:
 
 Internal
 --------
@@ -1323,7 +1377,7 @@ Internal
    previous implementations.
    `#6591 <https://github.com/datalad/datalad/pull/6591>`__ (by @mih)
 
-.. _tests-2:
+.. _tests-3:
 
 Tests
 -----
@@ -1569,7 +1623,7 @@ Bug Fix
    `#6140 <https://github.com/datalad/datalad/pull/6140>`__
    (`@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-3:
+.. _tests-4:
 
 Tests
 -----
@@ -1641,7 +1695,7 @@ Pushed to ``maint``
 -  CI: Enable new codecov uploader in Appveyor CI
    (`@adswa <https://github.com/adswa>`__)
 
-.. _internal-2:
+.. _internal-3:
 
 Internal
 --------
@@ -1666,7 +1720,7 @@ Documentation
    `#6065 <https://github.com/datalad/datalad/pull/6065>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-4:
+.. _tests-5:
 
 Tests
 -----
@@ -1735,7 +1789,7 @@ Bug Fix
    `#6007 <https://github.com/datalad/datalad/pull/6007>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-5:
+.. _tests-6:
 
 Tests
 -----
@@ -1797,7 +1851,7 @@ Pushed to ``maint``
 -  Discontinue testing of hirni extension
    (`@mih <https://github.com/mih>`__)
 
-.. _internal-3:
+.. _internal-4:
 
 Internal
 --------
@@ -1815,7 +1869,7 @@ Documentation
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-6:
+.. _tests-7:
 
 Tests
 -----
@@ -2171,7 +2225,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-7:
+.. _tests-8:
 
 Tests
 -----
@@ -2242,7 +2296,7 @@ Pushed to ``maint``
 -  RF(BF?)+DOC: provide User-Agent to entire session headers + use those
    if provided (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-4:
+.. _internal-5:
 
 Internal
 --------
@@ -2263,7 +2317,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-8:
+.. _tests-9:
 
 Tests
 -----
@@ -2332,7 +2386,7 @@ Bug Fix
    `#5776 <https://github.com/datalad/datalad/pull/5776>`__
    (s.heunis@fz-juelich.de)
 
-.. _internal-5:
+.. _internal-6:
 
 Internal
 --------
@@ -2344,7 +2398,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-9:
+.. _tests-10:
 
 Tests
 -----
@@ -2372,7 +2426,7 @@ Authors: 4
 0.14.6 (Sun Jun 27 2021)
 ========================
 
-.. _internal-6:
+.. _internal-7:
 
 Internal
 --------
@@ -2483,7 +2537,7 @@ Pushed to ``maint``
 
 -  MNT: Post-release dance (`@kyleam <https://github.com/kyleam>`__)
 
-.. _internal-7:
+.. _internal-8:
 
 Internal
 --------
@@ -2496,7 +2550,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-10:
+.. _tests-11:
 
 Tests
 -----
