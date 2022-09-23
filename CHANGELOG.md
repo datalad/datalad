@@ -43,6 +43,9 @@
 - Allow for any 2 from first 3 to be consumed in test_gracefull_death.  [PR
   #7041](https://github.com/datalad/datalad/pull/7041) (by
   [@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.17.5 (Fri Sep 02 2022)
 
 #### 🐛 Bug Fix
