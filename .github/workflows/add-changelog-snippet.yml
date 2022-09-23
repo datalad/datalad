@@ -23,8 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+          token: ${{secrets.GITMATE_GITHUB_TOKEN }}
 
       - name: Configure Git identity
         run: |
