@@ -59,5 +59,7 @@ jobs:
                git push origin HEAD:${{ github.head_ref }}
           else echo "No changes to commit"
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITMATE_GITHUB_TOKEN }}
 
 # vim:set et sts=2:
