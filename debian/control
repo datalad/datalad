@@ -42,6 +42,7 @@ Build-Depends: debhelper (>= 11),
                python3-simplejson,
                python3-six,
                python3-tqdm,
+               python3-typing-extensions,
                python3-vcr,
                python3-whoosh,
 Build-Conflicts: git-annex (= 8.20200226-1)
