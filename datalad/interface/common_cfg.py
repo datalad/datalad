@@ -17,6 +17,7 @@ import logging
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
+import time
 
 from platformdirs import AppDirs
 
@@ -24,6 +25,7 @@ from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
     EnsureInt,
+    EnsureFloat,
     EnsureListOf,
     EnsureNone,
     EnsureStr,
@@ -719,6 +721,18 @@ _definitions = {
                     "ignore the incompatibility."}),
         'type': EnsureChoice('warning', 'error', 'none'),
         'default': 'warning',
+
+    },
+    'datalad.source.epoch': {
+        'ui': ('question', {
+            'title': 'Datetime epoch to use for dates in built materials',
+            'text': "Datetime to use for reproducible builds. Originally introduced "
+                    "for Debian packages to interface SOURCE_DATE_EPOCH described at "
+                    "https://reproducible-builds.org/docs/source-date-epoch/ ."
+                    "By default - current time"
+        }),
+        'type': EnsureFloat(),
+        'default': time.time(),
 
     },
     'datalad.ssh.executable': {

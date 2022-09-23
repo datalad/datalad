@@ -1,3 +1,92 @@
+
+<a id='changelog-0.17.6'></a>
+# 0.17.6 (2022-09-21)
+
+## Bug Fixes
+
+- UX: push - provide specific error with details if push failed due to
+  permission issue.  [PR #7011](https://github.com/datalad/datalad/pull/7011)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Fix datalad --help to not have *Global options* empty with python 3.10 and
+  list options in "options:" section.
+  [PR #7028](https://github.com/datalad/datalad/pull/7028)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Let `create` touch the dataset root, if not saving in parent dataset.  [PR
+  #7036](https://github.com/datalad/datalad/pull/7036) (by
+  [@mih](https://github.com/mih))
+
+- Let get_status_dict() use exception message if none is passed.  [PR
+  #7037](https://github.com/datalad/datalad/pull/7037) (by
+  [@mih](https://github.com/mih))
+
+- Make choices for `status|diff --annex` and `status|diff --untracked` visible.  [PR
+  #7039](https://github.com/datalad/datalad/pull/7039) (by
+  [@mih](https://github.com/mih))
+
+- push: Assume 0 bytes pushed if git-annex does not provide bytesize.  [PR
+  #7049](https://github.com/datalad/datalad/pull/7049) (by
+  [@yarikoptic](https://github.com/yarikoptic))
+
+## Internal
+
+- Use scriv for CHANGELOG generation in release workflow.  [PR
+  #7009](https://github.com/datalad/datalad/pull/7009) (by
+  [@jwodder](https://github.com/jwodder))
+
+- Stop using auto.  [PR #7024](https://github.com/datalad/datalad/pull/7024)
+  (by [@jwodder](https://github.com/jwodder))
+
+## Tests
+
+- Allow for any 2 from first 3 to be consumed in test_gracefull_death.  [PR
+  #7041](https://github.com/datalad/datalad/pull/7041) (by
+  [@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.17.5 (Fri Sep 02 2022)
+
+#### 🐛 Bug Fix
+
+- BF: blacklist 23.9.0 of keyring as introduces regression [#7003](https://github.com/datalad/datalad/pull/7003) ([@yarikoptic](https://github.com/yarikoptic))
+- Make the manpages build reproducible via datalad.source.epoch (to be used in Debian packaging) [#6997](https://github.com/datalad/datalad/pull/6997) ([@lamby](https://github.com/lamby) bot@datalad.org [@yarikoptic](https://github.com/yarikoptic))
+- BF: backquote path/drive in Changelog [#6997](https://github.com/datalad/datalad/pull/6997) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- Chris Lamb ([@lamby](https://github.com/lamby))
+- DataLad Bot (bot@datalad.org)
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# 0.17.4 (Tue Aug 30 2022)
+
+#### 🐛 Bug Fix
+
+- BF: make logic more consistent for files=[] argument (which is False but not None) [#6976](https://github.com/datalad/datalad/pull/6976) ([@yarikoptic](https://github.com/yarikoptic))
+- Run pytests in parallel (-n 2) on appveyor [#6987](https://github.com/datalad/datalad/pull/6987) ([@yarikoptic](https://github.com/yarikoptic))
+- Add workflow for autogenerating changelog snippets [#6981](https://github.com/datalad/datalad/pull/6981) ([@jwodder](https://github.com/jwodder))
+- Provide `/dev/null` (`b:\nul` on 💾 Windows) instead of empty string as a git-repo to avoid reading local repo configuration [#6986](https://github.com/datalad/datalad/pull/6986) ([@yarikoptic](https://github.com/yarikoptic))
+- RF: call_from_parser - move code into "else" to simplify reading etc [#6982](https://github.com/datalad/datalad/pull/6982) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: if early attempt to parse resulted in error, setup subparsers [#6980](https://github.com/datalad/datalad/pull/6980) ([@yarikoptic](https://github.com/yarikoptic))
+- Run pytests in parallel (-n 2) on Travis [#6915](https://github.com/datalad/datalad/pull/6915) ([@yarikoptic](https://github.com/yarikoptic))
+- Send one character (no newline) to stdout in protocol test to guarantee a single "message" and thus a single custom value [#6978](https://github.com/datalad/datalad/pull/6978) ([@christian-monch](https://github.com/christian-monch))
+
+#### 🧪 Tests
+
+- TST: test_stalling -- wait x10 not just x5 time [#6995](https://github.com/datalad/datalad/pull/6995) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.17.3 (Tue Aug 23 2022)
 
 #### 🐛 Bug Fix

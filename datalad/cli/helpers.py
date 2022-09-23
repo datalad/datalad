@@ -78,7 +78,7 @@ class HelpAction(argparse.Action):
         options = []
         in_options = False
         for line in helpstr.splitlines():
-            if line == 'optional arguments:':
+            if line in ('options:', 'optional arguments:'):
                 in_options = True
                 continue
             (options if in_options else preamble).append(line)

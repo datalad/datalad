@@ -882,6 +882,7 @@ def test_push_matching(path=None):
         ds.repo.get_hexsha(DEFAULT_BRANCH))
 
 
+@slow  # can run over 30 sec when running in parallel with n=2. Cannot force serial yet, see https://github.com/pytest-dev/pytest-xdist/issues/385
 @known_failure_githubci_win  # https://github.com/datalad/datalad/issues/5271
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)

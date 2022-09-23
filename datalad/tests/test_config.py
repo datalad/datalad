@@ -289,6 +289,24 @@ def test_something(path=None, new_home=None):
 
 
 @with_tree(tree={
+    '.gitconfig': """\
+[includeIf "gitdir:**/devbgc/**"]
+    path = ~/.gitconfig_bgc
+
+[custom "datalad"]
+  variable = value
+"""})
+def test_includeif_breaking(new_home=None):
+    patched_env = os.environ.copy()
+    patched_env.pop('GIT_CONFIG_GLOBAL', None)
+    patched_env.update(get_home_envvars(new_home))
+    with patch.dict('os.environ', patched_env, clear=True):
+        cfg = ConfigManager()
+        # just want to make sure we read it and didn't crash
+        assert cfg.get('custom.datalad.variable') == "value"
+
+
+@with_tree(tree={
     'ds': {
         '.datalad': {
             'config': """\

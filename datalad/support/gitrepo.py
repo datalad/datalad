@@ -2706,7 +2706,7 @@ class GitRepo(CoreGitRepo):
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
-        if paths:
+        if paths:  # is not None separate after
             # path matching will happen against what Git reports
             # and Git always reports POSIX paths
             # any incoming path has to be relative already, so we can simply
@@ -2865,7 +2865,7 @@ class GitRepo(CoreGitRepo):
             Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
         lgr.debug('Query status of %r for %s paths',
-                  self, len(paths) if paths else 'all')
+                  self, len(paths) if paths is not None else 'all')
         return self.diffstatus(
             fr='HEAD' if self.get_hexsha() else None,
             to=None,
@@ -2936,7 +2936,7 @@ class GitRepo(CoreGitRepo):
         if _cache is None:
             _cache = {}
 
-        if paths:
+        if paths is not None:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
             paths = map(ut.Path, paths)
@@ -2974,7 +2974,7 @@ class GitRepo(CoreGitRepo):
                         # included with `-m` alone
                         ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
-                        files=[str(p) for p in paths] if paths else None,
+                        files=[str(p) for p in paths] if paths is not None else None,
                         sep='\0',
                         read_only=True)
                     if p)

@@ -164,7 +164,7 @@ def setup_parser(
     all_parsers = {}  # name: (sub)parser
 
     if (completing and status == 'allknown') or status \
-            in ('allparsers', 'subcommand'):
+            in ('allparsers', 'subcommand', 'error'):
         # parseinfo could be None here, when we could not identify
         # a subcommand, but need to locate matching ones for
         # completion

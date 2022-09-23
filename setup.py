@@ -41,7 +41,8 @@ requires = {
     ],
     'downloaders': [
         'boto',
-        'keyring>=20.0', 'keyrings.alt',
+        'keyring>=20.0,!=23.9.0',
+        'keyrings.alt',
         'msgpack',
         'requests>=1.2',
     ],
@@ -97,9 +98,10 @@ requires.update({
     ],
     'devel-utils': [
         'asv',        # benchmarks
+        'coverage',
         'gprof2dot',  # rendering cProfile output as a graph image
         'psutil',
-        'coverage',
+        'pytest-xdist',  # parallelize pytest runs etc
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome
