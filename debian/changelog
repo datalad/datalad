@@ -1,13 +1,14 @@
-datalad (0.17.6-2) UNRELEASED; urgency=medium
+datalad (0.17.6-2) neurodebian; urgency=medium
 
   * d/control
     - fixed version depend for importlib-metadata, wrongly specified to be 0.16.2
     - add python3-typing-extensions explicitly into build-depends since we
       depend on them through importlib-metadata and that one managed to forget
       to declare depends on it
+  * debian/patches/deb_disable_pytest_warn - to help backporting on buster
 
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 21 Sep 2022 21:10:40 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 26 Sep 2022 14:30:59 -0400
 
 datalad (0.17.6-1) unstable; urgency=medium
 
