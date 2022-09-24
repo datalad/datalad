@@ -52,22 +52,20 @@ jobs:
         DL_PIP_INSTALLS=mock
         DL_APT_INSTALLS=dcm2niix
         DL_REPO=datalad/${{ matrix.extension }}
-        DL_TESTER=nose
+        DL_TESTER=pytest
         DL_NEED_SINGULARITY=
         # TODO: just reuse information from datalad-extensions!!
         case ${{ matrix.extension }} in
           datalad-metalad)
-            DL_PIP_INSTALLS+=" nose"
-            DL_TESTER=pytest;;
+            DL_PIP_INSTALLS+=" nose";;
+          datalad-neuroimaging|datalad-deprecated)
+            DL_TESTER=nose;;
           datalad-hirni)
             DL_REPO=psychoinformatics-de/${{ matrix.extension }}
+            DL_TESTER=nose
             DL_NEED_SINGULARITY=1;;
-          datalad-crawler)
-            DL_TESTER=pytest;;
           datalad-container)
             DL_NEED_SINGULARITY=1;;
-          datalad-next)
-            DL_TESTER=pytest;;
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
