@@ -1,8 +1,8 @@
-datalad (0.17.6-3) neurodebian; urgency=medium
+datalad (0.17.6-3) unstable; urgency=medium
 
   * d/control - fix python-appdirs to python3-appdirs.
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 27 Sep 2022 22:08:26 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 29 Sep 2022 19:23:14 -0400
 
 datalad (0.17.6-2) neurodebian; urgency=medium
 
