@@ -80,7 +80,7 @@ class ManPageFormatter(argparse.HelpFormatter):
 
     def _mk_name(self, prog, desc):
         """
-        this method is in consitent with others ... it relies on
+        this method is in consistent with others ... it relies on
         distribution
         """
         desc = desc.splitlines()[0] if desc else 'it is in the name'
