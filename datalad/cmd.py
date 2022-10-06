@@ -312,8 +312,8 @@ class BatchedCommand(SafeDelCloseMixin):
             if result is None:
                 return True
             self.return_code = result
+            self.runner = None
             if result != 0:
-                self.runner = None
                 raise BatchedCommandError(
                     cmd=" ".join(self.command),
                     request=self.last_request,
@@ -364,6 +364,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 while True:
                     try:
                         responses.append(self.process_request(request))
+                        self.last_request = request
                         break
                     except StopIteration:
                         # The process finished executing, store the last return
@@ -372,6 +373,20 @@ class BatchedCommand(SafeDelCloseMixin):
                         self.return_code = self.generator.return_code
                         self.runner = None
 
+        except CommandError as command_error:
+            # Convert CommandError into BatchedCommandError
+            self.runner = None
+            self.return_code = command_error.code
+            raise BatchedCommandError(
+                cmd=command_error.cmd,
+                request=self.last_request,
+                msg=command_error.msg,
+                code=command_error.code,
+                stdout=command_error.stdout,
+                stderr=command_error.stderr,
+                cwd=command_error.cwd,
+                **command_error.kwargs
+            )
 
         finally:
             self._active -= 1
@@ -389,7 +404,6 @@ class BatchedCommand(SafeDelCloseMixin):
             # Remember request end send it to subprocess
             if not isinstance(request, str):
                 request = ' '.join(request)
-            self.last_request = request
             self.stdin_queue.put((request + "\n").encode())
 
             # Get the response from the generator. We only consider

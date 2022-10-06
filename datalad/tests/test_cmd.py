@@ -165,27 +165,24 @@ exit(3)
     # Send something to start the process
     first_request = "line one"
     result = bc(first_request)
-    assert bc.return_code == None
+    assert bc.return_code is None
     assert result == "something"
-    with pytest.raises(CommandError) as exception_info:
+    with pytest.raises(BatchedCommandError) as exception_info:
         bc("line two")
-        assert exception_info.value.code == 3
-        print(exception_info.value.msg, file=sys.stderr)
-        assert exception_info.value.msg.endswith(first_request)
+    assert exception_info.value.code == 3
+    assert exception_info.value.request == first_request
+    assert bc.return_code == 3
 
     # Check for restart
-    #assert_equal(bc.return_code, None)
-    #result = bc(first_request)
-    #assert result == "something"
-    #with pytest.raises(CommandError) as exception_info:
-    #    bc.close(return_stderr=False)
-    #    assert exception_info.value.code == 3
+    result = bc(first_request)
+    assert result == "something"
+    bc.close(return_stderr=False)
 
 
 def test_command_fail_2():
-    # Expect that a failing command raises a CommandError in which the return
-    # code and the last successful request is caught, and that the process is
-    # restarted if the batched command is called again
+    # Expect that a failing command raises a BatchedCommandError in which the
+    # return code and the last successful request is caught. In this case the
+    # last successful request should be None.
     bc = BatchedCommand(
         cmd=py2cmd(
             """
@@ -194,25 +191,10 @@ print(a*b)
 
     # Send something to start the process
     first_request = "line one"
-    result = bc(first_request)
-    assert_not_equal(bc.return_code, 0)
-    assert_is_none(result)
-    result = bc("line two")
-    assert_not_equal(bc.return_code, 0)
-    assert_is_none(result)
-    bc.close(return_stderr=False)
-
-
-def test_command_fail_3():
-    # Expect that the return code of a failing command is caught,
-    # that None is returned as result.
-    bc = BatchedCommand(cmd=py2cmd("exit(4)"))
-
-    # Send something to start the process
-    result = bc("line one")
-    assert_equal(bc.return_code, None)
-    assert_equal(result, "something")
-    result = bc("line two")
-    assert_equal(bc.return_code, 3)
-    assert_equal(result, None)
+    with pytest.raises(BatchedCommandError) as exception_info:
+        _ = bc(first_request)
+    assert exception_info.value.code == 1
+    assert exception_info.value.request is None
+    assert bc.return_code == 1
+    assert bc.last_request is None
     bc.close(return_stderr=False)
