@@ -222,7 +222,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self.runner: Optional[WitlessRunner] = None
         self.encoding = None
         self.wait_timed_out = None
-        self.return_code = None
+        self.return_code: Optional[int] = None
         self._abandon_cache = None
         self.last_request: Optional[str] = None
 
