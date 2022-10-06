@@ -12,10 +12,14 @@ import sys
 import unittest.mock
 from subprocess import TimeoutExpired
 
+import pytest
+
 from datalad.cmd import (
     BatchedCommand,
     readline_rstripped,
 )
+from datalad.cmd import BatchedCommandError
+from datalad.runner.exception import CommandError
 from datalad.runner.tests.utils import py2cmd
 from datalad.tests.utils_pytest import (
     assert_equal,
@@ -148,8 +152,9 @@ def test_batched_restart():
 
 
 def test_command_fail_1():
-    # Expect that the return code of a failing command is caught,
-    # that None is returned as result.
+    # Expect that a failing command raises a CommandError in which the return
+    # code and the last successful request is caught, and that the command is
+    # restarted when called again
     bc = BatchedCommand(
         cmd=py2cmd(
             """
@@ -158,19 +163,29 @@ exit(3)
             """))
 
     # Send something to start the process
-    result = bc("line one")
-    assert_equal(bc.return_code, None)
-    assert_equal(result, "something")
-    result = bc("line two")
-    assert_equal(bc.return_code, 3)
-    assert_equal(result, None)
-    bc.close(return_stderr=False)
+    first_request = "line one"
+    result = bc(first_request)
+    assert bc.return_code == None
+    assert result == "something"
+    with pytest.raises(CommandError) as exception_info:
+        bc("line two")
+        assert exception_info.value.code == 3
+        print(exception_info.value.msg, file=sys.stderr)
+        assert exception_info.value.msg.endswith(first_request)
+
+    # Check for restart
+    #assert_equal(bc.return_code, None)
+    #result = bc(first_request)
+    #assert result == "something"
+    #with pytest.raises(CommandError) as exception_info:
+    #    bc.close(return_stderr=False)
+    #    assert exception_info.value.code == 3
 
 
 def test_command_fail_2():
-    # Expect that the return code of a failing command is caught,
-    # that None is returned as result and that the process is restarted,
-    # if the batched command is called again.
+    # Expect that a failing command raises a CommandError in which the return
+    # code and the last successful request is caught, and that the process is
+    # restarted if the batched command is called again
     bc = BatchedCommand(
         cmd=py2cmd(
             """
@@ -178,10 +193,26 @@ print(a*b)
             """))
 
     # Send something to start the process
-    result = bc("line one")
+    first_request = "line one"
+    result = bc(first_request)
     assert_not_equal(bc.return_code, 0)
     assert_is_none(result)
     result = bc("line two")
     assert_not_equal(bc.return_code, 0)
     assert_is_none(result)
+    bc.close(return_stderr=False)
+
+
+def test_command_fail_3():
+    # Expect that the return code of a failing command is caught,
+    # that None is returned as result.
+    bc = BatchedCommand(cmd=py2cmd("exit(4)"))
+
+    # Send something to start the process
+    result = bc("line one")
+    assert_equal(bc.return_code, None)
+    assert_equal(result, "something")
+    result = bc("line two")
+    assert_equal(bc.return_code, 3)
+    assert_equal(result, None)
     bc.close(return_stderr=False)

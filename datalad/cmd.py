@@ -68,6 +68,30 @@ from datalad.utils import (
 )
 
 
+class BatchedCommandError(CommandError):
+    def __init__(self,
+                 cmd="",
+                 request="",
+                 msg="",
+                 code=None,
+                 stdout="",
+                 stderr="",
+                 cwd=None,
+                 **kwargs):
+
+        CommandError.__init__(
+            self,
+            cmd=cmd,
+            msg=msg,
+            code=code,
+            stdout=stdout,
+            stderr=stderr,
+            cwd=cwd,
+            **kwargs
+        )
+        self.request = request
+
+
 lgr = logging.getLogger('datalad.cmd')
 
 # TODO unused?
@@ -200,6 +224,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self.wait_timed_out = None
         self.return_code = None
         self._abandon_cache = None
+        self.last_request: Optional[str] = None
 
         self._active = 0
         self._active_last = _now()
@@ -259,6 +284,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self.stderr_output = b""
         self.wait_timed_out = None
         self.return_code = None
+        self.last_request = None
 
         self.runner = WitlessRunner(
             cwd=self.path,
@@ -282,7 +308,19 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def process_running(self) -> bool:
         if self.runner:
-            return self.generator.runner.process.poll() is None
+            result = self.generator.runner.process.poll()
+            if result is None:
+                return True
+            self.return_code = result
+            if result != 0:
+                self.runner = None
+                raise BatchedCommandError(
+                    cmd=" ".join(self.command),
+                    request=self.last_request,
+                    msg=f"{type(self).__name__}: exited with {result} after "
+                        f"request: {self.last_request}",
+                    code=result
+                )
         return False
 
     def __call__(self,
@@ -334,11 +372,6 @@ class BatchedCommand(SafeDelCloseMixin):
                         self.return_code = self.generator.return_code
                         self.runner = None
 
-        except CommandError as command_error:
-            # The command exited with a non-zero return code
-            lgr.error("%s: command error: %s", self, command_error)
-            self.return_code = command_error.code
-            self.runner = None
 
         finally:
             self._active -= 1
@@ -353,9 +386,10 @@ class BatchedCommand(SafeDelCloseMixin):
             if not self.process_running():
                 self._initialize()
 
-            # Send request to subprocess
+            # Remember request end send it to subprocess
             if not isinstance(request, str):
                 request = ' '.join(request)
+            self.last_request = request
             self.stdin_queue.put((request + "\n").encode())
 
             # Get the response from the generator. We only consider
