@@ -3061,23 +3061,31 @@ class GitRepo(CoreGitRepo):
             if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
+            subrepo = None  # just for "safer" conditioning below
             if not GitRepo.is_valid_repo(f):
-                # submodule is not present, no chance for a conflict
-                st['state'] = 'clean'
-                continue
-            # we have to recurse into the dataset and get its status
-            subrepo = repo_from_path(f)
-            # get the HEAD commit, or the one of the corresponding branch
-            # only that one counts re super-sub relationship
-            # save() syncs the corresponding branch each time
-            subrepo_commit = subrepo.get_hexsha(subrepo.get_corresponding_branch())
-            st['gitshasum'] = subrepo_commit
-            # subdataset records must be labeled clean up to this point
-            # test if current commit in subdataset deviates from what is
-            # recorded in the dataset
-            st['state'] = 'modified' \
-                if st['prev_gitshasum'] != subrepo_commit \
-                else 'clean'
+                # submodule is not present
+                if 'prev_gitshasum' in st and (st['prev_gitshasum'] != st['gitshasum']):
+                    # has changes in index, should not be ignored
+                    st['state'] = 'modified'
+                else:
+                    # no changes to index -- no chance for a conflict
+                    st['state'] = 'clean'
+                    continue
+            else:
+                # we have to recurse into the dataset and get its new status
+                # which might be different from the one in index
+                subrepo = repo_from_path(f)
+                # get the HEAD commit, or the one of the corresponding branch
+                # only that one counts re super-sub relationship
+                # save() syncs the corresponding branch each time
+                subrepo_commit = subrepo.get_hexsha(subrepo.get_corresponding_branch())
+                st['gitshasum'] = subrepo_commit
+                # subdataset records must be labeled clean up to this point
+                # test if current commit in subdataset deviates from what is
+                # recorded in the dataset
+                st['state'] = 'modified' \
+                    if st['prev_gitshasum'] != subrepo_commit \
+                    else 'clean'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
             if eval_submodule_state == 'commit':
@@ -3093,7 +3101,7 @@ class GitRepo(CoreGitRepo):
                 paths=None,
                 untracked=untracked,
                 eval_submodule_state='global',
-                _cache=_cache) if st['state'] == 'clean' else 'modified'
+                _cache=_cache) if (st['state'] == 'clean' and subrepo) else 'modified'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
 
