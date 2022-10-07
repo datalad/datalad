@@ -121,5 +121,3 @@ class SSHRun(Interface):
         finally:
             if no_stdin:
                 stdin_.close()
-        os.write(1, out.encode('UTF-8'))
-        os.write(2, err.encode('UTF-8'))

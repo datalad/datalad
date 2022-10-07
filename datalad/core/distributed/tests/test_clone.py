@@ -1158,7 +1158,6 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
 
 
 # TODO?: make parametric again on _test_ria_postclonecfg
-@known_failure_osx  # https://github.com/datalad/datalad/issues/6599
 @known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
