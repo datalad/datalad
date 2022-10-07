@@ -267,6 +267,31 @@ def test_stalling(kill=False):
     assert_equal(v1, v2)
 
 
+@with_tempfile(mkdir=True)
+def test_parallel_singletons(topd=None):
+    from datalad.support.gitrepo import GitRepo
+
+    # ProducerConsumer relies on unique args to consumer so we will provide 2nd different arg
+    def create_GitRepo(args):
+        return GitRepo(args[0])
+
+    # let's really hunt down race condition
+    for batch in range(10):
+        repopath = op.join(topd, str(batch))
+        # should succeed and be the same thing
+        # An example of errored run: https://github.com/datalad/datalad/issues/6598
+        repos = list(
+            ProducerConsumer(
+                ((repopath, i) for i in range(10)),
+                create_GitRepo,
+                jobs=10
+            )
+        )
+        assert op.exists(repopath)
+        instances = set(map(id, repos))
+        assert len(instances) == 1
+
+
 if __name__ == '__main__':
     test_ProducerConsumer()
     # test_creatsubdatasets()
