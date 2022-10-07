@@ -56,7 +56,7 @@ matrix:
     - PYTEST_SELECTION=
     - PYTEST_SELECTION_OP=not
   # Two matrix runs for "recent python and git-annex with the recent supported by git annex
-  # new version of repo"
+  # new version of repo" and various extra options/features enabled for git-annex
   - python: '3.10'
     dist: focal
     env:
@@ -64,6 +64,7 @@ matrix:
       - PYTEST_SELECTION_OP=not
       - DATALAD_REPO_VERSION=10
       - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
+      - DATALAD_TESTS_GITCONFIG="\n[annex]\n stalldetection = 1KB/120s\n"
   - python: '3.10'
     dist: focal
     env:
@@ -71,6 +72,7 @@ matrix:
       - PYTEST_SELECTION_OP=
       - DATALAD_REPO_VERSION=10
       - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
+      - DATALAD_TESTS_GITCONFIG="\n[annex]\n stalldetection = 1KB/120s\n"
   - if: type = cron
     python: 3.7
     # Single run for Python 3.7
