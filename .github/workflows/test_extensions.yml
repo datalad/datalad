@@ -58,7 +58,7 @@ jobs:
         case ${{ matrix.extension }} in
           datalad-metalad)
             DL_PIP_INSTALLS+=" nose";;
-          datalad-neuroimaging|datalad-deprecated)
+          datalad-neuroimaging)
             DL_TESTER=nose;;
           datalad-hirni)
             DL_REPO=psychoinformatics-de/${{ matrix.extension }}
