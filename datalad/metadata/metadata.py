@@ -1141,6 +1141,7 @@ def query_aggregated_metadata(reporton: str,
                               aps: List[Dict],
                               recursive: bool = False,
                               metadata_source: Optional[str] = None,
+                              yield_impossible: Optional[bool] = None,
                               **kwargs):
     """Query legacy and NG-metadata stored in a dataset or its metadata store
 
@@ -1161,6 +1162,10 @@ def query_aggregated_metadata(reporton: str,
       prior metalad version 0.3.0 will be queried, if set to "gen4", only
       metadata of metalad version 0.3.0 and beyond will be queried, if set
       to 'None', all known metadata will be queried.
+    yield_impossible : Optional[bool]
+      If set to True, filter out records containing the status="impossible".
+      If `None` (default, for compatibility) - it is set to True if
+      metadata_source is None, i.e. not specified explicitly.
     **kwargs
       Any other argument will be passed on to the query result dictionary.
 
@@ -1170,20 +1175,27 @@ def query_aggregated_metadata(reporton: str,
       Of result dictionaries.
     """
 
+    if yield_impossible is None:
+        yield_impossible = metadata_source is not None
+
     if metadata_source in (None, "legacy"):
-        yield from legacy_query_aggregated_metadata(
+        for r in legacy_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
             aps=aps,
             recursive=recursive,
             **kwargs
-        )
+        ):
+            if yield_impossible or r.get('status') != "impossible":
+                yield r
 
     if metadata_source in (None, "gen4") and next_generation_metadata_available:
-        yield from gen4_query_aggregated_metadata(
+        for r in gen4_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
             aps=aps,
             recursive=recursive,
             **kwargs
-        )
+        ):
+            if yield_impossible or r.get('status') != "impossible":
+                yield r

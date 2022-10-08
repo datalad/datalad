@@ -602,8 +602,19 @@ def test_gen4_query_aggregated_metadata():
             )
             if metadata_result['status'] == 'impossible'
         ]
-        assert_equal(len(result), 2)
+        assert_equal(len(result), 0)
 
+        result = [
+            metadata_result
+            for metadata_result in query_aggregated_metadata(
+                reporton='all',
+                ds=DatasetMock('ds'),
+                aps=mocked_annotated_paths,
+                yield_impossible=True,
+            )
+            if metadata_result['status'] == 'impossible'
+        ]
+        assert_equal(len(result), 2)
 
 @with_tempfile(mkdir=True)
 def test_metadata_source_handling(temp_dir=None):
