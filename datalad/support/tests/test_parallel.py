@@ -268,7 +268,7 @@ def test_stalling(kill=False):
 
 
 @with_tempfile(mkdir=True)
-def test_parallel_singletons(topd=None):
+def test_parallel_flyweights(topd=None):
     from datalad.support.gitrepo import GitRepo
 
     # ProducerConsumer relies on unique args to consumer so we will provide 2nd different arg
