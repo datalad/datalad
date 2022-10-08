@@ -222,10 +222,6 @@ class PathBasedFlyweight(Flyweight):
         # Custom handling for few special abbreviations if defined by the class
         path_ = cls._flyweight_preproc_path(path)
 
-        # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
-            path = str(path)
-
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
         # if it is not a local thing:
