@@ -1124,7 +1124,7 @@ def gen4_query_aggregated_metadata(reporton: str,
                     }
                 }
         except NoMetadataStoreFound:
-            lgr.warning(f"Found no gen4-metadata in dataset {dataset.pathobj}.")
+            lgr.warning("Found no gen4-metadata in dataset %s.", dataset.pathobj)
             if len(matching_types) == 2:
                 matching_type = "all"
             elif len(matching_types) == 0:
