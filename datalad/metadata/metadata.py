@@ -1129,8 +1129,10 @@ def gen4_query_aggregated_metadata(reporton: str,
                 matching_type = "all"
             elif len(matching_types) == 0:
                 matching_type = "none"
-            else:
+            elif len(matching_types) == 1:
                 matching_type = matching_types[0]
+            else:
+                raise RuntimeError(f"Was expecting matching_types with 1 element, got {matching_types}")
             yield {
                 **kwargs,
                 'path': str(ds.pathobj / relative_path),
