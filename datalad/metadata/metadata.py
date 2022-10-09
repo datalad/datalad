@@ -1165,11 +1165,11 @@ def query_aggregated_metadata(reporton: str,
     recursive : bool
       Whether or not to report metadata underneath all query paths
       recursively.
-    metadata_source : Optional[str]
+    metadata_source : [str] {'all', 'legacy', 'gen4'}
       Metadata source that should be used. If set to "legacy", only metadata
       prior metalad version 0.3.0 will be queried, if set to "gen4", only
       metadata of metalad version 0.3.0 and beyond will be queried, if set
-      to 'None', all known metadata will be queried.
+      to 'all', all known metadata will be queried.
     **kwargs
       Any other argument will be passed on to the query result dictionary.
 
