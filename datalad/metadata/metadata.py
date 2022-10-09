@@ -1010,7 +1010,7 @@ class Metadata(Interface):
             if not query_agg:
                 continue
             # report from aggregated metadata
-            for r in legacy_query_aggregated_metadata(
+            for r in query_aggregated_metadata(
                     reporton,
                     # by default query the reference dataset, only if there is none
                     # try our luck in the dataset that contains the queried path
@@ -1149,7 +1149,7 @@ def query_aggregated_metadata(reporton: str,
                               ds: Dataset,
                               aps: List[Dict],
                               recursive: bool = False,
-                              metadata_source: Optional[str] = None,
+                              metadata_source: str = "legacy",
                               **kwargs):
     """Query legacy and gen4-metadata stored in a dataset or its metadata store
 
@@ -1179,7 +1179,7 @@ def query_aggregated_metadata(reporton: str,
       Of result dictionaries.
     """
 
-    if metadata_source in (None, "legacy"):
+    if metadata_source in ("all", "legacy"):
         yield from legacy_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
@@ -1188,7 +1188,7 @@ def query_aggregated_metadata(reporton: str,
             **kwargs
         )
 
-    if metadata_source in (None, "gen4") and next_generation_metadata_available:
+    if metadata_source in ("all", "gen4") and next_generation_metadata_available:
         yield from gen4_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
