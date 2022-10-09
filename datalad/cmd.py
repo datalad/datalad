@@ -401,7 +401,7 @@ class BatchedCommand(SafeDelCloseMixin):
             if not self.process_running():
                 self._initialize()
 
-            # Remember request end send it to subprocess
+            # Remember request and send it to subprocess
             if not isinstance(request, str):
                 request = ' '.join(request)
             self.stdin_queue.put((request + "\n").encode())
