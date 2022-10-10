@@ -3646,9 +3646,19 @@ class GitRepo(CoreGitRepo):
         # first gather info from all datasets in read-only fashion, and then
         # update index, .gitmodules and .git/config at once
         info = []
+        known_subs =  {s['path']: s for s in self.get_submodules_()}
         for path in paths:
             rpath = str(path.relative_to(self.pathobj).as_posix())
-            subm = repo_from_path(path)
+            try:
+                subm = repo_from_path(path)
+            except ValueError as exc:
+                # TODO - dedicated exception
+                if "No repository" in str(exc) and path in known_subs:
+                    # there is one but it is not installed and we know about it,
+                    # we cannot really tell more than what we know about it already
+                    # TODO: yield smth about that?
+                    continue
+                raise
             # if there is a corresponding branch, we want to record it's state.
             # we rely on the corresponding branch being synced already.
             # `save` should do that each time it runs.
