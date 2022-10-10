@@ -3259,7 +3259,9 @@ class GitRepo(CoreGitRepo):
             # implementation (which also run an additional dry-run commit
             GitRepo.commit(
                 self,
-                files=to_commit,
+                # pass no files if we are to commit them all anyways and assuming
+                # they are all already staged
+                files=to_commit if not partial_commit else None,
                 msg=message,
                 options=to_options(amend=amend, allow_empty=allow_empty),
                 # do not raise on empty commit
