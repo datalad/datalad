@@ -1317,7 +1317,6 @@ class Search(Interface):
         metadata_source=Parameter(
             args=('--metadata-source',),
             choices=('legacy', 'gen4', 'all'),
-            default='legacy',
             doc="""if given, defines which metadata source will be used to
             search. 'legacy' will limit search to metadata in the old format,
             i.e. stored in '$DATASET/.datalad/metadata'. 'gen4' will limit
