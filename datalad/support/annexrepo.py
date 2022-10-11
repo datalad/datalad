@@ -2766,8 +2766,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                     ':'.join(annex_cmd), annex_cmd,
                     path=self.path)(key_)
             except CommandError:
-                # git-annex will signal an unknown remote by exiting with
-                # return code 1.
+                # git-annex runs in batch mode, but will still signal some
+                # errors, e.g. an unknown remote, by exiting with a non-zero
+                # return code.
                 return False
             try:
                 return {
