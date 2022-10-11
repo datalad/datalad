@@ -336,7 +336,7 @@ class BatchedCommand(SafeDelCloseMixin):
                     msg=f"{type(self).__name__}: exited with {result} after "
                         f"request: {self.last_request}",
                     code=result
-                )
+                ) from CommandError
         return False
 
     def __call__(self,
@@ -402,7 +402,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 stderr=command_error.stderr,
                 cwd=command_error.cwd,
                 **command_error.kwargs
-            )
+            ) from command_error
 
         finally:
             self._active -= 1
