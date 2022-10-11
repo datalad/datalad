@@ -773,7 +773,7 @@ class _EGrepCSSearch(_Search):
     _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
-    def __init__(self, ds, metadata_source=None, **kwargs):
+    def __init__(self, ds, metadata_source='all', **kwargs):
         super(_EGrepCSSearch, self).__init__(ds, metadata_source, **kwargs)
         self._queried_keys = None  # to be memoized by get_query
 
@@ -1316,14 +1316,14 @@ class Search(Interface):
             for debugging purposes."""),
         metadata_source=Parameter(
             args=('--metadata-source',),
-            choices=('legacy', 'gen4'),
-            default=None,
+            choices=('legacy', 'gen4', 'all'),
             doc="""if given, defines which metadata source will be used to
             search. 'legacy' will limit search to metadata in the old format,
             i.e. stored in '$DATASET/.datalad/metadata'. 'gen4' will limit
             search to metadata stored by the git-backend of 
-            'datalad-metadata-model'. If not given, metadata from all supported
-            sources will be included in search.""")
+            'datalad-metadata-model'. If 'all' is given, metadata from all
+            supported sources will be included in the search. The default is
+            'legacy'.""")
     )
 
     @staticmethod
@@ -1338,7 +1338,7 @@ class Search(Interface):
                  full_record=False,
                  show_keys=None,
                  show_query=False,
-                 metadata_source=None):
+                 metadata_source='legacy'):
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
@@ -1369,7 +1369,10 @@ class Search(Interface):
                 'unknown search mode "{}"'.format(mode))
 
         searcher = searcher(
-            ds, metadata_source=metadata_source, force_reindex=force_reindex)
+            ds,
+            metadata_source=metadata_source,
+            force_reindex=force_reindex
+        )
 
         if show_keys:
             searcher.show_keys(show_keys, regexes=query)

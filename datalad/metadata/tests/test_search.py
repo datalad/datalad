@@ -579,6 +579,7 @@ def test_gen4_query_aggregated_metadata():
             for metadata_result in query_aggregated_metadata(
                 reporton='all',
                 ds=DatasetMock('ds'),
+                metadata_source='gen4',
                 aps=mocked_annotated_paths,
             )
             if metadata_result['status'] == 'ok'
@@ -598,6 +599,7 @@ def test_gen4_query_aggregated_metadata():
             for metadata_result in query_aggregated_metadata(
                 reporton='all',
                 ds=DatasetMock('ds'),
+                metadata_source='all',
                 aps=mocked_annotated_paths,
             )
             if metadata_result['status'] == 'impossible'
@@ -635,7 +637,7 @@ def test_metadata_source_handling(temp_dir=None):
         reset_mock(legacy_mock, legacy_result)
         r = tuple(
             result["metadata_source"]
-            for result in search(dataset=temp_ds, query="v1")
+            for result in search(dataset=temp_ds, query="v1", metadata_source='all')
         )
         assert_equal(r, ("legacy", "gen4"))
 
