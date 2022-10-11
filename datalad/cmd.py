@@ -68,17 +68,33 @@ from datalad.utils import (
 )
 
 
+__docformat__ = "restructuredtext"
+
+
 class BatchedCommandError(CommandError):
     def __init__(self,
                  cmd="",
-                 request="",
+                 last_processed_request="",
                  msg="",
                  code=None,
                  stdout="",
                  stderr="",
                  cwd=None,
                  **kwargs):
+        """
+        This exception extends a CommandError that is raised by the command,
+        that is executed by `BatchedCommand`. It extends the `CommandError` by
+        `last_processed_request`. This attribute contains the last request, i.e.
+        argument to `BatchedCommand.__call__()`, that was successfully
+        processed, i.e. for which a result was received from the command (that
+        does not imply that the result was positive).
 
+        :param last_processed_request: the last request for which a response was
+            received from the underlying command. This could be used to restart
+            an interrupted process.
+
+        For all other arguments see `CommandError`.
+        """
         CommandError.__init__(
             self,
             cmd=cmd,
@@ -89,7 +105,7 @@ class BatchedCommandError(CommandError):
             cwd=cwd,
             **kwargs
         )
-        self.request = request
+        self.last_processed_request = last_processed_request
 
 
 lgr = logging.getLogger('datalad.cmd')
@@ -316,7 +332,7 @@ class BatchedCommand(SafeDelCloseMixin):
             if result != 0:
                 raise BatchedCommandError(
                     cmd=" ".join(self.command),
-                    request=self.last_request,
+                    last_processed_request=self.last_request,
                     msg=f"{type(self).__name__}: exited with {result} after "
                         f"request: {self.last_request}",
                     code=result
@@ -379,7 +395,7 @@ class BatchedCommand(SafeDelCloseMixin):
             self.return_code = command_error.code
             raise BatchedCommandError(
                 cmd=command_error.cmd,
-                request=self.last_request,
+                last_processed_request=self.last_request,
                 msg=command_error.msg,
                 code=command_error.code,
                 stdout=command_error.stdout,

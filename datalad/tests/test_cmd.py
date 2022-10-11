@@ -170,7 +170,7 @@ exit(3)
     with pytest.raises(BatchedCommandError) as exception_info:
         bc("line two")
     assert exception_info.value.code == 3
-    assert exception_info.value.request == first_request
+    assert exception_info.value.last_processed_request == first_request
     assert bc.return_code == 3
 
     # Check for restart
@@ -194,7 +194,7 @@ print(a*b)
     with pytest.raises(BatchedCommandError) as exception_info:
         _ = bc(first_request)
     assert exception_info.value.code == 1
-    assert exception_info.value.request is None
+    assert exception_info.value.last_processed_request is None
     assert bc.return_code == 1
     assert bc.last_request is None
     bc.close(return_stderr=False)
