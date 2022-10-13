@@ -10,11 +10,11 @@ jobs:
 
     steps:
     - name: Set up environment
-      uses: actions/checkout@v1
+      uses: actions/checkout@v3
       with:  # no need for the history
         fetch-depth: 1
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: '3.7'
     - name: Install dependencies

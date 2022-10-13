@@ -23,9 +23,11 @@ jobs:
         # See also the GIT_ASKPASS env var below
         git config --global core.askPass ""
 
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - name: Set up Python 3.7
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
     - name: Install dependencies

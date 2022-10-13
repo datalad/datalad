@@ -11,6 +11,7 @@
 """
 
 import logging
+import threading
 
 from datalad.support.exceptions import InvalidInstanceRequestError
 from datalad.support.network import RI
@@ -65,6 +66,9 @@ class Flyweight(type):
     c = MyFlyweightClass('whatever', id=2)
     assert c is not a
     """
+
+    # to avoid parallel creation of (identical) instances
+    _lock = threading.Lock()
 
     def _flyweight_id_from_args(cls, *args, **kwargs):
         """create an ID from arguments passed to `__call__`
@@ -144,29 +148,35 @@ class Flyweight(type):
     def __call__(cls, *args, **kwargs):
 
         id_, new_args, new_kwargs = cls._flyweight_id_from_args(*args, **kwargs)
-        instance = cls._unique_instances.get(id_, None)
+        # Thread lock following block so we do not fall victim to
+        # race condition across threads trying to instantiate multiple
+        # instances. In principle we better have a lock per id_ but that mean we
+        # might race at getting "name specific lock" (Yarik did not research much),
+        # so keeping it KISS -- just lock instantiation altogether, but could be
+        # made smarter later on.
+        with cls._lock:
+            instance = cls._unique_instances.get(id_, None)
 
-        if instance is None or instance._flyweight_invalid():
-            # we have no such instance yet or the existing one is invalidated,
-            # so we instantiate:
-            instance = type.__call__(cls, *new_args, **new_kwargs)
-            cls._unique_instances[id_] = instance
-        else:
-            # we have an instance already that is not invalid itself; check
-            # whether there is a conflict, otherwise return existing one:
-            # TODO
-            # Note, that this might (and probably should) go away, when we
-            # decide how to deal with currently possible invalid constructor
-            # calls for the repo classes. In particular this is about calling
-            # it with different options than before, that might lead to
-            # fundamental changes in the repository (like annex repo version
-            # change or re-init of git)
+            if instance is None or instance._flyweight_invalid():
+                # we have no such instance yet or the existing one is invalidated,
+                # so we instantiate:
+                instance = type.__call__(cls, *new_args, **new_kwargs)
+                cls._unique_instances[id_] = instance
+            else:
+                # we have an instance already that is not invalid itself; check
+                # whether there is a conflict, otherwise return existing one:
+                # TODO
+                # Note, that this might (and probably should) go away, when we
+                # decide how to deal with currently possible invalid constructor
+                # calls for the repo classes. In particular this is about calling
+                # it with different options than before, that might lead to
+                # fundamental changes in the repository (like annex repo version
+                # change or re-init of git)
 
-            # force? may not mean the same thing
-            msg = cls._flyweight_reject(id_, *new_args, **new_kwargs)
-            if msg is not None:
-                raise InvalidInstanceRequestError(id_, msg)
-
+                # force? may not mean the same thing
+                msg = cls._flyweight_reject(id_, *new_args, **new_kwargs)
+                if msg is not None:
+                    raise InvalidInstanceRequestError(id_, msg)
         return instance
 
 
@@ -221,10 +231,6 @@ class PathBasedFlyweight(Flyweight):
 
         # Custom handling for few special abbreviations if defined by the class
         path_ = cls._flyweight_preproc_path(path)
-
-        # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
-            path = str(path)
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
