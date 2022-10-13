@@ -89,7 +89,7 @@ class PullRequest:
                 + " via "
             )
         item += f"{self.as_link()} (by {self.author.as_link()})"
-        return f"### {self.category}\n\n{item}\n"
+        return f"### {self.category}\n\n- {item}\n"
 
 
 def main():
