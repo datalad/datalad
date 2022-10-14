@@ -3638,7 +3638,13 @@ class GitRepo(CoreGitRepo):
         # first gather info from all datasets in read-only fashion, and then
         # update index, .gitmodules and .git/config at once
         info = []
+        # To avoid adding already known: https://github.com/datalad/datalad/issues/6843
+        # We must not add already known submodules explicitly since "untracked"
+        # can be assigned even for known ones (TODO: add issue, might have been closed)?
+        # Not sure if operating on relative paths would provide any speed up so use full
+        known_sub_paths = {s['path'] for s in self.get_submodules_()}
         for path in paths:
+            already_known = path in known_sub_paths
             rpath = str(path.relative_to(self.pathobj).as_posix())
             subm = repo_from_path(path)
             # if there is a corresponding branch, we want to record it's state.
@@ -3668,7 +3674,7 @@ class GitRepo(CoreGitRepo):
                      paths[path] if isinstance(paths, dict)
                      else dict(type='directory', state='untracked'),
                      path=path, rpath=rpath, commit=subm_commit, id=subm_id,
-                     url=url))
+                     url=url, known=already_known))
 
         # bypass any convenience or safe-manipulator for speed reasons
         # use case: saving many new subdatasets in a single run
@@ -3681,11 +3687,11 @@ class GitRepo(CoreGitRepo):
                     i['commit'], i['rpath']
                 ])
                 # only write the .gitmodules/.config changes when this is not yet
-                # a subdataset
+                # a subdataset and not yet already known
                 # TODO: we could update the URL, and branch info at this point,
                 # even for previously registered subdatasets
-                if i['type'] != 'dataset' or (
-                        i['type'] == 'dataset' and i['state'] == 'untracked'):
+                if not i['known'] and (i['type'] != 'dataset' or (
+                        i['type'] == 'dataset' and i['state'] == 'untracked')):
                     gmprops = dict(path=i['rpath'], url=i['url'])
                     if i['id']:
                         gmprops['datalad-id'] = i['id']
