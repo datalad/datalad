@@ -3426,11 +3426,7 @@ class GitRepo(CoreGitRepo):
                     untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
-            if to_add_submodules:
-                for r in self._save_add_submodules(to_add_submodules):
-                    if r.get('status', None) == 'ok':
-                        submodule_change = True
-                    yield r
+
         to_stage_submodules = {
             f: props
             for f, props in status_state['modified_or_untracked'].items()
@@ -3441,7 +3437,10 @@ class GitRepo(CoreGitRepo):
                 len(to_stage_submodules), self,
                 to_stage_submodules
                 if len(to_stage_submodules) < 10 else '')
-            for r in self._save_add_submodules(to_stage_submodules):
+            to_add_submodules += list(to_stage_submodules)
+
+        if to_add_submodules:
+            for r in self._save_add_submodules(to_add_submodules):
                 if r.get('status', None) == 'ok':
                     submodule_change = True
                 yield r
