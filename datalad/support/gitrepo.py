@@ -3061,23 +3061,31 @@ class GitRepo(CoreGitRepo):
             if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
+            subrepo = None  # just for "safer" conditioning below
             if not GitRepo.is_valid_repo(f):
-                # submodule is not present, no chance for a conflict
-                st['state'] = 'clean'
-                continue
-            # we have to recurse into the dataset and get its status
-            subrepo = repo_from_path(f)
-            # get the HEAD commit, or the one of the corresponding branch
-            # only that one counts re super-sub relationship
-            # save() syncs the corresponding branch each time
-            subrepo_commit = subrepo.get_hexsha(subrepo.get_corresponding_branch())
-            st['gitshasum'] = subrepo_commit
-            # subdataset records must be labeled clean up to this point
-            # test if current commit in subdataset deviates from what is
-            # recorded in the dataset
-            st['state'] = 'modified' \
-                if st['prev_gitshasum'] != subrepo_commit \
-                else 'clean'
+                # submodule is not present
+                if 'prev_gitshasum' in st and (st['prev_gitshasum'] != st['gitshasum']):
+                    # has changes in index, should not be ignored
+                    st['state'] = 'modified'
+                else:
+                    # no changes to index -- no chance for a conflict
+                    st['state'] = 'clean'
+                    continue
+            else:
+                # we have to recurse into the dataset and get its new status
+                # which might be different from the one in index
+                subrepo = repo_from_path(f)
+                # get the HEAD commit, or the one of the corresponding branch
+                # only that one counts re super-sub relationship
+                # save() syncs the corresponding branch each time
+                subrepo_commit = subrepo.get_hexsha(subrepo.get_corresponding_branch())
+                st['gitshasum'] = subrepo_commit
+                # subdataset records must be labeled clean up to this point
+                # test if current commit in subdataset deviates from what is
+                # recorded in the dataset
+                st['state'] = 'modified' \
+                    if st['prev_gitshasum'] != subrepo_commit \
+                    else 'clean'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
             if eval_submodule_state == 'commit':
@@ -3093,7 +3101,7 @@ class GitRepo(CoreGitRepo):
                 paths=None,
                 untracked=untracked,
                 eval_submodule_state='global',
-                _cache=_cache) if st['state'] == 'clean' else 'modified'
+                _cache=_cache) if (st['state'] == 'clean' and subrepo) else 'modified'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
 
@@ -3251,7 +3259,9 @@ class GitRepo(CoreGitRepo):
             # implementation (which also run an additional dry-run commit
             GitRepo.commit(
                 self,
-                files=to_commit,
+                # pass no files if we are to commit them all anyways and assuming
+                # they are all already staged
+                files=to_commit if not partial_commit else None,
                 msg=message,
                 options=to_options(amend=amend, allow_empty=allow_empty),
                 # do not raise on empty commit
@@ -3638,9 +3648,19 @@ class GitRepo(CoreGitRepo):
         # first gather info from all datasets in read-only fashion, and then
         # update index, .gitmodules and .git/config at once
         info = []
+        known_subs =  {s['path']: s for s in self.get_submodules_()}
         for path in paths:
             rpath = str(path.relative_to(self.pathobj).as_posix())
-            subm = repo_from_path(path)
+            try:
+                subm = repo_from_path(path)
+            except ValueError as exc:
+                # TODO - dedicated exception
+                if "No repository" in str(exc) and path in known_subs:
+                    # there is one but it is not installed and we know about it,
+                    # we cannot really tell more than what we know about it already
+                    # TODO: yield smth about that?
+                    continue
+                raise
             # if there is a corresponding branch, we want to record it's state.
             # we rely on the corresponding branch being synced already.
             # `save` should do that each time it runs.
