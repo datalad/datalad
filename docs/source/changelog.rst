@@ -79,8 +79,8 @@ Bug Fixes
    dataset. `PR #7036 <https://github.com/datalad/datalad/pull/7036>`__
    (by `@mih <https://github.com/mih>`__)
 
--  Let get_status_dict() use exception message if none is passed. `PR
-   #7037 <https://github.com/datalad/datalad/pull/7037>`__ (by
+-  Let ``get_status_dict()`` use exception message if none is passed.
+   `PR #7037 <https://github.com/datalad/datalad/pull/7037>`__ (by
    `@mih <https://github.com/mih>`__)
 
 -  Make choices for ``status|diff --annex`` and
