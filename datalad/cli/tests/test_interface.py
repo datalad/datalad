@@ -19,7 +19,7 @@ from ..interface import (
 def test_alter_interface_docs_for_cmdline():
     alt = alter_interface_docs_for_cmdline(demo_doc)
     alt_l = alt.split('\n')
-    # dedented
+    # de-dented
     assert_false(alt_l[0].startswith(' '))
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('PY', alt)
