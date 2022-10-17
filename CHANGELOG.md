@@ -1,4 +1,43 @@
 
+<a id='changelog-0.17.7'></a>
+# 0.17.7 (2022-10-14)
+
+## Bug Fixes
+
+- Let `EnsureChoice` report the value is failed validating.  [PR
+  #7067](https://github.com/datalad/datalad/pull/7067) (by
+  [@mih](https://github.com/mih))
+
+- Avoid writing to stdout/stderr from within datalad sshrun. This could lead to
+  broken pipe errors when cloning via SSH and was superfluous to begin with.
+  Fixes https://github.com/datalad/datalad/issues/6599 via
+  https://github.com/datalad/datalad/pull/7072 (by @bpoldrack)
+
+- BF: lock across threads check/instantiation of Flyweight instances.  Fixes [#6598](https://github.com/datalad/datalad/issues/6598) via [PR #7075](https://github.com/datalad/datalad/pull/7075) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## Internal
+
+- Do not use `gen4`-metadata methods in `datalad metadata`-command.
+  [PR #7001](https://github.com/datalad/datalad/pull/7001) (by
+  [@christian-monch](https://github.com/christian-monch))
+
+- Revert "Remove chardet version upper limit" (introduced in 0.17.6~11^2) to bring back upper limit <= 5.0.0 on chardet. Otherwise we can get some deprecation warnings from requests [PR #7057](https://github.com/datalad/datalad/pull/7057) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Ensure that `BatchedCommandError` is raised if the subprocesses of `BatchedCommand` fails or raises a `CommandError`.  [PR #7068](https://github.com/datalad/datalad/pull/7068) (by [@christian-monch](https://github.com/christian-monch))
+
+- RF: remove unused code str-ing PurePath.  [PR
+  #7073](https://github.com/datalad/datalad/pull/7073) (by
+  [@yarikoptic](https://github.com/yarikoptic))
+
+- Update GitHub Actions action versions.
+  [PR #7082](https://github.com/datalad/datalad/pull/7082) (by
+  [@jwodder](https://github.com/jwodder))
+
+## Tests
+
+- Fix broken test helpers for result record testing that would falsely pass.
+  [PR #7002](https://github.com/datalad/datalad/pull/7002) (by [@bpoldrack](https://github.com/bpoldrack))
+
 <a id='changelog-0.17.6'></a>
 # 0.17.6 (2022-09-21)
 
@@ -13,35 +52,36 @@
   [PR #7028](https://github.com/datalad/datalad/pull/7028)
   (by [@yarikoptic](https://github.com/yarikoptic))
 
-- Let `create` touch the dataset root, if not saving in parent dataset.  [PR
-  #7036](https://github.com/datalad/datalad/pull/7036) (by
+- Let `create` touch the dataset root, if not saving in parent dataset.
+  [PR #7036](https://github.com/datalad/datalad/pull/7036) (by
   [@mih](https://github.com/mih))
 
-- Let get_status_dict() use exception message if none is passed.  [PR
-  #7037](https://github.com/datalad/datalad/pull/7037) (by
+- Let `get_status_dict()` use exception message if none is passed.
+  [PR #7037](https://github.com/datalad/datalad/pull/7037) (by
   [@mih](https://github.com/mih))
 
-- Make choices for `status|diff --annex` and `status|diff --untracked` visible.  [PR
-  #7039](https://github.com/datalad/datalad/pull/7039) (by
+- Make choices for `status|diff --annex` and `status|diff --untracked` visible.
+  [PR #7039](https://github.com/datalad/datalad/pull/7039) (by
   [@mih](https://github.com/mih))
 
-- push: Assume 0 bytes pushed if git-annex does not provide bytesize.  [PR
-  #7049](https://github.com/datalad/datalad/pull/7049) (by
+- push: Assume 0 bytes pushed if git-annex does not provide bytesize.
+  [PR #7049](https://github.com/datalad/datalad/pull/7049) (by
   [@yarikoptic](https://github.com/yarikoptic))
 
 ## Internal
 
-- Use scriv for CHANGELOG generation in release workflow.  [PR
-  #7009](https://github.com/datalad/datalad/pull/7009) (by
+- Use scriv for CHANGELOG generation in release workflow.
+  [PR #7009](https://github.com/datalad/datalad/pull/7009) (by
   [@jwodder](https://github.com/jwodder))
 
-- Stop using auto.  [PR #7024](https://github.com/datalad/datalad/pull/7024)
+- Stop using auto.
+  [PR #7024](https://github.com/datalad/datalad/pull/7024)
   (by [@jwodder](https://github.com/jwodder))
 
 ## Tests
 
-- Allow for any 2 from first 3 to be consumed in test_gracefull_death.  [PR
-  #7041](https://github.com/datalad/datalad/pull/7041) (by
+- Allow for any 2 from first 3 to be consumed in test_gracefull_death.
+  [PR #7041](https://github.com/datalad/datalad/pull/7041) (by
   [@yarikoptic](https://github.com/yarikoptic))
 
 ---

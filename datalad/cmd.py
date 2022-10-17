@@ -68,6 +68,46 @@ from datalad.utils import (
 )
 
 
+__docformat__ = "restructuredtext"
+
+
+class BatchedCommandError(CommandError):
+    def __init__(self,
+                 cmd="",
+                 last_processed_request="",
+                 msg="",
+                 code=None,
+                 stdout="",
+                 stderr="",
+                 cwd=None,
+                 **kwargs):
+        """
+        This exception extends a CommandError that is raised by the command,
+        that is executed by `BatchedCommand`. It extends the `CommandError` by
+        `last_processed_request`. This attribute contains the last request, i.e.
+        argument to `BatchedCommand.__call__()`, that was successfully
+        processed, i.e. for which a result was received from the command (that
+        does not imply that the result was positive).
+
+        :param last_processed_request: the last request for which a response was
+            received from the underlying command. This could be used to restart
+            an interrupted process.
+
+        For all other arguments see `CommandError`.
+        """
+        CommandError.__init__(
+            self,
+            cmd=cmd,
+            msg=msg,
+            code=code,
+            stdout=stdout,
+            stderr=stderr,
+            cwd=cwd,
+            **kwargs
+        )
+        self.last_processed_request = last_processed_request
+
+
 lgr = logging.getLogger('datalad.cmd')
 
 # TODO unused?
@@ -198,8 +238,9 @@ class BatchedCommand(SafeDelCloseMixin):
         self.runner: Optional[WitlessRunner] = None
         self.encoding = None
         self.wait_timed_out = None
-        self.return_code = None
+        self.return_code: Optional[int] = None
         self._abandon_cache = None
+        self.last_request: Optional[str] = None
 
         self._active = 0
         self._active_last = _now()
@@ -259,6 +300,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self.stderr_output = b""
         self.wait_timed_out = None
         self.return_code = None
+        self.last_request = None
 
         self.runner = WitlessRunner(
             cwd=self.path,
@@ -282,7 +324,19 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def process_running(self) -> bool:
         if self.runner:
-            return self.generator.runner.process.poll() is None
+            result = self.generator.runner.process.poll()
+            if result is None:
+                return True
+            self.return_code = result
+            self.runner = None
+            if result != 0:
+                raise BatchedCommandError(
+                    cmd=" ".join(self.command),
+                    last_processed_request=self.last_request,
+                    msg=f"{type(self).__name__}: exited with {result} after "
+                        f"request: {self.last_request}",
+                    code=result
+                ) from CommandError
         return False
 
     def __call__(self,
@@ -326,6 +380,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 while True:
                     try:
                         responses.append(self.process_request(request))
+                        self.last_request = request
                         break
                     except StopIteration:
                         # The process finished executing, store the last return
@@ -335,10 +390,19 @@ class BatchedCommand(SafeDelCloseMixin):
                         self.runner = None
 
         except CommandError as command_error:
-            # The command exited with a non-zero return code
-            lgr.error("%s: command error: %s", self, command_error)
-            self.return_code = command_error.code
+            # Convert CommandError into BatchedCommandError
             self.runner = None
+            self.return_code = command_error.code
+            raise BatchedCommandError(
+                cmd=command_error.cmd,
+                last_processed_request=self.last_request,
+                msg=command_error.msg,
+                code=command_error.code,
+                stdout=command_error.stdout,
+                stderr=command_error.stderr,
+                cwd=command_error.cwd,
+                **command_error.kwargs
+            ) from command_error
 
         finally:
             self._active -= 1
@@ -353,7 +417,7 @@ class BatchedCommand(SafeDelCloseMixin):
             if not self.process_running():
                 self._initialize()
 
-            # Send request to subprocess
+            # Remember request and send it to subprocess
             if not isinstance(request, str):
                 request = ' '.join(request)
             self.stdin_queue.put((request + "\n").encode())

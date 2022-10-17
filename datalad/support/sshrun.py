@@ -116,10 +116,13 @@ class SSHRun(Interface):
         # use an empty temp file as stdin if none shall be connected
         stdin_ = tempfile.TemporaryFile() if no_stdin else sys.stdin
         try:
-            out, err = ssh(cmd, stdin=stdin_, log_output=False,
-                           options=options)
+            # We pipe the SSH process' stdout/stderr by means of
+            # `log_output=False`. That's necessary to let callers - for example
+            # git-clone - communicate with the SSH process. Hence, we expect no
+            # output being returned from this call:
+            out, err = ssh(cmd, stdin=stdin_, log_output=False, options=options)
+            assert not out
+            assert not err
         finally:
             if no_stdin:
                 stdin_.close()
-        os.write(1, out.encode('UTF-8'))
-        os.write(2, err.encode('UTF-8'))
