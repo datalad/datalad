@@ -705,7 +705,7 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
         yield r
 
 
-def _check_error_reported(res: dict, error_dict: dict):
+def _check_error_reported_before(res: dict, error_dict: dict):
     # Helper to check if an impossible result for a path that does
     # not exist has already been yielded before. If not, add path
     # to the error_dict.
@@ -890,7 +890,8 @@ class Get(Interface):
                 # maintain path argument semantics and pass in dataset arg
                 # as is
                 dataset=dataset,
-                # always come from the top to get sensible generator behavior
+                # from the bottom prevents duplicate yielding of results
+                # for a dataset where subdatasets are not installed yet
                 bottomup=True,
                 # when paths are given, they will constrain the recursion
                 # automatically, and we need to enable recursion so we can
@@ -942,7 +943,7 @@ class Get(Interface):
                             # are a bit pointless
                             # "notneeded" for annex get comes below
                             # prevent double yielding of impossible result
-                            if _check_error_reported(res, error_reported):
+                            if _check_error_reported_before(res, error_reported):
                                 continue
                             yield res
                 else:
@@ -982,7 +983,7 @@ class Get(Interface):
                     # paths, prior in this loop
                     if res.get('status', None) != 'notneeded' or not known_ds:
                         # prevent double yielding of impossible result
-                        if _check_error_reported(res, error_reported):
+                        if _check_error_reported_before(res, error_reported):
                             continue
                         yield res
 
