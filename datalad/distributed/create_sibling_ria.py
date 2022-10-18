@@ -684,10 +684,7 @@ def _create_sibling_ria(
             # skip & error have been handled at this point
             gr.init(
                 sanity_checks=False,
-                init_options=[
-                    "--bare",
-                    "--shared={}".format(shared) if shared else "",
-                ]
+                init_options=["--bare"] + ([f"--shared={shared}"] if shared else []),
             )
         if storage_sibling:
             # write special remote's uuid into git-config, so clone can
