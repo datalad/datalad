@@ -141,7 +141,8 @@ def _get_procedure_implementation(name='*', ds=None):
                 yield (m, n,) + _get_proc_config(n, ds=ds)
         # 2.1. check subdatasets recursively
         for subds in ds.subdatasets(return_type='generator',
-                                    result_xfm='datasets'):
+                                    result_xfm='datasets',
+                                    result_renderer='disabled'):
             for m, n, f, h in _get_procedure_implementation(name=name, ds=subds):
                 yield m, n, f, h
 
