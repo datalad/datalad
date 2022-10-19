@@ -135,7 +135,6 @@ def test_creatsubdatasets(topds_path=None, n=2):
     assert_repo_status(ds.repo)
 
 
-@known_failure_osx  # https://github.com/datalad/datalad/issues/5309
 def test_gracefull_death():
 
     def assert_provides_and_raises(pc, exception, target=None):
@@ -220,7 +219,11 @@ def test_gracefull_death():
         pc = iter(ProducerConsumer(range(1000), consumer, jobs=2))
         yield next(pc)
         yield next(pc)
-    assert_equal(sorted(inner()), [0, 1])
+    # typically it should be [0, 1] but it does happen some times that
+    # one other worker gets ahead and we get [0, 2]. As it is not per se the
+    # purpose of this test to ensure absence of such race, we just allow for any
+    # two from first 3 possible.
+    assert len(set(inner()).intersection({0, 1, 2})) == 2
     consumed = sorted(consumed)
     assert_equal(consumed, list(range(len(consumed))))
     assert_greater_equal(len(consumed), 4)  # we should wait for that 2nd batch to finish
@@ -245,7 +248,7 @@ def test_stalling(kill=False):
     with concurrent.futures.ThreadPoolExecutor(1) as executor:
         # print("submitting")
         future = executor.submit(worker)
-        dt2_limit = dt1 * 5
+        dt2_limit = dt1 * 10
         # print("waiting for up to %.2f sec" % dt2_limit)
         while not future.done():
             # print("not yet")
@@ -259,9 +262,34 @@ def test_stalling(kill=False):
                     import os
                     import signal
                     os.kill(os.getpid(), signal.SIGTERM)
-                raise AssertionError("Future has not finished in 5x time")
+                raise AssertionError("Future has not finished in 10x time")
         v2 = future.result()
     assert_equal(v1, v2)
+
+
+@with_tempfile(mkdir=True)
+def test_parallel_flyweights(topd=None):
+    from datalad.support.gitrepo import GitRepo
+
+    # ProducerConsumer relies on unique args to consumer so we will provide 2nd different arg
+    def create_GitRepo(args):
+        return GitRepo(args[0])
+
+    # let's really hunt down race condition
+    for batch in range(10):
+        repopath = op.join(topd, str(batch))
+        # should succeed and be the same thing
+        # An example of errored run: https://github.com/datalad/datalad/issues/6598
+        repos = list(
+            ProducerConsumer(
+                ((repopath, i) for i in range(10)),
+                create_GitRepo,
+                jobs=10
+            )
+        )
+        assert op.exists(repopath)
+        instances = set(map(id, repos))
+        assert len(instances) == 1
 
 
 if __name__ == '__main__':

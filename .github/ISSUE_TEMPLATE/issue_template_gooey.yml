@@ -1,0 +1,52 @@
+name: Gooey issue
+
+# For documentation concerning the Github form schema see
+# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
+
+description: Gooey issue
+
+body:
+
+  - type: dropdown
+    attributes:
+      label: Is it a new bug?
+      description: "Before filing an issue, please take some time to
+       browse through [existing issues](https://github.com/datalad/datalad/issues).
+       If it has been reported already, please add a comment to the existing
+       report instead of opening a new issue."
+      options:
+        - I did not find an existing issue about my problem
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: What is the problem?
+      description: "Please summarize the issue briefly. Add screenshots if they
+      help to illustrate it, or copy-paste error messages"
+      placeholder: "Example: Running get in the Gooey App fails with cryptic error"
+
+
+  - type: textarea
+    attributes:
+      label: What steps will reproduce the problem?
+      description: "How do you trigger this bug? Please walk us through it step
+       by step."
+      placeholder: |
+       Example:
+       1. Open the App in simplified view.
+       2. Clone this dataset from <url> ...
+       3. Right-click on the first annexed-file and select get.
+       4. Click ok to get the file
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: "Is there anything else that would be useful to know in this context? Please also copy-paste relevant output from the Command log,
+      Error log, or the background Terminal. Have you had success with the same command in a terminal?"
+
+  - type: textarea
+    attributes:
+      label: DataLad information
+      description: |
+        What version of DataLad and git-annex do you use, on what operating system (run `datalad wtf` in a terminal, or click on 'Help' -> 'Diagnostic infos')?

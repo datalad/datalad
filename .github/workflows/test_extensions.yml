@@ -16,57 +16,108 @@ jobs:
             datalad-metalad,
             datalad-crawler,
             datalad-deprecated,
+            datalad-next,
         ]
+
     steps:
     - name: Set up system
       shell: bash
       run: |
         bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+        # enable in case -devel version is needed
+        # sudo sed -i-devel.list -e 's,/debian ,/debian-devel ,g' /etc/apt/sources.list.d/neurodebian.sources.list
         sudo apt-get update -qq
         sudo apt-get install eatmydata
         sudo eatmydata apt-get install git-annex-standalone
+
     - name: Set up environment
       run: |
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
     - name: Set up Python 3.7
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
-    - name: Install dependencies
+
+    - name: Install DataLad and dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements-devel.txt
-        # we are using pytest here but extensions still tested with nose
-        pip install nose
-    - name: Install ${{ matrix.extension }} extension
+
+    - name: Setup ${{ matrix.extension }} extension specific variables
       run: |
-        pip install https://github.com/datalad/${{ matrix.extension }}/archive/master.zip
-      if: matrix.extension != 'datalad-hirni'
-    - name: Install ${{ matrix.extension }} extension
+        DL_PIP_INSTALLS=mock
+        DL_APT_INSTALLS=dcm2niix
+        DL_REPO=datalad/${{ matrix.extension }}
+        DL_TESTER=pytest
+        DL_NEED_SINGULARITY=
+        # TODO: just reuse information from datalad-extensions!!
+        case ${{ matrix.extension }} in
+          datalad-metalad)
+            DL_PIP_INSTALLS+=" nose";;
+          datalad-neuroimaging)
+            DL_TESTER=nose;;
+          datalad-hirni)
+            DL_REPO=psychoinformatics-de/${{ matrix.extension }}
+            DL_TESTER=nose
+            DL_NEED_SINGULARITY=1;;
+          datalad-container)
+            DL_NEED_SINGULARITY=1;;
+        esac
+        {
+        echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
+        echo "DL_APT_INSTALLS=$DL_APT_INSTALLS"
+        echo "DL_REPO=$DL_REPO"
+        echo "DL_TESTER=$DL_TESTER"
+        echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
+        echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
+        } >> "$GITHUB_ENV"
+        
+    - name: Clone and install ${{ matrix.extension }} extension
       run: |
-        pip install https://github.com/psychoinformatics-de/${{ matrix.extension }}/archive/master.zip
-      if: matrix.extension == 'datalad-hirni'
-    - name: Install additional dependencies
-      run: |
-        pip install mock
-      if: matrix.extension == 'datalad-crawler'
+        git clone https://github.com/$DL_REPO __extension__
+        pip install ./__extension__[devel]
+
     - name: Install Singularity
       run: sudo eatmydata apt-get install singularity-container
-      if: matrix.extension == 'datalad-container' || matrix.extension == 'datalad-hirni'
+      if: env.DL_NEED_SINGULARITY == '1'
+
+    - name: Install additional dependencies and prepare for testing
+      run: |
+        pip install $DL_PIP_INSTALLS
+        [ -z "$DL_APT_INSTALLS" ] || sudo apt-get install $DL_APT_INSTALLS
+        mkdir -p __testhome__
+
     - name: WTF!?
       run: |
         datalad wtf
-    - name: ${{ matrix.extension }} tests
+
+    - name: ${{ matrix.extension }} tests using nose
       run: |
-        mkdir -p __testhome__
         cd __testhome__
-        python -m nose -s -v --with-cov --cover-package datalad $(echo ${{ matrix.extension }} | tr '-' '_')
-        # TODO: later whenever some extensions would migrate to pytest -- use pytest
-        # python -m pytest -c ../tox.ini -s -v --cov=datalad --pyargs $(echo ${{ matrix.extension }} | tr '-' '_')
+        python -m nose -s -v --with-cov --cover-package datalad ${DL_PACKAGE}
+      if: env.DL_TESTER == 'nose'
+
+    - name: ${{ matrix.extension }} tests using pytest
+      run: |
+        cd __testhome__
+        # -crawler's tox.ini points to itself (but without full path) for coverage
+        # configuration.  So far attempts to "fix" by somehow providing full path did not work.
+        # That is why just symlink it here.  If no tox.ini -- create an empty one
+        [ -e ../__extension__/tox.ini ] && ln -s ../__extension__/tox.ini . || touch tox.ini
+        python -m pytest -c ./tox.ini -s -v --cov=datalad --pyargs ${DL_PACKAGE}
+      if: env.DL_TESTER == 'pytest'
+
+    - name: Prepare coverage
+      run: |
+        cd __testhome__
         python -m coverage xml
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

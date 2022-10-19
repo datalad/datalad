@@ -55,14 +55,24 @@ matrix:
     env:
     - PYTEST_SELECTION=
     - PYTEST_SELECTION_OP=not
+  # Two matrix runs for "recent python and git-annex with the recent supported by git annex
+  # new version of repo" and various extra options/features enabled for git-annex
   - python: '3.10'
     dist: focal
     env:
       - PYTEST_SELECTION=
       - PYTEST_SELECTION_OP=not
-      # current "default" version of git-annex 8.20201007  is not co-installable
-      # with python 3.10, so let's just allow for any git-annex version
+      - DATALAD_REPO_VERSION=10
       - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
+      - DATALAD_TESTS_GITCONFIG="\n[annex]\n stalldetection = 1KB/120s\n"
+  - python: '3.10'
+    dist: focal
+    env:
+      - PYTEST_SELECTION=
+      - PYTEST_SELECTION_OP=
+      - DATALAD_REPO_VERSION=10
+      - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex -m conda"
+      - DATALAD_TESTS_GITCONFIG="\n[annex]\n stalldetection = 1KB/120s\n"
   - if: type = cron
     python: 3.7
     # Single run for Python 3.7
@@ -76,11 +86,13 @@ matrix:
     env:
     - PYTEST_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - DATALAD_RUNTIME_PATHSPEC__FROM__FILE=always
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=10.20220525 -m conda"
   - python: 3.7
     env:
     - PYTEST_SELECTION_OP=""
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - DATALAD_RUNTIME_PATHSPEC__FROM__FILE=always
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=8.20210310 -m conda"
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for pytest.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
@@ -237,6 +249,9 @@ before_install:
 install:
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
+  # we are pip sudo install  below and versioneer needs to run git. recent git needs to
+  # be made certain it is safe to do
+  - sudo git config --global --add safe.directory $PWD
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
@@ -256,14 +271,16 @@ script:
   # Run tests
   #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
   #  in effect, dumping too many logs.
-  - http_proxy=
+  - set -x; http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
       -c ../tox.ini
+      -n 2
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
       --doctest-modules
       --cov=datalad
+      --cov-report=
       --pyargs
       $TESTS_TO_PERFORM
   - cd ..

@@ -116,13 +116,15 @@ def split_ext(filename):
     return ".".join(file_parts), "." + ".".join(ext_parts)
 
 
-def get_parent_paths(paths, parents, only_with_parents=False):
+def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
     """Given a list of children paths, return their parent paths among parents
     or their own path if there is no known parent. A path is also considered its
     own parent (haven't you watched Predestination?) ;)
 
-    All paths should be POSIX, relative, and not pointing outside (not starting
-    with ../)
+    All paths should be relative, not pointing outside (not starting
+    with ../), and normalized (no // or dir/../dir and alike). Only minimal
+    sanity checking of values is done.  By default paths are considered to be
+    POSIX. Use 'sep' kwarg to set to `os.sep` to provide OS specific handling.
 
     Accent is made on performance to avoid O(len(paths) * len(parents))
     runtime.  ATM should be typically less than O(len(paths) * len(log(parents)))
@@ -142,6 +144,10 @@ def get_parent_paths(paths, parents, only_with_parents=False):
     only_with_parents: bool, optional
       If set to True, return a list of only parent paths where that path had
       a parent
+    sep: str, optional
+      Path separator.  By default - '/' and thus treating paths as POSIX.
+      If you are processing OS-specific paths (for both `parents` and `paths`),
+      specify `sep=os.sep`.
 
     Returns
     -------
@@ -157,6 +163,10 @@ def get_parent_paths(paths, parents, only_with_parents=False):
     # We will create a lookup for known parent lengths
     parents = set(parents)  # O(log(len(parents))) lookup
 
+    # Will be used in sanity checking that we got consistently used separators, i.e.
+    # not mixing non-POSIX paths and POSIX parents
+    asep = {'/': '\\', '\\': '/'}[sep]
+
     # rely on path[:n] be quick, and len(parent_lengths) << len(parents)
     # when len(parents) is large.  We will also bail checking any parent of
     # the length if at that length path has no directory boundary ('/').
@@ -165,7 +175,7 @@ def get_parent_paths(paths, parents, only_with_parents=False):
     # parent path to list of parents with that length
     parent_lengths = _defaultdict(set)
     for parent in parents:
-        _get_parent_paths_check(parent)
+        _get_parent_paths_check(parent, sep, asep)
         parent_lengths[len(parent)].add(parent)
 
     # Make it ordered in the descending order so we select the deepest/longest parent
@@ -178,9 +188,9 @@ def get_parent_paths(paths, parents, only_with_parents=False):
 
     for path in paths:  # O(len(paths)) - unavoidable but could be parallelized!
         # Sanity check -- should not be too expensive
-        _get_parent_paths_check(path)
+        _get_parent_paths_check(path, sep, asep)
         for parent_length, parents_ in parent_lengths:  # O(len(parent_lengths))
-            if (len(path) < parent_length) or (len(path) > parent_length and path[parent_length] != '/'):
+            if (len(path) < parent_length) or (len(path) > parent_length and path[parent_length] != sep):
                 continue  # no directory deep enough
             candidate_parent = path[:parent_length]
             if candidate_parent in parents_:  # O(log(len(parents))) but expected one less due to per length handling
@@ -197,8 +207,11 @@ def get_parent_paths(paths, parents, only_with_parents=False):
     return res
 
 
-def _get_parent_paths_check(path):
+def _get_parent_paths_check(path, sep, asep):
     """A little helper for get_parent_paths"""
     if isabs(path) or path.startswith(pardir + sep) or path.startswith(curdir + sep):
         raise ValueError("Expected relative within directory paths, got %r" % path)
-
+    if sep+sep in path:
+        raise ValueError(f"Expected normalized paths, got {path} containing '{sep+sep}'")
+    if asep in path:
+        raise ValueError(f"Expected paths with {sep} as separator, got {path} containing '{asep}'")

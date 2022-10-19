@@ -97,7 +97,6 @@ def setup_parser(
         prog='datalad',
         # usage="%(prog)s ...",
         description=help_gist,
-        epilog='"Be happy!"',
         formatter_class=formatter_class,
         add_help=False,
         # TODO: when dropping support for Python 3.8: uncomment below
@@ -165,7 +164,7 @@ def setup_parser(
     all_parsers = {}  # name: (sub)parser
 
     if (completing and status == 'allknown') or status \
-            in ('allparsers', 'subcommand'):
+            in ('allparsers', 'subcommand', 'error'):
         # parseinfo could be None here, when we could not identify
         # a subcommand, but need to locate matching ones for
         # completion

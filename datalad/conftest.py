@@ -89,7 +89,7 @@ def setup_package():
 	# allowed by default
 	allowed-url-schemes = http https file
 	allowed-http-addresses = all
-"""
+""" + os.environ.get('DATALAD_TESTS_GITCONFIG', '').replace('\\n', os.linesep)
             # TODO: split into a function + context manager
             with make_tempfile(mkdir=True) as new_home:
                 pass

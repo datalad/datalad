@@ -138,16 +138,24 @@ def test_help_np():
     ok_startswith(stdout, 'Usage: datalad')
     # Sections start/end with * if ran under DATALAD_HELP2MAN mode
     sections = [l[1:-1] for l in filter(re.compile(r'^\*.*\*$').match, stdout.split('\n'))]
-    for s in {'Essential commands',
-              'Commands for metadata handling',
-              'Miscellaneous commands',
+    for s in {'Essential',
+              'Metadata',
+              'Miscellaneous',
               'General information',
               'Global options',
-              'Plumbing commands',
+              'Plumbing',
               }:
         assert_in(s, sections)
         # should be present only one time!
-        eq_(stdout.count(s), 1)
+        eq_(stdout.count(f'*{s}*'), 1)
+
+    # check that we have global options actually listed after "Global options"
+    # ATM -c is the first such option
+    assert re.search(r"Global options\W*-c ", stdout, flags=re.MULTILINE)
+    # and -c should be listed only once - i.e. that we do not duplicate sections
+    # and our USAGE summary has only [global-opts]
+    assert re.match("Usage: .*datalad.* \[global-opts\] command \[command-opts\]", stdout)
+    assert stdout.count(' -c ') == 1
 
     assert_all_commands_present(stdout)
 
@@ -202,6 +210,15 @@ def test_combined_short_option():
     stdout, stderr = run_main(['-fjson'], exit_code=2, expect_stderr=True)
     assert_not_in("unrecognized argument", stderr)
     assert_in("too few arguments", stderr)
+
+
+# https://github.com/datalad/datalad/issues/6814
+@with_tempfile(mkdir=True)
+def test_conflicting_short_option(tempdir=None):
+    # datalad -f|--format   requires a value. regression made parser ignore command
+    # and its options
+    with chpwd(tempdir):  # can't just use -C tempdir since we do "in process" run_main
+        run_main(['create', '-f'])
 
 
 # apparently a bit different if following a good one so let's do both
@@ -269,11 +286,12 @@ def test_script_shims(script):
                  get_numeric_portion(version))
 
 
-@slow  # 11.2591s
 @with_tempfile(mkdir=True)
 def test_cfg_override(path=None):
     with chpwd(path):
-        cmd = ['datalad', 'wtf', '-s', 'some']
+        # use 'wtf' to dump the config
+        # should be rewritten to use `configuration`
+        cmd = ['datalad', 'wtf', '-S', 'configuration', '-s', 'some']
         # control
         out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
         assert_not_in('datalad.dummy: this', out)
@@ -304,6 +322,27 @@ def test_cfg_override(path=None):
         out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
                            protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
+
+        # set a config
+        run_main([
+            'configuration', '--scope', 'local', 'set', 'mike.item=some'])
+        # verify it is successfully set
+        assert 'some' == run_main([
+            'configuration', 'get', 'mike.item'])[0].strip()
+        # verify that an override can unset the config
+        # we cannot use run_main(), because the "singleton" instance of the
+        # dataset we are in is still around in this session, and with it
+        # also its config managers that we will not be able to post-hoc
+        # overwrite with this method. Instead, we'll execute in a subprocess.
+        assert '' == Runner().run([
+            'datalad', '-c', ':mike.item',
+            'configuration', 'get', 'mike.item'],
+            protocol=StdOutErrCapture)['stdout'].strip()
+        # verify the effect is not permanent
+        assert 'some' == Runner().run([
+            'datalad',
+            'configuration', 'get', 'mike.item'],
+            protocol=StdOutErrCapture)['stdout'].strip()
 
 
 def test_incorrect_cfg_override():

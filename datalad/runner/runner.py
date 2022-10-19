@@ -8,12 +8,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Base DataLad command execution runner
 """
+from __future__ import annotations
 
 import logging
+from typing import cast
 
 from .coreprotocols import NoCapture
 from .exception import CommandError
-from .nonasyncrunner import ThreadedRunner
+from .nonasyncrunner import (
+    ThreadedRunner,
+    _ResultGenerator,
+)
 from .protocol import GeneratorMixIn
 
 
@@ -47,7 +52,6 @@ class WitlessRunner(object):
 
         self.threaded_runner = None
 
-
     def _get_adjusted_env(self, env=None, cwd=None, copy=True):
         """Return an adjusted copy of an execution environment
 
@@ -70,7 +74,7 @@ class WitlessRunner(object):
             env=None,
             timeout=None,
             exception_on_error=True,
-            **kwargs):
+            **kwargs) -> dict | _ResultGenerator:
         """Execute a command and communicate with it.
 
         Parameters
@@ -122,13 +126,14 @@ class WitlessRunner(object):
 
         Returns
         -------
-          Union[Any, Generator]
+          dict | _ResultGenerator
 
             If the protocol is not a subclass of `GeneratorMixIn`, the
             result of protocol._prepare_result will be returned.
 
-            If the protocol is a subclass of `GeneratorMixIn`, a Generator
-            will be returned. This allows to use this method in constructs like:
+            If the protocol is a subclass of `GeneratorMixIn`, a Generator, i.e.
+            a `_ResultGenerator`, will be returned. This allows to use this
+            method in constructs like:
 
                 for protocol_output in runner.run():
                     ...
@@ -168,7 +173,12 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        lgr.debug('Run %r (cwd=%s)', cmd, cwd)
+        lgr.debug(
+            'Run %r (protocol_class=%s) (cwd=%s)',
+            cmd,
+            protocol.__name__,
+            cwd
+        )
 
         self.threaded_runner = ThreadedRunner(
             cmd=cmd,
@@ -186,7 +196,7 @@ class WitlessRunner(object):
         if issubclass(protocol, GeneratorMixIn):
             return results_or_iterator
         else:
-            results = results_or_iterator
+            results = cast(dict, results_or_iterator)
 
         # log before any exception is raised
         lgr.debug("Finished %r with status %s", cmd, results['code'])

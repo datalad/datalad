@@ -55,7 +55,7 @@ class TestRepo(object, metaclass=ABCMeta):
         # swallow logs so we don't print all those about crippled FS etc
         with swallow_logs():
             self.repo = self.REPO_CLASS(path)
-            # For additional testing of our datalad remote to not interfer
+            # For additional testing of our datalad remote to not interfere
             # and manage to handle all http urls and requests:
             if self.REPO_CLASS is AnnexRepo and \
                     os.environ.get('DATALAD_TESTS_DATALADREMOTE'):

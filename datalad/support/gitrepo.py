@@ -1239,6 +1239,7 @@ class GitRepo(CoreGitRepo):
                 ensure_list(git_options) +
                 to_options(update=update) + ['--verbose'],
                 files=files,
+                pathspec_from_file=True,
                 read_only=False,
             )
             # get all the entries
@@ -1315,7 +1316,7 @@ class GitRepo(CoreGitRepo):
         return [
             line.strip()[4:-1]
             for line in self.call_git_items_(
-                ['rm'] + to_options(**kwargs), files=files)
+                ['rm'] + to_options(**kwargs), files=files, pathspec_from_file=True)
         ]
 
     def precommit(self):
@@ -1373,7 +1374,7 @@ class GitRepo(CoreGitRepo):
         self.precommit()
 
         # assemble commandline
-        cmd = self._git_cmd_prefix + ['commit']
+        cmd = ['commit']
         options = ensure_list(options)
 
         if date:
@@ -1406,30 +1407,22 @@ class GitRepo(CoreGitRepo):
 
         lgr.debug("Committing via direct call of git: %s", cmd)
 
-        file_chunks = generate_file_chunks(files, cmd) if files else [[]]
-
-        # store pre-commit state to be able to check if anything was committed
         prev_sha = self.get_hexsha()
 
+        # Old code was doing clever --amend'ing of chunked series of commits manually
+        # here, but with pathspec_from_file it is no longer needed.
+        # store pre-commit state to be able to check if anything was committed
         try:
-            for i, chunk in enumerate(file_chunks):
-                cur_cmd = cmd.copy()
-                # if this is an explicit dry-run, there is no point in
-                # amending, because no commit was ever made
-                # otherwise, amend the first commit, and prevent
-                # leaving multiple commits behind
-                if i > 0 and '--dry-run' not in cmd:
-                    if '--amend' not in cmd:
-                        cur_cmd.append('--amend')
-                    if '--no-edit' not in cmd:
-                        cur_cmd.append('--no-edit')
-                cur_cmd += ['--'] + chunk
-                self._git_runner.run(
-                    cur_cmd,
-                    protocol=StdOutErrCapture,
-                    stdin=None,
+            # Note: call_git operates via joining call_git_items_ and that one wipes out
+            # .stdout from exception and collects/repopulates stderr only. Let's use
+            # _call_git which returns both outputs and collects/re-populates both stdout
+            # **and** stderr
+            _ = self._call_git(
+                    cmd,
+                    files=files,
                     env=env,
-                )
+                    pathspec_from_file=True,
+            )
         except CommandError as e:
             # real errors first
             if "did not match any file(s) known to git" in e.stderr:
@@ -1453,7 +1446,6 @@ class GitRepo(CoreGitRepo):
                 lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
-
         if orig_msg \
                 or '--dry-run' in cmd \
                 or prev_sha == self.get_hexsha() \
@@ -2714,27 +2706,29 @@ class GitRepo(CoreGitRepo):
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
-        if paths:
+        if paths:  # is not None separate after
             # path matching will happen against what Git reports
             # and Git always reports POSIX paths
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
             # note: will be list-ified below
-            paths = map(ut.PurePosixPath,  paths)
+            posix_paths = [ut.PurePath(p).as_posix() for p in paths]
         elif paths is not None:
             return info
+        else:
+            posix_paths = None
 
-        path_strs = list(map(str, paths)) if paths else None
-        if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
+        if posix_paths and (not ref or external_versions["cmd:git"] >= "2.29.0"):
             # If a path points within a submodule, we need to map it to the
             # containing submodule before feeding it to ls-files or ls-tree.
             #
             # Before Git 2.29.0, ls-tree and ls-files differed in how they
             # reported paths within submodules: ls-files provided no output,
             # and ls-tree listed the submodule. Now they both return no output.
-            submodules = [str(s["path"].relative_to(self.pathobj))
+            submodules = [s["path"].relative_to(self.pathobj).as_posix()
                           for s in self.get_submodules_()]
-            path_strs = get_parent_paths(path_strs, submodules)
+            # `paths` get normalized into PurePosixPath above, submodules are POSIX as well
+            posix_paths = get_parent_paths(posix_paths, submodules)
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -2768,7 +2762,7 @@ class GitRepo(CoreGitRepo):
         try:
             stdout = self.call_git(
                 cmd,
-                files=path_strs,
+                files=posix_paths,
                 expect_fail=True,
                 read_only=True)
         except CommandError as exc:
@@ -2871,7 +2865,7 @@ class GitRepo(CoreGitRepo):
             Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
         lgr.debug('Query status of %r for %s paths',
-                  self, len(paths) if paths else 'all')
+                  self, len(paths) if paths is not None else 'all')
         return self.diffstatus(
             fr='HEAD' if self.get_hexsha() else None,
             to=None,
@@ -2942,7 +2936,7 @@ class GitRepo(CoreGitRepo):
         if _cache is None:
             _cache = {}
 
-        if paths:
+        if paths is not None:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
             paths = map(ut.Path, paths)
@@ -2980,7 +2974,7 @@ class GitRepo(CoreGitRepo):
                         # included with `-m` alone
                         ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
-                        files=[str(p) for p in paths] if paths else None,
+                        files=[str(p) for p in paths] if paths is not None else None,
                         sep='\0',
                         read_only=True)
                     if p)
@@ -3569,6 +3563,7 @@ class GitRepo(CoreGitRepo):
                 ['-c', 'annex.largefiles=nothing', 'add'] +
                 ensure_list(git_opts) + ['--verbose'],
                 files=list(files.keys()),
+                pathspec_from_file=True,
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
@@ -3705,6 +3700,17 @@ def _get_save_status_state(status):
         if state == 'clean':
             # we don't care about clean
             continue
+        if state == 'modified' and props.get('gitshasum') \
+                and props.get('gitshasum') == props.get('prev_gitshasum'):
+            # reported as modified, but with identical shasums -> typechange
+            # a subdataset maybe? do increasingly expensive tests for
+            # speed reasons
+            if props.get('type') != 'dataset' and f.is_dir() \
+                    and GitRepo.is_valid_repo(f):
+                # it was not a dataset, but now there is one.
+                # we declare it untracked to engage the discovery tooling.
+                state = 'untracked'
+                props = dict(type='dataset', state='untracked')
         status_state[state][f] = props
         # The hybrid one to retain the same order as in original status
         if state in ('modified', 'untracked'):

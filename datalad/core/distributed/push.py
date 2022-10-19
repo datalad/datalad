@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from collections import OrderedDict
+from itertools import chain
 import logging
 import re
 
@@ -442,14 +443,27 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     target = None
     if not _target:
         try:
-            # let Git figure out what needs doing
-            # we will reuse the result further down again, so nothing is wasted
-            wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
-            # we did not get an explicit push target, get it from Git
-            target = set(p.get('remote', None) for p in wannabe_gitpush)
-            # handle case where a pushinfo record did not have a 'remote'
-            # property -- should not happen, but be robust
-            target.discard(None)
+            try:
+                # let Git figure out what needs doing
+                # we will reuse the result further down again, so nothing is wasted
+                wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
+                # we did not get an explicit push target, get it from Git
+                target = set(p.get('remote', None) for p in wannabe_gitpush)
+                # handle case where a pushinfo record did not have a 'remote'
+                # property -- should not happen, but be robust
+                target.discard(None)
+            except CommandError as e:
+                if 'Please make sure you have the correct access rights' in e.stderr:
+                    # there is a default push target but we have no permission
+                    yield dict(
+                        res_kwargs,
+                        status='impossible',
+                        message='Attempt to push to default target resulted in following '
+                                'error.  Address the error or specify different target with --to: '
+                                + e.stderr,
+                    )
+                    return
+                raise
         except Exception as e:
             lgr.debug(
                 'Dry-run push to determine default push target failed, '
@@ -498,7 +512,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     depvar = 'remote.{}.datalad-publish-depends'.format(target)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = ensure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, [], get_all=True))
     if publish_depends:
         lgr.debug("Discovered publication dependencies for '%s': %s'",
                   target, publish_depends)
@@ -874,7 +888,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         else:
             file_list += bytes(Path(c['path']).relative_to(ds.pathobj))
             file_list += b'\0'
-            nbytes += c['bytesize']
+            nbytes += c.get('bytesize', 0)
             seen_keys.add(key)
     lgr.debug('Counted %d bytes of annex data to transfer',
               nbytes)

@@ -78,7 +78,7 @@ class HelpAction(argparse.Action):
         options = []
         in_options = False
         for line in helpstr.splitlines():
-            if line == 'optional arguments:':
+            if line in ('options:', 'optional arguments:'):
                 in_options = True
                 continue
             (options if in_options else preamble).append(line)
@@ -255,17 +255,23 @@ def _parse_overrides_from_cmdline(cmdlineargs):
     # errors: we need a section, a variable, and a value at minimum
     # otherwise we break our own config parsing helpers
     # https://github.com/datalad/datalad/issues/3451
-    noassign_expr = re.compile(r'[^\s]+\.[^\s]+=[\S]+')
+    assign_expr = re.compile(r'[^\s]+\.[^\s]+=[\S]+')
+    unset_expr = re.compile(r':[^\s]+\.[^\s=]+')
     noassign = [
         o
         for o in cmdlineargs.cfg_overrides
-        if not noassign_expr.match(o)
+        if not (assign_expr.match(o) or unset_expr.match(o))
     ]
     if noassign:
         lgr.error(
             "Configuration override without section/variable "
-            "or value assignment (must be 'section.variable=value'): %s",
+            "or unset marker or value assignment "
+            "(must be '(:section.variable|section.variable=value)'): %s",
             noassign)
         sys.exit(3)
-    overrides = dict(o.split('=', 1) for o in cmdlineargs.cfg_overrides)
+    overrides = dict(
+        [o[1:], None] if o.startswith(':')
+        else o.split('=', 1)
+        for o in cmdlineargs.cfg_overrides
+    )
     return overrides

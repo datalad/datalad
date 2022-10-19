@@ -54,8 +54,6 @@ from datalad.runner.utils import (
     AssemblingDecoderMixIn,
     LineSplitter,
 )
-# must not be loads, because this one would log, and we need to log ourselves
-from datalad.support.json_py import json_loads
 from datalad.support.exceptions import CapturedException
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
@@ -104,10 +102,6 @@ from .exceptions import (
 )
 
 lgr = logging.getLogger('datalad.annex')
-
-# This is a map between an auto-upgradeable version and the version that it
-# upgrades to. It should track autoUpgradeableVersions in Annex.Version.
-_AUTO_UPGRADEABLE_VERSIONS = {v: 8 for v in range(3, 8)}
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -1438,10 +1432,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         if description is not None:
             opts += [description]
         if version is not None:
-            upgraded_version = _AUTO_UPGRADEABLE_VERSIONS.get(version)
-            if upgraded_version:
-                lgr.info("Annex repository version %s will be upgraded to %s",
-                         version, upgraded_version)
+            version = str(version)
+            supported_versions = AnnexRepo.check_repository_versions()['supported']
+            if version not in supported_versions:
+                first_supported_version = int(supported_versions[0])
+                if int(version) < first_supported_version:
+                    lgr.info("Annex repository version %s will be upgraded to %s or later version",
+                             version, first_supported_version)
+                    # and if it is higher than any supported -- we will just let git-annex to do
+                    # what it wants to do
             opts += ['--version', '{0}'.format(version)]
 
         # TODO: RM DIRECT?  or RF at least ?
@@ -2760,9 +2759,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(
-                ':'.join(annex_cmd), annex_cmd,
-                path=self.path)(key_)
+            try:
+                out = self._batched.get(
+                    ':'.join(annex_cmd), annex_cmd,
+                    path=self.path)(key_)
+            except CommandError:
+                # git-annex runs in batch mode, but will still signal some
+                # errors, e.g. an unknown remote, by exiting with a non-zero
+                # return code.
+                return False
             try:
                 return {
                     # happens on travis in direct/heavy-debug mode, that process
@@ -3369,7 +3374,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             cmd = ['find'] + cmd
             # stringify any pathobjs
-            if paths:
+            if paths:  # we have early exit above in case of [] and not None
                 files = [str(p) for p in paths]
             else:
                 cmd += ['--include', '*']
@@ -3430,7 +3435,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         .. deprecated:: 0.16
             Use get_content_annexinfo() or the test helper
-            datalad/utils/get_annexstatus() instead.
+            :py:func:`datalad.tests.utils.get_annexstatus` instead.
         """
         info = self.get_content_annexinfo(
             paths=paths,
@@ -3676,14 +3681,12 @@ class AnnexJsonProtocol(WitlessProtocol):
             data = self._unprocessed + data
             self._unprocessed = None
         # this is where the JSON records come in
-        # json_loads() is already logging any error, which is OK, because
-        # under no circumstances we would expect broken JSON
         lines = data.splitlines()
         data_ends_with_eol = data.endswith(os.linesep.encode())
         del data
         for iline, line in enumerate(lines):
             try:
-                j = json_loads(line)
+                j = json.loads(line)
             except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
@@ -3993,4 +3996,9 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 def readline_json(stdout):
     toload = stdout.readline().strip()
-    return json_loads(toload) if toload else {}
+    try:
+        return json.loads(toload) if toload else {}
+    except json.JSONDecodeError:
+        lgr.error('Received undecodable JSON output: %s', line)
+        raise
+

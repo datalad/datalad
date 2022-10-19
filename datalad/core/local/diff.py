@@ -77,7 +77,7 @@ class Diff(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="""path to contrain the report to""",
+            doc="""path to constrain the report to""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         fr=Parameter(

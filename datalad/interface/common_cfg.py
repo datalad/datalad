@@ -17,6 +17,7 @@ import logging
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
+import time
 
 from platformdirs import AppDirs
 
@@ -24,6 +25,7 @@ from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
     EnsureInt,
+    EnsureFloat,
     EnsureListOf,
     EnsureNone,
     EnsureStr,
@@ -327,18 +329,18 @@ _definitions = {
     },
     'datalad.github.token-note': {
         'ui': ('question', {
-            'title': 'Github token note',
+            'title': 'GitHub token note',
             'text': 'Description for a Personal access token to generate.'}),
         'default': 'DataLad',
     },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
-               'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),
+               'title': 'Skips network tests completely if this flag is set, Examples include test for S3, git_repositories, OpenfMRI, etc'}),
         'type': EnsureBool(),
     },
     'datalad.tests.nonlo': {
         'ui': ('question', {
-               'title': 'Specifies network interfaces to bring down/up for testing. Currently used by travis.'}),
+               'title': 'Specifies network interfaces to bring down/up for testing. Currently used by Travis CI.'}),
     },
     'datalad.tests.noteardown': {
         'ui': ('yesno', {
@@ -605,6 +607,17 @@ _definitions = {
         'type': EnsureInt(),
         'default': 1,
     },
+    'datalad.runtime.pathspec-from-file': {
+        'ui': ('question', {
+            'title': 'Provide list of files to git commands via --pathspec-from-file',
+            'text': "Instructs when DataLad will provide list of paths to 'git' commands which "
+                    "support --pathspec-from-file option via some temporary file. If set to "
+                    "'multi-chunk' it will be done only if multiple invocations of the command "
+                    "on chunks of files list is needed. If set to 'always', DataLad will always "
+                    "use --pathspec-from-file."}),
+        'type': EnsureChoice('multi-chunk', 'always'),
+        'default': 'multi-chunk',
+    },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
                'title': 'Error behavior',
@@ -708,6 +721,18 @@ _definitions = {
                     "ignore the incompatibility."}),
         'type': EnsureChoice('warning', 'error', 'none'),
         'default': 'warning',
+
+    },
+    'datalad.source.epoch': {
+        'ui': ('question', {
+            'title': 'Datetime epoch to use for dates in built materials',
+            'text': "Datetime to use for reproducible builds. Originally introduced "
+                    "for Debian packages to interface SOURCE_DATE_EPOCH described at "
+                    "https://reproducible-builds.org/docs/source-date-epoch/ ."
+                    "By default - current time"
+        }),
+        'type': EnsureFloat(),
+        'default': time.time(),
 
     },
     'datalad.ssh.executable': {
