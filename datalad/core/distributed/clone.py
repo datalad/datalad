@@ -54,9 +54,15 @@ from .clone_utils import (  # needed because other code imports it from here
     _format_clone_errors,
     _generate_candidate_clone_sources,
     _get_remote,
+    _get_tracking_source,
+    _map_urls,
     _test_existing_clone_target,
     _try_clone_candidates,
     decode_source_spec,
+    # RIA imports needed b/c datalad-next imports it from here ATM;
+    # Remove after core was released and next dropped the ria patch.
+    postclone_preannex_cfg_ria,
+    postclonecfg_ria,
 )
 
 __docformat__ = 'restructuredtext'
