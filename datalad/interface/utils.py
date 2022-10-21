@@ -378,6 +378,9 @@ def _execute_command_(
         {**cmd_kwargs, **exec_kwargs},
     )
 
+    # validate the complete parameterization
+    _validate_cmd_call(interface, allkwargs)
+
     # look for potential override of logging behavior
     result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
     # resolve string labels for transformers too
@@ -504,6 +507,23 @@ def _execute_command_(
         raise IncompleteResultsError(
             failed=incomplete_results,
             msg="Command did not complete successfully")
+
+
+def _validate_cmd_call(interface: anInterface, kwargs: Dict) -> None:
+    """Validate a parameterization of a command call
+
+    This is called by `_execute_command_()` before a command call, with
+    the respective Interface sub-type of the command, and all its
+    arguments in keyword argument dict style. This dict also includes
+    the default values for any parameter that was not explicitly included
+    in the command call.
+
+    This expected behavior is to raise an exception whenever an invalid
+    parameterization is encountered.
+
+    This default implementation performs no validation.
+    """
+    pass
 
 
 def generic_result_renderer(res):
