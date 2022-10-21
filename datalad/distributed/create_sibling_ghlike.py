@@ -391,10 +391,19 @@ class _GitHubLike(object):
                     reponame, self.api_url)
 
             if 'message' not in res:
-                res['message'] = (
-                    "sibling repository '%s' created at %s",
-                    siblingname, res.get('html_url')
-                )
+                if not dry_run:
+                    res['message'] = (
+                        "sibling repository '%s' created at %s",
+                        siblingname, res.get('html_url')
+                    )
+                else:
+                    # can't know url when request was not made
+                    res['message'] = (
+                        "would create sibling '%s' and repository '%s%s'",
+                        siblingname,
+                        organization + "/" if organization else "",
+                        reponame
+                    )
             # report to caller
             yield get_status_dict(**res)
 
@@ -458,6 +467,7 @@ class _GitHubLike(object):
         headers = self.request_headers
 
         if dry_run:
+            res_msg = "would create {} sibling and repository named {}"
             return dict(
                 status='ok',
                 request_url=endpoint,
