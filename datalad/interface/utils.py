@@ -332,107 +332,40 @@ def eval_results(wrapped):
         # look for hooks
         hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 
-        # this internal helper function actually drives the command
-        # generator-style, it may generate an exception if desired,
-        # on incomplete results
-        def generator_func(*_args, **_kwargs):
-            # flag whether to raise an exception
-            incomplete_results = []
-            # track what actions were performed how many times
-            action_summary = {}
-
-            # if a custom summary is to be provided, collect the results
-            # of the command execution
-            results = []
-            do_custom_result_summary = result_renderer in (
-                'tailored', 'generic', 'default') and hasattr(
-                    wrapped_class,
-                    'custom_result_summary_renderer')
-            pass_summary = do_custom_result_summary \
-                and getattr(wrapped_class,
-                            'custom_result_summary_renderer_pass_summary',
-                            None)
-
-            # process main results
-            for r in _process_results(
-                    # execution
-                    wrapped(*_args, **_kwargs),
-                    wrapped_class,
-                    common_params['on_failure'],
-                    # bookkeeping
-                    action_summary,
-                    incomplete_results,
-                    # communication
-                    result_renderer,
-                    result_log_level,
-                    # let renderers get to see how a command was called
-                    allkwargs):
-                for hook, spec in hooks.items():
-                    # run the hooks before we yield the result
-                    # this ensures that they are executed before
-                    # a potentially wrapper command gets to act
-                    # on them
-                    if match_jsonhook2result(hook, r, spec['match']):
-                        lgr.debug('Result %s matches hook %s', r, hook)
-                        # a hook is also a command that yields results
-                        # so yield them outside too
-                        # users need to pay attention to void infinite
-                        # loops, i.e. when a hook yields a result that
-                        # triggers that same hook again
-                        for hr in run_jsonhook(hook, spec, r, dataset_arg):
-                            # apply same logic as for main results, otherwise
-                            # any filters would only tackle the primary results
-                            # and a mixture of return values could happen
-                            if not keep_result(hr, result_filter, **allkwargs):
-                                continue
-                            hr = xfm_result(hr, result_xfm)
-                            # rationale for conditional is a few lines down
-                            if hr:
-                                yield hr
-                if not keep_result(r, result_filter, **allkwargs):
-                    continue
-                r = xfm_result(r, result_xfm)
-                # in case the result_xfm decided to not give us anything
-                # exclude it from the results. There is no particular reason
-                # to do so other than that it was established behavior when
-                # this comment was written. This will not affect any real
-                # result record
-                if r:
-                    yield r
-
-                # collect if summary is desired
-                if do_custom_result_summary:
-                    results.append(r)
-
-            # result summary before a potential exception
-            # custom first
-            if do_custom_result_summary:
-                if pass_summary:
-                    summary_args = (results, action_summary)
-                else:
-                    summary_args = (results,)
-                wrapped_class.custom_result_summary_renderer(*summary_args)
-            elif result_renderer in ('generic', 'default') \
-                    and action_summary \
-                    and sum(sum(s.values())
-                            for s in action_summary.values()) > 1:
-                # give a summary in generic mode, when there was more than one
-                # action performed
-                render_action_summary(action_summary)
-
-            if incomplete_results:
-                raise IncompleteResultsError(
-                    failed=incomplete_results,
-                    msg="Command did not complete successfully")
-
         if return_type == 'generator':
             # hand over the generator
             lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
-            return generator_func(*args, **kwargs)
+            return _execute_command_(
+                wrapped,
+                wrapped_class,
+                result_renderer,
+                common_params,
+                result_log_level,
+                allkwargs,
+                hooks,
+                dataset_arg,
+                result_filter,
+                result_xfm,
+                *args,
+                **kwargs
+            )
         else:
-            @wraps(generator_func)
+            @wraps(_execute_command_)
             def return_func(*args_, **kwargs_):
-                results = generator_func(*args_, **kwargs_)
+                results = _execute_command_(
+                    wrapped,
+                    wrapped_class,
+                    result_renderer,
+                    common_params,
+                    result_log_level,
+                    allkwargs,
+                    hooks,
+                    dataset_arg,
+                    result_filter,
+                    result_xfm,
+                    *args,
+                    **kwargs
+                )
                 if inspect.isgenerator(results):
                     # unwind generator if there is one, this actually runs
                     # any processing
@@ -449,6 +382,113 @@ def eval_results(wrapped):
     ret = eval_func
     ret._eval_results = True
     return ret
+
+
+def _execute_command_(
+        wrapped,
+        wrapped_class,
+        result_renderer,
+        common_params,
+        result_log_level,
+        allkwargs,
+        hooks,
+        dataset_arg,
+        result_filter,
+        result_xfm,
+        *_args,
+        **_kwargs):
+    """This internal helper function actually drives a command
+    generator-style, it may generate an exception if desired,
+    on incomplete results
+    """
+    # flag whether to raise an exception
+    incomplete_results = []
+    # track what actions were performed how many times
+    action_summary = {}
+
+    # if a custom summary is to be provided, collect the results
+    # of the command execution
+    results = []
+    do_custom_result_summary = result_renderer in (
+        'tailored', 'generic', 'default') and hasattr(
+            wrapped_class,
+            'custom_result_summary_renderer')
+    pass_summary = do_custom_result_summary \
+        and getattr(wrapped_class,
+                    'custom_result_summary_renderer_pass_summary',
+                    None)
+
+    # process main results
+    for r in _process_results(
+            # execution
+            wrapped(*_args, **_kwargs),
+            wrapped_class,
+            common_params['on_failure'],
+            # bookkeeping
+            action_summary,
+            incomplete_results,
+            # communication
+            result_renderer,
+            result_log_level,
+            # let renderers get to see how a command was called
+            allkwargs):
+        for hook, spec in hooks.items():
+            # run the hooks before we yield the result
+            # this ensures that they are executed before
+            # a potentially wrapper command gets to act
+            # on them
+            if match_jsonhook2result(hook, r, spec['match']):
+                lgr.debug('Result %s matches hook %s', r, hook)
+                # a hook is also a command that yields results
+                # so yield them outside too
+                # users need to pay attention to void infinite
+                # loops, i.e. when a hook yields a result that
+                # triggers that same hook again
+                for hr in run_jsonhook(hook, spec, r, dataset_arg):
+                    # apply same logic as for main results, otherwise
+                    # any filters would only tackle the primary results
+                    # and a mixture of return values could happen
+                    if not keep_result(hr, result_filter, **allkwargs):
+                        continue
+                    hr = xfm_result(hr, result_xfm)
+                    # rationale for conditional is a few lines down
+                    if hr:
+                        yield hr
+        if not keep_result(r, result_filter, **allkwargs):
+            continue
+        r = xfm_result(r, result_xfm)
+        # in case the result_xfm decided to not give us anything
+        # exclude it from the results. There is no particular reason
+        # to do so other than that it was established behavior when
+        # this comment was written. This will not affect any real
+        # result record
+        if r:
+            yield r
+
+        # collect if summary is desired
+        if do_custom_result_summary:
+            results.append(r)
+
+    # result summary before a potential exception
+    # custom first
+    if do_custom_result_summary:
+        if pass_summary:
+            summary_args = (results, action_summary)
+        else:
+            summary_args = (results,)
+        wrapped_class.custom_result_summary_renderer(*summary_args)
+    elif result_renderer in ('generic', 'default') \
+            and action_summary \
+            and sum(sum(s.values())
+                    for s in action_summary.values()) > 1:
+        # give a summary in generic mode, when there was more than one
+        # action performed
+        render_action_summary(action_summary)
+
+    if incomplete_results:
+        raise IncompleteResultsError(
+            failed=incomplete_results,
+            msg="Command did not complete successfully")
 
 
 def generic_result_renderer(res):
