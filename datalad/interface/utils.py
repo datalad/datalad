@@ -295,24 +295,6 @@ def eval_results(wrapped):
         # short cuts and configured setup for common options
         return_type = common_params['return_type']
 
-        # query cfg for defaults
-        # .is_installed and .config can be costly, so ensure we do
-        # it only once. See https://github.com/datalad/datalad/issues/3575
-        dataset_arg = allkwargs.get('dataset', None)
-        ds = None
-        if dataset_arg is not None:
-            from datalad.distribution.dataset import Dataset
-            if isinstance(dataset_arg, Dataset):
-                ds = dataset_arg
-            else:
-                try:
-                    ds = Dataset(dataset_arg)
-                except ValueError:
-                    pass
-
-        # look for hooks
-        hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
-
         if return_type == 'generator':
             # hand over the generator
             lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
@@ -320,8 +302,6 @@ def eval_results(wrapped):
                 wrapped,
                 wrapped_class,
                 allkwargs,
-                hooks,
-                dataset_arg,
                 *args,
                 **kwargs
             )
@@ -332,8 +312,6 @@ def eval_results(wrapped):
                     wrapped,
                     wrapped_class,
                     allkwargs,
-                    hooks,
-                    dataset_arg,
                     *args,
                     **kwargs
                 )
@@ -359,8 +337,6 @@ def _execute_command_(
         wrapped,
         wrapped_class,
         allkwargs,
-        hooks,
-        dataset_arg,
         *_args,
         **_kwargs):
     """This internal helper function actually drives a command
@@ -385,6 +361,25 @@ def _execute_command_(
         # standardize on the new name 'generic' to avoid more complex
         # checking below
         result_renderer = 'generic'
+
+    # figure out which hooks are relevant for this command execution
+    # query cfg for defaults
+    # .is_installed and .config can be costly, so ensure we do
+    # it only once. See https://github.com/datalad/datalad/issues/3575
+    dataset_arg = allkwargs.get('dataset', None)
+    ds = None
+    if dataset_arg is not None:
+        from datalad.distribution.dataset import Dataset
+        if isinstance(dataset_arg, Dataset):
+            ds = dataset_arg
+        else:
+            try:
+                ds = Dataset(dataset_arg)
+            except ValueError:
+                pass
+    # look for hooks
+    hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
+    # end of hooks discovery
 
     # flag whether to raise an exception
     incomplete_results = []
