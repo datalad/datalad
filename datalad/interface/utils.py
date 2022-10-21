@@ -298,8 +298,8 @@ def eval_results(wrapped):
                 wrapped,
                 wrapped_class,
                 common_params,
-                *args,
-                **kwargs
+                args,
+                kwargs
             )
         else:
             @wraps(_execute_command_)
@@ -308,8 +308,8 @@ def eval_results(wrapped):
                     wrapped,
                     wrapped_class,
                     common_params,
-                    *args,
-                    **kwargs
+                    args,
+                    kwargs
                 )
                 if inspect.isgenerator(results):
                     # unwind generator if there is one, this actually runs
@@ -335,8 +335,8 @@ def _execute_command_(
         wrapped,
         wrapped_class,
         common_params,
-        *_args,
-        **_kwargs):
+        cmd_args,
+        cmd_kwargs):
     """This internal helper function actually drives a command
     generator-style, it may generate an exception if desired,
     on incomplete results
@@ -346,8 +346,8 @@ def _execute_command_(
     # incl. defaults and args given as positionals
     allkwargs = get_allargs_as_kwargs(
         wrapped,
-        _args,
-        {**_kwargs, **common_params},
+        cmd_args,
+        {**cmd_kwargs, **common_params},
     )
 
     # look for potential override of logging behavior
@@ -408,7 +408,7 @@ def _execute_command_(
     # process main results
     for r in _process_results(
             # execution
-            wrapped(*_args, **_kwargs),
+            wrapped(*cmd_args, **cmd_kwargs),
             wrapped_class,
             allkwargs['on_failure'],
             # bookkeeping
