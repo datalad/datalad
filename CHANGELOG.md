@@ -4,8 +4,8 @@
 
 ## Bug Fixes
 
-- Let `EnsureChoice` report the value is failed validating.  [PR
-  #7067](https://github.com/datalad/datalad/pull/7067) (by
+- Let `EnsureChoice` report the value is failed validating.
+  [PR #7067](https://github.com/datalad/datalad/pull/7067) (by
   [@mih](https://github.com/mih))
 
 - Avoid writing to stdout/stderr from within datalad sshrun. This could lead to
@@ -25,8 +25,7 @@
 
 - Ensure that `BatchedCommandError` is raised if the subprocesses of `BatchedCommand` fails or raises a `CommandError`.  [PR #7068](https://github.com/datalad/datalad/pull/7068) (by [@christian-monch](https://github.com/christian-monch))
 
-- RF: remove unused code str-ing PurePath.  [PR
-  #7073](https://github.com/datalad/datalad/pull/7073) (by
+- RF: remove unused code str-ing PurePath.  [PR #7073](https://github.com/datalad/datalad/pull/7073) (by
   [@yarikoptic](https://github.com/yarikoptic))
 
 - Update GitHub Actions action versions.
