@@ -17,6 +17,13 @@ import logging
 import sys
 from functools import wraps
 from time import time
+from typing import (
+    Callable,
+    Dict,
+    Generator,
+    TypeVar,
+    TYPE_CHECKING,
+)
 from os import listdir
 from os.path import join as opj
 from os.path import isdir
@@ -54,6 +61,12 @@ from datalad.core.local.resulthooks import (
     match_jsonhook2result,
     run_jsonhook,
 )
+
+if TYPE_CHECKING:
+    from .base import Interface
+
+anInterface = TypeVar('anInterface', bound='Interface')
+
 
 lgr = logging.getLogger('datalad.interface.utils')
 
@@ -295,21 +308,21 @@ def eval_results(wrapped):
                     "Returning generator_func from eval_func for %s",
                     wrapped_class)
             return _execute_command_(
-                wrapped,
-                wrapped_class,
-                common_params,
-                args,
-                kwargs
+                interface=wrapped_class,
+                cmd=wrapped,
+                cmd_args=args,
+                cmd_kwargs=kwargs,
+                exec_kwargs=common_params,
             )
         else:
             @wraps(_execute_command_)
             def return_func(*args_, **kwargs_):
                 results = _execute_command_(
-                    wrapped,
-                    wrapped_class,
-                    common_params,
-                    args,
-                    kwargs
+                    interface=wrapped_class,
+                    cmd=wrapped,
+                    cmd_args=args,
+                    cmd_kwargs=kwargs,
+                    exec_kwargs=common_params,
                 )
                 if inspect.isgenerator(results):
                     # unwind generator if there is one, this actually runs
@@ -332,22 +345,37 @@ def eval_results(wrapped):
 
 
 def _execute_command_(
-        wrapped,
-        wrapped_class,
-        common_params,
-        cmd_args,
-        cmd_kwargs):
-    """This internal helper function actually drives a command
-    generator-style, it may generate an exception if desired,
-    on incomplete results
+    *,
+    interface: anInterface,
+    cmd: Callable[..., Generator[Dict, None, None]],
+    cmd_args: tuple,
+    cmd_kwargs: Dict,
+    exec_kwargs: Dict,
+) -> Generator[Dict, None, None]:
+    """Internal helper to drive a command execution generator-style
+
+    Parameters
+    ----------
+    interface:
+      Interface class of associated with the `cmd` callable
+    cmd:
+      A DataLad command implementation. Typically the `__call__()` of
+      the given `interface`.
+    cmd_args:
+      Positional arguments for `cmd`.
+    cmd_kwargs:
+      Keyword arguments for `cmd`.
+    exec_kwargs:
+      Keyword argument affecting the result handling.
+      See `datalad.interface.common_opts.eval_params`.
     """
     # for result filters and validation
     # we need to produce a dict with argname/argvalue pairs for all args
     # incl. defaults and args given as positionals
     allkwargs = get_allargs_as_kwargs(
-        wrapped,
+        cmd,
         cmd_args,
-        {**cmd_kwargs, **common_params},
+        {**cmd_kwargs, **exec_kwargs},
     )
 
     # look for potential override of logging behavior
@@ -359,7 +387,7 @@ def _execute_command_(
         allkwargs['result_xfm'])
     result_filter = get_result_filter(allkwargs['result_filter'])
     result_renderer = allkwargs['result_renderer']
-    if result_renderer == 'tailored' and not hasattr(wrapped_class,
+    if result_renderer == 'tailored' and not hasattr(interface,
                                                      'custom_result_renderer'):
         # a tailored result renderer is requested, but the class
         # does not provide any, fall back to the generic one
@@ -398,18 +426,18 @@ def _execute_command_(
     results = []
     do_custom_result_summary = result_renderer in (
         'tailored', 'generic', 'default') and hasattr(
-            wrapped_class,
+            interface,
             'custom_result_summary_renderer')
     pass_summary = do_custom_result_summary \
-        and getattr(wrapped_class,
+        and getattr(interface,
                     'custom_result_summary_renderer_pass_summary',
                     None)
 
     # process main results
     for r in _process_results(
             # execution
-            wrapped(*cmd_args, **cmd_kwargs),
-            wrapped_class,
+            cmd(*cmd_args, **cmd_kwargs),
+            interface,
             allkwargs['on_failure'],
             # bookkeeping
             action_summary,
@@ -463,7 +491,7 @@ def _execute_command_(
             summary_args = (results, action_summary)
         else:
             summary_args = (results,)
-        wrapped_class.custom_result_summary_renderer(*summary_args)
+        interface.custom_result_summary_renderer(*summary_args)
     elif result_renderer in ('generic', 'default') \
             and action_summary \
             and sum(sum(s.values())
