@@ -337,7 +337,6 @@ def eval_results(wrapped):
                 wrapped,
                 wrapped_class,
                 result_renderer,
-                common_params,
                 allkwargs,
                 hooks,
                 dataset_arg,
@@ -353,7 +352,6 @@ def eval_results(wrapped):
                     wrapped,
                     wrapped_class,
                     result_renderer,
-                    common_params,
                     allkwargs,
                     hooks,
                     dataset_arg,
@@ -384,7 +382,6 @@ def _execute_command_(
         wrapped,
         wrapped_class,
         result_renderer,
-        common_params,
         allkwargs,
         hooks,
         dataset_arg,
@@ -421,7 +418,7 @@ def _execute_command_(
             # execution
             wrapped(*_args, **_kwargs),
             wrapped_class,
-            common_params['on_failure'],
+            allkwargs['on_failure'],
             # bookkeeping
             action_summary,
             incomplete_results,
