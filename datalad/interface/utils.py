@@ -297,7 +297,9 @@ def eval_results(wrapped):
 
         if return_type == 'generator':
             # hand over the generator
-            lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
+            lgr.log(2,
+                    "Returning generator_func from eval_func for %s",
+                    wrapped_class)
             return _execute_command_(
                 wrapped,
                 wrapped_class,
@@ -325,7 +327,9 @@ def eval_results(wrapped):
                 else:
                     return results
 
-            lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
+            lgr.log(2,
+                    "Returning return_func from eval_func for %s",
+                    wrapped_class)
             return return_func(*args, **kwargs)
 
     ret = eval_func
