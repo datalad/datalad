@@ -311,8 +311,6 @@ def eval_results(wrapped):
             # standardize on the new name 'generic' to avoid more complex
             # checking below
             result_renderer = 'generic'
-        # look for potential override of logging behavior
-        result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
 
         # query cfg for defaults
         # .is_installed and .config can be costly, so ensure we do
@@ -340,7 +338,6 @@ def eval_results(wrapped):
                 wrapped_class,
                 result_renderer,
                 common_params,
-                result_log_level,
                 allkwargs,
                 hooks,
                 dataset_arg,
@@ -357,7 +354,6 @@ def eval_results(wrapped):
                     wrapped_class,
                     result_renderer,
                     common_params,
-                    result_log_level,
                     allkwargs,
                     hooks,
                     dataset_arg,
@@ -389,7 +385,6 @@ def _execute_command_(
         wrapped_class,
         result_renderer,
         common_params,
-        result_log_level,
         allkwargs,
         hooks,
         dataset_arg,
@@ -401,6 +396,9 @@ def _execute_command_(
     generator-style, it may generate an exception if desired,
     on incomplete results
     """
+    # look for potential override of logging behavior
+    result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
+
     # flag whether to raise an exception
     incomplete_results = []
     # track what actions were performed how many times
