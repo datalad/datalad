@@ -286,12 +286,6 @@ def eval_results(wrapped):
                 getattr(wrapped_class, p_name))
             for p_name in eval_params}
 
-        # for result filters
-        # we need to produce a dict with argname/argvalue pairs for all args
-        # incl. defaults and args given as positionals
-        allkwargs = get_allargs_as_kwargs(wrapped, args,
-                                          {**kwargs, **common_params})
-
         # short cuts and configured setup for common options
         return_type = common_params['return_type']
 
@@ -303,7 +297,7 @@ def eval_results(wrapped):
             return _execute_command_(
                 wrapped,
                 wrapped_class,
-                allkwargs,
+                common_params,
                 *args,
                 **kwargs
             )
@@ -313,7 +307,7 @@ def eval_results(wrapped):
                 results = _execute_command_(
                     wrapped,
                     wrapped_class,
-                    allkwargs,
+                    common_params,
                     *args,
                     **kwargs
                 )
@@ -340,13 +334,22 @@ def eval_results(wrapped):
 def _execute_command_(
         wrapped,
         wrapped_class,
-        allkwargs,
+        common_params,
         *_args,
         **_kwargs):
     """This internal helper function actually drives a command
     generator-style, it may generate an exception if desired,
     on incomplete results
     """
+    # for result filters and validation
+    # we need to produce a dict with argname/argvalue pairs for all args
+    # incl. defaults and args given as positionals
+    allkwargs = get_allargs_as_kwargs(
+        wrapped,
+        _args,
+        {**_kwargs, **common_params},
+    )
+
     # look for potential override of logging behavior
     result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
     # resolve string labels for transformers too
