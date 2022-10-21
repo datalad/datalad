@@ -294,23 +294,6 @@ def eval_results(wrapped):
 
         # short cuts and configured setup for common options
         return_type = common_params['return_type']
-        result_filter = get_result_filter(common_params['result_filter'])
-        # resolve string labels for transformers too
-        result_xfm = known_result_xfms.get(
-            common_params['result_xfm'],
-            # use verbatim, if not a known label
-            common_params['result_xfm'])
-        result_renderer = common_params['result_renderer']
-
-        if result_renderer == 'tailored' and not hasattr(wrapped_class,
-                                                         'custom_result_renderer'):
-            # a tailored result renderer is requested, but the class
-            # does not provide any, fall back to the generic one
-            result_renderer = 'generic'
-        if result_renderer == 'default':
-            # standardize on the new name 'generic' to avoid more complex
-            # checking below
-            result_renderer = 'generic'
 
         # query cfg for defaults
         # .is_installed and .config can be costly, so ensure we do
@@ -336,12 +319,9 @@ def eval_results(wrapped):
             return _execute_command_(
                 wrapped,
                 wrapped_class,
-                result_renderer,
                 allkwargs,
                 hooks,
                 dataset_arg,
-                result_filter,
-                result_xfm,
                 *args,
                 **kwargs
             )
@@ -351,12 +331,9 @@ def eval_results(wrapped):
                 results = _execute_command_(
                     wrapped,
                     wrapped_class,
-                    result_renderer,
                     allkwargs,
                     hooks,
                     dataset_arg,
-                    result_filter,
-                    result_xfm,
                     *args,
                     **kwargs
                 )
@@ -381,12 +358,9 @@ def eval_results(wrapped):
 def _execute_command_(
         wrapped,
         wrapped_class,
-        result_renderer,
         allkwargs,
         hooks,
         dataset_arg,
-        result_filter,
-        result_xfm,
         *_args,
         **_kwargs):
     """This internal helper function actually drives a command
@@ -395,6 +369,22 @@ def _execute_command_(
     """
     # look for potential override of logging behavior
     result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
+    # resolve string labels for transformers too
+    result_xfm = known_result_xfms.get(
+        allkwargs['result_xfm'],
+        # use verbatim, if not a known label
+        allkwargs['result_xfm'])
+    result_filter = get_result_filter(allkwargs['result_filter'])
+    result_renderer = allkwargs['result_renderer']
+    if result_renderer == 'tailored' and not hasattr(wrapped_class,
+                                                     'custom_result_renderer'):
+        # a tailored result renderer is requested, but the class
+        # does not provide any, fall back to the generic one
+        result_renderer = 'generic'
+    if result_renderer == 'default':
+        # standardize on the new name 'generic' to avoid more complex
+        # checking below
+        result_renderer = 'generic'
 
     # flag whether to raise an exception
     incomplete_results = []
