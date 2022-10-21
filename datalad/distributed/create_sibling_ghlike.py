@@ -134,8 +134,8 @@ class _GitHubLike(object):
             args=("--dry-run",),
             action="store_true",
             doc="""if set, no repository will be created, only tests for
-            name collisions will be performed, and would-be repository names
-            are reported for all relevant datasets"""),
+            sibling name collisions will be performed, and would-be repository
+            names are reported for all relevant datasets"""),
     )
 
     def __init__(self, url, credential, require_token=True, token_info=None):
