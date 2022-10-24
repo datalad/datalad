@@ -19,6 +19,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v3
         with:
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
           # Check out all history so that the previous release tag can be
           # found:
           fetch-depth: 0
@@ -29,7 +30,7 @@ jobs:
       - name: Prepare release
         uses: datalad/release-action/release@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
           pypi-token: ${{ secrets.PYPI_TOKEN }}
           pre-tag: |
             make update-changelog
