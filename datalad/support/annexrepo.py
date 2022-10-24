@@ -2761,9 +2761,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(
-                ':'.join(annex_cmd), annex_cmd,
-                path=self.path)(key_)
+            try:
+                out = self._batched.get(
+                    ':'.join(annex_cmd), annex_cmd,
+                    path=self.path)(key_)
+            except CommandError:
+                # git-annex runs in batch mode, but will still signal some
+                # errors, e.g. an unknown remote, by exiting with a non-zero
+                # return code.
+                return False
             try:
                 return {
                     # happens on travis in direct/heavy-debug mode, that process

@@ -37,7 +37,7 @@ class WitlessRunner(object):
         """
         Parameters
         ----------
-        cwd : path-like, optional
+        cwd : str or path-like, optional
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise.
         env : dict, optional
@@ -48,7 +48,7 @@ class WitlessRunner(object):
         """
         self.env = env
         # stringify to support Path instances on PY35
-        self.cwd = str(cwd) if cwd is not None else None
+        self.cwd = cwd
 
         self.threaded_runner = None
 
@@ -61,9 +61,9 @@ class WitlessRunner(object):
         if copy:
             env = env.copy() if env else None
         if cwd and env is not None:
-            # if CWD was provided, we must not make it conflict with
+            # if `cwd` was provided, we must not make it conflict with
             # a potential PWD setting
-            env['PWD'] = cwd
+            env['PWD'] = str(cwd)
         return env
 
     def run(self,
@@ -96,7 +96,7 @@ class WitlessRunner(object):
           If stdin is a Queue, all elements (bytes) put into the Queue will
           be passed to stdin until None is read from the queue. If None is read,
           stdin of the subprocess is closed.
-        cwd : path-like, optional
+        cwd : str or path-like, optional
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise. Overrides
           any `cwd` given to the constructor.

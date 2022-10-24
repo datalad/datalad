@@ -93,7 +93,7 @@ def test_dedent():
 def test_alter_interface_docs_for_api():
     alt = alter_interface_docs_for_api(demo_doc)
     alt_l = alt.split('\n')
-    # dedented
+    # de-dented
     assert_false(alt_l[0].startswith(' '))
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('CMD', alt)

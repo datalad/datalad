@@ -518,7 +518,8 @@ def _create_sibling_ria(
             use_remote_annex_bundle=False)
         ssh.open()
 
-    if existing in ['skip', 'error']:
+    exists = False
+    if existing in ['skip', 'error', 'reconfigure']:
         config_path = repo_path / 'config'
         # No .git -- if it's an existing repo in a RIA store it should be a
         # bare repo.
@@ -545,7 +546,7 @@ def _create_sibling_ria(
                     **res_kwargs
                 )
                 return
-            else:  # existing == 'error'
+            elif existing == 'error':
                 yield get_status_dict(
                     status='error',
                     message="remote directory {} already "
@@ -553,6 +554,9 @@ def _create_sibling_ria(
                     **res_kwargs
                 )
                 return
+            else:
+                # reconfigure will be handled later in the code
+                pass
 
     if storage_sibling == 'only':
         lgr.info("create storage sibling '{}' ...".format(name))
@@ -674,6 +678,14 @@ def _create_sibling_ria(
     else:
         gr = GitRepo(repo_path, create=True, bare=True,
                      shared=shared if shared else None)
+        if exists and existing == 'reconfigure':
+            # if the repo exists at the given path, the GitRepo would not
+            # (re)-run git init, and just return an instance of GitRepo;
+            # skip & error have been handled at this point
+            gr.init(
+                sanity_checks=False,
+                init_options=["--bare"] + ([f"--shared={shared}"] if shared else []),
+            )
         if storage_sibling:
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with

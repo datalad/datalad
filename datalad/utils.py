@@ -738,6 +738,21 @@ def ensure_list(s, copy=False, iterate=True):
     return ensure_iter(s, list, copy=copy, iterate=iterate)
 
 
+def ensure_result_list(r):
+    """Return a list of result records
+
+    Largely same as ensure_list, but special casing a single dict being passed
+    in, which a plain `ensure_list` would iterate over. Hence, this deals with
+    the three ways datalad commands return results:
+    - single dict
+    - list of dicts
+    - generator
+
+    Used for result assertion helpers.
+    """
+    return [r] if isinstance(r, dict) else ensure_list(r)
+
+
 def ensure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
