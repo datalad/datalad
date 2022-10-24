@@ -2,8 +2,47 @@
 
 Change log
 **********
+0.17.8 (2022-10-24)
+===================
+
+Bug Fixes
+---------
+
+-  Prevent adding duplicate entries to .gitmodules. `PR
+   #7088 <https://github.com/datalad/datalad/pull/7088>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  [BF] Prevent double yielding of impossible get result Fixes
+   `#5537 <https://github.com/datalad/datalad/issues/5537>`__. `PR
+   #7093 <https://github.com/datalad/datalad/pull/7093>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__)
+
+-  Stop rendering the output of internal ``subdatset()`` call in the
+   results of ``run_procedure()``. Fixes
+   `#7091 <https://github.com/datalad/datalad/issues/7091>`__ via `PR
+   #7094 <https://github.com/datalad/datalad/pull/7094>`__ (by
+   `@mslw <https://github.com/mslw>`__ & `@mih <https://github.com/mih>`__)
+
+-  Improve handling of ``--existing reconfigure`` in
+   ``create-sibling-ria``: previously, the command would not make the
+   underlying ``git init`` call for existing local repositories, leading
+   to some configuration updates not being applied. Partially addresses
+   https://github.com/datalad/datalad/issues/6967 via
+   https://github.com/datalad/datalad/pull/7095 (by @mslw)
+
+-  Ensure subprocess environments have a valid path in
+   ``os.environ['PWD']``, even if a Path-like object was given to the
+   runner on subprocess creation or invocation. Fixes
+   `#7040 <https://github.com/datalad/datalad/issues/7040>`__ via `PR
+   #7107 <https://github.com/datalad/datalad/pull/7107>`__ (by
+   `@christian-monch <https://github.com/christian-monch>`__)
+
+.. _section-1:
+
 0.17.7 (2022-10-14)
 ===================
+
+.. _bug-fixes-1:
 
 Bug Fixes
 ---------
@@ -55,12 +94,12 @@ Tests
    pass. `PR #7002 <https://github.com/datalad/datalad/pull/7002>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-1:
+.. _section-2:
 
 0.17.6 (2022-09-21)
 ===================
 
-.. _bug-fixes-1:
+.. _bug-fixes-2:
 
 Bug Fixes
 ---------
@@ -501,7 +540,7 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
-.. _bug-fixes-2:
+.. _bug-fixes-3:
 
 Bug Fixes
 ---------
@@ -1147,7 +1186,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-3:
+.. _bug-fixes-4:
 
 Bug Fixes
 ---------
