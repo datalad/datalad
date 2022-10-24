@@ -311,3 +311,34 @@ def test_too_long():
                 protocol=StdOutCapture
             )
         cml.assert_logged('.*use.*ulimit.*')
+
+
+def test_path_to_str_conversion():
+    # Regression test to ensure that Path-objects are converted into strings
+    # before they are put into the environment variable `$PWD`
+    runner = Runner()
+    adjusted_env = runner._get_adjusted_env(
+        cwd=Path("/a/b/c"),
+        env=dict(some_key="value")
+    )
+    assert "/a/b/c" == adjusted_env['PWD']
+
+
+@with_tempfile(mkdir=True)
+def test_environment(temp_dir_path=None):
+    # Ensure that the subprocess sees a string in `$PWD`, even if a Path-object
+    # is provided to `cwd`.
+    cmd = py2cmd('import os; print(os.environ["PWD"])')
+    test_kwargs = {
+        'cwd': Path(temp_dir_path),
+        'env': dict(TEST='test_value')
+    }
+    runner = Runner()
+    results = runner.run(cmd=cmd, protocol=StdOutCapture, **test_kwargs)
+    output = results['stdout'].splitlines()[0]
+    assert output == temp_dir_path
+
+    runner = Runner(**test_kwargs)
+    results = runner.run(cmd=cmd, protocol=StdOutCapture)
+    output = results['stdout'].splitlines()[0]
+    assert output == temp_dir_path
