@@ -343,3 +343,41 @@ def test_environment(temp_dir_path=None):
     results = runner.run(cmd=cmd, protocol=StdOutCapture)
     output = results['stdout'].splitlines()[0]
     assert output == temp_dir_path
+
+
+def test_argument_priority():
+    class X:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def run(self):
+            return dict(
+                code=0,
+                args=self.args,
+                kwargs=self.kwargs,
+            )
+
+    test_path_1 = "a/b/c"
+    test_env_1 = dict(source="constructor")
+    test_path_2 = "d/e/f"
+    test_env_2 = dict(source="run-method")
+
+    with unittest.mock.patch('datalad.runner.runner.ThreadedRunner') as tr_mock:
+
+        tr_mock.side_effect = X
+        runner = Runner(cwd=test_path_1, env=test_env_1)
+
+        result = runner.run("first-command")
+        assert result['kwargs']['cwd'] == test_path_1
+        assert result['kwargs']['env'] == {
+            **test_env_1,
+            'PWD': test_path_1
+        }
+
+        result = runner.run("second-command", cwd=test_path_2, env=test_env_2)
+        assert result['kwargs']['cwd'] == test_path_2
+        assert result['kwargs']['env'] == {
+            **test_env_2,
+            'PWD': test_path_2
+        }
