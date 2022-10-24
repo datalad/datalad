@@ -31,6 +31,14 @@
   [PR #7107](https://github.com/datalad/datalad/pull/7107)
   (by [@christian-monch](https://github.com/christian-monch))
 
+- Improved reporting when using `dry-run` with github-like
+  `create-sibling*` commands (`-gin`, `-gitea`, `-github`,
+  `-gogs`). The result messages will now display names of the
+  repositories which would be created (useful for recursive
+  operations).
+  [PR #7103](https://github.com/datalad/datalad/pull/7103)
+  (by [@mslw](https://github.com/mslw))
+
 <a id='changelog-0.17.7'></a>
 # 0.17.7 (2022-10-14)
 
