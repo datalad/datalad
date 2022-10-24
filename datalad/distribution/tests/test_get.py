@@ -788,3 +788,26 @@ def test_source_candidate_subdataset(store1=None, store2=None, intermediate=None
     # This would fail if source candidates weren't right, since cloneds only
     # knows the second store so far (which doesn't have the subdatasets).
     cloneds.get("intermediate", recursive=True)
+
+
+@with_tempfile
+@with_tempfile
+def test_get_non_existing(origin_path=None, clone_path=None):
+
+    # test for gh-5537
+    _make_dataset_hierarchy(origin_path)
+    super_ds = clone(source=origin_path, path=clone_path)
+    res = super_ds.get(opj("sub1", "sub2", "sub3",
+                           "file_in_annex.wrong.extension"),
+                       result_renderer="disabled", on_failure='ignore')
+    # report failure only once:
+    assert_result_count(res, 1, status="impossible",
+                        message="path does not exist")
+
+    # same after intermediates are installed:
+    res = super_ds.get(opj("sub1", "sub2", "sub3",
+                           "file_in_annex.wrong.extension"),
+                       result_renderer="disabled", on_failure='ignore')
+
+    assert_result_count(res, 1, status="impossible",
+                        message="path does not exist")
