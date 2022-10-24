@@ -612,6 +612,8 @@ Refer datalad/config.py for information on how to add these environment variable
   is - change behavior of tests, that decorated with any of the `known_failure`,
   to not skip, but executed and *fail* if they would pass (indicating that the
   decorator may be removed/reconsidered).
+- *DATALAD_TESTS_GITCONFIG*:
+  Additional content to add to `~/.gitconfig` in the tests `HOME` environment. `\n` is replaced with `os.linesep`.
 - *DATALAD_CMD_PROTOCOL*:
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.

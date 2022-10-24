@@ -347,7 +347,7 @@ def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
 def _query_aggregated_metadata_singlepath(
         ds, agginfos, agg_base_path, qap, reporton, cache, dsmeta,
         contentinfo_objloc):
-    """This is the workhorse of query_aggregated_metadata() for querying for a
+    """This is the workhorse of legacy_query_aggregated_metadata() for querying for a
     single path"""
     rpath = qap['rpath']
     containing_ds = qap['metaprovider']
@@ -1124,13 +1124,22 @@ def gen4_query_aggregated_metadata(reporton: str,
                     }
                 }
         except NoMetadataStoreFound:
+            lgr.warning("Found no gen4-metadata in dataset %s.", dataset.pathobj)
+            if len(matching_types) == 2:
+                matching_type = "all"
+            elif len(matching_types) == 0:
+                matching_type = "none"
+            elif len(matching_types) == 1:
+                matching_type = matching_types[0]
+            else:
+                raise RuntimeError(f"Was expecting matching_types with 1 element, got {matching_types}")
             yield {
                 **kwargs,
                 'path': str(ds.pathobj / relative_path),
                 'status': 'impossible',
                 'message': f'Dataset at {ds.pathobj} does not contain gen4 '
                            f'metadata',
-                'type': matching_types
+                'type': matching_type
             }
 
     return None
@@ -1140,9 +1149,9 @@ def query_aggregated_metadata(reporton: str,
                               ds: Dataset,
                               aps: List[Dict],
                               recursive: bool = False,
-                              metadata_source: Optional[str] = None,
+                              metadata_source: str = "legacy",
                               **kwargs):
-    """Query legacy and NG-metadata stored in a dataset or its metadata store
+    """Query legacy and gen4-metadata stored in a dataset or its metadata store
 
     Parameters
     ----------
@@ -1156,11 +1165,11 @@ def query_aggregated_metadata(reporton: str,
     recursive : bool
       Whether or not to report metadata underneath all query paths
       recursively.
-    metadata_source : Optional[str]
+    metadata_source : [str] {'all', 'legacy', 'gen4'}
       Metadata source that should be used. If set to "legacy", only metadata
       prior metalad version 0.3.0 will be queried, if set to "gen4", only
       metadata of metalad version 0.3.0 and beyond will be queried, if set
-      to 'None', all known metadata will be queried.
+      to 'all', all known metadata will be queried.
     **kwargs
       Any other argument will be passed on to the query result dictionary.
 
@@ -1170,7 +1179,7 @@ def query_aggregated_metadata(reporton: str,
       Of result dictionaries.
     """
 
-    if metadata_source in (None, "legacy"):
+    if metadata_source in ("all", "legacy"):
         yield from legacy_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,
@@ -1179,7 +1188,7 @@ def query_aggregated_metadata(reporton: str,
             **kwargs
         )
 
-    if metadata_source in (None, "gen4") and next_generation_metadata_available:
+    if metadata_source in ("all", "gen4") and next_generation_metadata_available:
         yield from gen4_query_aggregated_metadata(
             reporton=reporton,
             ds=ds,

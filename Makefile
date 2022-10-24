@@ -38,6 +38,7 @@ update-changelog: CHANGELOG.md
 	# so doing manual post conversion
 	cat "$<" | sed -e 's,^#### ,## ,g' \
 	| iconv -c -f utf-8 -t ascii \
+    | grep -v  '^<.*> *$$' \
 	| pandoc -t rst \
 	| sed -e 's,\[\(@[^]]*\)\](\([^)]*\)),\`\1 <\2>\`__,g' \
 	>> docs/source/changelog.rst

@@ -285,6 +285,7 @@ datalad/metadata/tests/__init__.py
 datalad/metadata/tests/test_aggregation.py
 datalad/metadata/tests/test_base.py
 datalad/metadata/tests/test_extract_metadata.py
+datalad/metadata/tests/test_metadata.py
 datalad/metadata/tests/test_search.py
 datalad/metadata/tests/data/audio.mp3
 datalad/metadata/tests/data/exif.jpg

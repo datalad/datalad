@@ -595,7 +595,7 @@ class ConfigManager(object):
             _value = self[var]
         elif store is False and default is not None:
             # nothing will be stored, and we have a default -> no user confirmation
-            # we cannot use logging, because we want to use the config to confiugre
+            # we cannot use logging, because we want to use the config to configure
             # the logging
             #lgr.debug('using default {} for config setting {}'.format(default, var))
             _value = default

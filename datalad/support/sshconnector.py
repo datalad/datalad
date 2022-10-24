@@ -174,11 +174,13 @@ class BaseSSHConnection(object):
           (probably most) of the available configuration options should not be
           set here because they can critically change the properties of the
           connection. This exists to allow options like SendEnv to be set.
+        log_output: bool
+          Whether to capture and return stdout+stderr.
 
         Returns
         -------
         tuple of str
-          stdout, stderr of the command run.
+          stdout, stderr of the command run, if `log_output` was `True`
         """
         raise NotImplementedError
 

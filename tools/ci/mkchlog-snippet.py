@@ -89,15 +89,7 @@ class PullRequest:
                 + " via "
             )
         item += f"{self.as_link()} (by {self.author.as_link()})"
-        item = textwrap.fill(
-            item,
-            width=79,
-            initial_indent="- ",
-            subsequent_indent="  ",
-            break_long_words=False,
-            break_on_hyphens=False,
-        )
-        return f"### {self.category}\n\n{item}\n"
+        return f"### {self.category}\n\n- {item}\n"
 
 
 def main():
