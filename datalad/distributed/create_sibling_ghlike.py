@@ -467,7 +467,6 @@ class _GitHubLike(object):
         headers = self.request_headers
 
         if dry_run:
-            res_msg = "would create {} sibling and repository named {}"
             return dict(
                 status='ok',
                 request_url=endpoint,
