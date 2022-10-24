@@ -890,9 +890,8 @@ class Get(Interface):
                 # maintain path argument semantics and pass in dataset arg
                 # as is
                 dataset=dataset,
-                # from the bottom prevents duplicate yielding of results
-                # for a dataset where subdatasets are not installed yet
-                bottomup=True,
+                # always come from the top to get sensible generator behavior
+                bottomup=False,
                 # when paths are given, they will constrain the recursion
                 # automatically, and we need to enable recursion so we can
                 # location path in subdatasets several levels down
