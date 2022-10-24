@@ -4,3 +4,5 @@ deb_setup_no_msgpack_and_duecredit
 deb_no_utf8
 python3.patch
 revert_platformdirs
+0001-Mark-string-with-raw.patch
+0002-Use-utils_pytest-not-utils-need-nose.patch

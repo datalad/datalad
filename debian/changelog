@@ -1,9 +1,12 @@
 datalad (0.17.8-1) unstable; urgency=medium
 
   * Fresh upstream release
-  * d/patches - refreshed
+  * d/patches
+    - refreshed
+    - two post-release fixes added from
+      https://github.com/datalad/datalad/pull/7112
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 24 Oct 2022 18:03:30 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 24 Oct 2022 19:54:48 -0400
 
 datalad (0.17.6-3) unstable; urgency=medium
 

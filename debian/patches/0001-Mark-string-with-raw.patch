@@ -1,0 +1,25 @@
+From 7157b5c555ce7763f32dbe8e13c37660b2af0748 Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Mon, 24 Oct 2022 19:47:40 -0400
+Subject: [PATCH 1/2] Mark string with \[ raw
+
+---
+ datalad/cli/tests/test_main.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/datalad/cli/tests/test_main.py b/datalad/cli/tests/test_main.py
+index 5b90fbd25..84d681992 100644
+--- a/datalad/cli/tests/test_main.py
++++ b/datalad/cli/tests/test_main.py
+@@ -154,7 +154,7 @@ def test_help_np():
+     assert re.search(r"Global options\W*-c ", stdout, flags=re.MULTILINE)
+     # and -c should be listed only once - i.e. that we do not duplicate sections
+     # and our USAGE summary has only [global-opts]
+-    assert re.match("Usage: .*datalad.* \[global-opts\] command \[command-opts\]", stdout)
++    assert re.match(r"Usage: .*datalad.* \[global-opts\] command \[command-opts\]", stdout)
+     assert stdout.count(' -c ') == 1
+ 
+     assert_all_commands_present(stdout)
+-- 
+2.35.1
+
