@@ -87,6 +87,7 @@ class CreateSiblingGogs(Interface):
             access_protocol='https',
             publish_depends=None,
             private=False,
+            description=None,
             dry_run=False):
 
         yield from _create_sibling(
@@ -100,5 +101,6 @@ class CreateSiblingGogs(Interface):
             access_protocol=access_protocol,
             publish_depends=publish_depends,
             private=private,
+            description=description,
             dry_run=dry_run,
         )
