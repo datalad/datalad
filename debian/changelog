@@ -1,3 +1,10 @@
+datalad (0.17.8-1) unstable; urgency=medium
+
+  * Fresh upstream release
+  * d/patches - refreshed
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 24 Oct 2022 18:03:30 -0400
+
 datalad (0.17.6-3) unstable; urgency=medium
 
   * d/control - fix python-appdirs to python3-appdirs.
