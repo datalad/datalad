@@ -1,0 +1,19 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: disable filtering on this warning
+
+to ease backporting on buster (nd100) with old pytest. Causes pytest to puke 
+right away because it does not know that class.
+
+Origin: NeuroDebian
+Last-Update: 2022-09-23
+
+--- a/tox.ini
++++ b/tox.ini
+@@ -45,7 +45,6 @@ commands = {posargs}
+ [pytest]
+ filterwarnings =
+     error::DeprecationWarning:^datalad
+-    error:.*yield tests:pytest.PytestCollectionWarning
+     ignore:distutils Version classes are deprecated:DeprecationWarning
+     # comes from boto
+     ignore:the imp module is deprecated
