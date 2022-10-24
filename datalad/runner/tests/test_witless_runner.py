@@ -317,11 +317,12 @@ def test_path_to_str_conversion():
     # Regression test to ensure that Path-objects are converted into strings
     # before they are put into the environment variable `$PWD`
     runner = Runner()
+    test_path = Path("a/b/c")
     adjusted_env = runner._get_adjusted_env(
-        cwd=Path("/a/b/c"),
+        cwd=test_path,
         env=dict(some_key="value")
     )
-    assert "/a/b/c" == adjusted_env['PWD']
+    assert str(test_path) == adjusted_env['PWD']
 
 
 @with_tempfile(mkdir=True)
