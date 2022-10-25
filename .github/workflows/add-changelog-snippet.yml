@@ -1,8 +1,11 @@
 name: Add changelog.d snippet
 
 on:
+  # This action should be run in workflows triggered by `pull_request_target`
+  # (not by regular `pull_request`!)
   pull_request_target:
-    # "labeled" is also triggered when a PR is created with one or more labels
+    # Run whenever the PR is pushed to, receives a label, or is created with
+    # one or more labels:
     types: [synchronize, labeled]
 
 # Prevent the workflow from running multiple jobs at once when a PR is created
@@ -14,51 +17,18 @@ concurrency:
 jobs:
   add:
     runs-on: ubuntu-latest
-    if: >
-      github.repository_owner == 'datalad'
-        && contains(github.event.pull_request.labels.*.name, 'CHANGELOG-missing')
+    # Only run on PRs that have the "CHANGELOG-missing" label:
+    if: contains(github.event.pull_request.labels.*.name, 'CHANGELOG-missing')
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
-          token: ${{secrets.GITMATE_GITHUB_TOKEN }}
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
 
-      - name: Configure Git identity
-        run: |
-          git config --global user.name "DataLad Bot"
-          git config --global user.email "bot@datalad.org"
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Add changelog snippet
+        uses: datalad/release-action/add-changelog-snippet@v1
         with:
-          python-version: '^3.7'
-
-      - name: Install Python dependencies
-        run: python -m pip install --upgrade requests
-
-      - name: Generate changelog.d snippet
-        run: |
-          python3 tools/ci/mkchlog-snippet.py \
-            ${{ github.repository_owner }} \
-            ${{ github.event.repository.name }} \
-            ${{ github.event.pull_request.number }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITMATE_GITHUB_TOKEN }}
-
-      - name: Remove CHANGELOG-missing label
-        uses: actions-ecosystem/action-remove-labels@v1
-        with:
-          labels: CHANGELOG-missing
-
-      - name: Commit
-        run: |
-          git add changelog.d
-          if ! git diff --quiet --cached
-          then git commit -m 'Autogenerate changelog.d snippet for pull request'
-               git push origin HEAD:${{ github.head_ref }}
-          else echo "No changes to commit"
-          fi
-
-# vim:set et sts=2:
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+          rm-labels: CHANGELOG-missing

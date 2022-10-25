@@ -1,0 +1,21 @@
+fragment-directory: changelog.d
+
+categories:
+  - name: 💥 Breaking Changes
+    bump: major
+    label: semver-major
+  - name: 🚀 Enhancements and New Features
+    bump: minor
+    label: semver-minor
+  - name: 🐛 Bug Fixes
+    label: semver-patch
+  - name: 🔩 Dependencies
+    label: semver-dependencies
+  - name: 📝 Documentation
+    label: semver-documentation
+  - name: 🏠 Internal
+    label: semver-internal
+  - name: 🏎 Performance
+    label: semver-performance
+  - name: 🧪 Tests
+    label: semver-tests
