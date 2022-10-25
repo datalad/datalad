@@ -231,27 +231,39 @@ def test_gracefull_death():
         assert_greater_equal(20, len(consumed))
 
 
-# it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
+# `test_stalling` is a speculative test that is intended to detect stalled
+# subprocess execution by assuming an upper limit for the execution time of the
+# subprocess. Due to the nature of non-realtime process scheduling, this
+# assumption is necessarily incorrect and might be validated in a perfectly
+# working system. In other words, the test has the potential to create false
+# positives.
+# By raising the assumed maximum execution time, we try to reduce the number of
+# false positives.
+#
+# The test exists because an earlier version of `WitlessRunner` was based on
+# event loops and there was at least one stalling condition that manifested
+# itself in python 3.7 (see:
+# https://github.com/datalad/datalad/pull/5022#issuecomment-708716290). As of
+# datalad version 0.16, event loops are no longer used in `WitlessRunner` and
+# this test is a shot in the dark.
 def test_stalling(kill=False):
     import concurrent.futures
 
-    from datalad.cmd import WitlessRunner
+    from datalad.runner.coreprotocols import StdOutErrCapture
+    from datalad.runner.runner import WitlessRunner
 
     def worker():
-        WitlessRunner().run(["echo", "1"])
+        return WitlessRunner().run(["echo", "1"], StdOutErrCapture)
 
     t0 = time()
-    v1 = worker()
+    result1 = worker()
     dt1 = time() - t0
 
     t0 = time()
     with concurrent.futures.ThreadPoolExecutor(1) as executor:
-        # print("submitting")
         future = executor.submit(worker)
-        dt2_limit = dt1 * 10
-        # print("waiting for up to %.2f sec" % dt2_limit)
+        dt2_limit = max((5, dt1 * 100))
         while not future.done():
-            # print("not yet")
             sleep(dt1/3)
             if time() - t0 > dt2_limit:
                 # does not even shutdown
@@ -262,9 +274,9 @@ def test_stalling(kill=False):
                     import os
                     import signal
                     os.kill(os.getpid(), signal.SIGTERM)
-                raise AssertionError("Future has not finished in 10x time")
-        v2 = future.result()
-    assert_equal(v1, v2)
+                raise AssertionError(f"Future has not finished in {dt2_limit}s")
+        result2 = future.result()
+    assert result1 == result2
 
 
 @with_tempfile(mkdir=True)
