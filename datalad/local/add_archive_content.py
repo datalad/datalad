@@ -423,13 +423,13 @@ class AddArchiveContent(Interface):
         outside_stats = stats
         stats = ActivityStats()
 
+        # start a progress bar for extraction
+        pbar_id = f'add-archive-{archive_path}'
         try:
             # keep track of extracted files for progress bar logging
             file_counter = 0
             # iterative over all files in the archive
             extracted_files = list(earchive.get_extracted_files())
-            # start a progress bar for extraction
-            pbar_id = f'add-archive-{archive_path}'
             log_progress(
                 lgr.info, pbar_id, 'Extracting archive',
                 label="Extracting archive",
