@@ -504,8 +504,8 @@ class AddArchiveContent(Interface):
                         for regexp in exclude:
                             if re.search(regexp, extracted_file):
                                 lgr.debug(
-                                    "Skipping {extracted_file} since contains "
-                                    "{regexp} pattern".format(**locals()))
+                                    "Skipping %s since contains %s pattern",
+                                    extracted_file, regexp)
                                 stats.skipped += 1
                                 raise StopIteration
                     except StopIteration:
@@ -624,8 +624,8 @@ class AddArchiveContent(Interface):
                         stats.dropped += 1
                     stats.add_annex += 1
                 else:
-                    lgr.debug("File {} was added to git, not adding url".format(
-                        target_file_path))
+                    lgr.debug("File %s was added to git, not adding url",
+                        target_file_path)
                     stats.add_git += 1
 
                 if delete_after:
@@ -638,7 +638,7 @@ class AddArchiveContent(Interface):
                 del target_file
 
             if delete and archive and origin != 'key':
-                lgr.debug("Removing the original archive {}".format(archive))
+                lgr.debug("Removing the original archive %s", archive)
                 # force=True since some times might still be staged and fail
                 annex.remove(str(archive_path), force=True)
 
