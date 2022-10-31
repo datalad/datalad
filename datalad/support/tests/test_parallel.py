@@ -14,6 +14,8 @@ from time import (
     time,
 )
 
+import pytest
+
 # logging effects threading and causes some 'weak' tests to fail,
 # so we will just skip those (well, if happens again -- disable altogether)
 from datalad import lgr
@@ -192,7 +194,12 @@ def test_gracefull_death():
         ValueError)
     # we will get some results, seems around 4 and they should be "sequential"
     assert_equal(results, list(range(len(results))))
-    assert_greater_equal(len(results), 2)
+    try:
+        assert_greater_equal(len(results), 2)
+    except AssertionError:
+        # Possible TODO: if tests below would start failing too, move xfail to the level
+        # of the entire test
+        pytest.xfail(f"Rarely but happens. Got only {len(results)} instead of at least 2")
 
     # This test relies too much on threads scheduling to not hog up on handling
     # consumers, but if it happens so - they might actually consume all results
