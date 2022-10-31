@@ -60,8 +60,8 @@ requires = {
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
         'mypy~=0.900',
-        'pytest~=7.0',
-        'pytest-cov~=3.0',
+        'pytest',
+        'pytest-cov',
         'pytest-fail-slow~=0.2',
         'types-python-dateutil',
         'types-requests',
