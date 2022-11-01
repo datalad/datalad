@@ -14,6 +14,8 @@ returned. The response structure is determined by "output_proc"
 """
 from __future__ import annotations
 
+from __future__ import annotations
+
 import logging
 import os
 import queue
@@ -360,9 +362,14 @@ class BatchedCommand(SafeDelCloseMixin):
 
         Returns
         -------
-        str or list
-            Responses received from process. Either a string, or a list of
-            strings, if cmds was a list.
+        (return_type[self.output_proc] | str)
+        | list[(return_type[self.output_proc] | str)]
+
+            Responses received from process. Either a single element, or a list
+            of elements, if `cmds` was a list.
+            The type of the elements is `str`, if `self.output_proc` is `None`.
+            If `self.output_proc` is not `None`, the result type of
+            `self.output_proc` determines the type of the elements.
         """
         self._active += 1
         requests = cmds
@@ -409,7 +416,7 @@ class BatchedCommand(SafeDelCloseMixin):
         return responses if input_multiple else responses[0] if responses else None
 
     def process_request(self,
-                        request: Union[Tuple, str]) -> str:
+                        request: Union[Tuple, str]) -> Any | None:
 
         self._active += 1
         try:

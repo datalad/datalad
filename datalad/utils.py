@@ -67,8 +67,6 @@ from time import sleep
 from datalad.consts import TIMESTAMP_FMT
 from datalad.support.exceptions import CapturedException
 
-unicode_srctypes = str, bytes
-
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -877,34 +875,6 @@ def ensure_bool(s):
     return bool(s)
 
 
-def as_unicode(val, cast_types=object):
-    """Given an arbitrary value, would try to obtain unicode value of it
-    
-    For unicode it would return original value, for python2 str or python3
-    bytes it would use ensure_unicode, for None - an empty (unicode) string,
-    and for any other type (see `cast_types`) - would apply the unicode 
-    constructor.  If value is not an instance of `cast_types`, TypeError
-    is thrown
-    
-    Parameters
-    ----------
-    cast_types: type
-      Which types to cast to unicode by providing to constructor
-    """
-    if val is None:
-        return u''
-    elif isinstance(val, str):
-        return val
-    elif isinstance(val, unicode_srctypes):
-        return ensure_unicode(val)
-    elif isinstance(val, cast_types):
-        return str(val)
-    else:
-        raise TypeError(
-            "Value %r is not of any of known or provided %s types"
-            % (val, cast_types))
-
-
 def unique(seq, key=None, reverse=False):
     """Given a sequence return a list only with unique elements while maintaining order
 
@@ -939,27 +909,6 @@ def unique(seq, key=None, reverse=False):
         out = [x for x in trans(seq) if not (key(x) in seen or seen_add(key(x)))]
 
     return out[::-1] if reverse else out
-
-
-def all_same(items):
-    """Quick check if all items are the same.
-
-    Identical to a check like len(set(items)) == 1 but
-    should be more efficient while working on generators, since would
-    return False as soon as any difference detected thus possibly avoiding
-    unnecessary evaluations
-    """
-    first = True
-    first_item = None
-    for item in items:
-        if first:
-            first = False
-            first_item = item
-        else:
-            if item != first_item:
-                return False
-    # So we return False if was empty
-    return not first
 
 
 def map_items(func, v):

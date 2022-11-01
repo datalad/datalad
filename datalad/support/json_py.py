@@ -141,11 +141,6 @@ def load_stream(fname, compressed=None):
             yield loads(cont_line)
 
 
-def load_xzstream(fname):
-    for o in load_stream(fname, compressed=True):
-        yield o
-
-
 def loads(s, *args, **kwargs):
     """Helper to log actual value which failed to be parsed"""
     try:

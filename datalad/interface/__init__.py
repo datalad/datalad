@@ -63,19 +63,6 @@ _group_2dataset = (
         ('datalad.local.run_procedure', 'RunProcedure'),
     ])
 
-_group_2metadata = (
-    'Metadata',
-    [
-        ('datalad.metadata.search', 'Search',
-         'search', 'search'),
-        ('datalad.metadata.metadata', 'Metadata',
-         'metadata'),
-        ('datalad.metadata.aggregate', 'AggregateMetaData',
-         'aggregate-metadata', 'aggregate_metadata'),
-        ('datalad.metadata.extract_metadata', 'ExtractMetadata',
-         'extract-metadata', 'extract_metadata'),
-    ])
-
 _group_3misc = (
     'Miscellaneous',
     [

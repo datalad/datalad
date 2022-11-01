@@ -15,18 +15,7 @@ import re
 
 # directory containing prepared metadata of a dataset repository:
 DATALAD_DOTDIR = ".datalad"
-# Compatibility: Used at least in the crawler
-# TODO: figure out how to make it possible to issue DeprecationWarning
-# upon use.  Possible way: make consts into a class instance, but then they
-# all must be imported as `from datalad import consts` and as `consts.CONSTANT`
-HANDLE_META_DIR = DATALAD_DOTDIR
 
-# Make use of those in datalad.metadata
-OLDMETADATA_DIR = join(DATALAD_DOTDIR, 'meta')
-OLDMETADATA_FILENAME = 'meta.json'
-
-METADATA_DIR = join(DATALAD_DOTDIR, 'metadata')
-DATASET_METADATA_FILE = join(METADATA_DIR, 'dataset.json')
 DATASET_CONFIG_FILE = join(DATALAD_DOTDIR, 'config')
 
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
@@ -55,7 +44,6 @@ if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
-WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
 
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"

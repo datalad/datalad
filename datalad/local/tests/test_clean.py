@@ -17,7 +17,6 @@ from datalad.consts import (
     ANNEX_TEMP_DIR,
     ANNEX_TRANSFER_DIR,
     ARCHIVES_TEMP_DIR,
-    SEARCH_INDEX_DOTGITDIR,
 )
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
@@ -43,7 +42,6 @@ def test_clean(d=None):
     archives_path = ds.pathobj / Path(ARCHIVES_TEMP_DIR)
     annex_tmp_path = ds.pathobj / Path(ANNEX_TEMP_DIR)
     annex_trans_path = ds.pathobj / Path(ANNEX_TRANSFER_DIR)
-    index_path = ds.repo.dot_git / Path(SEARCH_INDEX_DOTGITDIR)
 
     # if we create some temp archives directory
     (archives_path / 'somebogus').mkdir(parents=True)
@@ -85,18 +83,6 @@ def test_clean(d=None):
                      "Removed 1 annex temporary transfer directory: somebogus")
         assert_false(annex_trans_path.exists())
 
-    # search index
-    index_path.mkdir(parents=True)
-    (index_path / "MAIN_r55n3hiyvxkdf1fi.seg, _MAIN_1.toc").write_text("noop")
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(index_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed 1 metadata search index file: "
-                     "MAIN_r55n3hiyvxkdf1fi.seg, _MAIN_1.toc")
-        assert_false(index_path.exists())
-
     # remove empty directories, too
     archives_path.mkdir(parents=True)
     with chpwd(d):
@@ -124,12 +110,3 @@ def test_clean(d=None):
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
                      "Removed empty annex temporary transfer directory")
         assert_false(annex_trans_path.exists())
-
-    index_path.mkdir(parents=True)
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(index_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed empty metadata search index directory")
-        assert_false(index_path.exists())

@@ -46,7 +46,6 @@ from datalad.utils import (
     CMD_MAX_ARG,
     Path,
     _path_,
-    all_same,
     any_re_search,
     auto_repr,
     better_wraps,
@@ -97,7 +96,6 @@ from datalad.utils import (
 from .utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
-    as_unicode,
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
@@ -717,28 +715,6 @@ def test_unique():
                key=itemgetter(1), reverse=True), [(1, 2), (0, 3)])
 
 
-def test_all_same():
-    ok_(all_same([0, 0, 0]))
-    ok_(not all_same([0, 0, '0']))
-    ok_(not all_same([]))
-
-    def never_get_to_not_needed():
-        yield 'a'
-        yield 'a'
-        yield 'b'
-        raise ValueError("Should not get here since on b should return")  # pragma: no cover
-
-    ok_(not all_same(never_get_to_not_needed()))
-
-    def gen1(n):
-        for x in range(n):
-            yield 'a'
-    ok_(not all_same(gen1(0)))
-    ok_(all_same(gen1(1)))
-    ok_(all_same(gen1(2)))
-    ok_(all_same(gen1(10)))
-
-
 def test_partition():
     def fn(*args, **kwargs):
         left, right = partition(*args, **kwargs)
@@ -838,21 +814,6 @@ def test_assure_unicode():
 def test_pathlib_unicode():
     eq_(str(Path("a")), u"a")
     eq_(str(Path(u"β")), u"β")
-
-
-def test_as_unicode():
-    eq_(as_unicode('grandchild_äöü東'), u'grandchild_äöü東')
-    eq_(as_unicode(None), u"")
-    eq_(as_unicode(1), u"1")
-    # NOTE: u? is because result is different between PY2 (prefixes unicode repr
-    # while in PY3 is no longer needed!  So aggregation result would differ between
-    # PY2 and PY3
-    # Didn't manage to make it work in PY2
-    #TODO assert_re_in(u'\[1, .s., u?.東.\]', as_unicode([1, "s", u"東"]))
-    eq_(as_unicode("01"), u"01")  # no some kind of conversion/stripping of numerals
-    with assert_raises(TypeError) as cme:
-        as_unicode(1, list)
-    assert_in("1 is not of any of known or provided", str(cme.value))
 
 
 @with_tempfile(mkdir=True)
