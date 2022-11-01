@@ -229,6 +229,7 @@ class CreateSiblingGithub(Interface):
             access_protocol='https',
             publish_depends=None,
             private=False,
+            description=None,
             dryrun=False,
             dry_run=False,
             api='https://api.github.com'):
@@ -288,5 +289,6 @@ class CreateSiblingGithub(Interface):
             access_protocol=access_protocol,
             publish_depends=publish_depends,
             private=private,
+            description=description,
             dry_run=dry_run,
         )
