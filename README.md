@@ -19,7 +19,7 @@
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-40-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-46-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -196,6 +196,14 @@ by [MacStadium](https://www.macstadium.com/).
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/bpinsard"><img src="https://avatars.githubusercontent.com/u/1155388?v=4?s=100" width="100px;" alt="Basile"/><br /><sub><b>Basile</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bpinsard" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/taylols"><img src="https://avatars.githubusercontent.com/u/28018084?v=4?s=100" width="100px;" alt="Taylor Olson"/><br /><sub><b>Taylor Olson</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=taylols" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://jdkent.github.io/"><img src="https://avatars.githubusercontent.com/u/12564882?v=4?s=100" width="100px;" alt="James Kent"/><br /><sub><b>James Kent</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=jdkent" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/xgui3783"><img src="https://avatars.githubusercontent.com/u/19381783?v=4?s=100" width="100px;" alt="xgui3783"/><br /><sub><b>xgui3783</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=xgui3783" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/tstoeter"><img src="https://avatars.githubusercontent.com/u/4901704?v=4?s=100" width="100px;" alt="tstoeter"/><br /><sub><b>tstoeter</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=tstoeter" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://jsheunis.github.io/"><img src="https://avatars.githubusercontent.com/u/10141237?v=4?s=100" width="100px;" alt="Stephan Heunis"/><br /><sub><b>Stephan Heunis</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=jsheunis" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://www.mmmccormick.com"><img src="https://avatars.githubusercontent.com/u/25432?v=4?s=100" width="100px;" alt="Matt McCormick"/><br /><sub><b>Matt McCormick</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=thewtex" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/vickychenglau"><img src="https://avatars.githubusercontent.com/u/22065437?v=4?s=100" width="100px;" alt="Vicky C Lau"/><br /><sub><b>Vicky C Lau</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=vickychenglau" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://chris-lamb.co.uk"><img src="https://avatars.githubusercontent.com/u/133209?v=4?s=100" width="100px;" alt="Chris Lamb"/><br /><sub><b>Chris Lamb</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=lamby" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
