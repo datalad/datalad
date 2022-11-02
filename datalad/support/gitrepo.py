@@ -1003,7 +1003,7 @@ class GitRepo(CoreGitRepo):
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
+                lgr.debug("Git clone from %s to %s", url, path)
 
                 res = GitWitlessRunner().run(cmd, protocol=GitProgress)
                 # fish out non-critical warnings by git-clone
@@ -1719,7 +1719,7 @@ class GitRepo(CoreGitRepo):
                                 read_only=True)
         except CommandError as e:
             if 'HEAD is not a symbolic ref' in e.stderr:
-                lgr.debug("detached HEAD in {0}".format(self))
+                lgr.debug("detached HEAD in %s", self)
                 return None
             else:
                 raise e
@@ -3393,11 +3393,7 @@ class GitRepo(CoreGitRepo):
                     untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
-            if to_add_submodules:
-                for r in self._save_add_submodules(to_add_submodules):
-                    if r.get('status', None) == 'ok':
-                        submodule_change = True
-                    yield r
+
         to_stage_submodules = {
             f: props
             for f, props in status_state['modified_or_untracked'].items()
@@ -3408,7 +3404,10 @@ class GitRepo(CoreGitRepo):
                 len(to_stage_submodules), self,
                 to_stage_submodules
                 if len(to_stage_submodules) < 10 else '')
-            for r in self._save_add_submodules(to_stage_submodules):
+            to_add_submodules += list(to_stage_submodules)
+
+        if to_add_submodules:
+            for r in self._save_add_submodules(to_add_submodules):
                 if r.get('status', None) == 'ok':
                     submodule_change = True
                 yield r
@@ -3606,7 +3605,13 @@ class GitRepo(CoreGitRepo):
         # first gather info from all datasets in read-only fashion, and then
         # update index, .gitmodules and .git/config at once
         info = []
+        # To avoid adding already known: https://github.com/datalad/datalad/issues/6843
+        # We must not add already known submodules explicitly since "untracked"
+        # can be assigned even for known ones (TODO: add issue, might have been closed)?
+        # Not sure if operating on relative paths would provide any speed up so use full
+        known_sub_paths = {s['path'] for s in self.get_submodules_()}
         for path in paths:
+            already_known = path in known_sub_paths
             rpath = str(path.relative_to(self.pathobj).as_posix())
             subm = repo_from_path(path)
             # if there is a corresponding branch, we want to record it's state.
@@ -3636,7 +3641,7 @@ class GitRepo(CoreGitRepo):
                      paths[path] if isinstance(paths, dict)
                      else dict(type='directory', state='untracked'),
                      path=path, rpath=rpath, commit=subm_commit, id=subm_id,
-                     url=url))
+                     url=url, known=already_known))
 
         # bypass any convenience or safe-manipulator for speed reasons
         # use case: saving many new subdatasets in a single run
@@ -3649,11 +3654,11 @@ class GitRepo(CoreGitRepo):
                     i['commit'], i['rpath']
                 ])
                 # only write the .gitmodules/.config changes when this is not yet
-                # a subdataset
+                # a subdataset and not yet already known
                 # TODO: we could update the URL, and branch info at this point,
                 # even for previously registered subdatasets
-                if i['type'] != 'dataset' or (
-                        i['type'] == 'dataset' and i['state'] == 'untracked'):
+                if not i['known'] and (i['type'] != 'dataset' or (
+                        i['type'] == 'dataset' and i['state'] == 'untracked')):
                     gmprops = dict(path=i['rpath'], url=i['url'])
                     if i['id']:
                         gmprops['datalad-id'] = i['id']

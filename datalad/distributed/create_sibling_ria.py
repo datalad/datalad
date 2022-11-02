@@ -14,57 +14,49 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from datalad.cmd import WitlessRunner as Runner
+from datalad.core.distributed.clone import decode_source_spec
+from datalad.customremotes.ria_utils import (
+    create_ds_in_store,
+    create_store,
+    get_layout_locations,
+    verify_ria_url,
+)
+from datalad.distributed.ora_remote import (
+    LocalIO,
+    RemoteCommandFailedError,
+    RIARemoteError,
+    SSHRemoteIO,
+)
+from datalad.distribution.dataset import (
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
+from datalad.distribution.utils import _yield_ds_w_matching_siblings
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.interface.common_opts import (
     recursion_flag,
-    recursion_limit
+    recursion_limit,
 )
-from datalad.interface.base import (
-    build_doc,
-    Interface,
-)
-from datalad.interface.results import (
-    get_status_dict,
-)
+from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
+from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from datalad.distribution.dataset import (
-    datasetmethod,
-    EnsureDataset,
-    require_dataset,
-)
-from datalad.distribution.utils import _yield_ds_w_matching_siblings
-from datalad.distributed.ora_remote import (
-    LocalIO,
-    RIARemoteError,
-    RemoteCommandFailedError,
-    SSHRemoteIO,
-)
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
 from datalad.utils import (
     Path,
     quote_cmdlinearg,
-)
-from datalad.support.exceptions import (
-    CommandError
-)
-from datalad.support.gitrepo import (
-    GitRepo
-)
-from datalad.core.distributed.clone import (
-    decode_source_spec
-)
-from datalad.log import log_progress
-from datalad.customremotes.ria_utils import (
-    get_layout_locations,
-    verify_ria_url,
-    create_store,
-    create_ds_in_store
 )
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_ria')
@@ -552,7 +544,8 @@ def _create_sibling_ria(
             use_remote_annex_bundle=False)
         ssh.open()
 
-    if existing in ['skip', 'error']:
+    exists = False
+    if existing in ['skip', 'error', 'reconfigure']:
         config_path = repo_path / 'config'
         # No .git -- if it's an existing repo in a RIA store it should be a
         # bare repo.
@@ -579,7 +572,7 @@ def _create_sibling_ria(
                     **res_kwargs
                 )
                 return
-            else:  # existing == 'error'
+            elif existing == 'error':
                 yield get_status_dict(
                     status='error',
                     message="remote directory {} already "
@@ -587,15 +580,18 @@ def _create_sibling_ria(
                     **res_kwargs
                 )
                 return
+            else:
+                # reconfigure will be handled later in the code
+                pass
 
     if storage_sibling == 'only':
-        lgr.info("create storage sibling '{}' ...".format(name))
+        lgr.info("create storage sibling '%s' ...", name)
     else:
-        lgr.info("create sibling{} '{}'{} ...".format(
+        lgr.info("create sibling%s '%s'%s ...",
             's' if storage_name else '',
             name,
             " and '{}'".format(storage_name) if storage_name else '',
-        ))
+        )
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                        base_path, ds.id, '2', '1', alias,
                        init_obj_tree=storage_sibling is not False)
@@ -604,7 +600,7 @@ def _create_sibling_ria(
         # is the storage sibling
         srname = name if storage_sibling == 'only' else storage_name
 
-        lgr.debug('init special remote {}'.format(srname))
+        lgr.debug('init special remote %s', srname)
         special_remote_options = [
             'type=external',
             'externaltype=ora',
@@ -708,6 +704,14 @@ def _create_sibling_ria(
     else:
         gr = GitRepo(repo_path, create=True, bare=True,
                      shared=shared if shared else None)
+        if exists and existing == 'reconfigure':
+            # if the repo exists at the given path, the GitRepo would not
+            # (re)-run git init, and just return an instance of GitRepo;
+            # skip & error have been handled at this point
+            gr.init(
+                sanity_checks=False,
+                init_options=["--bare"] + ([f"--shared={shared}"] if shared else []),
+            )
         if storage_sibling:
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with

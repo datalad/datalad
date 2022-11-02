@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Tributors Update
-        uses: con/tributors@0.0.19
+        uses: con/tributors@0.0.21
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -79,7 +79,7 @@ jobs:
           echo "PULL_REQUEST_BODY='Tributors update automated pull request.\n\n[skip ci]'" >> $GITHUB_ENV
 
       - name: Open Pull Request
-        uses: vsoch/pull-request-action@1.0.17
+        uses: vsoch/pull-request-action@1.0.22
         if: ${{ env.OPEN_PULL_REQUEST == '1' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

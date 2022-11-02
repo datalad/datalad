@@ -138,8 +138,8 @@ class _GitHubLike(object):
             args=("--dry-run",),
             action="store_true",
             doc="""if set, no repository will be created, only tests for
-            name collisions will be performed, and would-be repository names
-            are reported for all relevant datasets"""),
+            sibling name collisions will be performed, and would-be repository
+            names are reported for all relevant datasets"""),
     )
 
     def __init__(self, url, credential, require_token=True, token_info=None):
@@ -395,10 +395,19 @@ class _GitHubLike(object):
                     reponame, self.api_url)
 
             if 'message' not in res:
-                res['message'] = (
-                    "sibling repository '%s' created at %s",
-                    siblingname, res.get('html_url')
-                )
+                if not dry_run:
+                    res['message'] = (
+                        "sibling repository '%s' created at %s",
+                        siblingname, res.get('html_url')
+                    )
+                else:
+                    # can't know url when request was not made
+                    res['message'] = (
+                        "would create sibling '%s' and repository '%s%s'",
+                        siblingname,
+                        organization + "/" if organization else "",
+                        reponame
+                    )
             # report to caller
             yield get_status_dict(**res)
 

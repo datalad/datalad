@@ -13,27 +13,27 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+
 lgr = logging.getLogger('datalad.interface.base')
 
+import os
+import re
+import textwrap
+import warnings
 from abc import (
     ABC,
     abstractmethod,
 )
-import os
-import re
-import textwrap
+from collections import OrderedDict
 from importlib import import_module
-from collections import (
-    OrderedDict,
-)
-import warnings
 
 import datalad
+from datalad.distribution.dataset import (
+    Dataset,
+    resolve_path,
+)
 from datalad.interface.common_opts import eval_params
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import resolve_path
 from datalad.support.exceptions import CapturedException
-
 
 default_logchannels = {
     '': 'debug',
@@ -240,6 +240,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     the number and names of the callables arguments.
     """
     from datalad.utils import getargspec
+
     # get the signature
     args, varargs, varkw, defaults = getargspec(func, include_kwonlyargs=True)
     defaults = defaults or tuple()
@@ -394,7 +395,7 @@ def build_doc(cls, **kwargs):
     # would need to actually call the command once in order to build this
     # docstring.
 
-    lgr.debug("Building doc for {}".format(cls))
+    lgr.debug("Building doc for %s", cls)
 
     cls_doc = cls.__doc__
     if hasattr(cls, '_docs_'):

@@ -1057,9 +1057,10 @@ class RIARemote(SpecialRemote):
     def _get_version_config(self, path):
         """ Get version and config flags from remote file
         """
-
         if self.ria_store_url:
-            target_ri = self.ria_store_url[4:] + path.as_posix()
+            # construct path to ria_layout_version file for reporting
+            target_ri = self.ria_store_url[4:] +\
+                        path.relative_to(Path(self.store_base_path)).as_posix()
         elif self.storage_host:
             target_ri = "ssh://{}{}".format(self.storage_host, path.as_posix())
         else:

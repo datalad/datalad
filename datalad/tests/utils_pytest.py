@@ -1601,8 +1601,8 @@ def ignore_nose_capturing_stdout(func):
     """
     lgr.warning(
         "@ignore_nose_capturing_stdout no longer does anything - nose should "
-        "just be monkey patched in setup_package. {} still has it"
-        .format(func.__name__)
+        "just be monkey patched in setup_package. %s still has it",
+        func.__name__
     )
     return func
 

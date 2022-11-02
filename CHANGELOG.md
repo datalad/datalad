@@ -1,11 +1,51 @@
 
+<a id='changelog-0.17.8'></a>
+# 0.17.8 (2022-10-24)
+
+## Bug Fixes
+
+- Prevent adding duplicate entries to .gitmodules.  [PR #7088](https://github.com/datalad/datalad/pull/7088) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- [BF] Prevent double yielding of impossible get result
+  Fixes [#5537](https://github.com/datalad/datalad/issues/5537).
+  [PR #7093](https://github.com/datalad/datalad/pull/7093) (by
+  [@jsheunis](https://github.com/jsheunis))
+
+- Stop rendering the output of internal `subdatset()` call in the
+  results of `run_procedure()`.
+  Fixes [#7091](https://github.com/datalad/datalad/issues/7091) via
+  [PR #7094](https://github.com/datalad/datalad/pull/7094)
+  (by [@mslw](https://github.com/mslw) & [@mih](https://github.com/mih))
+
+- Improve handling of `--existing reconfigure` in
+  `create-sibling-ria`: previously, the command would not make the
+  underlying `git init` call for existing local repositories, leading
+  to some configuration updates not being applied. Partially addresses
+  https://github.com/datalad/datalad/issues/6967 via
+  https://github.com/datalad/datalad/pull/7095 (by @mslw)
+
+- Ensure subprocess environments have a valid path in `os.environ['PWD']`,
+  even if a Path-like object was given to the runner on subprocess creation
+  or invocation.
+  Fixes [#7040](https://github.com/datalad/datalad/issues/7040) via
+  [PR #7107](https://github.com/datalad/datalad/pull/7107)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Improved reporting when using `dry-run` with github-like
+  `create-sibling*` commands (`-gin`, `-gitea`, `-github`,
+  `-gogs`). The result messages will now display names of the
+  repositories which would be created (useful for recursive
+  operations).
+  [PR #7103](https://github.com/datalad/datalad/pull/7103)
+  (by [@mslw](https://github.com/mslw))
+
 <a id='changelog-0.17.7'></a>
 # 0.17.7 (2022-10-14)
 
 ## Bug Fixes
 
-- Let `EnsureChoice` report the value is failed validating.  [PR
-  #7067](https://github.com/datalad/datalad/pull/7067) (by
+- Let `EnsureChoice` report the value is failed validating.
+  [PR #7067](https://github.com/datalad/datalad/pull/7067) (by
   [@mih](https://github.com/mih))
 
 - Avoid writing to stdout/stderr from within datalad sshrun. This could lead to
@@ -25,8 +65,7 @@
 
 - Ensure that `BatchedCommandError` is raised if the subprocesses of `BatchedCommand` fails or raises a `CommandError`.  [PR #7068](https://github.com/datalad/datalad/pull/7068) (by [@christian-monch](https://github.com/christian-monch))
 
-- RF: remove unused code str-ing PurePath.  [PR
-  #7073](https://github.com/datalad/datalad/pull/7073) (by
+- RF: remove unused code str-ing PurePath.  [PR #7073](https://github.com/datalad/datalad/pull/7073) (by
   [@yarikoptic](https://github.com/yarikoptic))
 
 - Update GitHub Actions action versions.

@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
+
 lgr = logging.getLogger('datalad.network')
 
 lgr.log(5, "Importing support.network")
@@ -18,44 +19,48 @@ import pickle
 import re
 import sys
 import time
-import iso8601
-
-from hashlib import md5
 from collections import OrderedDict
-from os.path import (
-    dirname,
-    join as opj,
-)
+from hashlib import md5
 from ntpath import splitdrive as win_splitdrive
-
-from urllib.request import Request
+from os.path import dirname
+from os.path import join as opj
+from urllib.error import URLError
 from urllib.parse import (
-    parse_qsl,
     ParseResult,
-    unquote as urlunquote,
+    parse_qsl,
+)
+from urllib.parse import quote as urlquote
+from urllib.parse import unquote as urlunquote
+from urllib.parse import (
     urlencode,
     urljoin,
     urlparse,
     urlsplit,
     urlunparse,
 )
-from urllib.error import URLError
+from urllib.request import Request
 
-from datalad.utils import (
-    on_windows,
-    PurePath,
-    Path,
+import iso8601
+
+from datalad import (
+    cfg,
+    consts,
 )
-from datalad.utils import ensure_dir, ensure_bytes, ensure_unicode, map_items
-from datalad import consts
-from datalad import cfg
 from datalad.support.cache import lru_cache
 from datalad.support.exceptions import CapturedException
+from datalad.utils import (
+    Path,
+    PurePath,
+    ensure_bytes,
+    ensure_dir,
+    ensure_unicode,
+    map_items,
+    on_windows,
+)
 
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
-from urllib.parse import quote as urlquote
 
 
 def is_windows_path(path):
@@ -178,7 +183,10 @@ def get_tld(url):
     return rec.netloc
 
 
-from email.utils import parsedate_tz, mktime_tz
+from email.utils import (
+    mktime_tz,
+    parsedate_tz,
+)
 
 
 def rfc2822_to_epoch(datestr):
@@ -1021,7 +1029,7 @@ def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
         ensure_dir(dirname(doc_fname))
         # use pickle to store the entire request result dict
         pickle.dump(doc, open(doc_fname, 'wb'))
-        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
+        lgr.debug("stored result of request to '%s' in %s", url, doc_fname)
     return doc
 
 

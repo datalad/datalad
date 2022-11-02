@@ -89,6 +89,10 @@ def setup_package():
 	# allowed by default
 	allowed-url-schemes = http https file
 	allowed-http-addresses = all
+[protocol "file"]
+    # since git 2.38.1 cannot by default use local clones for submodules
+    # https://github.blog/2022-10-18-git-security-vulnerabilities-announced/#cve-2022-39253
+    allow = always
 """ + os.environ.get('DATALAD_TESTS_GITCONFIG', '').replace('\\n', os.linesep)
             # TODO: split into a function + context manager
             with make_tempfile(mkdir=True) as new_home:
