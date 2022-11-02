@@ -522,7 +522,7 @@ class EnsureDataset(Constraint):
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
-        elif isinstance(value, str):
+        elif isinstance(value, (str, PurePath)):
             # we cannot convert to a Dataset class right here
             # - duplicates require_dataset() later on
             # - we need to be able to distinguish between a bound
