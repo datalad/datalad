@@ -1003,7 +1003,7 @@ class GitRepo(CoreGitRepo):
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
+                lgr.debug("Git clone from %s to %s", url, path)
 
                 res = GitWitlessRunner().run(cmd, protocol=GitProgress)
                 # fish out non-critical warnings by git-clone
@@ -1727,7 +1727,7 @@ class GitRepo(CoreGitRepo):
                                 read_only=True)
         except CommandError as e:
             if 'HEAD is not a symbolic ref' in e.stderr:
-                lgr.debug("detached HEAD in {0}".format(self))
+                lgr.debug("detached HEAD in %s", self)
                 return None
             else:
                 raise e
