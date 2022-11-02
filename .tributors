@@ -18,8 +18,12 @@
         "bio": "PhD student in Cognitive Neuroscience at INM-7 (Brain & Behaviour) at Research Center Jülich, Jülich, Germany"
     },
     "soichih": {
-        "name": "soichih",
-        "blog": "https://github.com/soichih"
+        "name": "Soichi Hayashi",
+        "blog": "https://github.com/soichih",
+        "email": "hayashis@iu.edu",
+        "bio": "A software engineer @ brainlife.io. Making supercomputers more accessible for researchers and scientists.",
+        "orcid": "0000-0003-3641-3491",
+        "affiliation": "Indiana University"
     },
     "mvdoc": {
         "name": "mvdoc",
@@ -201,5 +205,34 @@
         "email": "jamesdkent21@gmail.com",
         "bio": "Postdoc",
         "blog": "https://jdkent.github.io/"
+    },
+    "jsheunis": {
+        "name": "Stephan Heunis",
+        "bio": "DataLad, decentralised (research) data management, real-time fMRI analysis, data quality control, Matlab and Python bits and pieces",
+        "blog": "https://jsheunis.github.io/",
+        "orcid": "0000-0003-3503-9872"
+    },
+    "lamby": {
+        "name": "Chris Lamb",
+        "email": "chris@chris-lamb.co.uk",
+        "bio": "🍥 Former @Debian Project Leader • @ReproducibleBuilds core dev  • Freelance programmer (@django, etc.) • Classical musician",
+        "blog": "https://chris-lamb.co.uk"
+    },
+    "thewtex": {
+        "name": "Matt McCormick",
+        "blog": "https://www.mmmccormick.com"
+    },
+    "tstoeter": {
+        "name": "tstoeter",
+        "blog": "https://github.com/tstoeter"
+    },
+    "vickychenglau": {
+        "name": "Vicky C Lau",
+        "email": "vickychenglau@gmail.com",
+        "blog": "https://github.com/vickychenglau"
+    },
+    "xgui3783": {
+        "name": "xgui3783",
+        "blog": "https://github.com/xgui3783"
     }
 }
