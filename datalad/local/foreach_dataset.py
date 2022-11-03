@@ -173,8 +173,9 @@ class ForEachDataset(Interface):
             constraints=EnsureChoice('capture', 'pass-through', 'relpath'),
             doc="""ways to handle outputs. 'capture' and return outputs from 'cmd' in the record ('stdout',
             'stderr'); 'pass-through' to the screen (and thus absent from returned record); prefix with 'relpath'
-            and just pass-through (similar to like grep does), and if `dataset` is specified - relative to top
-            of that dataset, if not - to current directory."""),
+            captured output (similar to like grep does) and write to stdout and stderr. In 'relpath', relative path
+            is relative to the top of the dataset if `dataset` is specified, and if not - relative to current
+            directory."""),
         chpwd=Parameter(
             args=("--chpwd",),
             constraints=EnsureChoice('ds', 'pwd'),
