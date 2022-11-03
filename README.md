@@ -140,6 +140,10 @@ Sciences, Imaging Platform.  This work is further facilitated by the ReproNim
 project (NIH 1P41EB019936-01A1). Mac mini instance for development is provided
 by [MacStadium](https://www.macstadium.com/).
 
+### Contributors ✨
+
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
