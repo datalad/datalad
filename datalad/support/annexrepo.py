@@ -3438,7 +3438,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         .. deprecated:: 0.16
             Use get_content_annexinfo() or the test helper
-            :py:func:`datalad.tests.utils.get_annexstatus` instead.
+            :py:func:`datalad.tests.utils_pytest.get_annexstatus` instead.
         """
         info = self.get_content_annexinfo(
             paths=paths,
