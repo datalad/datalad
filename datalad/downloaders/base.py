@@ -179,7 +179,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 if hasattr(e, 'status') and e.status == 429:
                     # Too many requests.
                     # We can retry by continuing the loop.
-                    time.sleep(0.5)
+                    time.sleep(0.5*(attempt**1.2))
                     continue
 
                 if isinstance(e, AnonymousAccessDeniedError):
