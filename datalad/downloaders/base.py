@@ -176,6 +176,12 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 break
             except AccessDeniedError as e:
                 ce = CapturedException(e)
+                if hasattr(e, 'status') and e.status == 429:
+                    # Too many requests.
+                    # We can retry by continuing the loop.
+                    time.sleep(0.5)
+                    continue
+
                 if isinstance(e, AnonymousAccessDeniedError):
                     access_denied = "Anonymous access"
                 else:
