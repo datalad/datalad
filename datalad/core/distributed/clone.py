@@ -953,24 +953,20 @@ def postclonecfg_ria(ds, props, remote="origin"):
         # And read it
         uuid = None
         if config_content:
-            # TODO: We might be able to spare the saving to a file.
-            #       "git config -f -" is not explicitly documented but happens
-            #       to work and would read from stdin. Make sure we know this
-            #       works for required git versions and on all platforms.
-            with make_tempfile(content=config_content) as cfg_file:
-                runner = GitWitlessRunner()
-                try:
-                    result = runner.run(
-                        ['git', 'config', '-f', cfg_file,
-                         'datalad.ora-remote.uuid'],
-                        protocol=StdOutCapture
-                    )
-                    uuid = result['stdout'].strip()
-                except CommandError as e:
-                    ce = CapturedException(e)
-                    # doesn't contain what we are looking for
-                    lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", remote, ce)
+            runner = GitWitlessRunner()
+            try:
+                # "git config -f -" can read from stdin; this spares us a temp file
+                result = runner.run(
+                    ['git', 'config', '-f', '-', 'datalad.ora-remote.uuid'],
+                    stdin=config_content.encode(encoding='utf-8'),
+                    protocol=StdOutCapture
+                )
+                uuid = result['stdout'].strip()
+            except CommandError as e:
+                ce = CapturedException(e)
+                # doesn't contain what we are looking for
+                lgr.debug("Found no UUID for ORA special remote at "
+                          "'%s' (%s)", remote, ce)
 
         return uuid
 
