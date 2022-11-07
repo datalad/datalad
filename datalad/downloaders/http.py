@@ -121,21 +121,25 @@ def check_response_status(response, err_prefix="", session=None):
         raise AccessDeniedError(
             err_msg,
             supported_types=process_www_authenticate(
-                response.headers.get('WWW-Authenticate')))
+                response.headers.get('WWW-Authenticate')),
+            status=response.status_code)
     elif response.status_code in {200}:
         pass
     elif response.status_code in {301, 302, 307}:
         # TODO: apparently tests do not exercise this one yet
         if session is None:
-            raise AccessFailedError(err_msg + " no session was provided")
+            raise AccessFailedError(err_msg + " no session was provided",
+                                    status=response.status_code)
         redirs = list(session.resolve_redirects(response, response.request))
         if len(redirs) > 1:
             lgr.warning("Multiple redirects aren't supported yet.  Taking first")
         elif len(redirs) == 0:
-            raise AccessFailedError("No redirects were resolved")
-        raise UnhandledRedirectError(err_msg, url=redirs[0].url)
+            raise AccessFailedError("No redirects were resolved",
+                                    status=response.status_code)
+        raise UnhandledRedirectError(err_msg, url=redirs[0].url,
+                                     status=response.status_code)
     else:
-        raise AccessFailedError(err_msg)
+        raise AccessFailedError(err_msg, status=response.status_code)
 
 
 @auto_repr
