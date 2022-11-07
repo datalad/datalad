@@ -1,4 +1,48 @@
 
+<a id='changelog-0.9.4'></a>
+# 0.9.4 (2022-11-07)
+
+## 🐛 Bug Fixes
+
+- Various small fixups ran after looking post-release and trying to build Debian package.  [PR #7112](https://github.com/datalad/datalad/pull/7112) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Fix add-archive-contents try-finally statement by defining variable earlier.  [PR #7117](https://github.com/datalad/datalad/pull/7117) (by [@adswa](https://github.com/adswa))
+
+- Fix RIA file URL reporting in exception handling.  [PR #7123](https://github.com/datalad/datalad/pull/7123) (by [@adswa](https://github.com/adswa))
+
+- HTTP download treated '429 - too many requests' as an authentication issue and
+  was consequently trying to obtain credentials.
+  Fixes [#7129](https://github.com/datalad/datalad/issues/7129) via
+  [PR #7129](https://github.com/datalad/datalad/pull/7129)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🔩 Dependencies
+
+- Unrestrict pytest and pytest-cov versions.  [PR #7125](https://github.com/datalad/datalad/pull/7125) (by [@jwodder](https://github.com/jwodder))
+
+- Remove remaining references to `nose` and the implied requirement for building the documentation
+  Fixes [#7100](https://github.com/datalad/datalad/issues/7100) via
+  [PR #7136](https://github.com/datalad/datalad/pull/7136)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🏠 Internal
+
+- Use datalad/release-action.  Fixes [#7110](https://github.com/datalad/datalad/issues/7110).  [PR #7111](https://github.com/datalad/datalad/pull/7111) (by [@jwodder](https://github.com/jwodder))
+
+- Fix all logging to use %-interpolation and not .format, sort imports in touched files, add pylint-ing for % formatting in log messages to `tox -e lint`.  [PR #7118](https://github.com/datalad/datalad/pull/7118) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Increase the upper time limit after which we assume that a process is stalling.
+  That should reduce false positives from `datalad.support.tests.test_parallel.py::test_stalling`,
+  without impacting the runtime of passing tests.
+  [PR #7119](https://github.com/datalad/datalad/pull/7119)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- XFAIL a check on length of results in test_gracefull_death.  [PR #7126](https://github.com/datalad/datalad/pull/7126) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Configure Git to allow for "file" protocol in tests.  [PR #7130](https://github.com/datalad/datalad/pull/7130) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.17.8'></a>
 # 0.17.8 (2022-10-24)
 
