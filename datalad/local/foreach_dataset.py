@@ -13,6 +13,9 @@ __docformat__ = 'restructuredtext'
 
 import inspect
 import logging
+import os.path as op
+import sys
+from typing import Union
 
 from argparse import REMAINDER
 from itertools import chain
@@ -167,9 +170,12 @@ class ForEachDataset(Interface):
             `contains` is used"""),
         output_streams=Parameter(
             args=("--output-streams", "--o-s"),
-            constraints=EnsureChoice('capture', 'pass-through'),
-            doc="""whether to capture and return outputs from 'cmd' in the record ('stdout', 'stderr') or
-            just 'pass-through' to the screen (and thus absent from returned record)."""),
+            constraints=EnsureChoice('capture', 'pass-through', 'relpath'),
+            doc="""ways to handle outputs. 'capture' and return outputs from 'cmd' in the record ('stdout',
+            'stderr'); 'pass-through' to the screen (and thus absent from returned record); prefix with 'relpath'
+            captured output (similar to like grep does) and write to stdout and stderr. In 'relpath', relative path
+            is relative to the top of the dataset if `dataset` is specified, and if not - relative to current
+            directory."""),
         chpwd=Parameter(
             args=("--chpwd",),
             constraints=EnsureChoice('ds', 'pwd'),
@@ -316,7 +322,7 @@ class ForEachDataset(Interface):
                         if output_streams == 'pass-through':
                             res = cmd_f(*cmd_a, **cmd_kw)
                             out = {}
-                        elif output_streams == 'capture':
+                        elif output_streams in ('capture', 'relpath'):
                             with swallow_outputs() as cmo:
                                 res = cmd_f(*cmd_a, **cmd_kw)
                                 out = {
@@ -342,7 +348,7 @@ class ForEachDataset(Interface):
                         cmd_expanded,
                         cwd=ds.path if chpwd == 'ds' else pwd,
                         protocol=protocol)
-                if output_streams == 'capture':
+                if output_streams in ('capture', 'relpath'):
                     status_rec.update(out)
                     # provide some feedback to user in default rendering
                     if any(out.values()):
@@ -377,7 +383,7 @@ class ForEachDataset(Interface):
                     warning += \
                         "Execution of Python commands in parallel threads while changing directory " \
                         "is not thread-safe. "
-                if output_streams == 'capture':
+                if output_streams in ('capture', 'relpath'):
                     warning += \
                         "Execution of Python commands in parallel while capturing output is not possible."
                 if warning:
@@ -395,6 +401,33 @@ class ForEachDataset(Interface):
             **pc_kw
         )
 
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        from datalad.interface.utils import generic_result_renderer
+        if kwargs.get('output_streams') == 'relpath':
+            from datalad.log import no_progress
+            with no_progress():
+                ds: Union[str, Dataset] = kwargs.get('dataset')
+                if ds:
+                    if not isinstance(ds, Dataset):
+                        ds = Dataset(ds)  # so all ///, ^ etc get treated
+                    refpath = ds.path
+                else:
+                    refpath = getpwd()
+                for k in ('stdout', 'stderr'):
+                    v = res.get(k)
+                    if v:
+                        path = res.get('path')
+                        relpath = op.relpath(path, refpath) if path else ''
+                        if relpath == op.curdir:
+                            relpath = ''
+                        if relpath and not relpath.endswith(op.sep):
+                            relpath += op.sep
+                        out = getattr(sys, k)
+                        for l in v.splitlines():
+                            out.write(f"{relpath}{l}\n")
+        else:
+            generic_result_renderer(res)
 
 # Reduced version from run
 def format_command(command, **kwds):
