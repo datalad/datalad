@@ -517,7 +517,6 @@ def test_force_checkdatapresent(srcpath=None, dstpath=None):
                       message='Slated for transport, but no content present')
 
 
-@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
 def test_ria_push(srcpath=None, dstpath=None):
@@ -883,7 +882,6 @@ def test_push_matching(path=None):
 
 
 @slow  # can run over 30 sec when running in parallel with n=2. Cannot force serial yet, see https://github.com/pytest-dev/pytest-xdist/issues/385
-@known_failure_githubci_win  # https://github.com/datalad/datalad/issues/5271
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
