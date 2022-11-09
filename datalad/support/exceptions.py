@@ -532,7 +532,11 @@ class ConnectionOpenFailedError(CommandError):
 
 
 class DownloadError(Exception):
-    pass
+
+    def __init__(self, msg=None, status=None, **kwargs):
+        super(DownloadError, self).__init__(msg, **kwargs)
+        # store response status code
+        self.status = status
 
 
 class IncompleteDownloadError(DownloadError):

@@ -143,7 +143,7 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
                  batched_command: "BatchedCommand",
                  done_future: Any = None,
                  encoding: Optional[str] = None,
-                 output_proc: Callable = None,
+                 output_proc: Optional[Callable] = None,
                  ):
         GeneratorMixIn.__init__(self)
         StdOutErrCapture.__init__(self, done_future, encoding)
@@ -224,7 +224,7 @@ class BatchedCommand(SafeDelCloseMixin):
     def __init__(self,
                  cmd: Union[str, Tuple, List],
                  path: Optional[str] = None,
-                 output_proc: Callable = None,
+                 output_proc: Optional[Callable] = None,
                  timeout: Optional[float] = None,
                  exception_on_timeout: bool = False,
                  ):

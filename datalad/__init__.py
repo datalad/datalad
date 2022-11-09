@@ -130,23 +130,23 @@ from .log import lgr
 def setup_package():
     import warnings
 
-    from datalad.tests.utils import setup_package
     warnings.warn(
         "setup_package() and testing with nose are deprecated."
         "  Switch to using pytest instead.",
         DeprecationWarning,
     )
+    from datalad.tests.utils import setup_package
     return setup_package()
+
 
 def teardown_package():
     import warnings
-
-    from datalad.tests.utils import teardown_package
     warnings.warn(
         "teardown_package() and testing with nose are deprecated."
         "  Switch to using pytest instead.",
         DeprecationWarning,
     )
+    from datalad.tests.utils import teardown_package
     return teardown_package()
 
 # To analyze/initiate our decision making on what current directory to return
