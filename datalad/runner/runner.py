@@ -88,11 +88,11 @@ class WitlessRunner(object):
           provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
           If the protocol has the GeneratorMixIn-mixin, the run-method
           will return an iterator and can therefore be used in a for-clause.
-        stdin : file-like, string, bytes, Queue, or None
+        stdin : file-like, bytes, Queue, or None
           If stdin is a file-like, it will be directly used as stdin for the
           subprocess. The caller is responsible for writing to it and closing it.
-          If stdin is a string or bytes, those will be fed to stdin of the
-          subprocess. If all data is written, stdin will be closed.
+          If stdin is a bytes, it will be fed to stdin of the subprocess.
+          If all data is written, stdin will be closed.
           If stdin is a Queue, all elements (bytes) put into the Queue will
           be passed to stdin until None is read from the queue. If None is read,
           stdin of the subprocess is closed.

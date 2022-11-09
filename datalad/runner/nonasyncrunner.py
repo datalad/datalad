@@ -173,11 +173,11 @@ class ThreadedRunner:
             `datalad.runner.protocol.GeneratorMixIn`, the function will return
             the result created by the protocol method `_generate_result`.
 
-        stdin : file-like, string, bytes, Queue, or None
+        stdin : file-like, bytes, Queue, or None
             If stdin is a file-like, it will be directly used as stdin for the
             subprocess. The caller is responsible for writing to it and closing
-            it. If stdin is a string or bytes, those will be fed to stdin of the
-            subprocess. If all data is written, stdin will be closed.
+            it. If stdin is a bytes, it will be fed to stdin of the subprocess.
+            If all data is written, stdin will be closed.
             If stdin is a Queue, all elements (bytes) put into the Queue will
             be passed to stdin until None is read from the queue. If None is
             read, stdin of the subprocess is closed.
@@ -328,7 +328,7 @@ class ThreadedRunner:
             # file-like he can write to it from a different thread.
             self.write_stdin = False
 
-        elif isinstance(self.stdin, (str, bytes)):
+        elif isinstance(self.stdin, bytes):
             # Establish a queue to write to the process and
             # enqueue the input that is already provided.
             self.write_stdin = True
