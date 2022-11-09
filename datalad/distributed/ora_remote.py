@@ -1117,7 +1117,7 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
             self.get_layout_locations(store_base_path, self.archive_id)
 
-        read_only_msg = "Treating remote as read-only in order to" \
+        read_only_msg = "Treating remote as read-only in order to " \
                         "prevent damage by putting things into an unknown " \
                         "version of the target layout. You can overrule this " \
                         "by setting 'annex.ora-remote.<name>.force-write=true'."
