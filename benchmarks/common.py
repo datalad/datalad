@@ -71,7 +71,7 @@ class SuprocBenchmarks(object):
             # so fails correctly identify rc as pre .0
             if external_versions['datalad'] < '0.12.1':
                 from datalad import utils
-                from datalad.interface import ls
+                from datalad.api import ls
                 utils.is_interactive = is_interactive
                 ls.is_interactive = is_interactive
             SuprocBenchmarks._monkey_patched = True

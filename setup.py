@@ -77,7 +77,6 @@ requires['full'] = sum(list(requires.values()), [])
 # Now add additional ones useful for development
 requires.update({
     'devel-docs': [
-        'nose>=1.3.4',
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
