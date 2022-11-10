@@ -168,6 +168,15 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
         eval_submodule_state=eval_submodule_state,
         _cache=cache)
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
+        if paths:
+            # when an annex query has been requested for specific paths,
+            # exclude untracked files from the annex query (else gh-7032)
+            untracked = [k for k, v in status.items() if
+                         v['state'] == 'untracked']
+            lgr.debug(
+                'Skipping %s.get_content_annexinfo() for untracked paths: %s',
+                repo, paths)
+            [paths.remove(p) for p in untracked]
         lgr.debug('Querying %s.get_content_annexinfo() for paths: %s', repo, paths)
         # this will amend `status`
         repo.get_content_annexinfo(
