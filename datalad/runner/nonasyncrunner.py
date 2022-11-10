@@ -69,10 +69,12 @@ class _ResultGenerator(Generator):
     is a subclass of `datalad.runner.protocol.GeneratorMixIn`
     """
     class GeneratorState(enum.Enum):
-        process_running = 0
-        process_exited = 1
-        connection_lost = 2
-        waiting_for_process = 3
+        initialized = 0
+        process_running = 1
+        process_exited = 2
+        connection_lost = 3
+        waiting_for_process = 4
+        exhausted = 5
 
     def __init__(self,
                  runner: ThreadedRunner,
@@ -89,10 +91,16 @@ class _ResultGenerator(Generator):
     def _check_result(self):
         self.runner._check_result()
 
-    def send(self, _):
-        runner = self.runner
-        if self.state == self.GeneratorState.process_running:
+    def send(self, message):
+        if self.state == self.GeneratorState.initialized:
+            if message is not None:
+                raise RuntimeError(
+                    "sent non-None message to initialized generator "
+                )
+            self.state = self.GeneratorState.process_running
 
+        if self.state == self.GeneratorState.process_running:
+            runner = self.runner
             # If we have elements in the result queue, return one
             while len(self.result_queue) == 0 and runner.should_continue():
                 runner.process_queue()
@@ -115,6 +123,7 @@ class _ResultGenerator(Generator):
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
 
+            runner = self.runner
             runner.ensure_stdin_stdout_stderr_closed()
             runner.protocol.connection_lost(None)   # TODO: check for exceptions
             runner.wait_for_threads()
@@ -125,8 +134,15 @@ class _ResultGenerator(Generator):
             # state: GeneratorState.process_exited.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
-            self.runner.generator = None
+            runner = self.runner
+            runner.generator = None
+            runner.owning_thread = None
+            self.state = self.GeneratorState.exhausted
+
+        if self.state == self.GeneratorState.exhausted:
             raise StopIteration(self.return_code)
+
+        raise RuntimeError(f"unknown state: {self.state}")
 
     def throw(self, exception_type, value=None, trace_back=None):
         return Generator.throw(self, exception_type, value, trace_back)
@@ -247,6 +263,7 @@ class ThreadedRunner:
         self.stall_check_interval = 10
 
         self.initialization_lock = threading.Lock()
+        self.owning_thread: Optional[int] = None
 
         # Pure declarations
         self.protocol: WitlessProtocol
@@ -256,7 +273,6 @@ class ThreadedRunner:
         self.file_to_fileno: dict[IO, int]
         self.result: dict
         self.return_code: int
-
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -321,7 +337,10 @@ class ThreadedRunner:
 
     def _locked_run(self) -> dict | _ResultGenerator:
         if self.generator is not None:
-            raise RuntimeError("ThreadedRunner.run() was re-entered")
+            raise RuntimeError(
+                "ThreadedRunner.run() was re-entered by "
+                f"{threading.get_ident()}. The execution is still owned by "
+                f"thread {self.owning_thread}")
 
         if isinstance(self.stdin, (int, IO, type(None))):
             # We will not write anything to stdin. If the caller passed a
@@ -475,6 +494,7 @@ class ThreadedRunner:
                 self,
                 self.protocol.result_queue
             )
+            self.owning_thread = threading.get_ident()
             return self.generator
 
         return self.process_loop()
