@@ -12,18 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
-import inspect
 import logging
 import sys
-from functools import wraps
 from time import time
-from typing import (
-    Callable,
-    Dict,
-    Generator,
-    TypeVar,
-    TYPE_CHECKING,
-)
 from os import listdir
 from os.path import join as opj
 from os.path import isdir
@@ -32,6 +23,9 @@ from os.path import sep
 
 import json
 
+from typing import (
+    TypeVar
+)
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import (
@@ -39,34 +33,17 @@ from datalad.utils import (
     path_is_subpath,
     ensure_unicode,
     getargspec,
-    get_wrapped_class,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import (
     CapturedException,
-    IncompleteResultsError,
 )
 from datalad import cfg as dlcfg
 from datalad.dochelpers import single_or_plural
-
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
 
-from datalad.interface.base import default_logchannels
-from datalad.interface.base import get_allargs_as_kwargs
-from datalad.interface.common_opts import eval_params
-from .results import known_result_xfms
-from datalad.core.local.resulthooks import (
-    get_jsonhooks_from_config,
-    match_jsonhook2result,
-    run_jsonhook,
-)
-
-if TYPE_CHECKING:
-    from .base import Interface
-
 anInterface = TypeVar('anInterface', bound='Interface')
-
 
 lgr = logging.getLogger('datalad.interface.utils')
 
@@ -241,289 +218,12 @@ def get_result_filter(fx):
 
 
 def eval_results(wrapped):
-    """Decorator for return value evaluation of datalad commands.
-
-    Note, this decorator is only compatible with commands that return
-    status dict sequences!
-
-    Two basic modes of operation are supported: 1) "generator mode" that
-    `yields` individual results, and 2) "list mode" that returns a sequence of
-    results. The behavior can be selected via the kwarg `return_type`.
-    Default is "list mode".
-
-    This decorator implements common functionality for result rendering/output,
-    error detection/handling, and logging.
-
-    Result rendering/output configured via the `result_renderer` keyword
-    argument of each decorated command. Supported modes are: 'generic' (a
-    generic renderer producing one line per result with key info like action,
-    status, path, and an optional message); 'json' (a complete JSON line
-    serialization of the full result record), 'json_pp' (like 'json', but
-    pretty-printed spanning multiple lines), 'tailored' custom output
-    formatting provided by each command class (if any), or 'disabled' for
-    no result rendering.
-
-    Error detection works by inspecting the `status` item of all result
-    dictionaries. Any occurrence of a status other than 'ok' or 'notneeded'
-    will cause an IncompleteResultsError exception to be raised that carries
-    the failed actions' status dictionaries in its `failed` attribute.
-
-    Status messages will be logged automatically, by default the following
-    association of result status and log channel will be used: 'ok' (debug),
-    'notneeded' (debug), 'impossible' (warning), 'error' (error).  Logger
-    instances included in the results are used to capture the origin of a
-    status report.
-
-    Parameters
-    ----------
-    func: function
-      __call__ method of a subclass of Interface,
-      i.e. a datalad command definition
-    """
-
-    @wraps(wrapped)
-    def eval_func(*args, **kwargs):
-        lgr.log(2, "Entered eval_func for %s", wrapped)
-        # determine the command class associated with `wrapped`
-        wrapped_class = get_wrapped_class(wrapped)
-
-        # retrieve common options from kwargs, and fall back on the command
-        # class attributes, or general defaults if needed
-        kwargs = kwargs.copy()  # we will pop, which might cause side-effect
-        common_params = {
-            p_name: kwargs.pop(
-                # go with any explicitly given default
-                p_name,
-                # otherwise determine the command class and pull any
-                # default set in that class
-                getattr(wrapped_class, p_name))
-            for p_name in eval_params}
-
-        # short cuts and configured setup for common options
-        return_type = common_params['return_type']
-
-        if return_type == 'generator':
-            # hand over the generator
-            lgr.log(2,
-                    "Returning generator_func from eval_func for %s",
-                    wrapped_class)
-            return _execute_command_(
-                interface=wrapped_class,
-                cmd=wrapped,
-                cmd_args=args,
-                cmd_kwargs=kwargs,
-                exec_kwargs=common_params,
-            )
-        else:
-            @wraps(_execute_command_)
-            def return_func(*args_, **kwargs_):
-                results = _execute_command_(
-                    interface=wrapped_class,
-                    cmd=wrapped,
-                    cmd_args=args,
-                    cmd_kwargs=kwargs,
-                    exec_kwargs=common_params,
-                )
-                if inspect.isgenerator(results):
-                    # unwind generator if there is one, this actually runs
-                    # any processing
-                    results = list(results)
-                if return_type == 'item-or-list' and \
-                        len(results) < 2:
-                    return results[0] if results else None
-                else:
-                    return results
-
-            lgr.log(2,
-                    "Returning return_func from eval_func for %s",
-                    wrapped_class)
-            return return_func(*args, **kwargs)
-
-    ret = eval_func
-    ret._eval_results = True
-    return ret
-
-
-def _execute_command_(
-    *,
-    interface: anInterface,
-    cmd: Callable[..., Generator[Dict, None, None]],
-    cmd_args: tuple,
-    cmd_kwargs: Dict,
-    exec_kwargs: Dict,
-) -> Generator[Dict, None, None]:
-    """Internal helper to drive a command execution generator-style
-
-    Parameters
-    ----------
-    interface:
-      Interface class of associated with the `cmd` callable
-    cmd:
-      A DataLad command implementation. Typically the `__call__()` of
-      the given `interface`.
-    cmd_args:
-      Positional arguments for `cmd`.
-    cmd_kwargs:
-      Keyword arguments for `cmd`.
-    exec_kwargs:
-      Keyword argument affecting the result handling.
-      See `datalad.interface.common_opts.eval_params`.
-    """
-    # for result filters and validation
-    # we need to produce a dict with argname/argvalue pairs for all args
-    # incl. defaults and args given as positionals
-    allkwargs = get_allargs_as_kwargs(
-        cmd,
-        cmd_args,
-        {**cmd_kwargs, **exec_kwargs},
-    )
-
-    # validate the complete parameterization
-    _validate_cmd_call(interface, allkwargs)
-
-    # look for potential override of logging behavior
-    result_log_level = dlcfg.get('datalad.log.result-level', 'debug')
-    # resolve string labels for transformers too
-    result_xfm = known_result_xfms.get(
-        allkwargs['result_xfm'],
-        # use verbatim, if not a known label
-        allkwargs['result_xfm'])
-    result_filter = get_result_filter(allkwargs['result_filter'])
-    result_renderer = allkwargs['result_renderer']
-    if result_renderer == 'tailored' and not hasattr(interface,
-                                                     'custom_result_renderer'):
-        # a tailored result renderer is requested, but the class
-        # does not provide any, fall back to the generic one
-        result_renderer = 'generic'
-    if result_renderer == 'default':
-        # standardize on the new name 'generic' to avoid more complex
-        # checking below
-        result_renderer = 'generic'
-
-    # figure out which hooks are relevant for this command execution
-    # query cfg for defaults
-    # .is_installed and .config can be costly, so ensure we do
-    # it only once. See https://github.com/datalad/datalad/issues/3575
-    dataset_arg = allkwargs.get('dataset', None)
-    ds = None
-    if dataset_arg is not None:
-        from datalad.distribution.dataset import Dataset
-        if isinstance(dataset_arg, Dataset):
-            ds = dataset_arg
-        else:
-            try:
-                ds = Dataset(dataset_arg)
-            except ValueError:
-                pass
-    # look for hooks
-    hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
-    # end of hooks discovery
-
-    # flag whether to raise an exception
-    incomplete_results = []
-    # track what actions were performed how many times
-    action_summary = {}
-
-    # if a custom summary is to be provided, collect the results
-    # of the command execution
-    results = []
-    do_custom_result_summary = result_renderer in (
-        'tailored', 'generic', 'default') and hasattr(
-            interface,
-            'custom_result_summary_renderer')
-    pass_summary = do_custom_result_summary \
-        and getattr(interface,
-                    'custom_result_summary_renderer_pass_summary',
-                    None)
-
-    # process main results
-    for r in _process_results(
-            # execution
-            cmd(*cmd_args, **cmd_kwargs),
-            interface,
-            allkwargs['on_failure'],
-            # bookkeeping
-            action_summary,
-            incomplete_results,
-            # communication
-            result_renderer,
-            result_log_level,
-            # let renderers get to see how a command was called
-            allkwargs):
-        for hook, spec in hooks.items():
-            # run the hooks before we yield the result
-            # this ensures that they are executed before
-            # a potentially wrapper command gets to act
-            # on them
-            if match_jsonhook2result(hook, r, spec['match']):
-                lgr.debug('Result %s matches hook %s', r, hook)
-                # a hook is also a command that yields results
-                # so yield them outside too
-                # users need to pay attention to void infinite
-                # loops, i.e. when a hook yields a result that
-                # triggers that same hook again
-                for hr in run_jsonhook(hook, spec, r, dataset_arg):
-                    # apply same logic as for main results, otherwise
-                    # any filters would only tackle the primary results
-                    # and a mixture of return values could happen
-                    if not keep_result(hr, result_filter, **allkwargs):
-                        continue
-                    hr = xfm_result(hr, result_xfm)
-                    # rationale for conditional is a few lines down
-                    if hr:
-                        yield hr
-        if not keep_result(r, result_filter, **allkwargs):
-            continue
-        r = xfm_result(r, result_xfm)
-        # in case the result_xfm decided to not give us anything
-        # exclude it from the results. There is no particular reason
-        # to do so other than that it was established behavior when
-        # this comment was written. This will not affect any real
-        # result record
-        if r:
-            yield r
-
-        # collect if summary is desired
-        if do_custom_result_summary:
-            results.append(r)
-
-    # result summary before a potential exception
-    # custom first
-    if do_custom_result_summary:
-        if pass_summary:
-            summary_args = (results, action_summary)
-        else:
-            summary_args = (results,)
-        interface.custom_result_summary_renderer(*summary_args)
-    elif result_renderer in ('generic', 'default') \
-            and action_summary \
-            and sum(sum(s.values())
-                    for s in action_summary.values()) > 1:
-        # give a summary in generic mode, when there was more than one
-        # action performed
-        render_action_summary(action_summary)
-
-    if incomplete_results:
-        raise IncompleteResultsError(
-            failed=incomplete_results,
-            msg="Command did not complete successfully")
-
-
-def _validate_cmd_call(interface: anInterface, kwargs: Dict) -> None:
-    """Validate a parameterization of a command call
-
-    This is called by `_execute_command_()` before a command call, with
-    the respective Interface sub-type of the command, and all its
-    arguments in keyword argument dict style. This dict also includes
-    the default values for any parameter that was not explicitly included
-    in the command call.
-
-    This expected behavior is to raise an exception whenever an invalid
-    parameterization is encountered.
-
-    This default implementation performs no validation.
-    """
-    pass
+    import warnings
+    from datalad.interface.base import eval_results as f
+    warnings.warn("datalad.interface.utils.eval_results is obsolete. "
+                  "Use datalad.interface.base.eval_results instead",
+                  DeprecationWarning)
+    return f(wrapped)
 
 
 def generic_result_renderer(res):
@@ -568,6 +268,7 @@ def render_action_summary(action_summary):
             ', '.join('{}: {}'.format(status, action_summary[act][status])
                       for status in sorted(action_summary[act])))
                     for act in sorted(action_summary))))
+
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
