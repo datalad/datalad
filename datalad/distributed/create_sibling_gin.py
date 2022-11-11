@@ -20,8 +20,8 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
-from datalad.interface.utils import eval_results
 from datalad.support.annexrepo import AnnexRepo
 
 

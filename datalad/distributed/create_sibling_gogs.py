@@ -20,8 +20,8 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
-from datalad.interface.utils import eval_results
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gogs')
 

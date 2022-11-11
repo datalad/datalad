@@ -26,6 +26,7 @@ from datalad.downloaders.credentials import UserPassword
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     annex_group_opt,
@@ -41,10 +42,7 @@ from datalad.interface.common_opts import (
     recursion_limit,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import (
-    generic_result_renderer,
-    eval_results,
-)
+from datalad.interface.utils import generic_result_renderer
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureBool,
