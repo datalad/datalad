@@ -33,6 +33,7 @@ from datetime import datetime
 from operator import attrgetter
 from weakref import WeakValueDictionary, ReferenceType, ref
 
+from datalad import cfg
 # start of legacy import block
 # to avoid breakage of code written before datalad.runner
 from datalad.runner.coreprotocols import (
@@ -69,6 +70,10 @@ from datalad.utils import (
 
 
 __docformat__ = "restructuredtext"
+
+
+_cfg_var = "datalad.runtime.stalled-external"
+_cfg_val = cfg.obtain(_cfg_var)
 
 
 class BatchedCommandError(CommandError):
@@ -200,7 +205,7 @@ class SafeDelCloseMixin(object):
     def __del__(self):
         try:
             self.close()
-        except TypeError:
+        except (TypeError, ImportError):
             if os.fdopen is None or lgr.debug is None:
                 # if we are late in the game and things already gc'ed in py3,
                 # it is Ok
@@ -594,12 +599,9 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def _get_abandon(self):
         if self._abandon_cache is None:
-            from . import cfg
-            cfg_var = "datalad.runtime.stalled-external"
-            cfg_val = cfg.obtain(cfg_var)
-            if cfg_val not in ("wait", "abandon"):
-                raise ValueError(f"Unexpected value: {cfg_var}={cfg_val!r}")
-            self._abandon_cache = cfg_val == "abandon"
+            if _cfg_val not in ("wait", "abandon"):
+                raise ValueError(f"Unexpected value: {_cfg_var}={_cfg_val!r}")
+            self._abandon_cache = _cfg_val == "abandon"
         return self._abandon_cache
 
 

@@ -35,17 +35,13 @@ class CommandError(RuntimeError):
         self.kwargs = kwargs
 
     def to_str(self, include_output=True):
-        from datalad.utils import (
-            ensure_unicode,
-            join_cmdline,
-        )
         to_str = "{}: ".format(self.__class__.__name__)
         cmd = self.cmd
         if cmd:
             to_str += "'{}'".format(
                 # go for a compact, normal looking, properly quoted
                 # command rendering if the command is in list form
-                join_cmdline(cmd) if isinstance(cmd, list) else cmd
+                " ".join(cmd) if isinstance(cmd, list) else cmd
             )
         if self.code:
             to_str += " failed with exitcode {}".format(self.code)

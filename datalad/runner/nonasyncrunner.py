@@ -554,9 +554,12 @@ class ThreadedRunner:
     def should_continue(self) -> bool:
         # Continue with queue processing if there is still a process or
         # monitored files, or if there are still elements in the output queue.
+        if self.is_stalled():
+            self.return_code = self.process.poll()
         return (
             len(self.active_file_numbers) > 0
-            or not self.output_queue.empty())
+            or not self.output_queue.empty()
+        ) and not self.is_stalled()
 
     def is_stalled(self) -> bool:
         # If all queue-filling threads have exited and the queue is empty, we
@@ -685,9 +688,13 @@ class ThreadedRunner:
 
     def ensure_stdin_stdout_stderr_closed(self):
         self.close_stdin()
-        self._ensure_closed((self.process.stdin,
-                             self.process.stdout,
-                             self.process.stderr))
+        self._ensure_closed(
+            (
+                self.process.stdin,
+                self.process.stdout,
+                self.process.stderr
+            )
+        )
 
     def ensure_stdout_stderr_closed(self):
         self._ensure_closed((self.process.stdout, self.process.stderr))

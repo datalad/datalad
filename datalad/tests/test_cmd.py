@@ -60,8 +60,8 @@ def test_batched_close_abandon():
     response = bc("import time; print('a')")
     assert_equal(response, "a")
     bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
-    with unittest.mock.patch("datalad.cfg") as cfg_mock:
-        cfg_mock.configure_mock(**{"obtain.return_value": "abandon"})
+
+    with unittest.mock.patch("datalad.cmd._cfg_val", "abandon"):
         bc.close(return_stderr=False)
         assert_true(bc.wait_timed_out is True)
         assert_is_none(bc.return_code)
