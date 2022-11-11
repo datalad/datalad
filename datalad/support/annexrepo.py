@@ -17,7 +17,6 @@ import logging
 import os
 import re
 import warnings
-from collections import OrderedDict
 from itertools import chain
 from multiprocessing import cpu_count
 from os import linesep
@@ -3355,7 +3354,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             is available (with `eval_availability`)
         """
         if init is None:
-            info = OrderedDict()
+            info = dict()
         elif init == 'git':
             info = super(AnnexRepo, self).get_content_info(
                 paths=paths, ref=ref, **kwargs)

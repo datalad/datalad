@@ -22,8 +22,6 @@ https://github.com/omab/python-social-auth
 
 import time
 
-from collections import OrderedDict
-
 from ..support.exceptions import (
     AccessDeniedError,
     CapturedException,
@@ -52,7 +50,7 @@ class Credential(object):
     assume `user` and `password` to be valid keys.
     """
 
-    # Should be defined in a subclass as an OrderedDict of fields
+    # Should be defined in a subclass as a dict of fields
     # name -> dict(attributes)
     _FIELDS = None
     _KNOWN_ATTRS = {
@@ -273,8 +271,8 @@ class Credential(object):
 class UserPassword(Credential):
     """Simple type of a credential which consists of user/password pair"""
 
-    _FIELDS = OrderedDict([('user', {}),
-                           ('password', {'hidden': True})])
+    _FIELDS = dict([('user', {}),
+                    ('password', {'hidden': True})])
 
     is_expired = False  # no expiration provisioned
 
@@ -282,7 +280,7 @@ class UserPassword(Credential):
 class Token(Credential):
     """Simple type of a credential which provides a single token"""
 
-    _FIELDS = OrderedDict([('token', {'hidden': True, 'repeat': False})])
+    _FIELDS = dict([('token', {'hidden': True, 'repeat': False})])
 
     is_expired = False  # no expiration provisioned
 
@@ -290,11 +288,11 @@ class Token(Credential):
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
 
-    _FIELDS = OrderedDict([('key_id', {'repeat': False}),
-                           ('secret_id', {'hidden': True, 'repeat': False}),
-                           ('session', {'optional': True}),
-                           ('expiration', {'optional': True}),
-                           ])
+    _FIELDS = dict([('key_id', {'repeat': False}),
+                    ('secret_id', {'hidden': True, 'repeat': False}),
+                    ('session', {'optional': True}),
+                    ('expiration', {'optional': True}),
+                   ])
 
     @property
     def is_expired(self):
@@ -455,8 +453,8 @@ class GitCredential(Credential):
     """
 
 
-    _FIELDS = OrderedDict([('user', {}),
-                           ('password', {'hidden': True})])
+    _FIELDS = dict([('user', {}),
+                    ('password', {'hidden': True})])
 
     # substitute keys used within datalad by the ones used by git-credential
     _FIELDS_GIT = {'user': 'username',

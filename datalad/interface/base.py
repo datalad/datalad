@@ -24,7 +24,6 @@ from abc import (
     ABC,
     abstractmethod,
 )
-from collections import OrderedDict
 from importlib import import_module
 
 import datalad
@@ -620,7 +619,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     assert (nargs >= len(defaults))
     # map any args to their name
     argmap = list(zip(argspec.args[:len(args)], args))
-    kwargs_ = OrderedDict(argmap)
+    kwargs_ = dict(argmap)
     # map defaults of kwargs to their names (update below)
     for k, v in zip(argspec.args[-len(defaults):], defaults):
         if k not in kwargs_:
