@@ -11,8 +11,14 @@
 from __future__ import annotations
 
 import logging
-from typing import cast
+from os import PathLike
+from queue import Queue
+from typing import (
+    IO,
+    cast,
+)
 
+from .protocol import WitlessProtocol
 from .coreprotocols import NoCapture
 from .exception import CommandError
 from .nonasyncrunner import (
@@ -67,13 +73,13 @@ class WitlessRunner(object):
         return env
 
     def run(self,
-            cmd,
-            protocol=None,
-            stdin=None,
-            cwd=None,
-            env=None,
-            timeout=None,
-            exception_on_error=True,
+            cmd: list | str,
+            protocol: type[WitlessProtocol] | None = None,
+            stdin: bytes | IO | Queue | None = None,
+            cwd: PathLike | str | None = None,
+            env: dict | None = None,
+            timeout: float | None = None,
+            exception_on_error: bool = True,
             **kwargs) -> dict | _ResultGenerator:
         """Execute a command and communicate with it.
 
@@ -106,7 +112,7 @@ class WitlessRunner(object):
           This must be a complete environment definition, no values
           from the current environment will be inherited. Overrides
           any `env` given to the constructor.
-        timeout:
+        timeout: float, optional
           None or the seconds after which a timeout callback is
           invoked, if no progress was made in communicating with
           the sub-process, or if waiting for the subprocess exit
@@ -214,6 +220,6 @@ class WitlessRunner(object):
                 cwd=self.cwd,
                 **results,
             )
-        # denoise, must be zero at this point
+        # Denoise result, the return code must be zero at this point.
         results.pop('code', None)
         return results
