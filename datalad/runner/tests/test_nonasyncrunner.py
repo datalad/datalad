@@ -539,7 +539,7 @@ def test_exit_3():
                         timeout=.5,
                         exception_on_error=False)
     tuple(rt.run())
-    assert_true(rt.process.poll() is not None)
+    assert_true(rt.return_code is not None)
 
 
 def test_exit_4():
@@ -548,7 +548,7 @@ def test_exit_4():
                         protocol_class=GenNothing,
                         timeout=.5)
     tuple(rt.run())
-    assert_true(rt.process.poll() is not None)
+    assert_true(rt.return_code is not None)
 
 
 def test_generator_throw():

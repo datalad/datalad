@@ -87,11 +87,16 @@ class _ResultGenerator(Generator):
         self.return_code = None
         self.state = self.GeneratorState.process_running
         self.all_closed = False
+        self.send_lock = threading.Lock()
 
     def _check_result(self):
         self.runner._check_result()
 
     def send(self, message):
+        with self.send_lock:
+            return self._locked_send(message)
+
+    def _locked_send(self, message):
         if self.state == self.GeneratorState.initialized:
             if message is not None:
                 raise RuntimeError(
@@ -127,6 +132,7 @@ class _ResultGenerator(Generator):
             runner.ensure_stdin_stdout_stderr_closed()
             runner.protocol.connection_lost(None)   # TODO: check for exceptions
             runner.wait_for_threads()
+            runner._set_process_exited()
             self.state = self.GeneratorState.connection_lost
 
         if self.state == self.GeneratorState.connection_lost:
@@ -257,6 +263,8 @@ class ThreadedRunner:
         self.output_queue: Queue = Queue()
         self.process_removed: bool = False
         self.generator: Optional[_ResultGenerator] = None
+        self.process: Optional[Popen[Any]] = None
+        self.return_code: Optional[int] = None
 
         self.last_touched: dict[Optional[int], float] = dict()
         self.active_file_numbers: set[Optional[int]] = set()
@@ -267,12 +275,10 @@ class ThreadedRunner:
 
         # Pure declarations
         self.protocol: WitlessProtocol
-        self.process: Popen[Any]
         self.fileno_mapping: dict[Optional[int], int]
         self.fileno_to_file: dict[Optional[int], Optional[IO]]
         self.file_to_fileno: dict[IO, int]
         self.result: dict
-        self.return_code: int
 
     def _check_result(self):
         if self.exception_on_error is True:
@@ -381,6 +387,10 @@ class ThreadedRunner:
             )
         }
 
+        if self.process is not None:
+            raise RuntimeError(f"Process already running {self.process.pid}")
+
+        self.return_code = None
         try:
             # The following command is generated internally by datalad
             # and trusted. Security check is therefore skipped.
@@ -516,6 +526,7 @@ class ThreadedRunner:
         self.ensure_stdin_stdout_stderr_closed()
         self.protocol.connection_lost(None)  # TODO: check exception
         self.wait_for_threads()
+        self._set_process_exited()
         return self.result
 
     def _handle_file_timeout(self, source):
@@ -582,6 +593,11 @@ class ThreadedRunner:
                 return True
         self.stall_check_interval -= 1
         return False
+
+    def _set_process_exited(self):
+        self.return_code = self.process.poll()
+        self.process = None
+        self.process_running = False
 
     def process_queue(self):
         """
