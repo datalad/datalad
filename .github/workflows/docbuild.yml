@@ -34,3 +34,6 @@ jobs:
         # no custom date - should be good for the next 980 years
         python setup.py build_manpage
         grep '\.TH "datalad" "1" "2' ./build/man/datalad.1
+    - name: Test for correct (unescaped) slashes
+      run: |
+        grep '\-\-help' docs/build/html/generated/man/datalad-create.html
