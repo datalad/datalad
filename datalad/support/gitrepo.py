@@ -2907,11 +2907,13 @@ class GitRepo(CoreGitRepo):
                 raise ValueError(
                     'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
-                r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
+                r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$',
+                re.DOTALL)
         else:
             cmd = ['ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(
-                r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
+                r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$',
+                re.DOTALL)
 
         lgr.debug('Query repo: %s', cmd)
         try:
