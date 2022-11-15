@@ -51,7 +51,6 @@ from datalad.tests.utils_pytest import (
     skip_if_adjusted_branch,
     slow,
     with_tempfile,
-    with_testrepos,
 )
 from datalad.utils import (
     Path,
