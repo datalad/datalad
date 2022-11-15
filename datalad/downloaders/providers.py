@@ -15,7 +15,6 @@ from logging import getLogger
 import re
 from os.path import dirname, abspath, join as pathjoin
 from urllib.parse import urlparse
-from collections import OrderedDict
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 
@@ -206,7 +205,7 @@ type = {credential_type}
         Is implemented as a function to ease mock testing depending on dirs.
         values
         """
-        paths = OrderedDict()
+        paths = dict()
         paths['dist'] = pathjoin(dirname(abspath(__file__)), 'configs')
         if dsroot is not None:
             paths['ds'] = pathjoin(dsroot, '.datalad', 'providers')
@@ -254,7 +253,7 @@ type = {credential_type}
         # there's a conflict between configuration files declared
         # at different precedence levels (ie. dataset vs system)
         # the appropriate precedence config wins.
-        providers = OrderedDict()
+        providers = dict()
         credentials = {}
 
         for section in config.sections():

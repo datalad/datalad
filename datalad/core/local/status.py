@@ -522,7 +522,7 @@ def get_paths_by_ds(refds, dataset_arg, paths, subdsroot_mode='rsync'):
       that are not located underneath the reference dataset.
     """
     ds_path = refds.path
-    paths_by_ds = OrderedDict()
+    paths_by_ds = dict()
     errors = []
 
     if not paths:
@@ -629,7 +629,12 @@ def _yield_paths_by_ds(refds, dataset_arg, paths):
             logger=lgr)
 
     while paths_by_ds:
-        qdspath, qpaths = paths_by_ds.popitem(last=False)
+        # gh-6566 advised replacement of OrderedDicts with dicts for performance
+        # The previous qdspath, qpaths = paths_by_ds.popitem(last=False) used an
+        # OrderedDict specific function (returns k, v in FIFO order). Below is a
+        # less pretty replacement for this functionality with a pure dict
+        qdspath = next(iter(paths_by_ds.keys()))
+        qpaths = paths_by_ds.pop(qdspath)
         if qpaths and qdspath in qpaths:
             # this is supposed to be a full status query, save some
             # cycles sifting through the actual path arguments

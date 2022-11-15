@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from collections import OrderedDict
 from datalad.utils import (
     ensure_list,
     ensure_unicode,
@@ -283,7 +282,7 @@ def diff_dataset(
             if recursion_limit is not None and recursive
             else -1 if recursive else 0,
             # TODO recode paths to repo path reference
-            origpaths=None if not path else OrderedDict(path),
+            origpaths=None if not path else dict(path),
             untracked=untracked,
             annexinfo=annex,
             cache=content_info_cache,
@@ -309,7 +308,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
     repo_path = repo.pathobj
     if datasets_only:
         assert not origpaths  # protected above with NotImplementedError
-        paths = OrderedDict(
+        paths = dict(
             (sds.pathobj.relative_to(ds.pathobj), False)
             for sds in ds.subdatasets(
                 recursive=False,
@@ -325,7 +324,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         # filter and normalize paths that match this dataset before passing them
         # onto the low-level query method
         paths = None if origpaths is None \
-            else OrderedDict(
+            else dict(
                 (repo_path / p.relative_to(ds.pathobj), goinside)
                 for p, goinside in origpaths.items()
                 if ds.pathobj in p.parents or (p == ds.pathobj and goinside)

@@ -16,7 +16,6 @@ import os.path as op
 import sys
 import tempfile
 from functools import partial
-from collections import OrderedDict
 
 
 from datalad.interface.base import Interface
@@ -447,7 +446,7 @@ class WTF(Interface):
         from datalad.ui import ui
         from datalad.support.external_versions import external_versions
 
-        infos = OrderedDict()
+        infos = dict()
         res = get_status_dict(
             action='wtf',
             path=ds.path if ds else ensure_unicode(op.abspath(op.curdir)),
