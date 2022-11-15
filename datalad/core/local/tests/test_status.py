@@ -21,7 +21,7 @@ from datalad.support.exceptions import (
     NoDatasetFound,
 )
 from datalad.tests.utils_pytest import (
-    OBSCURE_FILENAME,
+    OBSCURE_DIRNAME,
     SkipTest,
     assert_dict_equal,
     assert_in,
@@ -166,7 +166,7 @@ def test_status(_path=None, linkpath=None):
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
-                    OBSCURE_FILENAME + u'_directory_untracked')
+                    OBSCURE_DIRNAME + u'_directory_untracked')
     apathobj = ds.pathobj / rpath
     apath = str(apathobj)
     # ds.repo.pathobj will have the symlink resolved
