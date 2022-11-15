@@ -306,11 +306,6 @@ def setup_package():
         conftest.test_http_server.start()
         _TEMP_PATHS_GENERATED.append(serve_path)
 
-    if dl_cfg.obtain('datalad.tests.setup.testrepos'):
-        lgr.debug("Pre-populating testrepos")
-        from datalad.tests.utils import with_testrepos
-        with_testrepos()(lambda repo: 1)()
-
 
 def teardown_package():
     import os

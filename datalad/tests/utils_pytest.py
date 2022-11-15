@@ -1115,85 +1115,8 @@ def _get_resolved_flavors(flavors):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
 
-
-def clone_url(url):
-    runner = GitWitlessRunner()
-    tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
-        {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
-    runner.run(["git", "clone", url, tdir], protocol=KillOutput)
-    if GitRepo(tdir).is_with_annex():
-        AnnexRepo(tdir, init=True)
-    _TEMP_PATHS_CLONES.add(tdir)
-    return tdir
-
-
 local_testrepo_flavors = ['local'] # 'local-url'
-
 _TESTREPOS = None
-
-def _get_testrepos_uris(regex, flavors):
-    global _TESTREPOS
-    # we should instantiate those whenever test repos actually asked for
-    # TODO: just absorb all this lazy construction within some class
-    if not _TESTREPOS:
-        from .utils_testrepos import (
-            BasicAnnexTestRepo,
-            BasicGitTestRepo,
-            InnerSubmodule,
-            NestedDataset,
-            SubmoduleDataset,
-        )
-
-        _basic_annex_test_repo = BasicAnnexTestRepo()
-        _basic_git_test_repo = BasicGitTestRepo()
-        _submodule_annex_test_repo = SubmoduleDataset()
-        _nested_submodule_annex_test_repo = NestedDataset()
-        _inner_submodule_annex_test_repo = InnerSubmodule()
-        _TESTREPOS = {'basic_annex':
-                        {'network': 'https://github.com/datalad/testrepo--basic--r1',
-                         'local': _basic_annex_test_repo.path,
-                         'local-url': _basic_annex_test_repo.url},
-                      'basic_git':
-                        {'local': _basic_git_test_repo.path,
-                         'local-url': _basic_git_test_repo.url},
-                      'submodule_annex':
-                        {'local': _submodule_annex_test_repo.path,
-                         'local-url': _submodule_annex_test_repo.url},
-                      'nested_submodule_annex':
-                        {'local': _nested_submodule_annex_test_repo.path,
-                         'local-url': _nested_submodule_annex_test_repo.url},
-                      # TODO: append 'annex' to the name:
-                      # Currently doesn't work with some annex tests, despite
-                      # working manually. So, figure out how the tests' setup
-                      # messes things up with this one.
-                      'inner_submodule':
-                        {'local': _inner_submodule_annex_test_repo.path,
-                         'local-url': _inner_submodule_annex_test_repo.url}
-                      }
-        # assure that now we do have those test repos created -- delayed
-        # their creation until actually used
-        _basic_annex_test_repo.create()
-        _basic_git_test_repo.create()
-        _submodule_annex_test_repo.create()
-        _nested_submodule_annex_test_repo.create()
-        _inner_submodule_annex_test_repo.create()
-    uris = []
-    for name, spec in _TESTREPOS.items():
-        if not re.match(regex, name):
-            continue
-        uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
-
-        # additional flavors which might have not been
-        if 'clone' in flavors and 'clone' not in spec:
-            uris.append(clone_url(spec['local']))
-
-        if 'network-clone' in flavors \
-                and 'network' in spec \
-                and 'network-clone' not in spec:
-            uris.append(clone_url(spec['network']))
-
-    return uris
-
 
 @optional_args
 def with_sameas_remote(func, autoenabled=False):

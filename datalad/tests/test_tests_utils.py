@@ -77,7 +77,6 @@ from datalad.tests.utils import (
     skip_wo_symlink_capability,
     swallow_logs,
     with_tempfile,
-    with_testrepos,
     with_testsui,
     with_tree,
     without_http_proxy,
@@ -152,27 +151,6 @@ def test_with_tempfile_content_raises_on_mkdir():
         t()
 
 
-def test_with_testrepos():
-    repos = []
-
-    @with_testrepos
-    def check_with_testrepos(repo):
-        repos.append(repo)
-
-    check_with_testrepos()
-
-    eq_(len(repos),
-        2 if on_windows  # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
-          else (15 if dl_cfg.get('datalad.tests.nonetwork') else 16))  # local, local-url, clone, network
-
-    for repo in repos:
-        if not (repo.startswith('git://') or repo.startswith('http')):
-            # either it is a "local" or a removed clone
-            ok_(exists(opj(repo, '.git'))
-                or
-                not exists(opj(repo, '.git', 'remove-me')))
-
-
 def test_get_resolved_values():
     from datalad.tests.utils import _get_resolved_flavors
     flavors = ['networkish', 'local']
@@ -183,11 +161,6 @@ def test_get_resolved_values():
     with patch_config({'datalad.tests.nonetwork': '1'}):
         eq_(_get_resolved_flavors(flavors), ['local'])
 
-        # and one more to see the exception being raised if nothing to teston
-        @with_testrepos(flavors=['network'])
-        def magical():
-            raise AssertionError("Must not be ran")
-        assert_raises(SkipTest, magical)
 
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
