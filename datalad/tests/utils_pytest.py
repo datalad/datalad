@@ -9,41 +9,17 @@
 """Miscellaneous utilities to assist with testing"""
 
 import base64
-import glob
-import gzip
-import inspect
-import logging
 import lzma
 import multiprocessing
 import multiprocessing.queues
-import os
-import platform
-import random
-import re
-import shutil
-import socket
 import ssl
-import stat
-import tempfile
 import textwrap
-import time
-import warnings
-from contextlib import contextmanager
 from difflib import unified_diff
-from fnmatch import fnmatch
-from functools import wraps
 from http.server import (
     HTTPServer,
     SimpleHTTPRequestHandler,
 )
 from json import dumps
-from os.path import (
-    curdir,
-    exists,
-)
-from os.path import join as opj
-from os.path import relpath
-from os.path import split as pathsplit
 from unittest import SkipTest
 from unittest.mock import patch
 
@@ -52,31 +28,21 @@ import pytest
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
 from datalad.cmd import (
-    GitWitlessRunner,
-    KillOutput,
     StdOutErrCapture,
     WitlessRunner,
 )
-from datalad.core.local.repo import repo_from_path
-from datalad.utils import (
-    Path,
-    ensure_unicode,
-)
 
-from .. import utils
-from ..consts import ARCHIVES_TEMP_DIR
-from ..dochelpers import borrowkwargs
-from ..support.exceptions import (
-    CommandError,
-    CommandNotAvailableError,
-)
-from ..support.external_versions import external_versions
-from ..support.keyring_ import MemoryKeyring
-from ..support.network import RI
-from ..support.vcr_ import *
+from datalad import utils
+from datalad.consts import ARCHIVES_TEMP_DIR
+from datalad.dochelpers import borrowkwargs
+
+from datalad.support.external_versions import external_versions
+from datalad.support.keyring_ import MemoryKeyring
+from datalad.support.network import RI
+from datalad.support.vcr_ import *
 # TODO this must go
-from ..utils import *
-from . import _TEMP_PATHS_GENERATED
+from datalad.utils import *
+
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
