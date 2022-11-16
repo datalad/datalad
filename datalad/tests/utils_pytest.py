@@ -1486,7 +1486,9 @@ def get_most_obscure_supported_name(tdir, return_candidates=False, directory_nam
     directory_name: bool, optional
       if True, return an obscure directory name. Directories might have
       different obscurity profiles. Currently, directory names will not
-      contain newline characters.
+      contain newline characters. The reason for that is that git-annex
+      will not work properly in an annexed repository, if the root-directory
+      of the repository has a newline in its name.
 
     TODO: we might want to use it as a function where we would provide tdir
     """
