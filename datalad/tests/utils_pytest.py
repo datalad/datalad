@@ -1517,7 +1517,7 @@ def get_most_obscure_supported_name(tdir, return_candidates=False, directory_nam
 
     # incrementally build up the most obscure filename from parts
     for part in OBSCURE_FILENAME_PARTS:
-        if directory_name is True and part in DIRECTORY_EXCLUDED_PARTS:
+        if directory_name and part in DIRECTORY_EXCLUDED_PARTS:
             continue
         candidate = good + part
         if good_filename(candidate):
