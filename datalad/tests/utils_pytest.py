@@ -1510,7 +1510,7 @@ def get_most_obscure_supported_name(tdir, return_candidates=False, directory_nam
             return True
         except:
             lgr.debug(
-                f"{'Filename' if directory_name is False else 'Dirname'} %r is "
+                f"{'Dir' if directory_name else 'File'}name %r is "
                 "not supported on %s under %s",
                 filename, system, tdir)
             return False
