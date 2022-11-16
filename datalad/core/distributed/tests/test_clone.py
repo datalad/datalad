@@ -741,6 +741,19 @@ def test_relative_submodule_url(path=None):
         '../../origin')
 
 
+def test_mushy_windows_submodule_url(tmp_path):
+    """Test that subdataset clones from relative urls
+    do not include backslashes (gh-7180)"""
+    Dataset(tmp_path / 'origin').create()
+    ds = Dataset(tmp_path / 'ds').create()
+    with chpwd(ds.path):
+        ds_cloned = ds.clone(
+            source=op.join(op.pardir, 'origin'),
+            path='sources')
+        assert '\\' not in ds_cloned.config.get('remote.dl-test-remote.url')
+
+
+
 @with_tree(tree={"subdir": {}})
 @with_tempfile(mkdir=True)
 def test_local_url_with_fetch(path=None, path_other=None):
