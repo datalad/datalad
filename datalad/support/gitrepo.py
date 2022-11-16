@@ -968,7 +968,21 @@ class GitRepo(CoreGitRepo):
 
         # Massage URL
         url_ri = RI(url) if not isinstance(url, RI) else url
-        if not on_windows:
+        if on_windows:
+            # When we're cloning from a local path on Windows, the URL at
+            # this point is platform-specific (e.g., "..\\origin"). According 
+            # to Git clone's manpage, clone urls can't have backslashes.
+            # While Git does manage to clone a URL with backslashes, 
+            # in the case of subdatasets cloned from relative paths it nevertheless
+            # messed up the resulting remote url, resulting in a mix of
+            # front and backslashes (see also gh-7180): 
+            # 'C:/Users/adina/AppData/Local/Temp/datalad_temp_frvczceh/ds/..\\origin' 
+            # Therefore, we're turning it to Posix now.
+            if isinstance(url_ri, PathRI):
+                url = Path(url).as_posix()
+                url_ri = PathRI(url)
+
+        else:
             # if we are on windows, the local path of a URL
             # would not end up being a proper local path and cloning
             # would fail. Don't try to be smart and just pass the
