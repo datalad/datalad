@@ -1709,7 +1709,7 @@ def test_clone_url_mapping(src_path=None, dest_path=None):
     # we record the original-original URL
     eq_(submod_rec['gitmodule_datalad-url'], 'rambo')
     # and put the effective one as the primary URL
-    eq_(submod_rec['gitmodule_url'], src_path)
+    eq_(submod_rec['gitmodule_url'], Path(src_path).as_posix())
 
 
 _nomatch_map = {
