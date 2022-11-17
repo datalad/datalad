@@ -16,8 +16,10 @@ import re
 import os.path as op
 
 from datalad.config import ConfigManager
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
+from datalad.interface.base import (
+    Interface,
+    eval_results,
+)
 from datalad.interface.base import build_doc
 from datalad.interface.results import (
     get_status_dict,

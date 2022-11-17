@@ -25,8 +25,10 @@ import os.path as op
 from datalad import cfg
 from datalad import _seed
 from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    eval_results,
+)
 from datalad.interface.common_opts import (
     location_description,
 )

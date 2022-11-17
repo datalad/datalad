@@ -22,7 +22,10 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
 )
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    eval_results,
+)
 from datalad.support.constraints import (
     EnsureKeyChoice,
     EnsureNone,
@@ -54,7 +57,6 @@ from ..base import Interface
 from ..results import get_status_dict
 from ..utils import (
     discover_dataset_trace_to_targets,
-    eval_results,
     handle_dirty_dataset,
 )
 

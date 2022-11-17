@@ -26,15 +26,13 @@ from datalad.utils import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     recursion_limit,
     recursion_flag,
 )
-from datalad.interface.utils import (
-    eval_results,
-    generic_result_renderer,
-)
+from datalad.interface.utils import generic_result_renderer
 import datalad.support.ansi_colors as ac
 from datalad.support.param import Parameter
 from datalad.support.constraints import (

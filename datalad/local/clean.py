@@ -26,13 +26,13 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.utils import (

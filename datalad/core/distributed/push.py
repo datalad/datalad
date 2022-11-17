@@ -19,16 +19,14 @@ import re
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
     recursion_limit,
     recursion_flag,
 )
-from datalad.interface.utils import (
-    eval_results,
-    render_action_summary,
-)
+from datalad.interface.utils import render_action_summary
 from datalad.interface.results import annexjson2result
 from datalad.log import log_progress
 from datalad.support.annexrepo import (
