@@ -16,7 +16,6 @@ import os.path as op
 import posixpath
 import re
 import warnings
-from collections import OrderedDict
 from collections.abc import Mapping
 from functools import wraps
 from itertools import chain
@@ -144,7 +143,7 @@ def to_options(split_single_char_options=True, **kwargs):
         return []
 
     args = []
-    kwargs = OrderedDict(sorted(kwargs.items(), key=lambda x: x[0]))
+    kwargs = dict(sorted(kwargs.items(), key=lambda x: x[0]))
     for k, v in kwargs.items():
         if isinstance(v, (list, tuple)):
             for value in v:
@@ -2704,7 +2703,7 @@ class GitRepo(CoreGitRepo):
         """
         lgr.debug('%s.get_content_info(...)', self)
         # TODO limit by file type to replace code in subdatasets command
-        info = OrderedDict()
+        info = dict()
 
         if paths:  # is not None separate after
             # path matching will happen against what Git reports
@@ -3000,7 +2999,7 @@ class GitRepo(CoreGitRepo):
                 from_state = {}
             _cache[key] = from_state
 
-        status = OrderedDict()
+        status = dict()
         for f, to_state_r in to_state.items():
             props = self._diffstatus_get_state_props(
                 f,

@@ -19,7 +19,6 @@ import shutil
 import stat
 import sys
 import time
-from collections import OrderedDict
 from functools import wraps
 from operator import itemgetter
 from os.path import (
@@ -372,10 +371,10 @@ def test_updated():
     eq_(d, {'a': 'b'})
 
     # and that it would maintain the type
-    d = OrderedDict(((99, 0), ('z', 0), ('a', 0)))
+    d = dict(((99, 0), ('z', 0), ('a', 0)))
     d_ = updated(d, {0: 1})
-    ok_(isinstance(d_, OrderedDict))
-    eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
+    ok_(isinstance(d_, dict))
+    eq_(d_, dict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
 
 
 def test_get_local_file_url_windows():
@@ -1236,9 +1235,9 @@ def test_CMD_MAX_ARG():
 @with_tempfile(mkdir=True)
 def test_create_tree(path=None):
     content = u"мама мыла раму"
-    create_tree(path, OrderedDict([
+    create_tree(path, dict([
         ('1', content),
-        ('sd', OrderedDict(
+        ('sd', dict(
             [
             # right away an obscure case where we have both 1 and 1.gz
                 ('1', content*2),

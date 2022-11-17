@@ -2311,8 +2311,7 @@ def get_encoding_info():
     """Return a dictionary with various encoding/locale information"""
     import locale
     import sys
-    from collections import OrderedDict
-    return OrderedDict([
+    return dict([
         ('default', sys.getdefaultencoding()),
         ('filesystem', sys.getfilesystemencoding()),
         ('locale.prefered', locale.getpreferredencoding()),
@@ -2320,7 +2319,6 @@ def get_encoding_info():
 
 
 def get_envvars_info():
-    from collections import OrderedDict
     envs = []
     for var, val in os.environ.items():
         if (
@@ -2330,7 +2328,7 @@ def get_envvars_info():
                 var in ('LANG', 'LANGUAGE', 'PATH')
         ):
             envs.append((var, val))
-    return OrderedDict(envs)
+    return dict(envs)
 
 
 # This class is modified from Snakemake (v5.1.4)

@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections import OrderedDict
 from itertools import chain
 import logging
 import re
@@ -866,13 +865,13 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # input has type=dataset, but now it is about files
     res_kwargs.pop('type', None)
 
-    # A set and an OrderedDict is used to track files pointing to the
+    # A set and a dict is used to track files pointing to the
     # same key.  The set could be dropped, using a single dictionary
     # that has an entry for every seen key and a (likely empty) list
     # of redundant files, but that would mean looping over potentially
     # many keys to yield likely few if any notneeded results.
     seen_keys = set()
-    repkey_paths = OrderedDict()
+    repkey_paths = dict()
 
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative

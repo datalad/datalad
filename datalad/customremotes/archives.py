@@ -14,7 +14,6 @@ import logging
 import os
 import os.path as op
 import shutil
-from collections import OrderedDict
 from operator import itemgetter
 from pathlib import Path
 from urllib.parse import urlparse
@@ -141,7 +140,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     "Provide archive_file or archive_key - not both")
             archive_key = self.repo.get_file_annexinfo(archive_file)['key']
         assert(archive_key is not None)
-        attrs = OrderedDict()  # looking forward for more
+        attrs = dict()  # looking forward for more
         if file:
             attrs['path'] = file.lstrip('/')
         if size is not None:
