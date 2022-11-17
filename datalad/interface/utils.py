@@ -270,7 +270,6 @@ def render_action_summary(action_summary):
                     for act in sorted(action_summary))))
 
 
-
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
     # +1 because there was the original result + nsimilar displayed.
     n_suppressed = nsimilar - ndisplayed + 1
