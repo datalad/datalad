@@ -191,7 +191,7 @@ def test_cached_dataset(cache_dir=None):
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
                                 name=DEFAULT_REMOTE,
-                                url=str(cache_dir / name_in_cache))
+                                url=(cache_dir / name_in_cache).as_posix())
             here = ds.config.get("annex.uuid")
             origin = ds.config.get(f"remote.{DEFAULT_REMOTE}.annex-uuid")
             where = ds.repo.whereis(str(annexed_file))
@@ -208,7 +208,7 @@ def test_cached_dataset(cache_dir=None):
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
                                 name=DEFAULT_REMOTE,
-                                url=str(cache_dir / name_in_cache))
+                                url=(cache_dir / name_in_cache).as_posix())
             # origin is the same cached dataset, that got this content in
             # decorated_test2 before. Should still be there. But "here" we
             # didn't request it
@@ -229,7 +229,7 @@ def test_cached_dataset(cache_dir=None):
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
                                 name=DEFAULT_REMOTE,
-                                url=str(cache_dir / name_in_cache))
+                                url=(cache_dir / name_in_cache).as_posix())
             # origin is the same cached dataset, that got this content in
             # decorated_test2 before. Should still be there. But "here" we
             # didn't request it
