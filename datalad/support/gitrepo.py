@@ -1062,6 +1062,22 @@ class GitRepo(CoreGitRepo):
                 gr.fsck()
             else:
                 lgr.warning("Experienced issues while cloning: %s", fix_annex)
+        # ensure that Git doesn't mangle relative paths into obscure absolute
+        # paths: https://github.com/datalad/datalad/issues/3538
+        if isinstance(url_ri, PathRI):
+            url_path = Path(url)
+            if not url_path.is_absolute():
+                # get git-created path
+                remote_url = 'remote.' + gr.get_remotes()[0] + '.url'
+                git_url = gr.config.get(remote_url)
+                if Path(git_url).is_absolute():
+                    # Git created an absolute path from a relative URL.
+                    git_url = op.relpath(git_url, gr.path)
+                path = Path(git_url)
+                # always in POSIX even on Windows
+                path = path.as_posix()
+                gr.config.set(remote_url, path,
+                              scope='local', force=True)
         return gr
 
     # Note: __del__ shouldn't be needed anymore as we switched to
