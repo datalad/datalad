@@ -300,7 +300,7 @@ class ExportToFigshare(Interface):
             )
         )
         assert archive_out['status'] == 'ok'
-        fname = archive_out['path']
+        fname = str(archive_out['path'])
 
         lgr.info("Uploading %s to figshare", fname)
         figshare = FigshareRESTLaison()
