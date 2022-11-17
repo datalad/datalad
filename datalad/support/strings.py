@@ -10,7 +10,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections import OrderedDict
 import re
 
 
@@ -20,7 +19,7 @@ def get_replacement_dict(rules):
     if isinstance(rules, (bytes, str)):
         rules = [rules]
 
-    pairs = OrderedDict()
+    pairs = dict()
     for rule in rules:
         if isinstance(rule, (list, tuple)):
             if len(rule) == 2:

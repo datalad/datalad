@@ -14,57 +14,49 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from datalad.cmd import WitlessRunner as Runner
+from datalad.core.distributed.clone import decode_source_spec
+from datalad.customremotes.ria_utils import (
+    create_ds_in_store,
+    create_store,
+    get_layout_locations,
+    verify_ria_url,
+)
+from datalad.distributed.ora_remote import (
+    LocalIO,
+    RemoteCommandFailedError,
+    RIARemoteError,
+    SSHRemoteIO,
+)
+from datalad.distribution.dataset import (
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
+from datalad.distribution.utils import _yield_ds_w_matching_siblings
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+    eval_results,
+)
 from datalad.interface.common_opts import (
     recursion_flag,
-    recursion_limit
+    recursion_limit,
 )
-from datalad.interface.base import (
-    build_doc,
-    Interface,
-)
-from datalad.interface.results import (
-    get_status_dict,
-)
-from datalad.interface.utils import eval_results
+from datalad.interface.results import get_status_dict
+from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from datalad.distribution.dataset import (
-    datasetmethod,
-    EnsureDataset,
-    require_dataset,
-)
-from datalad.distribution.utils import _yield_ds_w_matching_siblings
-from datalad.distributed.ora_remote import (
-    LocalIO,
-    RIARemoteError,
-    RemoteCommandFailedError,
-    SSHRemoteIO,
-)
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
 from datalad.utils import (
     Path,
     quote_cmdlinearg,
-)
-from datalad.support.exceptions import (
-    CommandError
-)
-from datalad.support.gitrepo import (
-    GitRepo
-)
-from datalad.core.distributed.clone import (
-    decode_source_spec
-)
-from datalad.log import log_progress
-from datalad.customremotes.ria_utils import (
-    get_layout_locations,
-    verify_ria_url,
-    create_store,
-    create_ds_in_store
 )
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_ria')
@@ -84,6 +76,26 @@ class CreateSiblingRia(Interface):
     The store's base path is expected to not exist, be an empty directory,
     or a valid RIA store.
 
+    RIA URL format
+    ~~~~~~~~~~~~~~
+
+    Interactions with new or existing RIA stores require RIA URLs to identify
+    the store or specific datasets inside of it.
+
+    The general structure of a RIA URL pointing to a store takes the form
+    'ria+[scheme]://<storelocation>' (e.g.,
+    ria+ssh://[user@]hostname:/absolute/path/to/ria-store, or
+    ria+file:///absolute/path/to/ria-store)
+
+    The general structure of a RIA URL pointing to a dataset in a store (for
+    example for cloning) takes a similar form, but appends either the datasets
+    UUID or a ~ symbol followed by the dataset's alias name:
+    'ria+[scheme]://<storelocation>#<dataset-UUID>' or
+    'ria+[scheme]://<storelocation>#~<aliasname>'.
+    In addition, specific version identifiers can be appended to the URL with an
+    additional @ symbol:
+    'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>', where 'dataset-version' refers to a branch or tag.
+
     RIA store layout
     ~~~~~~~~~~~~~~~~
 
@@ -94,14 +106,19 @@ class CreateSiblingRia(Interface):
     subdirectory in order to mitigate files system limitations for stores
     containing a large number of datasets.
 
-    Each dataset subdirectory contains a standard bare Git repository for
-    the dataset.
+    By default, a dataset in a RIA store consists of two components:
+    A Git repository (for all dataset contents stored in Git) and a
+    storage sibling (for dataset content stored in git-annex).
 
-    In addition, a subdirectory 'annex' hold a standard Git-annex object
-    store. However, instead of using the 'dirhashlower' naming scheme for
-    the object directories, like Git-annex would do, a 'dirhashmixed'
-    layout is used -- the same as for non-bare Git repositories or regular
-    DataLad datasets.
+    It is possible to selectively disable either component using
+    ``storage-sibling 'off'`` or ``storage-sibling 'only'``, respectively.
+    If neither component is disabled, a dataset's subdirectory layout in a RIA
+    store contains a standard bare Git repository and an 'annex/' subdirectory
+    inside of it.
+    The latter holds a Git-annex object store and comprises the storage sibling.
+    Disabling the standard git-remote ('storage-sibling=only') will result
+    in not having the bare git repository, disabling the storage sibling
+    ('storage-sibling=off') will result in not having the 'annex/' subdirectory.
 
     Optionally, there can be a further subdirectory 'archives' with
     (compressed) 7z archives of annex objects. The storage remote is able to
@@ -122,6 +139,15 @@ class CreateSiblingRia(Interface):
     placing a symlink to the dataset location into an 'alias/' directory
     in the root of the store. This enables dataset access via URLs of format:
     'ria+<protocol>://<storelocation>#~<aliasname>'.
+
+    Compared to standard git-annex object stores, the 'annex/' subdirectories
+    used as storage siblings follow a different layout naming scheme
+    ('dirhashmixed' instead of 'dirhashlower').
+    This is mostly noted as a technical detail, but also serves to remind
+    git-annex powerusers to refrain from running git-annex commands
+    directly in-store as it can cause severe damage due to the layout
+    difference. Interactions should be handled via the ORA special remote
+    instead.
 
     Error logging
     ~~~~~~~~~~~~~
@@ -192,8 +218,10 @@ class CreateSiblingRia(Interface):
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
-            doc="""Enable git's default post-update-hook for the created
-            sibling.""",
+            doc="""Enable Git's default post-update-hook for the created
+            sibling. This is useful when the sibling is made accessible via a
+            "dumb server" that requires running 'git update-server-info'
+            to let Git interact properly with it.""",
             action="store_true"),
         shared=Parameter(
             args=("--shared",),
@@ -356,7 +384,6 @@ class CreateSiblingRia(Interface):
                         sname, dpath),
                     type='sibling',
                     name=sname,
-                    ds=ds,
                     **res_kwargs,
                 )
                 failed = True
@@ -517,7 +544,8 @@ def _create_sibling_ria(
             use_remote_annex_bundle=False)
         ssh.open()
 
-    if existing in ['skip', 'error']:
+    exists = False
+    if existing in ['skip', 'error', 'reconfigure']:
         config_path = repo_path / 'config'
         # No .git -- if it's an existing repo in a RIA store it should be a
         # bare repo.
@@ -544,7 +572,7 @@ def _create_sibling_ria(
                     **res_kwargs
                 )
                 return
-            else:  # existing == 'error'
+            elif existing == 'error':
                 yield get_status_dict(
                     status='error',
                     message="remote directory {} already "
@@ -552,15 +580,18 @@ def _create_sibling_ria(
                     **res_kwargs
                 )
                 return
+            else:
+                # reconfigure will be handled later in the code
+                pass
 
     if storage_sibling == 'only':
-        lgr.info("create storage sibling '{}' ...".format(name))
+        lgr.info("create storage sibling '%s' ...", name)
     else:
-        lgr.info("create sibling{} '{}'{} ...".format(
+        lgr.info("create sibling%s '%s'%s ...",
             's' if storage_name else '',
             name,
             " and '{}'".format(storage_name) if storage_name else '',
-        ))
+        )
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                        base_path, ds.id, '2', '1', alias,
                        init_obj_tree=storage_sibling is not False)
@@ -569,7 +600,7 @@ def _create_sibling_ria(
         # is the storage sibling
         srname = name if storage_sibling == 'only' else storage_name
 
-        lgr.debug('init special remote {}'.format(srname))
+        lgr.debug('init special remote %s', srname)
         special_remote_options = [
             'type=external',
             'externaltype=ora',
@@ -673,6 +704,14 @@ def _create_sibling_ria(
     else:
         gr = GitRepo(repo_path, create=True, bare=True,
                      shared=shared if shared else None)
+        if exists and existing == 'reconfigure':
+            # if the repo exists at the given path, the GitRepo would not
+            # (re)-run git init, and just return an instance of GitRepo;
+            # skip & error have been handled at this point
+            gr.init(
+                sanity_checks=False,
+                init_options=["--bare"] + ([f"--shared={shared}"] if shared else []),
+            )
         if storage_sibling:
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with

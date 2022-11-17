@@ -20,8 +20,8 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
-from datalad.interface.utils import eval_results
 from datalad.support.annexrepo import AnnexRepo
 
 
@@ -128,6 +128,7 @@ class CreateSiblingGin(Interface):
             access_protocol='https-ssh',
             publish_depends=None,
             private=False,
+            description=None,
             dry_run=False):
 
         for res in _create_sibling(
@@ -141,6 +142,7 @@ class CreateSiblingGin(Interface):
                 access_protocol=access_protocol,
                 publish_depends=publish_depends,
                 private=private,
+                description=description,
                 dry_run=dry_run):
             if res.get('action') == 'configure-sibling' \
                     and res.get('annex-ignore') in ('true', True):

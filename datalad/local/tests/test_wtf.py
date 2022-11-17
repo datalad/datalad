@@ -37,6 +37,8 @@ from datalad.tests.utils_pytest import (
 )
 from datalad.utils import ensure_unicode
 
+from datalad.support.external_versions import external_versions
+
 
 @with_tree({OBSCURE_FILENAME: {}})
 def test_wtf(topdir=None):
@@ -77,6 +79,11 @@ def test_wtf(topdir=None):
         wtf(dataset=ds.path, sensitive='all')
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
+        if external_versions['psutil']:
+            # filesystems detail should be reported
+            assert_in('max_pathlength:', cmo.out)
+        else:
+            assert_in("Hint: install psutil", cmo.out)
 
     # Sections selection
     #

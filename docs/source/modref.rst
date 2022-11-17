@@ -41,18 +41,6 @@ Dataset operations
    api.update
    api.unlock
 
-Metadata handling
------------------
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   api.search
-   api.metadata
-   api.aggregate_metadata
-   api.extract_metadata
-
 
 Reproducible execution
 ----------------------
@@ -135,7 +123,7 @@ Test infrastructure
 .. autosummary::
    :toctree: generated
 
-   tests.utils
+   tests.utils_pytest
    tests.utils_testrepos
    tests.heavyoutput
 

@@ -25,7 +25,7 @@ sudo mount -o "uid=$uid" "$loop" "$mntpoint"
 # Run the actual command
 echo "I: running $*"
 set +e
-TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" eval "$@"
+TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" "$@"
 ret=$?
 
 echo "I: done, unmounting"

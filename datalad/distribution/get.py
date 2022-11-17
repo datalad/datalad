@@ -16,8 +16,10 @@ import re
 import os.path as op
 
 from datalad.config import ConfigManager
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
+from datalad.interface.base import (
+    Interface,
+    eval_results,
+)
 from datalad.interface.base import build_doc
 from datalad.interface.results import (
     get_status_dict,
@@ -705,6 +707,23 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
         yield r
 
 
+def _check_error_reported_before(res: dict, error_dict: dict):
+    # Helper to check if an impossible result for a path that does
+    # not exist has already been yielded before. If not, add path
+    # to the error_dict.
+    if res.get('action', None) == 'get' and \
+        res.get('status', None) == 'impossible' and \
+        res.get('message', None) == 'path does not exist':
+            non_existing_path = res.get('path', None)
+            if non_existing_path not in error_dict.keys():
+                # if path not in dict, add it
+                error_dict[non_existing_path] = True
+                return False
+            else:
+                return True
+    return False
+
+
 @build_doc
 class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
@@ -850,6 +869,7 @@ class Get(Interface):
             reckless=None,
             jobs='auto',
     ):
+        
         if not (dataset or path):
             raise InsufficientArgumentsError(
                 "Neither dataset nor target path(s) provided")
@@ -862,6 +882,8 @@ class Get(Interface):
             # act on the whole dataset if nothing else was specified
             path = refds_path
 
+        # keep track of error results for paths that do not exist
+        error_reported = {}
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not
         # already present in the root dataset (refds)
@@ -921,6 +943,9 @@ class Get(Interface):
                             # all those messages on not having installed anything
                             # are a bit pointless
                             # "notneeded" for annex get comes below
+                            # prevent double yielding of impossible result
+                            if _check_error_reported_before(res, error_reported):
+                                continue
                             yield res
                 else:
                     # dunno what this is, send upstairs
@@ -958,6 +983,9 @@ class Get(Interface):
                     # installed by explorative installation to get to target
                     # paths, prior in this loop
                     if res.get('status', None) != 'notneeded' or not known_ds:
+                        # prevent double yielding of impossible result
+                        if _check_error_reported_before(res, error_reported):
+                            continue
                         yield res
 
         if not get_data:

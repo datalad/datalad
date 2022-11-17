@@ -12,12 +12,16 @@ via stdin. For each instruction send over stdin, a response is read and
 returned. The response structure is determined by "output_proc"
 
 """
+from __future__ import annotations
+
+from __future__ import annotations
 
 import logging
 import os
 import queue
 import sys
 import warnings
+from queue import Queue
 from subprocess import TimeoutExpired
 from typing import (
     Any,
@@ -29,7 +33,7 @@ from typing import (
 )
 from datetime import datetime
 from operator import attrgetter
-from weakref import WeakValueDictionary
+from weakref import WeakValueDictionary, ReferenceType, ref
 
 # start of legacy import block
 # to avoid breakage of code written before datalad.runner
@@ -55,6 +59,7 @@ from datalad.runner.coreprotocols import StdOutErrCapture
 from datalad.runner.nonasyncrunner import (
     STDERR_FILENO,
     STDOUT_FILENO,
+    _ResultGenerator,
 )
 from datalad.runner.protocol import GeneratorMixIn
 from datalad.runner.runner import WitlessRunner
@@ -63,6 +68,46 @@ from datalad.utils import (
     auto_repr,
     ensure_unicode,
 )
+
+
+__docformat__ = "restructuredtext"
+
+
+class BatchedCommandError(CommandError):
+    def __init__(self,
+                 cmd="",
+                 last_processed_request="",
+                 msg="",
+                 code=None,
+                 stdout="",
+                 stderr="",
+                 cwd=None,
+                 **kwargs):
+        """
+        This exception extends a CommandError that is raised by the command,
+        that is executed by `BatchedCommand`. It extends the `CommandError` by
+        `last_processed_request`. This attribute contains the last request, i.e.
+        argument to `BatchedCommand.__call__()`, that was successfully
+        processed, i.e. for which a result was received from the command (that
+        does not imply that the result was positive).
+
+        :param last_processed_request: the last request for which a response was
+            received from the underlying command. This could be used to restart
+            an interrupted process.
+
+        For all other arguments see `CommandError`.
+        """
+        CommandError.__init__(
+            self,
+            cmd=cmd,
+            msg=msg,
+            code=code,
+            stdout=stdout,
+            stderr=stderr,
+            cwd=cwd,
+            **kwargs
+        )
+        self.last_processed_request = last_processed_request
 
 
 lgr = logging.getLogger('datalad.cmd')
@@ -98,7 +143,7 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
                  batched_command: "BatchedCommand",
                  done_future: Any = None,
                  encoding: Optional[str] = None,
-                 output_proc: Callable = None,
+                 output_proc: Optional[Callable] = None,
                  ):
         GeneratorMixIn.__init__(self)
         StdOutErrCapture.__init__(self, done_future, encoding)
@@ -174,37 +219,40 @@ class BatchedCommand(SafeDelCloseMixin):
 
     # Collection of active BatchedCommands as a mapping from object IDs to
     # instances
-    _active_instances = WeakValueDictionary()
+    _active_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
 
     def __init__(self,
                  cmd: Union[str, Tuple, List],
                  path: Optional[str] = None,
-                 output_proc: Callable = None,
+                 output_proc: Optional[Callable] = None,
                  timeout: Optional[float] = None,
                  exception_on_timeout: bool = False,
                  ):
 
         command = cmd
-        self.command = [command] if not isinstance(command, List) else command
-        self.path = path
-        self.output_proc = output_proc
-        self.timeout = timeout
-        self.exception_on_timeout = exception_on_timeout
+        self.command: list = [command] if not isinstance(command, List) else command
+        self.path: Optional[str] = path
+        self.output_proc: Optional[Callable] = output_proc
+        self.timeout: Optional[float] = timeout
+        self.exception_on_timeout: bool = exception_on_timeout
 
-        self.stdin_queue = None
         self.stderr_output = b""
-        self.runner = None
-        self.generator = None
+        self.runner: Optional[WitlessRunner] = None
         self.encoding = None
         self.wait_timed_out = None
-        self.return_code = None
+        self.return_code: Optional[int] = None
         self._abandon_cache = None
+        self.last_request: Optional[str] = None
 
         self._active = 0
         self._active_last = _now()
         self.clean_inactive()
         assert id(self) not in self._active_instances
         self._active_instances[id(self)] = self
+
+        # pure declarations
+        self.stdin_queue: Queue
+        self.generator: _ResultGenerator
 
     @classmethod
     def clean_inactive(cls):
@@ -254,6 +302,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self.stderr_output = b""
         self.wait_timed_out = None
         self.return_code = None
+        self.last_request = None
 
         self.runner = WitlessRunner(
             cwd=self.path,
@@ -277,7 +326,19 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def process_running(self) -> bool:
         if self.runner:
-            return self.generator.runner.process.poll() is None
+            result = self.generator.runner.process.poll()
+            if result is None:
+                return True
+            self.return_code = result
+            self.runner = None
+            if result != 0:
+                raise BatchedCommandError(
+                    cmd=" ".join(self.command),
+                    last_processed_request=self.last_request,
+                    msg=f"{type(self).__name__}: exited with {result} after "
+                        f"request: {self.last_request}",
+                    code=result
+                ) from CommandError
         return False
 
     def __call__(self,
@@ -301,9 +362,14 @@ class BatchedCommand(SafeDelCloseMixin):
 
         Returns
         -------
-        str or list
-            Responses received from process. Either a string, or a list of
-            strings, if cmds was a list.
+        (return_type[self.output_proc] | str)
+        | list[(return_type[self.output_proc] | str)]
+
+            Responses received from process. Either a single element, or a list
+            of elements, if `cmds` was a list.
+            The type of the elements is `str`, if `self.output_proc` is `None`.
+            If `self.output_proc` is not `None`, the result type of
+            `self.output_proc` determines the type of the elements.
         """
         self._active += 1
         requests = cmds
@@ -321,6 +387,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 while True:
                     try:
                         responses.append(self.process_request(request))
+                        self.last_request = request
                         break
                     except StopIteration:
                         # The process finished executing, store the last return
@@ -330,17 +397,26 @@ class BatchedCommand(SafeDelCloseMixin):
                         self.runner = None
 
         except CommandError as command_error:
-            # The command exited with a non-zero return code
-            lgr.error("%s: command error: %s", self, command_error)
-            self.return_code = command_error.code
+            # Convert CommandError into BatchedCommandError
             self.runner = None
+            self.return_code = command_error.code
+            raise BatchedCommandError(
+                cmd=command_error.cmd,
+                last_processed_request=self.last_request,
+                msg=command_error.msg,
+                code=command_error.code,
+                stdout=command_error.stdout,
+                stderr=command_error.stderr,
+                cwd=command_error.cwd,
+                **command_error.kwargs
+            ) from command_error
 
         finally:
             self._active -= 1
         return responses if input_multiple else responses[0] if responses else None
 
     def process_request(self,
-                        request: Union[Tuple, str]) -> str:
+                        request: Union[Tuple, str]) -> Any | None:
 
         self._active += 1
         try:
@@ -348,7 +424,7 @@ class BatchedCommand(SafeDelCloseMixin):
             if not self.process_running():
                 self._initialize()
 
-            # Send request to subprocess
+            # Remember request and send it to subprocess
             if not isinstance(request, str):
                 request = ' '.join(request)
             self.stdin_queue.put((request + "\n").encode())

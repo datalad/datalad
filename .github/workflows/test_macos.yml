@@ -21,13 +21,15 @@ jobs:
         git config --global user.name "GitHub Almighty"
 
 
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: Set up Python 3.7
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
-    
+
     - name: Install git-annex
       run: |
         pip install datalad-installer
@@ -52,6 +54,6 @@ jobs:
         python -m pytest -c ../tox.ini -s -v --cov=datalad --cov-report=xml --pyargs datalad.core datalad.support
 
     - name: Upload coverage report to Codecov
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         file: __testhome__/coverage.xml

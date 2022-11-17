@@ -1,0 +1,34 @@
+name: Add changelog.d snippet
+
+on:
+  # This action should be run in workflows triggered by `pull_request_target`
+  # (not by regular `pull_request`!)
+  pull_request_target:
+    # Run whenever the PR is pushed to, receives a label, or is created with
+    # one or more labels:
+    types: [synchronize, labeled]
+
+# Prevent the workflow from running multiple jobs at once when a PR is created
+# with multiple labels:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    # Only run on PRs that have the "CHANGELOG-missing" label:
+    if: contains(github.event.pull_request.labels.*.name, 'CHANGELOG-missing')
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+
+      - name: Add changelog snippet
+        uses: datalad/release-action/add-changelog-snippet@v1
+        with:
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+          rm-labels: CHANGELOG-missing

@@ -17,6 +17,7 @@ import logging
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
+import time
 
 from platformdirs import AppDirs
 
@@ -24,6 +25,7 @@ from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
     EnsureInt,
+    EnsureFloat,
     EnsureListOf,
     EnsureNone,
     EnsureStr,
@@ -532,45 +534,6 @@ _definitions = {
         'type': EnsureInt(),
         'default': 8,
     },
-    'datalad.metadata.maxfieldsize': {
-        'ui': ('question', {
-               'title': 'Maximum metadata field size',
-               'text': 'Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio'}),
-        'default': 100000,
-        'type': EnsureInt(),
-    },
-    'datalad.metadata.nativetype': {
-        'ui': ('question', {
-               'title': 'Native dataset metadata scheme',
-               'text': 'Set this label to engage a particular metadata extraction parser'}),
-    },
-    'datalad.metadata.store-aggregate-content': {
-        'ui': ('question', {
-               'title': 'Aggregated content metadata storage',
-               'text': 'If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery'}),
-        'type': EnsureBool(),
-        'default': True,
-    },
-    'datalad.search.default-mode': {
-        'ui': ('question', {
-               'title': 'Default search mode',
-               'text': 'Label of the mode to be used by default'}),
-        'type': EnsureChoice('egrep', 'textblob', 'autofield'),  # graph,...
-        'default': 'egrep',
-    },
-    'datalad.search.index-default-documenttype': {
-        'ui': ('question', {
-               'title': 'Type of search index documents',
-               'text': 'Labels of document types to include in a default search index'}),
-        'type': EnsureChoice('all', 'datasets', 'files'),
-        'default': 'datasets',
-    },
-    'datalad.metadata.create-aggregate-annex-limit': {
-        'ui': ('question', {
-               'title': 'Limit configuration annexing aggregated metadata in new dataset',
-               'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
-        'default': 'anything',
-    },
     'datalad.runtime.max-annex-jobs': {
         'ui': ('question', {
                'title': 'Maximum number of git-annex jobs to request when "jobs" option set to "auto" (default)',
@@ -605,6 +568,17 @@ _definitions = {
         'type': EnsureInt(),
         'default': 1,
     },
+    'datalad.runtime.pathspec-from-file': {
+        'ui': ('question', {
+            'title': 'Provide list of files to git commands via --pathspec-from-file',
+            'text': "Instructs when DataLad will provide list of paths to 'git' commands which "
+                    "support --pathspec-from-file option via some temporary file. If set to "
+                    "'multi-chunk' it will be done only if multiple invocations of the command "
+                    "on chunks of files list is needed. If set to 'always', DataLad will always "
+                    "use --pathspec-from-file."}),
+        'type': EnsureChoice('multi-chunk', 'always'),
+        'default': 'multi-chunk',
+    },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
                'title': 'Error behavior',
@@ -627,13 +601,6 @@ _definitions = {
                     'ATM applies only to batched git-annex processes. Should be changed with caution.'}),
         'type': EnsureChoice('wait', 'abandon'),
         'default': 'wait',
-    },
-    'datalad.search.indexercachesize': {
-        'ui': ('question', {
-               'title': 'Maximum cache size for search index (per process)',
-               'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
-        'default': 256,
-        'type': EnsureInt(),
     },
     'datalad.ui.progressbar': {
         'ui': ('question', {
@@ -708,6 +675,18 @@ _definitions = {
                     "ignore the incompatibility."}),
         'type': EnsureChoice('warning', 'error', 'none'),
         'default': 'warning',
+
+    },
+    'datalad.source.epoch': {
+        'ui': ('question', {
+            'title': 'Datetime epoch to use for dates in built materials',
+            'text': "Datetime to use for reproducible builds. Originally introduced "
+                    "for Debian packages to interface SOURCE_DATE_EPOCH described at "
+                    "https://reproducible-builds.org/docs/source-date-epoch/ ."
+                    "By default - current time"
+        }),
+        'type': EnsureFloat(),
+        'default': time.time(),
 
     },
     'datalad.ssh.executable': {

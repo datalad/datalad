@@ -89,7 +89,11 @@ def setup_package():
 	# allowed by default
 	allowed-url-schemes = http https file
 	allowed-http-addresses = all
-"""
+[protocol "file"]
+    # since git 2.38.1 cannot by default use local clones for submodules
+    # https://github.blog/2022-10-18-git-security-vulnerabilities-announced/#cve-2022-39253
+    allow = always
+""" + os.environ.get('DATALAD_TESTS_GITCONFIG', '').replace('\\n', os.linesep)
             # TODO: split into a function + context manager
             with make_tempfile(mkdir=True) as new_home:
                 pass
@@ -225,8 +229,14 @@ def capture_logs(caplog, monkeypatch):
 
 
 def pytest_ignore_collect(path):
-    # Skip the tests of old nose code:
+    # Skip old nose code and the tests for it:
+    # Note, that this is not only about executing tests but also importing those
+    # files to begin with.
     if path.basename == "test_tests_utils.py":
+        return True
+    if path.basename == "utils.py" and \
+        path.dirpath().basename == "tests" and \
+            path.dirpath().dirpath().basename == "datalad":
         return True
     # When pytest is told to run doctests, by default it will import every
     # source file in its search, but a number of datalad source file have

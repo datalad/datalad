@@ -27,12 +27,12 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
     save_message_opt,
 )
-from datalad.interface.utils import eval_results
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,

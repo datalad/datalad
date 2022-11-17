@@ -155,6 +155,11 @@ def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
                             status='ok',
                             action='get',
                             path=op.join(installed_ds.path, 'ds', 'file1.txt'))
+    # repeat the call to ensure it doesn't crash (see #6950)
+    res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore", on_failure='ignore')
+    assert_result_count(res, 1, status='error', action='create-sibling-ria', message=(
+                        "a sibling %r is already configured in dataset %r",
+                        'datastore', ds.path))
 
     # now, again but recursive.
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",

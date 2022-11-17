@@ -156,7 +156,10 @@ def setup_package():
         plugintest,
     )
 
-    from datalad import consts, lgr
+    from datalad import (
+        consts,
+        lgr,
+    )
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
     from datalad.tests.utils import (
@@ -1764,8 +1767,8 @@ def ignore_nose_capturing_stdout(func):
     """
     lgr.warning(
         "@ignore_nose_capturing_stdout no longer does anything - nose should "
-        "just be monkey patched in setup_package. {} still has it"
-        .format(func.__name__)
+        "just be monkey patched in setup_package. %s still has it",
+        func.__name__
     )
     return func
 

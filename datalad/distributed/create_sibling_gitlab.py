@@ -29,13 +29,13 @@ from ..dochelpers import exc_str
 from ..interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from ..interface.common_opts import (
     publish_depends,
     recursion_flag,
     recursion_limit,
 )
-from ..interface.utils import eval_results
 from ..local.subdatasets import Subdatasets
 from ..support.constraints import (
     EnsureChoice,

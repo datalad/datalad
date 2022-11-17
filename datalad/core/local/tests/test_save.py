@@ -225,6 +225,25 @@ def test_subdataset_save(path=None):
     sub.save('new2')
     assert_repo_status(parent.path, untracked=['untracked'], modified=['sub'])
 
+    # https://github.com/datalad/datalad/issues/6843
+    # saving subds within super must not add 2nd copy of the submodule within .gitmodules
+    with chpwd(sub.path):
+        # op.sep is critical to trigger saving within (although should not
+        # be relevant sice no changes within sub)
+        res = save(dataset="^", path=sub.path + op.sep)
+    assert_repo_status(parent.path, untracked=['untracked'])
+    git_modules = (parent.pathobj / ".gitmodules")
+    # there was nothing to do for .gitmodules
+    # TODO: enable assert_result_count(res, 0, path=str(git_modules))
+    # more thorough test that it also was not modified.
+    # ensure that .gitmodules does not have duplicate entries
+    submodules = [
+        l.strip()
+        for l in git_modules.read_text().splitlines()
+        if l.strip().split(' ', 1)[0] == '[submodule'
+    ]
+    assert len(submodules) == 1
+
 
 @with_tempfile(mkdir=True)
 def test_subsuperdataset_save(path=None):
@@ -317,7 +336,7 @@ def test_bf1886(path=None):
         op.join(parent.path, 'subdir', 'subsubdir', 'upup'))
     parent.save(op.join('subdir', 'subsubdir', 'upup'))
     assert_repo_status(parent.path)
-    # simulatenously add a subds and a symlink pointing to it
+    # simultaneously add a subds and a symlink pointing to it
     # create subds, but don't register it
     create(op.join(parent.path, 'sub2'))
     os.symlink(

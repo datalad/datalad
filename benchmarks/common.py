@@ -71,7 +71,7 @@ class SuprocBenchmarks(object):
             # so fails correctly identify rc as pre .0
             if external_versions['datalad'] < '0.12.1':
                 from datalad import utils
-                from datalad.interface import ls
+                from datalad.api import ls
                 utils.is_interactive = is_interactive
                 ls.is_interactive = is_interactive
             SuprocBenchmarks._monkey_patched = True
@@ -147,6 +147,9 @@ class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
         )
         self.remove_paths.append(tempdir)
         with tarfile.open(self.tarfile) as tar:
+            # note: not a concern for CVE-2007-4559 since we are the ones mastering
+            # content for the tar here. See https://github.com/datalad/datalad/pull/7104
+            # for more information.
             tar.extractall(tempdir)
 
         # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed

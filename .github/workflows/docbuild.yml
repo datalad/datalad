@@ -12,9 +12,9 @@ jobs:
       run: |
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Set up Python 3.7
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
     - name: Install dependencies
@@ -26,3 +26,11 @@ jobs:
     - name: Build docs
       run: |
         make -C docs html doctest;
+    - name: Test building manpages
+      run: |
+        # with custom date
+        DATALAD_SOURCE_EPOCH=100000000 python setup.py build_manpage
+        grep '\.TH "datalad" "1" "1973' ./build/man/datalad.1
+        # no custom date - should be good for the next 980 years
+        python setup.py build_manpage
+        grep '\.TH "datalad" "1" "2' ./build/man/datalad.1

@@ -37,10 +37,10 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import allow_dirty
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
 from datalad.log import (
     log_progress,
     logging,
@@ -423,13 +423,13 @@ class AddArchiveContent(Interface):
         outside_stats = stats
         stats = ActivityStats()
 
+        # start a progress bar for extraction
+        pbar_id = f'add-archive-{archive_path}'
         try:
             # keep track of extracted files for progress bar logging
             file_counter = 0
             # iterative over all files in the archive
             extracted_files = list(earchive.get_extracted_files())
-            # start a progress bar for extraction
-            pbar_id = f'add-archive-{archive_path}'
             log_progress(
                 lgr.info, pbar_id, 'Extracting archive',
                 label="Extracting archive",
@@ -504,8 +504,8 @@ class AddArchiveContent(Interface):
                         for regexp in exclude:
                             if re.search(regexp, extracted_file):
                                 lgr.debug(
-                                    "Skipping {extracted_file} since contains "
-                                    "{regexp} pattern".format(**locals()))
+                                    "Skipping %s since contains %s pattern",
+                                    extracted_file, regexp)
                                 stats.skipped += 1
                                 raise StopIteration
                     except StopIteration:
@@ -624,13 +624,13 @@ class AddArchiveContent(Interface):
                         stats.dropped += 1
                     stats.add_annex += 1
                 else:
-                    lgr.debug("File {} was added to git, not adding url".format(
-                        target_file_path))
+                    lgr.debug("File %s was added to git, not adding url",
+                        target_file_path)
                     stats.add_git += 1
 
                 if delete_after:
                     # we count the removal here, but don't yet perform it
-                    # to not interfer with batched processes - any pure Git
+                    # to not interfere with batched processes - any pure Git
                     # action invokes precommit which closes batched processes.
                     stats.removed += 1
 
@@ -638,7 +638,7 @@ class AddArchiveContent(Interface):
                 del target_file
 
             if delete and archive and origin != 'key':
-                lgr.debug("Removing the original archive {}".format(archive))
+                lgr.debug("Removing the original archive %s", archive)
                 # force=True since some times might still be staged and fail
                 annex.remove(str(archive_path), force=True)
 

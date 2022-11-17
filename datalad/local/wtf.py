@@ -16,11 +16,12 @@ import os.path as op
 import sys
 import tempfile
 from functools import partial
-from collections import OrderedDict
 
 
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.utils import (
     ensure_unicode,
     getpwd,
@@ -146,7 +147,7 @@ def _describe_system():
     }
 
 
-def _get_fs_type(loc, path):
+def _get_fs_type(loc, path, _was_warned=[]):
     """Return file system info for given Paths. Provide pathlib path as input"""
     res = {'path': path}
     try:
@@ -169,6 +170,11 @@ def _get_fs_type(loc, path):
         ce = CapturedException(exc)
         # if an exception occurs, leave out the fs type. The result renderer can
         # display a hint based on its lack in the report
+        if not _was_warned:
+            (lgr.debug if isinstance(exc, ImportError) else lgr.warning) (
+                "Could not determine filesystem types due to %s", ce)
+            # Rely on side-effect of [] as default arg
+            _was_warned.append("warned")
     return res
 
 
@@ -278,7 +284,6 @@ def _describe_dependencies():
 
 def _describe_dataset(ds, sensitive):
     from datalad.interface.results import success_status_map
-    from datalad.api import metadata
 
     try:
         infos = {
@@ -291,20 +296,6 @@ def _describe_dataset(ds, sensitive):
             '%s@%s' % (b, next(ds.repo.get_branch_commits_(branch=b))[:7])
             for b in ds.repo.get_branches()]
         infos['branches'] = branches
-        if not sensitive:
-            infos['metadata'] = _HIDDEN
-        elif ds.id:
-            ds_meta = metadata(
-                dataset=ds, reporton='datasets', return_type='list',
-                result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
-                result_renderer='disabled', on_failure='ignore')
-            if ds_meta:
-                ds_meta = [dm['metadata'] for dm in ds_meta]
-                if len(ds_meta) == 1:
-                    ds_meta = ds_meta.pop()
-                infos['metadata'] = ds_meta
-            else:
-                infos['metadata'] = None
         return infos
     except InvalidGitRepositoryError as e:
         ce = CapturedException(e)
@@ -355,8 +346,6 @@ SECTION_CALLABLES = {
     'configuration': None,
     'location': None,
     'extensions': _describe_extensions,
-    'metadata_extractors': lambda: _describe_metadata_elements('datalad.metadata.extractors'),
-    'metadata_indexers': lambda: _describe_metadata_elements('datalad.metadata.indexers'),
     'dependencies': _describe_dependencies,
     'dataset': None,
     'credentials': _describe_credentials,
@@ -375,7 +364,7 @@ class WTF(Interface):
 
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
-    from datalad.interface.utils import eval_results
+    from datalad.interface.base import eval_results
     from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import EnsureNone, EnsureChoice
 
@@ -459,7 +448,7 @@ class WTF(Interface):
         from datalad.ui import ui
         from datalad.support.external_versions import external_versions
 
-        infos = OrderedDict()
+        infos = dict()
         res = get_status_dict(
             action='wtf',
             path=ds.path if ds else ensure_unicode(op.abspath(op.curdir)),

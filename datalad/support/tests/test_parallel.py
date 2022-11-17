@@ -14,6 +14,8 @@ from time import (
     time,
 )
 
+import pytest
+
 # logging effects threading and causes some 'weak' tests to fail,
 # so we will just skip those (well, if happens again -- disable altogether)
 from datalad import lgr
@@ -135,7 +137,6 @@ def test_creatsubdatasets(topds_path=None, n=2):
     assert_repo_status(ds.repo)
 
 
-@known_failure_osx  # https://github.com/datalad/datalad/issues/5309
 def test_gracefull_death():
 
     def assert_provides_and_raises(pc, exception, target=None):
@@ -193,7 +194,12 @@ def test_gracefull_death():
         ValueError)
     # we will get some results, seems around 4 and they should be "sequential"
     assert_equal(results, list(range(len(results))))
-    assert_greater_equal(len(results), 2)
+    try:
+        assert_greater_equal(len(results), 2)
+    except AssertionError:
+        # Possible TODO: if tests below would start failing too, move xfail to the level
+        # of the entire test
+        pytest.xfail(f"Rarely but happens. Got only {len(results)} instead of at least 2")
 
     # This test relies too much on threads scheduling to not hog up on handling
     # consumers, but if it happens so - they might actually consume all results
@@ -220,7 +226,11 @@ def test_gracefull_death():
         pc = iter(ProducerConsumer(range(1000), consumer, jobs=2))
         yield next(pc)
         yield next(pc)
-    assert_equal(sorted(inner()), [0, 1])
+    # typically it should be [0, 1] but it does happen some times that
+    # one other worker gets ahead and we get [0, 2]. As it is not per se the
+    # purpose of this test to ensure absence of such race, we just allow for any
+    # two from first 3 possible.
+    assert len(set(inner()).intersection({0, 1, 2})) == 2
     consumed = sorted(consumed)
     assert_equal(consumed, list(range(len(consumed))))
     assert_greater_equal(len(consumed), 4)  # we should wait for that 2nd batch to finish
@@ -228,27 +238,39 @@ def test_gracefull_death():
         assert_greater_equal(20, len(consumed))
 
 
-# it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
+# `test_stalling` is a speculative test that is intended to detect stalled
+# subprocess execution by assuming an upper limit for the execution time of the
+# subprocess. Due to the nature of non-realtime process scheduling, this
+# assumption is necessarily incorrect and might be validated in a perfectly
+# working system. In other words, the test has the potential to create false
+# positives.
+# By raising the assumed maximum execution time, we try to reduce the number of
+# false positives.
+#
+# The test exists because an earlier version of `WitlessRunner` was based on
+# event loops and there was at least one stalling condition that manifested
+# itself in python 3.7 (see:
+# https://github.com/datalad/datalad/pull/5022#issuecomment-708716290). As of
+# datalad version 0.16, event loops are no longer used in `WitlessRunner` and
+# this test is a shot in the dark.
 def test_stalling(kill=False):
     import concurrent.futures
 
-    from datalad.cmd import WitlessRunner
+    from datalad.runner.coreprotocols import StdOutErrCapture
+    from datalad.runner.runner import WitlessRunner
 
     def worker():
-        WitlessRunner().run(["echo", "1"])
+        return WitlessRunner().run(["echo", "1"], StdOutErrCapture)
 
     t0 = time()
-    v1 = worker()
+    result1 = worker()
     dt1 = time() - t0
 
     t0 = time()
     with concurrent.futures.ThreadPoolExecutor(1) as executor:
-        # print("submitting")
         future = executor.submit(worker)
-        dt2_limit = dt1 * 5
-        # print("waiting for up to %.2f sec" % dt2_limit)
+        dt2_limit = max((5, dt1 * 100))
         while not future.done():
-            # print("not yet")
             sleep(dt1/3)
             if time() - t0 > dt2_limit:
                 # does not even shutdown
@@ -259,9 +281,34 @@ def test_stalling(kill=False):
                     import os
                     import signal
                     os.kill(os.getpid(), signal.SIGTERM)
-                raise AssertionError("Future has not finished in 5x time")
-        v2 = future.result()
-    assert_equal(v1, v2)
+                raise AssertionError(f"Future has not finished in {dt2_limit}s")
+        result2 = future.result()
+    assert result1 == result2
+
+
+@with_tempfile(mkdir=True)
+def test_parallel_flyweights(topd=None):
+    from datalad.support.gitrepo import GitRepo
+
+    # ProducerConsumer relies on unique args to consumer so we will provide 2nd different arg
+    def create_GitRepo(args):
+        return GitRepo(args[0])
+
+    # let's really hunt down race condition
+    for batch in range(10):
+        repopath = op.join(topd, str(batch))
+        # should succeed and be the same thing
+        # An example of errored run: https://github.com/datalad/datalad/issues/6598
+        repos = list(
+            ProducerConsumer(
+                ((repopath, i) for i in range(10)),
+                create_GitRepo,
+                jobs=10
+            )
+        )
+        assert op.exists(repopath)
+        instances = set(map(id, repos))
+        assert len(instances) == 1
 
 
 if __name__ == '__main__':

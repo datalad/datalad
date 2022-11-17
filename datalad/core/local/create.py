@@ -25,8 +25,10 @@ import os.path as op
 from datalad import cfg
 from datalad import _seed
 from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    eval_results,
+)
 from datalad.interface.common_opts import (
     location_description,
 )
@@ -450,6 +452,12 @@ class Create(Interface):
                 return_type='generator',
                 result_renderer='disabled',
             )
+        else:
+            # if we do not save, we touch the root directory of the new
+            # dataset to signal a change in the nature of the directory.
+            # this is useful for apps like datalad-gooey (or other
+            # inotify consumers) to pick up on such changes.
+            tbds.pathobj.touch()
 
         res.update({'status': 'ok'})
         yield res
@@ -540,10 +548,7 @@ def _setup_annex_repo(path, initopts=None, fake_dates=False,
     # make sure that v6 annex repos never commit content under .datalad
     attrs_cfg = (
         ('config', 'annex.largefiles', 'nothing'),
-        ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
-        ('metadata/objects/**', 'annex.largefiles',
-         '({})'.format(cfg.obtain(
-             'datalad.metadata.create-aggregate-annex-limit'))))
+    )
     attrs = tbrepo.get_gitattributes(
         [op.join('.datalad', i[0]) for i in attrs_cfg])
     set_attrs = []

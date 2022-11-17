@@ -25,7 +25,7 @@ from datalad.api import (
 from datalad.cmd import GitWitlessRunner
 from datalad.cmd import WitlessRunner as Runner
 from datalad.config import ConfigManager
-from datalad.core.distributed.clone import (
+from datalad.core.distributed.clone_utils import (
     _get_installationpath_from_url,
     decode_source_spec,
 )
@@ -105,11 +105,13 @@ def test_invalid_args(path=None, otherpath=None, alienpath=None):
     # clone into a URL-like path.
 
     # install to an "invalid URL" path
-    res = clone('Zoidberg', path='ssh://mars:Zoidberg', on_failure='ignore')
+    res = clone('Zoidberg', path='ssh://mars:Zoidberg', on_failure='ignore',
+                result_xfm=None)
     assert_status('error', res)
 
     # install to a "remote location" path
-    res = clone('Zoidberg', path='ssh://mars/Zoidberg', on_failure='ignore')
+    res = clone('Zoidberg', path='ssh://mars/Zoidberg', on_failure='ignore',
+                result_xfm=None)
     assert_status('error', res)
 
     # make fake dataset
@@ -118,7 +120,8 @@ def test_invalid_args(path=None, otherpath=None, alienpath=None):
     # make real dataset, try to install outside
     ds_target = create(Path(otherpath) / 'target')
     assert_raises(ValueError, ds_target.clone, ds.path, path=ds.path)
-    assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
+    assert_status('error', ds_target.clone(ds.path, path=alienpath,
+                                           on_failure='ignore', result_xfm=None))
 
 
 @integration
@@ -159,7 +162,7 @@ def test_clone_datasets_root(tdir=None):
         # and a third time into an existing something, that is not a dataset:
         (tdir / 'sub' / 'a_file.txt').write_text("something")
 
-        res = clone('///', path="sub", on_failure='ignore')
+        res = clone('///', path="sub", on_failure='ignore', result_xfm=None)
         assert_message(
             'target path already exists and not empty, refuse to clone into target path',
             res)
@@ -375,9 +378,10 @@ def test_notclone_known_subdataset(src_path=None, path=None):
     assert_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
     assert_not_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
     # clone is not meaningful
-    res = ds.clone('subm 1', on_failure='ignore')
+    res = ds.clone('subm 1', on_failure='ignore', result_xfm=None)
     assert_status('error', res)
-    assert_message('Failed to clone from all attempted sources: %s',
+    assert_message("Failed to clone from any candidate source URL. "
+                   "Encountered errors per each url were:\n- %s",
                    res)
     # get does the job
     res = ds.get(path='subm 1', get_data=False)
@@ -395,9 +399,10 @@ def test_notclone_known_subdataset(src_path=None, path=None):
 def test_failed_clone(dspath=None):
     ds = create(dspath)
     res = ds.clone("http://nonexistingreallyanything.datalad.org/bla", "sub",
-                   on_failure='ignore')
+                   on_failure='ignore', result_xfm=None)
     assert_status('error', res)
-    assert_message('Failed to clone from all attempted sources: %s',
+    assert_message("Failed to clone from any candidate source URL. "
+                   "Encountered errors per each url were:\n- %s",
                    res)
 
 
@@ -1158,7 +1163,6 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
 
 
 # TODO?: make parametric again on _test_ria_postclonecfg
-@known_failure_osx  # https://github.com/datalad/datalad/issues/6599
 @known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
@@ -1708,7 +1712,7 @@ _windows_map = {
 
 
 def test_url_mapping_specs():
-    from datalad.core.distributed.clone import _map_urls
+    from datalad.core.distributed.clone_utils import _map_urls
     cfg = ConfigManager()
     for m, i, o in (
             # path redirect on windows

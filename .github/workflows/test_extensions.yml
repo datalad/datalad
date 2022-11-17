@@ -16,6 +16,7 @@ jobs:
             datalad-metalad,
             datalad-crawler,
             datalad-deprecated,
+            datalad-next,
         ]
 
     steps:
@@ -23,6 +24,8 @@ jobs:
       shell: bash
       run: |
         bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+        # enable in case -devel version is needed
+        # sudo sed -i-devel.list -e 's,/debian ,/debian-devel ,g' /etc/apt/sources.list.d/neurodebian.sources.list
         sudo apt-get update -qq
         sudo apt-get install eatmydata
         sudo eatmydata apt-get install git-annex-standalone
@@ -32,10 +35,12 @@ jobs:
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: Set up Python 3.7
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
 
@@ -49,18 +54,12 @@ jobs:
         DL_PIP_INSTALLS=mock
         DL_APT_INSTALLS=dcm2niix
         DL_REPO=datalad/${{ matrix.extension }}
-        DL_TESTER=nose
+        DL_TESTER=pytest
         DL_NEED_SINGULARITY=
         # TODO: just reuse information from datalad-extensions!!
         case ${{ matrix.extension }} in
           datalad-metalad)
-            DL_PIP_INSTALLS+=" nose"
-            DL_TESTER=pytest;;
-          datalad-hirni)
-            DL_REPO=psychoinformatics-de/${{ matrix.extension }}
-            DL_NEED_SINGULARITY=1;;
-          datalad-crawler)
-            DL_TESTER=pytest;;
+            DL_PIP_INSTALLS+=" nose";;
           datalad-container)
             DL_NEED_SINGULARITY=1;;
         esac
@@ -103,8 +102,8 @@ jobs:
         cd __testhome__
         # -crawler's tox.ini points to itself (but without full path) for coverage
         # configuration.  So far attempts to "fix" by somehow providing full path did not work.
-        # That is why just symlink it here.
-        ln -s ../__extension__/tox.ini .
+        # That is why just symlink it here.  If no tox.ini -- create an empty one
+        [ -e ../__extension__/tox.ini ] && ln -s ../__extension__/tox.ini . || touch tox.ini
         python -m pytest -c ./tox.ini -s -v --cov=datalad --pyargs ${DL_PACKAGE}
       if: env.DL_TESTER == 'pytest'
 

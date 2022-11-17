@@ -503,6 +503,33 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+## Maintenace teams coordination
+
+We distinguish particular aspects of DataLad's functionality, each corresponding
+to parts of the code base in this repository, and loosely maintain teams assigned
+to these aspects.
+While any contributor can tackle issues on any aspect, you may want to refer to
+members of such teams (via GitHub tagging or review requests) or the team itself
+(via GitHub issue label ``team-<area>``) when creating a PR, feature request, or bug report.
+Members of a team are encouraged to respond to PRs or issues within the given area,
+and pro-actively improve robustness, user experience, documentation, and
+performance of the code.
+
+New and existing contributors are invited to join teams:
+
+- **core**: core API/commands (@datalad/team-core)
+
+- **git**: Git interface (e.g. GitRepo, protocols, helpers, compatibility) (@datalad/team-git)
+
+
+- **gitannex**: git-annex interface (e.g. AnnexRepo, protocols, helpers, compatibility) (@datalad/team-gitannex)
+
+- **remotes**: (special) remote implementations (@datalad/team-remotes)
+
+- **runner**: sub-process execution and IO (@datalad/team-runner)
+
+- **services**: interaction with 3rd-party services (create-sibling*, downloaders, credentials, etc.) (@datalad/team-services)
+
 ## Recognizing contributions
 
 We welcome and recognize all contributions from documentation to testing to code development.
@@ -612,6 +639,8 @@ Refer datalad/config.py for information on how to add these environment variable
   is - change behavior of tests, that decorated with any of the `known_failure`,
   to not skip, but executed and *fail* if they would pass (indicating that the
   decorator may be removed/reconsidered).
+- *DATALAD_TESTS_GITCONFIG*:
+  Additional content to add to `~/.gitconfig` in the tests `HOME` environment. `\n` is replaced with `os.linesep`.
 - *DATALAD_CMD_PROTOCOL*:
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.

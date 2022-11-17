@@ -13,9 +13,10 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
+from distutils.version import LooseVersion
+from os.path import curdir
+from os.path import join as opj
 from os.path import (
-    curdir,
-    join as opj,
     normpath,
     relpath,
 )
@@ -23,9 +24,6 @@ from os.path import (
 from looseversion import LooseVersion
 
 from datalad import ssh_manager
-
-from datalad.ui import ui
-
 from datalad.cmd import (
     CommandError,
     StdOutErrCapture,
@@ -33,24 +31,25 @@ from datalad.cmd import (
 )
 from datalad.consts import (
     TIMESTAMP_FMT,
-    WEB_META_LOG
+    WEB_META_LOG,
 )
-from datalad.distribution.siblings import (
-    _DelayedSuper,
-    Siblings,
-)
+from datalad.core.local.diff import diff_dataset
 from datalad.distribution.dataset import (
     Dataset,
-    datasetmethod,
     EnsureDataset,
-    resolve_path,
+    datasetmethod,
     require_dataset,
+    resolve_path,
+)
+from datalad.distribution.siblings import (
+    Siblings,
+    _DelayedSuper,
 )
 from datalad.interface.base import (
-    build_doc,
     Interface,
+    build_doc,
+    eval_results,
 )
-from datalad.interface.utils import eval_results
 from datalad.interface.common_opts import (
     annex_group_opt,
     annex_groupwanted_opt,
@@ -76,21 +75,20 @@ from datalad.support.exceptions import (
 )
 from datalad.support.external_versions import external_versions
 from datalad.support.network import (
-    is_ssh,
-    PathRI,
     RI,
+    PathRI,
+    is_ssh,
+)
+from datalad.support.param import Parameter
+from datalad.ui import ui
+from datalad.utils import (
+    _path_,
+    ensure_list,
+    make_tempfile,
+    on_windows,
 )
 from datalad.utils import quote_cmdlinearg as sh_quote
-from datalad.support.param import Parameter
-from datalad.utils import (
-    make_tempfile,
-    _path_,
-    slash_join,
-    ensure_list,
-)
-from datalad.core.local.diff import diff_dataset
-
-from datalad.utils import on_windows
+from datalad.utils import slash_join
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 # Window's own mkdir command creates intermediate directories by default
@@ -189,9 +187,9 @@ def _create_dataset_sibling(
         ds_target_pushurl = target_pushurl.replace('%RELNAME', ds_name) \
             if target_pushurl else ds_url
 
-    lgr.info("Considering to create a target dataset {0} at {1} of {2}".format(
+    lgr.info("Considering to create a target dataset %s at %s of %s",
         localds_path, remoteds_path,
-        "localhost" if isinstance(ri, PathRI) else ri.hostname))
+        "localhost" if isinstance(ri, PathRI) else ri.hostname)
     # Must be set to True only if exists and existing='reconfigure'
     # otherwise we might skip actions if we say existing='reconfigure'
     # but it did not even exist before
@@ -580,8 +578,9 @@ class CreateSibling(Interface):
         if ui:
             # the webui has been moved to the deprecated extension
             try:
-                from datalad_deprecated.sibling_webui \
-                    import upload_web_interface
+                from datalad_deprecated.sibling_webui import (
+                    upload_web_interface,
+                )
             except Exception as e:
                 # we could just test for ModuleNotFoundError (which should be
                 # all that would happen with PY3.6+, but be a little more robust
@@ -827,7 +826,9 @@ class CreateSibling(Interface):
 
             # publish web-interface to root dataset on publication server
             if current_ds.path == refds_path and ui:
-                from datalad_deprecated.sibling_webui import upload_web_interface
+                from datalad_deprecated.sibling_webui import (
+                    upload_web_interface,
+                )
                 lgr.info("Uploading web interface to %s", path)
                 try:
                     upload_web_interface(path, shell, shared, ui)

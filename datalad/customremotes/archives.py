@@ -14,7 +14,6 @@ import logging
 import os
 import os.path as op
 import shutil
-from collections import OrderedDict
 from operator import itemgetter
 from pathlib import Path
 from urllib.parse import urlparse
@@ -22,6 +21,8 @@ from urllib.parse import urlparse
 from annexremote import UnsupportedRequest
 
 from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.customremotes import RemoteError
+from datalad.customremotes.main import main as super_main
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.archives import ArchivesCache
@@ -31,14 +32,12 @@ from datalad.support.locking import lock_if_check_fails
 from datalad.support.network import URL
 from datalad.utils import (
     ensure_bytes,
-    getpwd,
     get_dataset_root,
+    getpwd,
     unique,
     unlink,
 )
 
-from datalad.customremotes import RemoteError
-from datalad.customremotes.main import main as super_main
 from .base import AnnexCustomRemote
 
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -141,7 +140,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     "Provide archive_file or archive_key - not both")
             archive_key = self.repo.get_file_annexinfo(archive_file)['key']
         assert(archive_key is not None)
-        attrs = OrderedDict()  # looking forward for more
+        attrs = dict()  # looking forward for more
         if file:
             attrs['path'] = file.lstrip('/')
         if size is not None:
@@ -405,8 +404,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 # so
                 pwd = getpwd()
                 lgr.debug(
-                    "Getting file {afile} from {akey_path} "
-                    "while PWD={pwd}".format(**locals()))
+                    "Getting file %s from %s while PWD=%s",
+                    afile, akey_path, pwd)
                 was_extracted = self.cache[akey_path].is_extracted
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, file)

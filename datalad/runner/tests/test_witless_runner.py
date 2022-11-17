@@ -194,18 +194,12 @@ def test_runner_parametrized_protocol():
             super().pipe_data_received(fd, self.value)
 
     res = runner.run(
-        py2cmd('print(1)'),
+        py2cmd('print(1, end="")'),
         protocol=ProtocolInt,
         # value passed to protocol constructor
         value=b'5',
     )
-    try:
-        eq_(res['stdout'], '5')
-    except AssertionError:
-        # TODO: remove when dropping support for python3.8
-        if res['stdout'] == '55' and sys.version_info[:2] == (3, 8):
-            pytest.xfail("got 55 and not 5, see https://github.com/datalad/datalad/issues/4921")
-        raise
+    eq_(res['stdout'], '5')
 
 
 @integration  # ~3 sec
@@ -317,3 +311,73 @@ def test_too_long():
                 protocol=StdOutCapture
             )
         cml.assert_logged('.*use.*ulimit.*')
+
+
+def test_path_to_str_conversion():
+    # Regression test to ensure that Path-objects are converted into strings
+    # before they are put into the environment variable `$PWD`
+    runner = Runner()
+    test_path = Path("a/b/c")
+    adjusted_env = runner._get_adjusted_env(
+        cwd=test_path,
+        env=dict(some_key="value")
+    )
+    assert str(test_path) == adjusted_env['PWD']
+
+
+@with_tempfile(mkdir=True)
+def test_environment(temp_dir_path=None):
+    # Ensure that the subprocess sees a string in `$PWD`, even if a Path-object
+    # is provided to `cwd`.
+    cmd = py2cmd("import os; print(os.environ['PWD'])")
+    test_kwargs = {
+        'cwd': Path(temp_dir_path),
+        'env': dict(SYSTEMROOT=os.environ.get('SYSTEMROOT', ''))
+    }
+    runner = Runner()
+    results = runner.run(cmd=cmd, protocol=StdOutCapture, **test_kwargs)
+    output = results['stdout'].splitlines()[0]
+    assert output == temp_dir_path
+
+    runner = Runner(**test_kwargs)
+    results = runner.run(cmd=cmd, protocol=StdOutCapture)
+    output = results['stdout'].splitlines()[0]
+    assert output == temp_dir_path
+
+
+def test_argument_priority():
+    class X:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def run(self):
+            return dict(
+                code=0,
+                args=self.args,
+                kwargs=self.kwargs,
+            )
+
+    test_path_1 = "a/b/c"
+    test_env_1 = dict(source="constructor")
+    test_path_2 = "d/e/f"
+    test_env_2 = dict(source="run-method")
+
+    with unittest.mock.patch('datalad.runner.runner.ThreadedRunner') as tr_mock:
+
+        tr_mock.side_effect = X
+        runner = Runner(cwd=test_path_1, env=test_env_1)
+
+        result = runner.run("first-command")
+        assert result['kwargs']['cwd'] == test_path_1
+        assert result['kwargs']['env'] == {
+            **test_env_1,
+            'PWD': test_path_1
+        }
+
+        result = runner.run("second-command", cwd=test_path_2, env=test_env_2)
+        assert result['kwargs']['cwd'] == test_path_2
+        assert result['kwargs']['env'] == {
+            **test_env_2,
+            'PWD': test_path_2
+        }

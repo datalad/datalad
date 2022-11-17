@@ -299,7 +299,7 @@ class EnsureChoice(Constraint):
 
     def __call__(self, value):
         if value not in self._allowed:
-            raise ValueError("value is not one of %s" % (self._allowed,))
+            raise ValueError(f"value {value} is not one of {self._allowed}")
         return value
 
     def long_description(self):
@@ -434,8 +434,8 @@ class AltConstraints(_MultiConstraint):
                 return c(value)
             except Exception as e:
                 e_list.append(e)
-        raise ValueError("all alternative constraints (%s) violated while testing value %r"
-                         % (self.constraints, value))
+        raise ValueError(f"{value} does not match any alternative: "
+                         f"{self.constraints} {e_list}")
 
 
 class Constraints(_MultiConstraint):

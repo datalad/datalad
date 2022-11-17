@@ -12,7 +12,6 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-from collections import OrderedDict
 import json
 import logging
 import os
@@ -23,27 +22,31 @@ from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
-    join as opj,
     exists,
-    lexists,
     isdir,
+)
+from os.path import join as opj
+from os.path import (
+    lexists,
     normpath,
 )
 from weakref import (
-    finalize,
     WeakValueDictionary,
+    finalize,
 )
 
-from datalad.cmd import (
+import datalad.utils as ut
+from datalad.cmd import (  # KillOutput,
     BatchedCommand,
     GitWitlessRunner,
-    # KillOutput,
     SafeDelCloseMixin,
     StdOutCapture,
     StdOutErrCapture,
     WitlessProtocol,
 )
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
+# imports from same module:
+from datalad.dataset.repo import RepoInterface
 from datalad.dochelpers import (
     borrowdoc,
     borrowkwargs,
@@ -54,53 +57,49 @@ from datalad.runner.utils import (
     AssemblingDecoderMixIn,
     LineSplitter,
 )
-# must not be loads, because this one would log, and we need to log ourselves
-from datalad.support.json_py import json_loads
-from datalad.support.exceptions import CapturedException
+
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
     _get_non_existing_from_annex_output,
     _sanitize_key,
 )
+from datalad.support.exceptions import CapturedException
 from datalad.ui import ui
-import datalad.utils as ut
 from datalad.utils import (
+    Path,
+    PurePosixPath,
     auto_repr,
     ensure_list,
     on_windows,
-    Path,
-    PurePosixPath,
     split_cmdline,
     unlink,
 )
 
-# imports from same module:
-from datalad.dataset.repo import RepoInterface
+from .exceptions import (
+    AccessDeniedError,
+    AccessFailedError,
+    AnnexBatchCommandError,
+    CommandError,
+    CommandNotAvailableError,
+    DirectModeNoLongerSupportedError,
+    FileInGitError,
+    FileNotInAnnexError,
+    IncompleteResultsError,
+    InsufficientArgumentsError,
+    InvalidAnnexRepositoryError,
+    InvalidGitRepositoryError,
+    MissingExternalDependency,
+    NoSuchPathError,
+    OutdatedExternalDependency,
+    OutOfSpaceError,
+    RemoteNotAvailableError,
+)
+from .external_versions import external_versions
 from .gitrepo import (
     GitRepo,
     normalize_path,
     normalize_paths,
-    to_options
-)
-from .external_versions import external_versions
-from .exceptions import (
-    CommandNotAvailableError,
-    CommandError,
-    FileNotInAnnexError,
-    FileInGitError,
-    AnnexBatchCommandError,
-    InsufficientArgumentsError,
-    OutOfSpaceError,
-    RemoteNotAvailableError,
-    OutdatedExternalDependency,
-    MissingExternalDependency,
-    NoSuchPathError,
-    IncompleteResultsError,
-    AccessDeniedError,
-    AccessFailedError,
-    InvalidAnnexRepositoryError,
-    InvalidGitRepositoryError,
-    DirectModeNoLongerSupportedError
+    to_options,
 )
 
 lgr = logging.getLogger('datalad.annex')
@@ -427,9 +426,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                     cor_branch = branch[9:-7]
                 else:
                     cor_branch = branch[9:]
-                    lgr.warning("Unexpected naming of adjusted branch '{}'.{}"
-                                "Assuming '{}' to be the corresponding branch."
-                                "".format(branch, linesep, cor_branch))
+                    lgr.warning("Unexpected naming of adjusted branch '%s'.%s"
+                                "Assuming '%s' to be the corresponding branch.",
+                                branch, linesep, cor_branch)
             else:
                 raise NotImplementedError(
                     "Detection of annex-managed branch '{}' follows a pattern "
@@ -2761,9 +2760,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(
-                ':'.join(annex_cmd), annex_cmd,
-                path=self.path)(key_)
+            try:
+                out = self._batched.get(
+                    ':'.join(annex_cmd), annex_cmd,
+                    path=self.path)(key_)
+            except CommandError:
+                # git-annex runs in batch mode, but will still signal some
+                # errors, e.g. an unknown remote, by exiting with a non-zero
+                # return code.
+                return False
             try:
                 return {
                     # happens on travis in direct/heavy-debug mode, that process
@@ -3349,7 +3354,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             is available (with `eval_availability`)
         """
         if init is None:
-            info = OrderedDict()
+            info = dict()
         elif init == 'git':
             info = super(AnnexRepo, self).get_content_info(
                 paths=paths, ref=ref, **kwargs)
@@ -3370,7 +3375,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             cmd = ['find'] + cmd
             # stringify any pathobjs
-            if paths:
+            if paths:  # we have early exit above in case of [] and not None
                 files = [str(p) for p in paths]
             else:
                 cmd += ['--include', '*']
@@ -3431,7 +3436,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         .. deprecated:: 0.16
             Use get_content_annexinfo() or the test helper
-            :py:func:`datalad.tests.utils.get_annexstatus` instead.
+            :py:func:`datalad.tests.utils_pytest.get_annexstatus` instead.
         """
         info = self.get_content_annexinfo(
             paths=paths,
@@ -3451,6 +3456,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _save_add(self, files, git=None, git_opts=None):
         """Simple helper to add files in save()"""
         from datalad.interface.results import get_status_dict
+
         # alter default behavior of git-annex by considering dotfiles
         # too
         # however, this helper is controlled by save() which itself
@@ -3677,14 +3683,12 @@ class AnnexJsonProtocol(WitlessProtocol):
             data = self._unprocessed + data
             self._unprocessed = None
         # this is where the JSON records come in
-        # json_loads() is already logging any error, which is OK, because
-        # under no circumstances we would expect broken JSON
         lines = data.splitlines()
         data_ends_with_eol = data.endswith(os.linesep.encode())
         del data
         for iline, line in enumerate(lines):
             try:
-                j = json_loads(line)
+                j = json.loads(line)
             except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
@@ -3724,6 +3728,7 @@ class AnnexJsonProtocol(WitlessProtocol):
 
         if label:
             from datalad.ui import utils as ui_utils
+
             # Reserving 55 characters for the progress bar is based
             # approximately off what used to be done in the now-removed
             # (948ccf3e18) ProcessAnnexProgressIndicators.
@@ -3994,4 +3999,8 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 def readline_json(stdout):
     toload = stdout.readline().strip()
-    return json_loads(toload) if toload else {}
+    try:
+        return json.loads(toload) if toload else {}
+    except json.JSONDecodeError:
+        lgr.error('Received undecodable JSON output: %s', toload)
+        return {}

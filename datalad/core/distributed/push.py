@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections import OrderedDict
 from itertools import chain
 import logging
 import re
@@ -20,16 +19,14 @@ import re
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
     recursion_limit,
     recursion_flag,
 )
-from datalad.interface.utils import (
-    eval_results,
-    render_action_summary,
-)
+from datalad.interface.utils import render_action_summary
 from datalad.interface.results import annexjson2result
 from datalad.log import log_progress
 from datalad.support.annexrepo import (
@@ -443,14 +440,27 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     target = None
     if not _target:
         try:
-            # let Git figure out what needs doing
-            # we will reuse the result further down again, so nothing is wasted
-            wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
-            # we did not get an explicit push target, get it from Git
-            target = set(p.get('remote', None) for p in wannabe_gitpush)
-            # handle case where a pushinfo record did not have a 'remote'
-            # property -- should not happen, but be robust
-            target.discard(None)
+            try:
+                # let Git figure out what needs doing
+                # we will reuse the result further down again, so nothing is wasted
+                wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
+                # we did not get an explicit push target, get it from Git
+                target = set(p.get('remote', None) for p in wannabe_gitpush)
+                # handle case where a pushinfo record did not have a 'remote'
+                # property -- should not happen, but be robust
+                target.discard(None)
+            except CommandError as e:
+                if 'Please make sure you have the correct access rights' in e.stderr:
+                    # there is a default push target but we have no permission
+                    yield dict(
+                        res_kwargs,
+                        status='impossible',
+                        message='Attempt to push to default target resulted in following '
+                                'error.  Address the error or specify different target with --to: '
+                                + e.stderr,
+                    )
+                    return
+                raise
         except Exception as e:
             lgr.debug(
                 'Dry-run push to determine default push target failed, '
@@ -855,13 +865,13 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # input has type=dataset, but now it is about files
     res_kwargs.pop('type', None)
 
-    # A set and an OrderedDict is used to track files pointing to the
+    # A set and a dict is used to track files pointing to the
     # same key.  The set could be dropped, using a single dictionary
     # that has an entry for every seen key and a (likely empty) list
     # of redundant files, but that would mean looping over potentially
     # many keys to yield likely few if any notneeded results.
     seen_keys = set()
-    repkey_paths = OrderedDict()
+    repkey_paths = dict()
 
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative
@@ -875,7 +885,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         else:
             file_list += bytes(Path(c['path']).relative_to(ds.pathobj))
             file_list += b'\0'
-            nbytes += c['bytesize']
+            nbytes += c.get('bytesize', 0)
             seen_keys.add(key)
     lgr.debug('Counted %d bytes of annex data to transfer',
               nbytes)

@@ -71,26 +71,23 @@ class ConsoleLog(object):
         self.out = out
 
     def message(self, msg, cr='\n'):
-        from datalad.log import log_progress
-        log_progress(lgr.info, None, 'Clear progress bars', maint='clear',
-                     noninteractive_level=5)
-        try:
-            self.out.write(msg)
-        except UnicodeEncodeError as e:
-            # all unicode magic has failed and the receiving end cannot handle
-            # a particular unicode char. rather than crashing, we replace the
-            # offending chars to be able to message at least something, and we
-            # log that we did that
-            encoding = self.out.encoding
-            lgr.debug(
-                "Replacing unicode chars in message output for display: %s",
-                e)
-            self.out.write(
-                msg.encode(encoding, "replace").decode(encoding))
-        if cr:
-            self.out.write(cr)
-        log_progress(lgr.info, None, 'Refresh progress bars', maint='refresh',
-                     noninteractive_level=5)
+        from datalad.log import no_progress
+        with no_progress():
+            try:
+                self.out.write(msg)
+            except UnicodeEncodeError as e:
+                # all unicode magic has failed and the receiving end cannot handle
+                # a particular unicode char. rather than crashing, we replace the
+                # offending chars to be able to message at least something, and we
+                # log that we did that
+                encoding = self.out.encoding
+                lgr.debug(
+                    "Replacing unicode chars in message output for display: %s",
+                    e)
+                self.out.write(
+                    msg.encode(encoding, "replace").decode(encoding))
+            if cr:
+                self.out.write(cr)
 
     def error(self, error):
         self.message("ERROR: %s" % error)

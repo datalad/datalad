@@ -1476,7 +1476,10 @@ def assert_status(label, results):
     in this sequence.
     """
     label = ensure_list(label)
-    results = ensure_list(results)
+    results = ensure_result_list(results)
+    if len(results) == 0:
+        # If there are no results, an assertion about all results must fail.
+        raise AssertionError("No results retrieved")
     for i, r in enumerate(results):
         try:
             assert_in('status', r)
@@ -1495,7 +1498,13 @@ def assert_message(message, results):
     This only tests the message template string, and not a formatted message
     with args expanded.
     """
-    for r in ensure_list(results):
+
+    results = ensure_result_list(results)
+    if len(results) == 0:
+        # If there are no results, an assertion about all results must fail.
+        raise AssertionError("No results retrieved")
+
+    for r in results:
         assert_in('message', r)
         m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
         assert_equal(m, message)
@@ -1510,7 +1519,7 @@ def _format_res(x):
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
-    results = ensure_list(results)
+    results = ensure_result_list(results)
     for r in results:
         if not len(kwargs):
             count += 1
@@ -1527,8 +1536,9 @@ def assert_result_count(results, n, **kwargs):
 
 
 def _check_results_in(should_contain, results, **kwargs):
+    results = ensure_result_list(results)
     found = False
-    for r in ensure_list(results):
+    for r in results:
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
             break
@@ -1556,6 +1566,7 @@ def assert_not_in_results(results, **kwargs):
 def assert_result_values_equal(results, prop, values):
     """Verify that the values of all results for a given key in the status dicts
     match the given sequence"""
+    results = ensure_result_list(results)
     assert_equal(
         [r[prop] for r in results],
         values)
@@ -1571,7 +1582,8 @@ def assert_result_values_cond(results, prop, cond):
     prop: str
     cond: callable
     """
-    for r in ensure_list(results):
+    results = ensure_result_list(results)
+    for r in results:
         ok_(cond(r[prop]),
             msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
 
@@ -1589,8 +1601,8 @@ def ignore_nose_capturing_stdout(func):
     """
     lgr.warning(
         "@ignore_nose_capturing_stdout no longer does anything - nose should "
-        "just be monkey patched in setup_package. {} still has it"
-        .format(func.__name__)
+        "just be monkey patched in setup_package. %s still has it",
+        func.__name__
     )
     return func
 

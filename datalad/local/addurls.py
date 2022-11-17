@@ -1169,7 +1169,7 @@ class Addurls(Interface):
         EnsureDataset,
         datasetmethod,
     )
-    from datalad.interface.utils import eval_results
+    from datalad.interface.base import eval_results
     from datalad.support.constraints import (
         EnsureChoice,
         EnsureNone,
@@ -1528,7 +1528,7 @@ class Addurls(Interface):
         # We need to group by dataset since otherwise we will initiate
         # batched annex process per each subdataset, which might be infeasible
         # in any use-case with a considerable number of subdatasets.
-        # Also groupping allows us for parallelization across datasets, and avoids
+        # Also grouping allows us for parallelization across datasets, and avoids
         # proliferation of commit messages upon creation of each individual subdataset.
 
         def keyfn(d):

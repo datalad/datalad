@@ -30,12 +30,12 @@ from datalad.interface.common_opts import (
     if_dirty_opt,
     recursion_flag,
 )
-from datalad.interface.utils import (
-    eval_results,
-    handle_dirty_dataset,
-)
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.results import get_status_dict
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    eval_results,
+)
 from datalad.utils import (
     ensure_list,
 )

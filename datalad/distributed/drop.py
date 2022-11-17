@@ -26,6 +26,7 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
@@ -37,7 +38,6 @@ from datalad.interface.results import (
     results_from_annex_noinfo,
     success_status_map,
 )
-from datalad.interface.utils import eval_results
 from datalad.runner.exception import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
@@ -727,6 +727,9 @@ def _kill_dataset(ds):
 def _drop_allkeys(ds, repo, force=False, jobs=None):
     """
     """
+    assert not (repo.dot_git / 'annex').is_symlink(), \
+        "Dropping from a symlinked annex is unsupported to prevent data-loss"
+
     cmd = ['drop', '--all']
     if force:
         cmd.append('--force')
@@ -757,6 +760,8 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
     ------
     dict
     """
+    assert not (repo.dot_git / 'annex').is_symlink(), \
+        "Dropping from a symlinked annex is unsupported to prevent data-loss"
     cmd = ['drop']
     if force:
         cmd.append('--force')

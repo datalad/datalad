@@ -31,9 +31,9 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
@@ -141,7 +141,8 @@ def _get_procedure_implementation(name='*', ds=None):
                 yield (m, n,) + _get_proc_config(n, ds=ds)
         # 2.1. check subdatasets recursively
         for subds in ds.subdatasets(return_type='generator',
-                                    result_xfm='datasets'):
+                                    result_xfm='datasets',
+                                    result_renderer='disabled'):
             for m, n, f, h in _get_procedure_implementation(name=name, ds=subds):
                 yield m, n, f, h
 

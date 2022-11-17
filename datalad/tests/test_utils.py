@@ -19,7 +19,6 @@ import shutil
 import stat
 import sys
 import time
-from collections import OrderedDict
 from functools import wraps
 from operator import itemgetter
 from os.path import (
@@ -46,7 +45,6 @@ from datalad.utils import (
     CMD_MAX_ARG,
     Path,
     _path_,
-    all_same,
     any_re_search,
     auto_repr,
     better_wraps,
@@ -97,7 +95,6 @@ from datalad.utils import (
 from .utils_pytest import (
     OBSCURE_FILENAME,
     SkipTest,
-    as_unicode,
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
@@ -374,10 +371,10 @@ def test_updated():
     eq_(d, {'a': 'b'})
 
     # and that it would maintain the type
-    d = OrderedDict(((99, 0), ('z', 0), ('a', 0)))
+    d = dict(((99, 0), ('z', 0), ('a', 0)))
     d_ = updated(d, {0: 1})
-    ok_(isinstance(d_, OrderedDict))
-    eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
+    ok_(isinstance(d_, dict))
+    eq_(d_, dict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
 
 
 def test_get_local_file_url_windows():
@@ -717,28 +714,6 @@ def test_unique():
                key=itemgetter(1), reverse=True), [(1, 2), (0, 3)])
 
 
-def test_all_same():
-    ok_(all_same([0, 0, 0]))
-    ok_(not all_same([0, 0, '0']))
-    ok_(not all_same([]))
-
-    def never_get_to_not_needed():
-        yield 'a'
-        yield 'a'
-        yield 'b'
-        raise ValueError("Should not get here since on b should return")  # pragma: no cover
-
-    ok_(not all_same(never_get_to_not_needed()))
-
-    def gen1(n):
-        for x in range(n):
-            yield 'a'
-    ok_(not all_same(gen1(0)))
-    ok_(all_same(gen1(1)))
-    ok_(all_same(gen1(2)))
-    ok_(all_same(gen1(10)))
-
-
 def test_partition():
     def fn(*args, **kwargs):
         left, right = partition(*args, **kwargs)
@@ -840,30 +815,14 @@ def test_pathlib_unicode():
     eq_(str(Path(u"β")), u"β")
 
 
-def test_as_unicode():
-    eq_(as_unicode('grandchild_äöü東'), u'grandchild_äöü東')
-    eq_(as_unicode(None), u"")
-    eq_(as_unicode(1), u"1")
-    # NOTE: u? is because result is different between PY2 (prefixes unicode repr
-    # while in PY3 is no longer needed!  So aggregation result would differ between
-    # PY2 and PY3
-    # Didn't manage to make it work in PY2
-    #TODO assert_re_in(u'\[1, .s., u?.東.\]', as_unicode([1, "s", u"東"]))
-    eq_(as_unicode("01"), u"01")  # no some kind of conversion/stripping of numerals
-    with assert_raises(TypeError) as cme:
-        as_unicode(1, list)
-    assert_in("1 is not of any of known or provided", str(cme.value))
-
-
-@skip_if_on_windows
 @with_tempfile(mkdir=True)
 def test_path_prefix(path=None):
-    eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
+    eq_(get_path_prefix(_p('/d1/d2'), _p('/d1/d2')), _p(''))
     # so we are under /d1/d2 so path prefix is ..
-    eq_(get_path_prefix('/d1/d2', '/d1/d2/d3'), '..')
-    eq_(get_path_prefix('/d1/d2/d3', '/d1/d2'), 'd3')
+    eq_(get_path_prefix(_p('/d1/d2'), _p('/d1/d2/d3')), _p('..'))
+    eq_(get_path_prefix(_p('/d1/d2/d3'), _p('/d1/d2')), _p('d3'))
     # but if outside -- full path
-    eq_(get_path_prefix('/d1/d2', '/d1/d20/d3'), '/d1/d2')
+    eq_(get_path_prefix(_p('/d1/d2'), _p('/d1/d20/d3')), _p('/d1/d2'))
     with chpwd(path):
         eq_(get_path_prefix('.'), '')
         eq_(get_path_prefix('d1'), 'd1')
@@ -923,37 +882,47 @@ def test_get_dataset_root(path=None):
         eq_(get_dataset_root(fname), os.curdir)
 
 
-@skip_if_on_windows
+def _p(p: str) -> str:
+    """A helper to code paths as POSIX paths in tests  below. Would prepend fake drive
+       C: to absolute paths on Windows"""
+    if on_windows:
+        pm = p.replace('/', os.sep)
+        if p.startswith('/'):
+            return f"C:{pm}"
+        else:
+            return pm
+    return p
+
+
 def test_path_startswith():
-    ok_(path_startswith('/a/b', '/a'))
-    ok_(path_startswith('/a/b', '/a/b'))
-    ok_(path_startswith('/a/b', '/a/b/'))
-    ok_(path_startswith('/a/b/', '/a/b'))
-    ok_(path_startswith('/a/b', '/'))
-    ok_(path_startswith('/aaa/b/c', '/aaa'))
-    nok_(path_startswith('/aaa/b/c', '/aa'))
-    nok_(path_startswith('/a/b', '/a/c'))
-    nok_(path_startswith('/a/b/c', '/a/c'))
+    ok_(path_startswith(_p('/a/b'), _p('/a')))
+    ok_(path_startswith(_p('/a/b'), _p('/a/b')))
+    ok_(path_startswith(_p('/a/b'), _p('/a/b/')))
+    ok_(path_startswith(_p('/a/b/'), _p('/a/b')))
+    ok_(path_startswith(_p('/a/b'), _p('/')))
+    ok_(path_startswith(_p('/aaa/b/c'), _p('/aaa')))
+    nok_(path_startswith(_p('/aaa/b/c'), _p('/aa')))
+    nok_(path_startswith(_p('/a/b'), _p('/a/c')))
+    nok_(path_startswith(_p('/a/b/c'), _p('/a/c')))
     # must not mix relative and abs
-    assert_raises(ValueError, path_startswith, 'a/b', '/a')
-    assert_raises(ValueError, path_startswith, '/a/b', 'a')
+    assert_raises(ValueError, path_startswith, _p('a/b'), _p('/a'))
+    assert_raises(ValueError, path_startswith, _p('/a/b'), _p('a'))
 
 
-@skip_if_on_windows
 def test_path_is_subpath():
-    ok_(path_is_subpath('/a/b', '/a'))
-    ok_(path_is_subpath('/a/b/c', '/a'))
-    nok_(path_is_subpath('/a/b', '/a/b'))
-    nok_(path_is_subpath('/a/b', '/a/b/'))
-    nok_(path_is_subpath('/a/b/', '/a/b'))
-    ok_(path_is_subpath('/a/b', '/'))
-    ok_(path_is_subpath('/aaa/b/c', '/aaa'))
-    nok_(path_is_subpath('/aaa/b/c', '/aa'))
-    nok_(path_is_subpath('/a/b', '/a/c'))
-    nok_(path_is_subpath('/a/b/c', '/a/c'))
+    ok_(path_is_subpath(_p('/a/b'), _p('/a')))
+    ok_(path_is_subpath(_p('/a/b/c'), _p('/a')))
+    nok_(path_is_subpath(_p('/a/b'), _p('/a/b')))
+    nok_(path_is_subpath(_p('/a/b'), _p('/a/b/')))
+    nok_(path_is_subpath(_p('/a/b/'), _p('/a/b')))
+    ok_(path_is_subpath(_p('/a/b'), _p('/')))
+    ok_(path_is_subpath(_p('/aaa/b/c'), _p('/aaa')))
+    nok_(path_is_subpath(_p('/aaa/b/c'), _p('/aa')))
+    nok_(path_is_subpath(_p('/a/b'), _p('/a/c')))
+    nok_(path_is_subpath(_p('/a/b/c'), _p('/a/c')))
     # must not mix relative and abs
-    assert_raises(ValueError, path_is_subpath, 'a/b', '/a')
-    assert_raises(ValueError, path_is_subpath, '/a/b', 'a')
+    assert_raises(ValueError, path_is_subpath, _p('a/b'), _p('/a'))
+    assert_raises(ValueError, path_is_subpath, _p('/a/b'), _p('a'))
 
 
 def test_probe_known_failure():
@@ -1186,9 +1155,9 @@ def test_dlabspath(path=None):
         eq_(d, dlabspath(d))
         # in the root of ds
         with chpwd(d):
-            eq_(dlabspath("bu"), opj(d, "bu"))
-            eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
-            eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
+            eq_(dlabspath("path"), opj(d, "path"))
+            eq_(dlabspath("./path"), opj(d, "./path"))  # we do not normpath by default
+            eq_(dlabspath("./path", norm=True), opj(d, "path"))
 
 
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
@@ -1266,9 +1235,9 @@ def test_CMD_MAX_ARG():
 @with_tempfile(mkdir=True)
 def test_create_tree(path=None):
     content = u"мама мыла раму"
-    create_tree(path, OrderedDict([
+    create_tree(path, dict([
         ('1', content),
-        ('sd', OrderedDict(
+        ('sd', dict(
             [
             # right away an obscure case where we have both 1 and 1.gz
                 ('1', content*2),

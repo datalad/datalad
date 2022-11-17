@@ -36,16 +36,14 @@ from datalad.distribution.install import Install
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
     save_message_opt,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import (
-    eval_results,
-    generic_result_renderer,
-)
+from datalad.interface.utils import generic_result_renderer
 from datalad.local.unlock import Unlock
 from datalad.support.constraints import (
     EnsureBool,
@@ -751,7 +749,7 @@ def _create_record(run_info, sidecar_flag, ds):
     Returns
     -------
     str or None, str or None
-      The first value is either the full run record in JSON serialzied form,
+      The first value is either the full run record in JSON serialized form,
       or content-based ID hash, if the record was written to a file. In that
       latter case, the second value is the path to the record sidecar file,
       or None otherwise.

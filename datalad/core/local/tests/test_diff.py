@@ -131,7 +131,7 @@ def test_repo_diff(path=None, norepo=None):
                 'state': 'untracked',
                 'type': 'directory'}})
 
-    # again a unmatching path constrainted will give an empty report
+    # again a unmatching path constrained will give an empty report
     eq_(ds.repo.diff(fr='HEAD', to=None, paths=['other']), {})
     # perfect match and anything underneath will do
     eq_(ds.repo.diff(fr='HEAD', to=None, paths=['deep']),

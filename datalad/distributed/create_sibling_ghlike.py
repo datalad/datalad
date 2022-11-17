@@ -124,6 +124,10 @@ class _GitHubLike(object):
             doc="""access protocol/URL to configure for the sibling. With
             'https-ssh' SSH will be used for write access, whereas HTTPS
             is used for read access."""),
+        description=Parameter(
+            args=("--description",),
+            doc="""Brief description, displayed on the project's page""",
+            constraints=EnsureStr() | EnsureNone()),
         publish_depends=publish_depends,
         private=Parameter(
             args=("--private",),
@@ -134,8 +138,8 @@ class _GitHubLike(object):
             args=("--dry-run",),
             action="store_true",
             doc="""if set, no repository will be created, only tests for
-            name collisions will be performed, and would-be repository names
-            are reported for all relevant datasets"""),
+            sibling name collisions will be performed, and would-be repository
+            names are reported for all relevant datasets"""),
     )
 
     def __init__(self, url, credential, require_token=True, token_info=None):
@@ -254,7 +258,7 @@ class _GitHubLike(object):
         return siblingname
 
     def create_repo(self, ds, reponame, organization, private, dry_run,
-                    existing):
+                    description, existing):
         """Create a repository on the target platform
 
         Returns
@@ -271,7 +275,7 @@ class _GitHubLike(object):
           HTTP response codes) will raise an exception.
         """
         res = self.repo_create_request(
-            reponame, organization, private, dry_run)
+            reponame, organization, private, dry_run, description)
 
         if res.get('status') == 'impossible' and res.get('preexisted'):
             # we cannot create, because there is something in the target
@@ -322,7 +326,7 @@ class _GitHubLike(object):
                 # try creating now
                 return self.create_repo(
                     ds, reponame, organization, private, dry_run,
-                    existing)
+                    description, existing)
 
         # TODO intermediate error handling?
 
@@ -358,7 +362,7 @@ class _GitHubLike(object):
         raise NotImplementedError
 
     def create_repos(self, dsrepo_map, siblingname, organization,
-                     private, dry_run, res_kwargs,
+                     private, dry_run, description, res_kwargs,
                      existing, access_protocol,
                      publish_depends):
         """Create a series of repos on the target platform
@@ -374,7 +378,7 @@ class _GitHubLike(object):
         """
         for d, reponame in dsrepo_map:
             res = self.create_repo(
-                d, reponame, organization, private, dry_run,
+                d, reponame, organization, private, dry_run, description,
                 existing)
             # blend reported results with standard properties
             res = dict(
@@ -391,10 +395,19 @@ class _GitHubLike(object):
                     reponame, self.api_url)
 
             if 'message' not in res:
-                res['message'] = (
-                    "sibling repository '%s' created at %s",
-                    siblingname, res.get('html_url')
-                )
+                if not dry_run:
+                    res['message'] = (
+                        "sibling repository '%s' created at %s",
+                        siblingname, res.get('html_url')
+                    )
+                else:
+                    # can't know url when request was not made
+                    res['message'] = (
+                        "would create sibling '%s' and repository '%s%s'",
+                        siblingname,
+                        organization + "/" if organization else "",
+                        reponame
+                    )
             # report to caller
             yield get_status_dict(**res)
 
@@ -433,7 +446,7 @@ class _GitHubLike(object):
                 result_renderer='disabled')
 
     def repo_create_request(self, reponame, organization, private,
-                            dry_run=False):
+                            dry_run=False, description=None):
         """Perform a request to create a repo on the target platform
 
         Also implements reporting of "fake" results in dry-run mode.
@@ -449,9 +462,10 @@ class _GitHubLike(object):
                 organization=organization)
             if organization else
             self.create_user_repo_endpoint)
+        desc_text = description if description is not None else 'some default'
         data = {
             'name': reponame,
-            'description': 'some default',
+            'description': desc_text,
             'private': private,
             'auto_init': False,
         }
@@ -557,6 +571,7 @@ def _create_sibling(
         access_protocol='https',
         publish_depends=None,
         private=False,
+        description=None,
         dry_run=False):
     """Helper function to conduct sibling creation on a target platform
 
@@ -615,6 +630,7 @@ def _create_sibling(
         orgname,
         private,
         dry_run,
+        description,
         res_kwargs,
         existing,
         access_protocol,

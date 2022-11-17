@@ -1,0 +1,45 @@
+#!/bin/bash
+# Evaluate given command while running with DATALAD_TESTS_TEMP_DIR pointing to
+# that temporary filesystem mounted using nfs
+
+set -e
+
+fs=nfs
+# TODO: nfs and mount options?
+
+set -u
+tmp=$(mktemp -u "${TMPDIR:-/tmp}/datalad-nfs-XXXXX")
+
+
+uid=$(id -u)
+mntorig="$tmp.orig"
+mntpoint="$tmp.nfs"
+
+echo "I: mounting $mntorig under $mntpoint via $fs"
+
+set -x
+
+mkdir -p "$mntpoint"
+mkdir -p "$mntorig"
+
+if ! dpkg -l nfs-kernel-server | grep '^ii.*nfs-kernel-server'; then
+    sudo apt-get install -y nfs-kernel-server
+fi
+
+sudo exportfs -o rw "localhost:$mntorig"
+sudo mount -t "$fs" "localhost:$mntorig" "$mntpoint"
+
+# should how it was mounted
+sudo mount | grep "$mntpoint" | sed -e 's,^,I: ,g'
+
+# Run the actual command
+echo "I: running $@"
+TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" "$@"
+ret=$?
+
+echo "I: done, unmounting"
+sudo umount "$mntpoint"
+sudo exportfs -u "localhost:$mntorig"
+
+rm -rf "$mntpoint" "$mntorig"
+exit "$ret"
