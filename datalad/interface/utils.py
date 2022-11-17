@@ -219,11 +219,11 @@ def get_result_filter(fx):
 
 def eval_results(wrapped):
     import warnings
-    from datalad.interface.base import eval_results as f
+    from datalad.interface.base import eval_results as eval_results_moved
     warnings.warn("datalad.interface.utils.eval_results is obsolete. "
                   "Use datalad.interface.base.eval_results instead",
                   DeprecationWarning)
-    return f(wrapped)
+    return eval_results_moved(wrapped)
 
 
 def generic_result_renderer(res):
