@@ -2372,13 +2372,15 @@ class GitRepo(CoreGitRepo):
         if paths:
             # ease comparison
             paths = [self.pathobj / p for p in paths]
-            # contrain the report by the given paths
+            # constrain the report by the given paths
+
             modinfo = {
                 # modpath is absolute
                 modpath: modprobs
                 for modpath, modprobs in modinfo.items()
                 # is_relative_to() also match equal paths
-                if any(is_relative_to(modpath, p) for p in paths)
+                if (any(is_relative_to(p, modpath) for p in paths) or
+                    any(is_relative_to(modpath, p) for p in paths))
             }
         for r in self.call_git_items_(
             ['ls-files', '--stage', '-z'],

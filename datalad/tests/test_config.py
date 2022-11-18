@@ -50,7 +50,6 @@ from datalad.tests.utils_pytest import (
 from datalad.utils import (
     Path,
     get_home_envvars,
-    on_windows,
     swallow_logs,
 )
 
