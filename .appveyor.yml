@@ -66,24 +66,24 @@ environment:
     # is a need for debugging
 
     # Ubuntu core tests
-    - ID: Ubu20core
-      # ~30min
-      DTS: >
-          datalad.cli
-          datalad.core
-          datalad.customremotes
-          datalad.dataset
-          datalad.distributed
-          datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+#    - ID: Ubu20core
+#      # ~30min
+#      DTS: >
+#          datalad.cli
+#          datalad.core
+#          datalad.customremotes
+#          datalad.dataset
+#          datalad.distributed
+#          datalad.distribution
+#      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+#      INSTALL_SYSPKGS: python3-virtualenv
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
+#      # system git-annex is way too old, use better one
+#      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
     # Windows core tests
     - ID: WinP39core
       # ~35 min
-      DTS: datalad.core datalad.dataset datalad.runner
+      DTS: datalad.core.distributed.tests.test_clone # datalad.dataset datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       # Python version specification is non-standard on windows
       PY: 39-x64
@@ -92,113 +92,113 @@ environment:
       # This one is set in master but kept without change in maint for now
       # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
-    - ID: MacP38core
-      # ~40min
-      DTS: datalad.core datalad.dataset datalad.runner datalad.support
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      # does not give a functional installation
-      # INSTALL_GITANNEX: git-annex -m snapshot
-      #INSTALL_GITANNEX: git-annex=8.20201129
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
-
-    # Additional test runs
-    - ID: Ubu20a1
-      # ~30min
-      DTS: >
-          datalad.downloaders
-          datalad.interface
-          datalad.local
-          datalad.runner
-          datalad.support
-          datalad.tests
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
-    - ID: WinP39a1
-      # ~40min
-      DTS: >
-          datalad.cli
-          datalad.customremotes
-          datalad.distribution
-          datalad.distributed
-          datalad.downloaders
-          datalad.interface
-          datalad.tests
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
-    - ID: WinP39a2
-      # ~45min
-      DTS: >
-          datalad.local
-          datalad.support
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
-
-    - ID: MacP38a1
-      # ~40min
-      DTS: >
-          datalad.cli
-          datalad.customremotes
-          datalad.distribution
-          datalad.downloaders
-          datalad.interface
-          datalad.tests
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
-    - ID: MacP38a2
-      # ~40min
-      DTS: >
-          datalad.local
-          datalad.distributed
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
-
-    # Test alternative Python versions
-    - ID: Ubu20P37a
-      # ~35min
-      PY: 3.7
-      DTS: >
-          datalad.cli
-          datalad.core
-          datalad.customremotes
-          datalad.dataset
-          datalad.distributed
-          datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
-    - ID: Ubu20P37b
-      # ~25min
-      PY: 3.7
-      DTS: >
-          datalad.downloaders
-          datalad.interface
-          datalad.local
-          datalad.runner
-          datalad.support
-          datalad.tests
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+#    - ID: MacP38core
+#      # ~40min
+#      DTS: datalad.core datalad.dataset datalad.runner datalad.support
+#      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+#      PY: 3.8
+#      # does not give a functional installation
+#      # INSTALL_GITANNEX: git-annex -m snapshot
+#      #INSTALL_GITANNEX: git-annex=8.20201129
+#      INSTALL_GITANNEX: git-annex
+#      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+#
+#    # Additional test runs
+#    - ID: Ubu20a1
+#      # ~30min
+#      DTS: >
+#          datalad.downloaders
+#          datalad.interface
+#          datalad.local
+#          datalad.runner
+#          datalad.support
+#          datalad.tests
+#          datalad.ui
+#      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+#      INSTALL_SYSPKGS: python3-virtualenv
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
+#      # system git-annex is way too old, use better one
+#      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+#    - ID: WinP39a1
+#      # ~40min
+#      DTS: >
+#          datalad.cli
+#          datalad.customremotes
+#          datalad.distribution
+#          datalad.distributed
+#          datalad.downloaders
+#          datalad.interface
+#          datalad.tests
+#      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+#      PY: 39-x64
+#    - ID: WinP39a2
+#      # ~45min
+#      DTS: >
+#          datalad.local
+#          datalad.support
+#          datalad.ui
+#      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+#      PY: 39-x64
+#
+#    - ID: MacP38a1
+#      # ~40min
+#      DTS: >
+#          datalad.cli
+#          datalad.customremotes
+#          datalad.distribution
+#          datalad.downloaders
+#          datalad.interface
+#          datalad.tests
+#          datalad.ui
+#      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+#      PY: 3.8
+#      INSTALL_GITANNEX: git-annex
+#      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+#    - ID: MacP38a2
+#      # ~40min
+#      DTS: >
+#          datalad.local
+#          datalad.distributed
+#      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+#      PY: 3.8
+#      INSTALL_GITANNEX: git-annex
+#      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+#
+#    # Test alternative Python versions
+#    - ID: Ubu20P37a
+#      # ~35min
+#      PY: 3.7
+#      DTS: >
+#          datalad.cli
+#          datalad.core
+#          datalad.customremotes
+#          datalad.dataset
+#          datalad.distributed
+#          datalad.distribution
+#      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+#      INSTALL_SYSPKGS: python3-virtualenv
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
+#      # system git-annex is way too old, use better one
+#      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+#    - ID: Ubu20P37b
+#      # ~25min
+#      PY: 3.7
+#      DTS: >
+#          datalad.downloaders
+#          datalad.interface
+#          datalad.local
+#          datalad.runner
+#          datalad.support
+#          datalad.tests
+#          datalad.ui
+#      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+#      INSTALL_SYSPKGS: python3-virtualenv
+#      CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
+#      # system git-annex is way too old, use better one
+#      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
 
 matrix:
   allow_failures:
