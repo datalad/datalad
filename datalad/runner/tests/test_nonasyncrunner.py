@@ -16,6 +16,7 @@ import queue
 import signal
 import subprocess
 import sys
+import time
 from itertools import count
 from time import sleep
 from typing import Optional
@@ -589,3 +590,81 @@ def test_stalling_detection_2():
         runner.process_queue()
     eq_(logger.method_calls[0][0], "warning")
     eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
+
+
+def test_concurrent_waiting_run():
+    from threading import Thread
+
+    threaded_runner = ThreadedRunner(
+        py2cmd("import time; time.sleep(1)"),
+        protocol_class=NoCapture,
+        stdin=None,
+    )
+
+    start = time.time()
+
+    number_of_threads = 5
+    caller_threads = []
+    for c in range(number_of_threads):
+        caller_thread = Thread(target=threaded_runner.run)
+        caller_thread.start()
+        caller_threads.append(caller_thread)
+
+    while caller_threads:
+        t = caller_threads.pop()
+        t.join()
+
+    # If the threads are serialized, the duration should at least
+    # be one second per thread.
+    duration = time.time() - start
+    assert duration >= 1.0 * number_of_threads
+
+
+def test_concurrent_generator_run():
+    from threading import Thread
+
+    class GenReturnStdout(GeneratorMixIn, StdOutCapture):
+        def __init__(self,
+                     done_future=None,
+                     encoding=None):
+
+            StdOutErrCapture.__init__(
+                self,
+                done_future=done_future,
+                encoding=encoding)
+            GeneratorMixIn.__init__(self)
+
+        def timeout(self, fd: Optional[int]) -> bool:
+            return True
+
+        def pipe_data_received(self, fd, data):
+            for line in data.decode().splitlines():
+                self.send_result(line)
+
+    threaded_runner = ThreadedRunner(
+        py2cmd("for i in range(40): print(f'result#{i}')"),
+        protocol_class=GenReturnStdout,
+        stdin=None,
+    )
+
+    result_generator = threaded_runner.run()
+
+    def thread_main(thread_number, result_generator):
+        try:
+            print(f"{thread_number}={next(result_generator)}", flush=True)
+            time.sleep(.3)
+        except StopIteration:
+            print(f"{thread_number}=None", flush=True)
+
+    thread_main(3, (x for x in range(10)))
+
+    number_of_threads = 100
+    caller_threads = []
+    for c in range(number_of_threads):
+        caller_thread = Thread(target=thread_main, args=(c, result_generator))
+        caller_thread.start()
+        caller_threads.append(caller_thread)
+
+    while caller_threads:
+        t = caller_threads.pop()
+        t.join()
