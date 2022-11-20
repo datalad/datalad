@@ -566,7 +566,7 @@ class ThreadedRunner:
         # Continue with queue processing if there is still a process or
         # monitored files, or if there are still elements in the output queue.
         if self.is_stalled():
-            self.return_code = self.process.poll()
+            self.return_code = self.process.poll() if self.process else None
         return (
             len(self.active_file_numbers) > 0
             or not self.output_queue.empty()
