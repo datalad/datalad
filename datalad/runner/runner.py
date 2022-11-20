@@ -37,9 +37,12 @@ class WitlessRunner(object):
     It aims to be as simple as possible, providing only essential
     functionality.
     """
-    __slots__ = ['cwd', 'env', 'threaded_runner']
+    __slots__ = ['cwd', 'env']
 
-    def __init__(self, cwd=None, env=None):
+    def __init__(self,
+                 cwd: str | PathLike | None = None,
+                 env: dict | None = None
+                 ):
         """
         Parameters
         ----------
@@ -47,28 +50,29 @@ class WitlessRunner(object):
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise.
         env : dict, optional
-          Environment to be used for command execution. If `cwd`
-          was given, 'PWD' in the environment is set to its value.
-          This must be a complete environment definition, no values
-          from the current environment will be inherited.
+          Environment to be used for command execution. If `None` is provided,
+          the current process environment is inherited by the sub-process. If
+          a mapping is provided, it will constitute the complete environment of
+          the sub-process, i.e.  no values from the environment of the current
+          process will be inherited. If `env` and `cwd` are given, 'PWD' in the
+          environment is set to the string-value of `cwd`.
         """
         self.env = env
-        # stringify to support Path instances on PY35
         self.cwd = cwd
 
-        self.threaded_runner = None
-
-    def _get_adjusted_env(self, env=None, cwd=None, copy=True):
+    def _get_adjusted_env(self,
+                          env: dict | None = None,
+                          cwd: str | PathLike | None = None,
+                          copy: bool = True):
         """Return an adjusted copy of an execution environment
 
         Or return an unaltered copy of the environment, if no adjustments
         need to be made.
         """
-        if copy:
-            env = env.copy() if env else None
+        env = env.copy() if env else None
         if cwd and env is not None:
-            # if `cwd` was provided, we must not make it conflict with
-            # a potential PWD setting
+            # If an environment and 'cwd' is provided, ensure the 'PWD' in the
+            # environment is set to the value of 'cwd'.
             env['PWD'] = str(cwd)
         return env
 
@@ -107,8 +111,9 @@ class WitlessRunner(object):
           the PWD of the parent process is used otherwise. Overrides
           any `cwd` given to the constructor.
         env : dict, optional
-          Environment to be used for command execution. If `cwd`
-          was given, 'PWD' in the environment is set to its value.
+          Environment to be used for command execution. If given, it will
+          completely replace any environment provided to theconstructor. If
+          `cwd` is given, 'PWD' in the environment is set to its value.
           This must be a complete environment definition, no values
           from the current environment will be inherited. Overrides
           any `env` given to the constructor.
@@ -173,37 +178,35 @@ class WitlessRunner(object):
             # by default let all subprocess stream pass through
             protocol = NoCapture
 
-        cwd = cwd or self.cwd
-        env = self._get_adjusted_env(
-            env or self.env,
-            cwd=cwd,
+        applied_cwd = cwd or self.cwd
+        applied_env = self._get_adjusted_env(
+            env=env or self.env,
+            cwd=applied_cwd,
         )
 
         lgr.debug(
             'Run %r (protocol_class=%s) (cwd=%s)',
             cmd,
             protocol.__name__,
-            cwd
+            applied_cwd
         )
 
-        self.threaded_runner = ThreadedRunner(
+        threaded_runner = ThreadedRunner(
             cmd=cmd,
             protocol_class=protocol,
             stdin=stdin,
             protocol_kwargs=kwargs,
             timeout=timeout,
             exception_on_error=exception_on_error,
-            cwd=cwd,
-            env=env
+            cwd=applied_cwd,
+            env=applied_env
         )
 
-        results_or_iterator = self.threaded_runner.run()
-
+        results_or_iterator = threaded_runner.run()
         if issubclass(protocol, GeneratorMixIn):
             return results_or_iterator
-        else:
-            results = cast(dict, results_or_iterator)
 
+        results = cast(dict, results_or_iterator)
         # log before any exception is raised
         lgr.debug("Finished %r with status %s", cmd, results['code'])
 
@@ -217,7 +220,7 @@ class WitlessRunner(object):
             raise CommandError(
                 # whatever the results were, we carry them forward
                 cmd=cmd,
-                cwd=self.cwd,
+                cwd=applied_cwd,
                 **results,
             )
         # Denoise result, the return code must be zero at this point.
