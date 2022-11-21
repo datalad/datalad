@@ -300,7 +300,7 @@ class ExportToFigshare(Interface):
             )
         )
         assert archive_out['status'] == 'ok'
-        fname = archive_out['path']
+        fname = str(archive_out['path'])
 
         lgr.info("Uploading %s to figshare", fname)
         figshare = FigshareRESTLaison()
@@ -354,7 +354,7 @@ class ExportToFigshare(Interface):
             lgr.info("Registering links back for the content of the archive")
             add_archive_content(
                 fname,
-                annex=dataset.repo,
+                dataset=dataset,
                 delete_after=True,  # just remove extracted into a temp dir
                 allow_dirty=True,  # since we have a tarball
                 commit=False  # we do not want to commit anything we have done here
