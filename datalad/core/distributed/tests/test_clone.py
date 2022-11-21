@@ -750,7 +750,7 @@ def test_mushy_windows_submodule_url(tmp_path):
         ds_cloned = ds.clone(
             source=op.join(op.pardir, 'origin'),
             path='sources')
-        assert '\\' not in ds_cloned.config.get('remote.dl-test-remote.url')
+        assert '\\' not in ds_cloned.config.get(f'remote.{DEFAULT_REMOTE}.url')
 
 
 
