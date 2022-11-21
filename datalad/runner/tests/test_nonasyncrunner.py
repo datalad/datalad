@@ -18,6 +18,8 @@ import subprocess
 import sys
 import time
 from itertools import count
+from queue import Queue
+from threading import Thread
 from time import sleep
 from typing import Optional
 from unittest.mock import (
@@ -53,6 +55,7 @@ from ..runnerthreads import (
     ReadThread,
     WriteThread,
 )
+from ..utils import LineSplitter
 from .utils import py2cmd
 
 
@@ -82,6 +85,31 @@ class GenNothing(GeneratorMixIn, NoCapture):
             done_future=done_future,
             encoding=encoding)
         GeneratorMixIn.__init__(self)
+
+
+class GenStdoutLines(GeneratorMixIn, StdOutCapture):
+    def __init__(self,
+                 done_future=None,
+                 encoding=None):
+
+        StdOutCapture.__init__(
+            self,
+            done_future=done_future,
+            encoding=encoding)
+        GeneratorMixIn.__init__(self)
+        self.line_splitter = LineSplitter()
+
+    def timeout(self, fd: Optional[int]) -> bool:
+        return True
+
+    def pipe_data_received(self, fd, data):
+        for line in self.line_splitter.process(data.decode(self.encoding)):
+            self.send_result(line)
+
+    def pipe_connection_lost(self, fd: int, exc: Optional[Exception]):
+        remaining_line = self.line_splitter.finish_processing()
+        if remaining_line is not None:
+            self.send_result(remaining_line)
 
 
 def test_subprocess_return_code_capture():
@@ -620,51 +648,47 @@ def test_concurrent_waiting_run():
     assert duration >= 1.0 * number_of_threads
 
 
-def test_concurrent_generator_run():
-    from threading import Thread
-
-    class GenReturnStdout(GeneratorMixIn, StdOutCapture):
-        def __init__(self,
-                     done_future=None,
-                     encoding=None):
-
-            StdOutErrCapture.__init__(
-                self,
-                done_future=done_future,
-                encoding=encoding)
-            GeneratorMixIn.__init__(self)
-
-        def timeout(self, fd: Optional[int]) -> bool:
-            return True
-
-        def pipe_data_received(self, fd, data):
-            for line in data.decode().splitlines():
-                self.send_result(line)
+def test_concurrent_generator_reading():
+    number_of_lines = 40
+    number_of_threads = 100
+    output_queue = Queue()
 
     threaded_runner = ThreadedRunner(
-        py2cmd("for i in range(40): print(f'result#{i}')"),
-        protocol_class=GenReturnStdout,
+        py2cmd(f"for i in range({number_of_lines}): print(f'result#{{i}}')"),
+        protocol_class=GenStdoutLines,
         stdin=None,
     )
-
     result_generator = threaded_runner.run()
 
-    def thread_main(thread_number, result_generator):
-        try:
-            print(f"{thread_number}={next(result_generator)}", flush=True)
-            time.sleep(.3)
-        except StopIteration:
-            print(f"{thread_number}=None", flush=True)
+    def thread_main(thread_number, result_generator, output_queue):
+        while True:
+            try:
+                output = next(result_generator)
+            except StopIteration:
+                output_queue.put((thread_number, None))
+                break
+            output_queue.put((thread_number, output))
 
-    thread_main(3, (x for x in range(10)))
-
-    number_of_threads = 100
     caller_threads = []
     for c in range(number_of_threads):
-        caller_thread = Thread(target=thread_main, args=(c, result_generator))
+        caller_thread = Thread(
+            target=thread_main,
+            args=(c, result_generator, output_queue)
+        )
         caller_thread.start()
         caller_threads.append(caller_thread)
 
     while caller_threads:
         t = caller_threads.pop()
         t.join()
+
+    collected_outputs = [
+        output_tuple[1]
+        for output_tuple in output_queue.queue
+        if output_tuple[1] is not None
+    ]
+    assert len(collected_outputs) == number_of_lines
+    assert collected_outputs == [
+        f"result#{i}"
+        for i in range(number_of_lines)
+    ]
