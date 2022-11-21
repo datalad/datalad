@@ -104,8 +104,9 @@ class _ResultGenerator(Generator):
                 )
             self.state = self.GeneratorState.process_running
 
+        runner = self.runner
+
         if self.state == self.GeneratorState.process_running:
-            runner = self.runner
             # If we have elements in the result queue, return one
             while len(self.result_queue) == 0 and runner.should_continue():
                 runner.process_queue()
@@ -127,8 +128,6 @@ class _ResultGenerator(Generator):
             # callback. Those are returned here.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
-
-            runner = self.runner
             runner.ensure_stdin_stdout_stderr_closed()
             runner.protocol.connection_lost(None)   # TODO: check for exceptions
             runner.wait_for_threads()
@@ -140,7 +139,6 @@ class _ResultGenerator(Generator):
             # state: GeneratorState.process_exited.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
-            runner = self.runner
             runner.generator = None
             runner.owning_thread = None
             self.state = self.GeneratorState.exhausted
