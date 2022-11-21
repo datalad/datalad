@@ -329,6 +329,8 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def process_running(self) -> bool:
         if self.runner:
+            if self.generator.runner.process is None:
+                return False
             result = self.generator.runner.process.poll()
             if result is None:
                 return True
@@ -580,7 +582,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 lgr.log(
                     5,
                     "stderr of %s had %d lines:",
-                    self.generator.runner.process.pid,
+                    self.generator.runner.process.pid if self.generator.runner.process else 'terminated',
                     len(stderr_lines))
                 for line in stderr_lines:
                     lgr.log(5, "| " + line)
