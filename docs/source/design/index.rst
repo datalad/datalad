@@ -33,3 +33,4 @@ subsystems in DataLad.
    docstrings
    progress_reporting
    github_actions
+   testing
