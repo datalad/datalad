@@ -18,8 +18,8 @@ The project aims for good unittest coverage (at least 80%).
 Running tests
 =============
 
-``datalad/tests`` contains tests for the core portion of the project.
-More tests are provided under corresponding submodules in ``tests/`` subdirectories to simplify re-running the tests concerning that portion of the codebase.
+
+Starting at the top level with ``datalad/tests``, every module in the package comes with a subdirectory ``tests/``, containing the tests for that portion of the codebase. This structure is meant to simplify (re-)running the tests for a particular module.
 The test suite is run using
 
 .. code-block:: bash
@@ -54,15 +54,15 @@ The projects uses https://codecov.io for an overview of code coverage.
 Writing tests
 =============
 
-Additional functionality is tested by extending existing similar tests with new test cases, or adding new tests to the respective test script of the module.
-Test helper functions assisting various general and DataLad specific assertions as well the construction of test directories and files can be found in ``datalad/tests/utils_pytest.py`` and ``datalad/tests/utils.py``.
+Additional functionality is tested by extending existing similar tests with new test cases, or adding new tests to the respective test script of the module. Generally, every file `example.py `with datalad code comes with a corresponding `tests/test_example.py`.
+Test helper functions assisting various general and DataLad specific assertions as well the construction of test directories and files can be found in ``datalad/tests/utils_pytest.py``.
 
 .. _decorators:
 
 Test annotations
 ----------------
 
-``datalad/tests/utils.py`` and ``datalad/tests/utils_pytest.py`` also define test decorators.
+``datalad/tests/utils_pytest.py`` also defines test decorators.
 Some of those are used to annotate tests for various aspects to allow for easy sub-selection via environment variables.
 
 **Speed**: Please annotate tests that take a while to complete with following decorators
