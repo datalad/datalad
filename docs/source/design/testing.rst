@@ -24,16 +24,16 @@ The test suite is run using
 
 .. code-block:: bash
 
-   pytest datalad
+   pip install -e .[tests]
+   python -m pytest -c tox.ini datalad
    # or, with coverage reports
-   pip install pytest coverage
-   pytest --cov=datalad datalad
+   python -m pytest  -c tox.ini --cov=datalad datalad
 
 Individual tests can be run using a path to the test file, followed by two colons and the test name:
 
 .. code-block:: bash
 
-    pytest datalad/core/local/tests/test_save.py::test_save_message_file
+    python -m pytest datalad/core/local/tests/test_save.py::test_save_message_file
 
 The set of to-be-run tests can be further sub-selected with environment variable based configurations that enable tests based on their :ref:`decorators`, or pytest-specific parameters.
 Invoking a test run using ``DATALAD_TESTS_KNOWNFAILURES_PROBE=True pytest datalad``, for example, will run tests marked as known failures whether or not they still fail.

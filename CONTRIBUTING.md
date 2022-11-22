@@ -284,9 +284,10 @@ release of Debian or Ubuntu) with all dependencies listed in README.md pre-insta
 ### CI setup
 
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.
-Please note that new a contributor's first PR needs workflow approval from a team member to start the CI runs, but we will hurry to start the CI runs on your PR.
+Please note that new a contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
 As the full CI suite takes a while to complete, we recommend to run at least tests directly related to your contributions locally beforehand.
 For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
+If you would like to propose patch against `git-annex` itself, submit them against [datalad/git-annex](https://github.com/datalad/git-annex/#submitting-patches) repository which builds and tests `git-annex`.
 
 ### Coverage
 
