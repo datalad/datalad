@@ -27,6 +27,8 @@ from unittest.mock import (
     patch,
 )
 
+import pytest
+
 from datalad.tests.utils_pytest import (
     assert_false,
     assert_raises,
@@ -692,3 +694,34 @@ def test_concurrent_generator_reading():
         f"result#{i}"
         for i in range(number_of_lines)
     ]
+
+
+def test_reenter_generator_detection():
+    threaded_runner = ThreadedRunner(
+        py2cmd(f"import time; time.sleep(5)"),
+        protocol_class=GenStdoutLines,
+        stdin=None,
+    )
+    threaded_runner.run()
+    with pytest.raises(RuntimeError) as error:
+        threaded_runner.run()
+    assert "re-enter" in str(error.value)
+
+    def target(threaded_runner, exception_queue):
+        try:
+            threaded_runner.run()
+        except RuntimeError as exc:
+            exception_queue.put(exc)
+
+    exception_queue = Queue()
+    other_thread = Thread(
+        target=target,
+        args=(threaded_runner, exception_queue)
+    )
+    other_thread.start()
+    other_thread.join()
+    exception_list = list(exception_queue.queue)
+    assert len(exception_list) == 1
+    exception = exception_list[0]
+    assert isinstance(exception, RuntimeError)
+    assert "re-entered" in str(exception)
