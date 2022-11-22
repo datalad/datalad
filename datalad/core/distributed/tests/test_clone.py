@@ -741,6 +741,19 @@ def test_relative_submodule_url(path=None):
         '../../origin')
 
 
+def test_mushy_windows_submodule_url(tmp_path):
+    """Test that subdataset clones from relative urls
+    do not include backslashes (gh-7180)"""
+    Dataset(tmp_path / 'origin').create()
+    ds = Dataset(tmp_path / 'ds').create()
+    with chpwd(ds.path):
+        ds_cloned = ds.clone(
+            source=op.join(op.pardir, 'origin'),
+            path='sources')
+        assert '\\' not in ds_cloned.config.get(f'remote.{DEFAULT_REMOTE}.url')
+
+
+
 @with_tree(tree={"subdir": {}})
 @with_tempfile(mkdir=True)
 def test_local_url_with_fetch(path=None, path_other=None):
@@ -1696,7 +1709,7 @@ def test_clone_url_mapping(src_path=None, dest_path=None):
     # we record the original-original URL
     eq_(submod_rec['gitmodule_datalad-url'], 'rambo')
     # and put the effective one as the primary URL
-    eq_(submod_rec['gitmodule_url'], src_path)
+    eq_(submod_rec['gitmodule_url'], Path(src_path).as_posix())
 
 
 _nomatch_map = {
