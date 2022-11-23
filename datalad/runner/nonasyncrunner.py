@@ -15,7 +15,6 @@ from __future__ import annotations
 import enum
 import logging
 import subprocess
-import sys
 import threading
 import time
 from collections import deque
@@ -284,7 +283,7 @@ class ThreadedRunner:
 
     def _check_result(self):
         if self.exception_on_error is True:
-            if self.return_code != 0:
+            if self.return_code not in (0, None):
                 protocol = self.protocol
                 decoded_output = {
                     source: protocol.fd_infos[fileno][1].decode(protocol.encoding)
@@ -572,8 +571,6 @@ class ThreadedRunner:
     def should_continue(self) -> bool:
         # Continue with queue processing if there is still a process or
         # monitored files, or if there are still elements in the output queue.
-        if self.is_stalled():
-            self.return_code = self.process.poll() if self.process else None
         return (
             len(self.active_file_numbers) > 0
             or not self.output_queue.empty()

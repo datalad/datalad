@@ -540,16 +540,12 @@ class BatchedCommand(SafeDelCloseMixin):
                 self.return_code = self.generator.return_code
 
             except CommandError as command_error:
-                if command_error.code is None:
-                    lgr.debug("process lost, return value set to None")
-                else:
-                    lgr.error(
-                        "%s subprocess exited with %s (%s)",
-                        repr(command_error.code),
-                        self,
-                        repr(command_error.code),
-                        command_error
-                    )
+                lgr.error(
+                    "%s subprocess exited with %s (%s)",
+                    self,
+                    repr(command_error.code),
+                    command_error
+                )
                 self.return_code = command_error.code
 
             if remaining:
