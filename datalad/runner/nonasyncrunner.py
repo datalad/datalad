@@ -15,6 +15,7 @@ from __future__ import annotations
 import enum
 import logging
 import subprocess
+import sys
 import threading
 import time
 from collections import deque
@@ -139,9 +140,11 @@ class _ResultGenerator(Generator):
             # state: GeneratorState.process_exited.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
-            runner.generator = None
-            runner.owning_thread = None
             self.state = self.GeneratorState.exhausted
+            runner.owning_thread = None
+            with runner.generator_condition:
+                runner.generator = None
+                runner.generator_condition.notify()
 
         if self.state == self.GeneratorState.exhausted:
             raise StopIteration(self.return_code)
@@ -269,6 +272,7 @@ class ThreadedRunner:
         self.stall_check_interval = 10
 
         self.initialization_lock = threading.Lock()
+        self.generator_condition = threading.Condition()
         self.owning_thread: Optional[int] = None
 
         # Pure declarations
@@ -340,11 +344,16 @@ class ThreadedRunner:
             return self._locked_run()
 
     def _locked_run(self) -> dict | _ResultGenerator:
-        if self.generator is not None:
-            raise RuntimeError(
-                "ThreadedRunner.run() was re-entered by "
-                f"{threading.get_ident()}. The execution is still owned by "
-                f"thread {self.owning_thread}")
+        with self.generator_condition:
+            if self.generator is not None:
+                if self.owning_thread == threading.get_ident():
+                    raise RuntimeError(
+                        "ThreadedRunner.run() was re-entered by already owning "
+                        f"thread {threading.get_ident()}. The execution is "
+                        f"still owned by thread {self.owning_thread}"
+                    )
+                self.generator_condition.wait()
+                assert self.generator is None
 
         if isinstance(self.stdin, (int, IO, type(None))):
             # We will not write anything to stdin. If the caller passed a
