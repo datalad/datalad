@@ -206,6 +206,7 @@ class SafeDelCloseMixin(object):
         try:
             self.close()
         except (TypeError, ImportError):
+            # ImportError could be raised when the interpreter is shutting down.
             if os.fdopen is None or lgr.debug is None:
                 # if we are late in the game and things already gc'ed in py3,
                 # it is Ok
