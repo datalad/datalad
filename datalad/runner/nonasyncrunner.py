@@ -100,7 +100,7 @@ class _ResultGenerator(Generator):
         if self.state == self.GeneratorState.initialized:
             if message is not None:
                 raise RuntimeError(
-                    "sent non-None message to initialized generator "
+                    f"sent non-None message {message!r} to initialized generator "
                 )
             self.state = self.GeneratorState.process_running
 
