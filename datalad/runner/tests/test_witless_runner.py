@@ -182,7 +182,7 @@ def test_runner_empty_stdin():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
     runner.run(
-        ["cat"],
+        py2cmd('import sys; print(sys.stdin.read())'),
         stdin=b"",
         protocol=None
     )
