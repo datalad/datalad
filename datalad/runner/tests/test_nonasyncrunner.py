@@ -90,6 +90,12 @@ class GenNothing(GeneratorMixIn, NoCapture):
 
 
 class GenStdoutLines(GeneratorMixIn, StdOutCapture):
+    """A generator-based protocol yielding individual subprocess' stdout lines
+
+    This is a simple implementation that is good enough for tests, i.e. with
+    controlled inpute. It will fail if data is delivered in parts to
+    self.pipe_data_received that are split inside an encoded character.
+    """
     def __init__(self,
                  done_future=None,
                  encoding=None):
