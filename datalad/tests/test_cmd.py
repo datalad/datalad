@@ -19,14 +19,12 @@ from datalad.cmd import (
     readline_rstripped,
 )
 from datalad.cmd import BatchedCommandError
-from datalad.runner.exception import CommandError
 from datalad.runner.tests.utils import py2cmd
 from datalad.tests.utils_pytest import (
     assert_equal,
     assert_is_none,
     assert_is_not_none,
     assert_not_equal,
-    assert_raises,
     assert_true,
 )
 
@@ -81,7 +79,8 @@ def test_batched_close_timeout_exception():
     bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
     with unittest.mock.patch("datalad.cfg") as cfg_mock:
         cfg_mock.configure_mock(**{"obtain.return_value": "abandon"})
-        assert_raises(TimeoutExpired, bc.close)
+        with pytest.raises(TimeoutExpired) as exc:
+            bc.close()
 
 
 def test_batched_close_wait():
