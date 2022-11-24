@@ -50,6 +50,7 @@ from datalad.tests.utils_pytest import (
     neq_,
     nok_,
     ok_,
+    skip_if,
     skip_if_on_windows,
     swallow_logs,
     with_tempfile,
@@ -230,6 +231,11 @@ def test_pathri_guessing(filename=None):
             # Does not happen on Windows since paths with \ instead of / do not
             # look like possible URLs
             assert_in('ParseResults contains params', cml.out)
+
+
+@skip_if(not on_windows)
+def test_pathri_windows_anchor():
+    assert RI('file:///c:/Windows').localpath == 'C:\\Windows'
 
 
 @known_failure_githubci_win
