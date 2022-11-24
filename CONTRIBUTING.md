@@ -243,6 +243,8 @@ rules before submitting a pull request:
 
 - New code should be accompanied by tests.
 
+The documentation contains a [Design Document specifically on running and writing tests](http://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
+Further hands-on advice is detailed below.
 
 ### Tests
 
@@ -279,75 +281,13 @@ Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in
 be used to establish a clean docker environment (based on any NtesteuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
-#### Test attributes
-
-[datalad/tests/utils.py]() defines many useful decorators. Some of those just to annotate tests
-for various aspects to allow for easy sub-selection.
-
-#### Migration from `nose` to `pytest` in downstream code
-
-`datalad.tests.utils` remains providing `nose`-based utils and `datalad.__init__` provides `nose`-based
-fixtures to not break extensions which still use `nose` for testing. For a typical migration of a DataLad
-extension to use `pytest` instead of `nose`:
-
-- keep all the `assert_*` and `ok_` helpers but import them from `datalad.tests.utils_pytest`
-  instead
-- for `@with_*` and other decorators populating positional arguments, convert corresponding
-  posarg to kwarg by adding `=None`
-- convert all generator-based parametric tests into direct invocation or, preferably,
-  `@pytest.mark.parametrized` tests
-- address DeprecationWarnings in the code. Only where desired to test deprecation,
-  add `@pytest.mark.filterwarnings("ignore: BEGINNING OF WARNING")` decorator to the test.
-
-For an example, see a "migrate to pytest" PR against datalad-deprecated:
-https://github.com/datalad/datalad-deprecated/pull/51 .
-
-##### Speed
-
-Please annotate with following decorators
-- `@slow` if test runs over 10 seconds
-- `@turtle` if test runs over 120 seconds (those would not typically be ran on CIs)
-
-##### Purpose
-
-As those tests also usually tend to be slower, use in conjunction with `@slow` or `@turtle` when slow
-- `@integration` - tests verifying correct operation with external tools/services beyond git/git-annex
-- `@usecase` - represents some (user) use-case, and not necessarily a "unit-test" of functionality
-
 ### CI setup
 
-We are using Travis-CI and have [buildbot setup](https://github.com/datalad/buildbot) which also
-exercises our tests battery for every PR and on the master.  Note that buildbot runs tests only submitted
-by datalad developers, or if a PR acquires 'buildbot' label.
-
-In case if you want to enter buildbot's environment
-
-1. Login to our development server (`smaug`)
-
-2. Find container ID associated with the environment you are interested in, e.g.
-
-        docker ps | grep nd16.04
-
-3. Enter that docker container environment using
-
-        docker exec -it <CONTAINER ID> /bin/bash
-
-4. Become buildbot user
-
-        su - buildbot
-
-5. Activate corresponding virtualenv using
-
-        source <VENV/bin/activate>
-
-   e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`
-
-And now you should be in the same environment as the very last tested PR.
-Note that the same path/venv is reused for all the PRs, so you might want
-first to check using `git show` under the `build/` directory if it corresponds
-to the commit you are interested to troubleshoot.
-
+We are using several continuous integration services to run our tests battery for every PR and on the default branch.
+Please note that new a contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
+As the full CI suite takes a while to complete, we recommend to run at least tests directly related to your contributions locally beforehand.
 For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
+If you would like to propose patch against `git-annex` itself, submit them against [datalad/git-annex](https://github.com/datalad/git-annex/#submitting-patches) repository which builds and tests `git-annex`.
 
 ### Coverage
 
