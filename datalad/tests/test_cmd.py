@@ -65,6 +65,7 @@ def test_batched_close_abandon():
         assert_is_none(bc.return_code)
 
 
+@pytest.mark.filterwarnings("ignore:Exception ignored")
 def test_batched_close_timeout_exception():
     # Expect a timeout if the process runs longer than timeout and the config
     # for "datalad.runtime.stalled-external" is "abandon".
