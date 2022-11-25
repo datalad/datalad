@@ -67,12 +67,28 @@ from datalad.utils import (
 
 
 def local_path_representation(path: str) -> str:
-    """Return an OS-specific representation of a "file:" URI-style path
+    """Return an OS-specific representation of a Posix-style path
 
     With a posix path in the form of "a/b" this function will return "a/b" on
     Unix-like operating systems and "a\\b" on Windows-style operating systems.
     """
     return str(Path(path))
+
+
+def local_url_path_representation(url_path: str) -> str:
+    """Return an OS-specific representation of the path component in a file:-URL
+
+    With a path component like "/c:/Windows" (i.e. from a URL that reads
+    "file:///c:/Windows"), this function will return "/c:/Windows" on a
+    Unix-like operating systems and "C:\\Windows" on Windows-like operating
+    systems.
+    """
+    return url2pathname(url_path)
+
+
+def local_path_from_url(url: str) -> str:
+    """Parse the url and extract an OS-specific local path representation"""
+    return local_url_path_representation(urlparse(url).path)
 
 
 def is_windows_path(path):

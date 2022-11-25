@@ -35,6 +35,7 @@ from datalad.support.network import (
     is_url,
     iso8601_to_epoch,
     local_path_representation,
+    local_url_path_representation,
     parse_url_opts,
     same_website,
     urlquote,
@@ -172,7 +173,11 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         eq_(getattr(ri_, f), v)
 
     if localpath:
-        assert ri_.localpath == local_path_representation(localpath)
+        if cls == URL:
+            local_representation = local_url_path_representation(localpath)
+        else:
+            local_representation = local_path_representation(localpath)
+        assert ri_.localpath == local_representation
         old_localpath = ri_.localpath  # for a test below
     else:
         # if not given -- must be a remote url, should raise exception
@@ -300,7 +305,7 @@ def test_url_samples():
     _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
     _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
     # not sure but let's check
-    _check_ri("file:///c:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/c:/path/sp1', exact_str=False)
+    _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
