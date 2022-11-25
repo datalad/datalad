@@ -9,41 +9,17 @@
 """Miscellaneous utilities to assist with testing"""
 
 import base64
-import glob
-import gzip
-import inspect
-import logging
 import lzma
 import multiprocessing
 import multiprocessing.queues
-import os
-import platform
-import random
-import re
-import shutil
-import socket
 import ssl
-import stat
-import tempfile
 import textwrap
-import time
-import warnings
-from contextlib import contextmanager
 from difflib import unified_diff
-from fnmatch import fnmatch
-from functools import wraps
 from http.server import (
     HTTPServer,
     SimpleHTTPRequestHandler,
 )
 from json import dumps
-from os.path import (
-    curdir,
-    exists,
-)
-from os.path import join as opj
-from os.path import relpath
-from os.path import split as pathsplit
 from unittest import SkipTest
 from unittest.mock import patch
 
@@ -52,31 +28,21 @@ import pytest
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
 from datalad.cmd import (
-    GitWitlessRunner,
-    KillOutput,
     StdOutErrCapture,
     WitlessRunner,
 )
-from datalad.core.local.repo import repo_from_path
-from datalad.utils import (
-    Path,
-    ensure_unicode,
-)
 
-from .. import utils
-from ..consts import ARCHIVES_TEMP_DIR
-from ..dochelpers import borrowkwargs
-from ..support.exceptions import (
-    CommandError,
-    CommandNotAvailableError,
-)
-from ..support.external_versions import external_versions
-from ..support.keyring_ import MemoryKeyring
-from ..support.network import RI
-from ..support.vcr_ import *
+from datalad import utils
+from datalad.consts import ARCHIVES_TEMP_DIR
+from datalad.dochelpers import borrowkwargs
+
+from datalad.support.external_versions import external_versions
+from datalad.support.keyring_ import MemoryKeyring
+from datalad.support.network import RI
+from datalad.support.vcr_ import *
 # TODO this must go
-from ..utils import *
-from . import _TEMP_PATHS_GENERATED
+from datalad.utils import *
+
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -1115,163 +1081,8 @@ def _get_resolved_flavors(flavors):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
 
-
-def clone_url(url):
-    runner = GitWitlessRunner()
-    tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
-        {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
-    runner.run(["git", "clone", url, tdir], protocol=KillOutput)
-    if GitRepo(tdir).is_with_annex():
-        AnnexRepo(tdir, init=True)
-    _TEMP_PATHS_CLONES.add(tdir)
-    return tdir
-
-
 local_testrepo_flavors = ['local'] # 'local-url'
-
 _TESTREPOS = None
-
-def _get_testrepos_uris(regex, flavors):
-    global _TESTREPOS
-    # we should instantiate those whenever test repos actually asked for
-    # TODO: just absorb all this lazy construction within some class
-    if not _TESTREPOS:
-        from .utils_testrepos import (
-            BasicAnnexTestRepo,
-            BasicGitTestRepo,
-            InnerSubmodule,
-            NestedDataset,
-            SubmoduleDataset,
-        )
-
-        _basic_annex_test_repo = BasicAnnexTestRepo()
-        _basic_git_test_repo = BasicGitTestRepo()
-        _submodule_annex_test_repo = SubmoduleDataset()
-        _nested_submodule_annex_test_repo = NestedDataset()
-        _inner_submodule_annex_test_repo = InnerSubmodule()
-        _TESTREPOS = {'basic_annex':
-                        {'network': 'https://github.com/datalad/testrepo--basic--r1',
-                         'local': _basic_annex_test_repo.path,
-                         'local-url': _basic_annex_test_repo.url},
-                      'basic_git':
-                        {'local': _basic_git_test_repo.path,
-                         'local-url': _basic_git_test_repo.url},
-                      'submodule_annex':
-                        {'local': _submodule_annex_test_repo.path,
-                         'local-url': _submodule_annex_test_repo.url},
-                      'nested_submodule_annex':
-                        {'local': _nested_submodule_annex_test_repo.path,
-                         'local-url': _nested_submodule_annex_test_repo.url},
-                      # TODO: append 'annex' to the name:
-                      # Currently doesn't work with some annex tests, despite
-                      # working manually. So, figure out how the tests' setup
-                      # messes things up with this one.
-                      'inner_submodule':
-                        {'local': _inner_submodule_annex_test_repo.path,
-                         'local-url': _inner_submodule_annex_test_repo.url}
-                      }
-        # assure that now we do have those test repos created -- delayed
-        # their creation until actually used
-        _basic_annex_test_repo.create()
-        _basic_git_test_repo.create()
-        _submodule_annex_test_repo.create()
-        _nested_submodule_annex_test_repo.create()
-        _inner_submodule_annex_test_repo.create()
-    uris = []
-    for name, spec in _TESTREPOS.items():
-        if not re.match(regex, name):
-            continue
-        uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
-
-        # additional flavors which might have not been
-        if 'clone' in flavors and 'clone' not in spec:
-            uris.append(clone_url(spec['local']))
-
-        if 'network-clone' in flavors \
-                and 'network' in spec \
-                and 'network-clone' not in spec:
-            uris.append(clone_url(spec['network']))
-
-    return uris
-
-
-@optional_args
-def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
-    """Decorator to provide a local/remote test repository
-
-    All tests under datalad/tests/testrepos are stored in two-level hierarchy,
-    where top-level name describes nature/identifier of the test repository,
-    and there could be multiple instances (e.g. generated differently) of the
-    same "content"
-
-    Parameters
-    ----------
-    regex : string, optional
-      Regex to select which test repos to use
-    flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
-      What URIs to provide.  E.g. 'local' would just provide path to the
-      repository, while 'network' would provide url of the remote location
-      available on Internet containing the test repository.  'clone' would
-      clone repository first to a temporary location. 'network-clone' would
-      first clone from the network location. 'auto' would include the list of
-      appropriate ones (e.g., no 'network*' flavors if network tests are
-      "forbidden").
-    count: int, optional
-      If specified, only up to that number of repositories to test with
-
-    Examples
-    --------
-
-    >>> from datalad.tests.utils_pytest import with_testrepos
-    >>> @with_testrepos('basic_annex')
-    ... def test_write(repo):
-    ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
-
-    """
-    @wraps(t)
-    @attr('with_testrepos')
-    def  _wrap_with_testrepos(*arg, **kw):
-        # addurls with our generated file:// URLs doesn't work on appveyor
-        # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
-        #if 'APPVEYOR' in os.environ:
-        #    pytest.skip("Testrepo setup is broken on AppVeyor")
-        # TODO: would need to either avoid this "decorator" approach for
-        # parametric tests or again aggregate failures like sweepargs does
-        flavors_ = _get_resolved_flavors(flavors)
-
-        testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        # we should always have at least one repo to test on, unless explicitly only
-        # network was requested by we are running without networked tests
-        if not (dl_cfg.get('datalad.tests.nonetwork') and flavors == ['network']):
-            assert(testrepos_uris)
-        else:
-            if not testrepos_uris:
-                pytest.skip("No non-networked repos to test on")
-
-        fake_dates = dl_cfg.get("datalad.fake-dates")
-        ntested = 0
-        for uri in testrepos_uris:
-            if count and ntested >= count:
-                break
-            ntested += 1
-            if __debug__:
-                lgr.debug('Running %s on %s', t.__name__, uri)
-            try:
-                t(*(arg + (uri,)), **kw)
-            finally:
-                # The is_explicit_path check is needed because it may be a URL,
-                # but check_dates needs a local path or GitRepo object.
-                if fake_dates and is_explicit_path(uri):
-                    from ..support.repodates import check_dates
-                    assert_false(
-                        check_dates(uri, annex="tree")["objects"])
-                if uri in _TEMP_PATHS_CLONES:
-                    _TEMP_PATHS_CLONES.discard(uri)
-                    rmtemp(uri)
-                pass  # might need to provide additional handling so, handle
-    return  _wrap_with_testrepos
-with_testrepos.__test__ = False
-
 
 @optional_args
 def with_sameas_remote(func, autoenabled=False):
