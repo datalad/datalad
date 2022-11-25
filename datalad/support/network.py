@@ -38,7 +38,11 @@ from urllib.parse import (
     urlsplit,
     urlunparse,
 )
-from urllib.request import Request
+from urllib.request import (
+    Request,
+    pathname2url,
+    url2pathname,
+)
 
 import iso8601
 
@@ -61,6 +65,14 @@ from datalad.utils import (
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
+
+def local_path_representation(path: str) -> str:
+    """Return an OS-specific representation of a "file:" URI-style path
+
+    With a posix path in the form of "a/b" this function will return "a/b" on
+    Unix-like operating systems and "a\\b" on Windows-style operating systems.
+    """
+    return str(Path(path))
 
 
 def is_windows_path(path):
@@ -706,7 +718,22 @@ class URL(RI):
         if not (hostname in (None, '', 'localhost', '::1')
                 or hostname.startswith('127.')):
             raise ValueError("file:// URL does not point to 'localhost'")
-        return self.path
+
+        # RFC1738 and RFC3986 both forbid unescaped backslash characters in
+        # URLs, and therefore also in the path-component of file:-URLs. We
+        # assume here that any backslash present in a file-URL is a relict of a
+        # verbatim copy of a Windows-style path.
+        unified_path = self.path.replace('\\', '/')
+        return url2pathname(unified_path)
+        print("---: self.path:", self.path, file=sys.stderr)
+        print("|1 : unified_path:", unified_path, file=sys.stderr)
+        print("|2 : url2pathname(unified_path):", url2pathname(unified_path), file=sys.stderr)
+        print("|3 : pathname2url(url2pathname(unified_path)):", pathname2url(url2pathname(unified_path)), file=sys.stderr)
+        print("|r : url2pathname(unified_path):", url2pathname(unified_path), file=sys.stderr)
+        pathname = url2pathname(unified_path)
+        if on_windows:
+            return pathname.replace("\\", "/")
+        return pathname
 
 
 class PathRI(RI):
@@ -721,7 +748,7 @@ class PathRI(RI):
 
     @property
     def localpath(self):
-        return self.path
+        return str(Path(self.path))
 
     @property
     def posixpath(self):
