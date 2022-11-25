@@ -19,14 +19,12 @@ from datalad.cmd import (
     readline_rstripped,
 )
 from datalad.cmd import BatchedCommandError
-from datalad.runner.exception import CommandError
 from datalad.runner.tests.utils import py2cmd
 from datalad.tests.utils_pytest import (
     assert_equal,
     assert_is_none,
     assert_is_not_none,
     assert_not_equal,
-    assert_raises,
     assert_true,
 )
 
@@ -60,13 +58,14 @@ def test_batched_close_abandon():
     response = bc("import time; print('a')")
     assert_equal(response, "a")
     bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
-    with unittest.mock.patch("datalad.cfg") as cfg_mock:
-        cfg_mock.configure_mock(**{"obtain.return_value": "abandon"})
+
+    with unittest.mock.patch("datalad.cmd._cfg_val", "abandon"):
         bc.close(return_stderr=False)
         assert_true(bc.wait_timed_out is True)
         assert_is_none(bc.return_code)
 
 
+@pytest.mark.filterwarnings("ignore:Exception ignored")
 def test_batched_close_timeout_exception():
     # Expect a timeout if the process runs longer than timeout and the config
     # for "datalad.runtime.stalled-external" is "abandon".
@@ -81,7 +80,8 @@ def test_batched_close_timeout_exception():
     bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
     with unittest.mock.patch("datalad.cfg") as cfg_mock:
         cfg_mock.configure_mock(**{"obtain.return_value": "abandon"})
-        assert_raises(TimeoutExpired, bc.close)
+        with pytest.raises(TimeoutExpired) as exc:
+            bc.close()
 
 
 def test_batched_close_wait():

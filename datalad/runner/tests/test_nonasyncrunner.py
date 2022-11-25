@@ -16,13 +16,18 @@ import queue
 import signal
 import subprocess
 import sys
+import time
 from itertools import count
+from queue import Queue
+from threading import Thread
 from time import sleep
 from typing import Optional
 from unittest.mock import (
     MagicMock,
     patch,
 )
+
+import pytest
 
 from datalad.tests.utils_pytest import (
     assert_false,
@@ -52,6 +57,7 @@ from ..runnerthreads import (
     ReadThread,
     WriteThread,
 )
+from ..utils import LineSplitter
 from .utils import py2cmd
 
 
@@ -81,6 +87,37 @@ class GenNothing(GeneratorMixIn, NoCapture):
             done_future=done_future,
             encoding=encoding)
         GeneratorMixIn.__init__(self)
+
+
+class GenStdoutLines(GeneratorMixIn, StdOutCapture):
+    """A generator-based protocol yielding individual subprocess' stdout lines
+
+    This is a simple implementation that is good enough for tests, i.e. with
+    controlled inpute. It will fail if data is delivered in parts to
+    self.pipe_data_received that are split inside an encoded character.
+    """
+    def __init__(self,
+                 done_future=None,
+                 encoding=None):
+
+        StdOutCapture.__init__(
+            self,
+            done_future=done_future,
+            encoding=encoding)
+        GeneratorMixIn.__init__(self)
+        self.line_splitter = LineSplitter()
+
+    def timeout(self, fd: Optional[int]) -> bool:
+        return True
+
+    def pipe_data_received(self, fd, data):
+        for line in self.line_splitter.process(data.decode(self.encoding)):
+            self.send_result(line)
+
+    def pipe_connection_lost(self, fd: int, exc: Optional[Exception]):
+        remaining_line = self.line_splitter.finish_processing()
+        if remaining_line is not None:
+            self.send_result(remaining_line)
 
 
 def test_subprocess_return_code_capture():
@@ -539,7 +576,7 @@ def test_exit_3():
                         timeout=.5,
                         exception_on_error=False)
     tuple(rt.run())
-    assert_true(rt.process.poll() is not None)
+    assert_true(rt.return_code is not None)
 
 
 def test_exit_4():
@@ -548,7 +585,7 @@ def test_exit_4():
                         protocol_class=GenNothing,
                         timeout=.5)
     tuple(rt.run())
-    assert_true(rt.process.poll() is not None)
+    assert_true(rt.return_code is not None)
 
 
 def test_generator_throw():
@@ -589,3 +626,124 @@ def test_stalling_detection_2():
         runner.process_queue()
     eq_(logger.method_calls[0][0], "warning")
     eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
+
+
+def test_concurrent_waiting_run():
+    from threading import Thread
+
+    threaded_runner = ThreadedRunner(
+        py2cmd("import time; time.sleep(1)"),
+        protocol_class=NoCapture,
+        stdin=None,
+    )
+
+    start = time.time()
+
+    number_of_threads = 5
+    caller_threads = []
+    for c in range(number_of_threads):
+        caller_thread = Thread(target=threaded_runner.run)
+        caller_thread.start()
+        caller_threads.append(caller_thread)
+
+    while caller_threads:
+        t = caller_threads.pop()
+        t.join()
+
+    # If the threads are serialized, the duration should at least
+    # be one second per thread.
+    duration = time.time() - start
+    assert duration >= 1.0 * number_of_threads
+
+
+def test_concurrent_generator_reading():
+    number_of_lines = 40
+    number_of_threads = 100
+    output_queue = Queue()
+
+    threaded_runner = ThreadedRunner(
+        py2cmd(f"for i in range({number_of_lines}): print(f'result#{{i}}')"),
+        protocol_class=GenStdoutLines,
+        stdin=None,
+    )
+    result_generator = threaded_runner.run()
+
+    def thread_main(thread_number, result_generator, output_queue):
+        while True:
+            try:
+                output = next(result_generator)
+            except StopIteration:
+                output_queue.put((thread_number, None))
+                break
+            output_queue.put((thread_number, output))
+
+    caller_threads = []
+    for c in range(number_of_threads):
+        caller_thread = Thread(
+            target=thread_main,
+            args=(c, result_generator, output_queue)
+        )
+        caller_thread.start()
+        caller_threads.append(caller_thread)
+
+    while caller_threads:
+        t = caller_threads.pop()
+        t.join()
+
+    collected_outputs = [
+        output_tuple[1]
+        for output_tuple in output_queue.queue
+        if output_tuple[1] is not None
+    ]
+    assert len(collected_outputs) == number_of_lines
+    assert collected_outputs == [
+        f"result#{i}"
+        for i in range(number_of_lines)
+    ]
+
+
+def test_same_thread_reenter_detection():
+    threaded_runner = ThreadedRunner(
+        py2cmd(f"print('hello')"),
+        protocol_class=GenStdoutLines,
+        stdin=None,
+    )
+    threaded_runner.run()
+    with pytest.raises(RuntimeError) as error:
+        threaded_runner.run()
+    assert "re-entered by already" in str(error.value)
+
+
+def test_reenter_generator_detection():
+    threaded_runner = ThreadedRunner(
+        py2cmd(f"print('hello')"),
+        protocol_class=GenStdoutLines,
+        stdin=None,
+    )
+
+    def target(threaded_runner, output_queue):
+        try:
+            start_time = time.time()
+            tuple(threaded_runner.run())
+            output_queue.put(("result", time.time() - start_time))
+        except RuntimeError as exc:
+            output_queue.put(("exception", exc))
+
+    output_queue = Queue()
+
+    for sleep_time in range(1, 4):
+        other_thread = Thread(
+            target=target,
+            args=(threaded_runner, output_queue)
+        )
+
+        gen = threaded_runner.run()
+        other_thread.start()
+        time.sleep(sleep_time)
+        tuple(gen)
+        other_thread.join()
+
+        assert len(list(output_queue.queue)) == 1
+        result_type, value = output_queue.get()
+        assert result_type == "result"
+        assert value >= sleep_time
