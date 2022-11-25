@@ -9,7 +9,6 @@
 
 import logging
 import os
-import sys
 from collections import OrderedDict
 from os.path import isabs
 from os.path import join as opj
@@ -53,7 +52,6 @@ from datalad.tests.utils_pytest import (
     nok_,
     ok_,
     skip_if,
-    skip_if_on_windows,
     swallow_logs,
     with_tempfile,
 )
