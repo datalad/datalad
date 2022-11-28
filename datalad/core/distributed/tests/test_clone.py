@@ -722,7 +722,6 @@ def test_cfg_originorigin(path=None):
 
 
 # test fix for gh-2601/gh-3538
-@known_failure
 @with_tempfile()
 def test_relative_submodule_url(path=None):
     Dataset(op.join(path, 'origin')).create()
@@ -739,19 +738,6 @@ def test_relative_submodule_url(path=None):
     eq_(subinfo['gitmodule_url'],
         # must be a relative URL, not platform-specific relpath!
         '../../origin')
-
-
-def test_mushy_windows_submodule_url(tmp_path):
-    """Test that subdataset clones from relative urls
-    do not include backslashes (gh-7180)"""
-    Dataset(tmp_path / 'origin').create()
-    ds = Dataset(tmp_path / 'ds').create()
-    with chpwd(ds.path):
-        ds_cloned = ds.clone(
-            source=op.join(op.pardir, 'origin'),
-            path='sources')
-        assert '\\' not in ds_cloned.config.get(f'remote.{DEFAULT_REMOTE}.url')
-
 
 
 @with_tree(tree={"subdir": {}})
