@@ -39,6 +39,7 @@ from datalad.tests.utils_pytest import (
     assert_status,
     eq_,
     get_deeply_nested_structure,
+    known_failure_githubci_win,
     nok_,
     ok_,
     with_tempfile,
@@ -574,6 +575,7 @@ def test_drop_allkeys_result_contains_annex_error_messages(path=None):
 
 
 # https://github.com/datalad/datalad/issues/6948
+@known_failure_githubci_win  # recent git-annex, https://github.com/datalad/datalad/issues/7197
 @with_tempfile
 @with_tempfile
 def test_nodrop_symlinked_annex(origpath=None, clonepath=None):
