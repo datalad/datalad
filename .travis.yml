@@ -271,7 +271,7 @@ script:
   #  in effect, dumping too many logs.
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $PYTEST_WRAPPER python
+    echo $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
       -c ../tox.ini
       -n 2
