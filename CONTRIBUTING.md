@@ -286,6 +286,7 @@ release of Debian or Ubuntu) with all dependencies listed in README.md pre-insta
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.
 Please note that new a contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
 As the full CI suite takes a while to complete, we recommend to run at least tests directly related to your contributions locally beforehand.
+Logs from all CI runs are collected periodically by [con/tinuous](https://github.com/con/tinuous/) and archived at `smaug:/mnt/btrfs/datasets/datalad/ci/logs/`.
 For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
 If you would like to propose patch against `git-annex` itself, submit them against [datalad/git-annex](https://github.com/datalad/git-annex/#submitting-patches) repository which builds and tests `git-annex`.
 
@@ -461,7 +462,6 @@ New and existing contributors are invited to join teams:
 
 - **git**: Git interface (e.g. GitRepo, protocols, helpers, compatibility) (@datalad/team-git)
 
-
 - **gitannex**: git-annex interface (e.g. AnnexRepo, protocols, helpers, compatibility) (@datalad/team-gitannex)
 
 - **remotes**: (special) remote implementations (@datalad/team-remotes)
@@ -622,19 +622,19 @@ Refer datalad/config.py for information on how to add these environment variable
 
 ## Releasing with GitHub Actions, auto, and pull requests
 
-New releases of datalad are created via a GitHub Actions workflow built
-around [`auto`](https://github.com/intuit/auto).  Whenever a pull request is
-merged into `maint` that has the "`release`" label, `auto` updates the
+New releases of DataLad are created via a GitHub Actions workflow using [datalad/release-action](https://github.com/datalad/release-action), which was inspired by [`auto`](https://github.com/intuit/auto).
+Whenever a pull request is merged into `maint` that has the "`release`" label, that workflow updates the
 changelog based on the pull requests since the last release, commits the
 results, tags the new commit with the next version number, and creates a GitHub
-release for the tag.  This in turn triggers a job for building an sdist & wheel
-for the project and uploading them to PyPI.
+release for the tag.
+This in turn triggers a job for building an sdist & wheel for the project and uploading them to PyPI.
 
-### Labelling pull requests
+### CHANGELOG entries and labelling pull requests
 
-The section that `auto` adds to the changelog on a new release consists of the
-titles of all pull requests merged into master since the previous release,
-organized by label.  `auto` recognizes the following PR labels:
+DataLad uses [scriv](https://github.com/nedbat/scriv/) to maintain [CHANGELOG.md](./CHANGELOG.md).
+Adding label `CHANGELOG-missing` to a PR triggers workflow to add a new `scriv` changelog fragment under `changelog.d/` using PR title as the content.
+That produced changelog snippet could subsequently tuned to improve perspective CHANGELOG entry.
+The section that workflow adds to the changelog depends on the `semver-` label added to the PR:
 
 - `semver-minor` — for changes corresponding to an increase in the minor version
   component
@@ -650,9 +650,12 @@ organized by label.  `auto` recognizes the following PR labels:
 [contrib_emoji]: https://allcontributors.org/docs/en/emoji-key
 
 
-### Filing issues with git-annex
+## git-annex
 
 Even though git-annex is a separate project, DataLad's and git-annex's development is often intertwined.
+
+## Filing issues
+
 It is not uncommon to discover potential git-annex bugs or git-annex feature request while working on DataLad.
 In those cases, it is common for developers and contributors to file an issue in git-annex's public bug tracker at [git-annex.branchable.com](https://git-annex.branchable.com/).
 Here are a few hints on how to go about it:
@@ -660,3 +663,11 @@ Here are a few hints on how to go about it:
 - You can report a new bug or browse through existing bug reports at [git-annex.branchable.com/bugs](https://git-annex.branchable.com/bugs/))
 - In order to associate a bug report with the DataLad you can add the following mark up into the description: ``[[!tag projects/datalad]]``
 - You can add author metadata with the following mark up: ``[[!meta author=yoh]]``. Some authors will be automatically associated with the DataLad project by git-annex's bug tracker.
+
+## Testing and contributing
+
+To provide downstream testing of development `git-annex` against DataLad, we maintain the [datalad/git-annex](https://github.com/datalad/git-annex) repository.
+It provides daily builds of git-annex with CI setup to run git-annex built-in tests and tests of DataLad across all supported operating systems.
+It also has a facility to test git-annex on *your* client systems following [the instructions](https://github.com/datalad/git-annex/tree/master/clients#testing-git-annex-builds-on-local-clients).
+All the build logs and artifacts (installer packages etc) for daily builds and releases are collected using [con/tinuous](https://github.com/con/tinuous/) and archived on `smaug:/mnt/btrfs/datasets/datalad/ci/git-annex/`.
+You can test your fixes for git-annex by submitting patches for it [following instructions](https://github.com/datalad/git-annex#submitting-patches).
