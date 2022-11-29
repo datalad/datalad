@@ -741,15 +741,6 @@ class URL(RI):
         # verbatim copy of a Windows-style path.
         unified_path = self.path.replace('\\', '/')
         return url2pathname(unified_path)
-        print("---: self.path:", self.path, file=sys.stderr)
-        print("|1 : unified_path:", unified_path, file=sys.stderr)
-        print("|2 : url2pathname(unified_path):", url2pathname(unified_path), file=sys.stderr)
-        print("|3 : pathname2url(url2pathname(unified_path)):", pathname2url(url2pathname(unified_path)), file=sys.stderr)
-        print("|r : url2pathname(unified_path):", url2pathname(unified_path), file=sys.stderr)
-        pathname = url2pathname(unified_path)
-        if on_windows:
-            return pathname.replace("\\", "/")
-        return pathname
 
 
 class PathRI(RI):
