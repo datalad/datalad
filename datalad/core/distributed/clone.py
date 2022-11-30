@@ -69,6 +69,7 @@ from datalad.utils import (
     knows_annex,
     make_tempfile,
     Path,
+    PurePath,
     PurePosixPath,
     rmtree,
 )
@@ -379,11 +380,23 @@ class Clone(Interface):
             # Modify .gitmodules to contain originally given url. This is
             # particularly relevant for postclone routines on a later `get`
             # for that subdataset. See gh-5256.
+
+            if isinstance(RI(source), PathRI):
+                # ensure posix paths; Windows paths would neither be meaningful
+                # as a committed path nor are they currently stored correctly
+                # (see gh-7182).
+                # Restricted to when 'source' is identified as a path, b/c this
+                # wouldn't work with file-URLs (ria or not):
+                #
+                # PureWindowsPath("file:///C:/somewhere/path").as_posix() ->
+                # 'file:/C:/somewhere/path'
+                source = PurePath(source).as_posix()
             if actually_saved_subds:
                 # New subdataset actually saved. Amend the modification
-                # of .gitmodules. Note, that we didn't allow to deviate
-                # from git default behavior WRT a submodule's name vs
-                # its path when we made this a new subdataset.
+                # of .gitmodules.
+                # Note, that we didn't allow deviating from git's default
+                # behavior WRT a submodule's name vs its path when we made this
+                # a new subdataset.
                 subds_name = path.relative_to(ds.pathobj)
                 ds.repo.call_git(
                     ['config',

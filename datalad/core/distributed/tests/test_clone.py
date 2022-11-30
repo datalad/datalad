@@ -324,7 +324,7 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     # source is recorded in .gitmodules:
     sds = ds.subdatasets("sub")
     assert_result_count(sds, 1, action='subdataset')
-    eq_(sds[0]['gitmodule_datalad-url'], source.path)
+    eq_(sds[0]['gitmodule_datalad-url'], source.pathobj.as_posix())
     # Clone produced one commit including the addition to .gitmodule:
     commits = list(ds.repo.get_branch_commits_(
         branch=DEFAULT_BRANCH,
