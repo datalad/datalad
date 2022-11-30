@@ -214,6 +214,7 @@ matrix:
 skip_commits:
   files:
     - docs/
+    - changelog.d/
 
 
 # tests need specific hostnames to be available
