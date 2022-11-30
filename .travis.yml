@@ -269,13 +269,15 @@ script:
   # Run tests
   #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
   #  in effect, dumping too many logs.
+  - set -x
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    echo $PYTEST_WRAPPER python
+    $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
       -c ../tox.ini
       -n 2
       -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)"
+      --collect-only
       --doctest-modules
       --cov=datalad
       --cov-report=
