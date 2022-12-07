@@ -20,6 +20,7 @@ from datalad.customremotes.ria_utils import (
     create_store,
     get_layout_locations,
     verify_ria_url,
+    url_path2local_path,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -58,6 +59,7 @@ from datalad.utils import (
     Path,
     quote_cmdlinearg,
 )
+
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_ria')
 
@@ -298,7 +300,7 @@ class CreateSiblingRia(Interface):
         # reduced to single instance, since rewriting url based on config could
         # be different for subdatasets.
         try:
-            ssh_host, base_path, rewritten_url = \
+            ssh_host, url_base_path, rewritten_url = \
                 verify_ria_url(push_url if push_url else url, ds.config)
         except ValueError as e:
             yield get_status_dict(
@@ -307,6 +309,8 @@ class CreateSiblingRia(Interface):
                 **res_kwargs
             )
             return
+
+        local_base_path = Path(url_path2local_path(url_base_path))
 
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
@@ -366,26 +370,23 @@ class CreateSiblingRia(Interface):
             # determine the existence of a store by trying to read its layout.
             # Because this raises a FileNotFound error if non-existent, we need
             # to catch it
-            io.read_file(Path(base_path) / 'ria-layout-version')
+            io.read_file(local_base_path / 'ria-layout-version')
         except (FileNotFoundError, RIARemoteError, RemoteCommandFailedError) as e:
             if not new_store_ok:
                 # we're instructed to only act in case of an existing RIA store
                 res = get_status_dict(
                     status='error',
                     message="No store found at '{}'. Forgot "
-                            "--new-store-ok ?".format(
-                        Path(base_path)),
+                            "--new-store-ok ?".format(local_base_path),
                     **res_kwargs)
                 yield res
                 return
 
         log_progress(
             lgr.info, 'create-sibling-ria',
-            'Creating a new RIA store at %s', Path(base_path),
+            'Creating a new RIA store at %s', local_base_path,
         )
-        create_store(io,
-                     Path(base_path),
-                     '1')
+        create_store(io, local_base_path, '1')
 
         yield from _create_sibling_ria(
             ds,
@@ -458,7 +459,7 @@ def _create_sibling_ria(
 
     # parse target URL
     try:
-        ssh_host, base_path, rewritten_url = \
+        ssh_host, url_base_path, rewritten_url = \
             verify_ria_url(push_url if push_url else url, ds.config)
     except ValueError as e:
         yield get_status_dict(
@@ -468,7 +469,7 @@ def _create_sibling_ria(
         )
         return
 
-    base_path = Path(base_path)
+    local_base_path = Path(url_path2local_path(url_base_path))
 
     git_url = decode_source_spec(
         # append dataset id to url and use magic from clone-helper:
@@ -481,7 +482,7 @@ def _create_sibling_ria(
     )['giturl'] if push_url else None
 
     # determine layout locations; go for a v1 store-level layout
-    repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
+    repo_path, _, _ = get_layout_locations(1, local_base_path, ds.id)
 
     ds_siblings = [
         r['name'] for r in ds.siblings(
@@ -559,7 +560,7 @@ def _create_sibling_ria(
             " and '{}'".format(storage_name) if storage_name else '',
         )
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
-                       base_path, ds.id, '2', '1', alias,
+                       local_base_path, ds.id, '2', '1', alias,
                        init_obj_tree=storage_sibling is not False)
     if storage_sibling:
         # we are using the main `name`, if the only thing we are creating

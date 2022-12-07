@@ -9,9 +9,18 @@
 """Helper for RIA stores
 
 """
+from __future__ import annotations
 
 import logging
 from pathlib import Path
+from urllib.parse import (
+    unquote,
+    urlparse,
+)
+from urllib.request import (
+    url2pathname,
+    pathname2url,
+)
 
 
 lgr = logging.getLogger('datalad.customremotes.ria_utils')
@@ -87,6 +96,7 @@ def verify_ria_url(url, cfg):
       (host, base-path, rewritten url)
       `host` is not just a hostname, but is a stub URL that may also contain
       username, password, and port, if specified in a given URL.
+      `base-path` is the path component of the url
     """
     from datalad.config import rewrite_url
     from datalad.support.network import URL
@@ -243,3 +253,16 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version,
         except FileExistsError:
             lgr.warning("Alias %r already exists in the RIA store, not adding an "
                         "alias.", alias)
+
+
+def local_path2url_path(local_path: str) -> str:
+    """Convert a local path into a URL path part"""
+    if not local_path:
+        return '/'
+    return urlparse(unquote(pathname2url(local_path))).path
+
+
+def url_path2local_path(url_path: str) -> str:
+    if not url_path:
+        return str(Path('/'))
+    return url2pathname(url_path)

@@ -1,7 +1,12 @@
+import tempfile
+from os.path import join
+
 from datalad.customremotes.ria_utils import (
     UnknownLayoutVersion,
     create_ds_in_store,
     create_store,
+    local_path2url_path,
+    url_path2local_path,
     verify_ria_url,
 )
 from datalad.distributed.ora_remote import (
@@ -157,3 +162,13 @@ def test_verify_ria_url():
     for i, o in cases.items():
         # we are not testing the URL rewriting here
         assert_equal(o, verify_ria_url(i, {})[:2])
+
+
+def test_mapping_identity():
+
+    temp_dir = tempfile.gettempdir()
+    for name in (temp_dir, join(temp_dir, "x.txt")):
+        assert url_path2local_path(local_path2url_path(name)) == name
+
+    for name in ("/c:/window", "/d"):
+        assert local_path2url_path(url_path2local_path(name)) == name
