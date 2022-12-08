@@ -17,7 +17,6 @@ import email.utils
 import os
 import pickle
 import re
-import sys
 import time
 from collections import OrderedDict
 from hashlib import md5
@@ -50,6 +49,7 @@ from datalad import (
     cfg,
     consts,
 )
+from datalad.customremotes.ria_utils import local_path2url_path
 from datalad.support.cache import lru_cache
 from datalad.support.exceptions import CapturedException
 from datalad.utils import (
@@ -83,7 +83,8 @@ def local_url_path_representation(url_path: str) -> str:
     Unix-like operating systems and "C:\\Windows" on Windows-like operating
     systems.
     """
-    return url2pathname(url_path)
+    from urllib.parse import quote
+    return url2pathname(quote(url_path))
 
 
 def local_path_from_url(url: str) -> str:
@@ -979,8 +980,11 @@ def get_local_file_url(fname, compatibility='git-annex'):
     compatibility : str, optional
         This parameter exists for compatibility reasons only, it has no effect.
     """
-    from datalad.customremotes.ria_utils import local_path2url_path
-    return f'file://{local_path2url_path(fname)}'
+    path = str(Path(fname).resolve().absolute())
+    r1 = local_path2url_path(path)
+    print(f"fname: {repr(path)}")
+    print(f"local_path2url_path(fname): {repr(r1)}")
+    return f'file://{local_path2url_path(path)}'
 
 
 def get_url_cache_filename(url, name=None):

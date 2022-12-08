@@ -1,11 +1,14 @@
 import tempfile
 from os.path import join
+from urllib.parse import quote
 
+from datalad.customremotes import ria_utils
 from datalad.customremotes.ria_utils import (
     UnknownLayoutVersion,
     create_ds_in_store,
     create_store,
     local_path2url_path,
+    quote_path,
     url_path2local_path,
     verify_ria_url,
 )
@@ -165,10 +168,23 @@ def test_verify_ria_url():
 
 
 def test_mapping_identity():
+    from datalad.tests.utils_pytest import OBSCURE_FILENAME
 
+    absolute_obsure_path = str(Path('/') / OBSCURE_FILENAME)
     temp_dir = tempfile.gettempdir()
-    for name in (temp_dir, join(temp_dir, "x.txt")):
+    for name in (temp_dir, join(temp_dir, "x.txt"), absolute_obsure_path):
         assert url_path2local_path(local_path2url_path(name)) == name
 
-    for name in ("/c:/window", "/d"):
+    for name in map(quote_path, ("/c:/window", "/d", absolute_obsure_path)):
         assert local_path2url_path(url_path2local_path(name)) == name
+
+
+def test_quote_path(monkeypatch):
+    with monkeypatch.context() as ctx:
+        ctx.setattr(ria_utils, 'on_windows', True)
+        assert quote_path("/c:/win:xxx") == "/c:/win%3Axxx"
+        assert quote_path("/C:/win:xxx") == "/C:/win%3Axxx"
+
+        ctx.setattr(ria_utils, 'on_windows', False)
+        assert quote_path("/c:/win:xxx") == "/c%3A/win%3Axxx"
+        assert quote_path("/C:/win:xxx") == "/C%3A/win%3Axxx"

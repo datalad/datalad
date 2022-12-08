@@ -12,15 +12,18 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from urllib.parse import (
-    unquote,
+    quote,
     urlparse,
 )
 from urllib.request import (
     url2pathname,
     pathname2url,
 )
+
+from datalad.utils import on_windows
 
 
 lgr = logging.getLogger('datalad.customremotes.ria_utils')
@@ -256,13 +259,28 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version,
 
 
 def local_path2url_path(local_path: str) -> str:
-    """Convert a local path into a URL path part"""
+    """Convert a local path into a URL path component"""
     if not local_path:
-        return '/'
-    return urlparse(unquote(pathname2url(local_path))).path
+        return "/"
+    if not Path(local_path).is_absolute():
+        raise ValueError(
+            f"cannot convert relative path to URL path: {local_path}")
+    return urlparse(pathname2url(local_path)).path
 
 
-def url_path2local_path(url_path: str) -> str:
+def url_path2local_path(url_path: str, strict: bool = True) -> str:
     if not url_path:
-        return str(Path('/'))
+        return str(Path("/"))
+    if strict is True:
+        test_path = url_path.replace("%", "_")
+        if quote_path(test_path) != test_path:
+            raise ValueError(f"illegal URL path component: {url_path}")
     return url2pathname(url_path)
+
+
+def quote_path(path: str) -> str:
+    """quote the path component of a URL, takes OS specifics into account"""
+    if on_windows:
+        if re.match("^/[a-zA-Z]:/", path):
+            return path[:3] + quote(path[3:])
+    return quote(path)

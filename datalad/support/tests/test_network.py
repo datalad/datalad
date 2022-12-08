@@ -492,13 +492,10 @@ def test_get_local_file_url():
         # Yarik found no better way to trigger.  .decode() isn't enough
         print("D: %s" % path)
         if isabs(path):
-            eq_(get_local_file_url(path), url)
+            assert get_local_file_url(path) == url
         else:
-            eq_(get_local_file_url(path),
-                '/'.join((
-                    get_local_file_url(os.getcwd()),
-                    url))
-            )
+            assert get_local_file_url(path) == '/'.join(
+                (get_local_file_url(os.getcwd()), url))
 
 
 @with_tempfile(mkdir=True)
