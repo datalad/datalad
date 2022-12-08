@@ -24,6 +24,7 @@ from ..path import (
     abspath,
     curdir,
     get_parent_paths,
+    get_limited_paths,
     robust_abspath,
     split_ext,
 )
@@ -114,3 +115,13 @@ def test_get_parent_paths(sep):
 
     # and we get the deepest parent
     eq_(gpp(_pp(['a/b/file', 'a/b/file2']), _pp(['a', 'a/b'])), _pp(['a/b']))
+
+
+def test_get_limited_paths():
+    # just to avoid typing all the same
+    def glp(*args, **kwargs):
+        return list(get_limited_paths(*args, **kwargs))
+
+    assert glp(['a', 'b'], ['a', 'c']) == ['a']
+    assert glp(['a', 'b'], ['a/b', 'c']) == []  # a is not subpath of a/b
+    assert glp(['a', 'b'], ['a/b', 'c'], include_within_path=True) == ['a']  # a is not subpath of a/b

@@ -20,6 +20,7 @@ from collections import defaultdict as _defaultdict
 
 from functools import wraps
 from itertools import dropwhile
+from pathlib import Path, PurePosixPath
 
 from ..utils import (
     ensure_bytes,
@@ -205,6 +206,58 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
                     seen.add(path)
 
     return res
+
+
+def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_within_path: bool = False) -> list[Path]:
+    """Given list of relative POSIX paths (or Path objects), select the ones within limits (also relative and POSIX).
+
+    In case of include_with_path=True, if limit points to some path under a 'path' within 'paths',
+    that path would be returned as well.
+
+    Yields
+    -------
+    list of paths, sorted (so order is not preserved), which reside under 'limits' paths or path within 'limits' is
+    under that path.
+    """
+    # do conversion and sanity checks, O(N)
+    def _harmonize_paths(l: list) -> list:
+        ps = []
+        for p in l:
+            if isinstance(p, str):
+                p = PurePosixPath(p)
+            if p.is_absolute():
+                raise ValueError(f"Got absolute path {p}, expected relative")
+            if p.parts and p.parts[0] == '..':
+                raise ValueError(f"Path {p} leads outside")
+            ps.append(p.parts)  # store parts
+        return sorted(ps)  # O(N * log(N))
+
+    paths_parts = _harmonize_paths(paths)
+    limits_parts = _harmonize_paths(limits)
+
+    # we will pretty much "scroll" through sorted paths and limits at the same time
+    for path_parts in paths_parts:
+        while limits_parts:
+            limit_parts = limits_parts[0]
+            l = min(len(path_parts), len(limit_parts))
+            # if common part is "greater" in the path -- we can go to the next "limit"
+            if limit_parts[:l] < path_parts[:l]:
+                # get to the next one
+                limits_parts = limits_parts[1:]
+            else:
+                break  # otherwise -- consider this one!
+        if not limits_parts:
+            # none left
+            break
+        if include_within_path:
+            # if one identical or subpath of another one -- their parts match in the beginning
+            # and we will just reuse that 'l'
+            pass
+        else:
+            # if all components of the limit match, for that we also add len(path_parts) check below
+            l = len(limit_parts)
+        if len(path_parts) >= l and (path_parts[:l] == limit_parts[:l]):
+            yield '/'.join(path_parts)
 
 
 def _get_parent_paths_check(path, sep, asep):
