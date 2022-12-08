@@ -976,31 +976,11 @@ def get_local_file_url(fname, compatibility='git-annex'):
     ----------
     fname : string
         Filename.  If not absolute, abspath is used
-    compatibility : {'git', 'git-annex'}, optional
-        On Windows, and only on that platform, file:// URLs may need to look
-        different depending on the use case or consuming application. This
-        switch selects different compatibility modes: 'git' for use with
-        Git commands (e.g. `clone` or `submodule add`); 'git-annex` for
-        Git-annex command input (e.g. `addurl`). On any other platform this
-        setting has no effect.
+    compatibility : str, optional
+        This parameter exists for compatibility reasons only, it has no effect.
     """
-    # we resolve the path to circumwent potential short paths on unfortunate
-    # platforms that would ruin the URL format.
-    #path = Path(fname).resolve().absolute()
-    path = Path(fname).resolve()
-    if on_windows:
-        # in addition we need to absolute(), as on windows resolve() doesn't
-        # imply that
-        path = path.absolute().as_posix()
-        furl = 'file://{}{}'.format(
-            '/' if compatibility == 'git' else '',
-            urlquote(
-                re.sub(r'([a-zA-Z]):', r'\1', path)
-            ))
-    else:
-        # TODO:  need to fix for all the encoding etc
-        furl = str(URL(scheme='file', path=str(path)))
-    return furl
+    from datalad.customremotes.ria_utils import local_path2url_path
+    return f'file://{local_path2url_path(fname)}'
 
 
 def get_url_cache_filename(url, name=None):

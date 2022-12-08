@@ -1024,11 +1024,11 @@ class RIARemote(SpecialRemote):
                 "No base path configured for RIA store. Specify a proper "
                 "ria+<scheme>://... URL.")
 
-        # the base path is ultimately derived from a URL, always treat as POSIX
+        # the base path is ultimately derived from a URL
         if not Path(self.store_base_path).is_absolute():
             raise RIARemoteError(
                 'Non-absolute object tree base path configuration: %s'
-                '' % str(self.store_base_path))
+                % str(self.store_base_path))
 
         if self.ria_store_pushurl:
             if self.ria_store_pushurl.startswith("ria+http"):
