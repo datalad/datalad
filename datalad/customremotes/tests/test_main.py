@@ -10,26 +10,31 @@
 
 import logging
 import os
+import pytest
 
 from ..main import main
 
 from ..base import AnnexCustomRemote
 
 from datalad.tests.utils_pytest import (
+    patch,
     swallow_logs,
     swallow_outputs,
 )
-
-import pytest
+from datalad.ui import ui
 
 
 def test_erroring_out():
     class TooAbstract(AnnexCustomRemote):
         pass
 
+    # patch to not let `main` change the ui.backend
+    # of the test process (instead of a special remote process it is actually
+    # targeting)
     with swallow_logs(new_level=logging.DEBUG) as cml, \
         swallow_outputs() as cmo:
-        with pytest.raises(SystemExit) as cme:
+        with pytest.raises(SystemExit) as cme,\
+                patch.object(ui, "set_backend", autospec=True):
             main(args=[], cls=TooAbstract)
         assert cme.value.code == 1
         assert 'passing ERROR to git-annex' in cml.out
