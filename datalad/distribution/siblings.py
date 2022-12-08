@@ -562,19 +562,18 @@ def _configure_remote(
                         store=False):
                     repo.enable_remote(name)
             except (CommandError, DownloadError) as exc:
-                ce = CapturedException(exc)
-                # TODO yield
-                # this is unlikely to ever happen, now done for AnnexRepo
-                # instances only
                 # Note: CommandError happens with git-annex
                 # 6.20180416+gitg86b18966f-1~ndall+1 (prior 6.20180510, from
                 # which starts to fail with AccessFailedError) if URL is bogus,
                 # so enableremote fails. E.g. as "tested" in test_siblings
-                lgr.info(
-                    "Could not enable annex remote %s. This is expected if %s "
-                    "is a pure Git remote, or happens if it is not accessible.",
-                    name, name)
-                lgr.debug("Exception was: %s", ce)
+                # TODO yield
+                ce = CapturedException(exc)
+                repo.config.reload()
+                if repo.is_remote_annex_ignored(name):
+                    # Only inform user about the failure, if it's actually
+                    # consequential, because annex decided to set
+                    # annex-ignore=true.
+                    lgr.info("Could not annex-enable %s: %s", name, exc.stderr)
 
             if as_common_datasrc:
                 # we need a fully configured remote here
@@ -709,17 +708,16 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
                         info['annex-groupwanted'] = groupwanted
                 except CommandError as exc:
                     if 'cannot determine uuid' in exc.stderr:
-                        # not an annex (or no connection), would be marked as
-                        #  annex-ignore
-                        msg = "Could not detect whether %s carries an annex. " \
-                              "If %s is a pure Git remote, this is expected. " %\
-                              (remote, remote)
+                        ce = CapturedException(exc)
                         repo.config.reload()
                         if repo.is_remote_annex_ignored(remote):
-                            msg += "Remote was marked by annex as annex-ignore. " \
-                                   "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
-                        lgr.warning(msg)
-                        info['annex-ignore'] = True
+                            lgr.warning(
+                                "%s was marked by git-annex as annex-ignore."
+                                "Edit .git/config to reset if you think that "
+                                "was done by mistake due to absent "
+                                "connection etc.",
+                                remote)
+                            info['annex-ignore'] = True
                     else:
                         raise
             else:
