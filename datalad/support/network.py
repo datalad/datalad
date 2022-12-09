@@ -973,7 +973,7 @@ def is_ssh(ri):
 def get_local_file_url(fname: str,
                        compatibility: str = 'git-annex',
                        include_netloc: bool = True,
-                       allow_relative_path: bool = False
+                       allow_relative_path: bool = True
                        ) -> str:
     """Return OS specific URL pointing to a local file
 
