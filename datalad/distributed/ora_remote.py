@@ -521,6 +521,18 @@ class SSHRemoteIO(IOBase):
             raise RIARemoteError("annex object {src} does not exist."
                                  "".format(src=src))
 
+        from os.path import basename
+        key = basename(str(src))
+        try:
+            size = self._get_download_size_from_key(key)
+        except RemoteError as e:
+            raise RemoteError(f"src: {src}") from e
+
+        if size is None:
+            # rely on SCP for now
+            self.ssh.get(str(src), str(dst))
+            return
+
         # TODO: see get_from_archive()
 
         # TODO: Currently we will hang forever if the file isn't readable and
@@ -535,18 +547,6 @@ class SSHRemoteIO(IOBase):
         self.shell.stdin.write(cmd.encode())
         self.shell.stdin.write(b"\n")
         self.shell.stdin.flush()
-
-        from os.path import basename
-        key = basename(str(src))
-        try:
-            size = self._get_download_size_from_key(key)
-        except RemoteError as e:
-            raise RemoteError(f"src: {src}") from e
-
-        if size is None:
-            # rely on SCP for now
-            self.ssh.get(str(src), str(dst))
-            return
 
         with open(dst, 'wb') as target_file:
             bytes_received = 0
@@ -1117,7 +1117,7 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
             self.get_layout_locations(store_base_path, self.archive_id)
 
-        read_only_msg = "Treating remote as read-only in order to" \
+        read_only_msg = "Treating remote as read-only in order to " \
                         "prevent damage by putting things into an unknown " \
                         "version of the target layout. You can overrule this " \
                         "by setting 'annex.ora-remote.<name>.force-write=true'."

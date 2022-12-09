@@ -258,7 +258,7 @@ class RSTManPageFormatter(ManPageFormatter):
 
     def _format_action(self, action):
         # determine the required width and the entry label
-        action_header = self._format_action_invocation(action, doubledash='-\\\\-')
+        action_header = self._format_action_invocation(action, doubledash='-\\-')
 
         if action.help:
             help_text = self._expand_help(action)

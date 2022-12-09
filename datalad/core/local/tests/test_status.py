@@ -26,6 +26,7 @@ from datalad.tests.utils_pytest import (
     assert_dict_equal,
     assert_in,
     assert_in_results,
+    assert_not_in_results,
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -222,6 +223,17 @@ def test_status(_path=None, linkpath=None):
             assert res['type'] == 'symlink', res
         else:
             assert res['type'] != 'symlink', res
+
+@with_tempfile(mkdir=True)
+def test_untracked_annex_query(path=None):
+    # test for #7032
+    ds = Dataset(path).create()
+    (ds.pathobj / 'untracked_file.txt').write_text(u'dummy')
+    res = ds.status(annex='basic', path='untracked_file.txt')
+    assert_not_in_results(
+        res,
+        error_message='File unknown to git',
+        )
 
 
 # https://github.com/datalad/datalad-revolution/issues/64

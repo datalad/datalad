@@ -79,14 +79,6 @@ def _reentry_detection_run(protocol: type[WitlessProtocol],
     return exception
 
 
-def test_thread_reentry_detection():
-    # expect that two run calls on the same runner with a generator-protocol
-    # and an active generator create a runtime error
-
-    exceptions = _reentry_detection_run(MinimalGeneratorProtocol, False)
-    assert exceptions == [RuntimeError]
-
-
 def test_thread_serialization():
     # expect that two run calls on the same runner with a non-generator-protocol
     # do not create a runtime error (executions are serialized though)

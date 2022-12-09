@@ -33,7 +33,10 @@ from datalad.interface.common_opts import (
     recursion_limit,
 )
 from datalad.interface.results import get_status_dict
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import (
+    EnsureChoice,
+    EnsureNone,
+)
 from datalad.support.param import Parameter
 from datalad.utils import (
     Path,
@@ -92,11 +95,11 @@ class Clean(Interface):
         what=Parameter(
             args=("--what",),
             dest='what',
-            choices=('cached-archives', 'annex-tmp', 'annex-transfer',
-                     'search-index'),
             nargs="*",
             doc="""What to clean. If none specified -- all known
-            targets are considered."""),
+            targets are considered.""",
+            constraints=EnsureChoice('cached-archives', 'annex-tmp',
+                'annex-transfer', 'search-index') | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
     )

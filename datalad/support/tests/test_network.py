@@ -9,7 +9,6 @@
 
 import logging
 import os
-import sys
 from os.path import isabs
 from os.path import join as opj
 
@@ -33,6 +32,8 @@ from datalad.support.network import (
     is_ssh,
     is_url,
     iso8601_to_epoch,
+    local_path_representation,
+    local_url_path_representation,
     parse_url_opts,
     same_website,
     urlquote,
@@ -49,7 +50,7 @@ from datalad.tests.utils_pytest import (
     neq_,
     nok_,
     ok_,
-    skip_if_on_windows,
+    skip_if,
     swallow_logs,
     with_tempfile,
 )
@@ -169,7 +170,11 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         eq_(getattr(ri_, f), v)
 
     if localpath:
-        eq_(ri_.localpath, localpath)
+        if cls == URL:
+            local_representation = local_url_path_representation(localpath)
+        else:
+            local_representation = local_path_representation(localpath)
+        assert ri_.localpath == local_representation
         old_localpath = ri_.localpath  # for a test below
     else:
         # if not given -- must be a remote url, should raise exception
@@ -186,7 +191,7 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     eq_(ri_.path, newpath)
     neq_(str(ri_), old_str)
     if localpath:
-        eq_(ri_.localpath, opj(old_localpath, 'sub'))
+        assert ri_.localpath == local_path_representation(opj(old_localpath, 'sub'))
 
 
 def test_url_base():
@@ -229,6 +234,11 @@ def test_pathri_guessing(filename=None):
             # Does not happen on Windows since paths with \ instead of / do not
             # look like possible URLs
             assert_in('ParseResults contains params', cml.out)
+
+
+@skip_if(not on_windows)
+def test_pathri_windows_anchor():
+    assert RI('file:///c:/Windows').localpath == 'C:\\Windows'
 
 
 @known_failure_githubci_win
@@ -292,7 +302,7 @@ def test_url_samples():
     _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
     _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
     # not sure but let's check
-    _check_ri("file:///c:/path/sp1", URL, localpath='/c:/path/sp1', scheme='file', path='/c:/path/sp1', exact_str=False)
+    _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
@@ -425,11 +435,11 @@ def test_url_dicts():
 
 
 def test_get_url_path_on_fileurls():
-    eq_(URL('file:///a').path, '/a')
-    eq_(URL('file:///a/b').path, '/a/b')
-    eq_(URL('file:///a/b').localpath, '/a/b')
-    eq_(URL('file:///a/b#id').path, '/a/b')
-    eq_(URL('file:///a/b?whatever').path, '/a/b')
+    assert URL('file:///a').path == '/a'
+    assert URL('file:///a/b').path == '/a/b'
+    assert URL('file:///a/b').localpath == local_path_representation('/a/b')
+    assert URL('file:///a/b#id').path == '/a/b'
+    assert URL('file:///a/b?whatever').path == '/a/b'
 
 
 def test_is_url():

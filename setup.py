@@ -81,7 +81,7 @@ requires.update({
         'pypandoc',
         # Documentation
         'sphinx>=4.3.0',
-        'sphinx-rtd-theme>=0.5.1"',
+        'sphinx-rtd-theme>=0.5.1',
     ],
     'devel-utils': [
         'asv',        # benchmarks
