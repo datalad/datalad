@@ -15,13 +15,15 @@ from __future__ import annotations
 # TODO: RF and move all paths related functions from datalad.utils in here
 import os
 import os.path as op
-
 # to not pollute API importing as _
 from collections import defaultdict as _defaultdict
-
 from functools import wraps
 from itertools import dropwhile
-from pathlib import Path, PurePosixPath
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
+from typing import Generator
 
 from ..utils import (
     ensure_bytes,
@@ -209,7 +211,8 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
     return res
 
 
-def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_within_path: bool = False) -> list[Path]:
+def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_within_path: bool = False) \
+        -> Generator[str, None, None]:
     """Given list of relative POSIX paths (or Path objects), select the ones within limits (also relative and POSIX).
 
     In case of include_with_path=True, if limit points to some path under a 'path' within 'paths',
@@ -247,8 +250,8 @@ def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_
                 limits_parts = limits_parts[1:]
             else:
                 break  # otherwise -- consider this one!
-        if not limits_parts:
-            # none left
+        else:
+            # no limiting path left - the other paths cannot be the selected ones
             break
         if include_within_path:
             # if one identical or subpath of another one -- their parts match in the beginning

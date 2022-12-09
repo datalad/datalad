@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+from pathlib import PurePosixPath
 
 from ...tests.utils_pytest import (
     SkipTest,
@@ -123,5 +124,26 @@ def test_get_limited_paths():
         return list(get_limited_paths(*args, **kwargs))
 
     assert glp(['a', 'b'], ['a', 'c']) == ['a']
+    assert glp(['a', 'b'], ['b']) == ['b']
+    assert glp(['a', 'b'], ['c']) == []
+
     assert glp(['a', 'b'], ['a/b', 'c']) == []  # a is not subpath of a/b
     assert glp(['a', 'b'], ['a/b', 'c'], include_within_path=True) == ['a']  # a is not subpath of a/b
+
+    # all paths returned due to '.', and order is sorted
+    paths = ['a', 'b', '1/2/3', 'abc']
+    paths_sorted = sorted(paths)
+    assert glp(paths, ['.']) == paths_sorted
+    assert glp(paths, paths_sorted) == paths_sorted
+    assert glp(paths, paths_sorted, include_within_path=True) == paths_sorted
+    # we can take a mix of str and Path
+    assert glp([PurePosixPath(paths[0])] + paths[1:], ['.']) == paths_sorted
+
+
+    # nothing within empty "limits" matches -- so no paths yielded
+    assert glp(paths, []) == []
+
+    assert_raises(ValueError, glp, ['/a'], [])
+    assert_raises(ValueError, glp, [PurePosixPath('/a')], [])
+    assert_raises(ValueError, glp, ['a'], ['/a'])
+    assert_raises(ValueError, glp, ['../a'], ['a'])
