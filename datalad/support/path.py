@@ -10,6 +10,7 @@
 
 One of the reasons is also to robustify operation with unicode filenames
 """
+from __future__ import annotations
 
 # TODO: RF and move all paths related functions from datalad.utils in here
 import os
