@@ -78,7 +78,14 @@ jobs:
         pip install ./__extension__[devel]
 
     - name: Install Singularity
-      run: sudo eatmydata apt-get install singularity-container
+      run: |
+        release="$(curl -fsSL https://api.github.com/repos/sylabs/singularity/releases/latest | jq -r .tag_name)"
+        codename="$(lsb_release -cs)"
+        arch="$(dpkg --print-architecture)"
+        cd /tmp
+        wget -O singularity-ce.deb https://github.com/sylabs/singularity/releases/download/$release/singularity-ce_${release#v}-${codename}_$arch.deb
+        sudo dpkg -i singularity-ce.deb
+        sudo apt-get install -f
       if: env.DL_NEED_SINGULARITY == '1'
 
     - name: Install additional dependencies and prepare for testing
