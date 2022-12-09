@@ -141,14 +141,13 @@ def test_split_colon():
 
 
 def test_url_eq():
-    eq_(URL(), URL())
+    assert URL() == URL()
     # doesn't make sense to ask what kind of a url it is an empty URL
-    #eq_(RI(), RI())
-    neq_(URL(), URL(hostname='x'))
+    assert URL() != URL(hostname='x')
     # Different types aren't equal even if have the same fields values
-    neq_(URL(path='x'), PathRI(path='x'))
-    neq_(URL(hostname='x'), SSHRI(hostname='x'))
-    neq_(str(URL(hostname='x')), str(SSHRI(hostname='x')))
+    assert URL(path='x') != PathRI(path='x')
+    assert URL(hostname='x') != SSHRI(hostname='x')
+    assert str(URL(hostname='x')) != str(SSHRI(hostname='x'))
 
 
 def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
@@ -156,19 +155,23 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     with swallow_logs(new_level=logging.DEBUG) as cml:
         ri_ = cls(**fields)
         murl = RI(ri)
-        eq_(murl.__class__, cls)  # not just a subclass
-        eq_(murl, ri_)
+        assert murl.__class__ == cls  # not just a subclass
+        assert murl == ri_
         if isinstance(ri, str):
-            eq_(str(RI(ri)), ri)
-        eq_(eval(repr(ri_)), ri)  # repr leads back to identical ri_
-        eq_(ri, ri_)  # just in case ;)  above should fail first if smth is wrong
+            assert str(RI(ri)) == ri
+        assert eval(repr(ri_)) == ri  # repr leads back to identical ri_
+        assert ri == ri_  # just in case ;)  above should fail first if smth is wrong
         if not exact_str:
             assert_in('Parsed version of', cml.out)
-    (eq_ if exact_str else neq_)(str(ri), str(ri_))  # that we can reconstruct it EXACTLY on our examples
+    if exact_str:
+        assert str(ri) == str(ri_)
+    else:
+        assert str(ri) != str(ri_)
+
     # and that we have access to all those fields
     nok_(set(fields).difference(set(cls._FIELDS)))
     for f, v in fields.items():
-        eq_(getattr(ri_, f), v)
+        assert getattr(ri_, f) == v
 
     if localpath:
         if cls == URL:
@@ -189,8 +192,8 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     # do changes in the path persist?
     old_str = str(ri_)
     ri_.path = newpath = opj(ri_.path, 'sub')
-    eq_(ri_.path, newpath)
-    neq_(str(ri_), old_str)
+    assert ri_.path == newpath
+    assert str(ri_) != old_str
     if localpath:
         assert ri_.localpath == local_path_representation(opj(old_localpath, 'sub'))
 
@@ -303,7 +306,12 @@ def test_url_samples():
     _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
     _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
     # not sure but let's check
-    _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+    if on_windows:
+        _check_ri("file:///C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        _check_ri("file:/C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+    else:
+        _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        _check_ri("file:/C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
@@ -361,7 +369,6 @@ def test_url_samples():
         # but we store original str
         eq_(str(weird_url), weird_str)
         neq_(weird_url.as_str(), weird_str)
-
 
     raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
 
@@ -475,28 +482,30 @@ def test_is_datalad_compat_ri():
 
 
 def test_get_local_file_url():
-    for path, url in (
+    compat_annex = 'git-annex'
+    compat_git = 'git'
+    for path, url, compatibility in (
                 # relpaths are special-cased below
-                ('test.txt', 'test.txt'),
+                ('test.txt', 'test.txt', compat_annex),
+                (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME), compat_annex),
             ) + (
-                ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
+                ('C:\\Windows\\notepad.exe', 'file://C:/Windows/notepad.exe', compat_annex),
+                ('C:\\Windows\\notepad.exe', 'file:///C:/Windows/notepad.exe', compat_git),
             ) if on_windows else (
-                (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME)),
-                ('/a', 'file:///a'),
-                ('/a/b/c', 'file:///a/b/c'),
-                ('/a~', 'file:///a~'),
+                ('/a', 'file:///a', compat_annex),
+                ('/a/b/c', 'file:///a/b/c', compat_annex),
+                ('/a~', 'file:///a~', compat_annex),
                 # there are no files with trailing slashes in the name
                 #('/a b/', 'file:///a%20b/'),
-                ('/a b/name', 'file:///a%20b/name'),
+                ('/a b/name', 'file:///a%20b/name', compat_annex),
             ):
         # Yarik found no better way to trigger.  .decode() isn't enough
         print("D: %s" % path)
         if isabs(path):
-            assert get_local_file_url(path) == url
+            assert get_local_file_url(path, compatibility=compatibility) == url
         else:
-            assert get_local_file_url(path) == '/'.join(
-                (get_local_file_url(os.getcwd()), url))
-
+            assert get_local_file_url(path, allow_relative_path=True, compatibility=compatibility) \
+                   == '/'.join((get_local_file_url(os.getcwd(), compatibility=compatibility), url))
 
 @with_tempfile(mkdir=True)
 def test_get_local_file_url_compatibility(path=None):
@@ -511,7 +520,7 @@ def test_get_local_file_url_compatibility(path=None):
     # compat with annex addurl
     ds1.repo.add_url_to_file(
         'test.txt',
-        get_local_file_url(testfile, compatibility='git-annex'))
+        get_local_file_url(str(testfile), compatibility='git-annex'))
 
     # compat with git clone/submodule
     assert_status(

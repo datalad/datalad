@@ -265,16 +265,35 @@ def local_path2url_path(local_path: str) -> str:
     if not Path(local_path).is_absolute():
         raise ValueError(
             f"cannot convert relative path to URL path: {local_path}")
-    return urlparse(pathname2url(local_path)).path
+    result = pathname2url(local_path)
+    # If the result contains a --necessarily empty-- network location, return
+    # just `local-path` as defined in RFC 8089
+    if result.startswith("///"):
+        return result[2:]
+    return result
 
 
-def url_path2local_path(url_path: str, strict: bool = True) -> str:
+def url_path2local_path(url_path: str,
+                        check_encoding: bool = True
+                        ) -> str:
     if not url_path:
         return str(Path("/"))
-    if strict is True:
+    if check_encoding is True:
         test_path = url_path.replace("%", "_")
         if quote_path(test_path) != test_path:
-            raise ValueError(f"illegal URL path component: {url_path}")
+            raise ValueError(
+                f"illegal characters in URL path component: {url_path}")
+
+    # If `url_path` contains an network location, remove it before attempting
+    # a conversion. This way `url_path` matches the definiion of `local-path`
+    # provided in RFC 8089
+    if url_path.startswith("///"):
+        url_path = url_path[2:]
+    # Ensure that there is no network location in the path
+    if url_path.startswith("//"):
+        raise ValueError(
+            "'url_path' contains network location and is therefore not a"
+            "'local-path' component as defined in RFC 8089")
     return url2pathname(url_path)
 
 
