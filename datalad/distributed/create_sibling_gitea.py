@@ -94,6 +94,18 @@ class CreateSiblingGitea(Interface):
     In order to be able to use this command, a personal access token has to be
     generated on the platform (Account->Settings->Applications->Generate Token).
 
+    This command can be configured with
+    "datalad.create-sibling-ghlike.extra-remote-settings.NETLOC.KEY=VALUE" in
+    order to add any local KEY = VALUE configuration to the created sibling in
+    the local `.git/config` file. NETLOC is the domain of the Gitea instance to
+    apply the configuration for.
+    This leads to a behavior that is equivalent to calling datalad's
+    ``siblings('configure', ...)``||``siblings configure`` command with the
+    respective KEY-VALUE pair after creating the sibling.
+    The configuration, like any other, could be set at user- or system level, so
+    users do not need to add this configuration to every sibling created with
+    the service at NETLOC themselves.
+
     .. versionadded:: 0.16
     """
 
