@@ -2399,7 +2399,7 @@ class GitRepo(CoreGitRepo):
                         path = path.relative_to(self.pathobj)
                     except ValueError as exc:
                         lgr.debug(
-                            "Path %s it not relative to %s, skipping since nothing should match it: %s",
+                            "Path %s it not underneath %s, skipping since nothing should match it: %s",
                             path, self.pathobj, CapturedException(exc)
                         )
                         continue

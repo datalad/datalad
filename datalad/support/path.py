@@ -220,7 +220,7 @@ def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_
 
     Yields
     -------
-    list of paths, sorted (so order is not preserved), which reside under 'limits' paths or path within 'limits' is
+    paths, sorted (so order is not preserved), which reside under 'limits' paths or path within 'limits' is
     under that path.
     """
     # do conversion and sanity checks, O(N)
