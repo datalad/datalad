@@ -612,6 +612,7 @@ class URL(RI):
 
     _FIELDS = RI._FIELDS + (
         'scheme',
+        'netloc',
         'username',
         'password',
         'hostname', 'port',
@@ -726,22 +727,48 @@ class URL(RI):
     def fragment_dict(self):
         return self._parse_qs(self.fragment)
 
-    @property
-    def localpath(self, compatibility: str = 'git'):
-        if self.scheme != 'file':
-            raise ValueError(
-                "Non 'file://' URL cannot be resolved to a local path")
-        hostname = self.hostname
-        if not (hostname in (None, '', 'localhost', '::1')
-                or hostname.startswith('127.')):
-            raise ValueError("file:// URL does not point to 'localhost'")
+    def _windows_local_path(self,
+                            support_unc: bool = False
+                            ) -> str:
+        """Convert the URL to a local path on windows, supports UNC and git-annex"""
 
         # RFC1738 and RFC3986 both forbid unescaped backslash characters in
         # URLs, and therefore also in the path-component of file:-URLs. We
         # assume here that any backslash present in a file-URL is a relict of a
         # verbatim copy of a Windows-style path.
         unified_path = self.path.replace('\\', '/')
-        return url2pathname(unified_path)
+        local_path = url2pathname(unified_path)
+
+        # We support UNC notation, and the "special" git-annex drive encoding
+        # scheme, i.e. netloc is the drive letter plus a colon.
+        # NB, this if clause will not evaluate to True, because our caller
+        # filters out net locations with
+        if self.netloc:
+            if re.match('^[a-zA-Z]:$', self.netloc):
+                # This is the git-annex case, i.e. drive spec in netloc
+                return self.netloc + local_path
+            if support_unc:
+                return '\\\\' + self.netloc + local_path
+        return local_path
+
+    @property
+    def localpath(self):
+        if self.scheme != 'file':
+            raise ValueError(
+                "Non 'file://' URL cannot be resolved to a local path")
+
+        # If there is a hostname, we might want to convert to UNC, unless the
+        # hostname has the form of a 'Windows drive letter' on windows
+        hostname = self.hostname
+        if not (hostname in (None, '', 'localhost', '::1')
+                or hostname.startswith('127.')
+                or re.match('^[a-zA-Z]:$', self.netloc)):
+            raise ValueError("file:// URL does not point to 'localhost'")
+
+        if on_windows:
+            return self._windows_local_path()
+
+        return url2pathname(self.path)
 
 
 class PathRI(RI):

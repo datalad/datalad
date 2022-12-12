@@ -181,7 +181,8 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         assert ri_.localpath == local_representation
         old_localpath = ri_.localpath  # for a test below
     else:
-        # if not given -- must be a remote url, should raise exception
+        # if not given -- must be a remote url, should raise exception on
+        # non-Windows systems and on Windows systems until we allow UNC URLs
         with assert_raises(ValueError):
             ri_.localpath
 
@@ -206,7 +207,7 @@ def test_url_base():
     eq_(url.scheme, 'http')
     eq_(url.port, '')  # not specified -- empty strings
     eq_(url.username, '')  # not specified -- empty strings
-    eq_(repr(url), "URL(hostname='example.com', scheme='http')")
+    eq_(repr(url), "URL(hostname='example.com', netloc='example.com', scheme='http')")
     eq_(url, "http://example.com")  # automagic coercion in __eq__
 
     neq_(URL(), URL(hostname='x'))
@@ -247,16 +248,17 @@ def test_pathri_windows_anchor():
 
 @known_failure_githubci_win
 def test_url_samples():
-    _check_ri("http://example.com", URL, scheme='http', hostname="example.com")
+    _check_ri("http://example.com", URL, scheme='http', hostname="example.com", netloc='example.com')
     # "complete" one for classical http
     _check_ri("http://user:pw@example.com:8080/p/sp?p1=v1&p2=v2#frag", URL,
-              scheme='http', hostname="example.com", port=8080,
-              username='user', password='pw', path='/p/sp',
-              query='p1=v1&p2=v2', fragment='frag')
+              scheme='http', netloc='user:pw@example.com:8080',
+              hostname="example.com", port=8080, username='user', password='pw',
+              path='/p/sp', query='p1=v1&p2=v2', fragment='frag')
 
     # sample one for ssh with specifying the scheme
     # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
-    _check_ri("ssh://host/path/sp1", URL, scheme='ssh', hostname='host', path='/path/sp1')
+    _check_ri("ssh://host/path/sp1", URL, scheme='ssh', hostname='host',
+              netloc='host', path='/path/sp1')
     _check_ri("user@host:path/sp1", SSHRI,
               hostname='host', path='path/sp1', username='user')
     _check_ri("host:path/sp1", SSHRI, hostname='host', path='path/sp1')
@@ -276,8 +278,8 @@ def test_url_samples():
 
     # here we will do custom magic allowing only schemes with + in them, such as dl+archive
     # or not so custom as
-    _check_ri("hg+https://host/user/proj", URL,
-              scheme="hg+https", hostname='host', path='/user/proj')
+    _check_ri("hg+https://host/user/proj", URL, scheme="hg+https",
+              netloc='host', hostname='host', path='/user/proj')
     # "old" style
     _check_ri("dl+archive:KEY/path/sp1#size=123", URL,
               scheme='dl+archive', path='KEY/path/sp1', fragment='size=123')
@@ -289,17 +291,20 @@ def test_url_samples():
               scheme='dl+archive', path='KEY', fragment='path=path%2Fbsp1&size=123')
 
     #https://en.wikipedia.org/wiki/File_URI_scheme
-    _check_ri("file://host", URL, scheme='file', hostname='host')
-    _check_ri("file://host/path/sp1", URL, scheme='file', hostname='host', path='/path/sp1')
+    _check_ri("file://host", URL, scheme='file', netloc='host', hostname='host')
+    _check_ri("file://host/path/sp1", URL, scheme='file', netloc='host',
+              hostname='host', path='/path/sp1')
     # stock libraries of Python aren't quite ready for ipv6
     ipv6address = '2001:db8:85a3::8a2e:370:7334'
     _check_ri("file://%s/path/sp1" % ipv6address, URL,
-              scheme='file', hostname=ipv6address, path='/path/sp1')
+              scheme='file', netloc=ipv6address, hostname=ipv6address,
+              path='/path/sp1')
     for lh in ('localhost', '::1', '', '127.3.4.155'):
         _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
-                  scheme='file', hostname=lh, path='/path/sp1')
+                  scheme='file', netloc=lh, hostname=lh, path='/path/sp1')
     _check_ri('http://[1fff:0:a88:85a3::ac1f]:8001/index.html', URL,
-              scheme='http', hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
+              scheme='http', netloc='[1fff:0:a88:85a3::ac1f]:8001',
+              hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
     _check_ri("file:///path/sp1", URL, localpath='/path/sp1', scheme='file', path='/path/sp1')
     # we don't do any magical comprehension for home paths/drives for windows
     # of file:// urls, thus leaving /~ and /c: for now:
@@ -309,6 +314,8 @@ def test_url_samples():
     if on_windows:
         _check_ri("file:///C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
         _check_ri("file:/C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        # git-annex style drive-letter encoding
+        _check_ri("file://C:/path/sp1", URL, netloc="C:", hostname="c", localpath='C:/path/sp1', scheme='file', path='/path/sp1', exact_str=False)
     else:
         _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
         _check_ri("file:/C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
@@ -325,7 +332,8 @@ def test_url_samples():
     _check_ri("/f/s1", PathRI, localpath='/f/s1', path='/f/s1')
 
     # some github ones, just to make sure
-    _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
+    _check_ri("git://host/user/proj", URL, scheme="git", netloc="host",
+              hostname="host", path="/user/proj")
     _check_ri("git@host:user/proj", SSHRI, hostname="host", path="user/proj", username='git')
 
     _check_ri('weird:/', SSHRI, hostname='weird', path='/')
