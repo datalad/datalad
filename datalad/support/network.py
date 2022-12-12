@@ -749,6 +749,7 @@ class URL(RI):
                 return self.netloc + local_path
             if support_unc:
                 return '\\\\' + self.netloc + local_path
+            raise ValueError("Unsupported file: URL: {self}")
         return local_path
 
     @property
@@ -763,6 +764,8 @@ class URL(RI):
         if not (hostname in (None, '', 'localhost', '::1')
                 or hostname.startswith('127.')
                 or re.match('^[a-zA-Z]:$', self.netloc)):
+            if on_windows:
+                return self._windows_local_path(support_unc=True)
             raise ValueError("file:// URL does not point to 'localhost'")
 
         if on_windows:

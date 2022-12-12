@@ -182,9 +182,11 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         old_localpath = ri_.localpath  # for a test below
     else:
         # if not given -- must be a remote url, should raise exception on
-        # non-Windows systems and on Windows systems until we allow UNC URLs
-        with assert_raises(ValueError):
-            ri_.localpath
+        # non-Windows systems. But not on Windows systems because we allow UNCs
+        # to be encoded in URLs
+        if not on_windows:
+            with assert_raises(ValueError):
+                ri_.localpath
 
     # This one does not have a path. TODO: either proxy path from its .RI or adjust
     # hierarchy of classes to make it more explicit
@@ -300,8 +302,13 @@ def test_url_samples():
               scheme='file', netloc=ipv6address, hostname=ipv6address,
               path='/path/sp1')
     for lh in ('localhost', '::1', '', '127.3.4.155'):
-        _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
-                  scheme='file', netloc=lh, hostname=lh, path='/path/sp1')
+        if on_windows:
+            url = RI(f"file://{lh}/path/sp1")
+            assert url.localpath == f'\\\\{lh}\\path\\sp1' if lh else '\\path\\sp1'
+        else:
+            _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
+                      scheme='file', netloc=lh, hostname=lh, path='/path/sp1')
+
     _check_ri('http://[1fff:0:a88:85a3::ac1f]:8001/index.html', URL,
               scheme='http', netloc='[1fff:0:a88:85a3::ac1f]:8001',
               hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
