@@ -476,7 +476,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']
         # in case it is missing
-        msg = "Visit http://handbook.datalad.org/en/latest/intro/installation.html" \
+        msg = "Visit http://handbook.datalad.org/r.html?install " \
               "for instructions on how to install DataLad and git-annex."
 
         exc_kwargs = dict(
