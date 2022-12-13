@@ -184,15 +184,15 @@ def alter_interface_docs_for_api(docs):
         flags=re.MULTILINE | re.DOTALL)
     # clean cmdline in-line bits
     docs = re.sub(
-        r'\[CMD:\s[^\[\]]*\sCMD\]',
+        r'\[CMD:\s.*?\sCMD\]',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        r'\[PY:\s([^\[\]]*)\sPY\]',
+        r'\[PY:\s(.*?)\sPY\]',
         lambda match: match.group(1),
         docs,
-        flags=re.MULTILINE)
+        flags=re.MULTILINE | re.DOTALL)
     # select only the python alternative from argument specifications
     docs = re.sub(
         r'``([a-zA-Z0-9_,.]+)\|\|([a-zA-Z0-9-,.]+)``',
