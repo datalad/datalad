@@ -769,7 +769,7 @@ class URL(RI):
             raise ValueError("file:// URL does not point to 'localhost'")
 
         if on_windows:
-            return self._windows_local_path()
+            return self._windows_local_path(support_unc=True)
 
         return url2pathname(self.path)
 
@@ -1002,7 +1002,6 @@ def is_ssh(ri):
 
 def get_local_file_url(fname: str,
                        compatibility: str = 'git-annex',
-                       include_netloc: bool = True,
                        allow_relative_path: bool = True
                        ) -> str:
     """Return OS specific URL pointing to a local file
@@ -1015,34 +1014,29 @@ def get_local_file_url(fname: str,
         This parameter is only interpreted on Windows systems. If set to
         anything else than 'git', the anchor, e.g. `C:` of `fname` will be put
         into the `file-auth` part, i.e. network location, defined in RFC 8089.
-        If set to anything else than 'git' `include_netloc` is enforced to be
-        `True`. This option is mainly used to support git-annex specific
-        encoding of Windows paths.
-    include_netloc: bool, optional
-        Specify whether the network location should be included in the resulting
-        URL. (Automatically set to True if `compatibility != 'git'`.
+        This option is mainly used to support git-annex specific encoding of
+        Windows paths.
     allow_relative_path: bool, optional
         Allow `fname` to be a relative path. The path will be converted to an
-        absolute path, by using the path is relative to the current directory.
+        absolute path, by using the current directory as path prefix.
     """
     path_obj = Path(fname)
     if not path_obj.is_absolute():
         if allow_relative_path is True:
-            fname = str(Path(fname).resolve().absolute())
+            fname = str(Path(os.getcwd()) / path_obj)
         else:
             raise ValueError('cannot create file-URL with relative path')
+
+    url_path = local_path2url_path(fname, auto_resolve=False)
     if on_windows and compatibility != "git":
         # Work around the way in which git-annex interprets file URLs on
         # Windows. This code path will put the path anchor, e.g. `C:` of `fname`
         # into the network location component of the resulting URL.
-        netloc = "/"
-        include_netloc = True
-    else:
-        netloc = "//"
-    return (
-        "file:"
-        + (netloc if include_netloc else "")
-        + local_path2url_path(fname))
+        return "file:/" + url_path
+
+    result = "file://" + url_path
+    assert result == Path(fname).as_uri()
+    return result
 
 
 def get_url_cache_filename(url, name=None):

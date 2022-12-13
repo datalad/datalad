@@ -12,16 +12,14 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from urllib.parse import (
     quote,
     urlparse,
 )
-from urllib.request import (
-    url2pathname,
-    pathname2url,
-)
+from urllib.request import url2pathname
 
 from datalad.utils import on_windows
 
@@ -258,48 +256,52 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version,
                         "alias.", alias)
 
 
-def local_path2url_path(local_path: str) -> str:
+def local_path2url_path(local_path: str,
+                        auto_resolve: bool = False
+                        ) -> str:
     """Convert a local path into a URL path component"""
     if not local_path:
-        return "/"
-    if not Path(local_path).is_absolute():
+        if not auto_resolve:
+            raise ValueError("cannot convert empty local path to URL path")
+        local_path = os.getcwd()
+
+    url = urlparse(Path(local_path).as_uri())
+    if url.hostname:
         raise ValueError(
-            f"cannot convert relative path to URL path: {local_path}")
-    result = pathname2url(local_path)
-    # If the result contains a --necessarily empty-- network location, return
-    # just `local-path` as defined in RFC 8089
-    if result.startswith("///"):
-        return result[2:]
-    return result
+            f"cannot convert remote path to an URL path: {local_path}")
+    return url.path
 
 
 def url_path2local_path(url_path: str,
-                        check_encoding: bool = True
+                        check_encoding: bool = True,
+                        make_absolut: bool = True,
                         ) -> str:
-    if not url_path:
-        return str(Path("/"))
+    if not url_path or not url_path.startswith("/"):
+        # We expect a 'path-absolute' as defined in RFC 3986, therefore the
+        # path must begin with a slash.
+        raise ValueError(
+            f"url path does not start with '/': {url_path}, and is therefore "
+            f"not an absolute-path as defined in RFC 8089")
+
+    if url_path.startswith("//"):
+        # We expect a 'path-absolute' as defined in RFC 3986, therefore the
+        # first segment must not be empty, i.e. the path must not start with
+        # two or more slashes.
+        raise ValueError(
+            f"url path has empty first segment: {url_path}, and is therefore "
+            f"not an absolute-path as defined in RFC 8089")
+
     if check_encoding is True:
-        test_path = url_path.replace("%", "_")
-        if quote_path(test_path) != test_path:
+        if quote_path(url_path, safe='/%') != url_path:
             raise ValueError(
                 f"illegal characters in URL path component: {url_path}")
 
-    # If `url_path` contains an network location, remove it before attempting
-    # a conversion. This way `url_path` matches the definiion of `local-path`
-    # provided in RFC 8089
-    if url_path.startswith("///"):
-        url_path = url_path[2:]
-    # Ensure that there is no network location in the path
-    if url_path.startswith("//"):
-        raise ValueError(
-            "'url_path' contains network location and is therefore not a"
-            "'local-path' component as defined in RFC 8089")
     return url2pathname(url_path)
 
 
-def quote_path(path: str) -> str:
+def quote_path(path: str, safe: str = "/") -> str:
     """quote the path component of a URL, takes OS specifics into account"""
     if on_windows:
         if re.match("^/[a-zA-Z]:/", path):
-            return path[:3] + quote(path[3:])
-    return quote(path)
+            return path[:3] + quote(path[3:], safe=safe)
+    return quote(path, safe=safe)

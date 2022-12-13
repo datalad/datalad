@@ -60,7 +60,6 @@ from datalad.utils import (
     quote_cmdlinearg,
 )
 
-
 lgr = logging.getLogger('datalad.distributed.create_sibling_ria')
 
 

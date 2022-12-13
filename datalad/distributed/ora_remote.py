@@ -31,7 +31,6 @@ from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
     verify_ria_url,
-    url_path2local_path,
 )
 from datalad.utils import (
     ensure_write_permission,
@@ -990,9 +989,9 @@ class RIARemote(SpecialRemote):
                     if k.startswith('url.')}
 
         if self.ria_store_url:
-            self.storage_host, url_base_path, self.ria_store_url = \
+            self.storage_host, self.store_base_path, self.ria_store_url = \
                 verify_ria_url(self.ria_store_url, url_cfgs)
-            self.store_base_path = url_path2local_path(url_base_path)
+
         else:
             # for now still accept the configs, if no ria-URL is known, but
             # issue deprecation warning:
@@ -1024,21 +1023,22 @@ class RIARemote(SpecialRemote):
                 "No base path configured for RIA store. Specify a proper "
                 "ria+<scheme>://... URL.")
 
-        # the base path is ultimately derived from a URL
-        if not Path(self.store_base_path).is_absolute():
+        # the base path is ultimately derived from a URL, always treat as POSIX
+        self.store_base_path = PurePosixPath(self.store_base_path)
+        if not self.store_base_path.is_absolute():
             raise RIARemoteError(
                 'Non-absolute object tree base path configuration: %s'
-                % str(self.store_base_path))
+                '' % str(self.store_base_path))
 
         if self.ria_store_pushurl:
             if self.ria_store_pushurl.startswith("ria+http"):
                 raise RIARemoteError("Invalid push-url: {}. Pushing over HTTP "
                                      "not implemented."
                                      "".format(self.ria_store_pushurl))
-            self.storage_host_push, url_store_base_path_push, \
+            self.storage_host_push, self.store_base_path_push, \
                 self.ria_store_pushurl = verify_ria_url(self.ria_store_pushurl,
                                                         url_cfgs)
-            self.store_base_path_push = url_path2local_path(url_store_base_path_push)
+
         # TODO duplicates call to `git-config` after RIA url rewrite
         self._load_cfg(gitdir, name)
 

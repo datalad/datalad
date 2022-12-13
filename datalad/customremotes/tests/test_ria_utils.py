@@ -170,12 +170,13 @@ def test_verify_ria_url():
 def test_mapping_identity():
     from datalad.tests.utils_pytest import OBSCURE_FILENAME
 
-    absolute_obsure_path = str(Path('/') / OBSCURE_FILENAME)
+    absolute_obscure_path = str(Path('/').absolute() / OBSCURE_FILENAME)
     temp_dir = tempfile.gettempdir()
-    for name in (temp_dir, join(temp_dir, "x.txt"), absolute_obsure_path):
+    for name in (temp_dir, join(temp_dir, "x.txt"), absolute_obscure_path):
         assert url_path2local_path(local_path2url_path(name)) == name
 
-    for name in map(quote_path, ("/c:/window", "/d", absolute_obsure_path)):
+    prefix = "/C:" if on_windows else ""
+    for name in map(quote_path, (prefix + "/window", prefix + "/d", prefix + "/" + OBSCURE_FILENAME)):
         assert local_path2url_path(url_path2local_path(name)) == name
 
 
