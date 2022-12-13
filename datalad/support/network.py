@@ -620,6 +620,13 @@ class URL(RI):
         'fragment',
     )
 
+    # Only interpreted on Windows. If set to `True`, UNC-names encoded in
+    # file-URLs, e.g. "file://server/share/path", would be considered local
+    # and mapped onto "\\server\share\path". If set to `False`, UNC-names
+    # encoded in file-URLs would not be considered local and cannot be resolved
+    # to a local path.
+    support_unc = False
+
     def as_str(self):
         """Render URL as a string"""
         return urlunparse(self.to_pr())
@@ -765,7 +772,7 @@ class URL(RI):
                 or hostname.startswith('127.')
                 or re.match('^[a-zA-Z]:$', self.netloc)):
             if on_windows:
-                return self._windows_local_path(support_unc=True)
+                return self._windows_local_path(support_unc=self.support_unc)
             raise ValueError("file:// URL does not point to 'localhost'")
 
         if on_windows:
