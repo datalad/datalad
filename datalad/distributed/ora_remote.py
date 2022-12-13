@@ -20,6 +20,7 @@ from datalad.customremotes import (
     SpecialRemote,
 )
 from datalad.customremotes.main import main as super_main
+from datalad.customremotes.ria_utils import url_path2local_path
 from datalad.support.annex_utils import _sanitize_key
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
@@ -917,8 +918,9 @@ class RIARemote(SpecialRemote):
         """
 
         # ensure base path is platform path
-        dataset_tree_version_file = \
-            Path(self.store_base_path) / 'ria-layout-version'
+        dataset_tree_version_file = Path(
+            url_path2local_path(
+                str(self.store_base_path))) / 'ria-layout-version'
 
         # check dataset tree version
         try:
@@ -1059,8 +1061,10 @@ class RIARemote(SpecialRemote):
         """
         if self.ria_store_url:
             # construct path to ria_layout_version file for reporting
-            target_ri = self.ria_store_url[4:] +\
-                        path.relative_to(Path(self.store_base_path)).as_posix()
+            store_base_path = Path(
+                url_path2local_path(str(self.store_base_path)))
+            target_ri = self.ria_store_url[4:] + path.relative_to(
+                store_base_path).as_posix()
         elif self.storage_host:
             target_ri = "ssh://{}{}".format(self.storage_host, path.as_posix())
         else:
@@ -1074,7 +1078,11 @@ class RIARemote(SpecialRemote):
         # as it includes the store base address including the access
         # method).
         except FileNotFoundError as exc:
-            raise NoLayoutVersion(f"{target_ri} not found.") from exc
+            raise NoLayoutVersion(
+                f"{target_ri} not found, "
+                f"self.ria_store_url: {self.ria_store_url}, "
+                f"self.store_base_pass: {self.store_base_path}, "
+                f"path: {type(path)} {path}") from exc
         except PermissionError as exc:
             raise PermissionError(f"Permission denied: {target_ri}") from exc
         except Exception as exc:
@@ -1110,7 +1118,7 @@ class RIARemote(SpecialRemote):
         # but it is subsequently assumed to be a platform path, by
         # get_layout_locations() etc. Hence it must be converted
         # to match the *remote* platform, not the local client
-        store_base_path = Path(self.store_base_path) \
+        store_base_path = Path(url_path2local_path(str(self.store_base_path))) \
             if self._local_io else self.store_base_path
 
         # cache remote layout directories
