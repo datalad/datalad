@@ -20,6 +20,7 @@ from annexremote import (
     RemoteError as _RemoteError,
 )
 from datalad.support.exceptions import format_exception_with_cause
+from datalad.ui import ui
 
 
 class RemoteError(_RemoteError):
@@ -52,6 +53,12 @@ class RemoteError(_RemoteError):
 class SpecialRemote(_SpecialRemote):
     """Common base class for all of DataLad's special remote implementations"""
 
+    def __init__(self, annex):
+        super(SpecialRemote, self).__init__(annex=annex)
+        # instruct annex backend UI to use this remote
+        if ui.backend == 'annex':
+            ui.set_specialremote(self)
+
     def message(self, msg, type='debug'):
         handler = dict(
             debug=self.annex.debug,
@@ -70,3 +77,32 @@ class SpecialRemote(_SpecialRemote):
             # If we can't have an actual info message, at least have a
             # debug message.
             self.annex.debug(msg)
+
+    def send_progress(self, progress):
+        """Indicates the current progress of the transfer (in bytes).
+
+        May be repeated any number of times during the transfer process.
+
+        Too frequent updates are wasteful but bear in mind that this is used
+        both to display a progress meter for the user, and for
+        ``annex.stalldetection``. So, sending an update on each 1% of the file
+        may not be frequent enough, as it could appear to be a stall when
+        transferring a large file.
+
+        Parameters
+        ----------
+        progress : int
+            The current progress of the transfer in bytes.
+        """
+        # This method is called by AnnexSpecialRemoteProgressBar through an
+        # obscure process that involves multiple layers of abstractions for
+        # UIs, providers, downloaders, progressbars, which is only happening
+        # within the environment of a running special remote process though
+        # a combination of circumstances.
+        #
+        # The main purpose of this method is to have a place to leave this
+        # comment within the code base of the special remotes, in order to
+        # aid future souls having to sort this out.
+        # (and to avoid having complex code make direct calls to internals
+        # of this class, making things even more complex)
+        self.annex.progress(progress)
