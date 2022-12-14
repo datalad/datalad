@@ -419,7 +419,7 @@ class RI(object):
     provided as output, e.g.
 
     >>> RI('http://example.com')
-    URL(hostname='example.com', scheme='http')
+    URL(hostname='example.com', netloc='example.com', scheme='http')
     >>> RI('example.com:path')
     SSHRI(hostname='example.com', path='path')
     """
