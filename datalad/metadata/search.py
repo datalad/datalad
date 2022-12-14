@@ -12,24 +12,29 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+
 from datalad.log import log_progress
+
 lgr = logging.getLogger('datalad.metadata.search')
 
 import os
 import re
-from functools import partial
-from os.path import join as opj, exists
-from os.path import relpath
-from os.path import normpath
 import sys
+from functools import partial
+from os.path import exists
+from os.path import join as opj
+from os.path import (
+    normpath,
+    relpath,
+)
 from time import time
 
 from datalad import cfg
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
-from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import (
-    datasetmethod,
+    Dataset,
     EnsureDataset,
+    datasetmethod,
     require_dataset,
 )
 from datalad.dochelpers import single_or_plural
@@ -38,6 +43,7 @@ from datalad.interface.base import (
     build_doc,
 )
 from datalad.interface.utils import eval_results
+from datalad.metadata.metadata import query_aggregated_metadata
 from datalad.support.constraints import (
     EnsureInt,
     EnsureNone,
@@ -56,7 +62,6 @@ from datalad.utils import (
     shortened_repr,
     unicode_srctypes,
 )
-from datalad.metadata.metadata import query_aggregated_metadata
 
 # TODO: consider using plain as_unicode, without restricting
 # the types?
@@ -180,7 +185,10 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                 yield key, v
 
     def get_indexer(metadata_format_name: str) -> callable:
-        from pkg_resources import EntryPoint, iter_entry_points
+        from pkg_resources import (
+            EntryPoint,
+            iter_entry_points,
+        )
 
         all_indexers = tuple(iter_entry_points('datalad.metadata.indexers', metadata_format_name))
         if all_indexers:
@@ -406,6 +414,7 @@ class _WhooshSearch(_Search):
         `meta2doc` - must return dict for index document from result input
         """
         from whoosh import index as widx
+
         from .metadata import get_ds_aggregate_db_locations
         dbloc, db_base_path = get_ds_aggregate_db_locations(self.ds)
         # what is the latest state of aggregated metadata
@@ -465,8 +474,8 @@ class _WhooshSearch(_Search):
                 else:
                     raise
 
-        lgr.info('{} search index'.format(
-            'Rebuilding' if exists(index_dir) else 'Building'))
+        lgr.info('%s search index',
+            'Rebuilding' if exists(index_dir) else 'Building')
 
         if not exists(index_dir):
             os.makedirs(index_dir)
@@ -541,7 +550,7 @@ class _WhooshSearch(_Search):
                 admin['id'] = res.get('dsid', None)
 
             doc.update({k: ensure_unicode(v) for k, v in admin.items()})
-            lgr.debug("Adding document to search index: {}".format(doc))
+            lgr.debug("Adding document to search index: %s", doc)
             # inject into index
             idx.add_document(**doc)
             idx_size += 1
@@ -586,7 +595,7 @@ class _WhooshSearch(_Search):
                 max_nresults,
                 single_or_plural('match', 'matches', max_nresults)
             )
-            lgr.info('Query completed in {} sec.{}'.format(
+            lgr.info('Query completed in %s sec.%s',
                 hits.runtime,
                 ' Reporting {}.'.format(
                     ('up to ' + topstr)
@@ -595,7 +604,7 @@ class _WhooshSearch(_Search):
                 )
                 if not hits.is_empty()
                 else ' No matches.'
-            ))
+            )
 
             if not hits:
                 return
@@ -642,8 +651,8 @@ class _WhooshSearch(_Search):
 
             if max_nresults and nhits == max_nresults:
                 lgr.info(
-                    "Reached the limit of {}, there could be more which "
-                    "were not reported.".format(topstr)
+                    "Reached the limit of %s, there could be more which "
+                    "were not reported.", topstr
                 )
 
 
@@ -841,8 +850,8 @@ class _EGrepCSSearch(_Search):
                         single_or_plural('match', 'matches', max_nresults)
                     )
                     lgr.info(
-                        "Reached the limit of {}, there could be more which "
-                        "were not reported.".format(topstr)
+                        "Reached the limit of %s, there could be more which "
+                        "were not reported.", topstr
                     )
                     break
 

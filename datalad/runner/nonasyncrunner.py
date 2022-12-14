@@ -69,10 +69,12 @@ class _ResultGenerator(Generator):
     is a subclass of `datalad.runner.protocol.GeneratorMixIn`
     """
     class GeneratorState(enum.Enum):
-        process_running = 0
-        process_exited = 1
-        connection_lost = 2
-        waiting_for_process = 3
+        initialized = 0
+        process_running = 1
+        process_exited = 2
+        connection_lost = 3
+        waiting_for_process = 4
+        exhausted = 5
 
     def __init__(self,
                  runner: ThreadedRunner,
@@ -85,14 +87,26 @@ class _ResultGenerator(Generator):
         self.return_code = None
         self.state = self.GeneratorState.process_running
         self.all_closed = False
+        self.send_lock = threading.Lock()
 
     def _check_result(self):
         self.runner._check_result()
 
-    def send(self, _):
-        runner = self.runner
-        if self.state == self.GeneratorState.process_running:
+    def send(self, message):
+        with self.send_lock:
+            return self._locked_send(message)
 
+    def _locked_send(self, message):
+        if self.state == self.GeneratorState.initialized:
+            if message is not None:
+                raise RuntimeError(
+                    f"sent non-None message {message!r} to initialized generator "
+                )
+            self.state = self.GeneratorState.process_running
+
+        runner = self.runner
+
+        if self.state == self.GeneratorState.process_running:
             # If we have elements in the result queue, return one
             while len(self.result_queue) == 0 and runner.should_continue():
                 runner.process_queue()
@@ -114,10 +128,10 @@ class _ResultGenerator(Generator):
             # callback. Those are returned here.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
-
             runner.ensure_stdin_stdout_stderr_closed()
             runner.protocol.connection_lost(None)   # TODO: check for exceptions
             runner.wait_for_threads()
+            runner._set_process_exited()
             self.state = self.GeneratorState.connection_lost
 
         if self.state == self.GeneratorState.connection_lost:
@@ -125,8 +139,16 @@ class _ResultGenerator(Generator):
             # state: GeneratorState.process_exited.
             if len(self.result_queue) > 0:
                 return self.result_queue.popleft()
-            self.runner.generator = None
+            self.state = self.GeneratorState.exhausted
+            runner.owning_thread = None
+            with runner.generator_condition:
+                runner.generator = None
+                runner.generator_condition.notify()
+
+        if self.state == self.GeneratorState.exhausted:
             raise StopIteration(self.return_code)
+
+        raise RuntimeError(f"unknown state: {self.state}")
 
     def throw(self, exception_type, value=None, trace_back=None):
         return Generator.throw(self, exception_type, value, trace_back)
@@ -173,11 +195,11 @@ class ThreadedRunner:
             `datalad.runner.protocol.GeneratorMixIn`, the function will return
             the result created by the protocol method `_generate_result`.
 
-        stdin : file-like, string, bytes, Queue, or None
+        stdin : file-like, bytes, Queue, or None
             If stdin is a file-like, it will be directly used as stdin for the
             subprocess. The caller is responsible for writing to it and closing
-            it. If stdin is a string or bytes, those will be fed to stdin of the
-            subprocess. If all data is written, stdin will be closed.
+            it. If stdin is a bytes, it will be fed to stdin of the subprocess.
+            If all data is written, stdin will be closed.
             If stdin is a Queue, all elements (bytes) put into the Queue will
             be passed to stdin until None is read from the queue. If None is
             read, stdin of the subprocess is closed.
@@ -241,26 +263,27 @@ class ThreadedRunner:
         self.output_queue: Queue = Queue()
         self.process_removed: bool = False
         self.generator: Optional[_ResultGenerator] = None
+        self.process: Optional[Popen[Any]] = None
+        self.return_code: Optional[int] = None
 
         self.last_touched: dict[Optional[int], float] = dict()
         self.active_file_numbers: set[Optional[int]] = set()
         self.stall_check_interval = 10
 
         self.initialization_lock = threading.Lock()
+        self.generator_condition = threading.Condition()
+        self.owning_thread: Optional[int] = None
 
         # Pure declarations
         self.protocol: WitlessProtocol
-        self.process: Popen[Any]
         self.fileno_mapping: dict[Optional[int], int]
         self.fileno_to_file: dict[Optional[int], Optional[IO]]
         self.file_to_fileno: dict[IO, int]
         self.result: dict
-        self.return_code: int
-
 
     def _check_result(self):
         if self.exception_on_error is True:
-            if self.return_code != 0:
+            if self.return_code not in (0, None):
                 protocol = self.protocol
                 decoded_output = {
                     source: protocol.fd_infos[fileno][1].decode(protocol.encoding)
@@ -320,15 +343,23 @@ class ThreadedRunner:
             return self._locked_run()
 
     def _locked_run(self) -> dict | _ResultGenerator:
-        if self.generator is not None:
-            raise RuntimeError("ThreadedRunner.run() was re-entered")
+        with self.generator_condition:
+            if self.generator is not None:
+                if self.owning_thread == threading.get_ident():
+                    raise RuntimeError(
+                        "ThreadedRunner.run() was re-entered by already owning "
+                        f"thread {threading.get_ident()}. The execution is "
+                        f"still owned by thread {self.owning_thread}"
+                    )
+                self.generator_condition.wait()
+                assert self.generator is None
 
         if isinstance(self.stdin, (int, IO, type(None))):
             # We will not write anything to stdin. If the caller passed a
             # file-like he can write to it from a different thread.
             self.write_stdin = False
 
-        elif isinstance(self.stdin, (str, bytes)):
+        elif isinstance(self.stdin, bytes):
             # Establish a queue to write to the process and
             # enqueue the input that is already provided.
             self.write_stdin = True
@@ -362,6 +393,10 @@ class ThreadedRunner:
             )
         }
 
+        if self.process is not None:
+            raise RuntimeError(f"Process already running {self.process.pid}")
+
+        self.return_code = None
         try:
             # The following command is generated internally by datalad
             # and trusted. Security check is therefore skipped.
@@ -475,6 +510,7 @@ class ThreadedRunner:
                 self,
                 self.protocol.result_queue
             )
+            self.owning_thread = threading.get_ident()
             return self.generator
 
         return self.process_loop()
@@ -496,6 +532,7 @@ class ThreadedRunner:
         self.ensure_stdin_stdout_stderr_closed()
         self.protocol.connection_lost(None)  # TODO: check exception
         self.wait_for_threads()
+        self._set_process_exited()
         return self.result
 
     def _handle_file_timeout(self, source):
@@ -536,7 +573,8 @@ class ThreadedRunner:
         # monitored files, or if there are still elements in the output queue.
         return (
             len(self.active_file_numbers) > 0
-            or not self.output_queue.empty())
+            or not self.output_queue.empty()
+        ) and not self.is_stalled()
 
     def is_stalled(self) -> bool:
         # If all queue-filling threads have exited and the queue is empty, we
@@ -559,6 +597,11 @@ class ThreadedRunner:
                 return True
         self.stall_check_interval -= 1
         return False
+
+    def _set_process_exited(self):
+        self.return_code = self.process.poll()
+        self.process = None
+        self.process_running = False
 
     def process_queue(self):
         """
@@ -665,9 +708,13 @@ class ThreadedRunner:
 
     def ensure_stdin_stdout_stderr_closed(self):
         self.close_stdin()
-        self._ensure_closed((self.process.stdin,
-                             self.process.stdout,
-                             self.process.stderr))
+        self._ensure_closed(
+            (
+                self.process.stdin,
+                self.process.stdout,
+                self.process.stderr
+            )
+        )
 
     def ensure_stdout_stderr_closed(self):
         self._ensure_closed((self.process.stdout, self.process.stderr))

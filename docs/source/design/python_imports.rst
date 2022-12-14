@@ -73,5 +73,5 @@ Examples
     
     from ..mod import func1
 
-    from datalad.tests.utils import assert_true
+    from datalad.tests.utils_pytest import assert_true
     

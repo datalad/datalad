@@ -531,10 +531,8 @@ tools/ci/gpg-90F7E9EB.pub
 tools/ci/install-annex.sh
 tools/ci/install-minimum-git.sh
 tools/ci/install-upstream-git.sh
-tools/ci/mkchlog-snippet.py
 tools/ci/prep-travis-devel-annex.sh
 tools/ci/prep-travis-forssh.sh
-tools/ci/release-comment.py
 tools/coverage-bin/datalad
 tools/coverage-bin/git-annex-remote-datalad
 tools/coverage-bin/git-annex-remote-datalad-archives

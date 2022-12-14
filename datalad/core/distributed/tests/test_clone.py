@@ -324,7 +324,7 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     # source is recorded in .gitmodules:
     sds = ds.subdatasets("sub")
     assert_result_count(sds, 1, action='subdataset')
-    eq_(sds[0]['gitmodule_datalad-url'], source.path)
+    eq_(sds[0]['gitmodule_datalad-url'], source.pathobj.as_posix())
     # Clone produced one commit including the addition to .gitmodule:
     commits = list(ds.repo.get_branch_commits_(
         branch=DEFAULT_BRANCH,
@@ -722,7 +722,6 @@ def test_cfg_originorigin(path=None):
 
 
 # test fix for gh-2601/gh-3538
-@known_failure
 @with_tempfile()
 def test_relative_submodule_url(path=None):
     Dataset(op.join(path, 'origin')).create()
@@ -1696,7 +1695,7 @@ def test_clone_url_mapping(src_path=None, dest_path=None):
     # we record the original-original URL
     eq_(submod_rec['gitmodule_datalad-url'], 'rambo')
     # and put the effective one as the primary URL
-    eq_(submod_rec['gitmodule_url'], src_path)
+    eq_(submod_rec['gitmodule_url'], Path(src_path).as_posix())
 
 
 _nomatch_map = {

@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
+
 lgr = logging.getLogger('datalad.network')
 
 lgr.log(5, "Importing support.network")
@@ -18,44 +19,76 @@ import pickle
 import re
 import sys
 import time
-import iso8601
-
-from hashlib import md5
 from collections import OrderedDict
-from os.path import (
-    dirname,
-    join as opj,
-)
+from hashlib import md5
 from ntpath import splitdrive as win_splitdrive
-
-from urllib.request import Request
+from os.path import dirname
+from os.path import join as opj
+from urllib.error import URLError
 from urllib.parse import (
-    parse_qsl,
     ParseResult,
-    unquote as urlunquote,
+    parse_qsl,
+)
+from urllib.parse import quote as urlquote
+from urllib.parse import unquote as urlunquote
+from urllib.parse import (
     urlencode,
     urljoin,
     urlparse,
     urlsplit,
     urlunparse,
 )
-from urllib.error import URLError
-
-from datalad.utils import (
-    on_windows,
-    PurePath,
-    Path,
+from urllib.request import (
+    Request,
+    pathname2url,
+    url2pathname,
 )
-from datalad.utils import ensure_dir, ensure_bytes, ensure_unicode, map_items
-from datalad import consts
-from datalad import cfg
+
+import iso8601
+
+from datalad import (
+    cfg,
+    consts,
+)
 from datalad.support.cache import lru_cache
 from datalad.support.exceptions import CapturedException
+from datalad.utils import (
+    Path,
+    PurePath,
+    ensure_bytes,
+    ensure_dir,
+    ensure_unicode,
+    map_items,
+    on_windows,
+)
 
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
-from urllib.parse import quote as urlquote
+
+def local_path_representation(path: str) -> str:
+    """Return an OS-specific representation of a Posix-style path
+
+    With a posix path in the form of "a/b" this function will return "a/b" on
+    Unix-like operating systems and "a\\b" on Windows-style operating systems.
+    """
+    return str(Path(path))
+
+
+def local_url_path_representation(url_path: str) -> str:
+    """Return an OS-specific representation of the path component in a file:-URL
+
+    With a path component like "/c:/Windows" (i.e. from a URL that reads
+    "file:///c:/Windows"), this function will return "/c:/Windows" on a
+    Unix-like operating systems and "C:\\Windows" on Windows-like operating
+    systems.
+    """
+    return url2pathname(url_path)
+
+
+def local_path_from_url(url: str) -> str:
+    """Parse the url and extract an OS-specific local path representation"""
+    return local_url_path_representation(urlparse(url).path)
 
 
 def is_windows_path(path):
@@ -178,7 +211,10 @@ def get_tld(url):
     return rec.netloc
 
 
-from email.utils import parsedate_tz, mktime_tz
+from email.utils import (
+    mktime_tz,
+    parsedate_tz,
+)
 
 
 def rfc2822_to_epoch(datestr):
@@ -698,7 +734,13 @@ class URL(RI):
         if not (hostname in (None, '', 'localhost', '::1')
                 or hostname.startswith('127.')):
             raise ValueError("file:// URL does not point to 'localhost'")
-        return self.path
+
+        # RFC1738 and RFC3986 both forbid unescaped backslash characters in
+        # URLs, and therefore also in the path-component of file:-URLs. We
+        # assume here that any backslash present in a file-URL is a relict of a
+        # verbatim copy of a Windows-style path.
+        unified_path = self.path.replace('\\', '/')
+        return url2pathname(unified_path)
 
 
 class PathRI(RI):
@@ -713,7 +755,7 @@ class PathRI(RI):
 
     @property
     def localpath(self):
-        return self.path
+        return str(Path(self.path))
 
     @property
     def posixpath(self):
@@ -1021,7 +1063,7 @@ def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
         ensure_dir(dirname(doc_fname))
         # use pickle to store the entire request result dict
         pickle.dump(doc, open(doc_fname, 'wb'))
-        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
+        lgr.debug("stored result of request to '%s' in %s", url, doc_fname)
     return doc
 
 

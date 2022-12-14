@@ -69,6 +69,7 @@ from datalad.utils import (
     knows_annex,
     make_tempfile,
     Path,
+    PurePath,
     PurePosixPath,
     rmtree,
 )
@@ -379,11 +380,23 @@ class Clone(Interface):
             # Modify .gitmodules to contain originally given url. This is
             # particularly relevant for postclone routines on a later `get`
             # for that subdataset. See gh-5256.
+
+            if isinstance(RI(source), PathRI):
+                # ensure posix paths; Windows paths would neither be meaningful
+                # as a committed path nor are they currently stored correctly
+                # (see gh-7182).
+                # Restricted to when 'source' is identified as a path, b/c this
+                # wouldn't work with file-URLs (ria or not):
+                #
+                # PureWindowsPath("file:///C:/somewhere/path").as_posix() ->
+                # 'file:/C:/somewhere/path'
+                source = PurePath(source).as_posix()
             if actually_saved_subds:
                 # New subdataset actually saved. Amend the modification
-                # of .gitmodules. Note, that we didn't allow to deviate
-                # from git default behavior WRT a submodule's name vs
-                # its path when we made this a new subdataset.
+                # of .gitmodules.
+                # Note, that we didn't allow deviating from git's default
+                # behavior WRT a submodule's name vs its path when we made this
+                # a new subdataset.
                 subds_name = path.relative_to(ds.pathobj)
                 ds.repo.call_git(
                     ['config',
@@ -953,24 +966,20 @@ def postclonecfg_ria(ds, props, remote="origin"):
         # And read it
         uuid = None
         if config_content:
-            # TODO: We might be able to spare the saving to a file.
-            #       "git config -f -" is not explicitly documented but happens
-            #       to work and would read from stdin. Make sure we know this
-            #       works for required git versions and on all platforms.
-            with make_tempfile(content=config_content) as cfg_file:
-                runner = GitWitlessRunner()
-                try:
-                    result = runner.run(
-                        ['git', 'config', '-f', cfg_file,
-                         'datalad.ora-remote.uuid'],
-                        protocol=StdOutCapture
-                    )
-                    uuid = result['stdout'].strip()
-                except CommandError as e:
-                    ce = CapturedException(e)
-                    # doesn't contain what we are looking for
-                    lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", remote, ce)
+            runner = GitWitlessRunner()
+            try:
+                # "git config -f -" can read from stdin; this spares us a temp file
+                result = runner.run(
+                    ['git', 'config', '-f', '-', 'datalad.ora-remote.uuid'],
+                    stdin=config_content.encode(encoding='utf-8'),
+                    protocol=StdOutCapture
+                )
+                uuid = result['stdout'].strip()
+            except CommandError as e:
+                ce = CapturedException(e)
+                # doesn't contain what we are looking for
+                lgr.debug("Found no UUID for ORA special remote at "
+                          "'%s' (%s)", remote, ce)
 
         return uuid
 

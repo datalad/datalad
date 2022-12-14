@@ -154,7 +154,7 @@ def test_help_np():
     assert re.search(r"Global options\W*-c ", stdout, flags=re.MULTILINE)
     # and -c should be listed only once - i.e. that we do not duplicate sections
     # and our USAGE summary has only [global-opts]
-    assert re.match("Usage: .*datalad.* \[global-opts\] command \[command-opts\]", stdout)
+    assert re.match(r"Usage: .*datalad.* \[global-opts\] command \[command-opts\]", stdout)
     assert stdout.count(' -c ') == 1
 
     assert_all_commands_present(stdout)

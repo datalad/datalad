@@ -332,8 +332,6 @@ def test_diff_recursive(path=None):
         action='diff', state='modified', path=sub.path, type='dataset')
 
 
-# https://github.com/datalad/datalad/issues/3725
-@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_path_diff(_path=None, linkpath=None):

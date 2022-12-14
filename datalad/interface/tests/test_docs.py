@@ -57,7 +57,9 @@ demo_doc = """\
     << PYTHON ||
 
     And an example for in-line markup: [PY: just for Python PY] and
-    the other one [CMD: just for the command line CMD]. End of demo.
+    the other one [CMD: just for the command line CMD]. [PY: multiline
+    python-only with [ brackets [] ] PY][CMD: multiline cli-only with [ brackets
+    [] ] CMD]. End of demo.
 
     Generic appendix. Ding dong ding dong ding dong.  Ding dong ding dong ding
     dong.  Ding dong ding dong ding dong.  Ding dong ding dong ding dong.  Ding
@@ -70,7 +72,10 @@ demo_paramdoc = """\
     Parameters
     ----------
     dataset : Dataset or None, optional
-      something [PY: python only PY] in between [CMD: cmdline only CMD] appended [PY: more python PY]
+      something [PY: python only PY] in between [CMD: cmdline only CMD] appended
+      Brackets can also be within and we can deal with [PY: multiline
+      python-only with [ some brackets [] PY] [CMD: multiline cli-only [
+      brackets included [ can we also have || ?] CMD].
       dataset is given, an attempt is made to identify the dataset based
       Dataset (e.g. a path), or value must be `None`. [Default: None]
 """
@@ -102,9 +107,19 @@ def test_alter_interface_docs_for_api():
     assert_in('a b', alt)
     assert_in('not\n   reflowed', alt)
     assert_in("Some Python-only bits Multiline!", alt)
+    assert_in("Some Python-only bits", alt)
+    assert_in("just for Python", alt)
+    assert_not_in("just for the command line", alt)
+    assert_not_in("multiline cli-only with [ brackets\n[] ]", alt)
+    assert_in("multiline\npython-only with [ brackets [] ]", alt)
 
     altpd = alter_interface_docs_for_api(demo_paramdoc)
+    assert_not_in("PY", altpd)
+    assert_not_in("CMD", altpd)
     assert_in('python', altpd)
     assert_in('in between', altpd)
     assert_in('appended', altpd)
+    assert_in("multiline\n  python-only with [ some brackets []", altpd)
     assert_not_in('cmdline', altpd)
+    assert_not_in("multiline cli-only [\n  brackets included "
+                  "[ can we also have || ?]", altpd)

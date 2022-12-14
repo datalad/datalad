@@ -1,6 +1,6 @@
 
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils_pytest import with_tempfile
 
 
 @with_tempfile(mkdir=True)

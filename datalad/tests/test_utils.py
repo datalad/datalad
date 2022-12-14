@@ -177,11 +177,13 @@ def test_getargspec():
         # so we know that our expected is correct
         if not has_kwonlyargs:
             # if False - we test function with kwonlys - inspect.getargspec would barf
-            eq_(inspect.getargspec(f), expected)
+            if sys.version_info < (3, 11):
+                eq_(inspect.getargspec(f), expected)
             # and getfullargspec[:4] wouldn't provide a full picture
             eq_(inspect.getfullargspec(f)[:4], expected)
         else:
-            assert_raises(ValueError, inspect.getargspec, f)
+            if sys.version_info < (3, 11):
+                assert_raises(ValueError, inspect.getargspec, f)
             inspect.getfullargspec(f)  # doesn't barf
         eq_(getargspec(f, include_kwonlyargs=has_kwonlyargs), expected)
 

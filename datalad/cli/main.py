@@ -17,12 +17,13 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+
 lgr = logging.getLogger('datalad.cli')
 
 lgr.log(5, "Importing cli.main")
 
-import sys
 import os
+import sys
 
 import datalad
 
@@ -65,6 +66,7 @@ def main(args=sys.argv):
     completing = "_ARGCOMPLETE" in os.environ
     if completing and 'COMP_LINE' in os.environ:
         import shlex
+
         # TODO support posix=False too?
         args = shlex.split(os.environ['COMP_LINE']) or args
 
@@ -74,6 +76,7 @@ def main(args=sys.argv):
         args = [_fix_datalad_ri(s) for s in args]
 
     from datalad.support.entrypoints import load_extensions
+
     # load extensions requested by configuration
     # analog to what coreapi is doing for a Python session
     # importantly, load them prior to parser construction, such
@@ -97,9 +100,9 @@ def main(args=sys.argv):
     has_func = hasattr(cmdlineargs, 'func') and cmdlineargs.func is not None
     if unparsed_args:
         if has_func:
-            lgr.error('unknown argument{}: {}'.format(
+            lgr.error('unknown argument%s: %s',
                 's' if len(unparsed_args) > 1 else '',
-                unparsed_args if len(unparsed_args) > 1 else unparsed_args[0])
+                unparsed_args if len(unparsed_args) > 1 else unparsed_args[0],
             )
             cmdlineargs.subparser.print_usage()
             sys.exit(1)
@@ -172,6 +175,7 @@ def _run(namespace):
 def _run_with_debugger(cmdlineargs):
     """Execute the command and drop into debugger if it crashes"""
     from .utils import setup_exceptionhook
+
     # so we could see/stop clearly at the point of failure
     setup_exceptionhook(ipython=cmdlineargs.common_idebug)
     return cmdlineargs.func(cmdlineargs)
@@ -188,9 +192,9 @@ def _run_with_exception_handler(cmdlineargs):
     except BaseException as exc:
         from datalad.support.exceptions import (
             CapturedException,
-            InsufficientArgumentsError,
-            IncompleteResultsError,
             CommandError,
+            IncompleteResultsError,
+            InsufficientArgumentsError,
         )
         ce = CapturedException(exc)
         # we crashed, it has got to be non-zero for starters
@@ -212,7 +216,7 @@ def _run_with_exception_handler(cmdlineargs):
             exit_code = 3
         else:
             # some unforeseen problem
-            lgr.error('%s (%s)', ce.message, ce.name)
+            lgr.error('%s', ce.format_with_cause())
         sys.exit(exit_code)
 
 

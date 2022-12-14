@@ -11,56 +11,55 @@
 """
 
 import hashlib
-import os
-import tempfile
-import string
-import random
 import logging
+import os
+import random
+import string
+import tempfile
 
-from datalad.support.path import (
-    join as opj,
-    exists,
-    abspath,
-    isabs,
-    normpath,
-    relpath,
-    pardir,
-    isdir,
-    sep as opsep,
-)
-
-from datalad.support.locking import lock_if_check_fails
-from datalad.support.external_versions import external_versions
+from datalad import cfg
+from datalad.config import anything2bool
 from datalad.consts import ARCHIVES_TEMP_DIR
+from datalad.support.external_versions import external_versions
+from datalad.support.locking import lock_if_check_fails
+from datalad.support.path import (
+    abspath,
+    exists,
+    isabs,
+    isdir,
+)
+from datalad.support.path import join as opj
+from datalad.support.path import (
+    normpath,
+    pardir,
+    relpath,
+)
+from datalad.support.path import sep as opsep
 from datalad.utils import (
+    Path,
     any_re_search,
     ensure_bytes,
     ensure_unicode,
-    unlink,
-    rmtemp,
-    rmtree,
     get_tempfile_kwargs,
     on_windows,
-    Path,
+    rmtemp,
+    rmtree,
+    unlink,
 )
-from datalad import cfg
-from datalad.config import anything2bool
 
 # fall back on patool, if requested, or 7z is not found
 if (cfg.obtain('datalad.runtime.use-patool', default=False,
                valtype=anything2bool)
         or not external_versions['cmd:7z']):
-    from datalad.support.archive_utils_patool import (
-        decompress_file as _decompress_file,
-        # other code expects this to be here
-        compress_files
-    )
+    from datalad.support.archive_utils_patool import compress_files
+    from datalad.support.archive_utils_patool import \
+        decompress_file as \
+        _decompress_file  # other code expects this to be here
 else:
-    from datalad.support.archive_utils_7z import (
-        decompress_file as _decompress_file,
-        # other code expects this to be here
-        compress_files
-    )
+    from datalad.support.archive_utils_7z import compress_files
+    from datalad.support.archive_utils_7z import \
+        decompress_file as \
+        _decompress_file  # other code expects this to be here
 
 lgr = logging.getLogger('datalad.support.archives')
 
@@ -323,7 +322,7 @@ class ExtractedArchive(object):
         # we need to extract the archive
         # TODO: extract to _tmp and then move in a single command so we
         # don't end up picking up broken pieces
-        lgr.debug(u"Extracting {self._archive} under {path}".format(**locals()))
+        lgr.debug("Extracting %s under %s", self._archive, path)
         if exists(path):
             lgr.debug(
                 "Previous extracted (but probably not fully) cached archive "
@@ -416,7 +415,7 @@ class ExtractedArchive(object):
         return leading if leading is None else opj(*leading)
 
     def get_extracted_file(self, afile):
-        lgr.debug(u"Requested file {afile} from archive {self._archive}".format(**locals()))
+        lgr.debug("Requested file %s from archive %s", afile, self._archive)
         # TODO: That could be a good place to provide "compatibility" layer if
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back
