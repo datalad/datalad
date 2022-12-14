@@ -95,7 +95,7 @@ environment:
     - ID: MacP38core
       # ~40min
       DTS: datalad.core datalad.dataset datalad.runner datalad.support
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.8
       # does not give a functional installation
       # INSTALL_GITANNEX: git-annex -m snapshot
@@ -154,7 +154,7 @@ environment:
           datalad.interface
           datalad.tests
           datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
@@ -164,7 +164,7 @@ environment:
       DTS: >
           datalad.local
           datalad.distributed
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.8
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
