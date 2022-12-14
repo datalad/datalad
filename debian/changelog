@@ -3,6 +3,9 @@ datalad (0.17.10-1) unstable; urgency=medium
   * Fresh upstream patch release
   * debian/patches
     - refreshed and two CPed patches removed
+  * debian/rules
+    - setting a keyring in tests was moved upstream in this release,
+      so we remove setting it in debian/rules
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 14 Dec 2022 11:47:35 -0500
 
