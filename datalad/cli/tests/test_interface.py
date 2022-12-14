@@ -28,6 +28,12 @@ def test_alter_interface_docs_for_cmdline():
     assert_in('a b', alt)
     assert_in('not\n   reflowed', alt)
     assert_in("Something for the cmdline only Multiline!", alt)
+    assert_not_in("Some Python-only bits", alt)
+    assert_not_in("just for Python", alt)
+    assert_in("just for the command line", alt)
+    assert_in("multiline cli-only with [ brackets\n[] ]", alt)
+    assert_not_in("multiline\npython-only with [ brackets [] ]", alt)
+
     # args
     altarg = alter_interface_docs_for_cmdline(demo_argdoc)
     # RST role markup
@@ -42,10 +48,15 @@ def test_alter_interface_docs_for_cmdline():
         'one bla bla two bla')
 
     altpd = alter_interface_docs_for_cmdline(demo_paramdoc)
+    assert_not_in("PY", altpd)
+    assert_not_in("CMD", altpd)
     assert_not_in('python', altpd)
+    assert_not_in("python-only with [ some brackets []", altpd)
     assert_in('in between', altpd)
     assert_in('appended', altpd)
     assert_in('cmdline', altpd)
+    assert_in("multiline cli-only [\n  brackets included "
+              "[ can we also have || ?]", altpd)
 
 
 def test_name_generation():
