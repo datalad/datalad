@@ -103,7 +103,7 @@ Last-Update: 2018-06-05
  
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1787,7 +1787,9 @@ def with_parametric_batch(t):
+@@ -1790,7 +1790,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -116,7 +116,7 @@ Last-Update: 2018-06-05
  # so Й might get recoded
 --- a/datalad/runner/tests/test_witless_runner.py
 +++ b/datalad/runner/tests/test_witless_runner.py
-@@ -56,7 +56,7 @@ from .utils import py2cmd
+@@ -63,7 +63,7 @@ result_counter = 0
  @with_tempfile
  def test_runner(tempfile=None):
      runner = Runner()

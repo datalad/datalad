@@ -8,7 +8,7 @@
          'iso8601',
          'humanize',
          'fasteners>=0.14',
-@@ -186,8 +185,7 @@ datalad_setup(
+@@ -185,8 +184,7 @@ datalad_setup(
      'datalad',
      description="data distribution geared toward scientific datasets",
      install_requires=
