@@ -13,12 +13,10 @@ __docformat__ = 'restructuredtext'
 
 import glob
 import logging
-import re
 import os
 import os.path as op
-from collections import (
-    OrderedDict,
-)
+import re
+from collections import OrderedDict
 from pathlib import Path
 from typing import (
     Dict,
@@ -26,55 +24,58 @@ from typing import (
     Optional,
 )
 
-from datalad import cfg
-from datalad.interface.annotate_paths import _minimal_annotate_paths
-from datalad.interface.base import Interface
-from datalad.interface.results import get_status_dict
-from datalad.interface.utils import (
-    eval_results,
-    generic_result_renderer,
-)
-from datalad.interface.base import build_doc
-from datalad.metadata.definitions import version as vocabulary_version
-from datalad.support.collections import ReadOnlyDict, _val2hashable
-from datalad.support.constraints import (
-    EnsureNone,
-    EnsureBool,
-    EnsureStr,
-)
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CapturedException
-from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
-from datalad.support.json_py import (
-    load as jsonload,
-    load_xzstream,
+from datalad import cfg
+from datalad.consts import (
+    OLDMETADATA_DIR,
+    OLDMETADATA_FILENAME,
 )
-from datalad.interface.common_opts import (
-    recursion_flag,
-    reporton_opt,
-)
+from datalad.core.local.status import get_paths_by_ds
 from datalad.distribution.dataset import (
     Dataset,
     EnsureDataset,
     datasetmethod,
     require_dataset,
 )
+from datalad.dochelpers import single_or_plural
+from datalad.interface.annotate_paths import _minimal_annotate_paths
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.common_opts import (
+    recursion_flag,
+    reporton_opt,
+)
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import (
+    eval_results,
+    generic_result_renderer,
+)
+from datalad.log import log_progress
+from datalad.metadata.definitions import version as vocabulary_version
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.collections import (
+    ReadOnlyDict,
+    _val2hashable,
+)
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import CapturedException
+from datalad.support.gitrepo import GitRepo
+from datalad.support.json_py import load as jsonload
+from datalad.support.json_py import load_xzstream
+from datalad.support.param import Parameter
+from datalad.ui import ui
 from datalad.utils import (
+    as_unicode,
     ensure_list,
     path_is_subpath,
     path_startswith,
-    as_unicode,
 )
-from datalad.ui import ui
-from datalad.dochelpers import single_or_plural
-from datalad.consts import (
-    OLDMETADATA_DIR,
-    OLDMETADATA_FILENAME,
-)
-from datalad.log import log_progress
-from datalad.core.local.status import get_paths_by_ds
 
 # Check availability of new-generation metadata
 try:
@@ -225,6 +226,7 @@ def legacy_query_aggregated_metadata(reporton, ds, aps, recursive=False,
       Of result dictionaries.
     """
     from datalad.coreapi import get
+
     # look for and load the aggregation info for the base dataset
     agginfos, agg_base_path = load_ds_aggregate_db(ds)
 
@@ -480,11 +482,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
             lgr.warning(
-                '{} files have no content present, '
-                'some extractors will not operate on {}'.format(
+                '%s files have no content present, '
+                'some extractors will not operate on %s',
                     nocontent,
                     'them' if nocontent > 10
-                           else [p for p, c, a in content_info if not c and a])
+                           else [p for p, c, a in content_info if not c and a]
             )
 
     # pull out potential metadata field blacklist config settings

@@ -110,3 +110,8 @@ def test_format_exception_with_cause():
         assert_equal(
             format_exception_with_cause(e),
             'RuntimeError -caused by- ValueError -caused by- Mike')
+        # make sure it also works with TracebackException/CapturedException:
+        ce = CapturedException(e)
+        assert_equal(
+            ce.format_with_cause(),
+            'RuntimeError -caused by- ValueError -caused by- Mike')

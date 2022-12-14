@@ -968,7 +968,21 @@ class GitRepo(CoreGitRepo):
 
         # Massage URL
         url_ri = RI(url) if not isinstance(url, RI) else url
-        if not on_windows:
+        if on_windows:
+            # When we're cloning from a local path on Windows, the URL at
+            # this point is platform-specific (e.g., "..\\origin"). According 
+            # to Git clone's manpage, clone urls can't have backslashes.
+            # While Git does manage to clone a URL with backslashes, 
+            # in the case of subdatasets cloned from relative paths it nevertheless
+            # messed up the resulting remote url, resulting in a mix of
+            # front and backslashes (see also gh-7180): 
+            # 'C:/Users/adina/AppData/Local/Temp/datalad_temp_frvczceh/ds/..\\origin' 
+            # Therefore, we're turning it to Posix now.
+            if isinstance(url_ri, PathRI):
+                url = Path(url).as_posix()
+                url_ri = PathRI(url)
+
+        else:
             # if we are on windows, the local path of a URL
             # would not end up being a proper local path and cloning
             # would fail. Don't try to be smart and just pass the
@@ -1003,7 +1017,7 @@ class GitRepo(CoreGitRepo):
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
+                lgr.debug("Git clone from %s to %s", url, path)
 
                 res = GitWitlessRunner().run(cmd, protocol=GitProgress)
                 # fish out non-critical warnings by git-clone
@@ -1048,6 +1062,22 @@ class GitRepo(CoreGitRepo):
                 gr.fsck()
             else:
                 lgr.warning("Experienced issues while cloning: %s", fix_annex)
+        # ensure that Git doesn't mangle relative paths into obscure absolute
+        # paths: https://github.com/datalad/datalad/issues/3538
+        if isinstance(url_ri, PathRI):
+            url_path = Path(url)
+            if not url_path.is_absolute():
+                # get git-created path
+                remote_url = 'remote.' + gr.get_remotes()[0] + '.url'
+                git_url = gr.config.get(remote_url)
+                if Path(git_url).is_absolute():
+                    # Git created an absolute path from a relative URL.
+                    git_url = op.relpath(git_url, gr.path)
+                path = Path(git_url)
+                # always in POSIX even on Windows
+                path = path.as_posix()
+                gr.config.set(remote_url, path,
+                              scope='local', force=True)
         return gr
 
     # Note: __del__ shouldn't be needed anymore as we switched to
@@ -1727,7 +1757,7 @@ class GitRepo(CoreGitRepo):
                                 read_only=True)
         except CommandError as e:
             if 'HEAD is not a symbolic ref' in e.stderr:
-                lgr.debug("detached HEAD in {0}".format(self))
+                lgr.debug("detached HEAD in %s", self)
                 return None
             else:
                 raise e

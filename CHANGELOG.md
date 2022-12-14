@@ -1,4 +1,125 @@
 
+<a id='changelog-0.17.10'></a>
+# 0.17.10 (2022-12-14)
+
+## 🚀 Enhancements and New Features
+
+- Enhance concurrent invocation behavior of `ThreadedRunner.run()`. If possible invocations are serialized instead of raising *re-enter* runtime errors. Deadlock situations are detected and runtime errors are raised instead of deadlocking.
+  Fixes [#7138](https://github.com/datalad/datalad/issues/7138) via
+  [PR #7201](https://github.com/datalad/datalad/pull/7201)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Exceptions bubbling up through CLI are now reported on including their chain
+  of __cause__.
+  Fixes [#7163](https://github.com/datalad/datalad/issues/7163) via
+  [PR #7210](https://github.com/datalad/datalad/pull/7210)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🐛 Bug Fixes
+
+- BF: read RIA config from stdin instead of temporary file.  Fixes [#6514](https://github.com/datalad/datalad/issues/6514) via [PR #7147](https://github.com/datalad/datalad/pull/7147) (by [@adswa](https://github.com/adswa))
+
+- Prevent doomed annex calls on files we already know are untracked.  Fixes [#7032](https://github.com/datalad/datalad/issues/7032) via [PR #7166](https://github.com/datalad/datalad/pull/7166) (by [@adswa](https://github.com/adswa))
+
+- Comply to Posix-like clone URL formats on Windows.  Fixes [#7180](https://github.com/datalad/datalad/issues/7180) via [PR #7181](https://github.com/datalad/datalad/pull/7181) (by [@adswa](https://github.com/adswa))
+
+- Ensure that paths used in the datalad-url field of .gitmodules are posix. Fixes [#7182](https://github.com/datalad/datalad/issues/7182) via [PR #7183](https://github.com/datalad/datalad/pull/7183) (by [@adswa](https://github.com/adswa))
+
+- Bandaids for export-to-figshare to restore functionality.  [PR #7188](https://github.com/datalad/datalad/pull/7188) (by [@adswa](https://github.com/adswa))
+
+- Fixes hanging threads when `close()` or `del` where called in `BatchedCommand` instances. That could lead to hanging tests if the tests used the `@serve_path_via_http()`-decorator
+  Fixes [#6804](https://github.com/datalad/datalad/issues/6804) via
+  [PR #7201](https://github.com/datalad/datalad/pull/7201)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Interpret file-URL path components according to the local operating system as described in RFC 8089. With this fix, `datalad.network.RI('file:...').localpath` returns a correct local path on Windows if the RI is constructed with a file-URL.
+  Fixes [#7186](https://github.com/datalad/datalad/issues/7186) via
+  [PR #7206](https://github.com/datalad/datalad/pull/7206)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Fix a bug when retrieving several files from a RIA store via SSH, when the annex key does not contain size information. Fixes [#7214](https://github.com/datalad/datalad/issues/7214) via [PR #7215](https://github.com/datalad/datalad/pull/7215) (by [@mslw](https://github.com/mslw))
+
+- Interface-specific (python vs CLI) doc generation for commands and their parameters was broken when brackets were used within the interface markups.
+  Fixes [#7225](https://github.com/datalad/datalad/issues/7225) via
+  [PR #7226](https://github.com/datalad/datalad/pull/7226)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 📝 Documentation
+
+- Fix documentation of `Runner.run()` to not accept strings. Instead, encoding
+  must be ensured by the caller.
+  Fixes [#7145](https://github.com/datalad/datalad/issues/7145) via
+  [PR #7155](https://github.com/datalad/datalad/pull/7155)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🏠 Internal
+
+- Fix import of the `ls` command from datalad-deprecated for benchmarks.
+  Fixes [#7149](https://github.com/datalad/datalad/issues/7149) via
+  [PR #7154](https://github.com/datalad/datalad/pull/7154)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Unify definition of parameter choices with `datalad clean`.
+  Fixes [#7026](https://github.com/datalad/datalad/issues/7026) via
+  [PR #7161](https://github.com/datalad/datalad/pull/7161)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🧪 Tests
+
+- Fix test failure with old annex.  Fixes [#7157](https://github.com/datalad/datalad/issues/7157) via [PR #7159](https://github.com/datalad/datalad/pull/7159) (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Reenable now passing test_path_diff test on Windows.  Fixes [#3725](https://github.com/datalad/datalad/issues/3725) via [PR #7194](https://github.com/datalad/datalad/pull/7194) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Use Plaintext keyring backend in tests to avoid the need for (interactive)
+  authentication to unlock the keyring during (CI-) test runs.
+  Fixes [#6623](https://github.com/datalad/datalad/issues/6623) via
+  [PR #7209](https://github.com/datalad/datalad/pull/7209)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+<a id='changelog-0.17.9'></a>
+# 0.17.9 (2022-11-07)
+
+## 🐛 Bug Fixes
+
+- Various small fixups ran after looking post-release and trying to build Debian package.  [PR #7112](https://github.com/datalad/datalad/pull/7112) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Fix add-archive-contents try-finally statement by defining variable earlier.  [PR #7117](https://github.com/datalad/datalad/pull/7117) (by [@adswa](https://github.com/adswa))
+
+- Fix RIA file URL reporting in exception handling.  [PR #7123](https://github.com/datalad/datalad/pull/7123) (by [@adswa](https://github.com/adswa))
+
+- HTTP download treated '429 - too many requests' as an authentication issue and
+  was consequently trying to obtain credentials.
+  Fixes [#7129](https://github.com/datalad/datalad/issues/7129) via
+  [PR #7129](https://github.com/datalad/datalad/pull/7129)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🔩 Dependencies
+
+- Unrestrict pytest and pytest-cov versions.  [PR #7125](https://github.com/datalad/datalad/pull/7125) (by [@jwodder](https://github.com/jwodder))
+
+- Remove remaining references to `nose` and the implied requirement for building the documentation
+  Fixes [#7100](https://github.com/datalad/datalad/issues/7100) via
+  [PR #7136](https://github.com/datalad/datalad/pull/7136)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🏠 Internal
+
+- Use datalad/release-action.  Fixes [#7110](https://github.com/datalad/datalad/issues/7110).  [PR #7111](https://github.com/datalad/datalad/pull/7111) (by [@jwodder](https://github.com/jwodder))
+
+- Fix all logging to use %-interpolation and not .format, sort imports in touched files, add pylint-ing for % formatting in log messages to `tox -e lint`.  [PR #7118](https://github.com/datalad/datalad/pull/7118) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Increase the upper time limit after which we assume that a process is stalling.
+  That should reduce false positives from `datalad.support.tests.test_parallel.py::test_stalling`,
+  without impacting the runtime of passing tests.
+  [PR #7119](https://github.com/datalad/datalad/pull/7119)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- XFAIL a check on length of results in test_gracefull_death.  [PR #7126](https://github.com/datalad/datalad/pull/7126) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Configure Git to allow for "file" protocol in tests.  [PR #7130](https://github.com/datalad/datalad/pull/7130) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.17.8'></a>
 # 0.17.8 (2022-10-24)
 
@@ -30,6 +151,14 @@
   Fixes [#7040](https://github.com/datalad/datalad/issues/7040) via
   [PR #7107](https://github.com/datalad/datalad/pull/7107)
   (by [@christian-monch](https://github.com/christian-monch))
+
+- Improved reporting when using `dry-run` with github-like
+  `create-sibling*` commands (`-gin`, `-gitea`, `-github`,
+  `-gogs`). The result messages will now display names of the
+  repositories which would be created (useful for recursive
+  operations).
+  [PR #7103](https://github.com/datalad/datalad/pull/7103)
+  (by [@mslw](https://github.com/mslw))
 
 <a id='changelog-0.17.7'></a>
 # 0.17.7 (2022-10-14)

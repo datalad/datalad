@@ -60,8 +60,8 @@ requires = {
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
         'mypy~=0.900',
-        'pytest~=7.0',
-        'pytest-cov~=3.0',
+        'pytest',
+        'pytest-cov',
         'pytest-fail-slow~=0.2',
         'types-python-dateutil',
         'types-requests',
@@ -88,12 +88,11 @@ requires['full'] = sum(list(requires.values()), [])
 # Now add additional ones useful for development
 requires.update({
     'devel-docs': [
-        'nose>=1.3.4',
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
         'sphinx>=4.3.0',
-        'sphinx-rtd-theme>=0.5.1"',
+        'sphinx-rtd-theme>=0.5.1',
     ],
     'devel-utils': [
         'asv',        # benchmarks

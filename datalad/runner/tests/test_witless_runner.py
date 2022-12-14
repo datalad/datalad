@@ -14,6 +14,10 @@ import os
 import signal
 import sys
 import unittest.mock
+from threading import (
+    Lock,
+    Thread,
+)
 from time import (
     sleep,
     time,
@@ -50,6 +54,9 @@ from .. import (
     StdOutErrCapture,
 )
 from .utils import py2cmd
+
+
+result_counter = 0
 
 
 @assert_cwd_unchanged
@@ -175,7 +182,7 @@ def test_runner_empty_stdin():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
     runner.run(
-        ["cat"],
+        py2cmd('import sys; print(sys.stdin.read())'),
         stdin=b"",
         protocol=None
     )
@@ -381,3 +388,44 @@ def test_argument_priority():
             **test_env_2,
             'PWD': test_path_2
         }
+
+
+def test_concurrent_execution():
+    runner = Runner()
+    caller_threads = []
+
+    result_list = []
+    result_list_lock = Lock()
+
+    def target(count, r_list, r_list_lock):
+        result = runner.run(
+            py2cmd(
+                "import time;"
+                "import sys;"
+                "time.sleep(1);"
+                "print('end', sys.argv[1])",
+                str(count)
+            ),
+            protocol=StdOutCapture,
+        )
+        output = result["stdout"].strip()
+        assert output == f"end {str(count)}"
+        with r_list_lock:
+            r_list.append(output)
+
+    for c in range(100):
+        caller_thread = Thread(
+            target=target,
+            kwargs=dict(
+                count=c,
+                r_list=result_list,
+                r_list_lock=result_list_lock,
+            ))
+        caller_thread.start()
+        caller_threads.append(caller_thread)
+
+    while caller_threads:
+        t = caller_threads.pop()
+        t.join()
+
+    assert len(result_list) == 100

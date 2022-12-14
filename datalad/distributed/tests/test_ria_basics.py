@@ -31,7 +31,10 @@ from datalad.distributed.tests.ria_utils import (
     get_all_files,
     populate_dataset,
 )
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CommandError,
+    IncompleteResultsError,
+)
 from datalad.tests.utils_pytest import (
     SkipTest,
     assert_equal,
@@ -470,9 +473,7 @@ def _test_version_check(host, dspath, store):
         f.write("arbitrary addition")
     ds.save(message="Add a new_file")
 
-    # TODO: use self.annex.error in special remote and see whether we get an
-    #       actual error result
-    with assert_raises(CommandError):
+    with assert_raises((CommandError, IncompleteResultsError)):
         ds.push('new_file', to='store')
 
     # However, we can force it by configuration
@@ -486,6 +487,7 @@ def _test_version_check(host, dspath, store):
 def test_version_check_ssh():
     # TODO: Skipped due to gh-4436
     _test_version_check('datalad-test')
+
 
 def test_version_check():
     _test_version_check(None)

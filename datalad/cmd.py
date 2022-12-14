@@ -33,6 +33,7 @@ from datetime import datetime
 from operator import attrgetter
 from weakref import WeakValueDictionary, ReferenceType, ref
 
+from datalad import cfg
 # start of legacy import block
 # to avoid breakage of code written before datalad.runner
 from datalad.runner.coreprotocols import (
@@ -69,6 +70,10 @@ from datalad.utils import (
 
 
 __docformat__ = "restructuredtext"
+
+
+_cfg_var = "datalad.runtime.stalled-external"
+_cfg_val = cfg.obtain(_cfg_var)
 
 
 class BatchedCommandError(CommandError):
@@ -141,7 +146,7 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
                  batched_command: "BatchedCommand",
                  done_future: Any = None,
                  encoding: Optional[str] = None,
-                 output_proc: Callable = None,
+                 output_proc: Optional[Callable] = None,
                  ):
         GeneratorMixIn.__init__(self)
         StdOutErrCapture.__init__(self, done_future, encoding)
@@ -200,7 +205,8 @@ class SafeDelCloseMixin(object):
     def __del__(self):
         try:
             self.close()
-        except TypeError:
+        except (TypeError, ImportError):
+            # ImportError could be raised when the interpreter is shutting down.
             if os.fdopen is None or lgr.debug is None:
                 # if we are late in the game and things already gc'ed in py3,
                 # it is Ok
@@ -222,7 +228,7 @@ class BatchedCommand(SafeDelCloseMixin):
     def __init__(self,
                  cmd: Union[str, Tuple, List],
                  path: Optional[str] = None,
-                 output_proc: Callable = None,
+                 output_proc: Optional[Callable] = None,
                  timeout: Optional[float] = None,
                  exception_on_timeout: bool = False,
                  ):
@@ -324,6 +330,8 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def process_running(self) -> bool:
         if self.runner:
+            if self.generator.runner.process is None:
+                return False
             result = self.generator.runner.process.poll()
             if result is None:
                 return True
@@ -533,7 +541,12 @@ class BatchedCommand(SafeDelCloseMixin):
                 self.return_code = self.generator.return_code
 
             except CommandError as command_error:
-                lgr.error("%s subprocess failed with %s", self, command_error)
+                lgr.error(
+                    "%s subprocess exited with %s (%s)",
+                    self,
+                    repr(command_error.code),
+                    command_error
+                )
                 self.return_code = command_error.code
 
             if remaining:
@@ -566,7 +579,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 lgr.log(
                     5,
                     "stderr of %s had %d lines:",
-                    self.generator.runner.process.pid,
+                    self.generator.runner.process.pid if self.generator.runner.process else 'terminated',
                     len(stderr_lines))
                 for line in stderr_lines:
                     lgr.log(5, "| " + line)
@@ -594,12 +607,9 @@ class BatchedCommand(SafeDelCloseMixin):
 
     def _get_abandon(self):
         if self._abandon_cache is None:
-            from . import cfg
-            cfg_var = "datalad.runtime.stalled-external"
-            cfg_val = cfg.obtain(cfg_var)
-            if cfg_val not in ("wait", "abandon"):
-                raise ValueError(f"Unexpected value: {cfg_var}={cfg_val!r}")
-            self._abandon_cache = cfg_val == "abandon"
+            if _cfg_val not in ("wait", "abandon"):
+                raise ValueError(f"Unexpected value: {_cfg_var}={_cfg_val!r}")
+            self._abandon_cache = _cfg_val == "abandon"
         return self._abandon_cache
 
 

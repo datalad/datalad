@@ -135,7 +135,7 @@ Test infrastructure
 .. autosummary::
    :toctree: generated
 
-   tests.utils
+   tests.utils_pytest
    tests.utils_testrepos
    tests.heavyoutput
 

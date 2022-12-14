@@ -93,6 +93,12 @@ class CapturedException(object):
         """
         return self.name + '(' + self.message + ')'
 
+    def format_with_cause(self):
+        """Returns a representation of the original exception including the
+        underlying causes"""
+
+        return format_exception_with_cause(self.tb)
+
     @property
     def message(self):
         """Returns only the message of the original exception
@@ -198,7 +204,9 @@ def format_exception_with_cause(e):
     while being recognizably different from potential exception payload
     messages.
     """
-    s = str(e) or e.__class__.__name__
+    s = str(e) or \
+        (e.exc_type.__name__ if isinstance(e, traceback.TracebackException)
+         else e.__class__.__name__)
     exc_cause = getattr(e, '__cause__', None)
     if exc_cause:
         s += f' -caused by- {format_exception_with_cause(exc_cause)}'
@@ -532,7 +540,11 @@ class ConnectionOpenFailedError(CommandError):
 
 
 class DownloadError(Exception):
-    pass
+
+    def __init__(self, msg=None, status=None, **kwargs):
+        super(DownloadError, self).__init__(msg, **kwargs)
+        # store response status code
+        self.status = status
 
 
 class IncompleteDownloadError(DownloadError):
