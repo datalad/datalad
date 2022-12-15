@@ -211,17 +211,24 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
     return res
 
 
-def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_within_path: bool = False) \
+def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
+                        *, include_within_path: bool = False) \
         -> Generator[str, None, None]:
-    """Given list of relative POSIX paths (or Path objects), select the ones within limits (also relative and POSIX).
+    """Among paths (or Path objects) select the ones within filter_paths.
 
-    In case of include_with_path=True, if limit points to some path under a 'path' within 'paths',
-    that path would be returned as well.
+    All `paths` and `filter_paths` must be relative and POSIX.
+
+    In case of `include_with_path=True`, if a `filter_path` points to some path
+    under a `path` within `paths`, that path would be returned as well, e.g.
+    `path` 'submod' would be returned if there is a `filter_path` 'submod/subsub/file'.
+
+    Complexity is O(N*log(N)), where N is the largest of the lengths of `paths`
+    or `filter_paths`.
 
     Yields
-    -------
-    paths, sorted (so order is not preserved), which reside under 'limits' paths or path within 'limits' is
-    under that path.
+    ------
+    paths, sorted (so order is not preserved), which reside under 'filter_paths' or
+    path within 'filter_paths' is under that path.
     """
     # do conversion and sanity checks, O(N)
     def _harmonize_paths(l: list) -> list:
@@ -237,30 +244,30 @@ def get_limited_paths(paths: list[str|Path], limits: list[str|Path], *, include_
         return sorted(ps)  # O(N * log(N))
 
     paths_parts = _harmonize_paths(paths)
-    limits_parts = _harmonize_paths(limits)
+    filter_paths_parts = _harmonize_paths(filter_paths)
 
-    # we will pretty much "scroll" through sorted paths and limits at the same time
+    # we will pretty much "scroll" through sorted paths and filter_paths at the same time
     for path_parts in paths_parts:
-        while limits_parts:
-            limit_parts = limits_parts[0]
-            l = min(len(path_parts), len(limit_parts))
-            # if common part is "greater" in the path -- we can go to the next "limit"
-            if limit_parts[:l] < path_parts[:l]:
+        while filter_paths_parts:
+            filter_path_parts = filter_paths_parts[0]
+            l = min(len(path_parts), len(filter_path_parts))
+            # if common part is "greater" in the path -- we can go to the next "filter"
+            if filter_path_parts[:l] < path_parts[:l]:
                 # get to the next one
-                limits_parts = limits_parts[1:]
+                filter_paths_parts = filter_paths_parts[1:]
             else:
                 break  # otherwise -- consider this one!
         else:
-            # no limiting path left - the other paths cannot be the selected ones
+            # no filter path left - the other paths cannot be the selected ones
             break
         if include_within_path:
             # if one identical or subpath of another one -- their parts match in the beginning
             # and we will just reuse that 'l'
             pass
         else:
-            # if all components of the limit match, for that we also add len(path_parts) check below
-            l = len(limit_parts)
-        if len(path_parts) >= l and (path_parts[:l] == limit_parts[:l]):
+            # if all components of the filter match, for that we also add len(path_parts) check below
+            l = len(filter_path_parts)
+        if len(path_parts) >= l and (path_parts[:l] == filter_path_parts[:l]):
             yield '/'.join(path_parts)
 
 

@@ -92,7 +92,7 @@ from .network import (
     PathRI,
     is_ssh,
 )
-from .path import get_parent_paths, get_limited_paths
+from .path import get_parent_paths, get_filtered_paths_
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -2406,7 +2406,7 @@ class GitRepo(CoreGitRepo):
                 posix_paths.append(path.as_posix())
 
             # constrain the report by the given paths, make sure all paths are POSIX
-            posix_mod_paths = list(get_limited_paths(
+            posix_mod_paths = list(get_filtered_paths_(
                 posix_mod_paths,
                 posix_paths,
                 include_within_path=True,
