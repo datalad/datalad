@@ -137,7 +137,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     #
     # When bumping this, check whether datalad.repo.version needs to be
     # adjusted.
-    GIT_ANNEX_MIN_VERSION = '8.20200309'
+    GIT_ANNEX_MIN_VERSION = '8.20210223'
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None

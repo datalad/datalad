@@ -158,7 +158,7 @@ matrix:
   - if: type = cron
     python: 3.7
     env:
-    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=8.20200309 -m conda"
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=8.20210223 -m conda"
   # Run with git's master branch rather the default one on the system.
   - if: type = cron
     python: 3.7
