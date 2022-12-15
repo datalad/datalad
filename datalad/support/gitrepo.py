@@ -2354,7 +2354,8 @@ class GitRepo(CoreGitRepo):
             modprops = {'gitmodule_{}'.format(k): v
                         for k, v in props.items()
                         if not (k.startswith('__') or k == 'path')}
-            modpath = self.pathobj / PurePosixPath(props['path'])
+            # Keep as PurePosixPath for possible normalization of / in the path etc
+            modpath = PurePosixPath(props['path'])
             modprops['gitmodule_name'] = name
             out[modpath] = modprops
         return out
@@ -2388,7 +2389,7 @@ class GitRepo(CoreGitRepo):
             # below
             return
 
-        posix_mod_paths = [m.relative_to(self.pathobj).as_posix() for m in modinfo]
+        posix_mod_paths = [m.as_posix() for m in modinfo]
         if paths:
             # harmonize them into relative to the repository
             posix_paths = []
@@ -2435,9 +2436,10 @@ class GitRepo(CoreGitRepo):
                 # there is either a stage 2 or stage 0, never both
                 continue
             # remove the expected line separator from the path
-            path = self.pathobj / PurePosixPath(rpath[:-1])
+            rpath = rpath[:-1]
+            path = PurePosixPath(rpath)
             yield dict(
-                path=path,
+                path=self.pathobj / rpath, # full path returned here
                 type='dataset',
                 gitshasum=gitsha,
                 **modinfo.get(path, {})
