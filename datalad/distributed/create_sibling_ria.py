@@ -309,7 +309,7 @@ class CreateSiblingRia(Interface):
             )
             return
 
-        local_base_path = Path(url_path2local_path(url_base_path))
+        local_base_path = Path(url_base_path)
 
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
