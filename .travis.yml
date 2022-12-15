@@ -155,8 +155,7 @@ matrix:
   # run with minimal supported git-annex version as defined in AnnexRepo.GIT_ANNEX_MIN_VERSION
   # TODO: ATM we do not have that minimal version as a Debian package in
   # snapshots!
-  - if: type = cron
-    python: 3.7
+  - python: 3.7
     env:
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=8.20210223 -m conda"
   # Run with git's master branch rather the default one on the system.
