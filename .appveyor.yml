@@ -100,7 +100,7 @@ environment:
       # does not give a functional installation
       # INSTALL_GITANNEX: git-annex -m snapshot
       #INSTALL_GITANNEX: git-annex=8.20201129
-      INSTALL_GITANNEX: git-annex
+      INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
@@ -156,7 +156,7 @@ environment:
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.8
-      INSTALL_GITANNEX: git-annex
+      INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
     - ID: MacP38a2
@@ -166,7 +166,7 @@ environment:
           datalad.distributed
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.8
-      INSTALL_GITANNEX: git-annex
+      INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
