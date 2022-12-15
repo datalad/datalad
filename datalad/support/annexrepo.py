@@ -3366,8 +3366,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
-        # of whether or not it actually (did) exist in the local annex
-        cmd = ['--copies', '0']
+        # of whether or not it actually (did) exist in the local annex.
+        # --include=* was recommended by Joey in
+        # https://git-annex.branchable.com/todo/add_--all___40__or_alike__41___to_find_and_findref/
+        cmd = ['--include=*']
         files = None
         if ref:
             cmd = ['findref'] + cmd
