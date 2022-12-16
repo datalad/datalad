@@ -164,7 +164,7 @@ def test_verify_ria_url():
     }
     for i, o in cases.items():
         # we are not testing the URL rewriting here
-        assert_equal(o, verify_ria_url(i, {})[:2])
+        assert o == verify_ria_url(i, {})[:2]
 
 
 def test_mapping_identity():

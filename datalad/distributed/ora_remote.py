@@ -918,9 +918,8 @@ class RIARemote(SpecialRemote):
         """
 
         # ensure base path is platform path
-        dataset_tree_version_file = Path(
-            url_path2local_path(
-                str(self.store_base_path))) / 'ria-layout-version'
+        dataset_tree_version_file = \
+            url_path2local_path(self.store_base_path) / 'ria-layout-version'
 
         # check dataset tree version
         try:
@@ -1040,6 +1039,7 @@ class RIARemote(SpecialRemote):
             self.storage_host_push, self.store_base_path_push, \
                 self.ria_store_pushurl = verify_ria_url(self.ria_store_pushurl,
                                                         url_cfgs)
+            self.store_base_path_push = PurePosixPath(self.store_base_path_push)
 
         # TODO duplicates call to `git-config` after RIA url rewrite
         self._load_cfg(gitdir, name)
@@ -1082,6 +1082,7 @@ class RIARemote(SpecialRemote):
                 f"{target_ri} not found, "
                 f"self.ria_store_url: {self.ria_store_url}, "
                 f"self.store_base_pass: {self.store_base_path}, "
+                f"self.store_base_pass_push: {self.store_base_path_push}, "
                 f"path: {type(path)} {path}") from exc
         except PermissionError as exc:
             raise PermissionError(f"Permission denied: {target_ri}") from exc

@@ -14,7 +14,10 @@ from __future__ import annotations
 import logging
 import os
 import re
-from pathlib import Path
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
 from urllib.parse import (
     quote,
     urlparse,
@@ -97,7 +100,7 @@ def verify_ria_url(url, cfg):
       (host, base-path, rewritten url)
       `host` is not just a hostname, but is a stub URL that may also contain
       username, password, and port, if specified in a given URL.
-      `base-path` is the path component of the url
+      `base-path` is the unquoted path component of the url
     """
     from datalad.config import rewrite_url
     from datalad.support.network import URL
@@ -128,11 +131,9 @@ def verify_ria_url(url, cfg):
         portdlm=':' if url_ri.port else '',
         port=url_ri.port or '',
     )
-    # this != file is critical behavior, if removed, it will ruin the IO selection
-    # in RIARemote!!
-    return host if protocol != 'file' else None, \
-        url_ri.path if url_ri.path else '/', \
-        url
+    # this ``!= 'file'´´ is critical behavior, if removed, it will ruin the IO
+    # selection in RIARemote!!
+    return host if protocol != 'file' else None, url_ri.path or '/', url
 
 
 def _ensure_version(io, base_path, version):
@@ -272,10 +273,16 @@ def local_path2url_path(local_path: str,
     return url.path
 
 
-def url_path2local_path(url_path: str,
-                        check_encoding: bool = True,
-                        make_absolut: bool = True,
-                        ) -> str:
+def url_path2local_path(url_path: str | PurePosixPath,
+                        make_absolute: bool = True,
+                        ) -> str | Path:
+
+    if isinstance(url_path, PurePosixPath):
+        return_path = True
+        url_path = str(url_path)
+    else:
+        return_path = False
+
     if not url_path or not url_path.startswith("/"):
         # We expect a 'path-absolute' as defined in RFC 3986, therefore the
         # path must begin with a slash.
@@ -291,12 +298,11 @@ def url_path2local_path(url_path: str,
             f"url path has empty first segment: {url_path}, and is therefore "
             f"not an absolute-path as defined in RFC 8089")
 
-    if check_encoding is True:
-        if quote_path(url_path, safe='/%') != url_path:
-            raise ValueError(
-                f"illegal characters in URL path component: {url_path}")
-
-    return url2pathname(url_path)
+    return (
+        Path(url2pathname(url_path))
+        if return_path
+        else url2pathname(url_path)
+    )
 
 
 def quote_path(path: str, safe: str = "/") -> str:

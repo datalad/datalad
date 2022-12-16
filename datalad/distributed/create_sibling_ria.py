@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+from pathlib import PurePosixPath as UrlPath
 
 from datalad.cmd import WitlessRunner as Runner
 from datalad.core.distributed.clone import decode_source_spec
@@ -309,7 +310,7 @@ class CreateSiblingRia(Interface):
             )
             return
 
-        local_base_path = Path(url_base_path)
+        local_base_path = Path(url_path2local_path(url_base_path))
 
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
