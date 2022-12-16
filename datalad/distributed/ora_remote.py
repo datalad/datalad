@@ -813,9 +813,12 @@ def handle_errors(func):
                             "".format(time=datetime.now(),
                                       exc_str=exc_str)
                     # ensure base path is platform path
-                    log_target = Path(self.store_base_path) / 'error_logs' / \
-                        "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                   uuid=self._repo.uuid)
+                    log_target = (
+                        url_path2local_path(self.store_base_path)
+                        / "error_logs"
+                        / "{dsid}.{uuid}.log".format(
+                            dsid=self.archive_id,
+                            uuid=self._repo.uuid))
                     self.io.write_file(log_target, entry, mode='a')
                 except Exception:
                     # If logging of the exception does fail itself, there's
@@ -1061,10 +1064,12 @@ class RIARemote(SpecialRemote):
         """
         if self.ria_store_url:
             # construct path to ria_layout_version file for reporting
-            store_base_path = Path(
-                url_path2local_path(str(self.store_base_path)))
-            target_ri = self.ria_store_url[4:] + path.relative_to(
-                store_base_path).as_posix()
+            local_store_base_path = url_path2local_path(self.store_base_path)
+            target_ri = (
+                self.ria_store_url[4:]
+                + "/"
+                + path.relative_to(local_store_base_path).as_posix()
+            )
         elif self.storage_host:
             target_ri = "ssh://{}{}".format(self.storage_host, path.as_posix())
         else:
@@ -1119,8 +1124,10 @@ class RIARemote(SpecialRemote):
         # but it is subsequently assumed to be a platform path, by
         # get_layout_locations() etc. Hence it must be converted
         # to match the *remote* platform, not the local client
-        store_base_path = Path(url_path2local_path(str(self.store_base_path))) \
-            if self._local_io else self.store_base_path
+        store_base_path = (
+            url_path2local_path(self.store_base_path)
+            if self._local_io
+            else self.store_base_path)
 
         # cache remote layout directories
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
@@ -1289,8 +1296,10 @@ class RIARemote(SpecialRemote):
                 self._last_archive_path = None
                 self._last_keypath = (None, None)
 
-                store_base_path = Path(self.store_base_path) \
-                    if self._local_io else self.store_base_path
+                store_base_path = (
+                    url_path2local_path(self.store_base_path)
+                    if self._local_io
+                    else self.store_base_path)
 
                 self.remote_git_dir, \
                 self.remote_archive_dir, \
