@@ -1029,7 +1029,7 @@ def get_local_file_url(fname: str,
     """
     path_obj = Path(fname)
     if not path_obj.is_absolute():
-        if allow_relative_path is True:
+        if allow_relative_path:
             fname = str(Path(os.getcwd()) / path_obj)
         else:
             raise ValueError('cannot create file-URL with relative path')
