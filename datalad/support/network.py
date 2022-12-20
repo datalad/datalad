@@ -1044,7 +1044,11 @@ def get_local_file_url(fname: str,
         return "file:/" + url_path
 
     result = "file://" + url_path
-    assert result == Path(fname).as_uri()
+    if result != Path(fname).as_uri():
+        lgr.warning(
+            f"get_local_file_url({fname}, {compatibility}, "
+            f"{allow_relative_path}) returned {result} instead of "
+            f"{Path(fname).as_uri()}")
     return result
 
 
