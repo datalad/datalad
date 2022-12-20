@@ -9,12 +9,14 @@
 
 import logging
 import os
+import tempfile
 from collections import OrderedDict
 from os.path import isabs
 from os.path import join as opj
 
 import pytest
 
+import datalad.support.network
 from datalad.distribution.dataset import Dataset
 from datalad.support.network import (
     RI,
@@ -34,10 +36,13 @@ from datalad.support.network import (
     is_url,
     iso8601_to_epoch,
     local_path_representation,
+    local_path2url_path,
     local_url_path_representation,
     parse_url_opts,
+    quote_path,
     same_website,
     urlquote,
+    url_path2local_path,
 )
 from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
@@ -577,3 +582,53 @@ def test_iso8601_to_epoch():
     eq_(iso8601_to_epoch('2016-07-07T14:25:15'), epoch)
 
     eq_(iso8601_to_epoch('2016-07-07T14:25:14'), epoch-1)
+
+
+def test_mapping_identity():
+    from datalad.tests.utils_pytest import OBSCURE_FILENAME
+
+    absolute_obscure_path = str(Path('/').absolute() / OBSCURE_FILENAME)
+    temp_dir = tempfile.gettempdir()
+    for name in (temp_dir, opj(temp_dir, "x.txt"), absolute_obscure_path):
+        assert url_path2local_path(local_path2url_path(name)) == name
+
+    prefix = "/C:" if on_windows else ""
+    for name in map(quote_path, (prefix + "/window", prefix + "/d", prefix + "/" + OBSCURE_FILENAME)):
+        assert local_path2url_path(url_path2local_path(name)) == name
+
+
+def test_auto_resolve_path():
+    relative_path = str(Path("a/b"))
+    with pytest.raises(ValueError):
+        local_path2url_path(relative_path)
+    local_path2url_path("", auto_resolve=True)
+
+
+@skip_if(not on_windows)
+def test_hostname_detection():
+    with pytest.raises(ValueError):
+        local_path2url_path("\\\\server\\share\\path")
+
+
+def test_url_path2local_path_excceptions():
+    with pytest.raises(ValueError):
+        url_path2local_path('')
+    with pytest.raises(ValueError):
+        url_path2local_path(None)
+    with pytest.raises(ValueError):
+        url_path2local_path('a/b')
+    with pytest.raises(ValueError):
+        url_path2local_path(PurePosixPath('a/b'))
+    with pytest.raises(ValueError):
+        url_path2local_path(PurePosixPath('//a/b'))
+
+
+def test_quote_path(monkeypatch):
+    with monkeypatch.context() as ctx:
+        ctx.setattr(datalad.support.network, 'on_windows', True)
+        assert quote_path("/c:/win:xxx") == "/c:/win%3Axxx"
+        assert quote_path("/C:/win:xxx") == "/C:/win%3Axxx"
+
+        ctx.setattr(datalad.support.network, 'on_windows', False)
+        assert quote_path("/c:/win:xxx") == "/c%3A/win%3Axxx"
+        assert quote_path("/C:/win:xxx") == "/C%3A/win%3Axxx"

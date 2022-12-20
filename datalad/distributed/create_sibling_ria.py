@@ -21,7 +21,6 @@ from datalad.customremotes.ria_utils import (
     create_store,
     get_layout_locations,
     verify_ria_url,
-    url_path2local_path,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -55,6 +54,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
+from datalad.support.network import url_path2local_path
 from datalad.support.param import Parameter
 from datalad.utils import (
     Path,

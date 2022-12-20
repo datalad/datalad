@@ -20,7 +20,6 @@ from datalad.customremotes import (
     SpecialRemote,
 )
 from datalad.customremotes.main import main as super_main
-from datalad.customremotes.ria_utils import url_path2local_path
 from datalad.support.annex_utils import _sanitize_key
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
@@ -28,6 +27,7 @@ from datalad.support.exceptions import (
     AccessFailedError,
     DownloadError
 )
+from datalad.support.network import url_path2local_path
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,

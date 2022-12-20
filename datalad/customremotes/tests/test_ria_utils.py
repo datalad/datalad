@@ -7,9 +7,6 @@ from datalad.customremotes.ria_utils import (
     UnknownLayoutVersion,
     create_ds_in_store,
     create_store,
-    local_path2url_path,
-    quote_path,
-    url_path2local_path,
     verify_ria_url,
 )
 from datalad.distributed.ora_remote import (
@@ -165,27 +162,3 @@ def test_verify_ria_url():
     for i, o in cases.items():
         # we are not testing the URL rewriting here
         assert o == verify_ria_url(i, {})[:2]
-
-
-def test_mapping_identity():
-    from datalad.tests.utils_pytest import OBSCURE_FILENAME
-
-    absolute_obscure_path = str(Path('/').absolute() / OBSCURE_FILENAME)
-    temp_dir = tempfile.gettempdir()
-    for name in (temp_dir, join(temp_dir, "x.txt"), absolute_obscure_path):
-        assert url_path2local_path(local_path2url_path(name)) == name
-
-    prefix = "/C:" if on_windows else ""
-    for name in map(quote_path, (prefix + "/window", prefix + "/d", prefix + "/" + OBSCURE_FILENAME)):
-        assert local_path2url_path(url_path2local_path(name)) == name
-
-
-def test_quote_path(monkeypatch):
-    with monkeypatch.context() as ctx:
-        ctx.setattr(ria_utils, 'on_windows', True)
-        assert quote_path("/c:/win:xxx") == "/c:/win%3Axxx"
-        assert quote_path("/C:/win:xxx") == "/C:/win%3Axxx"
-
-        ctx.setattr(ria_utils, 'on_windows', False)
-        assert quote_path("/c:/win:xxx") == "/c%3A/win%3Axxx"
-        assert quote_path("/C:/win:xxx") == "/C%3A/win%3Axxx"
