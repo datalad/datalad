@@ -84,7 +84,6 @@ def local_url_path_representation(url_path: str) -> str:
     Unix-like operating systems and "C:\\Windows" on Windows-like operating
     systems.
     """
-    from urllib.parse import quote
     return url2pathname(quote(url_path))
 
 
@@ -421,6 +420,8 @@ class RI(object):
 
     >>> RI('http://example.com')
     URL(hostname='example.com', netloc='example.com', scheme='http')
+    >>> RI('file://C:/Windows')
+    URL(hostname='c', netloc='C:', path='/Windows', scheme='file')
     >>> RI('example.com:path')
     SSHRI(hostname='example.com', path='path')
     """
