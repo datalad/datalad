@@ -1185,7 +1185,29 @@ def url_path2local_path(url_path: str | PurePosixPath) -> str | Path:
 
 
 def quote_path(path: str, safe: str = "/") -> str:
-    """quote the path component of a URL, takes OS specifics into account"""
+    """quote the path component of a URL, takes OS specifics into account
+
+    On Windows-like system a path-prefix consisting of a slash, a single letter,
+    a colon, and a slash, i.e. '/c:/Windows', the colon will not be quoted.
+    All characters after the colon will be quoted by `urllib.parse.quote`.
+
+    On Unix-like systems the complete path component will be quoted by
+    'urllib.parse.quote'.
+
+    Parameters
+    ----------
+    path: str
+      The path that should be quoted
+
+    safe: str (default '/')
+       Characters that should not be quoted, passed
+       on to the save-parameter of `urllib.parse.quote`.
+
+    Returns
+    -------
+    str
+       The quoted path component
+    """
     if on_windows:
         if re.match("^/[a-zA-Z]:/", path):
             return path[:3] + quote(path[3:], safe=safe)
