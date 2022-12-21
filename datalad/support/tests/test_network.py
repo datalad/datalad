@@ -508,7 +508,7 @@ def test_get_local_file_url():
                 # relpaths are special-cased below
                 ('test.txt', 'test.txt', compat_annex),
                 (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME), compat_annex),
-            ) + (
+            ) + ((
                 ('C:\\Windows\\notepad.exe', 'file://C:/Windows/notepad.exe', compat_annex),
                 ('C:\\Windows\\notepad.exe', 'file:///C:/Windows/notepad.exe', compat_git),
             ) if on_windows else (
@@ -518,14 +518,19 @@ def test_get_local_file_url():
                 # there are no files with trailing slashes in the name
                 #('/a b/', 'file:///a%20b/'),
                 ('/a b/name', 'file:///a%20b/name', compat_annex),
-            ):
+            )):
         # Yarik found no better way to trigger.  .decode() isn't enough
         print("D: %s" % path)
         if isabs(path):
             assert get_local_file_url(path, compatibility=compatibility) == url
+            abs_path = path
         else:
             assert get_local_file_url(path, allow_relative_path=True, compatibility=compatibility) \
                    == '/'.join((get_local_file_url(os.getcwd(), compatibility=compatibility), url))
+            abs_path = opj(os.getcwd(), path)
+        if compatibility == compat_git:
+            assert get_local_file_url(abs_path, compatibility=compatibility) == Path(abs_path).as_uri()
+
 
 @with_tempfile(mkdir=True)
 def test_get_local_file_url_compatibility(path=None):
@@ -606,7 +611,7 @@ def test_auto_resolve_path():
     relative_path = str(Path("a/b"))
     with pytest.raises(ValueError):
         local_path2url_path(relative_path)
-    local_path2url_path("", auto_resolve=True)
+    local_path2url_path("", allow_relative_path=True)
 
 
 @skip_if(not on_windows)

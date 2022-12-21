@@ -1029,14 +1029,7 @@ def get_local_file_url(fname: str,
         Allow `fname` to be a relative path. The path will be converted to an
         absolute path, by using the current directory as path prefix.
     """
-    path_obj = Path(fname)
-    if not path_obj.is_absolute():
-        if allow_relative_path:
-            fname = str(Path(os.getcwd()) / path_obj)
-        else:
-            raise ValueError('cannot create file-URL with relative path')
-
-    url_path = local_path2url_path(fname, auto_resolve=False)
+    url_path = local_path2url_path(fname, allow_relative_path=allow_relative_path)
     if on_windows and compatibility != "git":
         # Work around the way in which git-annex interprets file URLs on
         # Windows. This code path will put the path anchor, e.g. `C:` of `fname`
@@ -1044,11 +1037,6 @@ def get_local_file_url(fname: str,
         return "file:/" + url_path
 
     result = "file://" + url_path
-    if result != Path(fname).as_uri():
-        lgr.warning(
-            f"get_local_file_url({fname}, {compatibility}, "
-            f"{allow_relative_path}) returned {result} instead of "
-            f"{Path(fname).as_uri()}")
     return result
 
 
@@ -1153,13 +1141,12 @@ def download_url(url, dest=None, overwrite=False):
 
 
 def local_path2url_path(local_path: str,
-                        auto_resolve: bool = False
+                        allow_relative_path: bool = False
                         ) -> str:
-    """Convert a local path into a URL path component"""
-    if not local_path:
-        if not auto_resolve:
-            raise ValueError("cannot convert empty local path to URL path")
-        local_path = os.getcwd()
+    """Convert a local path into an URL path component"""
+    local_path = Path(local_path)
+    if not local_path.is_absolute() and allow_relative_path:
+        local_path = local_path.absolute()
 
     url = urlparse(Path(local_path).as_uri())
     if url.netloc:
@@ -1168,10 +1155,7 @@ def local_path2url_path(local_path: str,
     return url.path
 
 
-def url_path2local_path(url_path: str | PurePosixPath,
-                        make_absolute: bool = True,
-                        ) -> str | Path:
-
+def url_path2local_path(url_path: str | PurePosixPath) -> str | Path:
     if isinstance(url_path, PurePosixPath):
         return_path = True
         url_path = str(url_path)
