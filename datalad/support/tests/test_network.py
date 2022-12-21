@@ -589,8 +589,13 @@ def test_mapping_identity():
 
     absolute_obscure_path = str(Path('/').absolute() / OBSCURE_FILENAME)
     temp_dir = tempfile.gettempdir()
+    print(f"temp_dir: {temp_dir}")
     for name in (temp_dir, opj(temp_dir, "x.txt"), absolute_obscure_path):
-        assert url_path2local_path(local_path2url_path(name)) == name
+        # On some platforms, e.g. MacOS, `temp_dir` might contain trailing
+        # slashes. Since the conversion and its inverse normalize paths, we
+        # compare the result to the normalized path
+        normalized_name = str(Path(name))
+        assert url_path2local_path(local_path2url_path(name)) == normalized_name
 
     prefix = "/C:" if on_windows else ""
     for name in map(quote_path, (prefix + "/window", prefix + "/d", prefix + "/" + OBSCURE_FILENAME)):
