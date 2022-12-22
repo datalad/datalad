@@ -18,6 +18,7 @@ from urllib.parse import (
 
 import requests
 
+from datalad import cfg as dlcfg
 from datalad.distribution.dataset import (
     EnsureDataset,
     require_dataset,
@@ -157,6 +158,19 @@ class _GitHubLike(object):
             + f'. {token_info}' if token_info else '',
             require_token,
         )
+        self._set_extra_remote_settings()
+
+    def _set_extra_remote_settings(self):
+        target_name = urlparse(self.api_url).netloc
+        config_section = "datalad.create-sibling-ghlike.extra-remote-settings.{}".format(target_name)
+        target_specific_settings = {
+            option: dlcfg.get_value(config_section, option)
+            for option in dlcfg.options(config_section)
+        }
+        self.extra_remote_settings = {
+            **self.extra_remote_settings,
+            **target_specific_settings,
+        }
 
     @todo_interface_for_extensions
     def _set_request_headers(self, credential_name, auth_info, require_token):

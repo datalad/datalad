@@ -19,7 +19,7 @@
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-46-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-47-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -208,6 +208,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://www.mmmccormick.com"><img src="https://avatars.githubusercontent.com/u/25432?v=4?s=100" width="100px;" alt="Matt McCormick"/><br /><sub><b>Matt McCormick</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=thewtex" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/vickychenglau"><img src="https://avatars.githubusercontent.com/u/22065437?v=4?s=100" width="100px;" alt="Vicky C Lau"/><br /><sub><b>Vicky C Lau</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=vickychenglau" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://chris-lamb.co.uk"><img src="https://avatars.githubusercontent.com/u/133209?v=4?s=100" width="100px;" alt="Chris Lamb"/><br /><sub><b>Chris Lamb</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=lamby" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/asmacdo"><img src="https://avatars.githubusercontent.com/u/1028657?v=4?s=100" width="100px;" alt="Austin Macdonald"/><br /><sub><b>Austin Macdonald</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=asmacdo" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

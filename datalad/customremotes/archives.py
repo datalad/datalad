@@ -91,7 +91,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     URL_SCHEME = SUPPORTED_SCHEMES[0]
     URL_PREFIX = URL_SCHEME + ":"
 
-    AVAILABILITY = "local"
     COST = 500
 
     def __init__(self, annex, path=None, persistent_cache=True, **kwargs):
