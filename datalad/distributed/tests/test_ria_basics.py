@@ -627,6 +627,7 @@ def test_push_url(storepath=None, dspath=None, blockfile=None):
     ds = Dataset(dspath).create()
     populate_dataset(ds)
     assert_repo_status(ds.path)
+    repo = ds.repo
 
     # set up store:
     io = LocalIO()
@@ -645,26 +646,38 @@ def test_push_url(storepath=None, dspath=None, blockfile=None):
     block_url = "ria+" + blockfile.as_uri()
     init_opts = common_init_opts + ['url={}'.format(store_url),
                                     'push-url={}'.format(block_url)]
-    ds.repo.init_remote('store', options=init_opts)
-
-    # but a push will fail:
-    assert_raises(CommandError, ds.repo.call_annex,
-                  ['copy', 'one.txt', '--to', 'store'])
-
-    # reconfigure with correct push-url:
-    init_opts = common_init_opts + ['url={}'.format(store_url),
-                                    'push-url={}'.format(store_url)]
-    ds.repo.enable_remote('store', options=init_opts)
-
-    # push works now:
-    ds.repo.call_annex(['copy', 'one.txt', '--to', 'store'])
+    repo.init_remote('store', options=init_opts)
 
     store_uuid = ds.siblings(name='store',
                              return_type='item-or-list')['annex-uuid']
     here_uuid = ds.siblings(name='here',
                             return_type='item-or-list')['annex-uuid']
 
-    known_sources = ds.repo.whereis('one.txt')
+    # but a push will fail:
+    assert_raises(CommandError, ds.repo.call_annex,
+                  ['copy', 'one.txt', '--to', 'store'])
+
+    # reconfigure w/ local overwrite:
+    repo.config.add("remote.store.ora-push-url", store_url, scope='local')
+    # push works now:
+    repo.call_annex(['copy', 'one.txt', '--to', 'store'])
+
+    # remove again (config and file from store)
+    repo.call_annex(['move', 'one.txt', '--from', 'store'])
+    repo.config.unset("remote.store.ora-push-url", scope='local')
+    repo.call_annex(['fsck', '-f', 'store'])
+    known_sources = repo.whereis('one.txt')
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
+
+    # reconfigure (this time committed)
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(store_url)]
+    repo.enable_remote('store', options=init_opts)
+
+    # push works now:
+    repo.call_annex(['copy', 'one.txt', '--to', 'store'])
+    known_sources = repo.whereis('one.txt')
     assert_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)
 
