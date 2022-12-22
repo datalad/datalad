@@ -81,7 +81,7 @@ def test_GitRepo_invalid_path(path=None):
     with chpwd(path):
         assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
         ok_(not op.exists(op.join(path, "git:")))
-        assert_raises(ValueError, GitRepo, path="file://some/relative/path", create=True)
+        assert_raises(ValueError, GitRepo, path="file://some_location/path/at/location", create=True)
         ok_(not op.exists(op.join(path, "file:")))
 
 

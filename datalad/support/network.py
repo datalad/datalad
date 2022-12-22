@@ -6,6 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+from __future__ import annotations
 
 import logging
 
@@ -17,12 +18,12 @@ import email.utils
 import os
 import pickle
 import re
-import sys
 import time
 from hashlib import md5
 from ntpath import splitdrive as win_splitdrive
 from os.path import dirname
 from os.path import join as opj
+from pathlib import PurePosixPath
 from urllib.error import URLError
 from urllib.parse import (
     ParseResult,
@@ -31,6 +32,7 @@ from urllib.parse import (
 from urllib.parse import quote as urlquote
 from urllib.parse import unquote as urlunquote
 from urllib.parse import (
+    quote,
     urlencode,
     urljoin,
     urlparse,
@@ -39,7 +41,6 @@ from urllib.parse import (
 )
 from urllib.request import (
     Request,
-    pathname2url,
     url2pathname,
 )
 
@@ -82,7 +83,7 @@ def local_url_path_representation(url_path: str) -> str:
     Unix-like operating systems and "C:\\Windows" on Windows-like operating
     systems.
     """
-    return url2pathname(url_path)
+    return url2pathname(quote(url_path))
 
 
 def local_path_from_url(url: str) -> str:
@@ -417,7 +418,9 @@ class RI(object):
     provided as output, e.g.
 
     >>> RI('http://example.com')
-    URL(hostname='example.com', scheme='http')
+    URL(hostname='example.com', netloc='example.com', scheme='http')
+    >>> RI('file://C:/Windows')
+    URL(hostname='c', netloc='C:', path='/Windows', scheme='file')
     >>> RI('example.com:path')
     SSHRI(hostname='example.com', path='path')
     """
@@ -610,12 +613,20 @@ class URL(RI):
 
     _FIELDS = RI._FIELDS + (
         'scheme',
+        'netloc',
         'username',
         'password',
         'hostname', 'port',
         'query',
         'fragment',
     )
+
+    # Only interpreted on Windows. If set to `True`, UNC-names encoded in
+    # file-URLs, e.g. "file://server/share/path", would be considered local
+    # and mapped onto "\\server\share\path". If set to `False`, UNC-names
+    # encoded in file-URLs would not be considered local and cannot be resolved
+    # to a local path.
+    support_unc = False
 
     def as_str(self):
         """Render URL as a string"""
@@ -724,22 +735,51 @@ class URL(RI):
     def fragment_dict(self):
         return self._parse_qs(self.fragment)
 
-    @property
-    def localpath(self):
-        if self.scheme != 'file':
-            raise ValueError(
-                "Non 'file://' URL cannot be resolved to a local path")
-        hostname = self.hostname
-        if not (hostname in (None, '', 'localhost', '::1')
-                or hostname.startswith('127.')):
-            raise ValueError("file:// URL does not point to 'localhost'")
+    def _windows_local_path(self,
+                            support_unc: bool = False
+                            ) -> str:
+        """Convert the URL to a local path on windows, supports UNC and git-annex"""
 
         # RFC1738 and RFC3986 both forbid unescaped backslash characters in
         # URLs, and therefore also in the path-component of file:-URLs. We
         # assume here that any backslash present in a file-URL is a relict of a
         # verbatim copy of a Windows-style path.
         unified_path = self.path.replace('\\', '/')
-        return url2pathname(unified_path)
+        local_path = url2pathname(unified_path)
+
+        # We support UNC notation, and the "special" git-annex drive encoding
+        # scheme, i.e. netloc is the drive letter plus a colon.
+        # NB, this if clause will not evaluate to True, because our caller
+        # filters out net locations with
+        if self.netloc:
+            if re.match('^[a-zA-Z]:$', self.netloc):
+                # This is the git-annex case, i.e. drive spec in netloc
+                return self.netloc + local_path
+            if support_unc:
+                return '\\\\' + self.netloc + local_path
+            raise ValueError("Unsupported file: URL: {self}")
+        return local_path
+
+    @property
+    def localpath(self):
+        if self.scheme != 'file':
+            raise ValueError(
+                "Non 'file://' URL cannot be resolved to a local path")
+
+        # If there is a hostname, we might want to convert to UNC, unless the
+        # hostname has the form of a 'Windows drive letter' on windows
+        hostname = self.hostname
+        if not (hostname in (None, '', 'localhost', '::1')
+                or hostname.startswith('127.')
+                or re.match('^[a-zA-Z]:$', self.netloc)):
+            if on_windows:
+                return self._windows_local_path(support_unc=self.support_unc)
+            raise ValueError("file:// URL does not point to 'localhost'")
+
+        if on_windows:
+            return self._windows_local_path(support_unc=True)
+
+        return url2pathname(self.path)
 
 
 class PathRI(RI):
@@ -968,38 +1008,35 @@ def is_ssh(ri):
         or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
-def get_local_file_url(fname, compatibility='git-annex'):
+def get_local_file_url(fname: str,
+                       compatibility: str = 'git-annex',
+                       allow_relative_path: bool = True
+                       ) -> str:
     """Return OS specific URL pointing to a local file
 
     Parameters
     ----------
     fname : string
         Filename.  If not absolute, abspath is used
-    compatibility : {'git', 'git-annex'}, optional
-        On Windows, and only on that platform, file:// URLs may need to look
-        different depending on the use case or consuming application. This
-        switch selects different compatibility modes: 'git' for use with
-        Git commands (e.g. `clone` or `submodule add`); 'git-annex` for
-        Git-annex command input (e.g. `addurl`). On any other platform this
-        setting has no effect.
+    compatibility : str, optional
+        This parameter is only interpreted on Windows systems. If set to
+        anything else than 'git', the anchor, e.g. `C:` of `fname` will be put
+        into the `file-auth` part, i.e. network location, defined in RFC 8089.
+        This option is mainly used to support git-annex specific encoding of
+        Windows paths.
+    allow_relative_path: bool, optional
+        Allow `fname` to be a relative path. The path will be converted to an
+        absolute path, by using the current directory as path prefix.
     """
-    # we resolve the path to circumwent potential short paths on unfortunate
-    # platforms that would ruin the URL format.
-    #path = Path(fname).resolve().absolute()
-    path = Path(fname).resolve()
-    if on_windows:
-        # in addition we need to absolute(), as on windows resolve() doesn't
-        # imply that
-        path = path.absolute().as_posix()
-        furl = 'file://{}{}'.format(
-            '/' if compatibility == 'git' else '',
-            urlquote(
-                re.sub(r'([a-zA-Z]):', r'\1', path)
-            ))
-    else:
-        # TODO:  need to fix for all the encoding etc
-        furl = str(URL(scheme='file', path=str(path)))
-    return furl
+    url_path = local_path2url_path(fname, allow_relative_path=allow_relative_path)
+    if on_windows and compatibility != "git":
+        # Work around the way in which git-annex interprets file URLs on
+        # Windows. This code path will put the path anchor, e.g. `C:` of `fname`
+        # into the network location component of the resulting URL.
+        return "file:/" + url_path
+
+    result = "file://" + url_path
+    return result
 
 
 def get_url_cache_filename(url, name=None):
@@ -1100,6 +1137,80 @@ def download_url(url, dest=None, overwrite=False):
         return providers.download(url, path=str(dest), overwrite=overwrite)
     else:
         return providers.fetch(url)
+
+
+def local_path2url_path(local_path: str,
+                        allow_relative_path: bool = False
+                        ) -> str:
+    """Convert a local path into an URL path component"""
+    local_path = Path(local_path)
+    if not local_path.is_absolute() and allow_relative_path:
+        local_path = local_path.absolute()
+
+    url = urlparse(Path(local_path).as_uri())
+    if url.netloc:
+        raise ValueError(
+            f"cannot convert remote path to an URL path: {local_path}")
+    return url.path
+
+
+def url_path2local_path(url_path: str | PurePosixPath) -> str | Path:
+    if isinstance(url_path, PurePosixPath):
+        return_path = True
+        url_path = str(url_path)
+    else:
+        return_path = False
+
+    if not url_path or not url_path.startswith("/"):
+        # We expect a 'path-absolute' as defined in RFC 3986, therefore the
+        # path must begin with a slash.
+        raise ValueError(
+            f"url path does not start with '/': {url_path}, and is therefore "
+            f"not an absolute-path as defined in RFC 8089")
+
+    if url_path.startswith("//"):
+        # We expect a 'path-absolute' as defined in RFC 3986, therefore the
+        # first segment must not be empty, i.e. the path must not start with
+        # two or more slashes.
+        raise ValueError(
+            f"url path has empty first segment: {url_path}, and is therefore "
+            f"not an absolute-path as defined in RFC 8089")
+
+    return (
+        Path(url2pathname(url_path))
+        if return_path
+        else url2pathname(url_path)
+    )
+
+
+def quote_path(path: str, safe: str = "/") -> str:
+    """quote the path component of a URL, takes OS specifics into account
+
+    On Windows-like system a path-prefix consisting of a slash, a single letter,
+    a colon, and a slash, i.e. '/c:/Windows', the colon will not be quoted.
+    All characters after the colon will be quoted by `urllib.parse.quote`.
+
+    On Unix-like systems the complete path component will be quoted by
+    'urllib.parse.quote'.
+
+    Parameters
+    ----------
+    path: str
+      The path that should be quoted
+
+    safe: str (default '/')
+       Characters that should not be quoted, passed
+       on to the save-parameter of `urllib.parse.quote`.
+
+    Returns
+    -------
+    str
+       The quoted path component
+    """
+    if on_windows:
+        if re.match("^/[a-zA-Z]:/", path):
+            return path[:3] + quote(path[3:], safe=safe)
+    return quote(path, safe=safe)
 
 
 lgr.log(5, "Done importing support.network")

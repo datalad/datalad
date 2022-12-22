@@ -9,7 +9,6 @@
 """Helper for RIA stores
 
 """
-
 import logging
 from pathlib import Path
 
@@ -87,6 +86,7 @@ def verify_ria_url(url, cfg):
       (host, base-path, rewritten url)
       `host` is not just a hostname, but is a stub URL that may also contain
       username, password, and port, if specified in a given URL.
+      `base-path` is the unquoted path component of the url
     """
     from datalad.config import rewrite_url
     from datalad.support.network import URL
@@ -117,11 +117,9 @@ def verify_ria_url(url, cfg):
         portdlm=':' if url_ri.port else '',
         port=url_ri.port or '',
     )
-    # this != file is critical behavior, if removed, it will ruin the IO selection
-    # in RIARemote!!
-    return host if protocol != 'file' else None, \
-        url_ri.path if url_ri.path else '/', \
-        url
+    # this ``!= 'file'´´ is critical behavior, if removed, it will ruin the IO
+    # selection in RIARemote!!
+    return host if protocol != 'file' else None, url_ri.path or '/', url
 
 
 def _ensure_version(io, base_path, version):

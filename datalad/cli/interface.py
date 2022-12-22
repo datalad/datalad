@@ -66,15 +66,15 @@ def alter_interface_docs_for_cmdline(docs):
         flags=re.MULTILINE | re.DOTALL)
     # clean cmdline in-line bits
     docs = re.sub(
-        r'\[PY:\s[^\[\]]*\sPY\]',
+        r'\[PY:\s.*?\sPY\]',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        r'\[CMD:\s([^\[\]]*)\sCMD\]',
+        r'\[CMD:\s(.*?)\sCMD\]',
         lambda match: match.group(1),
         docs,
-        flags=re.MULTILINE)
+        flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
         r'\|\| CMDLINE \>\>(.*?)\<\< CMDLINE \|\|',
         lambda match: match.group(1),

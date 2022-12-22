@@ -67,21 +67,35 @@ def test_batched_close_abandon():
 
 @pytest.mark.filterwarnings("ignore:Exception ignored")
 def test_batched_close_timeout_exception():
-    # Expect a timeout if the process runs longer than timeout and the config
-    # for "datalad.runtime.stalled-external" is "abandon".
-    bc = BatchedCommand(
-        cmd=[sys.executable, "-i", "-u", "-q", "-"],
-        timeout=.5,
-        exception_on_timeout=True)
+    while True:
+        try:
+            # Expect a timeout at BatchedCommand.close() if the process runs
+            # longer than timeout and the config for
+            # "datalad.runtime.stalled-external" is "abandon".
+            # In most cases the next commands until `bc.close()` will execute
+            # faster than `timeout`. If not we just restart the process
+            bc = BatchedCommand(
+                cmd=[sys.executable, "-i", "-u", "-q", "-"],
+                timeout=.5,
+                exception_on_timeout=True)
 
-    # Send at least one instruction to start the subprocess
-    response = bc("import time; print('a')")
-    assert_equal(response, "a")
-    bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
-    with unittest.mock.patch("datalad.cfg") as cfg_mock:
-        cfg_mock.configure_mock(**{"obtain.return_value": "abandon"})
-        with pytest.raises(TimeoutExpired) as exc:
-            bc.close()
+            # Send at least one instruction to start the subprocess
+            response = bc("import time; print('a')")
+            assert_equal(response, "a")
+
+            # Send process to sleep for two seconds to trigger a timeout in
+            # bc.close().
+            bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
+            with unittest.mock.patch("datalad.cfg") as cfg_mock:
+                cfg_mock.obtain.return_value = "abandon"
+                try:
+                    bc.close()
+                    pytest.fail("bc.close() did not generate a timeout")
+                except TimeoutExpired:
+                    return
+        except TimeoutExpired:
+            # Timeout occurred early, try again
+            continue
 
 
 def test_batched_close_wait():
