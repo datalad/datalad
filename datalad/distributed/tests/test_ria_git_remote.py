@@ -264,7 +264,7 @@ def test_bare_git_version_2():
 #
 #     # add the ria remote:
 #     # Note: For serve_path_via_http to work (which we need later), the directory needs to already exist.
-#     #       But by default RIARemote will reject to create the remote structure in an already existing directory,
+#     #       But by default ORARemote will reject to create the remote structure in an already existing directory,
 #     #       that wasn't created by itself (lacks as ria-layout-version file).
 #     #       So, we can either configure force-write here or put a version file in it beforehand.
 #     #       However, this is specific to the test environment!

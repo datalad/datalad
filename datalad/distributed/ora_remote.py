@@ -707,7 +707,7 @@ class HTTPRemoteIO(object):
     # We want ORA over HTTP, but with a server side CGI to talk to in order to
     # reduce the number of requests. Implementing this as such an IO class would
     # mean to have separate requests for all server side executions, which is
-    # what we do not want. As a consequence RIARemote class implementation needs
+    # what we do not want. As a consequence ORARemote class implementation needs
     # to treat HTTP as a special case until refactoring to a design that fits
     # both approaches.
 
@@ -860,7 +860,7 @@ class NoLayoutVersion(Exception):
     pass
 
 
-class RIARemote(SpecialRemote):
+class ORARemote(SpecialRemote):
     """This is the class of RIA remotes.
     """
 
@@ -872,7 +872,7 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def __init__(self, annex):
-        super(RIARemote, self).__init__(annex)
+        super(ORARemote, self).__init__(annex)
         if hasattr(self, 'configs'):
             # introduced in annexremote 1.4.2 to support LISTCONFIGS
             self.configs['url'] = "RIA store to use"
@@ -1601,7 +1601,7 @@ class RIARemote(SpecialRemote):
 
     def _get_obj_location(self, key):
         # Notes: - Changes to this method may require an update of
-        #          RIARemote._layout_version
+        #          ORARemote._layout_version
         #        - archive_path is always the same ATM. However, it might depend
         #          on `key` in the future. Therefore build the actual filename
         #          for the archive herein as opposed to `get_layout_locations`.
@@ -1631,7 +1631,7 @@ class RIARemote(SpecialRemote):
 def main():
     """cmdline entry point"""
     super_main(
-        cls=RIARemote,
+        cls=ORARemote,
         remote_name='ora',
         description=\
         "transport file content to and from datasets hosted in RIA stores",
