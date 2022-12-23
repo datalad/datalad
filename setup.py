@@ -125,6 +125,7 @@ entry_points = {
         'datalad=datalad.cli.main:main',
         'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
         'git-annex-remote-datalad=datalad.customremotes.datalad:main',
+        'git-annex-remote-ria=datalad.customremotes.ria_remote:main',
         'git-annex-remote-ora=datalad.distributed.ora_remote:main',
         'git-credential-datalad=datalad.local.gitcredential_datalad:git_credential_datalad',
     ],
