@@ -28,7 +28,6 @@ Concepts and technologies
    related
    basics
    credentials
-   metadata
    customization
    design/index
    glossary

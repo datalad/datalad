@@ -26,8 +26,10 @@ from datalad.interface.results import (
     YieldDatasets,
     is_result_matching_pathsource_argument,
 )
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    eval_results,
+)
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,

@@ -32,3 +32,5 @@ subsystems in DataLad.
    pos_vs_kw_parameters
    docstrings
    progress_reporting
+   github_actions
+   testing

@@ -20,7 +20,7 @@ class ExportArchive(Interface):
     """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
-    from datalad.interface.utils import eval_results
+    from datalad.interface.base import eval_results
     from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import (
         EnsureChoice,

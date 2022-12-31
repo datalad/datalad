@@ -1169,7 +1169,7 @@ class Addurls(Interface):
         EnsureDataset,
         datasetmethod,
     )
-    from datalad.interface.utils import eval_results
+    from datalad.interface.base import eval_results
     from datalad.support.constraints import (
         EnsureChoice,
         EnsureNone,

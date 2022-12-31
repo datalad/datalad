@@ -10,16 +10,20 @@
 
 One of the reasons is also to robustify operation with unicode filenames
 """
+from __future__ import annotations
 
 # TODO: RF and move all paths related functions from datalad.utils in here
 import os
 import os.path as op
-
 # to not pollute API importing as _
 from collections import defaultdict as _defaultdict
-
 from functools import wraps
 from itertools import dropwhile
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
+from typing import Generator
 
 from ..utils import (
     ensure_bytes,
@@ -205,6 +209,66 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
                     seen.add(path)
 
     return res
+
+
+def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
+                        *, include_within_path: bool = False) \
+        -> Generator[str, None, None]:
+    """Among paths (or Path objects) select the ones within filter_paths.
+
+    All `paths` and `filter_paths` must be relative and POSIX.
+
+    In case of `include_with_path=True`, if a `filter_path` points to some path
+    under a `path` within `paths`, that path would be returned as well, e.g.
+    `path` 'submod' would be returned if there is a `filter_path` 'submod/subsub/file'.
+
+    Complexity is O(N*log(N)), where N is the largest of the lengths of `paths`
+    or `filter_paths`.
+
+    Yields
+    ------
+    paths, sorted (so order is not preserved), which reside under 'filter_paths' or
+    path within 'filter_paths' is under that path.
+    """
+    # do conversion and sanity checks, O(N)
+    def _harmonize_paths(l: list) -> list:
+        ps = []
+        for p in l:
+            if isinstance(p, str):
+                p = PurePosixPath(p)
+            if p.is_absolute():
+                raise ValueError(f"Got absolute path {p}, expected relative")
+            if p.parts and p.parts[0] == '..':
+                raise ValueError(f"Path {p} leads outside")
+            ps.append(p.parts)  # store parts
+        return sorted(ps)  # O(N * log(N))
+
+    paths_parts = _harmonize_paths(paths)
+    filter_paths_parts = _harmonize_paths(filter_paths)
+
+    # we will pretty much "scroll" through sorted paths and filter_paths at the same time
+    for path_parts in paths_parts:
+        while filter_paths_parts:
+            filter_path_parts = filter_paths_parts[0]
+            l = min(len(path_parts), len(filter_path_parts))
+            # if common part is "greater" in the path -- we can go to the next "filter"
+            if filter_path_parts[:l] < path_parts[:l]:
+                # get to the next one
+                filter_paths_parts = filter_paths_parts[1:]
+            else:
+                break  # otherwise -- consider this one!
+        else:
+            # no filter path left - the other paths cannot be the selected ones
+            break
+        if include_within_path:
+            # if one identical or subpath of another one -- their parts match in the beginning
+            # and we will just reuse that 'l'
+            pass
+        else:
+            # if all components of the filter match, for that we also add len(path_parts) check below
+            l = len(filter_path_parts)
+        if len(path_parts) >= l and (path_parts[:l] == filter_path_parts[:l]):
+            yield '/'.join(path_parts)
 
 
 def _get_parent_paths_check(path, sep, asep):

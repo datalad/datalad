@@ -19,7 +19,6 @@ import os
 import pickle
 import re
 import time
-from collections import OrderedDict
 from hashlib import md5
 from ntpath import splitdrive as win_splitdrive
 from os.path import dirname
@@ -500,7 +499,7 @@ class RI(object):
 
     @classmethod
     def _get_blank_fields(cls, **fields):
-        return OrderedDict(((f, fields.get(f, '')) for f in cls._FIELDS))
+        return dict(((f, fields.get(f, '')) for f in cls._FIELDS))
 
     @property
     def fields(self):
@@ -718,7 +717,7 @@ class URL(RI):
         """Helper around parse_qs to strip unneeded 'list'ing etc and return a dict of key=values"""
         if not s:
             return {}
-        out = map_items(ensure_unicode, OrderedDict(parse_qsl(s, 1)))
+        out = map_items(ensure_unicode, dict(parse_qsl(s, 1)))
         if not auto_delist:
             return out
         for k in out:

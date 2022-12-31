@@ -173,8 +173,8 @@ A string label categorizing the state of an entity. Common values are:
 - ``present``
 
 
-``error-messages``
-------------------
+``error_message``
+-----------------
 
 List of any error messages that were captured or produced while achieving a
 result.

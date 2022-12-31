@@ -199,7 +199,7 @@ def test_message_pbar_state_logging_is_demoted():
     lgr = LoggerHelper(name).get_initialized_logger()
     ui = ConsoleLog()
 
-    with patch("datalad.ui.dialog.lgr", lgr):
+    with patch("datalad.log.lgr", lgr):
         with swallow_logs(name=name, new_level=20) as cml:
             ui.message("testing 0")
             assert_not_in("Clear progress bars", cml.out)

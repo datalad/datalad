@@ -10,7 +10,6 @@
 import logging
 import os
 import tempfile
-from collections import OrderedDict
 from os.path import isabs
 from os.path import join as opj
 
@@ -436,19 +435,19 @@ def test_url_quote_path(cls, clskwargs, target_url):
 
 def test_url_compose_archive_one():
     url = URL(scheme='dl+archive', path='KEY',
-              fragment=OrderedDict((('path', 'f/p/ s+'), ('size', 30))))
+              fragment=dict((('path', 'f/p/ s+'), ('size', 30))))
     # funny - space is encoded as + but + is %2B
     eq_(str(url), 'dl+archive:KEY#path=f/p/+s%2B&size=30')
     eq_(url.fragment_dict, {'path': 'f/p/ s+', 'size': '30'})
 
 
 def test_url_fragments_and_query():
-    url = URL(hostname="host", query=OrderedDict((('a', 'x/b'), ('b', 'y'))))
+    url = URL(hostname="host", query=dict((('a', 'x/b'), ('b', 'y'))))
     eq_(str(url), '//host?a=x%2Fb&b=y')
     eq_(url.query, 'a=x%2Fb&b=y')
     eq_(url.query_dict, {'a': 'x/b', 'b': 'y'})
 
-    url = URL(hostname="host", fragment=OrderedDict((('b', 'x/b'), ('a', 'y'))))
+    url = URL(hostname="host", fragment=dict((('b', 'x/b'), ('a', 'y'))))
     eq_(str(url), '//host#b=x/b&a=y')
     eq_(url.fragment, 'b=x/b&a=y')
     eq_(url.fragment_dict, {'a': 'y', 'b': 'x/b'})

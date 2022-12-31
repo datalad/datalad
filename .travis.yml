@@ -86,11 +86,13 @@ matrix:
     env:
     - PYTEST_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - DATALAD_RUNTIME_PATHSPEC__FROM__FILE=always
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=10.20220525 -m conda"
   - python: 3.7
     env:
     - PYTEST_SELECTION_OP=""
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - DATALAD_RUNTIME_PATHSPEC__FROM__FILE=always
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --python-match minor --batch git-annex=8.20210310 -m conda"
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for pytest.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
@@ -229,8 +231,6 @@ before_install:
   # needed for tests of patool compression fall-back solution
   - travis_retry sudo eatmydata apt-get install xz-utils
   - travis_retry sudo eatmydata apt-get install shunit2
-  # for metadata support
-  - travis_retry sudo eatmydata apt-get install exempi
   # Configure _DL_TMPDIR before trying install git-annex -- script might use it
   - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
@@ -269,7 +269,7 @@ script:
   # Run tests
   #  Note: adding --log-cli-level=INFO would result in DATALAD_LOG_TARGET=/dev/null being not
   #  in effect, dumping too many logs.
-  - http_proxy=
+  - set -x; http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"

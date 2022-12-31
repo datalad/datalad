@@ -10,10 +10,13 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.support.annexrepo import AnnexRepo
+
+lgr = logging.getLogger('datalad.local.add_readme')
 
 
 @build_doc
@@ -28,7 +31,7 @@ class AddReadme(Interface):
     """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
-    from datalad.interface.utils import eval_results
+    from datalad.interface.base import eval_results
     from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import (
         EnsureChoice,
@@ -67,8 +70,6 @@ class AddReadme(Interface):
         from os.path import lexists
         from os.path import join as opj
         from io import open
-        import logging
-        lgr = logging.getLogger('datalad.local.add_readme')
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import ensure_list
@@ -111,24 +112,7 @@ class AddReadme(Interface):
                 )
 
         # get any metadata on the dataset itself
-        dsinfo = dataset.metadata(
-            '.',
-            reporton='datasets',
-            return_type='item-or-list',
-            result_renderer='disabled',
-            on_failure='ignore')
-        meta = {}
-        if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
-            lgr.warning("Could not obtain dataset metadata, proceeding without")
-            dsinfo = {}
-        else:
-            # flatten possibly existing multiple metadata sources
-            for src in dsinfo['metadata']:
-                if src.startswith('@'):
-                    # not a source
-                    continue
-                meta.update(dsinfo['metadata'][src])
-
+        meta = _get_dataset_metadata(dataset)
         metainfo = ''
         for label, content in (
                 ('', meta.get('description', meta.get('shortdescription', ''))),
@@ -249,3 +233,35 @@ files by whom, and when.
                 return_type='generator',
                 result_renderer='disabled'
         )
+
+
+def _get_dataset_metadata(dataset):
+    """Implement this function to perform metadata reporting for a dataset
+
+    This implementation reports no metadata.
+
+    Returns
+    -------
+    dict
+        Can contain keys like 'description', 'shortdescription', 'author',
+        'homepage', 'citation', 'license', 'tag', 'fundedby'
+    """
+
+    meta = {}
+    if hasattr(dataset, 'metadata'):
+        dsinfo = dataset.metadata(
+            '.',
+            reporton='datasets',
+            return_type='item-or-list',
+            result_renderer='disabled',
+            on_failure='ignore')
+        if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
+            lgr.warning("Could not obtain dataset metadata, proceeding without")
+        else:
+            # flatten possibly existing multiple metadata sources
+            for src in dsinfo['metadata']:
+                if src.startswith('@'):
+                    # not a source
+                    continue
+                meta.update(dsinfo['metadata'][src])
+    return meta

@@ -118,7 +118,7 @@ def verify_ria_url(url, cfg):
         port=url_ri.port or '',
     )
     # this ``!= 'file'´´ is critical behavior, if removed, it will ruin the IO
-    # selection in RIARemote!!
+    # selection in ORARemote!!
     return host if protocol != 'file' else None, url_ri.path or '/', url
 
 

@@ -27,12 +27,12 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
     save_message_opt,
 )
-from datalad.interface.utils import eval_results
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
@@ -246,27 +246,13 @@ class Remove(Interface):
                         lgr.debug('Remove file: %s', delpath)
                         delpath.unlink()
                     continue
-                # if we get here, there is nothing on the file system
-                # anymore at this path. Either because the parent
-                # dataset vanished already, or because we dropped a
-                # dataset, and it still needs to be unregistered
-                # from its parent -> `git rm`
-                if dpath.exists():
-                    GitRepo(dpath).call_git(
-                        # no need for recursion, we know that even the root
-                        # path not longer exists
-                        ['rm', '-q'],
-                        files=[str(delpath.relative_to(dpath))]
-                    )
-                    # this path was already being removed by drop
-                    # so it must belong to a dropped dataset
-                    # save won't report about this, let's do it
-                    yield dict(
-                        action='remove',
-                        status='ok',
-                        path=str(delpath),
-                        type='dataset',
-                    )
+                else:
+                    # if we get here, there is nothing on the file system
+                    # anymore at this path. Either because the parent
+                    # dataset vanished already, or because we dropped a
+                    # dataset. `save()` will properly unregistered
+                    # from the parents at the end. nothing else to do
+                    pass
 
         if not refds.is_installed():
             # we already dropped the whole thing
