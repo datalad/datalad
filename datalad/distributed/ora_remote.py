@@ -984,9 +984,12 @@ class ORARemote(SpecialRemote):
                    "ora-push-url": "ria_store_pushurl"
                    }
 
-        if self.gitcfg_name:
+        # in initremote we may not have a reliable name of the git remote config
+        # yet. Go with the default.
+        gitcfg_name = self.gitcfg_name or self.name
+        if gitcfg_name:
             for cfg, att in cfg_map.items():
-                value = self._repo.config.get(f"remote.{self.gitcfg_name}.{cfg}")
+                value = self._repo.config.get(f"remote.{gitcfg_name}.{cfg}")
                 if value is not None:
                     self.__setattr__(cfg_map[cfg], value)
                     if cfg == "ora-url":
@@ -998,7 +1001,7 @@ class ORARemote(SpecialRemote):
                     self.buffer_size = int(self.buffer_size)
                 except ValueError:
                     self.message(f"Invalid value of config "
-                                 f"'remote.{self.gitcfg_name}."
+                                 f"'remote.{gitcfg_name}."
                                  f"ora-buffer-size': {self.buffer_size}")
                     self.buffer_size = DEFAULT_BUFFER_SIZE
 
