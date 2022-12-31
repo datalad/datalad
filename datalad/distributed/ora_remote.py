@@ -30,6 +30,7 @@ from datalad.support.exceptions import (
     CapturedException,
     DownloadError
 )
+from datalad.support.network import url_path2local_path
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
     UnknownLayoutVersion,
@@ -815,9 +816,12 @@ def handle_errors(func):
                             "".format(time=datetime.now(),
                                       exc_str=exc_str)
                     # ensure base path is platform path
-                    log_target = Path(self.store_base_path) / 'error_logs' / \
-                        "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                   uuid=self._repo.uuid)
+                    log_target = (
+                        url_path2local_path(self.store_base_path)
+                        / "error_logs"
+                        / "{dsid}.{uuid}.log".format(
+                            dsid=self.archive_id,
+                            uuid=self._repo.uuid))
                     self.io.write_file(log_target, entry, mode='a')
                 except Exception:
                     # If logging of the exception does fail itself, there's
@@ -931,7 +935,7 @@ class ORARemote(SpecialRemote):
 
         # ensure base path is platform path
         dataset_tree_version_file = \
-            Path(self.store_base_path) / 'ria-layout-version'
+            url_path2local_path(self.store_base_path) / 'ria-layout-version'
 
         # check dataset tree version
         try:
@@ -1201,6 +1205,7 @@ class ORARemote(SpecialRemote):
             self.store_base_path_push, \
             self.ria_store_pushurl = \
                 verify_ria_url(self.ria_store_pushurl, url_cfgs)
+            self.store_base_path_push = PurePosixPath(self.store_base_path_push)
 
     def _get_version_config(self, path):
         """ Get version and config flags from RIA store's layout file
@@ -1208,8 +1213,12 @@ class ORARemote(SpecialRemote):
 
         if self.ria_store_url:
             # construct path to ria_layout_version file for reporting
-            target_ri = self.ria_store_url[4:] +\
-                        path.relative_to(Path(self.store_base_path)).as_posix()
+            local_store_base_path = url_path2local_path(self.store_base_path)
+            target_ri = (
+                self.ria_store_url[4:]
+                + "/"
+                + path.relative_to(local_store_base_path).as_posix()
+            )
         elif self.storage_host:
             target_ri = "ssh://{}{}".format(self.storage_host, path.as_posix())
         else:
@@ -1223,7 +1232,12 @@ class ORARemote(SpecialRemote):
         # as it includes the store base address including the access
         # method).
         except FileNotFoundError as exc:
-            raise NoLayoutVersion(f"{target_ri} not found.") from exc
+            raise NoLayoutVersion(
+                f"{target_ri} not found, "
+                f"self.ria_store_url: {self.ria_store_url}, "
+                f"self.store_base_pass: {self.store_base_path}, "
+                f"self.store_base_pass_push: {self.store_base_path_push}, "
+                f"path: {type(path)} {path}") from exc
         except PermissionError as exc:
             raise PermissionError(f"Permission denied: {target_ri}") from exc
         except Exception as exc:
@@ -1259,8 +1273,10 @@ class ORARemote(SpecialRemote):
         # but it is subsequently assumed to be a platform path, by
         # get_layout_locations() etc. Hence it must be converted
         # to match the *remote* platform, not the local client
-        store_base_path = Path(self.store_base_path) \
-            if self._local_io else self.store_base_path
+        store_base_path = (
+            url_path2local_path(self.store_base_path)
+            if self._local_io
+            else self.store_base_path)
 
         # cache remote layout directories
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
@@ -1426,8 +1442,10 @@ class ORARemote(SpecialRemote):
                 self._last_archive_path = None
                 self._last_keypath = (None, None)
 
-                store_base_path = Path(self.store_base_path) \
-                    if self._local_io else self.store_base_path
+                store_base_path = (
+                    url_path2local_path(self.store_base_path)
+                    if self._local_io
+                    else self.store_base_path)
 
                 self.remote_git_dir, \
                 self.remote_archive_dir, \

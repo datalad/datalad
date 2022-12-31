@@ -67,6 +67,15 @@ def setup_package():
                 }
             )
         )
+        m.enter_context(
+            patch.dict(
+                os.environ,
+                {
+                    'PYTHON_KEYRING_BACKEND':
+                        'keyrings.alt.file.PlaintextKeyring'
+                }
+            )
+        )
 
         def prep_tmphome():
             # re core.askPass:
