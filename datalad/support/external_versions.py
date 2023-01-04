@@ -13,8 +13,8 @@ import sys
 import os.path as op
 from os import linesep
 
-from distutils.version import LooseVersion
 from itertools import chain
+from looseversion import LooseVersion
 
 from datalad.log import lgr
 # import version helper from config to have only one implementation
@@ -184,7 +184,6 @@ class ExternalVersions(object):
         'annexremote',
         'platformdirs',
         'boto',
-        'exifread',
         'git',
         'gitdb',
         'humanize',
@@ -192,7 +191,6 @@ class ExternalVersions(object):
         'keyring',
         'keyrings.alt',
         'msgpack',
-        'mutagen',
         'patool',
         'cmd:7z',
         'requests',

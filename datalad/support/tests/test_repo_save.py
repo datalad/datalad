@@ -9,6 +9,7 @@
 
 import shutil
 
+from datalad.api import create
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
@@ -33,7 +34,7 @@ from datalad.utils import (
 
 @with_tempfile
 def test_save_basics(path=None):
-    ds = Dataset(path).create()
+    ds = Dataset(path).create(result_renderer='disabled')
     # nothing happens
     eq_(list(ds.repo.save(paths=[], _status={})),
         [])
@@ -51,7 +52,8 @@ def _test_save_all(path, repocls):
     # make sure we get a 'delete' result for each deleted file
     eq_(
         set(r['path'] for r in res if r['action'] == 'delete'),
-        {k for k, v in orig_status.items() if k.name == 'file_deleted'}
+        {k for k, v in orig_status.items()
+         if k.name in ('file_deleted', 'file_staged_deleted')}
     )
     saved_status = ds.repo.status(untracked='all')
     # we still have an entry for everything that did not get deleted
@@ -130,7 +132,7 @@ def test_save_typechange(path=None):
 
 @with_tempfile
 def test_save_to_git(path=None):
-    ds = Dataset(path).create()
+    ds = Dataset(path).create(result_renderer='disabled')
     create_tree(
         ds.path,
         {
@@ -147,3 +149,34 @@ def test_save_to_git(path=None):
             assert_not_in('key', p, f)
         elif f.match('*inannex'):
             assert_in('key', p, f)
+
+
+@with_tempfile
+def test_save_subds_change(path=None):
+    ckwa = dict(result_renderer='disabled')
+    ds = Dataset(path).create(**ckwa)
+    subds = ds.create('sub', **ckwa)
+    assert_repo_status(ds.repo)
+    rmtree(subds.path)
+    res = ds.save(**ckwa)
+    assert_repo_status(ds.repo)
+    # updated .gitmodules, deleted subds, saved superds
+    assert len(res) == 3
+    assert_in_results(
+        res, type='dataset', path=ds.path, action='save')
+    assert_in_results(
+        res, type='dataset', path=subds.path, action='delete')
+    assert_in_results(
+        res, type='file', path=str(ds.pathobj / '.gitmodules'), action='add')
+    # now add one via save
+    subds2 = create(ds.pathobj / 'sub2', **ckwa)
+    res = ds.save(**ckwa)
+    # updated .gitmodules, added subds, saved superds
+    assert len(res) == 3
+    assert_repo_status(ds.repo)
+    assert_in_results(
+        res, type='dataset', path=ds.path, action='save')
+    assert_in_results(
+        res, type='dataset', path=subds2.path, action='add')
+    assert_in_results(
+        res, type='file', path=str(ds.pathobj / '.gitmodules'), action='add')

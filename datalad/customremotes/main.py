@@ -18,8 +18,10 @@ from datalad.cli.parser import (
     parser_add_version_opt,
 )
 from datalad.cli.utils import setup_exceptionhook
-from datalad.log import lgr
 from datalad.ui import ui
+
+import logging
+lgr = logging.getLogger('datalad.customremotes')
 
 
 def setup_parser(remote_name, description):
@@ -75,5 +77,14 @@ def main(args=None, cls=None, remote_name=None, description=None):
         try:
             _main(args, cls)
         except Exception as exc:
-            lgr.error('%s (%s)', str(exc), exc.__class__.__name__)
+            lgr.debug('%s (%s) - passing ERROR to git-annex and exiting',
+                      str(exc), exc.__class__.__name__)
+            # `SpecialRemote` classes are supposed to catch everything and
+            # turn it into a `RemoteError` resulting in an ERROR message to
+            # annex. If we end up here, something went wrong outside of the
+            # `master.Listen()` call in `_main`.
+            # In any case, exiting the special remote process should be
+            # accompanied by such an ERROR message to annex rather than a log
+            # message.
+            print("ERROR %s (%s)" % (str(exc), exc.__class__.__name__))
             sys.exit(1)

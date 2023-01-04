@@ -86,6 +86,12 @@ class supers(SampleSuperDatasetBenchmarks):
     def time_subdatasets(self):
         self.ds.subdatasets()
 
+    def time_subdatasets_with_all_paths_recursive(self):
+        # to see if we do not get O(N^2) performance
+        subdatasets = self.ds.subdatasets(recursive=True, result_xfm='relpaths')
+        subdatasets2 = self.ds.subdatasets(path=subdatasets, recursive=True, result_xfm='relpaths')
+        assert subdatasets == subdatasets2
+
     def time_subdatasets_recursive(self):
         self.ds.subdatasets(recursive=True)
 

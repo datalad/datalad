@@ -26,8 +26,8 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
-from datalad.interface.utils import eval_results
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
@@ -129,6 +129,18 @@ class CreateSiblingGithub(Interface):
     generated on the platform (Account->Settings->Developer Settings->Personal
     access tokens->Generate new token).
 
+    This command can be configured with
+    "datalad.create-sibling-ghlike.extra-remote-settings.NETLOC.KEY=VALUE" in
+    order to add any local KEY = VALUE configuration to the created sibling in
+    the local `.git/config` file. NETLOC is the domain of the Github instance to
+    apply the configuration for.
+    This leads to a behavior that is equivalent to calling datalad's
+    ``siblings('configure', ...)``||``siblings configure`` command with the
+    respective KEY-VALUE pair after creating the sibling.
+    The configuration, like any other, could be set at user- or system level, so
+    users do not need to add this configuration to every sibling created with
+    the service at NETLOC themselves.
+
     .. versionchanged:: 0.16
        || REFLOW >>
        The API has been aligned with the some
@@ -229,6 +241,7 @@ class CreateSiblingGithub(Interface):
             access_protocol='https',
             publish_depends=None,
             private=False,
+            description=None,
             dryrun=False,
             dry_run=False,
             api='https://api.github.com'):
@@ -288,5 +301,6 @@ class CreateSiblingGithub(Interface):
             access_protocol=access_protocol,
             publish_depends=publish_depends,
             private=private,
+            description=description,
             dry_run=dry_run,
         )

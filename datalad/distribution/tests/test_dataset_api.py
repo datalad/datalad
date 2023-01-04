@@ -26,7 +26,6 @@ def test_datasetmethod_bound(path=None):
     assert ds.create  # simplest, intfspec only 2 entries
     assert ds.download_url  # 3 entries, with dash
     assert ds.create_sibling_github  # 3 entries, 2 dashes
-    assert ds.aggregate_metadata  # module name is called "aggregate"
     assert ds.drop  # some fancy parametrization
     assert ds.get  # some fancy parametrization
     # plugins

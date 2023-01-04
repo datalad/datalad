@@ -25,6 +25,7 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_cfg import definitions as cfg_defs
 from datalad.interface.common_opts import (
@@ -32,10 +33,7 @@ from datalad.interface.common_opts import (
     recursion_limit,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import (
-    default_result_renderer,
-    eval_results,
-)
+from datalad.interface.utils import default_result_renderer
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,

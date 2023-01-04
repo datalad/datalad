@@ -172,11 +172,6 @@ def setup_package():
             test_http_server.start()
             _TEMP_PATHS_GENERATED.append(serve_path)
 
-        if cfg.obtain('datalad.tests.setup.testrepos'):
-            lgr.debug("Pre-populating testrepos")
-            from datalad.tests.utils_pytest import with_testrepos
-            with_testrepos()(lambda repo: 1)()
-
         yield
 
         lgr.debug("Printing versioning information collected so far")

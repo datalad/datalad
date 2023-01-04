@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test foreach-dataset command"""
 
+import os.path as op
 import sys
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from datalad.tests.utils_pytest import (
     eq_,
     get_deeply_nested_structure,
     ok_clean_git,
+    swallow_outputs,
     with_tempfile,
 )
 
@@ -112,15 +114,34 @@ def check_python_eval(cmd, path):
 @with_tempfile(mkdir=True)
 def check_python_exec(cmd, path):
     ds = Dataset(path).create()
+    sub = ds.create('sub')  # create subdataset for better coverage etc
 
     # but exec has no result
     res = ds.foreach_dataset(cmd, cmd_type='exec')
     assert_not_in('result', res[0])
+
     # but allows for more complete/interesting setups in which we could import modules etc
-    res = ds.foreach_dataset('import sys; print("DIR: %s" % str(dir()))', output_streams='capture', cmd_type='exec')
-    assert_in('ds', res[0]['stdout'])
-    assert_in('sys', res[0]['stdout'])
-    eq_(res[0]['stderr'], '')
+    cmd2 = 'import os, sys; print(f"DIR: {os.linesep.join(dir())}")'
+    with swallow_outputs() as cmo:
+        res1 = ds.foreach_dataset(cmd2, output_streams='capture', cmd_type='exec')
+        assert_in('ds', res1[0]['stdout'])
+        assert_in('sys', res1[0]['stdout'])
+        eq_(res1[0]['stderr'], '')
+        # default renderer for each dataset
+        assert cmo.out.startswith(f'foreach-dataset(ok): {path}')
+        assert f'foreach-dataset(ok): {sub.path}' in cmo.out
+
+    with swallow_outputs() as cmo:
+        res2 = ds.foreach_dataset(cmd2, output_streams='relpath', cmd_type='exec')
+        # still have the same res
+        assert res1 == res2
+        # but we have "fancier" output
+        assert cmo.out.startswith(f'DIR: ')
+        # 2nd half should be identical to 1st half but with lines prefixed with sub/ path
+        lines = cmo.out.splitlines()
+        half = len(lines) // 2
+        assert [op.join('sub', l) for l in lines[:half]] == lines[half:]
+        assert 'foreach-dataset(ok)' not in cmo.out
 
 
 def test_python():

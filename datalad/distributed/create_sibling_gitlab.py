@@ -29,13 +29,13 @@ from ..dochelpers import exc_str
 from ..interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from ..interface.common_opts import (
     publish_depends,
     recursion_flag,
     recursion_limit,
 )
-from ..interface.utils import eval_results
 from ..local.subdatasets import Subdatasets
 from ..support.constraints import (
     EnsureChoice,
@@ -119,6 +119,19 @@ class CreateSiblingGitlab(Interface):
         Project location/path used for a datasets at GitLab instance
         SITENAME (see --project). Configuring this is useful for deriving
         project paths for subdatasets, relative to superdataset.
+
+    This command can be configured with
+    "datalad.create-sibling-ghlike.extra-remote-settings.NETLOC.KEY=VALUE" in
+    order to add any local KEY = VALUE configuration to the created sibling in
+    the local `.git/config` file. NETLOC is the domain of the Gitlab instance to
+    apply the configuration for.
+    This leads to a behavior that is equivalent to calling datalad's
+    ``siblings('configure', ...)``||``siblings configure`` command with the
+    respective KEY-VALUE pair after creating the sibling.
+    The configuration, like any other, could be set at user- or system level, so
+    users do not need to add this configuration to every sibling created with
+    the service at NETLOC themselves.
+
     """
     _params_ = dict(
         path=Parameter(

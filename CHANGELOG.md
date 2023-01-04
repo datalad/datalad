@@ -1,4 +1,137 @@
 
+<a id='changelog-0.18.0'></a>
+# 0.18.0 (2022-12-31)
+
+## 💥 Breaking Changes
+
+- Automatic reconfiguration of the ORA special remote when cloning from RIA
+  stores now only applies locally rather than being committed.
+  [PR #7235](https://github.com/datalad/datalad/pull/7235)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🚀 Enhancements and New Features
+
+- Saving removed dataset content was sped-up, and reporting of types of removed
+  content now accurately states `dataset` for added and removed subdatasets,
+  instead of `file`. Moreover, saving previously staged deletions is now also
+  reported.
+  [PR #6784](https://github.com/datalad/datalad/pull/6784) (by [@mih](https://github.com/mih))
+
+- `foreach-dataset` command got a new possible value for the --output-streamns|--o-s
+  option 'relpath' to capture and pass-through prefixing with path to subds.  Very
+  handy for e.g. running `git grep` command across subdatasets.
+  [PR #7071](https://github.com/datalad/datalad/pull/7071)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- New config `datalad.create-sibling-ghlike.extra-remote-settings.NETLOC.KEY=VALUE` allows to add and/or overwrite local configuration for the created sibling by the commands `create-sibling-<gin|gitea|github|gitlab|gogs>`.  [PR #7213](https://github.com/datalad/datalad/pull/7213) (by [@matrss](https://github.com/matrss))
+
+- The `siblings` command does not concern the user with messages about
+  inconsequential failure to annex-enable a remote anymore.
+  [PR #7217](https://github.com/datalad/datalad/pull/7217)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- ORA special remote now allows to override its configuration locally.
+  [PR #7235](https://github.com/datalad/datalad/pull/7235)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+- Added a 'ria' special remote to provide backwards compatibility with datasets
+  that were set up with the deprecated [ria-remote](https://github.com/datalad/git-annex-ria-remote).
+  [PR #7235](https://github.com/datalad/datalad/pull/7235)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 🐛 Bug Fixes
+
+- When ``create-sibling-ria`` was invoked with a sibling name of a pre-existing sibling, a duplicate key in the result record caused a crashed.
+  Fixes [#6950](https://github.com/datalad/datalad/issues/6950) via
+  [PR #6952](https://github.com/datalad/datalad/pull/6952) (by [@adswa](https://api.github.com/users/adswa))
+
+## 📝 Documentation
+
+- create-sibling-ria's docstring now defines the schema of RIA URLs and clarifies internal layout of a RIA store.
+  [PR #6861](https://github.com/datalad/datalad/pull/6861) (by [@adswa](https://api.github.com/users/adswa))
+
+- Move maintenance team info from issue to CONTRIBUTING.
+  [PR #6904](https://github.com/datalad/datalad/pull/6904) (by [@adswa](https://api.github.com/users/adswa))
+
+- Describe specifications for a DataLad GitHub Action.
+  [PR #6931](https://github.com/datalad/datalad/pull/6931) (by [@thewtex](https://api.github.com/users/thewtex))
+
+- Fix capitalization of some service names.
+  [PR #6936](https://github.com/datalad/datalad/pull/6936) (by [@aqw](https://api.github.com/users/aqw))
+
+- Command categories in help text are more consistently named.
+  [PR #7027](https://github.com/datalad/datalad/pull/7027) (by [@aqw](https://api.github.com/users/aqw))
+
+- DOC: Add design document on Tests and CI.  [PR #7195](https://github.com/datalad/datalad/pull/7195) (by [@adswa](https://github.com/adswa))
+
+- CONTRIBUTING.md was extended with up-to-date information on CI logging, changelog and release procedures.  [PR #7204](https://github.com/datalad/datalad/pull/7204) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Use `looseversion.LooseVersion` as drop-in replacement for `distutils.version.LooseVersion`
+  Fixes [#6307](https://github.com/datalad/datalad/issues/6307) via
+  [PR #6839](https://github.com/datalad/datalad/pull/6839)
+  (by [@effigies](https://api.github.com/users/effigies))
+
+- Use --pathspec-from-file where possible instead of passing long lists of paths to git/git-annex calls.
+  Fixes [#6922](https://github.com/datalad/datalad/issues/6922) via
+  [PR #6932](https://github.com/datalad/datalad/pull/6932) (by [@yarikoptic](https://api.github.com/users/yarikoptic))
+
+- Make clone_dataset() better patchable ny extensions and less monolithic.
+  [PR #7017](https://github.com/datalad/datalad/pull/7017) (by [@mih](https://api.github.com/users/mih))
+
+- Remove `simplejson` in favor of using `json`.
+  Fixes [#7034](https://github.com/datalad/datalad/issues/7034) via
+  [PR #7035](https://github.com/datalad/datalad/pull/7035) (by [@christian-monch](https://api.github.com/users/christian-monch))
+
+- Fix an error in the command group names-test.
+  [PR #7044](https://github.com/datalad/datalad/pull/7044) (by [@christian-monch](https://api.github.com/users/christian-monch))
+
+- Move eval_results() into interface.base to simplify imports for command implementations. Deprecate use from interface.utils accordingly. Fixes [#6694](https://github.com/datalad/datalad/issues/6694) via [PR #7170](https://github.com/datalad/datalad/pull/7170) (by [@adswa](https://github.com/adswa))
+
+## 🏎 Performance
+
+- Use regular dicts instead of OrderedDicts for speedier operations.  Fixes [#6566](https://github.com/datalad/datalad/issues/6566) via [PR #7174](https://github.com/datalad/datalad/pull/7174) (by [@adswa](https://github.com/adswa))
+
+- Reimplement `get_submodules_()` without `get_content_info()` for substantial performance boosts especially for large datasets with few subdatasets. Originally proposed in [PR #6942](https://github.com/datalad/datalad/pull/6942) by [@mih](https://github.com/mih), fixing [#6940](https://github.com/datalad/datalad/issues/6940).  [PR #7189](https://github.com/datalad/datalad/pull/7189) (by [@adswa](https://github.com/adswa)). Complemented with [PR #7220](https://github.com/datalad/datalad/pull/7220) (by [@yarikoptic](https://github.com/yarikoptic)) to avoid `O(N^2)` (instead of `O(N*log(N))` performance in some cases.
+
+- Use --include=* or --anything instead of --copies 0 to speed up get_content_annexinfo.  [PR #7230](https://github.com/datalad/datalad/pull/7230) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Reenable two now-passing core test on Windows CI.
+  [PR #7152](https://github.com/datalad/datalad/pull/7152) (by [@adswa](https://api.github.com/users/adswa))
+
+- Remove the `with_testrepos` decorator and associated tests for it
+  Fixes [#6752](https://github.com/datalad/datalad/issues/6752) via
+  [PR #7176](https://github.com/datalad/datalad/pull/7176) (by [@adswa](https://api.github.com/users/adswa))
+
+## Breaking Changes
+
+- Move all old-style metadata commands `aggregate_metadata`, `search`, `metadata` and `extract-metadata`, as well as the `cfg_metadatatypes` procedure and the old metadata extractors into the datalad-deprecated extension.
+  Now recommended way of handling metadata is to install the datalad-metalad extension instead.
+  Fixes [#7012](https://github.com/datalad/datalad/issues/7012) via
+  [PR #7014](https://github.com/datalad/datalad/pull/7014)
+
+## Internal
+
+- Allow EnsureDataset constraint to handle Path instances.
+  Fixes [#7069](https://github.com/datalad/datalad/issues/7069) via
+  [PR #7133](https://github.com/datalad/datalad/pull/7133)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## Enhancements and New Features
+
+- A repository description can be specified with a new `--description`
+  option when creating siblings using `create-sibling-[gin|gitea|github|gogs]`.
+  Fixes [#6816](https://github.com/datalad/datalad/issues/6816)
+  via [PR #7109](https://github.com/datalad/datalad/pull/7109)
+  (by [@mslw](https://github.com/mslw))
+
+- Make validation failure of alternative constraints more informative.
+  Fixes [#7092](https://github.com/datalad/datalad/issues/7092) via
+  [PR #7132](https://github.com/datalad/datalad/pull/7132)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
 <a id='changelog-0.17.10'></a>
 # 0.17.10 (2022-12-14)
 

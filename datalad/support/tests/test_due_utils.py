@@ -68,37 +68,3 @@ def test_duecredit_dataset(path=None):
         # assume that not present so donothing stubs would be used, and
         # we will just compare Nones
         pass
-
-    # Let's provide some, but no relevant, metadata
-    with patch.object(due, 'cite') as mcite, \
-        patch.object(dataset, 'metadata') as mmetadata:
-        mmetadata.return_value = {'metadata': {'mumbo': {'jumbo': True}}}
-        duecredit_dataset(dataset)
-        # We resort to catch all
-        mcite.assert_called_once_with(
-            # TODO: make a proper class for Text/Doi not just magical mock
-            Text("DataLad dataset at %s" % dataset.path),
-            description='DataLad dataset %s' % dataset.id,
-            path='datalad:%s' % dataset.id[:8],
-            version=None
-        )
-
-    # A sample call with BIDS dataset metadata
-    with patch.object(due, 'cite') as mcite, \
-        patch.object(dataset, 'metadata') as mmetadata:
-        doi = 'xxx.12/12.345'
-        mmetadata.return_value = {
-            'metadata': {
-                'bids': {
-                    # here we would test also to be case insensitive
-                    'DatasetDoi': doi,
-                    'name': "ds name",
-            }}}
-        duecredit_dataset(dataset)
-        mcite.assert_called_once_with(
-            Doi(doi), # ""DataLad dataset at %s" % dataset.path),
-            description='ds name',
-            path='datalad:%s' % dataset.id[:8],
-            version=None
-        )
-
