@@ -26,6 +26,7 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
@@ -37,7 +38,6 @@ from datalad.interface.results import (
     results_from_annex_noinfo,
     success_status_map,
 )
-from datalad.interface.utils import eval_results
 from datalad.runner.exception import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (

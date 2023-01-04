@@ -31,18 +31,9 @@ def test_basics(src=None, dst=None):
     sub = ds.create('subds')
     # second one for a result_xfm test below
     ds.create('subds2')
-    eq_(sub.config.get('datalad.metadata.nativetype'), None)
 
     # now clone the super
     clone = install(source=src, path=dst)
-    # and configure it, such that it modifies each obtained subdataset
-    # on install to have 'bids' listed as a metadata type
-    clone.config.set(
-        'datalad.result-hook.alwaysbids.call-json',
-        # string substitutions based on the result record are supported
-        'run_procedure {{"dataset":"{path}","spec":"cfg_metadatatypes bids dicom"}}',
-        scope='local',
-    )
     # config on which kind of results this hook should operate
     clone.config.set(
         'datalad.result-hook.alwaysbids.match-json',
@@ -91,13 +82,9 @@ def test_basics(src=None, dst=None):
     # setup done, now see if it works
     clone.get('subds')
     clone_sub = Dataset(clone.pathobj / 'subds')
-    eq_(clone_sub.config.get('datalad.metadata.nativetype', get_all=True),
-        ('bids', 'dicom'))
     # now the same thing with a result_xfm, should make no difference
     clone.get('subds2')
     clone_sub2 = Dataset(clone.pathobj / 'subds2')
-    eq_(clone_sub2.config.get('datalad.metadata.nativetype', get_all=True),
-        ('bids', 'dicom'))
 
     # hook auto-unlocks the file
     if not clone.repo.is_managed_branch():

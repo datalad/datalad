@@ -21,6 +21,8 @@ from os.path import (
     relpath,
 )
 
+from looseversion import LooseVersion
+
 from datalad import ssh_manager
 from datalad.cmd import (
     CommandError,
@@ -46,6 +48,7 @@ from datalad.distribution.siblings import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     annex_group_opt,
@@ -58,7 +61,6 @@ from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
-from datalad.interface.utils import eval_results
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureBool,

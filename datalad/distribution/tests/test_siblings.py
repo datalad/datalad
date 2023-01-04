@@ -41,7 +41,6 @@ from datalad.tests.utils_pytest import (
     serve_path_via_http,
     with_sameas_remote,
     with_tempfile,
-    with_testrepos,
 )
 from datalad.utils import (
     Path,

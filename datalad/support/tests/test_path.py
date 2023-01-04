@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+from pathlib import PurePosixPath
 
 from ...tests.utils_pytest import (
     SkipTest,
@@ -24,6 +25,7 @@ from ..path import (
     abspath,
     curdir,
     get_parent_paths,
+    get_filtered_paths_,
     robust_abspath,
     split_ext,
 )
@@ -114,3 +116,34 @@ def test_get_parent_paths(sep):
 
     # and we get the deepest parent
     eq_(gpp(_pp(['a/b/file', 'a/b/file2']), _pp(['a', 'a/b'])), _pp(['a/b']))
+
+
+def test_get_filtered_paths_():
+    # just to avoid typing all the same
+    def gfp(*args, **kwargs):
+        return list(get_filtered_paths_(*args, **kwargs))
+
+    assert gfp(['a', 'b'], ['a', 'c']) == ['a']
+    assert gfp(['a', 'b'], ['b']) == ['b']
+    assert gfp(['a', 'b'], ['c']) == []
+
+    assert gfp(['a', 'b'], ['a/b', 'c']) == []  # a is not subpath of a/b
+    assert gfp(['a', 'b'], ['a/b', 'c'], include_within_path=True) == ['a']  # a is not subpath of a/b
+
+    # all paths returned due to '.', and order is sorted
+    paths = ['a', 'b', '1/2/3', 'abc']
+    paths_sorted = sorted(paths)
+    assert gfp(paths, ['.']) == paths_sorted
+    assert gfp(paths, paths_sorted) == paths_sorted
+    assert gfp(paths, paths_sorted, include_within_path=True) == paths_sorted
+    # we can take a mix of str and Path
+    assert gfp([PurePosixPath(paths[0])] + paths[1:], ['.']) == paths_sorted
+
+
+    # nothing within empty "filter_paths" matches -- so no paths yielded
+    assert gfp(paths, []) == []
+
+    assert_raises(ValueError, gfp, ['/a'], [])
+    assert_raises(ValueError, gfp, [PurePosixPath('/a')], [])
+    assert_raises(ValueError, gfp, ['a'], ['/a'])
+    assert_raises(ValueError, gfp, ['../a'], ['a'])

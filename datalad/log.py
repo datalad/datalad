@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Logging setup and utilities, including progress reporting"""
 
+from contextlib import contextmanager
 from functools import partial
 import inspect
 import logging
@@ -546,6 +547,16 @@ def with_progress(items, lgrcall=None, label="Total", unit=" Files"):
             label=label, update=1, increment=True,
             noninteractive_level=5)
     log_progress(lgr.info, pid, "%s: done", base_label, noninteractive_level=5)
+
+
+@contextmanager
+def no_progress():
+    """Context manager to clear progress bars for the duration of the context"""
+    log_progress(lgr.info, None, 'Clear progress bars', maint='clear',
+                 noninteractive_level=5)
+    yield
+    log_progress(lgr.info, None, 'Refresh progress bars', maint='refresh',
+                 noninteractive_level=5)
 
 
 class LoggerHelper(object):

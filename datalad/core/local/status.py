@@ -26,15 +26,13 @@ from datalad.utils import (
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     recursion_limit,
     recursion_flag,
 )
-from datalad.interface.utils import (
-    eval_results,
-    generic_result_renderer,
-)
+from datalad.interface.utils import generic_result_renderer
 import datalad.support.ansi_colors as ac
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
@@ -531,7 +529,7 @@ def get_paths_by_ds(refds, dataset_arg, paths, subdsroot_mode='rsync'):
       that are not located underneath the reference dataset.
     """
     ds_path = refds.path
-    paths_by_ds = OrderedDict()
+    paths_by_ds = dict()
     errors = []
 
     if not paths:
@@ -638,7 +636,12 @@ def _yield_paths_by_ds(refds, dataset_arg, paths):
             logger=lgr)
 
     while paths_by_ds:
-        qdspath, qpaths = paths_by_ds.popitem(last=False)
+        # gh-6566 advised replacement of OrderedDicts with dicts for performance
+        # The previous qdspath, qpaths = paths_by_ds.popitem(last=False) used an
+        # OrderedDict specific function (returns k, v in FIFO order). Below is a
+        # less pretty replacement for this functionality with a pure dict
+        qdspath = next(iter(paths_by_ds.keys()))
+        qpaths = paths_by_ds.pop(qdspath)
         if qpaths and qdspath in qpaths:
             # this is supposed to be a full status query, save some
             # cycles sifting through the actual path arguments

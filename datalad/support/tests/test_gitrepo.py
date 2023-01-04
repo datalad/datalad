@@ -81,7 +81,7 @@ def test_GitRepo_invalid_path(path=None):
     with chpwd(path):
         assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
         ok_(not op.exists(op.join(path, "git:")))
-        assert_raises(ValueError, GitRepo, path="file://some/relative/path", create=True)
+        assert_raises(ValueError, GitRepo, path="file://some_location/path/at/location", create=True)
         ok_(not op.exists(op.join(path, "file:")))
 
 
@@ -958,6 +958,26 @@ def test_GitRepo_get_submodules(path=None):
     eq_([s["gitmodule_name"]
          for s in repo.get_submodules(sorted_=True)],
         ["s_abc", "s_xyz"])
+
+    # Limit by path
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=["s_abc"])],
+        ["s_abc"])
+
+    # Pointing to a path within submodule should include it too
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=["s_abc/unrelated"])],
+        ["s_abc"])
+
+    # top level should list all submodules
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=[repo.path])],
+        ["s_abc", "s_xyz"])
+
+    # Limit by non-existing/non-matching path
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(paths=["s_unknown"])],
+        [])
 
 
 @with_tempfile

@@ -9,15 +9,13 @@
 
 import logging
 import os.path as op
+from json import JSONDecodeError
 
 from datalad.support.json_py import (
-    JSONDecodeError,
     dump,
     dump2stream,
-    dump2xzstream,
     load,
     load_stream,
-    load_xzstream,
     loads,
 )
 from datalad.tests.utils_pytest import (
@@ -85,7 +83,3 @@ def test_dump2stream(path=None):
     stream = [dict(a=5), dict(b=4)]
     dump2stream([dict(a=5), dict(b=4)], path)
     eq_(list(load_stream(path)), stream)
-
-    # the same for compression
-    dump2xzstream([dict(a=5), dict(b=4)], path)
-    eq_(list(load_xzstream(path)), stream)

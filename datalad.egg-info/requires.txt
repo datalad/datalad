@@ -7,14 +7,13 @@ packaging
 patool>=1.7
 tqdm
 annexremote
+looseversion
 boto
 keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
 requests>=1.2
 python-gitlab
-simplejson
-whoosh
 
 [:platform_system == "Windows"]
 colorama
@@ -35,6 +34,7 @@ packaging
 patool>=1.7
 tqdm
 annexremote
+looseversion
 
 [core:platform_system == "Windows"]
 colorama
@@ -55,6 +55,7 @@ packaging
 patool>=1.7
 tqdm
 annexremote
+looseversion
 boto
 keyring!=23.9.0,>=20.0
 keyrings.alt
@@ -74,13 +75,6 @@ pytest-fail-slow~=0.2
 types-python-dateutil
 types-requests
 vcrpy
-simplejson
-whoosh
-PyYAML
-mutagen>=1.36
-exifread
-python-xmp-toolkit
-Pillow
 duecredit
 pypandoc
 sphinx>=4.3.0
@@ -135,6 +129,7 @@ packaging
 patool>=1.7
 tqdm
 annexremote
+looseversion
 boto
 keyring!=23.9.0,>=20.0
 keyrings.alt
@@ -154,13 +149,6 @@ pytest-fail-slow~=0.2
 types-python-dateutil
 types-requests
 vcrpy
-simplejson
-whoosh
-PyYAML
-mutagen>=1.36
-exifread
-python-xmp-toolkit
-Pillow
 duecredit
 
 [full:platform_system == "Windows"]
@@ -171,17 +159,6 @@ importlib-metadata>=3.6
 
 [full:python_version >= "3.8"]
 distro
-
-[metadata]
-simplejson
-whoosh
-
-[metadata-extra]
-PyYAML
-mutagen>=1.36
-exifread
-python-xmp-toolkit
-Pillow
 
 [misc]
 argcomplete>=1.12.3

@@ -9,12 +9,13 @@
 
 import logging
 import os
-from collections import OrderedDict
+import tempfile
 from os.path import isabs
 from os.path import join as opj
 
 import pytest
 
+import datalad.support.network
 from datalad.distribution.dataset import Dataset
 from datalad.support.network import (
     RI,
@@ -34,10 +35,13 @@ from datalad.support.network import (
     is_url,
     iso8601_to_epoch,
     local_path_representation,
+    local_path2url_path,
     local_url_path_representation,
     parse_url_opts,
+    quote_path,
     same_website,
     urlquote,
+    url_path2local_path,
 )
 from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,
@@ -141,14 +145,13 @@ def test_split_colon():
 
 
 def test_url_eq():
-    eq_(URL(), URL())
+    assert URL() == URL()
     # doesn't make sense to ask what kind of a url it is an empty URL
-    #eq_(RI(), RI())
-    neq_(URL(), URL(hostname='x'))
+    assert URL() != URL(hostname='x')
     # Different types aren't equal even if have the same fields values
-    neq_(URL(path='x'), PathRI(path='x'))
-    neq_(URL(hostname='x'), SSHRI(hostname='x'))
-    neq_(str(URL(hostname='x')), str(SSHRI(hostname='x')))
+    assert URL(path='x') != PathRI(path='x')
+    assert URL(hostname='x') != SSHRI(hostname='x')
+    assert str(URL(hostname='x')) != str(SSHRI(hostname='x'))
 
 
 def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
@@ -156,19 +159,23 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     with swallow_logs(new_level=logging.DEBUG) as cml:
         ri_ = cls(**fields)
         murl = RI(ri)
-        eq_(murl.__class__, cls)  # not just a subclass
-        eq_(murl, ri_)
+        assert murl.__class__ == cls  # not just a subclass
+        assert murl == ri_
         if isinstance(ri, str):
-            eq_(str(RI(ri)), ri)
-        eq_(eval(repr(ri_)), ri)  # repr leads back to identical ri_
-        eq_(ri, ri_)  # just in case ;)  above should fail first if smth is wrong
+            assert str(RI(ri)) == ri
+        assert eval(repr(ri_)) == ri  # repr leads back to identical ri_
+        assert ri == ri_  # just in case ;)  above should fail first if smth is wrong
         if not exact_str:
             assert_in('Parsed version of', cml.out)
-    (eq_ if exact_str else neq_)(str(ri), str(ri_))  # that we can reconstruct it EXACTLY on our examples
+    if exact_str:
+        assert str(ri) == str(ri_)
+    else:
+        assert str(ri) != str(ri_)
+
     # and that we have access to all those fields
     nok_(set(fields).difference(set(cls._FIELDS)))
     for f, v in fields.items():
-        eq_(getattr(ri_, f), v)
+        assert getattr(ri_, f) == v
 
     if localpath:
         if cls == URL:
@@ -178,9 +185,12 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         assert ri_.localpath == local_representation
         old_localpath = ri_.localpath  # for a test below
     else:
-        # if not given -- must be a remote url, should raise exception
-        with assert_raises(ValueError):
-            ri_.localpath
+        # if not given -- must be a remote url, should raise exception on
+        # non-Windows systems. But not on Windows systems because we allow UNCs
+        # to be encoded in URLs
+        if not on_windows:
+            with assert_raises(ValueError):
+                ri_.localpath
 
     # This one does not have a path. TODO: either proxy path from its .RI or adjust
     # hierarchy of classes to make it more explicit
@@ -189,8 +199,8 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     # do changes in the path persist?
     old_str = str(ri_)
     ri_.path = newpath = opj(ri_.path, 'sub')
-    eq_(ri_.path, newpath)
-    neq_(str(ri_), old_str)
+    assert ri_.path == newpath
+    assert str(ri_) != old_str
     if localpath:
         assert ri_.localpath == local_path_representation(opj(old_localpath, 'sub'))
 
@@ -203,7 +213,7 @@ def test_url_base():
     eq_(url.scheme, 'http')
     eq_(url.port, '')  # not specified -- empty strings
     eq_(url.username, '')  # not specified -- empty strings
-    eq_(repr(url), "URL(hostname='example.com', scheme='http')")
+    eq_(repr(url), "URL(hostname='example.com', netloc='example.com', scheme='http')")
     eq_(url, "http://example.com")  # automagic coercion in __eq__
 
     neq_(URL(), URL(hostname='x'))
@@ -244,16 +254,17 @@ def test_pathri_windows_anchor():
 
 @known_failure_githubci_win
 def test_url_samples():
-    _check_ri("http://example.com", URL, scheme='http', hostname="example.com")
+    _check_ri("http://example.com", URL, scheme='http', hostname="example.com", netloc='example.com')
     # "complete" one for classical http
     _check_ri("http://user:pw@example.com:8080/p/sp?p1=v1&p2=v2#frag", URL,
-              scheme='http', hostname="example.com", port=8080,
-              username='user', password='pw', path='/p/sp',
-              query='p1=v1&p2=v2', fragment='frag')
+              scheme='http', netloc='user:pw@example.com:8080',
+              hostname="example.com", port=8080, username='user', password='pw',
+              path='/p/sp', query='p1=v1&p2=v2', fragment='frag')
 
     # sample one for ssh with specifying the scheme
     # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
-    _check_ri("ssh://host/path/sp1", URL, scheme='ssh', hostname='host', path='/path/sp1')
+    _check_ri("ssh://host/path/sp1", URL, scheme='ssh', hostname='host',
+              netloc='host', path='/path/sp1')
     _check_ri("user@host:path/sp1", SSHRI,
               hostname='host', path='path/sp1', username='user')
     _check_ri("host:path/sp1", SSHRI, hostname='host', path='path/sp1')
@@ -273,8 +284,8 @@ def test_url_samples():
 
     # here we will do custom magic allowing only schemes with + in them, such as dl+archive
     # or not so custom as
-    _check_ri("hg+https://host/user/proj", URL,
-              scheme="hg+https", hostname='host', path='/user/proj')
+    _check_ri("hg+https://host/user/proj", URL, scheme="hg+https",
+              netloc='host', hostname='host', path='/user/proj')
     # "old" style
     _check_ri("dl+archive:KEY/path/sp1#size=123", URL,
               scheme='dl+archive', path='KEY/path/sp1', fragment='size=123')
@@ -286,24 +297,39 @@ def test_url_samples():
               scheme='dl+archive', path='KEY', fragment='path=path%2Fbsp1&size=123')
 
     #https://en.wikipedia.org/wiki/File_URI_scheme
-    _check_ri("file://host", URL, scheme='file', hostname='host')
-    _check_ri("file://host/path/sp1", URL, scheme='file', hostname='host', path='/path/sp1')
+    _check_ri("file://host", URL, scheme='file', netloc='host', hostname='host')
+    _check_ri("file://host/path/sp1", URL, scheme='file', netloc='host',
+              hostname='host', path='/path/sp1')
     # stock libraries of Python aren't quite ready for ipv6
     ipv6address = '2001:db8:85a3::8a2e:370:7334'
     _check_ri("file://%s/path/sp1" % ipv6address, URL,
-              scheme='file', hostname=ipv6address, path='/path/sp1')
+              scheme='file', netloc=ipv6address, hostname=ipv6address,
+              path='/path/sp1')
     for lh in ('localhost', '::1', '', '127.3.4.155'):
-        _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
-                  scheme='file', hostname=lh, path='/path/sp1')
+        if on_windows:
+            url = RI(f"file://{lh}/path/sp1")
+            assert url.localpath == f'\\\\{lh}\\path\\sp1' if lh else '\\path\\sp1'
+        else:
+            _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
+                      scheme='file', netloc=lh, hostname=lh, path='/path/sp1')
+
     _check_ri('http://[1fff:0:a88:85a3::ac1f]:8001/index.html', URL,
-              scheme='http', hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
+              scheme='http', netloc='[1fff:0:a88:85a3::ac1f]:8001',
+              hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
     _check_ri("file:///path/sp1", URL, localpath='/path/sp1', scheme='file', path='/path/sp1')
     # we don't do any magical comprehension for home paths/drives for windows
     # of file:// urls, thus leaving /~ and /c: for now:
     _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
     _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
     # not sure but let's check
-    _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+    if on_windows:
+        _check_ri("file:///C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        _check_ri("file:/C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        # git-annex style drive-letter encoding
+        _check_ri("file://C:/path/sp1", URL, netloc="C:", hostname="c", localpath='C:/path/sp1', scheme='file', path='/path/sp1', exact_str=False)
+    else:
+        _check_ri("file:///C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        _check_ri("file:/C:/path/sp1", URL, localpath='/C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
@@ -317,7 +343,8 @@ def test_url_samples():
     _check_ri("/f/s1", PathRI, localpath='/f/s1', path='/f/s1')
 
     # some github ones, just to make sure
-    _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
+    _check_ri("git://host/user/proj", URL, scheme="git", netloc="host",
+              hostname="host", path="/user/proj")
     _check_ri("git@host:user/proj", SSHRI, hostname="host", path="user/proj", username='git')
 
     _check_ri('weird:/', SSHRI, hostname='weird', path='/')
@@ -361,7 +388,6 @@ def test_url_samples():
         # but we store original str
         eq_(str(weird_url), weird_str)
         neq_(weird_url.as_str(), weird_str)
-
 
     raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
 
@@ -409,19 +435,19 @@ def test_url_quote_path(cls, clskwargs, target_url):
 
 def test_url_compose_archive_one():
     url = URL(scheme='dl+archive', path='KEY',
-              fragment=OrderedDict((('path', 'f/p/ s+'), ('size', 30))))
+              fragment=dict((('path', 'f/p/ s+'), ('size', 30))))
     # funny - space is encoded as + but + is %2B
     eq_(str(url), 'dl+archive:KEY#path=f/p/+s%2B&size=30')
     eq_(url.fragment_dict, {'path': 'f/p/ s+', 'size': '30'})
 
 
 def test_url_fragments_and_query():
-    url = URL(hostname="host", query=OrderedDict((('a', 'x/b'), ('b', 'y'))))
+    url = URL(hostname="host", query=dict((('a', 'x/b'), ('b', 'y'))))
     eq_(str(url), '//host?a=x%2Fb&b=y')
     eq_(url.query, 'a=x%2Fb&b=y')
     eq_(url.query_dict, {'a': 'x/b', 'b': 'y'})
 
-    url = URL(hostname="host", fragment=OrderedDict((('b', 'x/b'), ('a', 'y'))))
+    url = URL(hostname="host", fragment=dict((('b', 'x/b'), ('a', 'y'))))
     eq_(str(url), '//host#b=x/b&a=y')
     eq_(url.fragment, 'b=x/b&a=y')
     eq_(url.fragment_dict, {'a': 'y', 'b': 'x/b'})
@@ -475,30 +501,34 @@ def test_is_datalad_compat_ri():
 
 
 def test_get_local_file_url():
-    for path, url in (
+    compat_annex = 'git-annex'
+    compat_git = 'git'
+    for path, url, compatibility in (
                 # relpaths are special-cased below
-                ('test.txt', 'test.txt'),
-            ) + (
-                ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
+                ('test.txt', 'test.txt', compat_annex),
+                (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME), compat_annex),
+            ) + ((
+                ('C:\\Windows\\notepad.exe', 'file://C:/Windows/notepad.exe', compat_annex),
+                ('C:\\Windows\\notepad.exe', 'file:///C:/Windows/notepad.exe', compat_git),
             ) if on_windows else (
-                (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME)),
-                ('/a', 'file:///a'),
-                ('/a/b/c', 'file:///a/b/c'),
-                ('/a~', 'file:///a~'),
+                ('/a', 'file:///a', compat_annex),
+                ('/a/b/c', 'file:///a/b/c', compat_annex),
+                ('/a~', 'file:///a~', compat_annex),
                 # there are no files with trailing slashes in the name
                 #('/a b/', 'file:///a%20b/'),
-                ('/a b/name', 'file:///a%20b/name'),
-            ):
+                ('/a b/name', 'file:///a%20b/name', compat_annex),
+            )):
         # Yarik found no better way to trigger.  .decode() isn't enough
         print("D: %s" % path)
         if isabs(path):
-            eq_(get_local_file_url(path), url)
+            assert get_local_file_url(path, compatibility=compatibility) == url
+            abs_path = path
         else:
-            eq_(get_local_file_url(path),
-                '/'.join((
-                    get_local_file_url(os.getcwd()),
-                    url))
-            )
+            assert get_local_file_url(path, allow_relative_path=True, compatibility=compatibility) \
+                   == '/'.join((get_local_file_url(os.getcwd(), compatibility=compatibility), url))
+            abs_path = opj(os.getcwd(), path)
+        if compatibility == compat_git:
+            assert get_local_file_url(abs_path, compatibility=compatibility) == Path(abs_path).as_uri()
 
 
 @with_tempfile(mkdir=True)
@@ -514,7 +544,7 @@ def test_get_local_file_url_compatibility(path=None):
     # compat with annex addurl
     ds1.repo.add_url_to_file(
         'test.txt',
-        get_local_file_url(testfile, compatibility='git-annex'))
+        get_local_file_url(str(testfile), compatibility='git-annex'))
 
     # compat with git clone/submodule
     assert_status(
@@ -556,3 +586,58 @@ def test_iso8601_to_epoch():
     eq_(iso8601_to_epoch('2016-07-07T14:25:15'), epoch)
 
     eq_(iso8601_to_epoch('2016-07-07T14:25:14'), epoch-1)
+
+
+def test_mapping_identity():
+    from datalad.tests.utils_pytest import OBSCURE_FILENAME
+
+    absolute_obscure_path = str(Path('/').absolute() / OBSCURE_FILENAME)
+    temp_dir = tempfile.gettempdir()
+    print(f"temp_dir: {temp_dir}")
+    for name in (temp_dir, opj(temp_dir, "x.txt"), absolute_obscure_path):
+        # On some platforms, e.g. MacOS, `temp_dir` might contain trailing
+        # slashes. Since the conversion and its inverse normalize paths, we
+        # compare the result to the normalized path
+        normalized_name = str(Path(name))
+        assert url_path2local_path(local_path2url_path(name)) == normalized_name
+
+    prefix = "/C:" if on_windows else ""
+    for name in map(quote_path, (prefix + "/window", prefix + "/d", prefix + "/" + OBSCURE_FILENAME)):
+        assert local_path2url_path(url_path2local_path(name)) == name
+
+
+def test_auto_resolve_path():
+    relative_path = str(Path("a/b"))
+    with pytest.raises(ValueError):
+        local_path2url_path(relative_path)
+    local_path2url_path("", allow_relative_path=True)
+
+
+@skip_if(not on_windows)
+def test_hostname_detection():
+    with pytest.raises(ValueError):
+        local_path2url_path("\\\\server\\share\\path")
+
+
+def test_url_path2local_path_excceptions():
+    with pytest.raises(ValueError):
+        url_path2local_path('')
+    with pytest.raises(ValueError):
+        url_path2local_path(None)
+    with pytest.raises(ValueError):
+        url_path2local_path('a/b')
+    with pytest.raises(ValueError):
+        url_path2local_path(PurePosixPath('a/b'))
+    with pytest.raises(ValueError):
+        url_path2local_path(PurePosixPath('//a/b'))
+
+
+def test_quote_path(monkeypatch):
+    with monkeypatch.context() as ctx:
+        ctx.setattr(datalad.support.network, 'on_windows', True)
+        assert quote_path("/c:/win:xxx") == "/c:/win%3Axxx"
+        assert quote_path("/C:/win:xxx") == "/C:/win%3Axxx"
+
+        ctx.setattr(datalad.support.network, 'on_windows', False)
+        assert quote_path("/c:/win:xxx") == "/c%3A/win%3Axxx"
+        assert quote_path("/C:/win:xxx") == "/C%3A/win%3Axxx"

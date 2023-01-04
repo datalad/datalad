@@ -36,16 +36,14 @@ from datalad.distribution.install import Install
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
     save_message_opt,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import (
-    eval_results,
-    generic_result_renderer,
-)
+from datalad.interface.utils import generic_result_renderer
 from datalad.local.unlock import Unlock
 from datalad.support.constraints import (
     EnsureBool,

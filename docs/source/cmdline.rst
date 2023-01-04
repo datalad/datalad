@@ -96,18 +96,6 @@ Extending the functionality of the core ``run`` command.
    datalad run-procedure: Run prepared procedures (DataLad scripts) on a dataset <generated/man/datalad-run-procedure>
 
 
-Metadata handling
------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   datalad search: Query metadata of a dataset <generated/man/datalad-search>
-   datalad metadata: Report known metadata on particular datasets or files <generated/man/datalad-metadata>
-   datalad aggregate-metadata: Assemble metadata from datasets for later query <generated/man/datalad-aggregate-metadata>
-   datalad extract-metadata: Run metadata extractor on a dataset or file <generated/man/datalad-extract-metadata>
-
-
 Helpers and support utilities
 -----------------------------
 

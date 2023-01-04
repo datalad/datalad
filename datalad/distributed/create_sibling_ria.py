@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+from pathlib import PurePosixPath as UrlPath
 
 from datalad.cmd import WitlessRunner as Runner
 from datalad.core.distributed.clone import decode_source_spec
@@ -36,13 +37,13 @@ from datalad.distribution.utils import _yield_ds_w_matching_siblings
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import eval_results
 from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
@@ -53,6 +54,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
+from datalad.support.network import url_path2local_path
 from datalad.support.param import Parameter
 from datalad.utils import (
     Path,
@@ -76,6 +78,26 @@ class CreateSiblingRia(Interface):
     The store's base path is expected to not exist, be an empty directory,
     or a valid RIA store.
 
+    RIA URL format
+    ~~~~~~~~~~~~~~
+
+    Interactions with new or existing RIA stores require RIA URLs to identify
+    the store or specific datasets inside of it.
+
+    The general structure of a RIA URL pointing to a store takes the form
+    'ria+[scheme]://<storelocation>' (e.g.,
+    ria+ssh://[user@]hostname:/absolute/path/to/ria-store, or
+    ria+file:///absolute/path/to/ria-store)
+
+    The general structure of a RIA URL pointing to a dataset in a store (for
+    example for cloning) takes a similar form, but appends either the datasets
+    UUID or a ~ symbol followed by the dataset's alias name:
+    'ria+[scheme]://<storelocation>#<dataset-UUID>' or
+    'ria+[scheme]://<storelocation>#~<aliasname>'.
+    In addition, specific version identifiers can be appended to the URL with an
+    additional @ symbol:
+    'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>', where 'dataset-version' refers to a branch or tag.
+
     RIA store layout
     ~~~~~~~~~~~~~~~~
 
@@ -86,14 +108,19 @@ class CreateSiblingRia(Interface):
     subdirectory in order to mitigate files system limitations for stores
     containing a large number of datasets.
 
-    Each dataset subdirectory contains a standard bare Git repository for
-    the dataset.
+    By default, a dataset in a RIA store consists of two components:
+    A Git repository (for all dataset contents stored in Git) and a
+    storage sibling (for dataset content stored in git-annex).
 
-    In addition, a subdirectory 'annex' hold a standard Git-annex object
-    store. However, instead of using the 'dirhashlower' naming scheme for
-    the object directories, like Git-annex would do, a 'dirhashmixed'
-    layout is used -- the same as for non-bare Git repositories or regular
-    DataLad datasets.
+    It is possible to selectively disable either component using
+    ``storage-sibling 'off'`` or ``storage-sibling 'only'``, respectively.
+    If neither component is disabled, a dataset's subdirectory layout in a RIA
+    store contains a standard bare Git repository and an 'annex/' subdirectory
+    inside of it.
+    The latter holds a Git-annex object store and comprises the storage sibling.
+    Disabling the standard git-remote ('storage-sibling=only') will result
+    in not having the bare git repository, disabling the storage sibling
+    ('storage-sibling=off') will result in not having the 'annex/' subdirectory.
 
     Optionally, there can be a further subdirectory 'archives' with
     (compressed) 7z archives of annex objects. The storage remote is able to
@@ -114,6 +141,15 @@ class CreateSiblingRia(Interface):
     placing a symlink to the dataset location into an 'alias/' directory
     in the root of the store. This enables dataset access via URLs of format:
     'ria+<protocol>://<storelocation>#~<aliasname>'.
+
+    Compared to standard git-annex object stores, the 'annex/' subdirectories
+    used as storage siblings follow a different layout naming scheme
+    ('dirhashmixed' instead of 'dirhashlower').
+    This is mostly noted as a technical detail, but also serves to remind
+    git-annex powerusers to refrain from running git-annex commands
+    directly in-store as it can cause severe damage due to the layout
+    difference. Interactions should be handled via the ORA special remote
+    instead.
 
     Error logging
     ~~~~~~~~~~~~~
@@ -298,7 +334,7 @@ class CreateSiblingRia(Interface):
         # reduced to single instance, since rewriting url based on config could
         # be different for subdatasets.
         try:
-            ssh_host, base_path, rewritten_url = \
+            ssh_host, url_base_path, rewritten_url = \
                 verify_ria_url(push_url if push_url else url, ds.config)
         except ValueError as e:
             yield get_status_dict(
@@ -307,6 +343,8 @@ class CreateSiblingRia(Interface):
                 **res_kwargs
             )
             return
+
+        local_base_path = Path(url_path2local_path(url_base_path))
 
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
@@ -366,26 +404,23 @@ class CreateSiblingRia(Interface):
             # determine the existence of a store by trying to read its layout.
             # Because this raises a FileNotFound error if non-existent, we need
             # to catch it
-            io.read_file(Path(base_path) / 'ria-layout-version')
+            io.read_file(local_base_path / 'ria-layout-version')
         except (FileNotFoundError, RIARemoteError, RemoteCommandFailedError) as e:
             if not new_store_ok:
                 # we're instructed to only act in case of an existing RIA store
                 res = get_status_dict(
                     status='error',
                     message="No store found at '{}'. Forgot "
-                            "--new-store-ok ?".format(
-                        Path(base_path)),
+                            "--new-store-ok ?".format(local_base_path),
                     **res_kwargs)
                 yield res
                 return
 
         log_progress(
             lgr.info, 'create-sibling-ria',
-            'Creating a new RIA store at %s', Path(base_path),
+            'Creating a new RIA store at %s', local_base_path,
         )
-        create_store(io,
-                     Path(base_path),
-                     '1')
+        create_store(io, local_base_path, '1')
 
         yield from _create_sibling_ria(
             ds,
@@ -458,7 +493,7 @@ def _create_sibling_ria(
 
     # parse target URL
     try:
-        ssh_host, base_path, rewritten_url = \
+        ssh_host, url_base_path, rewritten_url = \
             verify_ria_url(push_url if push_url else url, ds.config)
     except ValueError as e:
         yield get_status_dict(
@@ -468,7 +503,7 @@ def _create_sibling_ria(
         )
         return
 
-    base_path = Path(base_path)
+    local_base_path = Path(url_path2local_path(url_base_path))
 
     git_url = decode_source_spec(
         # append dataset id to url and use magic from clone-helper:
@@ -481,7 +516,7 @@ def _create_sibling_ria(
     )['giturl'] if push_url else None
 
     # determine layout locations; go for a v1 store-level layout
-    repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
+    repo_path, _, _ = get_layout_locations(1, local_base_path, ds.id)
 
     ds_siblings = [
         r['name'] for r in ds.siblings(
@@ -559,7 +594,7 @@ def _create_sibling_ria(
             " and '{}'".format(storage_name) if storage_name else '',
         )
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
-                       base_path, ds.id, '2', '1', alias,
+                       local_base_path, ds.id, '2', '1', alias,
                        init_obj_tree=storage_sibling is not False)
     if storage_sibling:
         # we are using the main `name`, if the only thing we are creating

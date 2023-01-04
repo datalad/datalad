@@ -199,4 +199,6 @@ particular activity identifier (it always impacts all active progress bars):
 This call will trigger a temporary discontinuation of any progress bar display.
 Progress bars can either be re-enabled all at once, by an analog message with
 ``maint='refresh'``, or will re-show themselves automatically when the next
-update is received.
+update is received. A :py:func:`~datalad.log.no_progress` context manager helper
+can be used to surround your context with those two calls to prevent progress
+bars from interfering.

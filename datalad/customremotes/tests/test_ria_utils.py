@@ -1,3 +1,8 @@
+import tempfile
+from os.path import join
+from urllib.parse import quote
+
+from datalad.customremotes import ria_utils
 from datalad.customremotes.ria_utils import (
     UnknownLayoutVersion,
     create_ds_in_store,
@@ -156,4 +161,4 @@ def test_verify_ria_url():
     }
     for i, o in cases.items():
         # we are not testing the URL rewriting here
-        assert_equal(o, verify_ria_url(i, {})[:2])
+        assert o == verify_ria_url(i, {})[:2]

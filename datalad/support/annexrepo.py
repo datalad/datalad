@@ -17,7 +17,6 @@ import logging
 import os
 import re
 import warnings
-from collections import OrderedDict
 from itertools import chain
 from multiprocessing import cpu_count
 from os import linesep
@@ -58,14 +57,13 @@ from datalad.runner.utils import (
     AssemblingDecoderMixIn,
     LineSplitter,
 )
+
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
     _get_non_existing_from_annex_output,
     _sanitize_key,
 )
 from datalad.support.exceptions import CapturedException
-# must not be loads, because this one would log, and we need to log ourselves
-from datalad.support.json_py import json_loads
 from datalad.ui import ui
 from datalad.utils import (
     Path,
@@ -553,6 +551,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
         # applies to get, drop, move, copy, whereis
         kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
+        # applies to find, findref to list all known.
+        # was added in 10.20221212-17-g0b2dd374d on 20221220.
+        kludges["find-supports-anything"] = ver >= "10.20221212+git18"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -3356,7 +3357,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             is available (with `eval_availability`)
         """
         if init is None:
-            info = OrderedDict()
+            info = dict()
         elif init == 'git':
             info = super(AnnexRepo, self).get_content_info(
                 paths=paths, ref=ref, **kwargs)
@@ -3368,8 +3369,13 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
-        # of whether or not it actually (did) exist in the local annex
-        cmd = ['--copies', '0']
+        # of whether or not it actually (did) exist in the local annex.
+        if self._check_version_kludges("find-supports-anything"):
+            cmd = ['--anything']
+        else:
+            # --include=* was recommended by Joey in
+            # https://git-annex.branchable.com/todo/add_--all___40__or_alike__41___to_find_and_findref/
+            cmd = ['--include=*']
         files = None
         if ref:
             cmd = ['findref'] + cmd
@@ -3685,14 +3691,12 @@ class AnnexJsonProtocol(WitlessProtocol):
             data = self._unprocessed + data
             self._unprocessed = None
         # this is where the JSON records come in
-        # json_loads() is already logging any error, which is OK, because
-        # under no circumstances we would expect broken JSON
         lines = data.splitlines()
         data_ends_with_eol = data.endswith(os.linesep.encode())
         del data
         for iline, line in enumerate(lines):
             try:
-                j = json_loads(line)
+                j = json.loads(line)
             except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
@@ -4003,4 +4007,8 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 def readline_json(stdout):
     toload = stdout.readline().strip()
-    return json_loads(toload) if toload else {}
+    try:
+        return json.loads(toload) if toload else {}
+    except json.JSONDecodeError:
+        lgr.error('Received undecodable JSON output: %s', toload)
+        return {}

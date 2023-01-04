@@ -20,7 +20,7 @@ __docformat__ = 'restructuredtext'
 # the name of the `_group_*` variable determines the sorting in the command overview
 # alphanum ascending order
 _group_0dataset = (
-    'Essential commands',
+    'Essential',
     [
         # source module, source object[, dest. cmdline name[, dest python name]]
         # src module can be relative, but has to be relative to the main 'datalad' package
@@ -35,7 +35,7 @@ _group_0dataset = (
     ])
 
 _group_1siblings = (
-    'Commands for collaborative workflows',
+    'Collaborative workflows',
     [
         ('datalad.distributed.create_sibling_github', 'CreateSiblingGithub'),
         ('datalad.distributed.create_sibling_gitlab', 'CreateSiblingGitlab'),
@@ -63,21 +63,8 @@ _group_2dataset = (
         ('datalad.local.run_procedure', 'RunProcedure'),
     ])
 
-_group_2metadata = (
-    'Commands for metadata handling',
-    [
-        ('datalad.metadata.search', 'Search',
-         'search', 'search'),
-        ('datalad.metadata.metadata', 'Metadata',
-         'metadata'),
-        ('datalad.metadata.aggregate', 'AggregateMetaData',
-         'aggregate-metadata', 'aggregate_metadata'),
-        ('datalad.metadata.extract_metadata', 'ExtractMetadata',
-         'extract-metadata', 'extract_metadata'),
-    ])
-
 _group_3misc = (
-    'Miscellaneous commands',
+    'Miscellaneous',
     [
         ('datalad.local.configuration', 'Configuration'),
         ('datalad.local.wtf', 'WTF'),
@@ -94,7 +81,7 @@ _group_3misc = (
     ])
 
 _group_4plumbing = (
-    'Plumbing commands',
+    'Plumbing',
     [
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),

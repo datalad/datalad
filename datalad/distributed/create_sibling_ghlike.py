@@ -18,6 +18,7 @@ from urllib.parse import (
 
 import requests
 
+from datalad import cfg as dlcfg
 from datalad.distribution.dataset import (
     EnsureDataset,
     require_dataset,
@@ -124,6 +125,10 @@ class _GitHubLike(object):
             doc="""access protocol/URL to configure for the sibling. With
             'https-ssh' SSH will be used for write access, whereas HTTPS
             is used for read access."""),
+        description=Parameter(
+            args=("--description",),
+            doc="""Brief description, displayed on the project's page""",
+            constraints=EnsureStr() | EnsureNone()),
         publish_depends=publish_depends,
         private=Parameter(
             args=("--private",),
@@ -153,6 +158,19 @@ class _GitHubLike(object):
             + f'. {token_info}' if token_info else '',
             require_token,
         )
+        self._set_extra_remote_settings()
+
+    def _set_extra_remote_settings(self):
+        target_name = urlparse(self.api_url).netloc
+        config_section = "datalad.create-sibling-ghlike.extra-remote-settings.{}".format(target_name)
+        target_specific_settings = {
+            option: dlcfg.get_value(config_section, option)
+            for option in dlcfg.options(config_section)
+        }
+        self.extra_remote_settings = {
+            **self.extra_remote_settings,
+            **target_specific_settings,
+        }
 
     @todo_interface_for_extensions
     def _set_request_headers(self, credential_name, auth_info, require_token):
@@ -254,7 +272,7 @@ class _GitHubLike(object):
         return siblingname
 
     def create_repo(self, ds, reponame, organization, private, dry_run,
-                    existing):
+                    description, existing):
         """Create a repository on the target platform
 
         Returns
@@ -271,7 +289,7 @@ class _GitHubLike(object):
           HTTP response codes) will raise an exception.
         """
         res = self.repo_create_request(
-            reponame, organization, private, dry_run)
+            reponame, organization, private, dry_run, description)
 
         if res.get('status') == 'impossible' and res.get('preexisted'):
             # we cannot create, because there is something in the target
@@ -322,7 +340,7 @@ class _GitHubLike(object):
                 # try creating now
                 return self.create_repo(
                     ds, reponame, organization, private, dry_run,
-                    existing)
+                    description, existing)
 
         # TODO intermediate error handling?
 
@@ -358,7 +376,7 @@ class _GitHubLike(object):
         raise NotImplementedError
 
     def create_repos(self, dsrepo_map, siblingname, organization,
-                     private, dry_run, res_kwargs,
+                     private, dry_run, description, res_kwargs,
                      existing, access_protocol,
                      publish_depends):
         """Create a series of repos on the target platform
@@ -374,7 +392,7 @@ class _GitHubLike(object):
         """
         for d, reponame in dsrepo_map:
             res = self.create_repo(
-                d, reponame, organization, private, dry_run,
+                d, reponame, organization, private, dry_run, description,
                 existing)
             # blend reported results with standard properties
             res = dict(
@@ -442,7 +460,7 @@ class _GitHubLike(object):
                 result_renderer='disabled')
 
     def repo_create_request(self, reponame, organization, private,
-                            dry_run=False):
+                            dry_run=False, description=None):
         """Perform a request to create a repo on the target platform
 
         Also implements reporting of "fake" results in dry-run mode.
@@ -458,9 +476,10 @@ class _GitHubLike(object):
                 organization=organization)
             if organization else
             self.create_user_repo_endpoint)
+        desc_text = description if description is not None else 'some default'
         data = {
             'name': reponame,
-            'description': 'some default',
+            'description': desc_text,
             'private': private,
             'auto_init': False,
         }
@@ -566,6 +585,7 @@ def _create_sibling(
         access_protocol='https',
         publish_depends=None,
         private=False,
+        description=None,
         dry_run=False):
     """Helper function to conduct sibling creation on a target platform
 
@@ -624,6 +644,7 @@ def _create_sibling(
         orgname,
         private,
         dry_run,
+        description,
         res_kwargs,
         existing,
         access_protocol,

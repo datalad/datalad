@@ -19,6 +19,7 @@ from functools import partial
 from datalad.interface.base import (
     Interface,
     build_doc,
+    eval_results,
 )
 from datalad.interface.common_opts import (
     jobs_opt,
@@ -27,7 +28,6 @@ from datalad.interface.common_opts import (
     save_message_opt,
 )
 from datalad.interface.utils import (
-    eval_results,
     get_tree_roots,
     discover_dataset_trace_to_targets,
 )
