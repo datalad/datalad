@@ -1,3 +1,10 @@
+datalad (0.18.0-1) unstable; urgency=medium
+
+  * debian/patches
+    - refreshed
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 04 Jan 2023 17:42:05 -0500
+
 datalad (0.17.10-1) unstable; urgency=medium
 
   * Fresh upstream patch release
