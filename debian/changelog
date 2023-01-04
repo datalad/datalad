@@ -2,6 +2,9 @@ datalad (0.18.0-1) unstable; urgency=medium
 
   * debian/patches
     - refreshed
+  * debian/control
+    - whoosh and simplejson are no longer dependent on. metadata functionality
+      was refactored away, and simplejson was replaced with json.
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 04 Jan 2023 17:42:05 -0500
 
