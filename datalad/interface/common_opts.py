@@ -171,15 +171,15 @@ reckless_opt = Parameter(
     EnsureStrPrefix('shared-'),
     metavar='auto|ephemeral|shared-...',
     doc="""Obtain a dataset or subdatset and set it up in a potentially 
-    unsafe way for performance, or access reasons. 
+    unsafe way for performance or access reasons.
     Use with care, any dataset is marked as 'untrusted'.
     The reckless mode is stored in a dataset's local configuration under
-    'datalad.clone.reckless', and will be inherited to any of its subdatasets.
+    'datalad.clone.reckless', and will be inherited by any of its subdatasets.
     Supported modes are:
     ['auto']: hard-link files between local clones. In-place
     modification in any clone will alter original annex content.
-    ['ephemeral']: symlink annex to origin's annex and discard local
-    availability info via git-annex-dead 'here' and declares this annex private.
+    ['ephemeral']: symlink annex to origin's annex, discard local
+    availability info via git-annex-dead 'here', and declare this annex private.
     Shares an annex between origin and clone w/o git-annex being aware of it.
     In case of a change in origin you need to update the clone before you're
     able to save new content on your end.
@@ -190,7 +190,7 @@ reckless_opt = Parameter(
     using the respective other structure will be inaccessible.
     ['shared-<mode>']: set up repository and annex permission to enable multi-user
     access. This disables the standard write protection of annex'ed files.
-    <mode> can be any value support by 'git init --shared=', such as 'group', or
+    <mode> can be any value supported by 'git init --shared=', such as 'group', or
     'all'.""")
 
 jobs_opt = Parameter(
