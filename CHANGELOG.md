@@ -4,12 +4,28 @@
 
 ## 💥 Breaking Changes
 
+- Move all old-style metadata commands `aggregate_metadata`, `search`, `metadata` and `extract-metadata`, as well as the `cfg_metadatatypes` procedure and the old metadata extractors into the datalad-deprecated extension.
+  Now recommended way of handling metadata is to install the datalad-metalad extension instead.
+  Fixes [#7012](https://github.com/datalad/datalad/issues/7012) via
+  [PR #7014](https://github.com/datalad/datalad/pull/7014)
+
 - Automatic reconfiguration of the ORA special remote when cloning from RIA
   stores now only applies locally rather than being committed.
   [PR #7235](https://github.com/datalad/datalad/pull/7235)
   (by [@bpoldrack](https://github.com/bpoldrack))
 
 ## 🚀 Enhancements and New Features
+
+- A repository description can be specified with a new `--description`
+  option when creating siblings using `create-sibling-[gin|gitea|github|gogs]`.
+  Fixes [#6816](https://github.com/datalad/datalad/issues/6816)
+  via [PR #7109](https://github.com/datalad/datalad/pull/7109)
+  (by [@mslw](https://github.com/mslw))
+
+- Make validation failure of alternative constraints more informative.
+  Fixes [#7092](https://github.com/datalad/datalad/issues/7092) via
+  [PR #7132](https://github.com/datalad/datalad/pull/7132)
+  (by [@bpoldrack](https://github.com/bpoldrack))
 
 - Saving removed dataset content was sped-up, and reporting of types of removed
   content now accurately states `dataset` for added and removed subdatasets,
@@ -67,6 +83,11 @@
 
 ## 🏠 Internal
 
+- Allow EnsureDataset constraint to handle Path instances.
+  Fixes [#7069](https://github.com/datalad/datalad/issues/7069) via
+  [PR #7133](https://github.com/datalad/datalad/pull/7133)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
 - Use `looseversion.LooseVersion` as drop-in replacement for `distutils.version.LooseVersion`
   Fixes [#6307](https://github.com/datalad/datalad/issues/6307) via
   [PR #6839](https://github.com/datalad/datalad/pull/6839)
@@ -104,33 +125,6 @@
 - Remove the `with_testrepos` decorator and associated tests for it
   Fixes [#6752](https://github.com/datalad/datalad/issues/6752) via
   [PR #7176](https://github.com/datalad/datalad/pull/7176) (by [@adswa](https://api.github.com/users/adswa))
-
-## Breaking Changes
-
-- Move all old-style metadata commands `aggregate_metadata`, `search`, `metadata` and `extract-metadata`, as well as the `cfg_metadatatypes` procedure and the old metadata extractors into the datalad-deprecated extension.
-  Now recommended way of handling metadata is to install the datalad-metalad extension instead.
-  Fixes [#7012](https://github.com/datalad/datalad/issues/7012) via
-  [PR #7014](https://github.com/datalad/datalad/pull/7014)
-
-## Internal
-
-- Allow EnsureDataset constraint to handle Path instances.
-  Fixes [#7069](https://github.com/datalad/datalad/issues/7069) via
-  [PR #7133](https://github.com/datalad/datalad/pull/7133)
-  (by [@bpoldrack](https://github.com/bpoldrack))
-
-## Enhancements and New Features
-
-- A repository description can be specified with a new `--description`
-  option when creating siblings using `create-sibling-[gin|gitea|github|gogs]`.
-  Fixes [#6816](https://github.com/datalad/datalad/issues/6816)
-  via [PR #7109](https://github.com/datalad/datalad/pull/7109)
-  (by [@mslw](https://github.com/mslw))
-
-- Make validation failure of alternative constraints more informative.
-  Fixes [#7092](https://github.com/datalad/datalad/issues/7092) via
-  [PR #7132](https://github.com/datalad/datalad/pull/7132)
-  (by [@bpoldrack](https://github.com/bpoldrack))
 
 <a id='changelog-0.17.10'></a>
 # 0.17.10 (2022-12-14)
