@@ -167,9 +167,9 @@ reckless_opt = Parameter(
     nargs='?',
     # boolean types only for backward compatibility
     constraints=
-    EnsureChoice(None, True, False, 'auto', 'ephemeral') | \
+    EnsureChoice(None, True, False, 'auto', 'ephemeral', 'private') | \
     EnsureStrPrefix('shared-'),
-    metavar='auto|ephemeral|shared-...',
+    metavar='auto|ephemeral|private|shared-...',
     doc="""Obtain a dataset or subdatset and set it up in a potentially 
     unsafe way for performance or access reasons.
     Use with care, any dataset is marked as 'untrusted'.
@@ -188,6 +188,9 @@ reckless_opt = Parameter(
     non-bare repositories or a RIA store! Otherwise two different annex object tree
     structures (dirhashmixed vs dirhashlower) will be used simultaneously, and annex keys
     using the respective other structure will be inaccessible.
+    ['private']: set the annex.private option for the repository, so that no
+    mention of it will appear in the git-annex branch. Useful for temporary
+    clones which are meant to be removed after pushing changes back to origin.
     ['shared-<mode>']: set up repository and annex permission to enable multi-user
     access. This disables the standard write protection of annex'ed files.
     <mode> can be any value supported by 'git init --shared=', such as 'group', or
