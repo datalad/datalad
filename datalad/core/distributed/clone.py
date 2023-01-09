@@ -711,7 +711,10 @@ def _post_annex_init_processing_(
     repo = destds.repo
     ds = destds
 
-    if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
+    if (
+        reckless in ('auto', 'private')
+        or (reckless and reckless.startswith('shared-'))
+    ):
         repo.call_annex(['untrust', 'here'])
 
     _check_autoenable_special_remotes(repo)
