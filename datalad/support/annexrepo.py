@@ -148,7 +148,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                  create=True, create_sanity_checks=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None,
-                 repo=None, fake_dates=False):
+                 repo=None, fake_dates=False, private=False):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -186,6 +186,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         description: str, optional
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
+        private: bool, optional
+          Set annex.private=True to make a repository without any
+          mention of it ever appearing in the git-annex branch
         """
 
         # BEGIN Repo validity test
@@ -267,7 +270,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 version = None
 
         if do_init:
-            self._init(version=version, description=description)
+            self._init(version=version, description=description,
+                       private=private)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
         self._direct_mode = None
@@ -1417,7 +1421,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # minimum git-annex version.
             return True
 
-    def _init(self, version=None, description=None):
+    def _init(self, version=None, description=None, private=False):
         """Initializes an annex repository.
 
         Note: This is intended for private use in this class by now.
@@ -1471,6 +1475,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 value=new_value,
                                 scope='local',
                                 reload=False)
+
+        # If requested, set annex.private before git annex init
+        if private:
+            self._call_git(['config', '--local', 'annex.private', 'true'])
+
         self._call_annex(['init'] + opts, protocol=AnnexInitOutput)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
