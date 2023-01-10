@@ -21,6 +21,7 @@ import os
 import queue
 import sys
 import warnings
+from contextlib import contextmanager
 from queue import Queue
 from subprocess import TimeoutExpired
 from typing import (
@@ -108,6 +109,15 @@ def _readline_rstripped(stdout):
 
 def _now():
     return datetime.now().astimezone()
+
+
+@contextmanager
+def increased_active(batched_command):
+    batched_command._active += 1
+    try:
+        yield None
+    finally:
+        batched_command._active -= 1
 
 
 class BatchedCommandError(CommandError):
@@ -383,55 +393,52 @@ class BatchedCommand(SafeDelCloseMixin):
             If `self.output_proc` is not `None`, the result type of
             `self.output_proc` determines the type of the elements.
         """
-        self._active += 1
-        requests = cmds
+        with increased_active(self):
+            requests = cmds
 
-        input_multiple = isinstance(requests, list)
-        if not input_multiple:
-            requests = [requests]
+            input_multiple = isinstance(requests, list)
+            if not input_multiple:
+                requests = [requests]
 
-        responses = []
-        try:
-            # This code assumes that each processing request is
-            # a single line and leads to a response that triggers a
-            # `send_result` in the protocol.
-            for request in requests:
-                while True:
-                    try:
-                        responses.append(self.process_request(request))
-                        self.last_request = request
-                        break
-                    except StopIteration:
-                        # The process finished executing, store the last return
-                        # code and restart the process.
-                        lgr.debug("%s: command exited", self)
-                        self.return_code = self.generator.return_code
-                        self.runner = None
+            responses = []
+            try:
+                # This code assumes that each processing request is
+                # a single line and leads to a response that triggers a
+                # `send_result` in the protocol.
+                for request in requests:
+                    while True:
+                        try:
+                            responses.append(self.process_request(request))
+                            self.last_request = request
+                            break
+                        except StopIteration:
+                            # The process finished executing, store the last return
+                            # code and restart the process.
+                            lgr.debug("%s: command exited", self)
+                            self.return_code = self.generator.return_code
+                            self.runner = None
 
-        except CommandError as command_error:
-            # Convert CommandError into BatchedCommandError
-            self.runner = None
-            self.return_code = command_error.code
-            raise BatchedCommandError(
-                cmd=command_error.cmd,
-                last_processed_request=self.last_request,
-                msg=command_error.msg,
-                code=command_error.code,
-                stdout=command_error.stdout,
-                stderr=command_error.stderr,
-                cwd=command_error.cwd,
-                **command_error.kwargs
-            ) from command_error
+            except CommandError as command_error:
+                # Convert CommandError into BatchedCommandError
+                self.runner = None
+                self.return_code = command_error.code
+                raise BatchedCommandError(
+                    cmd=command_error.cmd,
+                    last_processed_request=self.last_request,
+                    msg=command_error.msg,
+                    code=command_error.code,
+                    stdout=command_error.stdout,
+                    stderr=command_error.stderr,
+                    cwd=command_error.cwd,
+                    **command_error.kwargs
+                ) from command_error
 
-        finally:
-            self._active -= 1
         return responses if input_multiple else responses[0] if responses else None
 
     def process_request(self,
                         request: Union[Tuple, str]) -> Any | None:
 
-        self._active += 1
-        try:
+        with increased_active(self):
 
             if not self.process_running():
                 self._initialize()
@@ -455,21 +462,15 @@ class BatchedCommand(SafeDelCloseMixin):
                     response = response.rstrip()
             return response
 
-        finally:
-            self._active -= 1
-
     def proc1(self,
               single_command: str):
         """
         Simulate the old interface. This method is used only once in
         AnnexRepo.get_metadata()
         """
-        self._active += 1
-        try:
+        with increased_active(self):
             assert isinstance(single_command, str)
             return self(single_command)
-        finally:
-            self._active -= 1
 
     def get_one_line(self) -> Optional[str]:
         """
