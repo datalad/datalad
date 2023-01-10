@@ -78,6 +78,38 @@ _cfg_var = "datalad.runtime.stalled-external"
 _cfg_val = cfg.obtain(_cfg_var)
 
 
+lgr = logging.getLogger('datalad.cmd')
+
+# TODO unused?
+# In python3 to split byte stream on newline, it must be bytes
+linesep_bytes = os.linesep.encode()
+
+# TODO unused?
+_TEMP_std = sys.stdout, sys.stderr
+
+# TODO unused?
+# To be used in the temp file name to distinguish the ones we create
+# in Runner so we take care about their removal, in contrast to those
+# which might be created outside and passed into Runner
+_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
+
+
+def readline_rstripped(stdout):
+    warnings.warn("the function `readline_rstripped()` is deprecated "
+                  "and will be removed in a future release",
+                  DeprecationWarning)
+    return _readline_rstripped(stdout)
+
+
+def _readline_rstripped(stdout):
+    """Internal helper for BatchedCommand"""
+    return stdout.readline().rstrip()
+
+
+def _now():
+    return datetime.now().astimezone()
+
+
 class BatchedCommandError(CommandError):
     def __init__(self,
                  cmd="",
@@ -113,34 +145,6 @@ class BatchedCommandError(CommandError):
             **kwargs
         )
         self.last_processed_request = last_processed_request
-
-
-lgr = logging.getLogger('datalad.cmd')
-
-# TODO unused?
-# In python3 to split byte stream on newline, it must be bytes
-linesep_bytes = os.linesep.encode()
-
-# TODO unused?
-_TEMP_std = sys.stdout, sys.stderr
-
-# TODO unused?
-# To be used in the temp file name to distinguish the ones we create
-# in Runner so we take care about their removal, in contrast to those
-# which might be created outside and passed into Runner
-_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
-
-
-def readline_rstripped(stdout):
-    warnings.warn("the function `readline_rstripped()` is deprecated "
-                  "and will be removed in a future release",
-                  DeprecationWarning)
-    return _readline_rstripped(stdout)
-
-
-def _readline_rstripped(stdout):
-    """Internal helper for BatchedCommand"""
-    return stdout.readline().rstrip()
 
 
 class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
@@ -618,7 +622,3 @@ class BatchedCommand(SafeDelCloseMixin):
                 raise ValueError(f"Unexpected value: {_cfg_var}={_cfg_val!r}")
             self._abandon_cache = _cfg_val == "abandon"
         return self._abandon_cache
-
-
-def _now():
-    return datetime.now().astimezone()
