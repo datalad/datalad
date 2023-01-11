@@ -123,6 +123,7 @@ def increased_active(batched_command):
         batched_command._active -= 1
         if batched_command._active == 0:
             BatchedCommand._cleanup_lock.release()
+            batched_command._active_last = _now()
 
 
 class BatchedCommandError(CommandError):
@@ -345,8 +346,6 @@ class BatchedCommand(SafeDelCloseMixin):
             output_proc=self.output_proc,
         )
         self.encoding = self.generator.runner.protocol.encoding
-
-        self._active_last = _now()
 
     def process_running(self) -> bool:
         if self.runner:
