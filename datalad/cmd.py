@@ -28,7 +28,6 @@ from subprocess import TimeoutExpired
 from typing import (
     Any,
     Callable,
-    Iterable,
     List,
     Optional,
     Tuple,
@@ -126,7 +125,7 @@ def increased_active(batched_command: "BatchedCommand"):
 
 
 @contextmanager
-def locked_instances(batched_commands: Iterable):
+def locked_instances(batched_commands: List):
     for batched_command in batched_commands:
         batched_command.lock.acquire()
     try:
@@ -295,7 +294,7 @@ class BatchedCommand(SafeDelCloseMixin):
         max_inactive_age = cfg.obtain("datalad.runtime.max-inactive-age")
 
         # Lock all known
-        with locked_instances(BatchedCommand._running_instances.values()[:]):
+        with locked_instances(list(BatchedCommand._running_instances.values())):
             try_to_close = len(cls._running_instances) - max_batched
             if try_to_close <= 0:
                 return
