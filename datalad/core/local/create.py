@@ -377,6 +377,10 @@ class Create(Interface):
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
+        # Inherit annex.private=true if parent dataset is given explicitly
+        if ds is not None:
+            private = private or ds.config.get('annex.private', None) == 'true'
+
         # Note for the code below:
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
         # Re-use tbrepo instance, do not use tbds.repo
