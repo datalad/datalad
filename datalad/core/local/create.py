@@ -430,6 +430,12 @@ class Create(Interface):
         for k, v in tbds_config.overrides.items():
             tbds_config.add(k, v, scope='local', reload=False)
 
+        # tell subdatasets cloned into this to use reckless if private was set
+        if private:
+            tbds_config.set(
+                'datalad.clone.reckless', 'private', scope='local',
+                reload=False)
+
         # all config manipulation is done -> fll reload
         tbds_config.reload()
 
