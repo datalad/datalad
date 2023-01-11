@@ -20,6 +20,7 @@ import logging
 import os
 import queue
 import sys
+import threading
 import warnings
 from contextlib import contextmanager
 from queue import Queue
@@ -113,11 +114,15 @@ def _now():
 
 @contextmanager
 def increased_active(batched_command):
+    if batched_command._active == 0:
+        BatchedCommand._cleanup_lock.acquire()
     batched_command._active += 1
     try:
         yield None
     finally:
         batched_command._active -= 1
+        if batched_command._active == 0:
+            BatchedCommand._cleanup_lock.release()
 
 
 class BatchedCommandError(CommandError):
@@ -237,9 +242,10 @@ class BatchedCommand(SafeDelCloseMixin):
     subprocess via stdin and stdout.
     """
 
-    # Collection of active BatchedCommands as a mapping from object IDs to
+    # Collection of existing BatchedCommands as a mapping from object IDs to
     # instances
-    _active_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
+    _existing_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
+    _cleanup_lock = threading.Lock()
 
     def __init__(self,
                  cmd: Union[str, Tuple, List],
@@ -267,8 +273,8 @@ class BatchedCommand(SafeDelCloseMixin):
         self._active = 0
         self._active_last = _now()
         self.clean_inactive()
-        assert id(self) not in self._active_instances
-        self._active_instances[id(self)] = self
+        assert id(self) not in self._existing_instances
+        self._existing_instances[id(self)] = self
 
         # pure declarations
         self.stdin_queue: Queue
@@ -276,41 +282,39 @@ class BatchedCommand(SafeDelCloseMixin):
 
     @classmethod
     def clean_inactive(cls):
-        from . import cfg
+
         max_batched = cfg.obtain("datalad.runtime.max-batched")
         max_inactive_age = cfg.obtain("datalad.runtime.max-inactive-age")
-        if len(cls._active_instances) > max_batched:
-            active_qty = 0
-            inactive = []
-            for c in cls._active_instances.values():
-                if c._active:
-                    active_qty += 1
-                else:
-                    inactive.append(c)
-            inactive.sort(key=attrgetter("_active_last"))
-            to_close = len(cls._active_instances) - max_batched
-            if to_close <= 0:
+
+        with BatchedCommand._cleanup_lock:
+            try_to_close = len(cls._existing_instances) - max_batched
+            if try_to_close <= 0:
                 return
-            too_young = 0
+
+            active = {
+                int(batched_command._active > 0)
+                for batched_command in cls._existing_instances.values()
+            }
+            inactive = set(cls._existing_instances.values()) - active
             now = _now()
-            for i, c in enumerate(inactive):
-                if (now - c._active_last).total_seconds() <= max_inactive_age:
-                    too_young = len(inactive) - i
-                    break
-                elif c._active:
-                    active_qty += 1
-                else:
-                    c.close()
-                    cls._active_instances.pop(id(c), None)
-                    to_close -= 1
-                    if to_close <= 0:
-                        break
-            if to_close > 0:
+            old_inactive = {
+                bc
+                for bc in active
+                if now - bc._active_last.total_seconds() >= max_inactive_age
+            }
+
+            for batched_command in old_inactive:
+                batched_command.close()
+                cls._existing_instances.pop(id(batched_command), None)
+
+            if len(old_inactive) < try_to_close:
                 lgr.debug(
-                    "Too many BatchedCommands remaining after cleanup;"
-                    " %d active, %d went inactive recently",
-                    active_qty,
-                    too_young,
+                    "Could not clean up desired number (%d) of BatchedCommand "
+                    "instances. Found %d active instances of which %d had too "
+                    "recent activity to be closed.",
+                    max_batched,
+                    len(active),
+                    len(inactive - old_inactive),
                 )
 
     def _initialize(self):
