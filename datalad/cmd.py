@@ -255,7 +255,6 @@ class BatchedCommand(SafeDelCloseMixin):
 
     # Collection of BatchedCommand instances that have a runner associated
     _running_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
-    _cleanup_lock = threading.Lock()
 
     def __init__(self,
                  cmd: Union[str, Tuple, List],
