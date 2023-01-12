@@ -304,7 +304,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 batched_command
                 for batched_command in cls._running_instances.values()
                 if batched_command._active == 0
-                and now - batched_command._active_last.total_seconds() >= max_inactive_age
+                and (now - batched_command._active_last).total_seconds() >= max_inactive_age
             }
 
             if len(old_inactive) < try_to_close:
