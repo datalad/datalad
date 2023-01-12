@@ -18,6 +18,7 @@ from typing import (
     IO,
     Optional,
 )
+from datalad.utils import COPY_BUFSIZE
 
 
 lgr = logging.getLogger("datalad.runner.runnerthreads")
@@ -189,7 +190,7 @@ class ReadThread(TransportThread):
                  user_info: Any,
                  source: IO,
                  destination_queue: Queue,
-                 length: int = 1024
+                 length: int = COPY_BUFSIZE
                  ):
 
         super().__init__(identifier, signal_queues, user_info)
