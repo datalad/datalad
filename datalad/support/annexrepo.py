@@ -553,7 +553,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
         # applies to find, findref to list all known.
         # was added in 10.20221212-17-g0b2dd374d on 20221220.
-        kludges["find-supports-anything"] = ver >= "10.20221212+git18"
+        kludges["find-supports-anything"] = ver >= "10.20221213"
         cls._version_kludges = kludges
         return kludges[key]
 
