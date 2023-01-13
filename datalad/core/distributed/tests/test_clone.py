@@ -62,6 +62,7 @@ from datalad.tests.utils_pytest import (
     neq_,
     nok_,
     ok_,
+    ok_exists,
     ok_file_has_content,
     ok_startswith,
     patch_config,
@@ -1451,6 +1452,24 @@ def test_ephemeral(origin_path=None, bare_path=None,
         eph_annex = eph_from_bare.repo.dot_git / 'annex'
         ok_(eph_annex.is_symlink())
         ok_(eph_annex.resolve().samefile(Path(bare_path) / 'annex'))
+
+
+@with_tempfile
+@with_tempfile
+def test_private(origin_path=None, clone_path=None):
+    ds = Dataset(origin_path).create()
+    ds_clone = clone(ds, clone_path, reckless="private")
+
+    # check that the annex.private config is set
+    eq_(ds_clone.config.get("annex.private"), "true")
+
+    # check if the clone applied the config & started its own private journal
+    ok_exists(ds_clone.repo.dot_git / "annex" / "journal-private" / "uuid.log")
+
+    # verify that the clone didn't add itself to git-annex:uuid.log
+    recorded_locations = ds_clone.repo.call_git(
+        ["cat-file", "blob", "git-annex:uuid.log"], read_only=True)
+    assert_not_in(ds_clone.config.get("annex.uuid"), recorded_locations)
 
 
 @with_tempfile(mkdir=True)
