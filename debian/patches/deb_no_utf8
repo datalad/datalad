@@ -103,7 +103,7 @@ Last-Update: 2018-06-05
  
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1790,7 +1790,9 @@ def with_parametric_batch(t):
+@@ -1707,7 +1707,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -127,7 +127,7 @@ Last-Update: 2018-06-05
      # no capture of any kind, by default
 --- a/datalad/tests/utils_pytest.py
 +++ b/datalad/tests/utils_pytest.py
-@@ -1616,7 +1616,7 @@ with_parametric_batch = pytest.mark.para
+@@ -1427,7 +1427,7 @@ with_parametric_batch = pytest.mark.para
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']

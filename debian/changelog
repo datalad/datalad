@@ -1,12 +1,14 @@
-datalad (0.18.0-1) unstable; urgency=medium
+datalad (0.18.1-1) unstable; urgency=medium
 
+  * Fresh upstream "major" + bugfix release
+    - includes significant OPTimization of 'status' command as well.
   * debian/patches
     - refreshed
   * debian/control
     - whoosh and simplejson are no longer dependent on. metadata functionality
       was refactored away, and simplejson was replaced with json.
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 04 Jan 2023 17:42:05 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 16 Jan 2023 18:41:01 -0500
 
 datalad (0.17.10-1) unstable; urgency=medium
 
