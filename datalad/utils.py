@@ -79,6 +79,16 @@ on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
 
+# COPY_BUFSIZE sort of belongs into datalad.consts, but that would lead to
+# circular import due to `on_windows`
+try:
+    from shutil import COPY_BUFSIZE
+except ImportError:  # pragma: no cover
+    # too old
+    from datalad.utils import on_windows
+    # from PY3.10
+    COPY_BUFSIZE = 1024 * 1024 if on_windows else 64 * 1024
+
 
 # Takes ~200msec, so should not be called at import time
 @lru_cache()  # output should not change through life time of datalad process
