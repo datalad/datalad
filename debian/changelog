@@ -4,6 +4,8 @@ datalad (0.18.1-1) unstable; urgency=medium
     - includes significant OPTimization of 'status' command as well.
   * debian/patches
     - refreshed
+    - added deb-looseversion.patch to bundle a little backport of
+      looseversion from 1.0.3 of https://github.com/effigies/looseversion
   * debian/control
     - whoosh and simplejson are no longer dependent on. metadata functionality
       was refactored away, and simplejson was replaced with json.
