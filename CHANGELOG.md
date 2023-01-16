@@ -1,4 +1,27 @@
 
+<a id='changelog-0.18.1'></a>
+# 0.18.1 (2023-01-16)
+
+## 🐛 Bug Fixes
+
+- Fixes crashes on windows where DataLad was mistaking git-annex 10.20221212 for
+  a not yet released git-annex version and trying to use a new feature.
+  Fixes [#7248](https://github.com/datalad/datalad/issues/7248) via
+  [PR #7249](https://github.com/datalad/datalad/pull/7249)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 📝 Documentation
+
+- DOC: fix EnsureCallable docstring.  [PR #7245](https://github.com/datalad/datalad/pull/7245) (by [@matrss](https://github.com/matrss))
+
+## 🏎 Performance
+
+- Integrate buffer size optimization from datalad-next, leading to significant
+  performance improvement for status and diff.
+  Fixes [#7190](https://github.com/datalad/datalad/issues/7190) via
+  [PR #7250](https://github.com/datalad/datalad/pull/7250)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
 <a id='changelog-0.18.0'></a>
 # 0.18.0 (2022-12-31)
 
