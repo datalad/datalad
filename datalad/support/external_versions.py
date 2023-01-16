@@ -14,7 +14,7 @@ import os.path as op
 from os import linesep
 
 from itertools import chain
-from looseversion import LooseVersion
+from .looseversion import LooseVersion
 
 from datalad.log import lgr
 # import version helper from config to have only one implementation

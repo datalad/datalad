@@ -21,7 +21,7 @@ from os.path import (
     relpath,
 )
 
-from looseversion import LooseVersion
+from datalad.support.looseversion import LooseVersion
 
 from datalad import ssh_manager
 from datalad.cmd import (
