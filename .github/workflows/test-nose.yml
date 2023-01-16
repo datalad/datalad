@@ -23,7 +23,7 @@ jobs:
           pip install -r requirements-devel.txt
           pip install coverage datalad-installer nose
           datalad-installer --sudo ok -E /tmp/new.env \
-            miniconda --batch \
+            miniconda --spec python==3.8 --batch \
             git-annex=8.20201007 -m conda
           . /tmp/new.env
           echo "PATH=$PATH" >> "$GITHUB_ENV"
