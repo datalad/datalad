@@ -2,6 +2,37 @@
 
 Change log
 **********
+0.18.1 (2023-01-16)
+===================
+
+Bug Fixes
+---------
+
+-  Fixes crashes on windows where DataLad was mistaking git-annex
+   10.20221212 for a not yet released git-annex version and trying to
+   use a new feature. Fixes
+   `#7248 <https://github.com/datalad/datalad/issues/7248>`__ via `PR
+   #7249 <https://github.com/datalad/datalad/pull/7249>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+Documentation
+-------------
+
+-  DOC: fix EnsureCallable docstring. `PR
+   #7245 <https://github.com/datalad/datalad/pull/7245>`__ (by
+   `@matrss <https://github.com/matrss>`__)
+
+Performance
+-----------
+
+-  Integrate buffer size optimization from datalad-next, leading to
+   significant performance improvement for status and diff. Fixes
+   `#7190 <https://github.com/datalad/datalad/issues/7190>`__ via `PR
+   #7250 <https://github.com/datalad/datalad/pull/7250>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+.. _section-1:
+
 0.18.0 (2022-12-31)
 ===================
 
@@ -73,6 +104,8 @@ Enhancements and New Features
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
+.. _bug-fixes-1:
+
 Bug Fixes
 ---------
 
@@ -82,6 +115,8 @@ Bug Fixes
    `#6950 <https://github.com/datalad/datalad/issues/6950>`__ via `PR
    #6952 <https://github.com/datalad/datalad/pull/6952>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
+
+.. _documentation-1:
 
 Documentation
 -------------
@@ -157,6 +192,8 @@ Internal
    #7170 <https://github.com/datalad/datalad/pull/7170>`__ (by
    `@adswa <https://github.com/adswa>`__)
 
+.. _performance-1:
+
 Performance
 -----------
 
@@ -194,7 +231,7 @@ Tests
    `PR #7176 <https://github.com/datalad/datalad/pull/7176>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _section-1:
+.. _section-2:
 
 0.17.10 (2022-12-14)
 ====================
@@ -218,7 +255,7 @@ Enhancements and New Features
    #7210 <https://github.com/datalad/datalad/pull/7210>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-1:
+.. _bug-fixes-2:
 
 Bug Fixes
 ---------
@@ -276,7 +313,7 @@ Bug Fixes
    #7226 <https://github.com/datalad/datalad/pull/7226>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-1:
+.. _documentation-2:
 
 Documentation
 -------------
@@ -325,12 +362,12 @@ Tests
    #7209 <https://github.com/datalad/datalad/pull/7209>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-2:
+.. _section-3:
 
 0.17.9 (2022-11-07)
 ===================
 
-.. _bug-fixes-2:
+.. _bug-fixes-3:
 
 Bug Fixes
 ---------
@@ -404,12 +441,12 @@ Tests
    #7130 <https://github.com/datalad/datalad/pull/7130>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-3:
+.. _section-4:
 
 0.17.8 (2022-10-24)
 ===================
 
-.. _bug-fixes-3:
+.. _bug-fixes-4:
 
 Bug Fixes
 ---------
@@ -427,8 +464,7 @@ Bug Fixes
    results of ``run_procedure()``. Fixes
    `#7091 <https://github.com/datalad/datalad/issues/7091>`__ via `PR
    #7094 <https://github.com/datalad/datalad/pull/7094>`__ (by
-   `@mslw <https://github.com/mslw>`__ &
-   `@mih <https://github.com/mih>`__)
+   `@mslw <https://github.com/mslw>`__ & `@mih <https://github.com/mih>`__)
 
 -  Improve handling of ``--existing reconfigure`` in
    ``create-sibling-ria``: previously, the command would not make the
@@ -452,12 +488,12 @@ Bug Fixes
    #7103 <https://github.com/datalad/datalad/pull/7103>`__ (by
    `@mslw <https://github.com/mslw>`__)
 
-.. _section-4:
+.. _section-5:
 
 0.17.7 (2022-10-14)
 ===================
 
-.. _bug-fixes-4:
+.. _bug-fixes-5:
 
 Bug Fixes
 ---------
@@ -513,12 +549,12 @@ Tests
    pass. `PR #7002 <https://github.com/datalad/datalad/pull/7002>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-5:
+.. _section-6:
 
 0.17.6 (2022-09-21)
 ===================
 
-.. _bug-fixes-5:
+.. _bug-fixes-6:
 
 Bug Fixes
 ---------
@@ -961,7 +997,7 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
-.. _bug-fixes-6:
+.. _bug-fixes-7:
 
 Bug Fixes
 ---------
@@ -981,7 +1017,7 @@ Bug Fixes
    prior recording a new dataset state. Fixes #4967
    `#6795 <https://github.com/datalad/datalad/pull/6795>`__ (by @mih)
 
-.. _documentation-2:
+.. _documentation-3:
 
 Documentation
 -------------
@@ -1609,7 +1645,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-7:
+.. _bug-fixes-8:
 
 Bug Fixes
 ---------
@@ -1732,7 +1768,7 @@ Bug Fixes
    `#6603 <https://github.com/datalad/datalad/pull/6603>`__ (by
    @yarikoptic)
 
-.. _documentation-3:
+.. _documentation-4:
 
 Documentation
 -------------
@@ -2239,7 +2275,7 @@ Internal
    `#6072 <https://github.com/datalad/datalad/pull/6072>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-4:
+.. _documentation-5:
 
 Documentation
 -------------
@@ -2388,7 +2424,7 @@ Internal
    `#5980 <https://github.com/datalad/datalad/pull/5980>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-5:
+.. _documentation-6:
 
 Documentation
 -------------
