@@ -6,11 +6,13 @@ datalad (0.18.1-1) unstable; urgency=medium
     - refreshed
     - added deb-looseversion.patch to bundle a little backport of
       looseversion from 1.0.3 of https://github.com/effigies/looseversion
+    - added deb_no_chardet_depends to remove upper version boundary for chardet
+      since in debian we have 5.1 already
   * debian/control
     - whoosh and simplejson are no longer dependent on. metadata functionality
       was refactored away, and simplejson was replaced with json.
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 16 Jan 2023 18:41:01 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 17 Jan 2023 10:13:49 -0500
 
 datalad (0.17.10-1) unstable; urgency=medium
 
