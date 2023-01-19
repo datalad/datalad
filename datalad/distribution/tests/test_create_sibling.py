@@ -946,6 +946,7 @@ def test_preserve_attrs(src=None, dest=None):
         assert fp.read() == "This is test text."
 
 
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 def test_only_one_level_without_recursion(path=None):
     # this tests for https://github.com/datalad/datalad/issues/5614: accidental
