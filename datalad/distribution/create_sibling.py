@@ -392,7 +392,9 @@ def _create_dataset_sibling(
 def _ls_remote_path(ssh, path):
     try:
         # yoh tried ls on mac
-        out, err = ssh("LC_ALL=C ls -A1 {}".format(sh_quote(path)))
+        out, err = ssh('sh -c "LC_ALL=C; export LC_ALL; /bin/ls -A1 {}"'.format(
+            sh_quote(path)))
+
         if err:
             # we might even want to raise an exception, but since it was
             # not raised, let's just log a warning
