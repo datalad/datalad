@@ -1,3 +1,9 @@
+datalad (0.18.1-2) unstable; urgency=medium
+
+  * Exclude flaky test_gracefull_death from testing (Closes: #1029450)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 25 Jan 2023 11:10:27 -0500
+
 datalad (0.18.1-1) unstable; urgency=medium
 
   * Fresh upstream "major" + bugfix release

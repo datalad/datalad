@@ -6,7 +6,8 @@ export PYBUILD_NAME = datalad
 
 # test_test would be removed as 0.17.1
 # test_subprocess_return_code_capture - https://github.com/datalad/datalad/issues/6109
-export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture' -c $(CURDIR)/tox.ini
+# test_gracefull_death - too flaky https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1029450
+export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture and not test_gracefull_death' -c $(CURDIR)/tox.ini
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=
 export https_proxy=
