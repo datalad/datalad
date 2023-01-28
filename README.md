@@ -29,7 +29,7 @@
 [![Debian Unstable](https://badges.debian.net/badges/debian/unstable/datalad/version.svg)](https://packages.debian.org/unstable/datalad)
 [![Fedora Rawhide package](https://repology.org/badge/version-for-repo/fedora_rawhide/datalad.svg?header=Fedora%20%28rawhide%29)](https://repology.org/project/datalad/versions)
 [![Gentoo (::science)](https://repology.org/badge/version-for-repo/gentoo_ovl_science/datalad.svg?header=Gentoo%20%28%3A%3Ascience%29)](https://repology.org/project/datalad/versions)
-[![PyPI package](https://repology.org/badge/version-for-repo/pypi/datalad.svg)](https://repology.org/project/datalad/versions)
+[![PyPI package](https://repology.org/badge/version-for-repo/pypi/datalad.svg?header=PyPI)](https://repology.org/project/datalad/versions)
 
 # 10000-ft. overview
 
