@@ -23,12 +23,11 @@
 
 ## Distribution
 
-[![AUR package](https://repology.org/badge/version-for-repo/aur/datalad.svg)](https://repology.org/project/datalad/versions)
-[![Conda-forge](https://anaconda.org/conda-forge/datalad/badges/version.svg)](https://anaconda.org/conda-forge/datalad)
+[![Arch (AUR)](https://repology.org/badge/version-for-repo/aur/datalad.svg?header=Arch%20%28%41%55%52%29)](https://repology.org/project/datalad/versions)
+[![Anaconda](https://anaconda.org/conda-forge/datalad/badges/version.svg)](https://anaconda.org/conda-forge/datalad)
 [![Debian Stable](https://badges.debian.net/badges/debian/stable/datalad/version.svg)](https://packages.debian.org/stable/datalad)
 [![Debian Unstable](https://badges.debian.net/badges/debian/unstable/datalad/version.svg)](https://packages.debian.org/unstable/datalad)
-[![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/)
-[![Gentoo Science package](https://repology.org/badge/version-for-repo/gentoo_ovl_science/datalad.svg)](https://repology.org/project/datalad/versions)
+[![Gentoo (::science)](https://repology.org/badge/version-for-repo/gentoo_ovl_science/datalad.svg?header=Gentoo%20%28%3A%3Ascience%29)](https://repology.org/project/datalad/versions)
 [![PyPI package](https://repology.org/badge/version-for-repo/pypi/datalad.svg)](https://repology.org/project/datalad/versions)
 
 # 10000-ft. overview
