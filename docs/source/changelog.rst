@@ -4839,7 +4839,7 @@ Major refactoring and deprecations since 0.12.0rc6
    ``--alternative-source`` parameter has been removed, and a
    ``clone_dataset`` function with multi-source capabilities is provided
    instead. The ``--reckless`` parameter can now take literal mode
-   labels instead of just beeing a binary flag, but backwards
+   labels instead of just being a binary flag, but backwards
    compatibility is maintained.
 
 -  The ``get_file_content`` method of ``GitRepo`` was no longer used
@@ -6261,7 +6261,7 @@ Fixes
 
 -  ``annex`` commands are now chunked assuming 50% “safety margin” on
    the maximal command line length. Should resolve crashes while
-   operating ot too many files at ones
+   operating of too many files at ones
    (`#3001 <https://github.com/datalad/datalad/issues/3001>`__)
 -  ``run`` sidecar config processing
    (`#2991 <https://github.com/datalad/datalad/issues/2991>`__)

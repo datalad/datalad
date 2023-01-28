@@ -2700,7 +2700,7 @@ only supported Python flavor.
   `--alternative-source` parameter has been removed, and a `clone_dataset`
   function with multi-source capabilities is provided instead. The
   `--reckless` parameter can now take literal mode labels instead of just
-  beeing a binary flag, but backwards compatibility is maintained.
+  being a binary flag, but backwards compatibility is maintained.
 
 - The `get_file_content` method of `GitRepo` was no longer used
   internally or in any known DataLad extensions and has been removed.
@@ -3699,7 +3699,7 @@ Rushed out bugfix release to stay fully compatible with recent
     while considering subdataset metadata for re-aggregation ([#3007][])
 - `annex` commands are now chunked assuming 50% "safety margin" on the
   maximal command line length. Should resolve crashes while operating
-  ot too many files at ones ([#3001][])
+  of too many files at ones ([#3001][])
 - `run` sidecar config processing ([#2991][])
 - no double trailing period in docs ([#2984][])
 - correct identification of the repository with symlinks in the paths
