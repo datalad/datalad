@@ -78,8 +78,11 @@ class CreateSiblingRia(Interface):
     The store's base path is expected to not exist, be an empty directory,
     or a valid RIA store.
 
+    Notes
+    -----
+
+
     RIA URL format
-    ~~~~~~~~~~~~~~
 
     Interactions with new or existing RIA stores require RIA URLs to identify
     the store or specific datasets inside of it.
@@ -98,8 +101,8 @@ class CreateSiblingRia(Interface):
     additional @ symbol:
     'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>', where 'dataset-version' refers to a branch or tag.
 
+
     RIA store layout
-    ~~~~~~~~~~~~~~~~
 
     A RIA store is a directory tree with a dedicated subdirectory for each
     dataset in the store. The subdirectory name is constructed from the
@@ -151,8 +154,8 @@ class CreateSiblingRia(Interface):
     difference. Interactions should be handled via the ORA special remote
     instead.
 
+
     Error logging
-    ~~~~~~~~~~~~~
 
     To enable error logging at the remote end, append a pipe symbol and an "l"
     to the version number in ria-layout-version (like so '1|l\\n').
