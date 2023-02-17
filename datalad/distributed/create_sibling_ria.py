@@ -88,25 +88,26 @@ class CreateSiblingRia(Interface):
     the store or specific datasets inside of it.
 
     The general structure of a RIA URL pointing to a store takes the form
-    'ria+[scheme]://<storelocation>' (e.g.,
-    ria+ssh://[user@]hostname:/absolute/path/to/ria-store, or
-    ria+file:///absolute/path/to/ria-store)
+    ``ria+[scheme]://<storelocation>`` (e.g.,
+    ``ria+ssh://[user@]hostname:/absolute/path/to/ria-store``, or
+    ``ria+file:///absolute/path/to/ria-store``)
 
     The general structure of a RIA URL pointing to a dataset in a store (for
     example for cloning) takes a similar form, but appends either the datasets
-    UUID or a ~ symbol followed by the dataset's alias name:
-    'ria+[scheme]://<storelocation>#<dataset-UUID>' or
-    'ria+[scheme]://<storelocation>#~<aliasname>'.
+    UUID or a "~" symbol followed by the dataset's alias name:
+    ``ria+[scheme]://<storelocation>#<dataset-UUID>`` or
+    ``ria+[scheme]://<storelocation>#~<aliasname>``.
     In addition, specific version identifiers can be appended to the URL with an
-    additional @ symbol:
-    'ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>', where 'dataset-version' refers to a branch or tag.
+    additional "@" symbol:
+    ``ria+[scheme]://<storelocation>#<dataset-UUID>@<dataset-version>``,
+    where ``dataset-version`` refers to a branch or tag.
 
 
     RIA store layout
 
     A RIA store is a directory tree with a dedicated subdirectory for each
     dataset in the store. The subdirectory name is constructed from the
-    DataLad dataset ID, e.g. '124/68afe-59ec-11ea-93d7-f0d5bf7b5561', where
+    DataLad dataset ID, e.g. ``124/68afe-59ec-11ea-93d7-f0d5bf7b5561``, where
     the first three characters of the ID are used for an intermediate
     subdirectory in order to mitigate files system limitations for stores
     containing a large number of datasets.
@@ -118,34 +119,35 @@ class CreateSiblingRia(Interface):
     It is possible to selectively disable either component using
     ``storage-sibling 'off'`` or ``storage-sibling 'only'``, respectively.
     If neither component is disabled, a dataset's subdirectory layout in a RIA
-    store contains a standard bare Git repository and an 'annex/' subdirectory
+    store contains a standard bare Git repository and an ``annex/`` subdirectory
     inside of it.
     The latter holds a Git-annex object store and comprises the storage sibling.
-    Disabling the standard git-remote ('storage-sibling=only') will result
+    Disabling the standard git-remote (``storage-sibling='only'``) will result
     in not having the bare git repository, disabling the storage sibling
-    ('storage-sibling=off') will result in not having the 'annex/' subdirectory.
+    (``storage-sibling='off'``) will result in not having the ``annex/``
+    subdirectory.
 
-    Optionally, there can be a further subdirectory 'archives' with
+    Optionally, there can be a further subdirectory ``archives`` with
     (compressed) 7z archives of annex objects. The storage remote is able to
     pull annex objects from these archives, if it cannot find in the regular
     annex object store. This feature can be useful for storing large
     collections of rarely changing data on systems that limit the number of
     files that can be stored.
 
-    Each dataset directory also contains a 'ria-layout-version' file that
+    Each dataset directory also contains a ``ria-layout-version`` file that
     identifies the data organization (as, for example, described above).
 
-    Lastly, there is a global 'ria-layout-version' file at the store's
+    Lastly, there is a global ``ria-layout-version`` file at the store's
     base path that identifies where dataset subdirectories themselves are
     located. At present, this file must contain a single line stating the
     version (currently "1"). This line MUST end with a newline character.
 
     It is possible to define an alias for an individual dataset in a store by
-    placing a symlink to the dataset location into an 'alias/' directory
+    placing a symlink to the dataset location into an ``alias/`` directory
     in the root of the store. This enables dataset access via URLs of format:
-    'ria+<protocol>://<storelocation>#~<aliasname>'.
+    ``ria+<protocol>://<storelocation>#~<aliasname>``.
 
-    Compared to standard git-annex object stores, the 'annex/' subdirectories
+    Compared to standard git-annex object stores, the ``annex/`` subdirectories
     used as storage siblings follow a different layout naming scheme
     ('dirhashmixed' instead of 'dirhashlower').
     This is mostly noted as a technical detail, but also serves to remind
@@ -158,16 +160,16 @@ class CreateSiblingRia(Interface):
     Error logging
 
     To enable error logging at the remote end, append a pipe symbol and an "l"
-    to the version number in ria-layout-version (like so '1|l\\n').
+    to the version number in ria-layout-version (like so: ``1|l\\n``).
 
     Error logging will create files in an "error_log" directory whenever the
     git-annex special remote (storage sibling) raises an exception, storing the
     Python traceback of it. The logfiles are named according to the scheme
-    '<dataset id>.<annex uuid of the remote>.log' showing "who" ran into this
+    ``<dataset id>.<annex uuid of the remote>.log`` showing "who" ran into this
     issue with which dataset. Because logging can potentially leak personal
     data (like local file paths for example), it can be disabled client-side
     by setting the configuration variable
-    "annex.ora-remote.<storage-sibling-name>.ignore-remote-config".
+    ``annex.ora-remote.<storage-sibling-name>.ignore-remote-config``.
     """
 
     # TODO: description?
