@@ -2500,8 +2500,14 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not batch:
             json_objects = self._call_annex_records(
-                ['info'] + options, files=files, merge_annex_branches=False)
+                ['info'] + options, files=files, merge_annex_branches=False,
+                exception_on_error=False,
+            )
         else:
+            # according to passing of the test_AnnexRepo_is_under_annex
+            # test with batch=True, there is no need for explicit
+            # exception_on_error=False, batched process does not raise
+            # CommandError.
             json_objects = self._batched.get(
                 'info',
                 annex_options=options, json=True, path=self.path,
