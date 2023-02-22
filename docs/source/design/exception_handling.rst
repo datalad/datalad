@@ -69,7 +69,7 @@ users.
 For message creation :class:`~datalad.support.exceptions.CapturedException`
 comes with a couple of ``format_*`` helper methods, its ``__str__`` provides a
 short representation of the form ``ExceptionClass(message)`` and its
-``__repr__`` the log form with a traceback tht is used for the auto-generated
+``__repr__`` the log form with a traceback that is used for the auto-generated
 log.
 
 For result dictionaries :class:`~datalad.support.exceptions.CapturedException`

@@ -444,7 +444,7 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
-## Maintenace teams coordination
+## Maintenance teams coordination
 
 We distinguish particular aspects of DataLad's functionality, each corresponding
 to parts of the code base in this repository, and loosely maintain teams assigned

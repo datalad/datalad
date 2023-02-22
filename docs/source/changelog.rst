@@ -222,7 +222,7 @@ Performance
 Tests
 -----
 
--  Reenable two now-passing core test on Windows CI. `PR
+-  Re-enable two now-passing core test on Windows CI. `PR
    #7152 <https://github.com/datalad/datalad/pull/7152>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
@@ -350,7 +350,7 @@ Tests
    #7159 <https://github.com/datalad/datalad/pull/7159>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
--  Reenable now passing test_path_diff test on Windows. Fixes
+-  Re-enable now passing test_path_diff test on Windows. Fixes
    `#3725 <https://github.com/datalad/datalad/issues/3725>`__ via `PR
    #7194 <https://github.com/datalad/datalad/pull/7194>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
@@ -1838,7 +1838,7 @@ Internal
    promotes “breadth-first” reporting with a new parameter
    ``reporting_order``
    `#6006 <https://github.com/datalad/datalad/pull/6006>`__ (by @mih)
--  ``AnnexRepo.get_file_annexinfo()`` is introduced for more convinient
+-  ``AnnexRepo.get_file_annexinfo()`` is introduced for more convenient
    queries for single files and replaces a now deprecated
    ``AnnexRepo.get_file_key()`` to receive information with fewer calls
    to Git `#6104 <https://github.com/datalad/datalad/pull/6104>`__ (by
@@ -2016,7 +2016,7 @@ Infra
    configuration
    `#6228 <https://github.com/datalad/datalad/pull/6228>`__ (by @adswa)
 -  The ``readthedocs-theme`` and ``Sphinx`` versions were pinned to
-   reenable rendering of bullet points in the documentation
+   re-enable rendering of bullet points in the documentation
    `#6346 <https://github.com/datalad/datalad/pull/6346>`__ (by @adswa)
 -  The PR template was updated with a CHANGELOG template. Future PRs
    should use it to include a summary for the CHANGELOG
@@ -3697,7 +3697,7 @@ Fixes
    (`#5218 <https://github.com/datalad/datalad/issues/5218>`__)
 
 -  The internal command runner’s handling of the event loop has been
-   tweaked to hopefully fix issues with runnning DataLad from IPython.
+   tweaked to hopefully fix issues with running DataLad from IPython.
    (`#5106 <https://github.com/datalad/datalad/issues/5106>`__)
 
 -  SSH cleanup wasn’t reliably triggered by the ORA special remote on
@@ -4839,7 +4839,7 @@ Major refactoring and deprecations since 0.12.0rc6
    ``--alternative-source`` parameter has been removed, and a
    ``clone_dataset`` function with multi-source capabilities is provided
    instead. The ``--reckless`` parameter can now take literal mode
-   labels instead of just beeing a binary flag, but backwards
+   labels instead of just being a binary flag, but backwards
    compatibility is maintained.
 
 -  The ``get_file_content`` method of ``GitRepo`` was no longer used
@@ -5160,7 +5160,7 @@ Fixes
    (`#3799 <https://github.com/datalad/datalad/issues/3799>`__)
    (`#3102 <https://github.com/datalad/datalad/issues/3102>`__)
 
--  Do not errorneously discover directory as a procedure.
+-  Do not erroneously discover directory as a procedure.
    (`#3793 <https://github.com/datalad/datalad/issues/3793>`__)
 
 -  Correctly extract version from manpage to trigger use of manpages for
@@ -5478,7 +5478,7 @@ Fixes
 Enhancements and new features
 -----------------------------
 
--  ``SSHConnection`` now offers methods for file upload and dowload
+-  ``SSHConnection`` now offers methods for file upload and download
    (``get()``, ``put()``. The previous ``copy()`` method only supported
    upload and was discontinued
    (`#3401 <https://github.com/datalad/datalad/issues/3401>`__)
@@ -6261,7 +6261,7 @@ Fixes
 
 -  ``annex`` commands are now chunked assuming 50% “safety margin” on
    the maximal command line length. Should resolve crashes while
-   operating ot too many files at ones
+   operating of too many files at ones
    (`#3001 <https://github.com/datalad/datalad/issues/3001>`__)
 -  ``run`` sidecar config processing
    (`#2991 <https://github.com/datalad/datalad/issues/2991>`__)
@@ -6472,7 +6472,7 @@ Fixes
    ``BadName`` issue.
    (`#2712 <https://github.com/datalad/datalad/issues/2712>`__),
    (`#2794 <https://github.com/datalad/datalad/issues/2794>`__)
--  The progess bar for annex file transferring was unable to handle an
+-  The progress bar for annex file transferring was unable to handle an
    empty file.
    (`#2717 <https://github.com/datalad/datalad/issues/2717>`__)
 -  ``datalad add-readme`` halted when no aggregated metadata was found
@@ -6941,7 +6941,7 @@ Enhancements and new features
    potential changes, instead of performing a complete traversal of a
    dataset tree
 -  `add <http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html>`__
-   looks for changes relative to the last commited state of a dataset to
+   looks for changes relative to the last committed state of a dataset to
    discover files to add more efficiently
 -  `diff <http://datalad.readthedocs.io/en/latest/generated/man/datalad-diff.html>`__
    can now report untracked files in addition to modified files
