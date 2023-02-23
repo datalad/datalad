@@ -904,6 +904,12 @@ class ConfigManager(object):
 
         if reload:
             self.reload()
+            # this function is only used to modify config. If any manager
+            # has modified the global scope, and is not itself the global
+            # manager, we reload that one too in order to avoid stale
+            # configuration reports
+            if scope == 'global' and id(self) != id(datalad.cfg):
+                datalad.cfg.reload()
         return out['stdout'], out['stderr']
 
     def _get_location_args(self, scope, args=None):
