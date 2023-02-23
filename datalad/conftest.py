@@ -116,6 +116,7 @@ def setup_package():
             cfg_file.write_text(gitconfig)
             return new_home, cfg_file
 
+        # Only Git 2.32 brought GIT_CONFIG_GLOBAL support
         if external_versions['cmd:git'] < "2.32":
             # To overcome pybuild overriding HOME but us possibly wanting our
             # own HOME where we pre-setup git for testing (name, email)
@@ -126,8 +127,17 @@ def setup_package():
                 new_home, _ = prep_tmphome()
                 m.enter_context(patch.dict(os.environ, get_home_envvars(new_home)))
         else:
-            _, cfg_file = prep_tmphome()
-            m.enter_context(patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': str(cfg_file)}))
+            new_home, cfg_file = prep_tmphome()
+            if 'GIT_HOME' in os.environ:
+                home_env = {'HOME': os.environ['GIT_HOME']}
+            else:
+                home_env = get_home_envvars(new_home)
+            # Some software does not expect a non-standard HOME
+            # point GIT_CONFIG_GLOBAL to the new git user config
+            # specifically to mitigate that
+            # see c0fab80374bc3e128453dd1bd5086d17c8e1186f
+            home_env['GIT_CONFIG_GLOBAL'] = str(cfg_file)
+            m.enter_context(patch.dict(os.environ, home_env))
 
         # Re-load ConfigManager, since otherwise it won't consider global config
         # from new $HOME (see gh-4153

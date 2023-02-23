@@ -281,6 +281,11 @@ Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in
 be used to establish a clean docker environment (based on any NtesteuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
+The pytest setup creates a new temporary HOME directory for each test run in order to
+minimize interaction with a user's particular configuration. Via the `GIT_HOME`
+environment variable, the test setup can be instructed to use a different particular
+(possibly persistent) HOME directory.
+
 ### CI setup
 
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.

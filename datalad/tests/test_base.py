@@ -92,3 +92,16 @@ def test_git_config_warning(path=None):
         ConfigManager._checked_git_identity = False
         Dataset(path).config.reload()
         assert_in("configure Git before", cml.out)
+
+
+def test_standard_setup():
+    # we define a temporary HOME setup in conftest.py to provide some
+    # isolation against a user's config. this tests whether this is happening
+    if 'GIT_HOME' in os.environ:
+        raise SkipTest("We are not using the standard temporary HOME setup")
+
+    # there is no need for something expensive. Whenever we see the custom
+    # email we set in conftest.py, we can be confident that nothing is
+    # broken fundamentally
+    from datalad import cfg
+    assert cfg['user.email'] == 'test@example.com'
