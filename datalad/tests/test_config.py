@@ -800,3 +800,35 @@ def test_where_to_scope():
     assert_equal(f(scope='dataset'), 'dataset')
     # we do not allow both
     assert_raises(ValueError, f, where='local', scope='local')
+
+
+def test_cross_cfgman_update(tmp_path):
+    myuniqcfg = 'datalad.tester.unique.updatecfg'
+    myuniqcfg_value = 'some'
+    myuniqcfg_value2 = 'someother'
+    assert myuniqcfg not in dl_cfg
+    ds = Dataset(tmp_path)
+    assert not ds.is_installed()
+    # there is no dataset to write to, it rejects it rightfully
+    # it is a bit versatile in its exception behavior
+    # https://github.com/datalad/datalad/issues/7300
+    with pytest.raises((ValueError, CommandError)):
+        ds.config.set(myuniqcfg, myuniqcfg_value, scope='local')
+    # but we can write to global scope
+    ds.config.set(myuniqcfg, myuniqcfg_value, scope='global')
+    # it can retrieve the update immediately, because set(reload=)
+    # defaults to True
+    assert ds.config.get(myuniqcfg) == myuniqcfg_value
+    # given that we modified the global scope, we expect this to
+    # be reflected in the global cfgman too
+    assert dl_cfg.get(myuniqcfg) == myuniqcfg_value
+
+    # now we create a repo
+    ds.create(result_renderer='disabled')
+    # we had written to global scope, we expect the probe item
+    # to stick around, even though the cfgman instance is replaced
+    assert ds.config.get(myuniqcfg) == myuniqcfg_value
+    # now we replace the value via this new cfgman
+    ds.config.set(myuniqcfg, myuniqcfg_value2, scope='global')
+    # and again expect the global instance to catch up with it
+    assert dl_cfg.get(myuniqcfg) == myuniqcfg_value2
