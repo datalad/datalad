@@ -269,6 +269,7 @@ class BaseSSHConnection(object):
         return ["scp"] + scp_options
 
     def _quote_filename(self, filename):
+        print(f"HERE {self.ssh_version!r}")
         if self.ssh_version and self.ssh_version[0] < 9:
             return _quote_filename_for_scp(filename)
 
