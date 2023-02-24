@@ -269,9 +269,13 @@ class BaseSSHConnection(object):
         return ["scp"] + scp_options
 
     def _quote_filename(self, filename):
-        print(f"HERE {self.ssh_version!r}")
-        if self.ssh_version and self.ssh_version[0] < 9:
-            return _quote_filename_for_scp(filename)
+        try:
+            if self.ssh_version and self.ssh_version[0] < 9:
+                return _quote_filename_for_scp(filename)
+        except Exception as exc:
+            import sys
+            sys.stderr.write("HERE EXC {exc} for {self.ssh_version!r}\n")
+            raise
 
         # no filename quoting for OpenSSH version 9 and above
         return filename
