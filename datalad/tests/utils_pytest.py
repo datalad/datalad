@@ -1070,9 +1070,10 @@ def known_failure_osx(func):
 
 
 xfail_buggy_annex_info = pytest.mark.xfail(
-    # there were no release on '10.20230221' - but that is the next day
-    # after the fix
-    external_versions['cmd:annex'] and ('10.20230214' <= external_versions['cmd:annex'] < '10.20230221'),
+    # 10.20230127 is lower bound since bug was introduced before next 10.20230214
+    # release, and thus snapshot builds would fail. There were no release on
+    # '10.20230221' - but that is the next day after the fix
+    external_versions['cmd:annex'] and ('10.20230127' <= external_versions['cmd:annex'] < '10.20230221'),
     reason="Regression in git-annex info. https://github.com/datalad/datalad/issues/7286"
 )
 
