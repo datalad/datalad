@@ -1062,9 +1062,19 @@ def known_failure_osx(func):
         return dm_func
     return func
 
+
 # ### ###
-# END known failure decorators
+# xfails - like known failures but never to be checked to pass etc.
+#   e.g. for specific versions of core tools with regressions
 # ### ###
+
+
+xfail_buggy_annex_info = pytest.mark.xfail(
+    # there were no release on '10.20230221' - but that is the next day
+    # after the fix
+    '10.20230214' <= external_versions['cmd:annex'] < '10.20230221',
+    reason="Regression in git-annex info. https://github.com/datalad/datalad/issues/7286"
+)
 
 
 def _get_resolved_flavors(flavors):
