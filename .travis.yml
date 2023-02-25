@@ -104,7 +104,7 @@ script:
     $PYTEST_WRAPPER python
       -m pytest "${PYTEST_OPTS[@]}"
       -c ../tox.ini
-      -k "test_ssh_copy"
+      -k "test_sshconnector or test_create_sibling_ria"
       --doctest-modules
       --cov=datalad
       --cov-report=
