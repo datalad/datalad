@@ -1,5 +1,5 @@
 [codespell]
-skip = .venv,venvs,.git,build,*.egg-info,*.lock,.asv,.mypy_cache,.tox,fixtures,_version.py,*.pem
+skip = .venv,venvs,.git,build,*.egg-info,*.lock,.asv,.mypy_cache,.tox,fixtures,_version.py,*.pem,trash,dist
 # commitish - vote if we want to fix (should be committish) -- used in GitRepo API
 # froms - plural "from" introduced by export_archive_ora
 # ned - Ned is a name
