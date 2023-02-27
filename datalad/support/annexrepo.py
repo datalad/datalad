@@ -553,7 +553,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
         # applies to find, findref to list all known.
         # was added in 10.20221212-17-g0b2dd374d on 20221220.
-        kludges["find-supports-anything"] = ver >= "10.20221212+git18"
+        kludges["find-supports-anything"] = ver >= "10.20221213"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -2500,8 +2500,14 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not batch:
             json_objects = self._call_annex_records(
-                ['info'] + options, files=files, merge_annex_branches=False)
+                ['info'] + options, files=files, merge_annex_branches=False,
+                exception_on_error=False,
+            )
         else:
+            # according to passing of the test_AnnexRepo_is_under_annex
+            # test with batch=True, there is no need for explicit
+            # exception_on_error=False, batched process does not raise
+            # CommandError.
             json_objects = self._batched.get(
                 'info',
                 annex_options=options, json=True, path=self.path,
