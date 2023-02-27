@@ -460,6 +460,20 @@ def test_kill(path=None):
     eq_(False, ds.pathobj.exists())
 
 
+@with_tempfile
+def test_kill_7013(path=None):
+    """check that a recursive kill does not silently skip subds"""
+    ds = Dataset(path).create()
+    (ds.pathobj / 'subdir').mkdir()
+    ds.create('subdir/subds')
+    ds.create('subds')
+    res = ds.drop(path=['subds', 'subdir'], what='all',
+                  reckless='kill', recursive=True)
+    # ensure that both subdatasets were killed
+    subs = ds.subdatasets(state='present')
+    assert len(subs) == 0
+
+
 @with_tempfile()
 def test_refuse_to_drop_cwd(path=None):
     ds = Dataset(path).create()
