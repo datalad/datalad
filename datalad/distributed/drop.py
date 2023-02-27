@@ -346,6 +346,30 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
         return
 
     if paths is not None and paths != [ds.pathobj] and what == 'all':
+        if recursive and reckless == 'kill':
+            # check if any paths contains a subdataset, and if so, drop it to
+            # ensure its not left behind
+            for sub in ds.subdatasets(
+                    # just check for subds at the provided path
+                    path=paths,
+                    state='present',
+                    recursive=recursive,
+                    recursion_limit=recursion_limit,
+                    result_xfm='datasets',
+                    on_failure='ignore',
+                    return_type='generator',
+                    result_renderer='disabled'):
+                if sub is not None:
+                    # there is a subdataset underneath the given path
+                    yield from _drop_dataset(
+                        ds=sub,
+                        # everything underneath the subds can go
+                        paths=None,
+                        what=what,
+                        reckless=reckless,
+                        recursive=False,
+                        recursion_limit=None,
+                        jobs=jobs)
         # so we have paths constraints that prevent dropping the full dataset
         lgr.debug('Only dropping file content for given paths in %s, '
                   'allthough instruction was to drop %s', ds, what)

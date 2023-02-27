@@ -462,7 +462,8 @@ def test_kill(path=None):
 
 @with_tempfile
 def test_kill_7013(path=None):
-    """check that a recursive kill does not silently skip subds"""
+    """check that a recursive kill does not silently skip subdatasets
+     contained in subdirectory: github.com/datalad/datalad/issues/7013"""
     ds = Dataset(path).create()
     (ds.pathobj / 'subdir').mkdir()
     ds.create('subdir/subds')
