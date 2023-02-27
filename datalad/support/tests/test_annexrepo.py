@@ -123,6 +123,7 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -349,6 +350,7 @@ def test_AnnexRepo_file_has_content(src=None, annex_path=None, *, batch):
 
 
 # 1 is enough to test
+@xfail_buggy_annex_info
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
@@ -386,6 +388,7 @@ def test_AnnexRepo_is_under_annex(src=None, annex_path=None, *, batch):
         [False])
 
 
+@xfail_buggy_annex_info
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -1614,6 +1617,7 @@ def test_get_urls_none(path=None):
     eq_(ar.get_urls("afile"), [])
 
 
+@xfail_buggy_annex_info
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path=None):
     ar = AnnexRepo(path, create=True)
