@@ -1,4 +1,29 @@
 
+<a id='changelog-0.18.2'></a>
+# 0.18.2 (2023-02-27)
+
+## 🐛 Bug Fixes
+
+- Fix `create-sibling` for non-English SSH remotes by providing `LC_ALL=C` for the `ls` call.  [PR #7265](https://github.com/datalad/datalad/pull/7265) (by [@nobodyinperson](https://github.com/nobodyinperson))
+
+- Fix EnsureListOf() and EnsureTupleOf() for string inputs.  [PR #7267](https://github.com/datalad/datalad/pull/7267) (by [@nobodyinperson](https://github.com/nobodyinperson))
+
+- create-sibling: Use C.UTF-8 locale instead of C on the remote end.  [PR #7273](https://github.com/datalad/datalad/pull/7273) (by [@nobodyinperson](https://github.com/nobodyinperson))
+
+- Address compatibility with most recent git-annex where info would exit with non-0.  [PR #7292](https://github.com/datalad/datalad/pull/7292) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🔩 Dependencies
+
+- Revert "Revert "Remove chardet version upper limit"".  [PR #7263](https://github.com/datalad/datalad/pull/7263) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Codespell more (CHANGELOGs etc) and remove custom CLI options from tox.ini.  [PR #7271](https://github.com/datalad/datalad/pull/7271) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Use older python 3.8 in testing nose utils in github-action test-nose.  Fixes [#7259](https://github.com/datalad/datalad/issues/7259) via [PR #7260](https://github.com/datalad/datalad/pull/7260) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.18.1'></a>
 # 0.18.1 (2023-01-16)
 
