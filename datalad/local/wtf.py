@@ -15,9 +15,12 @@ import os
 import os.path as op
 import sys
 import tempfile
+import textwrap
+
+from collections import defaultdict
 from functools import partial
 
-
+from datalad.dochelpers import get_docstring_split
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -267,11 +270,9 @@ def _describe_metadata_elements(group):
                 info['version'] = version
             elem = eload()
 
-            doc = getattr(elem, '__doc__', None)
+            doc, *_ = get_docstring_split(elem)
             if doc:
-                doc = str(doc).strip()  # str() for "resilience"
-            if doc:
-                info['doc'] = doc
+                info['doc'] = textwrap.fill(doc, 1000).strip()  # fill into a long line
 
             generation = getattr(elem, '__generation__', None)
             if generation:
@@ -369,6 +370,16 @@ SECTION_CALLABLES = {
     'credentials': _describe_credentials,
 }
 
+# look for top level sections and replace with all SECTION_CALLABLES_GROUPPED
+# Helper to look up SECTION_CALLABLES_GROUPPED when needed
+SECTION_CALLABLES_GROUPPED = defaultdict(list)
+for s in SECTION_CALLABLES:
+    section = s.split('.', 1)[0]
+    SECTION_CALLABLES_GROUPPED[section].append(s)
+    if section != s:
+        # add also subsection by itself
+        SECTION_CALLABLES_GROUPPED[s].append(s)
+
 
 @build_doc
 class WTF(Interface):
@@ -405,9 +416,11 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES) + ['*']),
+            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES_GROUPPED) + ['*']),
             doc="""section to include.  If not set - depends on flavor.
-            '*' could be used to force all sections.
+            '*' could be used to force all sections. If there are subsections 
+            like section.subsection available, then specifying just 'section'
+            would select all subsections for that section.
             [CMD: This option can be given multiple times. CMD]"""),
         flavor=Parameter(
             args=("--flavor",),
@@ -500,7 +513,9 @@ class WTF(Interface):
             else:
                 raise ValueError(flavor)
 
-        for s in sections:
+        sections_to_show = sum((SECTION_CALLABLES_GROUPPED[s] for s in sections), [])
+
+        for s in sections_to_show:
             try:
                 infos[s] = section_callables[s]()
             except KeyError:
