@@ -346,6 +346,8 @@ SECTION_CALLABLES = {
     'configuration': None,
     'location': None,
     'extensions': _describe_extensions,
+    'metadata_extractors': lambda: _describe_metadata_elements('datalad.metadata.extractors'),
+    'metadata_indexers': lambda: _describe_metadata_elements('datalad.metadata.indexers'),
     'dependencies': _describe_dependencies,
     'dataset': None,
     'credentials': _describe_credentials,
