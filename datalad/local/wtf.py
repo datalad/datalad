@@ -217,7 +217,6 @@ def _describe_extensions():
         infos[ename] = info
         try:
             ext = eload()
-            info['load_error'] = None
             info['description'] = ext[0]
             info['module'] = emod
             mod = import_module(emod, package='datalad')
@@ -236,7 +235,6 @@ def _describe_extensions():
             entry_points['{}.{}'.format(*ep[:2])] = ep_info
             try:
                 import_module(ep[0], package='datalad')
-                ep_info['load_error'] = None
             except Exception as e:
                 ce = CapturedException(e)
                 ep_info['load_error'] = ce.format_short()
@@ -268,7 +266,6 @@ def _describe_metadata_elements(group):
                 # no not clutter the report with no version
                 info['version'] = version
             eload()
-            info['load_error'] = None
         except Exception as e:
             ce = CapturedException(e)
             info['load_error'] = ce.format_short()
