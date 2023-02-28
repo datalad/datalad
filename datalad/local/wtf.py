@@ -265,7 +265,25 @@ def _describe_metadata_elements(group):
             if version:
                 # no not clutter the report with no version
                 info['version'] = version
-            eload()
+            elem = eload()
+
+            doc = getattr(elem, '__doc__', None)
+            if doc:
+                doc = str(doc).strip()  # str() for "resilience"
+            if doc:
+                info['doc'] = doc
+
+            generation = getattr(elem, '__generation__', None)
+            if generation:
+                info['generation'] = generation
+
+            try:
+                info['version'] = elem.get_version(elem)
+            except (AttributeError, NotImplementedError):
+                pass
+
+            # TODO?: levels - file, dataset.
+            # Too specific to each generation and might not be deducable
         except Exception as e:
             ce = CapturedException(e)
             info['load_error'] = ce.format_short()
