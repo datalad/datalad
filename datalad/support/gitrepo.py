@@ -2353,7 +2353,7 @@ class GitRepo(CoreGitRepo):
                 continue
             modprops = {'gitmodule_{}'.format(k): v
                         for k, v in props.items()
-                        if not (k.startswith('__') or k == 'path')}
+                        if not k.startswith('__')}
             # Keep as PurePosixPath for possible normalization of / in the path etc
             modpath = PurePosixPath(props['path'])
             modprops['gitmodule_name'] = name
