@@ -2246,7 +2246,8 @@ class GitRepo(CoreGitRepo):
             options = []
         if msg:
             options = options + ["-m", msg]
-        options += ['--allow-unrelated-histories']
+        if allow_unrelated:
+            options += ['--allow-unrelated-histories']
         self.call_git(
             ['merge'] + options + [name],
             **kwargs
