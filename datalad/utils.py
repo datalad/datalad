@@ -2510,9 +2510,9 @@ class File:
 
 
 TreeSpec = Union[
-    Tuple[Tuple[str | File, "Load"], ...],
-    List[Tuple[str | File, "Load"]],
-    Dict[str | File, "Load"],
+    Tuple[Tuple[Union[str, File], "Load"], ...],
+    List[Tuple[Union[str, File], "Load"]],
+    Dict[Union[str, File], "Load"],
 ]
 
 Load = Union[str, bytes, "TreeSpec"]
