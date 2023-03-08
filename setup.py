@@ -35,6 +35,7 @@ requires = {
         'packaging',
         'patool>=1.7',
         'tqdm',
+        'typing_extensions; python_version < "3.10"',
         'annexremote',
         'looseversion',
     ],
@@ -59,7 +60,7 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
-        'mypy~=0.900',
+        'mypy',
         'pytest',
         'pytest-cov',
         'pytest-fail-slow~=0.2',
