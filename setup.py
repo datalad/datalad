@@ -96,6 +96,7 @@ requires.update({
         # to the dbus whenever installed or smth like that, thus disabled here
         # but you might need it
         # 'dbus-python',
+        'scriv',  # changelog
     ],
 })
 requires['devel'] = sum(list(requires.values()), [])
