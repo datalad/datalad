@@ -20,7 +20,9 @@ import logging
 import os
 import queue
 import sys
+import threading
 import warnings
+from contextlib import contextmanager
 from queue import Queue
 from subprocess import TimeoutExpired
 from typing import (
@@ -78,6 +80,61 @@ _cfg_var = "datalad.runtime.stalled-external"
 _cfg_val = cfg.obtain(_cfg_var)
 
 
+lgr = logging.getLogger('datalad.cmd')
+
+# TODO unused?
+# In python3 to split byte stream on newline, it must be bytes
+linesep_bytes = os.linesep.encode()
+
+# TODO unused?
+_TEMP_std = sys.stdout, sys.stderr
+
+# TODO unused?
+# To be used in the temp file name to distinguish the ones we create
+# in Runner so we take care about their removal, in contrast to those
+# which might be created outside and passed into Runner
+_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
+
+
+def readline_rstripped(stdout):
+    warnings.warn("the function `readline_rstripped()` is deprecated "
+                  "and will be removed in a future release",
+                  DeprecationWarning)
+    return _readline_rstripped(stdout)
+
+
+def _readline_rstripped(stdout):
+    """Internal helper for BatchedCommand"""
+    return stdout.readline().rstrip()
+
+
+def _now():
+    return datetime.now().astimezone()
+
+
+@contextmanager
+def increased_active(batched_command: "BatchedCommand"):
+    batched_command.lock.acquire()
+    batched_command._active += 1
+    try:
+        yield None
+    finally:
+        batched_command._active -= 1
+        batched_command.lock.release()
+        batched_command._active_last = _now()
+
+
+@contextmanager
+def locked_instances(batched_commands: List):
+    for batched_command in batched_commands:
+        batched_command.lock.acquire()
+    try:
+        yield None
+    finally:
+        for batched_command in batched_commands:
+            batched_command.lock.release()
+
+
 class BatchedCommandError(CommandError):
     def __init__(self,
                  cmd="",
@@ -113,34 +170,6 @@ class BatchedCommandError(CommandError):
             **kwargs
         )
         self.last_processed_request = last_processed_request
-
-
-lgr = logging.getLogger('datalad.cmd')
-
-# TODO unused?
-# In python3 to split byte stream on newline, it must be bytes
-linesep_bytes = os.linesep.encode()
-
-# TODO unused?
-_TEMP_std = sys.stdout, sys.stderr
-
-# TODO unused?
-# To be used in the temp file name to distinguish the ones we create
-# in Runner so we take care about their removal, in contrast to those
-# which might be created outside and passed into Runner
-_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
-
-
-def readline_rstripped(stdout):
-    warnings.warn("the function `readline_rstripped()` is deprecated "
-                  "and will be removed in a future release",
-                  DeprecationWarning)
-    return _readline_rstripped(stdout)
-
-
-def _readline_rstripped(stdout):
-    """Internal helper for BatchedCommand"""
-    return stdout.readline().rstrip()
 
 
 class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
@@ -223,9 +252,8 @@ class BatchedCommand(SafeDelCloseMixin):
     subprocess via stdin and stdout.
     """
 
-    # Collection of active BatchedCommands as a mapping from object IDs to
-    # instances
-    _active_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
+    # Collection of BatchedCommand instances that have a runner associated
+    _running_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
 
     def __init__(self,
                  cmd: Union[str, Tuple, List],
@@ -249,12 +277,11 @@ class BatchedCommand(SafeDelCloseMixin):
         self.return_code: Optional[int] = None
         self._abandon_cache = None
         self.last_request: Optional[str] = None
+        self.lock = threading.RLock()
 
         self._active = 0
         self._active_last = _now()
         self.clean_inactive()
-        assert id(self) not in self._active_instances
-        self._active_instances[id(self)] = self
 
         # pure declarations
         self.stdin_queue: Queue
@@ -262,83 +289,83 @@ class BatchedCommand(SafeDelCloseMixin):
 
     @classmethod
     def clean_inactive(cls):
-        from . import cfg
+
         max_batched = cfg.obtain("datalad.runtime.max-batched")
         max_inactive_age = cfg.obtain("datalad.runtime.max-inactive-age")
-        if len(cls._active_instances) > max_batched:
-            active_qty = 0
-            inactive = []
-            for c in cls._active_instances.values():
-                if c._active:
-                    active_qty += 1
-                else:
-                    inactive.append(c)
-            inactive.sort(key=attrgetter("_active_last"))
-            to_close = len(cls._active_instances) - max_batched
-            if to_close <= 0:
+
+        # Lock all known
+        with locked_instances(list(BatchedCommand._running_instances.values())):
+            try_to_close = len(cls._running_instances) - max_batched
+            if try_to_close <= 0:
                 return
-            too_young = 0
+
             now = _now()
-            for i, c in enumerate(inactive):
-                if (now - c._active_last).total_seconds() <= max_inactive_age:
-                    too_young = len(inactive) - i
-                    break
-                elif c._active:
-                    active_qty += 1
-                else:
-                    c.close()
-                    cls._active_instances.pop(id(c), None)
-                    to_close -= 1
-                    if to_close <= 0:
-                        break
-            if to_close > 0:
+            old_inactive = {
+                batched_command
+                for batched_command in cls._running_instances.values()
+                if batched_command._active == 0
+                and (now - batched_command._active_last).total_seconds() >= max_inactive_age
+            }
+
+            if len(old_inactive) < try_to_close:
                 lgr.debug(
-                    "Too many BatchedCommands remaining after cleanup;"
-                    " %d active, %d went inactive recently",
-                    active_qty,
-                    too_young,
+                    "Could not close, i.e. remove runner, desired number (%d) "
+                    "of BatchedCommand instances. Found %d instances with "
+                    "runner, of which only %d had no recent activity.",
+                    try_to_close,
+                    len(BatchedCommand._running_instances),
+                    len(old_inactive),
                 )
+
+            # Close the old at most `try_to_close` instances
+            for batched_command in sorted(list(old_inactive), key=attrgetter("_active_last"))[-try_to_close:]:
+                batched_command.close()
 
     def _initialize(self):
 
         lgr.debug("Starting new runner for %s", repr(self))
         lgr.log(5, "Command: %s", self.command)
 
-        self.stdin_queue = queue.Queue()
-        self.stderr_output = b""
-        self.wait_timed_out = None
-        self.return_code = None
-        self.last_request = None
+        with self.lock:
+            assert id(self) not in self._running_instances
+            self._running_instances[id(self)] = self
 
-        self.runner = WitlessRunner(
-            cwd=self.path,
-            env=GitRunnerBase.get_git_environ_adjusted()
-        )
-        self.generator = self.runner.run(
-            cmd=self.command,
-            protocol=BatchedCommandProtocol,
-            stdin=self.stdin_queue,
-            cwd=self.path,
-            # This mimics the behavior of the old implementation w.r.t
-            # timeouts when waiting for the closing process
-            timeout=self.timeout or 11.0,
-            # Keyword arguments for the protocol
-            batched_command=self,
-            output_proc=self.output_proc,
-        )
-        self.encoding = self.generator.runner.protocol.encoding
+            self.stdin_queue = queue.Queue()
+            self.stderr_output = b""
+            self.wait_timed_out = None
+            self.return_code = None
+            self.last_request = None
 
-        self._active_last = _now()
+            self.runner = WitlessRunner(
+                cwd=self.path,
+                env=GitRunnerBase.get_git_environ_adjusted()
+            )
+            self.generator = self.runner.run(
+                cmd=self.command,
+                protocol=BatchedCommandProtocol,
+                stdin=self.stdin_queue,
+                cwd=self.path,
+                # This mimics the behavior of the old implementation w.r.t
+                # timeouts when waiting for the closing process
+                timeout=self.timeout or 11.0,
+                # Keyword arguments for the protocol
+                batched_command=self,
+                output_proc=self.output_proc,
+            )
+            self.encoding = self.generator.runner.protocol.encoding
 
     def process_running(self) -> bool:
         if self.runner:
             if self.generator.runner.process is None:
+                self.runner = None
+                del self._running_instances[id(self)]
                 return False
             result = self.generator.runner.process.poll()
             if result is None:
                 return True
             self.return_code = result
             self.runner = None
+            del self._running_instances[id(self)]
             if result != 0:
                 raise BatchedCommandError(
                     cmd=" ".join(self.command),
@@ -379,55 +406,53 @@ class BatchedCommand(SafeDelCloseMixin):
             If `self.output_proc` is not `None`, the result type of
             `self.output_proc` determines the type of the elements.
         """
-        self._active += 1
-        requests = cmds
+        with increased_active(self):
+            requests = cmds
 
-        input_multiple = isinstance(requests, list)
-        if not input_multiple:
-            requests = [requests]
+            input_multiple = isinstance(requests, list)
+            if not input_multiple:
+                requests = [requests]
 
-        responses = []
-        try:
-            # This code assumes that each processing request is
-            # a single line and leads to a response that triggers a
-            # `send_result` in the protocol.
-            for request in requests:
-                while True:
-                    try:
-                        responses.append(self.process_request(request))
-                        self.last_request = request
-                        break
-                    except StopIteration:
-                        # The process finished executing, store the last return
-                        # code and restart the process.
-                        lgr.debug("%s: command exited", self)
-                        self.return_code = self.generator.return_code
-                        self.runner = None
+            responses = []
+            try:
+                # This code assumes that each processing request is
+                # a single line and leads to a response that triggers a
+                # `send_result` in the protocol.
+                for request in requests:
+                    while True:
+                        try:
+                            responses.append(self.process_request(request))
+                            self.last_request = request
+                            break
+                        except StopIteration:
+                            # The process finished executing, store the last return
+                            # code and restart the process.
+                            lgr.debug("%s: command exited", self)
+                            self.return_code = self.generator.return_code
+                            self.runner = None
+                            del self._running_instances[id(self)]
+            except CommandError as command_error:
+                # Convert CommandError into BatchedCommandError
+                self.runner = None
+                del self._running_instances[id(self)]
+                self.return_code = command_error.code
+                raise BatchedCommandError(
+                    cmd=command_error.cmd,
+                    last_processed_request=self.last_request,
+                    msg=command_error.msg,
+                    code=command_error.code,
+                    stdout=command_error.stdout,
+                    stderr=command_error.stderr,
+                    cwd=command_error.cwd,
+                    **command_error.kwargs
+                ) from command_error
 
-        except CommandError as command_error:
-            # Convert CommandError into BatchedCommandError
-            self.runner = None
-            self.return_code = command_error.code
-            raise BatchedCommandError(
-                cmd=command_error.cmd,
-                last_processed_request=self.last_request,
-                msg=command_error.msg,
-                code=command_error.code,
-                stdout=command_error.stdout,
-                stderr=command_error.stderr,
-                cwd=command_error.cwd,
-                **command_error.kwargs
-            ) from command_error
-
-        finally:
-            self._active -= 1
         return responses if input_multiple else responses[0] if responses else None
 
     def process_request(self,
                         request: Union[Tuple, str]) -> Any | None:
 
-        self._active += 1
-        try:
+        with increased_active(self):
 
             if not self.process_running():
                 self._initialize()
@@ -451,21 +476,15 @@ class BatchedCommand(SafeDelCloseMixin):
                     response = response.rstrip()
             return response
 
-        finally:
-            self._active -= 1
-
     def proc1(self,
               single_command: str):
         """
         Simulate the old interface. This method is used only once in
         AnnexRepo.get_metadata()
         """
-        self._active += 1
-        try:
+        with increased_active(self):
             assert isinstance(single_command, str)
             return self(single_command)
-        finally:
-            self._active -= 1
 
     def get_one_line(self) -> Optional[str]:
         """
@@ -520,59 +539,62 @@ class BatchedCommand(SafeDelCloseMixin):
           stderr output if return_stderr is True, None otherwise
         """
 
-        if self.runner:
+        with self.lock:
+            if self.runner:
 
-            abandon = self._get_abandon()
+                abandon = self._get_abandon()
 
-            # Close stdin to let the process know that we want to end
-            # communication. We also close stdout and stderr to inform
-            # the generator that we do not care about them anymore. This
-            # will trigger process wait timeouts.
-            self.generator.runner.close_stdin()
+                # Close stdin to let the process know that we want to end
+                # communication. We also close stdout and stderr to inform
+                # the generator that we do not care about them anymore. This
+                # will trigger process wait timeouts.
+                self.generator.runner.close_stdin()
 
-            # Process all remaining messages until the subprocess exits.
-            remaining = []
-            timeout = False
-            try:
-                for source, data in self.generator:
-                    if source == STDERR_FILENO:
-                        self.stderr_output += data
-                    elif source == STDOUT_FILENO:
-                        remaining.append(data)
-                    elif source == "timeout":
-                        if data is None and abandon is True:
-                            timeout = True
-                            break
-                    else:
-                        raise ValueError(f"{self}: unknown source: {source}")
-                self.return_code = self.generator.return_code
+                # Process all remaining messages until the subprocess exits.
+                remaining = []
+                timeout = False
+                try:
+                    for source, data in self.generator:
+                        if source == STDERR_FILENO:
+                            self.stderr_output += data
+                        elif source == STDOUT_FILENO:
+                            remaining.append(data)
+                        elif source == "timeout":
+                            if data is None and abandon is True:
+                                timeout = True
+                                break
+                        else:
+                            raise ValueError(f"{self}: unknown source: {source}")
+                    self.return_code = self.generator.return_code
 
-            except CommandError as command_error:
-                lgr.error(
-                    "%s subprocess exited with %s (%s)",
-                    self,
-                    repr(command_error.code),
-                    command_error
-                )
-                self.return_code = command_error.code
+                except CommandError as command_error:
+                    lgr.error(
+                        "%s subprocess exited with %s (%s)",
+                        self,
+                        repr(command_error.code),
+                        command_error
+                    )
+                    self.return_code = command_error.code
 
-            if remaining:
-                lgr.debug("%s: remaining content: %s", self, remaining)
+                if remaining:
+                    lgr.debug("%s: remaining content: %s", self, remaining)
 
-            self.wait_timed_out = timeout is True
-            if self.wait_timed_out:
-                lgr.debug(
-                    "%s: timeout while waiting for subprocess to exit", self)
-                lgr.warning(
-                    "Batched process (%s) "
-                    "did not finish, abandoning it without killing it",
-                    self.generator.runner.process.pid,
-                )
+                self.wait_timed_out = timeout is True
+                if self.wait_timed_out:
+                    lgr.debug(
+                        "%s: timeout while waiting for subprocess to exit", self)
+                    lgr.warning(
+                        "Batched process (%s) "
+                        "did not finish, abandoning it without killing it",
+                        self.generator.runner.process.pid,
+                    )
 
-        result = self.get_requested_error_output(return_stderr)
-        self.runner = None
-        self.stderr_output = b""
-        return result
+            result = self.get_requested_error_output(return_stderr)
+            if self.runner is not None:
+                self.runner = None
+                del self._running_instances[id(self)]
+            self.stderr_output = b""
+            return result
 
     def get_requested_error_output(self, return_stderr: bool):
         if not self.runner:
@@ -618,7 +640,3 @@ class BatchedCommand(SafeDelCloseMixin):
                 raise ValueError(f"Unexpected value: {_cfg_var}={_cfg_val!r}")
             self._abandon_cache = _cfg_val == "abandon"
         return self._abandon_cache
-
-
-def _now():
-    return datetime.now().astimezone()
