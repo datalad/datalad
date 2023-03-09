@@ -3,5 +3,6 @@ skip = .venv,venvs,.git,build,*.egg-info,*.lock,.asv,.mypy_cache,.tox,fixtures,_
 # commitish - vote if we want to fix (should be committish) -- used in GitRepo API
 # froms - plural "from" introduced by export_archive_ora
 # ned - Ned is a name
-ignore-words-list = ba,commitish,froms,ro,ned
+# includeds - func arg name
+ignore-words-list = ba,commitish,froms,ro,ned,includeds
 exclude-file = .codespell-ignorelines

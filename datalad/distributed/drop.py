@@ -450,7 +450,7 @@ def _fatal_pre_drop_checks(ds, repo, paths, what, reckless, is_annex):
 
     if what in ('all', 'datasets') and not reckless == 'kill':
         # we must not have subdatasets anymore
-        # if we do, --recursive was forgotton
+        # if we do, --recursive was forgotten
         subdatasets = ds.subdatasets(
             path=paths,
             # we only care about the present ones
