@@ -97,20 +97,16 @@ from typing import (
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 from datalad.support.exceptions import CapturedException
+from datalad.typing import (
+    K,
+    Literal,
+    P,
+    T,
+    V,
+)
 
 # handle this dance once, and import pathlib from here
 # in all other places
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
-
-if sys.version_info >= (3, 8):
-    from typing import Literal
-else:
-    from typing_extensions import Literal
-
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -122,11 +118,6 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
-
-T = TypeVar("T")
-K = TypeVar("K")
-V = TypeVar("V")
-P = ParamSpec("P")
 
 # COPY_BUFSIZE sort of belongs into datalad.consts, but that would lead to
 # circular import due to `on_windows`
