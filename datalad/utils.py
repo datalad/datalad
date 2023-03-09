@@ -943,7 +943,7 @@ def ensure_unicode(s: str | bytes, encoding: Optional[str]=None, confidence: Opt
         return s.decode(encoding)
 
 
-def ensure_bool(s: str | bool) -> bool:
+def ensure_bool(s: Any) -> bool:
     """Convert value into boolean following convention for strings
 
     to recognize on,True,yes as True, off,False,no as False
