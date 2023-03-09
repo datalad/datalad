@@ -8,12 +8,14 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##g
 """Variety of helpers to deal with strings"""
 
+from __future__ import annotations
+
 __docformat__ = 'restructuredtext'
-
 import re
+from typing import AnyStr
 
 
-def get_replacement_dict(rules):
+def get_replacement_dict(rules: AnyStr | list[AnyStr | list[AnyStr] | tuple[AnyStr, AnyStr]]) -> dict[AnyStr, AnyStr]:
     """Given a string with replacement rules, produces a dict of from: to"""
 
     if isinstance(rules, (bytes, str)):
@@ -23,24 +25,25 @@ def get_replacement_dict(rules):
     for rule in rules:
         if isinstance(rule, (list, tuple)):
             if len(rule) == 2:
-                pairs.append(rule)
+                pairs[rule[0]] = rule[1]
             else:
                 raise ValueError("Got a rule %s which is not a string or a pair of values (from, to)"
                                  % repr(rule))
-        if len(rule) <= 2:
+        elif len(rule) <= 2:
             raise ValueError("")
-        rule_split = rule[1:].split(rule[0])
-        if len(rule_split) != 2:
-            raise ValueError(
-                "Rename string must be of format '/pat1/replacement', "
-                "where / is an arbitrary character to decide replacement. "
-                "Got %s when trying to separate %s" % (rule_split, rule)
-            )
-        pairs[rule_split[0]] = rule_split[1]
+        else:
+            rule_split = rule[1:].split(rule[0:1])
+            if len(rule_split) != 2:
+                raise ValueError(
+                    "Rename string must be of format '/pat1/replacement', "
+                    "where / is an arbitrary character to decide replacement. "
+                    "Got %r when trying to separate %r" % (rule_split, rule)
+                )
+            pairs[rule_split[0]] = rule_split[1]
     return pairs
 
 
-def apply_replacement_rules(rules, s):
+def apply_replacement_rules(rules: AnyStr | list[AnyStr | list[AnyStr] | tuple[AnyStr, AnyStr]], s: AnyStr) -> AnyStr:
     r"""Apply replacement rules specified as a single string
 
     Examples
