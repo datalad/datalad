@@ -31,6 +31,8 @@ import time
 import warnings
 from collections.abc import (
     Callable,
+    Iterable,
+    Iterator,
     Sequence,
 )
 from contextlib import contextmanager
@@ -81,8 +83,6 @@ from typing import (
     IO,
     Any,
     Dict,
-    Iterable,
-    Iterator,
     List,
     NamedTuple,
     Optional,
@@ -2590,12 +2590,16 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool =True, rem
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 
-def get_suggestions_msg(values: Optional[Iterable[str]], known: str, sep: str="\n        ") -> str:
+def get_suggestions_msg(values: Optional[str | Iterable[str]], known: str, sep: str="\n        ") -> str:
     """Return a formatted string with suggestions for values given the known ones
     """
     import difflib
     suggestions = []
-    for value in (values or []):  # might not want to do it if we change presentation below
+    if not values:
+        values = []
+    elif isinstance(values, str):
+        values = [values]
+    for value in values:  # might not want to do it if we change presentation below
         suggestions += difflib.get_close_matches(value, known)
     suggestions = unique(suggestions)
     msg = "Did you mean any of these?"
