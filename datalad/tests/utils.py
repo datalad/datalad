@@ -1113,7 +1113,7 @@ def with_tempfile(t, **tkwargs):
     ::
 
         @with_tempfile
-        def test_write(tfile):
+        def test_write(tfile=None):
             open(tfile, 'w').write('silly test')
     """
 
