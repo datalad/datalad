@@ -379,6 +379,8 @@ for s in SECTION_CALLABLES:
     if section != s:
         # add also subsection by itself
         SECTION_CALLABLES_GROUPPED[s].append(s)
+# un-defaultdict it so we gain KeyError
+SECTION_CALLABLES_GROUPPED = dict(SECTION_CALLABLES_GROUPPED.items())
 
 
 @build_doc
@@ -513,21 +515,22 @@ class WTF(Interface):
             else:
                 raise ValueError(flavor)
 
-        sections_to_show = sum((SECTION_CALLABLES_GROUPPED[s] for s in sections), [])
-
-        for s in sections_to_show:
+        # flatten and handle (skip with a record non-matching ones) section groups
+        for sg in sections:
             try:
-                infos[s] = section_callables[s]()
-            except KeyError:
+                for s in SECTION_CALLABLES_GROUPPED[sg]:
+                    infos[s] = section_callables[s]()
+            except KeyError as exc:
                 yield get_status_dict(
                     action='wtf',
                     path=Path.cwd(),
                     status='impossible',
                     message=(
                       'Requested section <%s> was not found among the '
-                      'available infos. Skipping report.', s),
+                      'available infos. Skipping report.', exc.args[0]),
                     logger=lgr
-                    )
+                )
+
         if clipboard:
             external_versions.check(
                 'pyperclip', msg="It is needed to be able to use clipboard")
