@@ -400,7 +400,7 @@ commits and then provide stats:
 - `asv continuous maint master` - would run and compare `maint` and `master` branches
 - `asv continuous HEAD` - would compare `HEAD` against `HEAD^`
 - `asv continuous master HEAD` - would compare `HEAD` against state of master
-- [TODO: contineous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
+- [TODO: continuous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
 
 Notes:
 - only significant changes will be reported

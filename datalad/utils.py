@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from __future__ import annotations
+
 import builtins
 import collections
 import gc
@@ -24,9 +26,15 @@ import stat
 import string
 import sys
 import tempfile
+import threading
 import time
 import warnings
-from collections.abc import Callable
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    Sequence,
+)
 from contextlib import contextmanager
 from copy import copy as shallow_copy
 from functools import (
@@ -58,15 +66,47 @@ from os.path import (
     split,
     splitdrive,
 )
+from pathlib import (
+    Path,
+    PurePath,
+    PurePosixPath,
+)
 from shlex import quote as shlex_quote
 from shlex import split as shlex_split
 from tempfile import NamedTemporaryFile
 from time import sleep
+from types import (
+    ModuleType,
+    TracebackType,
+)
+from typing import (
+    IO,
+    Any,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    TextIO,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 from datalad.support.exceptions import CapturedException
+from datalad.typing import (
+    K,
+    Literal,
+    P,
+    T,
+    V,
+)
 
+# handle this dance once, and import pathlib from here
+# in all other places
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -82,17 +122,18 @@ on_linux = platform_system == 'linux'
 # COPY_BUFSIZE sort of belongs into datalad.consts, but that would lead to
 # circular import due to `on_windows`
 try:
-    from shutil import COPY_BUFSIZE
+    from shutil import COPY_BUFSIZE  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover
     # too old
     from datalad.utils import on_windows
+
     # from PY3.10
     COPY_BUFSIZE = 1024 * 1024 if on_windows else 64 * 1024
 
 
 # Takes ~200msec, so should not be called at import time
 @lru_cache()  # output should not change through life time of datalad process
-def get_linux_distribution():
+def get_linux_distribution() -> tuple[str, str, str]:
     """Compatibility wrapper for {platform,distro}.linux_distribution().
     """
     if hasattr(platform, "linux_distribution"):
@@ -156,13 +197,16 @@ lgr.debug(
 #
 
 # `getargspec` has been deprecated in Python 3.
-ArgSpecFake = collections.namedtuple(
-    "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
+class ArgSpecFake(NamedTuple):
+    args: list[str]
+    varargs: Optional[str]
+    keywords: Optional[str]
+    defaults: Optional[tuple[Any, ...]]
 
 
 # adding cache here somehow does break it -- even 'datalad wtf' does not run
 # @lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
-def getargspec(func, *, include_kwonlyargs=False):
+def getargspec(func: Callable[..., Any], *, include_kwonlyargs: bool=False) -> ArgSpecFake:
     """Compat shim for getargspec deprecated in python 3.
 
     The main difference from inspect.getargspec (and inspect.getfullargspec
@@ -180,11 +224,12 @@ def getargspec(func, *, include_kwonlyargs=False):
     # Note: getfullargspec works Ok on wrapt-decorated functions
     f_sign = inspect.signature(func)
     # Loop through parameters and compose argspec
-    args4 = [[], None, None, {}]
+    args: list[str] = []
+    varargs: Optional[str] = None
+    keywords: Optional[str] = None
+    defaults: dict[str, Any] = {}
     # Collect all kwonlyargs into a dedicated dict - name: default
-    kwonlyargs = {}
-    # shortcuts
-    args, defaults = args4[0], args4[3]
+    kwonlyargs: dict[str, Any] = {}
     P = inspect.Parameter
 
     for p_name, p in f_sign.parameters.items():
@@ -194,9 +239,9 @@ def getargspec(func, *, include_kwonlyargs=False):
             if p.default is not P.empty:
                 defaults[p_name] = p.default
         elif p.kind == P.VAR_POSITIONAL:
-            args4[1] = p_name
+            varargs = p_name
         elif p.kind == P.VAR_KEYWORD:
-            args4[2] = p_name
+            keywords = p_name
         elif p.kind == P.KEYWORD_ONLY:
             assert p.default is not P.empty
             kwonlyargs[p_name] = p.default
@@ -213,13 +258,13 @@ def getargspec(func, *, include_kwonlyargs=False):
             defaults.update(kwonlyargs)
 
     # harmonize defaults to how original getargspec returned them -- just a tuple
-    args4[3] = None if not defaults else tuple(defaults.values())
-    return ArgSpecFake(*args4)
+    d_defaults = None if not defaults else tuple(defaults.values())
+    return ArgSpecFake(args, varargs, keywords, d_defaults)
 
 
 # Definitions to be (re)used in the next function
 _SIG_P = inspect.Parameter
-_SIG_KIND_SELECTORS = {
+_SIG_KIND_SELECTORS: dict[str, set[int]] = {
     'pos_only': {_SIG_P.POSITIONAL_ONLY,},
     'pos_any': {_SIG_P.POSITIONAL_ONLY, _SIG_P.POSITIONAL_OR_KEYWORD},
     'kw_any': {_SIG_P.POSITIONAL_OR_KEYWORD, _SIG_P.KEYWORD_ONLY},
@@ -229,7 +274,7 @@ _SIG_KIND_SELECTORS['any'] = set().union(*_SIG_KIND_SELECTORS.values())
 
 
 @lru_cache()  # signatures stay the same, why to "redo"? brings it into ns from mks
-def get_sig_param_names(f, kinds: tuple) -> tuple:
+def get_sig_param_names(f: Callable[..., Any], kinds: tuple[str, ...]) -> tuple[list[str], ...]:
     """A helper to selectively return parameters from inspect.signature.
 
     inspect.signature is the ultimate way for introspecting callables.  But
@@ -256,13 +301,13 @@ def get_sig_param_names(f, kinds: tuple) -> tuple:
     tuple:
       Each element is a list of parameters (names only) of that "kind".
     """
-    selectors = []
+    selectors: list[set[int]] = []
     for kind in kinds:
         if kind not in _SIG_KIND_SELECTORS:
             raise ValueError(f"Unknown 'kind' {kind}. Known are: {', '.join(_SIG_KIND_SELECTORS)}")
         selectors.append(_SIG_KIND_SELECTORS[kind])
 
-    out = [[] for _ in kinds]
+    out: list[list[str]] = [[] for _ in kinds]
     for p_name, p in inspect.signature(f).parameters.items():
         for i, selector in enumerate(selectors):
             if p.kind in selector:
@@ -271,7 +316,7 @@ def get_sig_param_names(f, kinds: tuple) -> tuple:
     return tuple(out)
 
 
-def any_re_search(regexes, value):
+def any_re_search(regexes: str | list[str], value: str) -> bool:
     """Return if any of regexes (list or str) searches successfully for value"""
     for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
@@ -279,7 +324,7 @@ def any_re_search(regexes, value):
     return False
 
 
-def not_supported_on_windows(msg=None):
+def not_supported_on_windows(msg: Optional[str]=None) -> None:
     """A little helper to be invoked to consistently fail whenever functionality is
     not supported (yet) on Windows
     """
@@ -288,7 +333,7 @@ def not_supported_on_windows(msg=None):
                                   + (": %s" % msg if msg else ""))
 
 
-def get_home_envvars(new_home):
+def get_home_envvars(new_home: str | Path) -> dict[str, str]:
     """Return dict with env variables to be adjusted for a new HOME
 
     Only variables found in current os.environ are adjusted.
@@ -310,11 +355,11 @@ def get_home_envvars(new_home):
     return {v: val for v, val in out.items() if v in os.environ}
 
 
-def _is_stream_tty(stream):
+def _is_stream_tty(stream: Optional[IO]) -> bool:
     try:
         # TODO: check on windows if hasattr check would work correctly and
         # add value:
-        return stream and stream.isatty()
+        return stream is not None and stream.isatty()
     except ValueError as exc:
         # Who knows why it is a ValueError, but let's try to be specific
         # If there is a problem with I/O - non-interactive, otherwise reraise
@@ -323,7 +368,7 @@ def _is_stream_tty(stream):
         raise
 
 
-def is_interactive():
+def is_interactive() -> bool:
     """Return True if all in/outs are open and tty.
 
     Note that in a somewhat abnormal case where e.g. stdin is explicitly
@@ -334,18 +379,18 @@ def is_interactive():
     return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
-def get_ipython_shell():
+def get_ipython_shell() -> Optional[Any]:
     """Detect if running within IPython and returns its `ip` (shell) object
 
     Returns None if not under ipython (no `get_ipython` function)
     """
     try:
-        return get_ipython()
+        return get_ipython()  # type: ignore[name-defined]
     except NameError:
         return None
 
 
-def md5sum(filename):
+def md5sum(filename: str | Path) -> str:
     """Compute an MD5 sum for the given file
     """
     from datalad.support.digests import Digester
@@ -359,13 +404,13 @@ _DATALAD_REGEX = r'%s\.(?:datalad)(?:%s|$)' % (
     _encoded_dirsep, _encoded_dirsep)
 
 
-def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
+def find_files(regex: str, topdir: str | Path = curdir, exclude: Optional[str]=None, exclude_vcs: bool =True, exclude_datalad: bool =False, dirs: bool =False) -> Iterator[str]:
     """Generator to find files matching regex
 
     Parameters
     ----------
-    regex: basestring
-    exclude: basestring, optional
+    regex: string
+    exclude: string, optional
       Matches to exclude
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
@@ -373,7 +418,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     exclude_datalad:
       If True, excludes files known to be datalad meta-data files (e.g. under
       .datalad/ subdirectory) (regex: `%r`)
-    topdir: basestring, optional
+    topdir: string, optional
       Directory where to search
     dirs: bool, optional
       Whether to match directories as well as files
@@ -391,10 +436,10 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
             if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
-find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)
+find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)  # type: ignore[operator]
 
 
-def expandpath(path, force_absolute=True):
+def expandpath(path: str | Path, force_absolute: bool =True) -> str:
     """Expand all variables and user handles in a path.
 
     By default return an absolute path
@@ -405,7 +450,7 @@ def expandpath(path, force_absolute=True):
     return path
 
 
-def posix_relpath(path, start=None):
+def posix_relpath(path: str | Path, start: Optional[str | Path]=None) -> str:
     """Behave like os.path.relpath, but always return POSIX paths...
 
     on any platform."""
@@ -417,7 +462,7 @@ def posix_relpath(path, start=None):
             relpath(path, start=start if start is not None else '')))
 
 
-def is_explicit_path(path):
+def is_explicit_path(path: str | Path) -> bool:
     """Return whether a path explicitly points to a location
 
     Any absolute path, or relative path starting with either '../' or
@@ -429,17 +474,7 @@ def is_explicit_path(path):
         or path.startswith(os.pardir + os.sep)
 
 
-# handle this dance once, and import pathlib from here
-# in all other places
-
-from pathlib import (
-    Path,
-    PurePath,
-    PurePosixPath,
-)
-
-
-def rotree(path, ro=True, chmod_files=True):
+def rotree(path: str | Path, ro: bool =True, chmod_files: bool =True) -> None:
     """To make tree read-only or writable
 
     Parameters
@@ -466,7 +501,7 @@ def rotree(path, ro=True, chmod_files=True):
         chmod(root)
 
 
-def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
+def rmtree(path: str | Path, chmod_files: bool | Literal["auto"] ='auto', children_only: bool =False, *args: Any, **kwargs: Any) -> None:
     """To remove git-annex .git it is needed to make all files and directories writable again first
 
     Parameters
@@ -518,13 +553,13 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
         unlink(path)
 
 
-def rmdir(path, *args, **kwargs):
+def rmdir(path: str | Path, *args: Any, **kwargs: Any) -> None:
     """os.rmdir with our optional checking for open files"""
     assert_no_open_files(path)
     os.rmdir(path)
 
 
-def get_open_files(path, log_open=False):
+def get_open_files(path: str | Path, log_open: int = False) -> dict[str, Any]:
     """Get open files under a path
 
     Note: This function is very slow on Windows.
@@ -572,7 +607,7 @@ def get_open_files(path, log_open=False):
 
 _assert_no_open_files_cfg = os.environ.get('DATALAD_ASSERT_NO_OPEN_FILES')
 if _assert_no_open_files_cfg:
-    def assert_no_open_files(path):
+    def assert_no_open_files(path: str | Path) -> None:
         files = get_open_files(path, log_open=40)
         if _assert_no_open_files_cfg == 'assert':
             assert not files, "Got following files still open: %s" % ','.join(files)
@@ -581,16 +616,16 @@ if _assert_no_open_files_cfg:
                 import pdb
                 pdb.set_trace()
             elif _assert_no_open_files_cfg == 'epdb':
-                import epdb
+                import epdb  # type: ignore[import]
                 epdb.serve()
             pass
         # otherwise we would just issue that error message in the log
 else:
-    def assert_no_open_files(*args, **kwargs):
+    def assert_no_open_files(path: str | Path) -> None:
         pass
 
 
-def rmtemp(f, *args, **kwargs):
+def rmtemp(f: str | Path, *args: Any, **kwargs: Any) -> None:
     """Wrapper to centralize removing of temp files so we could keep them around
 
     It will not remove the temporary file/directory if DATALAD_TESTS_TEMP_KEEP
@@ -610,7 +645,15 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s", f)
 
 
-def file_basename(name, return_ext=False):
+@overload
+def file_basename(name: str | Path, return_ext: Literal[True]) -> tuple[str, str]:
+    ...
+
+@overload
+def file_basename(name: str | Path, return_ext: Literal[False] = False) -> str:
+    ...
+
+def file_basename(name: str | Path, return_ext: bool =False) -> str | tuple[str, str]:
     """
     Strips up to 2 extensions of length up to 4 characters and starting with alpha
     not a digit, so we could get rid of .tar.gz etc
@@ -624,7 +667,7 @@ def file_basename(name, return_ext=False):
 
 
 # unused in -core
-def escape_filename(filename):
+def escape_filename(filename: str) -> str:
     """Surround filename in "" and escape " in the filename
     """
     filename = filename.replace('"', r'\"').replace('`', r'\`')
@@ -633,7 +676,7 @@ def escape_filename(filename):
 
 
 # unused in -core
-def encode_filename(filename):
+def encode_filename(filename: str | bytes) -> bytes:
     """Encode unicode filename
     """
     if isinstance(filename, str):
@@ -643,7 +686,7 @@ def encode_filename(filename):
 
 
 # unused in -core
-def decode_input(s):
+def decode_input(s: str | bytes) -> str:
     """Given input string/bytes, decode according to stdin codepage (or UTF-8)
     if not defined
 
@@ -665,12 +708,12 @@ def decode_input(s):
 
 # unused in -core
 if on_windows:
-    def lmtime(filepath, mtime):
+    def lmtime(filepath: str | Path, mtime: int | float) -> None:
         """Set mtime for files.  On Windows a merely adapter to os.utime
         """
         os.utime(filepath, (time.time(), mtime))
 else:
-    def lmtime(filepath, mtime):
+    def lmtime(filepath: str | Path, mtime: int | float) -> None:
         """Set mtime for files, while not de-referencing symlinks.
 
         To overcome absence of os.lutime
@@ -682,7 +725,7 @@ else:
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
-        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, str(filepath)])
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():
@@ -696,15 +739,21 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
-def ensure_tuple_or_list(obj):
+# See <https://github.com/python/typing/discussions/1366> for a request for a
+# better way to annotate this function.
+def ensure_tuple_or_list(obj: Any) -> list | tuple:
     """Given an object, wrap into a tuple if not list or tuple
     """
     if isinstance(obj, (list, tuple)):
-        return obj
+        return tuple(obj)
     return (obj,)
 
 
-def ensure_iter(s, cls, copy=False, iterate=True):
+ListOrSet = TypeVar("ListOrSet", list, set)
+
+
+# TODO: Improve annotation:
+def ensure_iter(s: Any, cls: type[ListOrSet], copy: bool=False, iterate: bool=True) -> ListOrSet:
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -731,7 +780,8 @@ def ensure_iter(s, cls, copy=False, iterate=True):
         return cls((s,))
 
 
-def ensure_list(s, copy=False, iterate=True):
+# TODO: Improve annotation:
+def ensure_list(s: Any, copy: bool=False, iterate: bool=True) -> list:
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -746,7 +796,8 @@ def ensure_list(s, copy=False, iterate=True):
     return ensure_iter(s, list, copy=copy, iterate=iterate)
 
 
-def ensure_result_list(r):
+# TODO: Improve annotation:
+def ensure_result_list(r: Any) -> list:
     """Return a list of result records
 
     Largely same as ensure_list, but special casing a single dict being passed
@@ -760,8 +811,15 @@ def ensure_result_list(r):
     """
     return [r] if isinstance(r, dict) else ensure_list(r)
 
+@overload
+def ensure_list_from_str(s: str, sep: str='\n') -> Optional[list[str]]:
+    ...
 
-def ensure_list_from_str(s, sep='\n'):
+@overload
+def ensure_list_from_str(s: list[T], sep: str='\n') -> Optional[list[T]]:
+    ...
+
+def ensure_list_from_str(s: str | list[T], sep: str='\n') -> Optional[list[str]] | Optional[list[T]]:
     """Given a multiline string convert it to a list of return None if empty
 
     Parameters
@@ -776,8 +834,15 @@ def ensure_list_from_str(s, sep='\n'):
         return s
     return s.split(sep)
 
+@overload
+def ensure_dict_from_str(s: str, sep: str = '\n') -> Optional[dict[str, str]]:
+    ...
 
-def ensure_dict_from_str(s, **kwargs):
+@overload
+def ensure_dict_from_str(s: dict[K, V], sep: str = '\n') -> Optional[dict[K, V]]:
+    ...
+
+def ensure_dict_from_str(s: str | dict[K, V], sep: str = '\n') -> Optional[dict[str, str]] | Optional[dict[K, V]]:
     """Given a multiline string with key=value items convert it to a dictionary
 
     Parameters
@@ -793,8 +858,10 @@ def ensure_dict_from_str(s, **kwargs):
     if isinstance(s, dict):
         return s
 
-    out = {}
-    for value_str in ensure_list_from_str(s, **kwargs):
+    out: dict[str, str] = {}
+    values = ensure_list_from_str(s, sep=sep)
+    assert values is not None
+    for value_str in values:
         if '=' not in value_str:
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)
@@ -805,7 +872,7 @@ def ensure_dict_from_str(s, **kwargs):
     return out
 
 
-def ensure_bytes(s, encoding='utf-8'):
+def ensure_bytes(s: str | bytes, encoding: str='utf-8') -> bytes:
     """Convert/encode unicode string to bytes.
 
     If `s` isn't a string, return it as is.
@@ -820,7 +887,7 @@ def ensure_bytes(s, encoding='utf-8'):
     return s.encode(encoding)
 
 
-def ensure_unicode(s, encoding=None, confidence=None):
+def ensure_unicode(s: str | bytes, encoding: Optional[str]=None, confidence: Optional[float]=None) -> str:
     """Convert/decode bytestring to unicode.
 
     If `s` isn't a bytestring, return it as is.
@@ -867,7 +934,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
         return s.decode(encoding)
 
 
-def ensure_bool(s):
+def ensure_bool(s: Any) -> bool:
     """Convert value into boolean following convention for strings
 
     to recognize on,True,yes as True, off,False,no as False
@@ -885,7 +952,7 @@ def ensure_bool(s):
     return bool(s)
 
 
-def unique(seq, key=None, reverse=False):
+def unique(seq: Sequence[T], key: Optional[Callable[[T], Any]]=None, reverse: bool=False) -> list[T]:
     """Given a sequence return a list only with unique elements while maintaining order
 
     This is the fastest solution.  See
@@ -906,12 +973,17 @@ def unique(seq, key=None, reverse=False):
       If True, uniqueness checked in the reverse order, so that the later ones
       will take the order
     """
-    seen = set()
+    seen: set[T] = set()
     seen_add = seen.add
 
-    trans = reversed if reverse else lambda x: x
+    if reverse:
+        def trans(x: Sequence[T]) -> Iterable[T]:
+            return reversed(x)
+    else:
+        def trans(x: Sequence[T]) -> Iterable[T]:
+            return x
 
-    if not key:
+    if key is None:
         out = [x for x in trans(seq) if not (x in seen or seen_add(x))]
     else:
         # OPT: could be optimized, since key is called twice, but for our cases
@@ -921,6 +993,8 @@ def unique(seq, key=None, reverse=False):
     return out[::-1] if reverse else out
 
 
+# TODO: Annotate (would be made easier if the return value was always a dict
+# instead of doing `v.__class__(...)`)
 def map_items(func, v):
     """A helper to apply `func` to all elements (keys and values) within dict
 
@@ -936,7 +1010,7 @@ def map_items(func, v):
     )
 
 
-def partition(items, predicate=bool):
+def partition(items: Iterable[T], predicate: Callable[[T], Any]=bool) -> tuple[Iterator[T], Iterator[T]]:
     """Partition `items` by `predicate`.
 
     Parameters
@@ -962,7 +1036,7 @@ def partition(items, predicate=bool):
             (item for pred, item in b if pred))
 
 
-def generate_chunks(container, size):
+def generate_chunks(container: list[T], size: int) -> Iterator[list[T]]:
     """Given a container, generate chunks from it with size up to `size`
     """
     # There could be a "smarter" solution but I think this would suffice
@@ -972,7 +1046,7 @@ def generate_chunks(container, size):
         container = container[size:]
 
 
-def generate_file_chunks(files, cmd=None):
+def generate_file_chunks(files: list[str], cmd: str | list[str] | None = None) -> Iterator[list[str]]:
     """Given a list of files, generate chunks of them to avoid exceeding cmdline length
 
     Parameters
@@ -1006,7 +1080,7 @@ def generate_file_chunks(files, cmd=None):
 # Generators helpers
 #
 
-def saved_generator(gen):
+def saved_generator(gen: Iterable[T]) -> tuple[Iterator[T], Iterator[T]]:
     """Given a generator returns two generators, where 2nd one just replays
 
     So the first one would be going through the generated items and 2nd one
@@ -1014,12 +1088,12 @@ def saved_generator(gen):
     """
     saved = []
 
-    def gen1():
+    def gen1() -> Iterator[T]:
         for x in gen:  # iterating over original generator
             saved.append(x)
             yield x
 
-    def gen2():
+    def gen2() -> Iterator[T]:
         for x in saved:  # yielding saved entries
             yield x
 
@@ -1037,6 +1111,7 @@ def saved_generator(gen):
 better_wraps = wraps
 
 
+# TODO: Annotate:
 # Borrowed from pandas
 # Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
 # License: BSD-3
@@ -1067,7 +1142,7 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs: Optional[dict[str, Any]]=None, prefix: str="", wrapped: Optional[Callable]=None) -> dict[str, Any]:
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
     if tkwargs is None:
@@ -1091,15 +1166,14 @@ def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
     return tkwargs_
 
 
-@optional_args
-def line_profile(func):
+def line_profile(func: Callable[P, T]) -> Callable[P, T]:
     """Q&D helper to line profile the function and spit out stats
     """
-    import line_profiler
+    import line_profiler  # type: ignore[import]
     prof = line_profiler.LineProfiler()
 
     @wraps(func)
-    def  _wrap_line_profile(*args, **kwargs):
+    def  _wrap_line_profile(*args: P.args, **kwargs: P.kwargs) -> T:
         try:
             pfunc = prof(func)
             return pfunc(*args, **kwargs)
@@ -1110,7 +1184,7 @@ def line_profile(func):
 
 # unused in -core
 @optional_args
-def collect_method_callstats(func):
+def collect_method_callstats(func: Callable[P, T]) -> Callable[P, T]:
     """Figure out methods which call the method repeatedly on the same instance
 
     Use case(s):
@@ -1129,13 +1203,13 @@ def collect_method_callstats(func):
     import traceback
     from collections import defaultdict
     from time import time
-    memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
+    memo: defaultdict[tuple[int, str], defaultdict[int, int]] = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
     # gross timing
     times = []
     toppath = dirname(__file__) + sep
 
     @wraps(func)
-    def  _wrap_collect_method_callstats(*args, **kwargs):
+    def _wrap_collect_method_callstats(*args: P.args, **kwargs: P.kwargs) -> T:
         try:
             self = args[0]
             stack = traceback.extract_stack()
@@ -1145,14 +1219,15 @@ def collect_method_callstats(func):
                     s=caller, relpath=relpath(caller.filename, toppath))
             sig = (id(self), stack_sig)
             # we will count based on id(self) + wherefrom
-            memo[sig][caller.lineno] += 1
+            if caller.lineno is not None:
+                memo[sig][caller.lineno] += 1
             t0 = time()
             return func(*args, **kwargs)
         finally:
             times.append(time() - t0)
             pass
 
-    def print_stats():
+    def print_stats() -> None:
         print("The cost of property {}:".format(func.__name__))
         if not memo:
             print("None since no calls")
@@ -1176,13 +1251,13 @@ def collect_method_callstats(func):
 
 
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
-def never_fail(f):
+def never_fail(f: Callable[P, T]) -> Callable[P, Optional[T]]:
     """Assure that function never fails -- all exceptions are caught
 
     Returns `None` if function fails internally.
     """
     @wraps(f)
-    def wrapped_func(*args, **kwargs):
+    def wrapped_func(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         try:
             return f(*args, **kwargs)
         except Exception as e:
@@ -1191,6 +1266,7 @@ def never_fail(f):
                 "Please report at https://github.com/datalad/datalad/issues"
                 % (f, e)
             )
+            return None
 
     if os.environ.get('DATALAD_ALLOW_FAIL', False):
         return f
@@ -1198,7 +1274,7 @@ def never_fail(f):
         return wrapped_func
 
 
-def shortened_repr(value, l=30):
+def shortened_repr(value: Any, l: int=30) -> str:
     try:
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
@@ -1217,8 +1293,8 @@ def shortened_repr(value, l=30):
     return value_repr
 
 
-def __auto_repr__(obj, short=True):
-    attr_names = tuple()
+def __auto_repr__(obj: Any, short: bool =True) -> str:
+    attr_names: tuple[str, ...] = tuple()
     if hasattr(obj, '__dict__'):
         attr_names += tuple(obj.__dict__.keys())
     if hasattr(obj, '__slots__'):
@@ -1239,7 +1315,7 @@ def __auto_repr__(obj, short=True):
 
 
 @optional_args
-def auto_repr(cls, short=True):
+def auto_repr(cls: type[T], short: bool=True) -> type[T]:
     """Decorator for a class to assign it an automagic quick and dirty __repr__
 
     It uses public class attributes to prepare repr of a class
@@ -1247,11 +1323,11 @@ def auto_repr(cls, short=True):
     Original idea: http://stackoverflow.com/a/27799004/1265472
     """
 
-    cls.__repr__ = lambda obj:__auto_repr__(obj, short=short)
+    cls.__repr__ = lambda obj:__auto_repr__(obj, short=short)  # type: ignore[assignment]
     return cls
 
 
-def todo_interface_for_extensions(f):
+def todo_interface_for_extensions(f: T) -> T:
     return f
 
 
@@ -1262,13 +1338,63 @@ def todo_interface_for_extensions(f):
 
 # unused in -core
 @contextmanager
-def nothing_cm():
+def nothing_cm() -> Iterator[None]:
     """Just a dummy cm to programmically switch context managers"""
     yield
 
 
+class SwallowOutputsAdapter:
+    """Little adapter to help getting out/err values
+    """
+    def __init__(self) -> None:
+        kw = get_tempfile_kwargs({}, prefix="outputs")
+
+        self._out = NamedTemporaryFile(delete=False, mode='w', **kw)
+        self._err = NamedTemporaryFile(delete=False, mode='w', **kw)
+
+    def _read(self, h: IO[str]) -> str:
+        with open(h.name) as f:
+            return f.read()
+
+    @property
+    def out(self) -> str:
+        if not self._out.closed:
+            self._out.flush()
+        return self._read(self._out)
+
+    @property
+    def err(self) -> str:
+        if not self._err.closed:
+            self._err.flush()
+        return self._read(self._err)
+
+    @property
+    def handles(self) -> tuple[TextIO, TextIO]:
+        return (cast(TextIO, self._out), cast(TextIO, self._err))
+
+    def cleanup(self) -> None:
+        self._out.close()
+        self._err.close()
+        out_name = self._out.name
+        err_name = self._err.name
+        from datalad import cfg
+        if cfg.getbool('datalad.log', 'outputs', default=False) \
+                and lgr.getEffectiveLevel() <= logging.DEBUG:
+            for s, sname in ((self.out, 'stdout'),
+                             (self.err, 'stderr')):
+                if s:
+                    pref = os.linesep + "| "
+                    lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
+                else:
+                    lgr.debug("Nothing was swallowed for %s", sname)
+        del self._out
+        del self._err
+        gc.collect()
+        rmtemp(out_name)
+        rmtemp(err_name)
+
 @contextmanager
-def swallow_outputs():
+def swallow_outputs() -> Iterator[SwallowOutputsAdapter]:
     """Context manager to help consuming both stdout and stderr, and print()
 
     stdout is available as cm.out and stderr as cm.err whenever cm is the
@@ -1281,60 +1407,9 @@ def swallow_outputs():
     print function had desired effect
     """
 
-    class StringIOAdapter(object):
-        """Little adapter to help getting out/err values
-        """
-        def __init__(self):
-            kw = get_tempfile_kwargs({}, prefix="outputs")
-
-            self._out = NamedTemporaryFile(delete=False, mode='w', **kw)
-            self._err = NamedTemporaryFile(delete=False, mode='w', **kw)
-
-        def _read(self, h):
-            with open(h.name) as f:
-                return f.read()
-
-        @property
-        def out(self):
-            if not self._out.closed:
-                self._out.flush()
-            return self._read(self._out)
-
-        @property
-        def err(self):
-            if not self._err.closed:
-                self._err.flush()
-            return self._read(self._err)
-
-        @property
-        def handles(self):
-            return self._out, self._err
-
-        def cleanup(self):
-            self._out.close()
-            self._err.close()
-            out_name = self._out.name
-            err_name = self._err.name
-            from datalad import cfg
-            if cfg.getbool('datalad.log', 'outputs', default=False) \
-                    and lgr.getEffectiveLevel() <= logging.DEBUG:
-                for s, sname in ((self.out, 'stdout'),
-                                 (self.err, 'stderr')):
-                    if s:
-                        pref = os.linesep + "| "
-                        lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
-                    else:
-                        lgr.debug("Nothing was swallowed for %s", sname)
-            del self._out
-            del self._err
-            gc.collect()
-            rmtemp(out_name)
-            rmtemp(err_name)
-
-    def fake_print(*args, **kwargs):
-        sep = kwargs.pop('sep', ' ')
-        end = kwargs.pop('end', '\n')
-        file = kwargs.pop('file', sys.stdout)
+    def fake_print(*args: str, sep: str = ' ', end: str = "\n", file: Optional[IO[str]] = None) -> None:
+        if file is None:
+            file = sys.stdout
 
         if file in (oldout, olderr, sys.stdout, sys.stderr):
             # we mock
@@ -1354,7 +1429,7 @@ def swallow_outputs():
     oldprint = getattr(builtins, 'print')
     oldout, olderr = sys.stdout, sys.stderr
     olduiout = ui.out
-    adapter = StringIOAdapter()
+    adapter = SwallowOutputsAdapter()
 
     try:
         sys.stdout, sys.stderr = adapter.handles
@@ -1368,103 +1443,104 @@ def swallow_outputs():
         adapter.cleanup()
 
 
-@contextmanager
-def swallow_logs(new_level=None, file_=None, name='datalad'):
-    """Context manager to consume all logs.
+# Let's log everything into a string
+# TODO: generalize with the one for swallow_outputs
+class SwallowLogsAdapter:
+    """Little adapter to help getting out values
 
+    And to stay consistent with how swallow_outputs behaves
     """
+    def __init__(self, file_: str | Path | None) -> None:
+        self._out: IO[str]
+        if file_ is None:
+            kw = get_tempfile_kwargs({}, prefix="logs")
+            self._out = NamedTemporaryFile(mode='a', delete=False, **kw)
+        else:
+            out_file = file_
+            # PY3 requires clearly one or another.  race condition possible
+            self._out = open(out_file, 'a')
+        self.file = file_
+        self._final_out: Optional[str] = None
+
+    def _read(self, h: IO[str]) -> str:
+        with open(h.name) as f:
+            return f.read()
+
+    @property
+    def out(self) -> str:
+        if self._final_out is not None:
+            # we closed and cleaned up already
+            return self._final_out
+        else:
+            self._out.flush()
+            return self._read(self._out)
+
+    @property
+    def lines(self) -> list[str]:
+        return self.out.split('\n')
+
+    @property
+    def handle(self) -> IO[str]:
+        return self._out
+
+    def cleanup(self) -> None:
+        # store for access while object exists
+        self._final_out = self.out
+        self._out.close()
+        out_name = self._out.name
+        del self._out
+        gc.collect()
+        if not self.file:
+            rmtemp(out_name)
+
+    def assert_logged(self, msg: Optional[str]=None, level: Optional[str]=None, regex: bool =True, **kwargs: Any) -> None:
+        """Provide assertion on whether a msg was logged at a given level
+
+        If neither `msg` nor `level` provided, checks if anything was logged
+        at all.
+
+        Parameters
+        ----------
+        msg: str, optional
+          Message (as a regular expression, if `regex`) to be searched.
+          If no msg provided, checks if anything was logged at a given level.
+        level: str, optional
+          String representing the level to be logged
+        regex: bool, optional
+          If False, regular `assert_in` is used
+        **kwargs: str, optional
+          Passed to `assert_re_in` or `assert_in`
+        """
+        from datalad.tests.utils_pytest import (
+            assert_in,
+            assert_re_in,
+        )
+
+        if regex:
+            match = r'\[%s\] ' % level if level else r"\[\S+\] "
+        else:
+            match = '[%s] ' % level if level else ''
+
+        if msg:
+            match += msg
+
+        if match:
+            (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
+        else:
+            assert not kwargs, "no kwargs to be passed anywhere"
+            assert self.out, "Nothing was logged!?"
+
+
+@contextmanager
+def swallow_logs(new_level: str | int | None = None, file_ : str | Path | None = None, name: str='datalad') -> Iterator[SwallowLogsAdapter]:
+    """Context manager to consume all logs."""
     lgr = logging.getLogger(name)
 
     # Keep old settings
     old_level = lgr.level
     old_handlers = lgr.handlers
 
-    # Let's log everything into a string
-    # TODO: generalize with the one for swallow_outputs
-    class StringIOAdapter(object):
-        """Little adapter to help getting out values
-
-        And to stay consistent with how swallow_outputs behaves
-        """
-        def __init__(self):
-            if file_ is None:
-                kw = get_tempfile_kwargs({}, prefix="logs")
-                self._out = NamedTemporaryFile(mode='a', delete=False, **kw)
-            else:
-                out_file = file_
-                # PY3 requires clearly one or another.  race condition possible
-                self._out = open(out_file, 'a')
-            self._final_out = None
-
-        def _read(self, h):
-            with open(h.name) as f:
-                return f.read()
-
-        @property
-        def out(self):
-            if self._final_out is not None:
-                # we closed and cleaned up already
-                return self._final_out
-            else:
-                self._out.flush()
-                return self._read(self._out)
-
-        @property
-        def lines(self):
-            return self.out.split('\n')
-
-        @property
-        def handle(self):
-            return self._out
-
-        def cleanup(self):
-            # store for access while object exists
-            self._final_out = self.out
-            self._out.close()
-            out_name = self._out.name
-            del self._out
-            gc.collect()
-            if not file_:
-                rmtemp(out_name)
-
-        def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
-            """Provide assertion on whether a msg was logged at a given level
-
-            If neither `msg` nor `level` provided, checks if anything was logged
-            at all.
-
-            Parameters
-            ----------
-            msg: str, optional
-              Message (as a regular expression, if `regex`) to be searched.
-              If no msg provided, checks if anything was logged at a given level.
-            level: str, optional
-              String representing the level to be logged
-            regex: bool, optional
-              If False, regular `assert_in` is used
-            **kwargs: str, optional
-              Passed to `assert_re_in` or `assert_in`
-            """
-            from datalad.tests.utils_pytest import (
-                assert_in,
-                assert_re_in,
-            )
-
-            if regex:
-                match = r'\[%s\] ' % level if level else r"\[\S+\] "
-            else:
-                match = '[%s] ' % level if level else ''
-
-            if msg:
-                match += msg
-
-            if match:
-                (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
-            else:
-                assert not kwargs, "no kwargs to be passed anywhere"
-                assert self.out, "Nothing was logged!?"
-
-    adapter = StringIOAdapter()
+    adapter = SwallowLogsAdapter(file_)
     # TODO: it does store messages but without any formatting, i.e. even without
     # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
     # set
@@ -1496,7 +1572,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
 
 # TODO: May be melt in with swallow_logs at some point:
 @contextmanager
-def disable_logger(logger=None):
+def disable_logger(logger: Optional[logging.Logger]=None) -> Iterator[logging.Logger]:
     """context manager to temporarily disable logging
 
     This is to provide one of swallow_logs' purposes without unnecessarily
@@ -1512,24 +1588,26 @@ def disable_logger(logger=None):
     class NullFilter(logging.Filter):
         """Filter class to reject all records
         """
-        def filter(self, record):
-            return 0
+        def filter(self, record: logging.LogRecord) -> bool:
+            return False
 
     if logger is None:
         # default: all of datalad's logging:
         logger = logging.getLogger('datalad')
 
     filter_ = NullFilter(logger.name)
-    [h.addFilter(filter_) for h in logger.handlers]
+    for h in logger.handlers:
+        h.addFilter(filter_)
 
     try:
         yield logger
     finally:
-        [h.removeFilter(filter_) for h in logger.handlers]
+        for h in logger.handlers:
+            h.removeFilter(filter_)
 
 
 @contextmanager
-def lock_if_required(lock_required, lock):
+def lock_if_required(lock_required: bool, lock: threading.Lock) -> Iterator[threading.Lock]:
     """ Acquired and released the provided lock if indicated by a flag"""
     if lock_required:
         lock.acquire()
@@ -1543,7 +1621,7 @@ def lock_if_required(lock_required, lock):
 #
 # Additional handlers
 #
-def ensure_dir(*args):
+def ensure_dir(*args: str) -> str:
     """Make sure directory exists.
 
     Joins the list of arguments to an os-specific path to the desired
@@ -1555,7 +1633,7 @@ def ensure_dir(*args):
     return dirname
 
 
-def updated(d, update):
+def updated(d: dict[K, V], update: dict[K, V]) -> dict[K, V]:
     """Return a copy of the input with the 'update'
 
     Primarily for updating dictionaries
@@ -1565,10 +1643,10 @@ def updated(d, update):
     return d
 
 
-_pwd_mode = None
+_pwd_mode: Optional[str] = None
 
 
-def _switch_to_getcwd(msg, *args):
+def _switch_to_getcwd(msg: str, *args: Any) -> None:
     global _pwd_mode
     _pwd_mode = 'cwd'
     lgr.debug(
@@ -1580,7 +1658,7 @@ def _switch_to_getcwd(msg, *args):
     # repos and tuning up their .paths to be resolved?
 
 
-def getpwd():
+def getpwd() -> str:
     """Try to return a CWD without dereferencing possible symlinks
 
     This function will try to use PWD environment variable to provide a current
@@ -1653,16 +1731,16 @@ def getpwd():
             return pwd
         except KeyError:
             _switch_to_getcwd("PWD env variable is no longer available")
-            return cwd  # Must not happen, but may be someone
-                        # evil purges PWD from environ?
-    else:
-        raise RuntimeError(
-            "Must have not got here. "
-            "pwd_mode must be either cwd or PWD. And it is now %r" % (_pwd_mode,)
-        )
+            if cwd is not None:
+                return cwd  # Must not happen, but may be someone
+                            # evil purges PWD from environ?
+    raise RuntimeError(
+        "Must have not got here. "
+        "pwd_mode must be either cwd or PWD. And it is now %r" % (_pwd_mode,)
+    )
 
 
-class chpwd(object):
+class chpwd:
     """Wrapper around os.chdir which also adjusts environ['PWD']
 
     The reason is that otherwise PWD is simply inherited from the shell
@@ -1672,8 +1750,9 @@ class chpwd(object):
     If used as a context manager it allows to temporarily change directory
     to the given path
     """
-    def __init__(self, path, mkdir=False, logsuffix=''):
+    def __init__(self, path: str | Path | None, mkdir: bool=False, logsuffix: str='') -> None:
 
+        self._prev_pwd: Optional[str]
         if path:
             pwd = getpwd()
             self._prev_pwd = pwd
@@ -1692,18 +1771,18 @@ class chpwd(object):
         os.chdir(path)  # for grep people -- ok, to chdir here!
         os.environ['PWD'] = str(path)
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         # nothing more to do really, chdir was in the constructor
         pass
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
         if self._prev_pwd:
             # Need to use self.__class__ so this instance, if the entire
             # thing mocked during the test, still would use correct chpwd
             self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
-def dlabspath(path, norm=False):
+def dlabspath(path: str | Path, norm: bool =False) -> str:
     """Symlinks-in-the-cwd aware abspath
 
     os.path.abspath relies on os.getcwd() which would not know about symlinks
@@ -1715,15 +1794,15 @@ def dlabspath(path, norm=False):
     if not isabs(path):
         # if not absolute -- relative to pwd
         path = op.join(getpwd(), path)
-    return normpath(path) if norm else path
+    return normpath(path) if norm else str(path)
 
 
-def with_pathsep(path):
+def with_pathsep(path: str) -> str:
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
 
 
-def get_path_prefix(path, pwd=None):
+def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
     """Get path prefix (for current directory)
 
     Returns relative path to the topdir, if we are under topdir, and if not
@@ -1747,7 +1826,7 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
-def _get_normalized_paths(path, prefix):
+def _get_normalized_paths(path: str, prefix: str) -> tuple[str, str]:
     if isabs(path) != isabs(prefix):
         raise ValueError("Both paths must either be absolute or relative. "
                          "Got %r and %r" % (path, prefix))
@@ -1756,7 +1835,7 @@ def _get_normalized_paths(path, prefix):
     return path, prefix
 
 
-def path_startswith(path, prefix):
+def path_startswith(path: str, prefix: str) -> bool:
     """Return True if path starts with prefix path
 
     Parameters
@@ -1768,7 +1847,7 @@ def path_startswith(path, prefix):
     return path.startswith(prefix)
 
 
-def path_is_subpath(path, prefix):
+def path_is_subpath(path: str, prefix: str) -> bool:
     """Return True if path is a subpath of prefix
 
     It will return False if path == prefix.
@@ -1782,7 +1861,7 @@ def path_is_subpath(path, prefix):
     return (len(prefix) < len(path)) and path.startswith(prefix)
 
 
-def knows_annex(path):
+def knows_annex(path: str | Path) -> bool:
     """Returns whether at a given path there is information about an annex
 
     It is just a thin wrapper around GitRepo.is_with_annex() classmethod
@@ -1800,7 +1879,7 @@ def knows_annex(path):
 
 
 @contextmanager
-def make_tempfile(content=None, wrapped=None, **tkwargs):
+def make_tempfile(content: str | bytes | None = None, wrapped: Optional[Callable[..., Any]] = None, **tkwargs: Any) -> Iterator[str]:
     """Helper class to provide a temporary file name and remove it at the end (context manager)
 
     Parameters
@@ -1841,22 +1920,23 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     # if DATALAD_TESTS_TEMP_DIR is set, use that as directory,
     # let mktemp handle it otherwise. However, an explicitly provided
     # dir=... will override this.
-    mkdir = tkwargs_.pop('mkdir', False)
+    mkdir = bool(tkwargs_.pop('mkdir', False))
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
     # MIH: not clear to me why we need to perform this (possibly expensive)
     # resolve. It was already part of the original implementation
     # 008d9ab8cc3e0170c0a9b8479e80dee9ffe6eb7f
-    filename = Path(filename).resolve()
+    filepath = Path(filename).resolve()
 
     if content:
-        (filename.write_bytes
-         if isinstance(content, bytes)
-         else filename.write_text)(content)
+        if isinstance(content, bytes):
+            filepath.write_bytes(content)
+        else:
+            filepath.write_text(content)
 
     # TODO globbing below can also be done with pathlib
-    filename = str(filename)
+    filename = str(filepath)
 
     if __debug__:
         lgr.debug(
@@ -1886,8 +1966,8 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
                 pass
 
 
-def _path_(*p):
-    """Given a path in POSIX" notation, regenerate one in native to the env one"""
+def _path_(*p: str) -> str:
+    """Given a path in POSIX notation, regenerate one in native to the env one"""
     if on_windows:
         return op.join(*map(lambda x: op.join(*x.split('/')), p))
     else:
@@ -1895,7 +1975,7 @@ def _path_(*p):
         return op.join(*p)
 
 
-def get_timestamp_suffix(time_=None, prefix='-'):
+def get_timestamp_suffix(time_: int | time.struct_time | None=None, prefix: str='-') -> str:
     """Return a time stamp (full date and time up to second)
 
     primarily to be used for generation of log files names
@@ -1909,7 +1989,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
 
 
 # unused in -core
-def get_logfilename(dspath, cmd='datalad'):
+def get_logfilename(dspath: str | Path, cmd: str='datalad') -> str:
     """Return a filename to use for logging under a dataset/repository
 
     directory would be created if doesn't exist, but dspath must exist
@@ -1917,11 +1997,11 @@ def get_logfilename(dspath, cmd='datalad'):
     """
     assert(exists(dspath))
     assert(isdir(dspath))
-    ds_logdir = ensure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
+    ds_logdir = ensure_dir(str(dspath), '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
     return op.join(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
-def get_trace(edges, start, end, trace=None):
+def get_trace(edges: Sequence[tuple[T, T]], start: T, end: T, trace: Optional[list[T]]=None) -> Optional[list[T]]:
     """Return the trace/path to reach a node in a tree.
 
     Parameters
@@ -1977,7 +2057,7 @@ def get_trace(edges, start, end, trace=None):
     return None
 
 
-def get_dataset_root(path):
+def get_dataset_root(path: str | Path) -> Optional[str]:
     """Return the root of an existent dataset containing a given path
 
     The root path is returned in the same absolute or relative form
@@ -2022,7 +2102,7 @@ def get_dataset_root(path):
 
 
 # ATM used in datalad_crawler extension, so do not remove yet
-def try_multiple(ntrials, exception, base, f, *args, **kwargs):
+def try_multiple(ntrials: int, exception: type[BaseException], base: float, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
     """Call f multiple times making exponentially growing delay between the calls"""
     for trial in range(1, ntrials+1):
         try:
@@ -2034,14 +2114,19 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
             lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
                         CapturedException(exc), trial, t)
             sleep(t)
+    raise ValueError("ntrials must be > 0")
 
 
 @optional_args
 def try_multiple_dec(
-        f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
-        exceptions_filter=None,
-        logger=None,
-):
+        f: Callable[P, T],
+        ntrials: Optional[int] = None,
+        duration: float = 0.1,
+        exceptions: type[BaseException] | tuple[type[BaseException], ...] | None = None,
+        increment_type: Literal["exponential"] | None = None,
+        exceptions_filter: Optional[Callable[[BaseException], Any]] = None,
+        logger: Optional[Callable] = None,
+) -> Callable[P, T]:
     """Decorator to try function multiple times.
 
     Main purpose is to decorate functions dealing with removal of files/directories
@@ -2066,41 +2151,50 @@ def try_multiple_dec(
       Logger to log upon failure.  If not provided, will use stock logger
       at the level of 5 (heavy debug).
     """
+    # We need to bind these to new names so that mypy doesn't complain about
+    # the values possibly being `None` inside the inner function:
+    exceptions_: type[BaseException] | tuple[type[BaseException], ...]
     if not exceptions:
-        exceptions = (OSError, WindowsError, PermissionError) \
-            if on_windows else OSError
+        exceptions_ = (OSError, PermissionError) if on_windows else OSError
+    else:
+        exceptions_ = exceptions
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
-        ntrials = 100 if on_windows else 10
+        ntrials_ = 100 if on_windows else 10
+    else:
+        ntrials_ = ntrials
     if logger is None:
-        def logger(*args, **kwargs):
+        def logger_(*args: Any, **kwargs: Any) -> None:
             return lgr.log(5, *args, **kwargs)
+    else:
+        logger_ = logger
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
-    def _wrap_try_multiple_dec(*args, **kwargs):
+    def _wrap_try_multiple_dec(*args: P.args, **kwargs: P.kwargs) -> T:
         t = duration
-        for trial in range(ntrials):
+        for trial in range(ntrials_):
             try:
                 return f(*args, **kwargs)
-            except exceptions as exc:
+            except exceptions_ as exc:
                 if exceptions_filter and not exceptions_filter(exc):
                     raise
-                if trial < ntrials - 1:
+                if trial < ntrials_ - 1:
                     if increment_type == 'exponential':
                         t = duration ** (trial + 1)
-                    logger(
+                    logger_(
                         "Caught %s on trial #%d. Sleeping %f and retrying",
                         CapturedException(exc), trial, t)
                     sleep(t)
                 else:
                     raise
+        raise ValueError("ntrials must be > 0")
 
     return _wrap_try_multiple_dec
 
 
 @try_multiple_dec
-def unlink(f):
+def unlink(f: str | Path) -> None:
     """'Robust' unlink.  Would try multiple times
 
     On windows boxes there is evidence for a latency of more than a second
@@ -2116,17 +2210,17 @@ def unlink(f):
 
 
 @try_multiple_dec
-def _rmtree(*args, **kwargs):
+def _rmtree(*args: Any, **kwargs: Any) -> None:
     """Just a helper to decorate shutil.rmtree.
 
     rmtree defined above does more and ideally should not itself be decorated
     since a recursive definition and does checks for open files inside etc -
     might be too runtime expensive
     """
-    return shutil.rmtree(*args, **kwargs)
+    shutil.rmtree(*args, **kwargs)
 
 
-def slash_join(base, extension):
+def slash_join(base: Optional[str], extension: Optional[str]) -> Optional[str]:
     """Join two strings with a '/', avoiding duplicate slashes
 
     If any of the strings is None the other is returned as is.
@@ -2145,7 +2239,7 @@ def slash_join(base, extension):
 #
 
 # unused in -core
-def open_r_encdetect(fname, readahead=1000):
+def open_r_encdetect(fname: str | Path, readahead: int=1000) -> IO[str]:
     """Return a file object in read mode with auto-detected encoding
 
     This is helpful when dealing with files of unknown encoding.
@@ -2172,7 +2266,15 @@ def open_r_encdetect(fname, readahead=1000):
     return io.open(fname, encoding=denc)
 
 
-def read_file(fname, decode=True):
+@overload
+def read_file(fname: str | Path, decode: Literal[True] =True) -> str:
+    ...
+
+@overload
+def read_file(fname: str | Path, decode: Literal[False]) -> bytes:
+    ...
+
+def read_file(fname: str | Path, decode: Literal[True, False] =True) -> str | bytes:
     """A helper to read file passing content via ensure_unicode
 
     Parameters
@@ -2185,7 +2287,7 @@ def read_file(fname, decode=True):
     return ensure_unicode(content) if decode else content
 
 
-def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
+def read_csv_lines(fname: str | Path, dialect: Optional[str] = None, readahead: int=16384, **kwargs: Any) -> Iterator[dict[str, str]]:
     """A generator of dict records from a CSV/TSV
 
     Automatically guesses the encoding for each record to convert to UTF-8
@@ -2203,37 +2305,36 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
       Passed to `csv.reader`
     """
     import csv
+    csv_dialect: str | type[csv.Dialect]
     if dialect is None:
         with open(fname) as tsvfile:
             # add robustness, use a sniffer
             try:
-                dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
+                csv_dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
             except Exception as exc:
                 lgr.warning(
                     'Could not determine file-format, assuming TSV: %s',
                     CapturedException(exc)
                 )
-                dialect = 'excel-tab'
+                csv_dialect = 'excel-tab'
+    else:
+        csv_dialect = dialect
 
-    kw = dict(encoding='utf-8')
-    with open(fname, 'r', **kw) as tsvfile:
-        # csv.py doesn't do Unicode; encode temporarily as UTF-8:
+    with open(fname, 'r', encoding="utf-8") as tsvfile:
         csv_reader = csv.reader(
             tsvfile,
-            dialect=dialect,
+            dialect=csv_dialect,
             **kwargs
         )
-        header = None
+        header: Optional[list[str]] = None
         for row in csv_reader:
-            # decode UTF-8 back to Unicode, cell by cell:
-            row_unicode = map(ensure_unicode, row)
             if header is None:
-                header = list(row_unicode)
+                header = row
             else:
-                yield dict(zip(header, row_unicode))
+                yield dict(zip(header, row))
 
 
-def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug):
+def import_modules(modnames: Iterable[str], pkg: str, msg: str="Failed to import {module}", log: Callable[[str], Any]=lgr.debug) -> list[ModuleType]:
     """Helper to import a list of modules without failing if N/A
 
     Parameters
@@ -2270,7 +2371,7 @@ def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug
     return mods_loaded
 
 
-def import_module_from_file(modpath, pkg=None, log=lgr.debug):
+def import_module_from_file(modpath: str, pkg: Optional[ModuleType]=None, log: Callable[[str], Any]=lgr.debug) -> ModuleType:
     """Import provided module given a path
 
     TODO:
@@ -2299,7 +2400,7 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
     try:
         if relmodpath:
             from importlib import import_module
-            mod = import_module(relmodpath, pkg.__name__)
+            mod = import_module(relmodpath, pkg.__name__ if pkg is not None else None)
         else:
             dirname_ = dirname(modpath)
             try:
@@ -2317,7 +2418,7 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
     return mod
 
 
-def get_encoding_info():
+def get_encoding_info() -> dict[str, str]:
     """Return a dictionary with various encoding/locale information"""
     import locale
     import sys
@@ -2328,7 +2429,7 @@ def get_encoding_info():
     ])
 
 
-def get_envvars_info():
+def get_envvars_info() -> dict[str, str]:
     envs = []
     for var, val in os.environ.items():
         if (
@@ -2354,12 +2455,12 @@ class SequenceFormatter(string.Formatter):
     a separator (space by default).
     """
 
-    def __init__(self, separator=" ", element_formatter=string.Formatter(),
-                 *args, **kwargs):
+    def __init__(self, separator: str=" ", element_formatter: string.Formatter =string.Formatter(),
+                 *args: Any, **kwargs: Any) -> None:
         self.separator = separator
         self.element_formatter = element_formatter
 
-    def format_element(self, elem, format_spec):
+    def format_element(self, elem: Any, format_spec: str) -> Any:
         """Format a single element
 
         For sequences, this is called once for each element in a
@@ -2368,7 +2469,7 @@ class SequenceFormatter(string.Formatter):
         """
         return self.element_formatter.format_field(elem, format_spec)
 
-    def format_field(self, value, format_spec):
+    def format_field(self, value: Any, format_spec: str) -> Any:
         if isinstance(value, (list, tuple, set, frozenset)):
             return self.separator.join(self.format_element(v, format_spec)
                                        for v in value)
@@ -2377,12 +2478,12 @@ class SequenceFormatter(string.Formatter):
 
 
 # TODO: eventually we might want to make use of attr module
-class File(object):
+class File:
     """Helper for a file entry in the create_tree/@with_tree
 
     It allows to define additional settings for entries
     """
-    def __init__(self, name, executable=False):
+    def __init__(self, name: str, executable: bool=False) -> None:
         """
 
         Parameters
@@ -2395,11 +2496,20 @@ class File(object):
         self.name = name
         self.executable = executable
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
-def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
+TreeSpec = Union[
+    Tuple[Tuple[Union[str, File], "Load"], ...],
+    List[Tuple[Union[str, File], "Load"]],
+    Dict[Union[str, File], "Load"],
+]
+
+Load = Union[str, bytes, "TreeSpec"]
+
+
+def create_tree_archive(path: str, name: str, load: TreeSpec, overwrite: bool=False, archives_leading_dir: bool=True) -> None:
     """Given an archive `name`, create under `path` with specified `load` tree
     """
     from datalad.support.archives import compress_files
@@ -2411,7 +2521,9 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     if archives_leading_dir:
         compress_files([dirname], name, path=path, overwrite=overwrite)
     else:
-        compress_files(list(map(basename, glob.glob(op.join(full_dirname, '*')))),
+        compress_files(
+            # <https://github.com/python/mypy/issues/9864>
+            list(map(basename, glob.glob(op.join(full_dirname, '*')))),  # type: ignore[arg-type]
                        op.join(pardir, name),
                        path=op.join(path, dirname),
                        overwrite=overwrite)
@@ -2419,7 +2531,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     rmtree(full_dirname)
 
 
-def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
+def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool =True, remove_existing: bool =False) -> None:
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -2430,7 +2542,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
         os.makedirs(path)
 
     if isinstance(tree, dict):
-        tree = tree.items()
+        tree = list(tree.items())
 
     for file_, load in tree:
         if isinstance(file_, File):
@@ -2453,24 +2565,32 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
                     archives_leading_dir=archives_leading_dir,
                     remove_existing=remove_existing)
         else:
-            open_func = open
             if full_name.endswith('.gz'):
-                open_func = gzip.open
+                def open_func() -> IO[bytes]:
+                    return gzip.open(full_name, "wb")  # type: ignore[return-value]
             elif full_name.split('.')[-1] in ('xz', 'lzma'):
                 import lzma
-                open_func = lzma.open
-            with open_func(full_name, "wb") as f:
+                def open_func() -> IO[bytes]:
+                    return lzma.open(full_name, "wb")
+            else:
+                def open_func() -> IO[bytes]:
+                    return open(full_name, "wb")
+            with open_func() as f:
                 f.write(ensure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 
-def get_suggestions_msg(values, known, sep="\n        "):
+def get_suggestions_msg(values: Optional[str | Iterable[str]], known: str, sep: str="\n        ") -> str:
     """Return a formatted string with suggestions for values given the known ones
     """
     import difflib
     suggestions = []
-    for value in ensure_list(values):  # might not want to do it if we change presentation below
+    if not values:
+        values = []
+    elif isinstance(values, str):
+        values = [values]
+    for value in values:  # might not want to do it if we change presentation below
         suggestions += difflib.get_close_matches(value, known)
     suggestions = unique(suggestions)
     msg = "Did you mean any of these?"
@@ -2484,7 +2604,7 @@ def get_suggestions_msg(values, known, sep="\n        "):
     return ''
 
 
-def bytes2human(n, format='%(value).1f %(symbol)sB'):
+def bytes2human(n: int | float, format: str ='%(value).1f %(symbol)sB') -> str:
     """
     Convert n bytes into a human readable string based on format.
     symbols can be either "customary", "customary_ext", "iec" or "iec_ext",
@@ -2525,7 +2645,7 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
     return format % dict(symbol=symbols[0], value=n)
 
 
-def quote_cmdlinearg(arg):
+def quote_cmdlinearg(arg: str) -> str:
     """Perform platform-appropriate argument quoting"""
     # https://stackoverflow.com/a/15262019
     return '"{}"'.format(
@@ -2533,7 +2653,7 @@ def quote_cmdlinearg(arg):
     ) if on_windows else shlex_quote(arg)
 
 
-def guard_for_format(arg):
+def guard_for_format(arg: str) -> str:
     """Replace { and } with {{ and }}
 
     To be used in cases if arg is not expected to have provided
@@ -2543,13 +2663,13 @@ def guard_for_format(arg):
     return arg.replace('{', '{{').replace('}', '}}')
 
 
-def join_cmdline(args):
+def join_cmdline(args: Iterable[str]) -> str:
     """Join command line args into a string using quote_cmdlinearg
     """
     return ' '.join(map(quote_cmdlinearg, args))
 
 
-def split_cmdline(s):
+def split_cmdline(s: str) -> list[str]:
     """Perform platform-appropriate command line splitting.
 
     Identical to `shlex.split()` on non-windows platforms.
@@ -2593,7 +2713,7 @@ def split_cmdline(s):
     return args
 
 
-def get_wrapped_class(wrapped):
+def get_wrapped_class(wrapped: Callable) -> type:
     """Determine the command class a wrapped __call__ belongs to"""
     mod = sys.modules[wrapped.__module__]
     command_class_name = wrapped.__qualname__.split('.')[-2]
@@ -2602,11 +2722,11 @@ def get_wrapped_class(wrapped):
     return _func_class
 
 
-def _make_assure_kludge(fn):
+def _make_assure_kludge(fn: Callable[P, T]) -> Callable[P, T]:
     old_name = fn.__name__.replace("ensure", "assure")
 
     @wraps(fn)
-    def compat_fn(*args, **kwargs):
+    def compat_fn(*args: P.args, **kwargs: P.kwargs) -> T:
         warnings.warn(
             "{} is deprecated and will be removed in a future release. "
             "Use {} instead."
@@ -2633,7 +2753,7 @@ assure_dir = _make_assure_kludge(ensure_dir)
 lgr.log(5, "Done importing datalad.utils")
 
 
-def check_symlink_capability(path, target):
+def check_symlink_capability(path: Path, target: Path) -> bool:
     """helper similar to datalad.tests.utils_pytest.has_symlink_capability
 
     However, for use in a datalad command context, we shouldn't
@@ -2666,7 +2786,7 @@ def check_symlink_capability(path, target):
             target.unlink()
 
 
-def obtain_write_permission(path):
+def obtain_write_permission(path: Path) -> Optional[int]:
     """Obtains write permission for `path` and returns previous mode if a
     change was actually made.
 
@@ -2692,7 +2812,7 @@ def obtain_write_permission(path):
 
 
 @contextmanager
-def ensure_write_permission(path):
+def ensure_write_permission(path: Path) -> Iterator[None]:
     """Context manager to get write permission on `path` and
     restore original mode afterwards.
 
