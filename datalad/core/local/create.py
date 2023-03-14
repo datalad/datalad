@@ -379,7 +379,11 @@ class Create(Interface):
 
         # Inherit annex.private=true if parent dataset is given explicitly
         if ds is not None:
-            private = private or ds.config.get('annex.private', None) == 'true'
+            try:
+                parent_private = ds.config.getbool('annex', 'private')
+            except KeyError:
+                parent_private = False
+            private = private or parent_private
 
         # Note for the code below:
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
