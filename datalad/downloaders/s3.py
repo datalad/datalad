@@ -22,8 +22,6 @@ from ..dochelpers import (
 )
 from ..support.network import (
     get_url_straight_filename,
-    iso8601_to_epoch,
-    rfc2822_to_epoch,
 )
 
 from .base import Authenticator
@@ -424,20 +422,8 @@ class S3Downloader(BaseDownloader):
         version_id = object_meta.get('VersionId')
         # TODO (mslw): VersionId will get discarded anyway -- remove here & below
 
-        # note: mslw is not sure if we need to pick & uppercase keys from
-        # http_headers, but this behaviour is kept for consistency
-        # with replaced code
-        http_headers = object_meta['ResponseMetadata']['HTTPHeaders']
-        headers = {
-            'Content-Length': http_headers.get('content-length'),
-            'Content-Disposition': http_headers.get('content-disposition'),
-        }
-
-        if http_headers.get('last-modified') is not None:
-            # note: there is also object_meta['LastModified'] -> datetime
-            headers['Last-Modified'] = rfc2822_to_epoch(
-                http_headers.get('last-modified')
-            )
+        headers = self.get_obj_headers(
+            object_meta, other={'Content-Disposition': url_filepath})
 
         # Consult about filename
         url_filename = get_url_straight_filename(url)
@@ -474,18 +460,22 @@ class S3Downloader(BaseDownloader):
         )
 
     @classmethod
-    def get_key_headers(cls, key, dateformat='rfc2822'):
-        headers = {
-            'Content-Length': key.size,
-            'Content-Disposition': key.name
-        }
+    def get_obj_headers(cls, obj_meta, other=None):
+        """Get a headers dict from head_object output
 
-        if key.last_modified:
-            # boto would return time string the way amazon returns which returns
-            # it in two different ones depending on how key information was obtained:
-            # https://github.com/boto/boto/issues/466
-            headers['Last-Modified'] = {'rfc2822': rfc2822_to_epoch,
-                                        'iso8601': iso8601_to_epoch}[dateformat](key.last_modified)
+        Picks, renames, and converts certain keys. Some (like
+        Content-Disposition) may need to be added via kwargs. Note:
+        the head_obj_metaect output also includes the relevant
+        information under ['ResponseMetadata']['HTTPHeaders']
+        (possibly using different data type), but this function only
+        uses top-level keys.
+        """
+        headers = {"Content-Length": obj_meta.get("ContentLength")}
+        if obj_meta.get("LastModified"):
+            headers["Last-Modified"] = int(
+                obj_meta.get("LastModified").timestamp())
+        if other:
+            headers.update(other)
         return headers
 
     @classmethod
@@ -497,7 +487,3 @@ class S3Downloader(BaseDownloader):
             mtime=headers.get('Last-Modified'),
             filename=headers.get('Content-Disposition')
         )
-
-    @classmethod
-    def get_key_status(cls, key, dateformat='rfc2822'):
-        return cls.get_status_from_headers(cls.get_key_headers(key, dateformat=dateformat))
