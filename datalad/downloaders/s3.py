@@ -43,6 +43,9 @@ from ..support.s3 import (
 )
 from ..support.status import FileStatus
 
+import boto3
+import botocore
+
 import logging
 from logging import getLogger
 lgr = getLogger('datalad.s3')
@@ -70,8 +73,7 @@ class S3Authenticator(Authenticator):
           to boto.connect_s3
         """
         super(S3Authenticator, self).__init__(*args, **kwargs)
-        self.connection = None
-        self.bucket = None
+        self.client = None
         self._conn_kwargs = {}
         if host:
             self._conn_kwargs['host'] = host
@@ -79,13 +81,18 @@ class S3Authenticator(Authenticator):
     def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
 
+        Sets up a boto3 S3 client. Uses supplied DataLad credentials,
+        reads credentials from boto configuration sources (environmental
+        variables or config files), or connects anonymously - in that order
+        of preference. Tests the credentials for the given bucket.
+
         Returns
         -------
-        bucket
+        s3client: botocore.client.S3
         """
 
-        if not boto:
-            raise RuntimeError("%s requires boto module which is N/A" % self)
+        if not boto3:
+            raise RuntimeError("%s requires boto3 module which is N/A" % self)
 
         # Shut up boto if we do not care to listen ;)
         boto_lgr.setLevel(
@@ -97,44 +104,85 @@ class S3Authenticator(Authenticator):
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
-        conn_kwargs = self._conn_kwargs.copy()
-        if bucket_name.lower() != bucket_name:
-            # per http://stackoverflow.com/a/19089045/1265472
-            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
+
+        # TODO: this was used previously, need to handle
+        # looking at init, it can only contain host
+        # conn_kwargs = self._conn_kwargs.copy()
+
+        # TODO: see boto3 issue #334 & api reference for Config; OrdinaryCallingFormat is probably gone
+        # if bucket_name.lower() != bucket_name:
+        #     # per http://stackoverflow.com/a/19089045/1265472
+        #     conn_kwargs['calling_format'] = OrdinaryCallingFormat()
 
         if credential is not None:
             credentials = credential()
             conn_kind = "with authentication"
-            conn_args = [credentials['key_id'], credentials['secret_id']]
-            conn_kwargs['security_token'] = credentials.get('session')
+            s3client = boto3.client(
+                "s3",
+                aws_access_key_id=credentials["key_id"],
+                aws_secret_access_key=credentials["secret_id"],
+                aws_session_token=credentials.get("session"),
+            )
         else:
-            conn_kind = "anonymously"
-            conn_args = []
-            conn_kwargs['anon'] = True
-        if '.' in bucket_name:
-            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
+            # let boto try and find credentials from config files or variables,
+            # or connect anonymously if it finds none
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
+            session = boto3.Session()
+            if session.get_credentials() is not None:
+                conn_kind = "with authentication"
+                s3client = session.client("s3")
+            else:
+                conn_kind = "anonymously"
+                conf = botocore.config.Config(signature_version=botocore.UNSIGNED)
+                s3client = session.client("s3", config=conf)
+
+        # TODO: same as above
+        # if '.' in bucket_name:
+        #     conn_kwargs['calling_format'] = OrdinaryCallingFormat()
 
         lgr.info(
             "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
         )
-        self.connection = conn = boto.connect_s3(*conn_args, **conn_kwargs)
-        self.bucket = bucket = get_bucket(conn, bucket_name)
-        return bucket
+
+        # check if the bucket is accessible
+        # (authentication happens only when request is made)
+        #
+        # note: using head_bucket() to test -- although that
+        # effectively tests for List permission, not file access.  We
+        # would ideally use head_object() instead, but the function in
+        # its current shape only knows the bucket, not the object. Old
+        # boto2 code used connect_s3 & get_bucket, which also led to
+        # head_bucket implicitly, so this is not a regression.
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/migrations3.html#accessing-a-bucket
+        try:
+            s3client.head_bucket(Bucket=bucket_name)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "404":
+                raise TargetFileAbsent(
+                    "Bucket " + bucket_name + " does not exist"
+                ) from e
+            else:
+                raise e
+
+        self.client = s3client
+        return s3client
 
 
 @auto_repr
 class S3DownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None, url=None, headers=None,
-                 key=None):
+                 client=None, download_kwargs=None):
         super(S3DownloaderSession, self).__init__(
             size=size, filename=filename, headers=headers, url=url
         )
-        self.key = key
+        self.client = client
+        self.download_kwargs = download_kwargs
 
     def download(self, f=None, pbar=None, size=None):
         # S3 specific (the rest is common with e.g. http)
         def pbar_callback(downloaded, totalsize):
-            assert (totalsize == self.key.size)
+            assert (totalsize == self.size)
             if pbar:
                 try:
                     pbar.update(downloaded)
@@ -144,16 +192,25 @@ class S3DownloaderSession(DownloaderSession):
         headers = {}
         # report for every % for files > 10MB, otherwise every 10%
         kwargs = dict(headers=headers, cb=pbar_callback,
-                      num_cb=100 if self.key.size > 10*(1024**2) else 10)
+                      num_cb=100 if self.size > 10*(1024**2) else 10)
         if size:
             headers['Range'] = 'bytes=0-%d' % (size - 1)
         if f:
             # TODO: May be we could use If-Modified-Since
             # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-            self.key.get_contents_to_file(f, **kwargs)
+            # note (mslw): in boto3, see client.head_object(IfModifiedSince)
+            self.client.download_fileobj(
+                Fileobj=f,
+                Callback=None,  # TODO: find out right callback signature
+                **self.download_kwargs,  # Bucket, Key, ExtraArgs (todo: explicit?)
+            )
         else:
-            return self.key.get_contents_as_string(encoding=None, **kwargs)
-
+            # return the contents of the file as bytes
+            s3_response = self.client.get_object(
+                **self.download_kwargs,  # Bucket, Key, ExtraArgs
+                Callback=None,  # TODO
+            )
+            return s3_response.get('Body').read()
 
 @auto_repr
 class S3Downloader(BaseDownloader):
@@ -165,14 +222,16 @@ class S3Downloader(BaseDownloader):
     @borrowkwargs(BaseDownloader)
     def __init__(self, **kwargs):
         super(S3Downloader, self).__init__(**kwargs)
-        self._bucket = None
+        self._client = None
+        self._bucket_name = None
 
     @property
-    def bucket(self):
-        return self._bucket
+    def client(self):
+        return self._client
 
     def reset(self):
-        self._bucket = None
+        self._client = None
+        self._bucket_name = None
 
     @classmethod
     def _parse_url(cls, url, bucket_only=False):
@@ -210,8 +269,8 @@ class S3Downloader(BaseDownloader):
           To state if old instance of a session/authentication was used
         """
         bucket_name = self._parse_url(url, bucket_only=True)
-        if allow_old and self._bucket:
-            if self._bucket.name == bucket_name:
+        if allow_old and self.client is not None:
+            if self._bucket_name == bucket_name:
                 try:
                     self._check_credential()
                     lgr.debug(
@@ -225,8 +284,9 @@ class S3Downloader(BaseDownloader):
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
 
         lgr.debug("S3 session: Reconnecting to the bucket")
-        self._bucket = try_multiple_dec_s3(self.authenticator.authenticate)(
+        self._client = try_multiple_dec_s3(self.authenticator.authenticate)(
             bucket_name, self.credential)
+        self._bucket_name = bucket_name
         return False
 
     def _check_credential(self):
@@ -343,32 +403,46 @@ class S3Downloader(BaseDownloader):
             newkeys = set(params.keys()) - {'versionId'}
             if newkeys:
                 raise NotImplementedError("Did not implement support for %s" % newkeys)
-        assert(self._bucket.name == bucket_name)  # must be the same
+            # see: boto3.s3.transfer.S3Transfer.ALLOWED_DOWNLOAD_ARGS
+            extra_args = {"VersionId": params.get("versionId")}
+        else:
+            extra_args = {}
+
+        assert(self._bucket_name == bucket_name)  # must be the same
 
         self._check_credential()
-        try:
-            key = try_multiple_dec_s3(self._get_key)(
-                url_filepath, version_id=params.get('versionId', None)
-            )
-        except S3ResponseError as e:
-            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s"
-                                % (url_filepath, url)) from e
-        if key is None:
-            raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
 
-        target_size = key.size  # S3 specific
+        object_meta = self.client.head_object(
+            Bucket=bucket_name,
+            Key=url_filepath,
+            **extra_args,
+        )
+        # the above may raise botocore.exceptions.ClientError
+        # for 404 not found or 403 forbidden
+
+        target_size = object_meta.get('ContentLength')  # S3 specific
+        version_id = object_meta.get('VersionId')
+        # TODO (mslw): VersionId will get discarded anyway -- remove here & below
+
+        # note: mslw is not sure if we need to pick & uppercase keys from
+        # http_headers, but this behaviour is kept for consistency
+        # with replaced code
+        http_headers = object_meta['ResponseMetadata']['HTTPHeaders']
         headers = {
-            'Content-Length': key.size,
-            'Content-Disposition': key.name
+            'Content-Length': http_headers.get('content-length'),
+            'Content-Disposition': http_headers.get('content-disposition'),
         }
 
-        if key.last_modified:
-            headers['Last-Modified'] = rfc2822_to_epoch(key.last_modified)
+        if http_headers.get('last-modified') is not None:
+            # note: there is also object_meta['LastModified'] -> datetime
+            headers['Last-Modified'] = rfc2822_to_epoch(
+                http_headers.get('last-modified')
+            )
 
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        if 'versionId' not in params and key.version_id:
+        if 'versionId' not in params and version_id is not None:
             # boto adds version_id to the request if it is known present.
             # It is a good idea in general to avoid race between moment of retrieving
             # the key information and actual download.
@@ -379,15 +453,24 @@ class S3Downloader(BaseDownloader):
             # Alternative would be to make this a generator and generate sessions
             # but also remember if the first download succeeded so we do not try
             # again to get versioned one first.
-            key.version_id = None
+            version_id = None
             # TODO: ask NDA to allow download of specific versionId?
+
+        # download_fileobj has slightly different signature than head_object
+        # we need to pass things below to the S3DownloaderSession
+        s3_download_kwargs = {
+            "Bucket": bucket_name,
+            "Key": url_filepath,
+            "ExtraArgs": extra_args if len(extra_args) > 0 else None,
+        }
 
         return S3DownloaderSession(
             size=target_size,
             filename=url_filename,
             url=url,
             headers=headers,
-            key=key
+            client=self.client,
+            download_kwargs=s3_download_kwargs,
         )
 
     @classmethod
