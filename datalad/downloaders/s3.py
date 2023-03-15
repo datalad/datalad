@@ -10,8 +10,10 @@
 """
 
 import re
-
 from urllib.parse import urlsplit, unquote as urlunquote
+
+import boto3
+import botocore
 
 from ..utils import (
     auto_repr,
@@ -28,21 +30,9 @@ from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
 from ..support.exceptions import (
     AccessPermissionExpiredError,
-    CapturedException,
     TargetFileAbsent,
 )
-from ..support.s3 import (
-    Key,
-    OrdinaryCallingFormat,
-    S3ResponseError,
-    boto,
-    get_bucket,
-    try_multiple_dec_s3,
-)
 from ..support.status import FileStatus
-
-import boto3
-import botocore
 
 import logging
 from logging import getLogger
