@@ -61,20 +61,29 @@ class S3Authenticator(Authenticator):
     allows_anonymous = True
     DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
 
-    def __init__(self, *args, host=None, **kwargs):
+    def __init__(self, *args, host=None, region=None, **kwargs):
         """
 
         Parameters
         ----------
         host: str, optional
-          In some cases it is necessary to provide host to connect to. Passed
-          to boto.connect_s3
+          this argument is deprecated and will be ignored; define region
+          instead (you can also define a default region in your ~/.aws/config
+          file or by setting the AWS_DEFAULT_REGION environment variable)
+        region: str, optional
+          will be passed to s3 client as region_name
         """
         super(S3Authenticator, self).__init__(*args, **kwargs)
         self.client = None
-        self._conn_kwargs = {}
+        self.region = region
         if host:
-            self._conn_kwargs['host'] = host
+            warnings.warn(
+                "Host argument is deprecated and will be ignored. "
+                "Use 'region' argument instead, or define a default region "
+                "in your ~/aws/config file, or set the environment variable "
+                "AWS_DEFAULT_REGION",
+                DeprecationWarning
+            )
 
     def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
@@ -103,10 +112,6 @@ class S3Authenticator(Authenticator):
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
 
-        # TODO: this was used previously, need to handle
-        # looking at init, it can only contain host
-        # conn_kwargs = self._conn_kwargs.copy()
-
         # TODO: see boto3 issue #334 & api reference for Config; OrdinaryCallingFormat is probably gone
         # if bucket_name.lower() != bucket_name:
         #     # per http://stackoverflow.com/a/19089045/1265472
@@ -117,6 +122,7 @@ class S3Authenticator(Authenticator):
             conn_kind = "with authentication"
             s3client = boto3.client(
                 "s3",
+                region_name=self.region,
                 aws_access_key_id=credentials["key_id"],
                 aws_secret_access_key=credentials["secret_id"],
                 aws_session_token=credentials.get("session"),
@@ -128,11 +134,11 @@ class S3Authenticator(Authenticator):
             session = boto3.Session()
             if session.get_credentials() is not None:
                 conn_kind = "with authentication"
-                s3client = session.client("s3")
+                s3client = session.client("s3", region_name=self.region)
             else:
                 conn_kind = "anonymously"
                 conf = botocore.config.Config(signature_version=botocore.UNSIGNED)
-                s3client = session.client("s3", config=conf)
+                s3client = session.client("s3", region_name=self.region, config=conf)
 
         # TODO: same as above
         # if '.' in bucket_name:
