@@ -323,28 +323,25 @@ class S3Downloader(BaseDownloader):
         # for 404 not found or 403 forbidden
 
         target_size = object_meta.get('ContentLength')  # S3 specific
-        version_id = object_meta.get('VersionId')
-        # TODO (mslw): VersionId will get discarded anyway -- remove here & below
-
         headers = self.get_obj_headers(
             object_meta, other={'Content-Disposition': url_filepath})
 
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        if 'versionId' not in params and version_id is not None:
-            # boto adds version_id to the request if it is known present.
-            # It is a good idea in general to avoid race between moment of retrieving
-            # the key information and actual download.
-            # But depending on permissions, we might be unable (like in the case with NDA)
-            # to download a guaranteed version of the key.
-            # So we will just download the latest version (if still there)
-            # if no versionId was specified in URL
-            # Alternative would be to make this a generator and generate sessions
-            # but also remember if the first download succeeded so we do not try
-            # again to get versioned one first.
-            version_id = None
-            # TODO: ask NDA to allow download of specific versionId?
+        # head_object will report VersionId if found, but we don't take it from
+        # there, only from the URL; original comment by yoh below
+        #
+        # It is a good idea in general to avoid race between moment of retrieving
+        # the key information and actual download.
+        # But depending on permissions, we might be unable (like in the case with NDA)
+        # to download a guaranteed version of the key.
+        # So we will just download the latest version (if still there)
+        # if no versionId was specified in URL
+        # Alternative would be to make this a generator and generate sessions
+        # but also remember if the first download succeeded so we do not try
+        # again to get versioned one first.
+        # TODO: ask NDA to allow download of specific versionId?
 
         # download_fileobj has slightly different signature than head_object
         # we need to pass things below to the S3DownloaderSession
