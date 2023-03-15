@@ -188,34 +188,27 @@ class S3DownloaderSession(DownloaderSession):
 
     def download(self, f=None, pbar=None, size=None):
         # S3 specific (the rest is common with e.g. http)
-        def pbar_callback(downloaded, totalsize):
-            assert (totalsize == self.size)
+        def pbar_callback(downloaded):
             if pbar:
                 try:
-                    pbar.update(downloaded)
+                    pbar.update(downloaded, increment=True)
                 except:  # MIH: what does it do? MemoryError?
                     pass  # do not let pbar spoil our fun
 
-        headers = {}
-        # report for every % for files > 10MB, otherwise every 10%
-        kwargs = dict(headers=headers, cb=pbar_callback,
-                      num_cb=100 if self.size > 10*(1024**2) else 10)
-        if size:
-            headers['Range'] = 'bytes=0-%d' % (size - 1)
         if f:
             # TODO: May be we could use If-Modified-Since
             # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
             # note (mslw): in boto3, see client.head_object(IfModifiedSince)
             self.client.download_fileobj(
                 Fileobj=f,
-                Callback=None,  # TODO: find out right callback signature
+                Callback=pbar_callback,
                 **self.download_kwargs,  # Bucket, Key, ExtraArgs (todo: explicit?)
             )
         else:
             # return the contents of the file as bytes
             s3_response = self.client.get_object(
                 **self.download_kwargs,  # Bucket, Key, ExtraArgs
-                Callback=None,  # TODO
+                Callback=pbar_callback,
             )
             return s3_response.get('Body').read()
 
