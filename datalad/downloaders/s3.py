@@ -108,14 +108,18 @@ class S3Authenticator(Authenticator):
             else logging.DEBUG
         )
 
+        # use boto3 standard retry mode, not legacy
+        conf_options = {"retries": {"mode": "standard"}}
+
+        # per http://stackoverflow.com/a/19089045/1265472 & updated for boto3
+        if bucket_name.lower() != bucket_name or "." in bucket_name:
+            conf_options["s3"] = {"addressing_style": "path"}
+
+        conf = botocore.config.Config(**conf_options)
+
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
-
-        conf = None
-        if bucket_name.lower() != bucket_name or "." in bucket_name:
-            # per http://stackoverflow.com/a/19089045/1265472 updated for boto3
-            conf = botocore.config.Config(s3={"addressing_style": "path"})
 
         if credential is not None:
             credentials = credential()
@@ -138,8 +142,9 @@ class S3Authenticator(Authenticator):
                 s3client = session.client("s3", region_name=self.region, config=conf)
             else:
                 conn_kind = "anonymously"
-                anon_conf = botocore.config.Config(signature_version=botocore.UNSIGNED)
-                conf = conf.merge(anon_conf) if conf is not None else anon_conf
+                conf = conf.merge(
+                    botocore.config.Config(signature_version=botocore.UNSIGNED)
+                )
                 s3client = session.client("s3", region_name=self.region, config=conf)
 
         lgr.info(
@@ -286,7 +291,7 @@ class S3Downloader(BaseDownloader):
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
 
         lgr.debug("S3 session: Reconnecting to the bucket")
-        self._client = try_multiple_dec_s3(self.authenticator.authenticate)(
+        self._client = self.authenticator.authenticate(
             bucket_name, self.credential)
         self._bucket_name = bucket_name
         return False
