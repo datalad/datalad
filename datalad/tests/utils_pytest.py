@@ -50,6 +50,7 @@ _TEMP_PATHS_CLONES = set()
 
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
+on_appveyor = bool(os.environ.get('APPVEYOR', False))
 
 if external_versions["cmd:git"] >= "2.28":
     # The specific value here doesn't matter, but it should not be the default
