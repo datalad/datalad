@@ -135,6 +135,14 @@ def test_wtf(topdir=None):
     # check that wtf of an unavailable section yields impossible result (#6712)
     res = wtf(sections=['murkie'], on_failure='ignore')
     eq_(res[0]["status"], "impossible")
+    # and we do not get double WTF reporting, while still rendering other sections ok
+    with swallow_outputs() as cmo:
+        res = wtf(sections=['system', 'murkie', 'environment'], on_failure='ignore')
+        assert cmo.out.count('# WTF') == 1  # report produced only ones
+        # and we still have other sections requested before or after
+        assert cmo.out.count('## system') == 1
+        assert cmo.out.count('## environment') == 1
+    eq_(res[0]["status"], "impossible")
 
     # should result only in '# WTF'
     skip_if_no_module('pyperclip')
