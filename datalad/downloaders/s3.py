@@ -112,10 +112,10 @@ class S3Authenticator(Authenticator):
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
 
-        # TODO: see boto3 issue #334 & api reference for Config; OrdinaryCallingFormat is probably gone
-        # if bucket_name.lower() != bucket_name:
-        #     # per http://stackoverflow.com/a/19089045/1265472
-        #     conn_kwargs['calling_format'] = OrdinaryCallingFormat()
+        conf = None
+        if bucket_name.lower() != bucket_name or "." in bucket_name:
+            # per http://stackoverflow.com/a/19089045/1265472 updated for boto3
+            conf = botocore.config.Config(s3={"addressing_style": "path"})
 
         if credential is not None:
             credentials = credential()
@@ -126,6 +126,7 @@ class S3Authenticator(Authenticator):
                 aws_access_key_id=credentials["key_id"],
                 aws_secret_access_key=credentials["secret_id"],
                 aws_session_token=credentials.get("session"),
+                config=conf,
             )
         else:
             # let boto try and find credentials from config files or variables,
@@ -134,15 +135,12 @@ class S3Authenticator(Authenticator):
             session = boto3.Session()
             if session.get_credentials() is not None:
                 conn_kind = "with authentication"
-                s3client = session.client("s3", region_name=self.region)
+                s3client = session.client("s3", region_name=self.region, config=conf)
             else:
                 conn_kind = "anonymously"
-                conf = botocore.config.Config(signature_version=botocore.UNSIGNED)
+                anon_conf = botocore.config.Config(signature_version=botocore.UNSIGNED)
+                conf = conf.merge(anon_conf) if conf is not None else anon_conf
                 s3client = session.client("s3", region_name=self.region, config=conf)
-
-        # TODO: same as above
-        # if '.' in bucket_name:
-        #     conn_kwargs['calling_format'] = OrdinaryCallingFormat()
 
         lgr.info(
             "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
