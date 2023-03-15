@@ -9,33 +9,15 @@ User messaging: result records vs exceptions vs logging
 
 .. topic:: Specification scope and status
 
-   This specification aims to delineate the applicable contexts for using result records,
-   exceptions, logging, or other types of user messaging methods.
+   This specification provides a partial overview of the current implementation.
 
 Motivation
 ==========
 
-Design specifications exist for :ref:`chap_design_result_records`,
-:ref:`chap_design_exception_handling`, :ref:`chap_design_log_levels`, and 
-:ref:`chap_design_progress_reporting`, and an ideal yet elusive goal is the consistent
-application of these methods in the applicable contexts. 
-
-From a **developer's perspective**, a specification for the proper use of specific user
-messaging methods creates a best practice standard that simplifies the implementation
-process, minimizes code duplication, and ensures consistency in the code base. This
-applies both to development in DataLad core as well as in DataLad extensions.
-
-From a **user's perspective**, it is imperative to receive the most appropriate and
-unambiguous message relating to the current context or action.
-
-Discrepancies (on the development side) and resulting ambiguity (on the user side) arise
-when the chosen user messaging methods are implemented interchangeably, inconsistently,
-within contexts that do not warrant them, and in ways that do not inform users
-appropriately.
-
-Consequently, the motivation of this specification is to delineate the applicable
-contexts for using result records, exceptions, logging, or other types of
-user messaging processes.
+This specification delineates the applicable contexts for using
+:ref:`result records <chap_design_result_records>`, :ref:`exceptions <chap_design_exception_handling>`,
+:ref:`progress reporting <chap_design_progress_reporting>`, specific :ref:`log levels <chap_design_log_levels>`,
+or other types of user messaging processes.
 
 
 Specification
@@ -44,23 +26,24 @@ Specification
 Result records
 --------------
 
-**Result records are the standard and preferred return value** format for all
-DataLad commands. Result records are routinely inspected throughout the code base,
-and are used to inform generic error handling, as well as particular calling commands
-on how to proceed with a specific operation.
+**Result records are the only return value format** for all DataLad interfaces.
 
-Yield result records when:
+Constrasting with classic Python interfaces that return specific non-annotated values,
+DataLad interfaces implement message passing by yielding :ref:`result records <chap_design_result_records>`
+that are associated with individual operations. Result records are routinely inspected throughout
+the code base and their annotations are used to inform general program flow and error handling.
 
-1. A generic and standard way of error handling is considered useful
-2. A process can reasonably be continued despite evident errors or shortcomings in
-   its subprocesses
+Command calls can include an ``on_failure`` parameterization to specify how to
+proceed with a particular operation if a returned result record is
+:ref:`classified as a failure result <target-result-status>`. Command calls can
+also can include a ``result_renderer`` parameterization to explicitly enable or
+disable the handling and rendering of result records.
 
-Based on the ``status`` field of a result record, a result is categorized into
-*success* (``ok``, ``notneeded``) and *failure* (``impossible``, ``error``).
-Depending on the ``on_failure`` parameterization of a command call (``on_failure='stop'``,
-``on_failure='continue'``, or ``on_failure='ignore'``), any failure-result
-emitted by a command can lead to an ``IncompleteResultsError`` being raised on command
-exit, or a non-zero exit code on the command line.
+Developers should be aware that external callers will use command call parameterizations
+that can selectively ignore or act on result records, and that the process should therefore
+yield meaningful result records. If, in turn, the process itself receives a set of result
+records from a sub-process, these should be inspected individually in order to identify result
+values that could require re-annotation or status re-classification.
 
 
 Exception handling
@@ -71,7 +54,7 @@ the offending action**.
 
 More specifically, raise an exception when:
 
-1. A command's parameter specifications are violated
+1. A DataLad interface's parameter specifications are violated
 2. An additional requirement (beyond parameters) for the successful running of a
    command, function, or process is not met
 
@@ -80,19 +63,14 @@ is, given the context within which the user/caller triggered the action.
 This is achieved directly via a (re)raised exception, as opposed to logging messages or
 results records which could be ignored or unseen by the user.
 
-If the relevant caller receives a set of result records, these should be inspected
-individually in order to identify result status values that could require an exception
-to be raised to the user/caller. Depending on developer-defined logic, an exception can
-then be raised with an unambiguous message that excludes internal and intermediate
-result messages.
-
-Additionally, in the case of a complex set of dependent actions it could be expensive to
-confirm parameter violations. In such cases, initial sub-processes might already generate
-result records that have to be inspected by the caller, and it could be practically better
-to yield a result record (with ``status=[error|impossible]``) to communicate the failure.
-It would then be up to the upstream caller to decide whether to specify
-``on_failure='ignore'`` or whether to inspect individual result records and turn them
-into exceptions or not.
+.. note::
+   In the case of a complex set of dependent actions it could be expensive to
+   confirm parameter violations. In such cases, initial sub-processes might already generate
+   result records that have to be inspected by the caller, and it could be practically better
+   to yield a result record (with ``status=[error|impossible]``) to communicate the failure.
+   It would then be up to the upstream caller to decide whether to specify
+   ``on_failure='ignore'`` or whether to inspect individual result records and turn them
+   into exceptions or not.
 
 
 Logging
@@ -101,20 +79,28 @@ Logging
 Logging provides developers with additional means to describe steps in a process,
 so as to **allow insight into the program flow during debugging** or analysis of e.g.
 usage patterns. Logging can be turned off externally, filtered, and redirected. Apart from
-the log-level and message, it is not inspectable and cannot be used to control the logic
-or flow of a program.
+the :ref:`log-level <chap_design_log_levels>` and message, it is not inspectable and
+cannot be used to control the logic or flow of a program.
 
-Importantly, logging is not a user messaging method. Therefore:
+Importantly, logging should not be the primary user messaging method for command outcomes,
+Therefore:
 
-1. No command should rely on logging for user communication.
+1. No command should rely solely on logging for user communication
+2. Use logging for in-progress user communication via the mechanism for :ref:`progress reporting <chap_design_progress_reporting>`
+3. Use logging to inform debugging processes
 
 
 UI Module
 ---------
 
-.. note::
-   TODO
+The :mod:`~datalad.ui` module provides the means to communicate information
+to the user in a user-interface-specific manner, e.g. via a console, dialog, or an iPython interface.
+Internally, all DataLad results processed by the result renderer are passed through the UI module.
 
+Therefore: in cases where existing user communication processes are not appropriate,
+developers should let explicit user communication happen through the UI module
+as it provides the flexibility to adjust to the present UI. Specifically,
+:py:func:`datalad.ui.message` allows passing a simple message via the UI module.
 
 
 Examples
