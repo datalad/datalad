@@ -190,7 +190,6 @@ progressbars = {
 
 try:
     from tqdm import tqdm
-    from datalad.support.external_versions import external_versions
     from datalad.utils import updated
 
     class tqdmProgressBar(ProgressBarBase):
@@ -202,22 +201,10 @@ try:
             'ipython': None  # to be loaded
         }
 
-        # TQDM behaved a bit suboptimally with older versions -- either was
-        # completely resetting time/size in global pbar, or not updating
-        # "slave" pbars, so we had to
-        # set miniters to 1, and mininterval to 0, so it always updates
-        # amd smoothing to 0 so it produces at least consistent average.
-        # But even then it is somewhat flawed.
-        # Newer versions seems to behave more consistently so do not require
-        # those settings
-        _default_pbar_params = \
-            dict(smoothing=0, miniters=1, mininterval=0.1) \
-            if external_versions['tqdm'] < '4.10.0' \
-            else dict(mininterval=0.1)
-
-        # react to changes in the terminal width
-        if external_versions['tqdm'] >= '2.1':
-            _default_pbar_params['dynamic_ncols'] = True
+        _default_pbar_params = {
+            'mininterval': 0.1,
+            'dynamic_ncols': True,  # react to changes in the terminal width
+        }
 
         def __init__(self, label='', fill_text=None,
                      total=None, unit='B', out=sys.stdout, leave=False,
