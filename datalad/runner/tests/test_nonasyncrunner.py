@@ -17,11 +17,18 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import (
+    Generator,
+    Iterator,
+)
 from itertools import count
 from queue import Queue
 from threading import Thread
 from time import sleep
-from typing import Optional
+from typing import (
+    Any,
+    Optional,
+)
 from unittest.mock import (
     MagicMock,
     patch,
@@ -64,8 +71,8 @@ from .utils import py2cmd
 # Protocol classes used for a set of generator tests later
 class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
     def __init__(self,
-                 done_future=None,
-                 encoding=None):
+                 done_future: Any = None,
+                 encoding: Optional[str] = None) -> None:
 
         StdOutErrCapture.__init__(
             self,
@@ -79,8 +86,8 @@ class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
 
 class GenNothing(GeneratorMixIn, NoCapture):
     def __init__(self,
-                 done_future=None,
-                 encoding=None):
+                 done_future: Any = None,
+                 encoding: Optional[str] = None) -> None:
 
         NoCapture.__init__(
             self,
@@ -97,8 +104,8 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
     self.pipe_data_received that are split inside an encoded character.
     """
     def __init__(self,
-                 done_future=None,
-                 encoding=None):
+                 done_future: Any = None,
+                 encoding: Optional[str] = None) -> None:
 
         StdOutCapture.__init__(
             self,
@@ -110,41 +117,41 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
     def timeout(self, fd: Optional[int]) -> bool:
         return True
 
-    def pipe_data_received(self, fd, data):
+    def pipe_data_received(self, fd: int, data: bytes) -> None:
         for line in self.line_splitter.process(data.decode(self.encoding)):
             self.send_result(line)
 
-    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]):
+    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]) -> None:
         remaining_line = self.line_splitter.finish_processing()
         if remaining_line is not None:
             self.send_result(remaining_line)
 
 
-def test_subprocess_return_code_capture():
+def test_subprocess_return_code_capture() -> None:
 
     class KillProtocol(Protocol):
 
         proc_out = True
         proc_err = True
 
-        def __init__(self, signal_to_send: int, result_pool: dict):
+        def __init__(self, signal_to_send: int, result_pool: dict) -> None:
             super().__init__()
             self.signal_to_send = signal_to_send
             self.result_pool = result_pool
 
-        def connection_made(self, process):
+        def connection_made(self, process: subprocess.Popen) -> None:
             super().connection_made(process)
             process.send_signal(self.signal_to_send)
 
-        def connection_lost(self, exc):
+        def connection_lost(self, exc: Optional[BaseException]) -> None:
             self.result_pool["connection_lost_called"] = (True, exc)
 
-        def process_exited(self):
+        def process_exited(self) -> None:
             self.result_pool["process_exited_called"] = True
 
     # windows doesn't support SIGINT but would need a Ctrl-C
     signal_to_send = signal.SIGTERM if on_windows else signal.SIGINT
-    result_pool = dict()
+    result_pool: dict[str, Any] = dict()
     result = run_command(["waitfor", "/T", "10000", "TheComputerTurnsIntoATulip"]
                          if on_windows
                          else ["sleep", "10000"],
@@ -155,6 +162,7 @@ def test_subprocess_return_code_capture():
                              "result_pool": result_pool
                          },
                          exception_on_error=False)
+    assert isinstance(result, dict)
     if not on_windows:
         # this one specifically tests the SIGINT case, which is not supported
         # on windows
@@ -163,30 +171,34 @@ def test_subprocess_return_code_capture():
     assert_true(result_pool["process_exited_called"])
 
 
-def test_interactive_communication():
+def test_interactive_communication() -> None:
 
     class BidirectionalProtocol(Protocol):
 
         proc_out = True
         proc_err = True
 
-        def __init__(self, result_pool: dict):
+        def __init__(self, result_pool: dict[str, bool]) -> None:
             super().__init__()
             self.state = 0
             self.result_pool = result_pool
 
-        def connection_made(self, process):
+        def connection_made(self, process: subprocess.Popen) -> None:
             super().connection_made(process)
+            assert self.process is not None
+            assert self.process.stdin is not None
             os.write(self.process.stdin.fileno(), b"1 + 1\n")
 
-        def connection_lost(self, exc):
+        def connection_lost(self, exc: Optional[BaseException]) -> None:
             self.result_pool["connection_lost_called"] = True
 
-        def process_exited(self):
+        def process_exited(self) -> None:
             self.result_pool["process_exited_called"] = True
 
-        def pipe_data_received(self, fd, data):
+        def pipe_data_received(self, fd: int, data: bytes) -> None:
             super().pipe_data_received(fd, data)
+            assert self.process is not None
+            assert self.process.stdin is not None
             if self.state == 0:
                 self.state += 1
                 os.write(self.process.stdin.fileno(), b"2 ** 3\n")
@@ -194,7 +206,7 @@ def test_interactive_communication():
                 self.state += 1
                 os.write(self.process.stdin.fileno(), b"exit(0)\n")
 
-    result_pool = dict()
+    result_pool: dict[str, bool] = dict()
     result = run_command([sys.executable, "-i"],
                          BidirectionalProtocol,
                          stdin=subprocess.PIPE,
@@ -202,14 +214,15 @@ def test_interactive_communication():
                             "result_pool": result_pool
                          })
 
+    assert isinstance(result, dict)
     lines = [line.strip() for line in result["stdout"].splitlines()]
     eq_(lines, ["2", "8"])
     assert_true(result_pool["connection_lost_called"], True)
     assert_true(result_pool["process_exited_called"], True)
 
 
-def test_blocking_thread_exit():
-    read_queue = queue.Queue()
+def test_blocking_thread_exit() -> None:
+    read_queue: Queue[tuple[Any, IOState, bytes]] = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     read_file = os.fdopen(read_descriptor, "rb")
@@ -243,8 +256,8 @@ def test_blocking_thread_exit():
     assert_true(read_queue.empty())
 
 
-def test_blocking_read_exception_catching():
-    read_queue = queue.Queue()
+def test_blocking_read_exception_catching() -> None:
+    read_queue: Queue[tuple[Any, IOState, Any]] = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     read_file = os.fdopen(read_descriptor, "rb")
@@ -267,27 +280,23 @@ def test_blocking_read_exception_catching():
     eq_(data, None)
 
 
-def test_blocking_read_closing():
+def test_blocking_read_closing() -> None:
     # Expect that a reader thread exits when os.read throws an error.
-    class FakeFile:
-        def fileno(self):
-            return -1
+    fake_file = MagicMock(**{"fileno.return_value": -1, "close.return_value": None})
 
-        def close(self):
-            pass
-
-    def fake_read(*args):
+    def fake_read(*args: Any) -> None:
         raise ValueError("test exception")
 
-    read_queue = queue.Queue()
+    read_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue()
+    destination_queue: Queue[tuple[Any, IOState, bytes]] = queue.Queue()
     with patch("datalad.runner.runnerthreads.os.read") as read:
         read.side_effect = fake_read
 
         read_thread = ReadThread(
             identifier="test thread",
             user_info=None,
-            source=FakeFile(),
-            destination_queue=None,
+            source=fake_file,
+            destination_queue=destination_queue,
             signal_queues=[read_queue])
 
         read_thread.start()
@@ -297,11 +306,11 @@ def test_blocking_read_closing():
     eq_(data, None)
 
 
-def test_blocking_write_exception_catching():
+def test_blocking_write_exception_catching() -> None:
     # Expect that a blocking writer catches exceptions and exits gracefully.
 
-    write_queue = queue.Queue()
-    signal_queue = queue.Queue()
+    write_queue: Queue[Optional[bytes]] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
@@ -326,10 +335,10 @@ def test_blocking_write_exception_catching():
     eq_(signal_queue.get(), (write_descriptor, IOState.ok, None))
 
 
-def test_blocking_writer_closing():
+def test_blocking_writer_closing() -> None:
     # Expect that a blocking writer closes its file when `None` is sent to it.
-    write_queue = queue.Queue()
-    signal_queue = queue.Queue()
+    write_queue: Queue[Optional[bytes]] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
@@ -351,12 +360,12 @@ def test_blocking_writer_closing():
     eq_(signal_queue.get(), (write_descriptor, IOState.ok, None))
 
 
-def test_blocking_writer_closing_timeout_signal():
+def test_blocking_writer_closing_timeout_signal() -> None:
     # Expect that writer or reader do not block forever on a full signal queue
 
-    write_queue = queue.Queue()
-    signal_queue = queue.Queue(1)
-    signal_queue.put("This is data")
+    write_queue: Queue[Optional[bytes]] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue(1)
+    signal_queue.put(("This is data", IOState.ok, None))
 
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
@@ -375,15 +384,15 @@ def test_blocking_writer_closing_timeout_signal():
 
     write_queue.put(None)
     write_thread.join()
-    eq_(signal_queue.get(), "This is data")
+    eq_(signal_queue.get(), ("This is data", IOState.ok, None))
 
 
-def test_blocking_writer_closing_no_signal():
+def test_blocking_writer_closing_no_signal() -> None:
     # Expect that writer or reader do not block forever on a full signal queue
 
-    write_queue = queue.Queue()
-    signal_queue = queue.Queue(1)
-    signal_queue.put("This is data")
+    write_queue: Queue[Optional[bytes]] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue(1)
+    signal_queue.put(("This is data", IOState.ok, None))
 
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
@@ -404,12 +413,14 @@ def test_blocking_writer_closing_no_signal():
     write_thread.join()
 
 
-def test_inside_async():
-    async def main():
+def test_inside_async() -> None:
+    async def main() -> dict:
         runner = Runner()
-        return runner.run(
+        res = runner.run(
             (["cmd.exe", "/c"] if on_windows else []) + ["echo", "abc"],
             StdOutCapture)
+        assert isinstance(res, dict)
+        return res
 
     result = asyncio.run(main())
     eq_(result["stdout"], "abc" + os.linesep)
@@ -421,11 +432,11 @@ def test_inside_async():
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_popen_invocation(src_path=None, dest_path=None):
+def test_popen_invocation(src_path: str = "", dest_path: str = "") -> None:
     # https://github.com/ReproNim/testkraken/issues/93
     from multiprocessing import Process
 
-    from datalad.api import clone
+    from datalad.api import clone  # type: ignore[attr-defined]
     from datalad.distribution.dataset import Dataset
 
     src = Dataset(src_path).create()
@@ -439,19 +450,20 @@ def test_popen_invocation(src_path=None, dest_path=None):
     assert_false(fetching_data.is_alive(), "Child is stuck!")
 
 
-def test_timeout():
+def test_timeout() -> None:
     # Expect timeout protocol calls on long running process
     # if the specified timeout is short enough
     class TestProtocol(StdOutErrCapture):
 
-        received_timeouts = list()
+        received_timeouts: list[tuple[int, Optional[int]]] = []
 
-        def __init__(self):
+        def __init__(self) -> None:
             StdOutErrCapture.__init__(self)
             self.counter = count()
 
-        def timeout(self, fd: Optional[int]):
-            TestProtocol.received_timeouts.append((self.counter.__next__(), fd))
+        def timeout(self, fd: Optional[int]) -> bool:
+            TestProtocol.received_timeouts.append((next(self.counter), fd))
+            return False
 
     run_command(
         ["waitfor", "/T", "1", "TheComputerTurnsIntoATulip"]
@@ -465,12 +477,12 @@ def test_timeout():
     assert_true(all(map(lambda e: e[1] in (1, 2, None), TestProtocol.received_timeouts)))
 
 
-def test_timeout_nothing():
+def test_timeout_nothing() -> None:
     # Expect timeout protocol calls for the process on long running processes,
     # if the specified timeout is short enough.
     class TestProtocol(NoCapture):
         def __init__(self,
-                     timeout_queue: list):
+                     timeout_queue: list[Optional[int]]) -> None:
             NoCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
@@ -479,12 +491,12 @@ def test_timeout_nothing():
             self.timeout_queue.append(fd)
             return False
 
-    stdin_queue = queue.Queue()
+    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    timeout_queue = []
+    timeout_queue: list[Optional[int]] = []
     run_command(
         py2cmd("import time; time.sleep(.4)\n"),
         stdin=stdin_queue,
@@ -497,25 +509,25 @@ def test_timeout_nothing():
     assert_true(len(timeout_queue) > 0)
 
 
-def test_timeout_stdout_stderr():
+def test_timeout_stdout_stderr() -> None:
     # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
-                     timeout_queue: list):
+                     timeout_queue: list[tuple[int, Optional[int]]]) -> None:
             StdOutErrCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
 
         def timeout(self, fd: Optional[int]) -> bool:
-            self.timeout_queue.append((self.counter.__next__(), fd))
+            self.timeout_queue.append((next(self.counter), fd))
             return False
 
-    stdin_queue = queue.Queue()
+    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    timeout_queue = []
+    timeout_queue: list[tuple[int, Optional[int]]] = []
     run_command(
         py2cmd("import time;time.sleep(.5)\n"),
         stdin=stdin_queue,
@@ -529,28 +541,28 @@ def test_timeout_stdout_stderr():
     sources = (1, 2)
     assert_true(len(timeout_queue) >= len(sources))
     for source in sources:
-        assert_true(any(filter(lambda t: t[1] == source, timeout_queue)))
+        assert_true(any(fd == source for _, fd in timeout_queue))
 
 
-def test_timeout_process():
+def test_timeout_process() -> None:
     # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
-                     timeout_queue: list):
+                     timeout_queue: list[tuple[int, Optional[int]]]) -> None:
             StdOutErrCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
 
         def timeout(self, fd: Optional[int]) -> bool:
-            self.timeout_queue.append((self.counter.__next__(), fd))
+            self.timeout_queue.append((next(self.counter), fd))
             return False
 
-    stdin_queue = queue.Queue()
+    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    timeout_queue = []
+    timeout_queue: list[tuple[int, Optional[int]]] = []
     run_command(
         py2cmd("import time;time.sleep(.5)\n"),
         stdin=stdin_queue,
@@ -564,10 +576,10 @@ def test_timeout_process():
     sources = (1, 2)
     assert_true(len(timeout_queue) >= len(sources))
     for source in sources:
-        assert_true(any(filter(lambda t: t[1] == source, timeout_queue)))
+        assert_true(any(fd == source for _, fd in timeout_queue))
 
 
-def test_exit_3():
+def test_exit_3() -> None:
     # Expect the process to be closed after
     # the generator exits.
     rt = ThreadedRunner(cmd=["sleep", "4"],
@@ -579,7 +591,7 @@ def test_exit_3():
     assert_true(rt.return_code is not None)
 
 
-def test_exit_4():
+def test_exit_4() -> None:
     rt = ThreadedRunner(cmd=["sleep", "4"],
                         stdin=None,
                         protocol_class=GenNothing,
@@ -588,23 +600,25 @@ def test_exit_4():
     assert_true(rt.return_code is not None)
 
 
-def test_generator_throw():
+def test_generator_throw() -> None:
     rt = ThreadedRunner(cmd=["sleep", "4"],
                         stdin=None,
                         protocol_class=GenNothing,
                         timeout=.5)
     gen = rt.run()
+    assert isinstance(gen, Generator)
     assert_raises(ValueError, gen.throw, ValueError, ValueError("abcdefg"))
 
 
-def test_exiting_process():
+def test_exiting_process() -> None:
     result = run_command(py2cmd("import time\ntime.sleep(3)\nprint('exit')"),
                          protocol=NoCapture,
                          stdin=None)
+    assert isinstance(result, dict)
     eq_(result["code"], 0)
 
 
-def test_stalling_detection_1():
+def test_stalling_detection_1() -> None:
     runner = ThreadedRunner("something", StdOutErrCapture, None)
     runner.stdout_enqueueing_thread = None
     runner.stderr_enqueueing_thread = None
@@ -615,7 +629,7 @@ def test_stalling_detection_1():
     eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
 
 
-def test_stalling_detection_2():
+def test_stalling_detection_2() -> None:
     thread_mock = MagicMock()
     thread_mock.is_alive.return_value = False
     runner = ThreadedRunner("something", StdOutErrCapture, None)
@@ -628,7 +642,7 @@ def test_stalling_detection_2():
     eq_(logger.method_calls[0][1][0], "ThreadedRunner.process_queue(): stall detected")
 
 
-def test_concurrent_waiting_run():
+def test_concurrent_waiting_run() -> None:
     from threading import Thread
 
     threaded_runner = ThreadedRunner(
@@ -656,10 +670,10 @@ def test_concurrent_waiting_run():
     assert duration >= 1.0 * number_of_threads
 
 
-def test_concurrent_generator_reading():
+def test_concurrent_generator_reading() -> None:
     number_of_lines = 40
     number_of_threads = 100
-    output_queue = Queue()
+    output_queue: Queue[tuple[int, Optional[str]]] = Queue()
 
     threaded_runner = ThreadedRunner(
         py2cmd(f"for i in range({number_of_lines}): print(f'result#{{i}}')"),
@@ -668,7 +682,7 @@ def test_concurrent_generator_reading():
     )
     result_generator = threaded_runner.run()
 
-    def thread_main(thread_number, result_generator, output_queue):
+    def thread_main(thread_number: int, result_generator: Iterator[str], output_queue: Queue[tuple[int, Optional[str]]]) -> None:
         while True:
             try:
                 output = next(result_generator)
@@ -702,7 +716,7 @@ def test_concurrent_generator_reading():
     ]
 
 
-def test_same_thread_reenter_detection():
+def test_same_thread_reenter_detection() -> None:
     threaded_runner = ThreadedRunner(
         py2cmd(f"print('hello')"),
         protocol_class=GenStdoutLines,
@@ -714,14 +728,14 @@ def test_same_thread_reenter_detection():
     assert "re-entered by already" in str(error.value)
 
 
-def test_reenter_generator_detection():
+def test_reenter_generator_detection() -> None:
     threaded_runner = ThreadedRunner(
         py2cmd(f"print('hello')"),
         protocol_class=GenStdoutLines,
         stdin=None,
     )
 
-    def target(threaded_runner, output_queue):
+    def target(threaded_runner: ThreadedRunner, output_queue: Queue[tuple[str, float | BaseException]]) -> None:
         try:
             start_time = time.time()
             tuple(threaded_runner.run())
@@ -729,7 +743,7 @@ def test_reenter_generator_detection():
         except RuntimeError as exc:
             output_queue.put(("exception", exc))
 
-    output_queue = Queue()
+    output_queue: Queue[tuple[str, float | BaseException]] = Queue()
 
     for sleep_time in range(1, 4):
         other_thread = Thread(
@@ -746,4 +760,5 @@ def test_reenter_generator_detection():
         assert len(list(output_queue.queue)) == 1
         result_type, value = output_queue.get()
         assert result_type == "result"
+        assert isinstance(value, float)
         assert value >= sleep_time
