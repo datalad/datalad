@@ -12,10 +12,14 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 import warnings
 from collections import deque
 from locale import getpreferredencoding
-from typing import Optional
+from typing import (
+    Any,
+    Optional,
+)
 
 from datalad.utils import ensure_unicode
 
@@ -62,7 +66,7 @@ class WitlessProtocol:
     proc_out = False
     proc_err = False
 
-    def __init__(self, done_future=None, encoding=None):
+    def __init__(self, done_future: Any = None, encoding: Optional[str] = None) -> None:
         """
         Parameters
         ----------
@@ -78,9 +82,9 @@ class WitlessProtocol:
                           "and will be removed in a future release",
                           DeprecationWarning)
 
-        self.fd_infos = {}
+        self.fd_infos: dict[int, tuple[str, Optional[bytearray]]] = {}
 
-        self.process = None
+        self.process: Optional[subprocess.Popen] = None
         self.stdout_fileno = 1
         self.stderr_fileno = 2
 
@@ -102,11 +106,12 @@ class WitlessProtocol:
         else:
             self._log = self._log_nolog
 
-    def _log_nolog(self, *args):
+    def _log_nolog(self, fd: int, data: str | bytes) -> None:
         pass
 
-    def _log_summary(self, fd, data):
+    def _log_summary(self, fd: int, data: str | bytes) -> None:
         fd_name = self.fd_infos[fd][0]
+        assert self.process is not None
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
                 len(data), self.process.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
@@ -116,7 +121,7 @@ class WitlessProtocol:
             # fd_name prefix
             lgr.log(5, "%s| %s ", fd_name, log_data)
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc: Optional[BaseException]) -> None:
         """Called when the connection is lost or closed.
 
         The argument is an exception object or None (the latter
@@ -124,18 +129,18 @@ class WitlessProtocol:
         aborted or closed).
         """
 
-    def connection_made(self, process):
+    def connection_made(self, process: subprocess.Popen) -> None:
         self.process = process
         lgr.log(8, 'Process %i started', self.process.pid)
 
-    def pipe_connection_lost(self, fd, exc):
+    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]) -> None:
         """Called when a file descriptor associated with the child process is
         closed.
 
         fd is the int file descriptor that was closed.
         """
 
-    def pipe_data_received(self, fd, data):
+    def pipe_data_received(self, fd: int, data: bytes) -> None:
         self._log(fd, data)
         # Store received output if stream was to be captured.
         fd_name, buffer = self.fd_infos[fd]
@@ -176,7 +181,7 @@ class WitlessProtocol:
         """
         return False
 
-    def _prepare_result(self):
+    def _prepare_result(self) -> dict:
         """Prepares the final result to be returned to the runner
 
         Note for derived classes overwriting this method:
@@ -186,6 +191,7 @@ class WitlessProtocol:
         this exception class as kwargs on error. The Runner will overwrite
         'cmd' and 'cwd' on error, if they are present in the result.
         """
+        assert self.process is not None
         return_code = self.process.poll()
         if return_code is None:
             raise CommandError(
@@ -196,7 +202,7 @@ class WitlessProtocol:
             'Process %i exited with return code %i',
             self.process.pid, return_code)
         # give captured process output back to the runner as string(s)
-        results = {
+        results: dict[str, Any] = {
             name: (
                 bytes(byt).decode(self.encoding)
                 if byt is not None
@@ -206,5 +212,5 @@ class WitlessProtocol:
         results['code'] = return_code
         return results
 
-    def process_exited(self):
+    def process_exited(self) -> None:
         pass

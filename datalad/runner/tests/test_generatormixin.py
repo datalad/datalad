@@ -77,7 +77,7 @@ def test_post_pipe_callbacks():
             self.send_result(1)
             self.send_result(2)
 
-        def connection_lost(self, exc: Optional[Exception]) -> None:
+        def connection_lost(self, exc: Optional[BaseException]) -> None:
             self.send_result(3)
             self.send_result(4)
 
@@ -99,7 +99,7 @@ def test_file_number_activity_detection():
         def process_exited(self):
             self.send_result(3)
 
-        def connection_lost(self, exc: Optional[Exception]) -> None:
+        def connection_lost(self, exc: Optional[BaseException]) -> None:
             self.send_result(4)
 
     wl_runner = WitlessRunner()

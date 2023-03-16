@@ -114,7 +114,7 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
         for line in self.line_splitter.process(data.decode(self.encoding)):
             self.send_result(line)
 
-    def pipe_connection_lost(self, fd: int, exc: Optional[Exception]):
+    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]):
         remaining_line = self.line_splitter.finish_processing()
         if remaining_line is not None:
             self.send_result(remaining_line)
