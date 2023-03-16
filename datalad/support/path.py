@@ -17,13 +17,13 @@ import os
 import os.path as op
 # to not pollute API importing as _
 from collections import defaultdict as _defaultdict
+from collections.abc import Iterator
 from functools import wraps
 from itertools import dropwhile
 from pathlib import (
     Path,
     PurePosixPath,
 )
-from typing import Generator
 
 from ..utils import (
     ensure_bytes,
@@ -65,7 +65,7 @@ realpath = _get_unicode_robust_version(op.realpath)
 sep = op.sep
 
 
-def robust_abspath(p):
+def robust_abspath(p: str | Path) -> str:
     """A helper which would not fail if p is relative and we are in non-existing directory
 
     It will rely on getpwd, which would rely on $PWD env variable to report
@@ -74,18 +74,17 @@ def robust_abspath(p):
     """
     try:
         return abspath(p)
-    except OSError as exc:
+    except OSError:
         if not isabs(p):
             try:
                 os.getcwd()
-                # if no exception raised it was not the reason, raise original
-                raise
-            except:
+            except Exception:
                 return normpath(join(getpwd(), p))
+        # if no exception raised it was not the reason, raise original
         raise
 
 
-def split_ext(filename):
+def split_ext(filename: str) -> tuple[str, str]:
     """Use git-annex's splitShortExtensions rule for splitting extensions.
 
     Parameters
@@ -120,7 +119,7 @@ def split_ext(filename):
     return ".".join(file_parts), "." + ".".join(ext_parts)
 
 
-def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
+def get_parent_paths(paths: list[str], parents: list[str], only_with_parents: bool = False, *, sep: str = '/') -> list[str]:
     """Given a list of children paths, return their parent paths among parents
     or their own path if there is no known parent. A path is also considered its
     own parent (haven't you watched Predestination?) ;)
@@ -165,27 +164,27 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
         return [] if only_with_parents else paths
 
     # We will create a lookup for known parent lengths
-    parents = set(parents)  # O(log(len(parents))) lookup
+    parent_set = set(parents)  # O(log(len(parents))) lookup
 
     # Will be used in sanity checking that we got consistently used separators, i.e.
     # not mixing non-POSIX paths and POSIX parents
     asep = {'/': '\\', '\\': '/'}[sep]
 
-    # rely on path[:n] be quick, and len(parent_lengths) << len(parents)
-    # when len(parents) is large.  We will also bail checking any parent of
+    # rely on path[:n] be quick, and len(parent_lengths) << len(parent_set)
+    # when len(parent_set) is large.  We will also bail checking any parent of
     # the length if at that length path has no directory boundary ('/').
     #
     # Create mapping for each length of
     # parent path to list of parents with that length
-    parent_lengths = _defaultdict(set)
-    for parent in parents:
+    parent_lengths_map: dict[int, set[str]] = _defaultdict(set)
+    for parent in parent_set:
         _get_parent_paths_check(parent, sep, asep)
-        parent_lengths[len(parent)].add(parent)
+        parent_lengths_map[len(parent)].add(parent)
 
     # Make it ordered in the descending order so we select the deepest/longest parent
     # and store them as sets for faster lookup.
     # Could be an ordered dict but no need
-    parent_lengths = [(l, parent_lengths[l]) for l in sorted(parent_lengths, reverse=True)]
+    parent_lengths = [(l, parent_lengths_map[l]) for l in sorted(parent_lengths_map, reverse=True)]
 
     res = []
     seen = set()
@@ -197,7 +196,7 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
             if (len(path) < parent_length) or (len(path) > parent_length and path[parent_length] != sep):
                 continue  # no directory deep enough
             candidate_parent = path[:parent_length]
-            if candidate_parent in parents_:  # O(log(len(parents))) but expected one less due to per length handling
+            if candidate_parent in parents_:  # O(log(len(parent_set))) but expected one less due to per length handling
                 if candidate_parent not in seen:
                     res.append(candidate_parent)
                     seen.add(candidate_parent)
@@ -213,7 +212,7 @@ def get_parent_paths(paths, parents, only_with_parents=False, *, sep='/'):
 
 def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
                         *, include_within_path: bool = False) \
-        -> Generator[str, None, None]:
+        -> Iterator[str]:
     """Among paths (or Path objects) select the ones within filter_paths.
 
     All `paths` and `filter_paths` must be relative and POSIX.
@@ -231,16 +230,15 @@ def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
     path within 'filter_paths' is under that path.
     """
     # do conversion and sanity checks, O(N)
-    def _harmonize_paths(l: list) -> list:
+    def _harmonize_paths(l: list[str | Path]) -> list[tuple[str, ...]]:
         ps = []
         for p in l:
-            if isinstance(p, str):
-                p = PurePosixPath(p)
-            if p.is_absolute():
+            pp = PurePosixPath(p)
+            if pp.is_absolute():
                 raise ValueError(f"Got absolute path {p}, expected relative")
-            if p.parts and p.parts[0] == '..':
+            if pp.parts and pp.parts[0] == '..':
                 raise ValueError(f"Path {p} leads outside")
-            ps.append(p.parts)  # store parts
+            ps.append(pp.parts)  # store parts
         return sorted(ps)  # O(N * log(N))
 
     paths_parts = _harmonize_paths(paths)
@@ -271,7 +269,7 @@ def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
             yield '/'.join(path_parts)
 
 
-def _get_parent_paths_check(path, sep, asep):
+def _get_parent_paths_check(path: str, sep: str, asep: str) -> None:
     """A little helper for get_parent_paths"""
     if isabs(path) or path.startswith(pardir + sep) or path.startswith(curdir + sep):
         raise ValueError("Expected relative within directory paths, got %r" % path)
