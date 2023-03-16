@@ -195,8 +195,7 @@ class WitlessProtocol:
         return_code = self.process.poll()
         if return_code is None:
             raise CommandError(
-                "Got None as a return_code for the process %i",
-                self.process.pid)
+                msg=f"Got None as a return_code for the process {self.process.pid}")
         lgr.log(
             8,
             'Process %i exited with return code %i',
