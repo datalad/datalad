@@ -465,7 +465,8 @@ def test_kill_7013(path=None):
     """check that a recursive kill does not silently skip subdatasets
      contained in subdirectory: github.com/datalad/datalad/issues/7013"""
     ds = Dataset(path).create()
-    (ds.pathobj / 'subdir').mkdir()
+    (ds.pathobj / 'subdir' / 'subsubdir' / 'subsubsubdir').mkdir(parents=True)
+    ds.create('subdir/subdir/subds')
     ds.create('subdir/subds')
     ds.create('subds')
     res = ds.drop(path=['subds', 'subdir'], what='all',
