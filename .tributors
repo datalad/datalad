@@ -238,5 +238,17 @@
     "asmacdo": {
         "name": "Austin Macdonald",
         "blog": "https://github.com/asmacdo"
+    },
+    "nobodyinperson": {
+        "name": "Yann Büchau",
+        "email": "nobodyinperson@posteo.de",
+        "bio": "GitLab: https://gitlab.com/nobodyinperson\r\nPhD student at the University of Tübingen.\r\nHobbies: tinkering, coding, guitar\r\n/\r\ngpg key id: 1E1F9E",
+        "blog": "https://nobodyinperson.de",
+        "orcid": "0000-0003-2472-2051",
+        "affiliation": "Eberhard Karls Universität Tübingen"
+    },
+    "matrss": {
+        "name": "Matthias Riße",
+        "blog": "https://github.com/matrss"
     }
 }
