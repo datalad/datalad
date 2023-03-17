@@ -50,6 +50,8 @@ _TEMP_PATHS_CLONES = set()
 
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
+on_appveyor = bool(os.environ.get('APPVEYOR', False))
+on_nfs = 'nfs' in os.getenv('TMPDIR', '')
 
 if external_versions["cmd:git"] >= "2.28":
     # The specific value here doesn't matter, but it should not be the default
@@ -906,7 +908,7 @@ def with_tempfile(t, **tkwargs):
     ::
 
         @with_tempfile
-        def test_write(tfile):
+        def test_write(tfile=None):
             open(tfile, 'w').write('silly test')
     """
 

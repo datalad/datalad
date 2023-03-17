@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from distutils.version import LooseVersion
 from os.path import curdir
 import shlex
 from os.path import join as opj
