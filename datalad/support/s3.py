@@ -301,7 +301,7 @@ def add_version_to_url(url, version, replace=False):
 
 
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
-                      s3conn=None, update=False):
+                      s3client=None, update=False):
     """Given a url return a versioned URL
 
     Originally targeting AWS S3 buckets with versioning enabled
@@ -335,12 +335,20 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     was_versioned = False
     all_versions = []
 
-    if url_rec.hostname.endswith('.s3.amazonaws.com'):
-        if url_rec.scheme not in ('http', 'https'):
-            raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
-        # bucket name could have . in it, e.g. openneuro.org
-        s3_bucket = url_rec.hostname[:-len('.s3.amazonaws.com')]
-    elif url_rec.hostname == 's3.amazonaws.com':
+
+    # hostname regex allowing optional region code
+    # bucket-name.s3.region-code.amazonaws.com
+    match_virtual_hosted_style = re.match(
+        r"^(.+)(\.s3)(?:[.-][a-z0-9-]+){0,1}(\.amazonaws\.com)$", url_rec.hostname
+    )
+    # s3.region-code.amazonaws.com/bucket-name/key-name
+    match_path_style = re.match(
+        r"^s3(?:\.[a-z0-9-]+){0,1}(\.amazonaws\.com)$", url_rec.hostname
+    )
+
+    if match_virtual_hosted_style is not None:
+        s3_bucket = match_virtual_hosted_style.group(1)
+    elif match_path_style is not None:
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # url is s3.amazonaws.com/bucket/PATH
@@ -358,7 +366,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
 
     if s3_bucket:
         # TODO: cache
-        if s3conn is None:
+        if s3client is None:
             # we need to reuse our providers
             from ..downloaders.providers import Providers
             providers = Providers.from_config_files()
@@ -366,40 +374,51 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             s3provider = providers.get_provider(s3url)
             authenticator = s3provider.authenticator
             if not authenticator:
-                # We will use anonymous one
+                # we will use the default one
                 from ..downloaders.s3 import S3Authenticator
                 authenticator = S3Authenticator()
-            if authenticator.bucket is not None and authenticator.bucket.name == s3_bucket:
+            if authenticator.client is not None:
                 # we have established connection before, so let's just reuse
-                bucket = authenticator.bucket
+                s3client = authenticator.client
             else:
-                bucket = authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
-        else:
-            bucket = s3conn.get_bucket(s3_bucket)
+                s3client = authenticator.authenticate(s3_bucket, s3provider.credential)
 
         supports_versioning = True  # assume that it does
         try:
-            supports_versioning = bucket.get_versioning_status()  # TODO cache
-        except S3ResponseError as e:
+            # Status can be "Enabled" | "Suspended", or missing altogether
+            response = s3client.get_bucket_versioning(Bucket=s3_bucket)
+            supports_versioning = response.get("Status") == "Enabled"
+        except ClientError as e:
             # might be forbidden, i.e. "403 Forbidden" so we try then anyways
             supports_versioning = 'maybe'
 
         if supports_versioning:
-            all_keys = bucket.list_versions(fpath)
+            response = s3client.list_object_versions(
+                Bucket=s3_bucket,
+                Prefix=fpath,
+            )
+
+            all_keys = response.get("Versions", [])
             # Filter and sort them so the newest one on top
-            all_keys = [x for x in sorted(all_keys, key=lambda x: (x.last_modified, x.is_latest))
-                        if ((x.name == fpath)  # match exact name, not just prefix
-                            )
-                        ][::-1]
+            all_keys = [
+                x
+                for x in sorted(
+                    all_keys,
+                    key=lambda x: (x["LastModified"], x["IsLatest"]),
+                    reverse=True,
+                )
+                if ((x["Key"] == fpath))  # match exact name, not just prefix
+            ]
+
             # our current assumptions
-            assert(all_keys[0].is_latest)
-            # and now filter out delete markers etc
-            all_keys = [x for x in all_keys if isinstance(x, Key)]  # ignore DeleteMarkers
-            assert(all_keys)
+            assert all_keys[0]["IsLatest"]
+
+            # boto compatibility note: boto3 response should separate
+            # Versions & DeleteMarkers, no action needed
 
             for key in all_keys:
                 url_versioned = add_version_to_url(
-                    url_rec, key.version_id, replace=update and not return_all)
+                    url_rec, key["VersionId"], replace=update and not return_all)
 
                 all_versions.append(url_versioned)
                 if verify:
