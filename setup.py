@@ -40,7 +40,7 @@ requires = {
         'looseversion',
     ],
     'downloaders': [
-        'boto',
+        'boto3',
         'keyring>=20.0,!=23.9.0',
         'keyrings.alt',
         'msgpack',
