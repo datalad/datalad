@@ -188,11 +188,11 @@ class S3DownloaderSession(DownloaderSession):
         if f:
             # TODO: May be we could use If-Modified-Since
             # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-            # note (mslw): in boto3, see client.head_object(IfModifiedSince)
+            # note (MSz): in boto3, see client.head_object(IfModifiedSince)
             self.client.download_fileobj(
                 Fileobj=f,
                 Callback=pbar_callback,
-                **self.download_kwargs,  # Bucket, Key, ExtraArgs (todo: explicit?)
+                **self.download_kwargs,  # Bucket, Key, ExtraArgs
             )
         else:
             # return the contents of the file as bytes
@@ -292,6 +292,16 @@ class S3Downloader(BaseDownloader):
                 "Credential %s has expired" % self.credential)
 
     def get_downloader_session(self, url, **kwargs):
+        """Create a DownloaderSession for a given URL
+
+        This function sets up a DownloaderSession object and reads the
+        information necessary (e.g. size, headers) by issuing a
+        head_object query.
+
+        Returns
+        -------
+        S3DownloaderSession
+        """
         bucket_name, url_filepath, params = self._parse_url(url)
         if params:
             newkeys = set(params.keys()) - {'versionId'}
@@ -306,13 +316,14 @@ class S3Downloader(BaseDownloader):
 
         self._check_credential()
 
+        # this is where the *real* access check (for the object) will happen;
+        # may raise botocore.exceptions.ClientError for 404 not found
+        # or 403 forbidden
         object_meta = self.client.head_object(
             Bucket=bucket_name,
             Key=url_filepath,
             **extra_args,
         )
-        # the above may raise botocore.exceptions.ClientError
-        # for 404 not found or 403 forbidden
 
         target_size = object_meta.get('ContentLength')  # S3 specific
         headers = self.get_obj_headers(
@@ -321,8 +332,9 @@ class S3Downloader(BaseDownloader):
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        # head_object will report VersionId if found, but we don't take it from
-        # there, only from the URL; original comment by yoh below
+        # head_object also reports VersionId if found, but we don't
+        # take it from there, only from the URL; original comment by
+        # yoh below
         #
         # It is a good idea in general to avoid race between moment of retrieving
         # the key information and actual download.
@@ -356,9 +368,11 @@ class S3Downloader(BaseDownloader):
     def get_obj_headers(cls, obj_meta, other=None):
         """Get a headers dict from head_object output
 
-        Picks, renames, and converts certain keys. Some (like
-        Content-Disposition) may need to be added via kwargs. Note:
-        the head_obj_metaect output also includes the relevant
+        Picks, renames, and converts certain keys from the boto3
+        head_object response. Some (like Content-Disposition) may need
+        to be added via kwargs.
+
+        Note: the head_object output also includes the relevant
         information under ['ResponseMetadata']['HTTPHeaders']
         (possibly using different data type), but this function only
         uses top-level keys.
