@@ -37,7 +37,7 @@ Command calls can include an ``on_failure`` parameterization to specify how to
 proceed with a particular operation if a returned result record is
 :ref:`classified as a failure result <target-result-status>`. Command calls can
 also include a ``result_renderer`` parameterization to explicitly enable or
-disable the handling and rendering of result records.
+disable the rendering of result records.
 
 Developers should be aware that external callers will use command call parameterizations
 that can selectively ignore or act on result records, and that the process should therefore
