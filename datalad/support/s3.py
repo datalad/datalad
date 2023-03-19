@@ -135,7 +135,7 @@ def gen_test_bucket(bucket_name):
         lgr.info("Deleting existing bucket %s", bucket.name)
         prune_and_delete_bucket(bucket)
     # by default, bucket is created in us-east, leading to constraint exception
-    # if user has different (endpoint) region in config; now using the latter
+    # if user has different (endpoint) region in config - read & use the latter
     bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
     return bucket
 
@@ -320,6 +320,9 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     verify: bool, optional
       Verify that URL is accessible. As discovered some versioned keys might
       be denied access to
+    s3client: botocore.client.S3, optional
+      A boto3 client instance that will be used to interact with AWS; if None,
+      a new one will be created.
     update : bool, optional
       If the URL already contains a version ID, update it to the latest version
       ID.  This option has no effect if return_all is true.
@@ -336,7 +339,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     all_versions = []
 
 
-    # hostname regex allowing optional region code
+    # hostname regex match allowing optional region code
     # bucket-name.s3.region-code.amazonaws.com
     match_virtual_hosted_style = re.match(
         r"^(.+)(\.s3)(?:[.-][a-z0-9-]+){0,1}(\.amazonaws\.com)$", url_rec.hostname
