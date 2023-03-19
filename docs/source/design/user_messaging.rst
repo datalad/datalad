@@ -65,7 +65,7 @@ results records which could be ignored or unseen by the user.
 
 .. note::
    In the case of a complex set of dependent actions it could be expensive to
-   confirm parameter violations. In such cases, initial sub-processes might already generate
+   confirm parameter violations. In such cases, initial sub-routines might already generate
    result records that have to be inspected by the caller, and it could be practically better
    to yield a result record (with ``status=[error|impossible]``) to communicate the failure.
    It would then be up to the upstream caller to decide whether to specify
