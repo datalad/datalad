@@ -10,16 +10,28 @@
 
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import os.path as op
 import posixpath
 import re
+import subprocess
 import warnings
-from collections.abc import Mapping
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from functools import wraps
 from itertools import chain
-from os import linesep
+from os import (
+    PathLike,
+    linesep,
+)
 from os.path import (
     commonprefix,
     curdir,
@@ -32,6 +44,17 @@ from os.path import (
     pardir,
     relpath,
     sep,
+)
+from re import Pattern
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
 )
 
 import datalad.utils as ut
@@ -61,6 +84,15 @@ from datalad.log import log_progress
 from datalad.support.due import (
     Doi,
     due,
+)
+from datalad.typing import (
+    Concatenate,
+    Literal,
+    P,
+    Protocol,
+    Self,
+    T,
+    TypedDict,
 )
 from datalad.utils import (
     Path,
@@ -92,7 +124,13 @@ from .network import (
     PathRI,
     is_ssh,
 )
-from .path import get_parent_paths, get_filtered_paths_
+from .path import (
+    get_filtered_paths_,
+    get_parent_paths,
+)
+
+if TYPE_CHECKING:
+    from datalad.distribution.dataset import Dataset
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -101,9 +139,11 @@ _pardirsep = pardir + sep
 
 lgr = logging.getLogger('datalad.gitrepo')
 
+Option = Union[str, bool, None, List[Union[str, bool, None]], Tuple[Union[str, bool, None], ...]]
+
 
 # outside the repo base classes only used in ConfigManager
-def to_options(split_single_char_options=True, **kwargs):
+def to_options(split_single_char_options: bool = True, **kwargs: Option) -> list[str]:
     """Transform keyword arguments into a list of cmdline options
 
     Imported from GitPython.
@@ -123,10 +163,10 @@ def to_options(split_single_char_options=True, **kwargs):
     -------
     list
     """
-    def dashify(string):
+    def dashify(string: str) -> str:
         return string.replace('_', '-')
 
-    def transform_kwarg(name, value, split_single_char_options):
+    def transform_kwarg(name: str, value: str | bool | None, split_single_char_options: bool) -> list[str]:
         if len(name) == 1:
             if value is True:
                 return ["-%s" % name]
@@ -143,8 +183,7 @@ def to_options(split_single_char_options=True, **kwargs):
         return []
 
     args = []
-    kwargs = dict(sorted(kwargs.items(), key=lambda x: x[0]))
-    for k, v in kwargs.items():
+    for k, v in sorted(kwargs.items()):
         if isinstance(v, (list, tuple)):
             for value in v:
                 args += transform_kwarg(k, value, split_single_char_options)
@@ -153,7 +192,7 @@ def to_options(split_single_char_options=True, **kwargs):
     return args
 
 
-def _normalize_path(base_dir, path):
+def _normalize_path(base_dir: str, path: str) -> str:
     """Helper to check paths passed to methods of this class.
 
     Checks whether `path` is beneath `base_dir` and normalizes it.
@@ -214,8 +253,12 @@ def _normalize_path(base_dir, path):
     return relpath(path, start=base_dir)
 
 
+class _WithPath(Protocol):
+    path: str
+
+
 @optional_args
-def normalize_path(func):
+def normalize_path(func: Callable[Concatenate[_WithPath, str, P], T]) -> Callable[Concatenate[_WithPath, str, P], T]:
     """Decorator to provide unified path conversion for a single file
 
     Unlike normalize_paths, intended to be used for functions dealing with a
@@ -232,7 +275,7 @@ def normalize_path(func):
     """
 
     @wraps(func)
-    def  _wrap_normalize_path(self, file_, *args, **kwargs):
+    def  _wrap_normalize_path(self: _WithPath, file_: str, *args: P.args, **kwargs: P.kwargs) -> T:
         file_new = _normalize_path(self.path, file_)
         return func(self, file_new, *args, **kwargs)
 
@@ -353,7 +396,7 @@ if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
     # these deeper levels out so that save_() doesn't fail trying to add them.
     #
     # This regression fixed with upstream's 072a231016 (2019-12-10).
-    def _prune_deeper_repos(repos):
+    def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
         firstlevel_repos = []
         prev = None
         for repo in sorted(repos):
@@ -362,7 +405,7 @@ if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
                 firstlevel_repos.append(repo)
         return firstlevel_repos
 else:
-    def _prune_deeper_repos(repos):
+    def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
         return repos
 
 
@@ -397,21 +440,23 @@ class GitProgress(WitlessProtocol):
         CHECKING_OUT: ("Check out", "Things"),
     }
 
-    __slots__ = ('_seen_ops', '_pbars', '_encoding')
+    __slots__ = ('_unprocessed', '_seen_ops', '_pbars')
 
     re_op_absolute = re.compile(r"(remote: )?([\w\s]+):\s+()(\d+)()(.*)")
     re_op_relative = re.compile(r"(remote: )?([\w\s]+):\s+(\d+)% \((\d+)/(\d+)\)(.*)")
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        self._unprocessed = None
+    def __init__(self, done_future: Any = None, encoding: Optional[str] = None) -> None:
+        super().__init__(done_future=done_future, encoding=encoding)
+        self._unprocessed: Optional[bytes] = None
+        self._seen_ops: list[int] = []
+        self._pbars: set[str] = set()
 
-    def connection_made(self, transport):
+    def connection_made(self, transport: subprocess.Popen) -> None:
         super().connection_made(transport)
         self._seen_ops = []
         self._pbars = set()
 
-    def process_exited(self):
+    def process_exited(self) -> None:
         # take down any progress bars that were not closed orderly
         for pbar_id in self._pbars:
             log_progress(
@@ -421,7 +466,7 @@ class GitProgress(WitlessProtocol):
             )
         super().process_exited()
 
-    def pipe_data_received(self, fd, byts):
+    def pipe_data_received(self, fd: int, byts: bytes) -> None:
         # progress reports only come from stderr
         if fd != 2:
             # let the base class decide what to do with it
@@ -448,7 +493,7 @@ class GitProgress(WitlessProtocol):
                     # it to become a recognizable progress report
                     self._unprocessed = line
 
-    def _parse_progress_line(self, line):
+    def _parse_progress_line(self, line: bytes) -> bool:
         """Process a single line
 
         Parameters
@@ -465,28 +510,28 @@ class GitProgress(WitlessProtocol):
         # Compressing objects:  50% (1/2)
         # Compressing objects: 100% (2/2)
         # Compressing objects: 100% (2/2), done.
-        line = line.decode(self.encoding) if isinstance(line, bytes) else line
-        if line.startswith(('warning:', 'error:', 'fatal:')):
+        sline = line.decode(self.encoding)
+        if sline.startswith(('warning:', 'error:', 'fatal:')):
             return False
 
         # find escape characters and cut them away - regex will not work with
         # them as they are non-ascii. As git might expect a tty, it will send them
         last_valid_index = None
-        for i, c in enumerate(reversed(line)):
+        for i, c in enumerate(reversed(sline)):
             if ord(c) < 32:
                 # its a slice index
                 last_valid_index = -i - 1
             # END character was non-ascii
-        # END for each character in line
+        # END for each character in sline
         if last_valid_index is not None:
-            line = line[:last_valid_index]
+            sline = sline[:last_valid_index]
         # END cut away invalid part
-        line = line.rstrip()
+        sline = sline.rstrip()
 
         cur_count, max_count = None, None
-        match = self.re_op_relative.match(line)
+        match = self.re_op_relative.match(sline)
         if match is None:
-            match = self.re_op_absolute.match(line)
+            match = self.re_op_absolute.match(sline)
 
         if not match:
             return False
@@ -519,7 +564,7 @@ class GitProgress(WitlessProtocol):
             # This can't really be prevented.
             lgr.debug(
                 'Output line matched a progress report of an unknown type: %s',
-                line)
+                sline)
             # TODO investigate if there is any chance that we might swallow
             # important info -- until them do not flag this line
             # as progress
@@ -565,7 +610,7 @@ class GitProgress(WitlessProtocol):
             log_progress(
                 lgr.info,
                 pbar_id,
-                line,
+                sline,
                 update=float(cur_count),
                 noninteractive_level=logging.DEBUG,
             )
@@ -625,7 +670,7 @@ class FetchInfo(dict):
     }
 
     @classmethod
-    def _from_line(cls, line):
+    def _from_line(cls, line: str) -> FetchInfo:
         """Parse information from the given line as returned by git-fetch -v
         and return a new FetchInfo object representing this information.
         """
@@ -715,7 +760,7 @@ class PushInfo(dict):
     }
 
     @classmethod
-    def _from_line(cls, line):
+    def _from_line(cls, line: str) -> PushInfo:
         """Create a new PushInfo instance as parsed from line which is expected to be like
             refs/heads/master:refs/heads/master 05d2687..1d0568e as bytes"""
         control_character, from_to, summary = line.split('\t', 3)
@@ -772,6 +817,14 @@ class PushInfo(dict):
         )
 
 
+InfoT = TypeVar("InfoT", FetchInfo, PushInfo)
+
+
+class GitAddOutput(TypedDict):
+    file: str
+    success: bool
+
+
 @path_based_str_repr
 class GitRepo(CoreGitRepo):
     """Representation of a git repository
@@ -785,7 +838,7 @@ class GitRepo(CoreGitRepo):
     git_version = None
 
     @classmethod
-    def _check_git_version(cls):
+    def _check_git_version(cls) -> None:
         external_versions.check("cmd:git", min_version=cls.GIT_MIN_VERSION)
         cls.git_version = external_versions['cmd:git']
 
@@ -796,10 +849,10 @@ class GitRepo(CoreGitRepo):
                # override path since there is no need ATM for such details
                path="datalad",
                description="DataLad - Data management and distribution platform")
-    def __init__(self, path, runner=None, create=True,
-                 git_opts=None, repo=None, fake_dates=False,
-                 create_sanity_checks=True,
-                 **kwargs):
+    def __init__(self, path: str, runner: Any = None, create: bool = True,
+                 git_opts: Optional[dict[str, Any]] = None, repo: Any = None,
+                 fake_dates: bool = False, create_sanity_checks: bool = True,
+                 **kwargs: Any) -> None:
         """Creates representation of git repository at `path`.
 
         Can also be used to create a git repository at `path`.
@@ -898,10 +951,11 @@ class GitRepo(CoreGitRepo):
             from_cmdline = git_opts.pop('_from_cmdline_', [])
             self.init(
                 sanity_checks=create_sanity_checks,
-                init_options=from_cmdline + to_options(**git_opts),
+                init_options=from_cmdline + to_options(True, **git_opts),
             )
 
         # with DryRunProtocol path might still not exist
+        self.inode: Optional[int]
         if exists(self.path):
             self.inode = os.stat(self.path).st_ino
         else:
@@ -911,7 +965,7 @@ class GitRepo(CoreGitRepo):
             self.configure_fake_dates()
 
     @property
-    def bare(self):
+    def bare(self) -> bool:
         """Returns a bool indicating whether the repository is bare
 
         Importantly, this is not reporting the configuration value
@@ -924,7 +978,7 @@ class GitRepo(CoreGitRepo):
         return self.pathobj == self.dot_git
 
     @classmethod
-    def clone(cls, url, path, *args, clone_options=None, **kwargs):
+    def clone(cls, url: str, path: str, *args: Any, clone_options: Optional[list[str] | dict[str, Option]] = None, **kwargs: Any) -> Self:
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -1008,7 +1062,7 @@ class GitRepo(CoreGitRepo):
         cmd = cls._git_cmd_prefix + ['clone', '--progress']
         if clone_options:
             if isinstance(clone_options, Mapping):
-                clone_options = to_options(**clone_options)
+                clone_options = to_options(True, **clone_options)
             cmd.extend(clone_options)
         cmd.extend([url, path])
 
@@ -1072,9 +1126,8 @@ class GitRepo(CoreGitRepo):
                 if Path(git_url).is_absolute():
                     # Git created an absolute path from a relative URL.
                     git_url = op.relpath(git_url, gr.path)
-                path = Path(git_url)
                 # always in POSIX even on Windows
-                path = path.as_posix()
+                path = Path(git_url).as_posix()
                 gr.config.set(remote_url, path,
                               scope='local', force=True)
         return gr
@@ -1091,7 +1144,7 @@ class GitRepo(CoreGitRepo):
     #     # stalls etc
     #     self._cfg = None
 
-    def is_valid_git(self):
+    def is_valid_git(self) -> bool:
         """Returns whether the underlying repository appears to be still valid
 
         Note, that this almost identical to the classmethod is_valid_repo().
@@ -1109,12 +1162,12 @@ class GitRepo(CoreGitRepo):
         return self.is_valid()
 
     @classmethod
-    def is_valid_repo(cls, path):
+    def is_valid_repo(cls, path: str) -> bool:
         """Returns if a given path points to a git repository"""
         return cls.is_valid(path)
 
     @staticmethod
-    def get_git_dir(repo):
+    def get_git_dir(repo: str | GitRepo) -> str:
         """figure out a repo's gitdir
 
         '.git' might be a  directory, a symlink or a file
@@ -1153,7 +1206,7 @@ class GitRepo(CoreGitRepo):
         # just proxy the core repo APIs property for backward-compatibility
         return self.cfg
 
-    def is_with_annex(self):
+    def is_with_annex(self) -> bool:
         """Report if GitRepo (assumed) has (remotes with) a git-annex branch
         """
         return any(
@@ -1162,7 +1215,7 @@ class GitRepo(CoreGitRepo):
         )
 
     @classmethod
-    def get_toppath(cls, path, follow_up=True, git_options=None):
+    def get_toppath(cls, path: str, follow_up: bool = True, git_options: Optional[list[str]] = None) -> Optional[str]:
         """Return top-level of a repository given the path.
 
         Parameters
@@ -1183,6 +1236,7 @@ class GitRepo(CoreGitRepo):
         try:
             out = GitWitlessRunner(cwd=path).run(
                 cmd, protocol=StdOutErrCapture)
+            assert isinstance(out, dict)
             toppath = out['stdout'].rstrip('\n\r')
         except CommandError:
             return None
@@ -1207,7 +1261,7 @@ class GitRepo(CoreGitRepo):
         return toppath
 
     @normalize_paths
-    def add(self, files, git=True, git_options=None, update=False):
+    def add(self, files: list[str], git: bool = True, git_options: Optional[list[str]] = None, update: bool = False) -> list[GitAddOutput]:
         """Adds file(s) to the repository.
 
         Parameters
@@ -1238,7 +1292,7 @@ class GitRepo(CoreGitRepo):
         return list(GitRepo.add_(self, files, git=git, git_options=git_options,
                     update=update))
 
-    def add_(self, files, git=True, git_options=None, update=False):
+    def add_(self, files: list[str], git: bool = True, git_options: Optional[list[str]] = None, update: bool = False) -> Iterator[GitAddOutput]:
         """Like `add`, but returns a generator"""
         # TODO: git_options is used as options for the git-add here,
         # instead of options to the git executable => rename for consistency
@@ -1303,17 +1357,17 @@ class GitRepo(CoreGitRepo):
         return
 
     @staticmethod
-    def _process_git_get_output(stdout, stderr=None):
+    def _process_git_get_output(stdout: str | bytes, stderr: Any = None) -> list[GitAddOutput]:
         """Given both outputs (stderr is ignored atm) of git add - process it
 
         Primarily to centralize handling in both indirect annex and direct
         modes when ran through proxy
         """
-        return [{u'file': f, u'success': True}
+        return [{'file': f, 'success': True}
                 for f in re.findall("'(.*)'[\n$]", ensure_unicode(stdout))]
 
     @normalize_paths(match_return_type=False)
-    def remove(self, files, recursive=False, **kwargs):
+    def remove(self, files: list[str], recursive: bool = False, **kwargs: Option) -> list[str]:
         """Remove files.
 
         Calls git-rm.
@@ -1345,28 +1399,28 @@ class GitRepo(CoreGitRepo):
         return [
             line.strip()[4:-1]
             for line in self.call_git_items_(
-                ['rm'] + to_options(**kwargs), files=files, pathspec_from_file=True)
+                ['rm'] + to_options(True, **kwargs), files=files, pathspec_from_file=True)
         ]
 
-    def precommit(self):
+    def precommit(self) -> None:
         """Perform pre-commit maintenance tasks
         """
         # we used to clean up GitPython here
         pass
 
     @staticmethod
-    def _get_prefixed_commit_msg(msg):
+    def _get_prefixed_commit_msg(msg: Optional[str]) -> str:
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
-    def configure_fake_dates(self):
+    def configure_fake_dates(self) -> None:
         """Configure repository to use fake dates.
         """
         lgr.debug("Enabling fake dates")
         self.config.set("datalad.fake-dates", "true")
 
     @property
-    def fake_dates_enabled(self):
+    def fake_dates_enabled(self) -> bool:
         """Is the repository configured to use fake dates?
         """
         # this turned into a private property of the CoreGitRepo
@@ -1376,8 +1430,10 @@ class GitRepo(CoreGitRepo):
         # was renamed in CoreGitRepo
         return self.add_fake_dates_to_env(env)
 
-    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
-               files=None, date=None, index_file=None):
+    def commit(self, msg: Optional[str] = None,
+               options: Optional[list[str]] = None, _datalad_msg: bool = False,
+               careless: bool = True, files: Optional[list[str]] = None,
+               date: Optional[str] = None, index_file: Optional[str] = None) -> None:
         """Commit changes to git.
 
         Parameters
@@ -1497,7 +1553,7 @@ class GitRepo(CoreGitRepo):
 
     # TODO usage is only in the tests, consider making a test helper and
     # remove from GitRepo API
-    def get_indexed_files(self):
+    def get_indexed_files(self) -> list[str]:
         """Get a list of files in git's index
 
         Returns
@@ -1512,7 +1568,7 @@ class GitRepo(CoreGitRepo):
                 paths=None, ref=None, untracked='no')
         ]
 
-    def format_commit(self, fmt, commitish=None):
+    def format_commit(self, fmt: str, commitish: Optional[str] = None) -> Optional[str]:
         """Return `git show` output for `commitish`.
 
         Parameters
@@ -1551,7 +1607,7 @@ class GitRepo(CoreGitRepo):
         # compatibility across platforms.
         return stdout.rsplit("\0", 1)[0]
 
-    def get_hexsha(self, commitish=None, short=False):
+    def get_hexsha(self, commitish: Optional[str] = None, short: bool = False) -> Optional[str]:
         """Return a hexsha for a given commitish.
 
         Parameters
@@ -1587,7 +1643,7 @@ class GitRepo(CoreGitRepo):
             raise ValueError("Unknown commit identifier: %s" % commitish)
 
     @normalize_paths(match_return_type=False)
-    def get_last_commit_hexsha(self, files):
+    def get_last_commit_hexsha(self, files: list[str]) -> Optional[str]:
         """Return the hash of the last commit the modified any of the given
         paths"""
         try:
@@ -1605,7 +1661,7 @@ class GitRepo(CoreGitRepo):
                 return None
             raise
 
-    def get_revisions(self, revrange=None, fmt="%H", options=None):
+    def get_revisions(self, revrange: str | list[str] | None = None, fmt: str = "%H", options: Optional[list[str]] = None) -> list[str]:
         """Return list of revisions in `revrange`.
 
         Parameters
@@ -1639,7 +1695,7 @@ class GitRepo(CoreGitRepo):
             raise
         return stdout.splitlines()
 
-    def commit_exists(self, commitish):
+    def commit_exists(self, commitish: str) -> bool:
         """Does `commitish` exist in the repo?
 
         Parameters
@@ -1659,7 +1715,7 @@ class GitRepo(CoreGitRepo):
             read_only=True,
         )
 
-    def get_merge_base(self, commitishes):
+    def get_merge_base(self, commitishes: str | list[str]) -> Optional[str]:
         """Get a merge base hexsha
 
         Parameters
@@ -1680,7 +1736,10 @@ class GitRepo(CoreGitRepo):
         if not commitishes:
             raise ValueError("Provide at least a single value")
         elif len(commitishes) == 1:
-            commitishes = commitishes + [self.get_active_branch()]
+            branch = self.get_active_branch()
+            if branch is None:
+                raise ValueError("Single commitish provided and no active branch")
+            commitishes = commitishes + [branch]
 
         try:
             base = self.call_git_oneline(['merge-base'] + commitishes,
@@ -1695,7 +1754,7 @@ class GitRepo(CoreGitRepo):
 
         return base
 
-    def is_ancestor(self, reva, revb):
+    def is_ancestor(self, reva: str, revb: str) -> bool:
         """Is `reva` an ancestor of `revb`?
 
         Parameters
@@ -1711,7 +1770,7 @@ class GitRepo(CoreGitRepo):
             ["merge-base", "--is-ancestor", reva, revb],
             read_only=True)
 
-    def get_commit_date(self, branch=None, date='authored'):
+    def get_commit_date(self, branch: Optional[str] = None, date: str = 'authored') -> Optional[int]:
         """Get the date stamp of the last commit (in a branch or head otherwise)
 
         Parameters
@@ -1734,7 +1793,7 @@ class GitRepo(CoreGitRepo):
         d = self.format_commit(format, commitish=branch)
         return int(d) if d else None
 
-    def get_active_branch(self):
+    def get_active_branch(self) -> Optional[str]:
         """Get the name of the active branch
 
         Returns
@@ -1754,11 +1813,11 @@ class GitRepo(CoreGitRepo):
                 raise e
         return out.strip()[11:]  # strip refs/heads/
 
-    def get_corresponding_branch(self, branch=None):
+    def get_corresponding_branch(self, branch: Any = None) -> Optional[str]:
         """Always returns None, a plain GitRepo has no managed branches"""
         return None
 
-    def get_branches(self):
+    def get_branches(self) -> list[str]:
         """Get all branches of the repo.
 
         Returns
@@ -1772,7 +1831,7 @@ class GitRepo(CoreGitRepo):
             for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/heads')
         ]
 
-    def get_remote_branches(self):
+    def get_remote_branches(self) -> list[str]:
         """Get all branches of all remotes of the repo.
 
         Returns
@@ -1790,7 +1849,7 @@ class GitRepo(CoreGitRepo):
             for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/remotes')
         ]
 
-    def get_remotes(self, with_urls_only=False):
+    def get_remotes(self, with_urls_only: bool = False) -> list[str]:
         """Get known remotes of the repository
 
         Parameters
@@ -1818,7 +1877,7 @@ class GitRepo(CoreGitRepo):
 
     # TODO this is practically unused outside the tests, consider turning
     # into a test helper and trim from the API
-    def get_files(self, branch=None):
+    def get_files(self, branch: Optional[str] = None) -> list[str]:
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -1839,7 +1898,7 @@ class GitRepo(CoreGitRepo):
                 paths=None, ref=branch, untracked='no')
             ]
 
-    def add_remote(self, name, url, options=None):
+    def add_remote(self, name: str, url: str, options: Optional[list[str]] = None) -> tuple[str, str]:
         """Register remote pointing to a url
         """
         cmd = ['remote', 'add']
@@ -1853,7 +1912,7 @@ class GitRepo(CoreGitRepo):
         self.config.reload()
         return result
 
-    def remove_remote(self, name):
+    def remove_remote(self, name: str) -> None:
         """Remove existing remote
         """
 
@@ -1876,7 +1935,7 @@ class GitRepo(CoreGitRepo):
         self.config.reload()
         return
 
-    def _maybe_open_ssh_connection(self, remote, prefer_push=True):
+    def _maybe_open_ssh_connection(self, remote: Optional[str], prefer_push: bool = True) -> None:
         """Open connection if `remote` has an SSH URL.
 
         Doing so enables SSH caching, preventing datalad-sshrun subprocesses
@@ -1897,19 +1956,19 @@ class GitRepo(CoreGitRepo):
             if url and is_ssh(url):
                 ssh_manager.get_connection(url).open()
 
-    def update_remote(self, name=None, verbose=False):
+    def update_remote(self, name: Optional[str] = None, verbose: bool = False) -> None:
         """
         """
         options = ["-v"] if verbose else []
         self._maybe_open_ssh_connection(name)
-        name = [name] if name else []
+        namelst = [name] if name else []
         self.call_git(
-            ['remote'] + name + ['update'] + options,
+            ['remote'] + namelst + ['update'] + options,
             expect_stderr=True
         )
 
-    def fetch(self, remote=None, refspec=None, all_=False, git_options=None,
-              **kwargs):
+    def fetch(self, remote: Optional[str] = None, refspec: str | list[str] | None = None, all_: bool = False, git_options: Optional[list[str]] = None,
+              **kwargs: Option) -> list[FetchInfo]:
         """Fetches changes from a remote (or all remotes).
 
         Parameters
@@ -1930,7 +1989,7 @@ class GitRepo(CoreGitRepo):
         """
         git_options = ensure_list(git_options)
         if kwargs:
-            git_options.extend(to_options(**kwargs))
+            git_options.extend(to_options(True, **kwargs))
         return list(
             self.fetch_(
                 remote=remote,
@@ -1940,7 +1999,7 @@ class GitRepo(CoreGitRepo):
             )
         )
 
-    def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
+    def fetch_(self, remote: Optional[str] = None, refspec: str | list[str] | None = None, all_: bool = False, git_options: Optional[list[str]] = None) -> Iterator[FetchInfo]:
         """Like `fetch`, but returns a generator"""
         yield from self._fetch_push_helper(
             base_cmd=self._git_cmd_prefix + ['fetch', '--verbose', '--progress'],
@@ -1955,8 +2014,8 @@ class GitRepo(CoreGitRepo):
             all_=all_,
             git_options=git_options)
 
-    def push(self, remote=None, refspec=None, all_remotes=False,
-             all_=False, git_options=None, **kwargs):
+    def push(self, remote: Optional[str] = None, refspec: str | list[str] | None = None, all_remotes: bool = False,
+             all_: bool = False, git_options: Optional[list[str]] = None, **kwargs: Option) -> list[PushInfo]:
         """Push changes to a remote (or all remotes).
 
         If remote and refspec are specified, and remote has
@@ -1985,7 +2044,7 @@ class GitRepo(CoreGitRepo):
         """
         git_options = ensure_list(git_options)
         if kwargs:
-            git_options.extend(to_options(**kwargs))
+            git_options.extend(to_options(True, **kwargs))
         if all_remotes:
             # be nice to the elderly
             all_ = True
@@ -1999,7 +2058,7 @@ class GitRepo(CoreGitRepo):
                       cfg_push_var, refspec[0])
             push_refspecs = [[refspec[0]], refspec[1:]]
 
-        push_res = []
+        push_res: list[PushInfo] = []
         for refspecs in push_refspecs:
             push_res.extend(
                 self.push_(
@@ -2016,7 +2075,7 @@ class GitRepo(CoreGitRepo):
             cfg.unset(cfg_push_var, 'local')
         return push_res
 
-    def push_(self, remote=None, refspec=None, all_=False, git_options=None):
+    def push_(self, remote: Optional[str] = None, refspec: str | list[str] | None = None, all_: bool = False, git_options: Optional[list[str]] =None) -> Iterator[PushInfo]:
         """Like `push`, but returns a generator"""
         yield from self._fetch_push_helper(
             base_cmd=self._git_cmd_prefix + ['push', '--progress', '--porcelain'],
@@ -2033,14 +2092,14 @@ class GitRepo(CoreGitRepo):
 
     def _fetch_push_helper(
             self,
-            base_cmd,     # arg list
-            action,       # label fetch|push
-            urlvars,      # variables to query for URLs
-            protocol,     # processor for output
-            info_cls,     # Push|FetchInfo
-            info_from,    # stdout, stderr
-            add_remote,   # whether to add a 'remote' field to the info dict
-            remote=None, refspec=None, all_=False, git_options=None):
+            base_cmd: list[str],     # arg list
+            action: str,       # label fetch|push
+            urlvars: tuple[str, ...],      # variables to query for URLs
+            protocol: type[WitlessProtocol],     # processor for output
+            info_cls: type[InfoT],     # Push|FetchInfo
+            info_from: str,    # stdout, stderr
+            add_remote: bool,   # whether to add a 'remote' field to the info dict
+            remote: Optional[str] = None, refspec: str | list[str] | None = None, all_: bool =False, git_options: Optional[list[str]] = None) -> Iterator[InfoT]:
 
         git_options = ensure_list(git_options)
 
@@ -2137,6 +2196,7 @@ class GitRepo(CoreGitRepo):
                     if not output:
                         raise
 
+                assert isinstance(output, str)
                 for line in output.splitlines():
                     try:
                         # push info doesn't identify a remote, add it here
@@ -2159,7 +2219,7 @@ class GitRepo(CoreGitRepo):
                     'Finished %sing remotes for %s', action, self,
                 )
 
-    def get_remote_url(self, name, push=False):
+    def get_remote_url(self, name: str, push: bool = False) -> Optional[str]:
         """Get the url of a remote.
 
         Reads the configuration of remote `name` and returns its url or None,
@@ -2176,7 +2236,7 @@ class GitRepo(CoreGitRepo):
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
         return self.config.get(var, None)
 
-    def set_remote_url(self, name, url, push=False):
+    def set_remote_url(self, name: str, url: str, push: bool = False) -> None:
         """Set the URL a remote is pointing to
 
         Sets the URL of the remote `name`. Requires the remote to already exist.
@@ -2193,7 +2253,7 @@ class GitRepo(CoreGitRepo):
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
         self.config.set(var, url, scope='local', reload=True)
 
-    def get_branch_commits_(self, branch=None, limit=None, stop=None):
+    def get_branch_commits_(self, branch: Optional[str] = None, limit: Optional[str] = None, stop: Optional[str] = None) -> Iterator[str]:
         """Return commit hexshas for a branch
 
         Parameters
@@ -2217,6 +2277,8 @@ class GitRepo(CoreGitRepo):
             cmd.append('--left-only')
         if not branch:
             branch = self.get_active_branch()
+            if branch is None:
+                raise ValueError("Branch not provided and no active branch")
         cmd.append(branch)
         # and trailing -- marker to make sure that Git never confused the branch
         # with a potentially existing directory of the same name
@@ -2226,7 +2288,7 @@ class GitRepo(CoreGitRepo):
                 return
             yield r
 
-    def checkout(self, name, options=None):
+    def checkout(self, name: str, options: Optional[list[str]] = None) -> None:
         """
         """
         # TODO: May be check for the need of -b options herein?
@@ -2241,7 +2303,7 @@ class GitRepo(CoreGitRepo):
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
-    def merge(self, name, options=None, msg=None, allow_unrelated=False, **kwargs):
+    def merge(self, name: str, options: Optional[list[str]] = None, msg: Optional[str] = None, allow_unrelated: bool = False, **kwargs: Any) -> None:
         if options is None:
             options = []
         if msg:
@@ -2253,10 +2315,10 @@ class GitRepo(CoreGitRepo):
             **kwargs
         )
 
-    def remove_branch(self, branch):
+    def remove_branch(self, branch: str) -> None:
         self.call_git(['branch', '-D', branch])
 
-    def cherry_pick(self, commit):
+    def cherry_pick(self, commit: str) -> None:
         """Cherry pick `commit` to the current branch.
 
         Parameters
@@ -2267,7 +2329,7 @@ class GitRepo(CoreGitRepo):
         self.call_git(["cherry-pick", commit])
 
     @property
-    def dirty(self):
+    def dirty(self) -> bool:
         """Is the repository dirty?
 
         Note: This provides a quick answer when you simply want to know if
@@ -2290,7 +2352,7 @@ class GitRepo(CoreGitRepo):
         return False
 
     @property
-    def untracked_files(self):
+    def untracked_files(self) -> list[str]:
         """Legacy interface, do not use! Use the status() method instead.
 
         Despite its name, it also reports on untracked datasets, and
@@ -2306,7 +2368,7 @@ class GitRepo(CoreGitRepo):
             if props.get('state', None) == 'untracked'
         ]
 
-    def gc(self, allow_background=False, auto=False):
+    def gc(self, allow_background: bool = False, auto: bool = False) -> None:
         """Perform house keeping (garbage collection, repacking)"""
         cmd_options = []
         if not allow_background:
@@ -2316,7 +2378,7 @@ class GitRepo(CoreGitRepo):
             cmd_options += ['--auto']
         self.call_git(cmd_options)
 
-    def _parse_gitmodules(self):
+    def _parse_gitmodules(self) -> dict[PurePosixPath, dict[str, str]]:
         # TODO read .gitconfig from Git blob?
         gitmodules = self.pathobj / '.gitmodules'
         if not gitmodules.exists():
@@ -2331,7 +2393,7 @@ class GitRepo(CoreGitRepo):
         # but could easily appear when duplicates are included. In this case,
         # we better not crash
         db, _ = parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
-        mods = {}
+        mods: dict[str, dict[str, str]] = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
                 # we don't know what this is
@@ -2341,10 +2403,8 @@ class GitRepo(CoreGitRepo):
             # module name is everything after 'submodule.' that is not the variable
             # name
             mod_name = '.'.join(k_l[1:-1])
-            mod = mods.get(mod_name, {})
             # variable name is the last 'dot-free' segment in the key
-            mod[k_l[-1]] = v
-            mods[mod_name] = mod
+            mods.setdefault(mod_name, {})[k_l[-1]] = v
 
         out = {}
         # bring into traditional shape
@@ -2361,7 +2421,7 @@ class GitRepo(CoreGitRepo):
             out[modpath] = modprops
         return out
 
-    def get_submodules_(self, paths=None):
+    def get_submodules_(self, paths: Optional[list[str | PathLike[str]]] = None) -> Iterator[dict]:
         """Yield submodules in this repository.
 
         Parameters
@@ -2446,7 +2506,7 @@ class GitRepo(CoreGitRepo):
                 **modinfo.get(path, {})
             )
 
-    def get_submodules(self, sorted_=True, paths=None):
+    def get_submodules(self, sorted_: bool = True, paths: Optional[list[str | PathLike[str]]] = None) -> list[dict]:
         """Return list of submodules.
 
         Parameters
@@ -2464,10 +2524,11 @@ class GitRepo(CoreGitRepo):
         xs = self.get_submodules_(paths=paths)
 
         if sorted_:
-            xs = sorted(xs, key=lambda x: x["path"])
-        return list(xs)
+            return sorted(xs, key=lambda x: x["path"])
+        else:
+            return list(xs)
 
-    def update_ref(self, ref, value, oldvalue=None, symbolic=False):
+    def update_ref(self, ref: str, value: str, oldvalue: Optional[str] = None, symbolic: bool = False) -> None:
         """Update the object name stored in a ref "safely".
 
         Just a shim for `git update-ref` call if not symbolic, and
@@ -2495,7 +2556,7 @@ class GitRepo(CoreGitRepo):
             cmd = ['update-ref', ref, value] + ([oldvalue] if oldvalue else [])
         self.call_git(cmd)
 
-    def tag(self, tag, message=None, commit=None, options=None):
+    def tag(self, tag: str, message: Optional[str] = None, commit: Optional[str] = None, options: Optional[list[str]] = None) -> None:
         """Tag a commit
 
         Parameters
@@ -2526,7 +2587,15 @@ class GitRepo(CoreGitRepo):
             args.append(commit)
         self.call_git(args)
 
-    def get_tags(self, output=None):
+    @overload
+    def get_tags(self, output: None = None) -> list[dict[str, str]]:
+        ...
+
+    @overload
+    def get_tags(self, output: str) -> list[str]:
+        ...
+
+    def get_tags(self, output: Optional[str] = None) -> list[dict[str, str]] | list[str]:
         """Get list of tags
 
         Parameters
@@ -2560,7 +2629,7 @@ class GitRepo(CoreGitRepo):
         else:
             return tags
 
-    def describe(self, commitish=None, **kwargs):
+    def describe(self, commitish: Optional[str] = None, **kwargs: Option) -> Optional[str]:
         """ Quick and dirty implementation to call git-describe
 
         Parameters
@@ -2571,17 +2640,16 @@ class GitRepo(CoreGitRepo):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
-        cmd = ['describe'] + to_options(**kwargs)
+        cmd = ['describe'] + to_options(True, **kwargs)
         if commitish is not None:
             cmd.append(commitish)
         try:
             describe = self.call_git(cmd, expect_fail=True)
             return describe.strip()
-        # TODO: WTF "catch everything"?
-        except:
+        except Exception:
             return None
 
-    def get_tracking_branch(self, branch=None, remote_only=False):
+    def get_tracking_branch(self, branch: Optional[str] = None, remote_only: bool = False) -> tuple[Optional[str], Optional[str]]:
         """Get the tracking branch for `branch` if there is any.
 
         Parameters
@@ -2609,7 +2677,7 @@ class GitRepo(CoreGitRepo):
         return track_remote, track_branch
 
     @property
-    def count_objects(self):
+    def count_objects(self) -> dict[str, int]:
         """return dictionary with count, size(in KiB) information of git objects
         """
 
@@ -2621,7 +2689,7 @@ class GitRepo(CoreGitRepo):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_git_attributes(self):
+    def get_git_attributes(self) -> dict[str, str | bool]:
         """Query gitattributes which apply to top level directory
 
         It is a thin compatibility/shortcut wrapper around more versatile
@@ -2638,7 +2706,7 @@ class GitRepo(CoreGitRepo):
         """
         return self.get_gitattributes('.')['.']
 
-    def get_gitattributes(self, path, index_only=False):
+    def get_gitattributes(self, path: str | list[str], index_only: bool = False) -> dict[str, dict[str, str | bool]]:
         """Query gitattributes for one or more paths
 
         Parameters
@@ -2663,7 +2731,7 @@ class GitRepo(CoreGitRepo):
             cmd.append('--cached')
         # make sure we have one entry for each query path to
         # simplify work with the result
-        attributes = {p: {} for p in path}
+        attributes: dict[str, dict[str, str | bool]] = {p: {} for p in path}
         attr = []
         for item in self.call_git_items_(cmd, files=path, sep='\0',
                                          read_only=True):
@@ -2680,7 +2748,7 @@ class GitRepo(CoreGitRepo):
         return {relpath(k, self.path) if isabs(k) else k: v
                 for k, v in attributes.items()}
 
-    def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
+    def set_gitattributes(self, attrs: list[tuple[str, dict[str, str | bool]]], attrfile: str = '.gitattributes', mode: str = 'a') -> None:
         """Set gitattributes
 
         By default appends additional lines to `attrfile`. Note, that later
@@ -2738,7 +2806,7 @@ class GitRepo(CoreGitRepo):
                         attrline += ' {}={}'.format(a, val)
                 f.write('{}\n'.format(attrline))
 
-    def get_content_info(self, paths=None, ref=None, untracked='all'):
+    def get_content_info(self, paths: Optional[Sequence[str | PathLike[str]]] = None, ref: Optional[str] = None, untracked: str = 'all') -> dict[Path, dict[str, str | int | None]]:
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2791,7 +2859,7 @@ class GitRepo(CoreGitRepo):
         """
         lgr.debug('%s.get_content_info(...)', self)
         # TODO limit by file type to replace code in subdatasets command
-        info = dict()
+        info: dict[Path, dict[str, str | int | None]] = dict()
 
         if paths:  # is not None separate after
             # path matching will happen against what Git reports
@@ -2867,7 +2935,7 @@ class GitRepo(CoreGitRepo):
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
-    def _get_content_info_line_helper(self, ref, info, lines, props_re):
+    def _get_content_info_line_helper(self, ref: Optional[str], info: dict[Path, dict[str, str | int | None]], lines: list[str], props_re: Pattern[str]) -> None:
         """Internal helper of get_content_info() to parse Git output"""
         mode_type_map = {
             '100644': 'file',
@@ -2878,7 +2946,7 @@ class GitRepo(CoreGitRepo):
         for line in lines:
             if not line:
                 continue
-            inf = {}
+            inf: dict[str, str | int | None] = {}
             props = props_re.match(line)
             if not props:
                 # Kludge: Filter out paths starting with .git/ to work around
@@ -2908,14 +2976,14 @@ class GitRepo(CoreGitRepo):
             # join item path with repo path to get a universally useful
             # path representation with auto-conversion and tons of other
             # stuff
-            path = self.pathobj.joinpath(path)
+            joinedpath = self.pathobj.joinpath(path)
             if 'type' not in inf:
                 # be nice and assign types for untracked content
-                inf['type'] = 'symlink' if path.is_symlink() \
-                    else 'directory' if path.is_dir() else 'file'
-            info[path] = inf
+                inf['type'] = 'symlink' if joinedpath.is_symlink() \
+                    else 'directory' if joinedpath.is_dir() else 'file'
+            info[joinedpath] = inf
 
-    def status(self, paths=None, untracked='all', eval_submodule_state='full'):
+    def status(self, paths: Optional[Sequence[str | PathLike[str]]] = None, untracked: str= 'all', eval_submodule_state: Literal["commit", "full", "no"] = 'full') -> dict[Path, dict[str, str]]:
         """Simplified `git status` equivalent.
 
         Parameters
@@ -2960,8 +3028,8 @@ class GitRepo(CoreGitRepo):
             untracked=untracked,
             eval_submodule_state=eval_submodule_state)
 
-    def diff(self, fr, to, paths=None, untracked='all',
-             eval_submodule_state='full'):
+    def diff(self, fr: Optional[str], to: Optional[str], paths: Optional[Sequence[str | PathLike[str]]] = None, untracked: str = 'all',
+             eval_submodule_state: Literal["commit", "full", "no"] = 'full') -> dict[Path, dict[str, str]]:
         """Like status(), but reports changes between to arbitrary revisions
 
         Parameters
@@ -3007,8 +3075,17 @@ class GitRepo(CoreGitRepo):
             eval_submodule_state=eval_submodule_state).items()
             if v.get('state', None) != 'clean'}
 
-    def diffstatus(self, fr, to, paths=None, untracked='all',
-                   eval_submodule_state='full', _cache=None):
+    @overload
+    def diffstatus(self, fr: Optional[str], to: Optional[str], paths: Optional[Sequence[str | PathLike[str]]] = None, untracked: str = 'all', *, eval_submodule_state: Literal["global"], _cache: Optional[dict] = None) -> str:
+        ...
+
+    @overload
+    def diffstatus(self, fr: Optional[str], to: Optional[str], paths: Optional[Sequence[str | PathLike[str]]] = None, untracked: str = 'all', eval_submodule_state: Literal["commit", "full", "no"] = "full", _cache: Optional[dict] = None) -> dict[Path, dict[str, str]]:
+        ...
+
+    def diffstatus(self, fr: Optional[str], to: Optional[str], paths: Optional[Sequence[str | PathLike[str]]] = None, untracked: str = 'all',
+                   eval_submodule_state: str = 'full', _cache: Optional[dict] = None) -> dict[Path, dict[str, str]] | str:
+
         """Like diff(), but reports the status of 'clean' content too.
 
         It supports an additional submodule evaluation state 'global'.
@@ -3016,21 +3093,23 @@ class GitRepo(CoreGitRepo):
         (vs. 'clean') state label for the entire repository, as soon as
         it can.
         """
-        def _get_cache_key(label, paths, ref, untracked=None):
+        def _get_cache_key(label: str, paths: Optional[list[Path]], ref: Optional[str], untracked: Optional[str] = None) -> tuple[str, str, Optional[tuple[Path, ...]], Optional[str], Optional[str]]:
             return self.path, label, tuple(paths) if paths else None, \
                 ref, untracked
 
         if _cache is None:
             _cache = {}
 
+        ppaths: Optional[list[Path]]
         if paths is not None:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
-            paths = map(ut.Path, paths)
-            paths = [
+            ppaths = [
                 p.relative_to(self.pathobj) if p.is_absolute() else p
-                for p in paths
+                for p in map(ut.Path, paths)
             ]
+        else:
+            ppaths = None
 
         # TODO report more info from get_content_info() calls in return
         # value, those are cheap and possibly useful to a consumer
@@ -3038,16 +3117,16 @@ class GitRepo(CoreGitRepo):
         if to is None:
             # everything we know about the worktree, including os.stat
             # for each file
-            key = _get_cache_key('ci', paths, None, untracked)
+            key = _get_cache_key('ci', ppaths, None, untracked)
             if key in _cache:
                 to_state = _cache[key]
             else:
                 to_state = self.get_content_info(
-                    paths=paths, ref=None, untracked=untracked)
+                    paths=ppaths, ref=None, untracked=untracked)
                 _cache[key] = to_state
             # we want Git to tell us what it considers modified and avoid
             # reimplementing logic ourselves
-            key = _get_cache_key('mod', paths, None)
+            key = _get_cache_key('mod', ppaths, None)
             if key in _cache:
                 modified = _cache[key]
             else:
@@ -3061,27 +3140,27 @@ class GitRepo(CoreGitRepo):
                         # included with `-m` alone
                         ['ls-files', '-z', '-m', '-d'],
                         # low-level code cannot handle pathobjs
-                        files=[str(p) for p in paths] if paths is not None else None,
+                        files=[str(p) for p in ppaths] if ppaths is not None else None,
                         sep='\0',
                         read_only=True)
                     if p)
                 _cache[key] = modified
         else:
-            key = _get_cache_key('ci', paths, to)
+            key = _get_cache_key('ci', ppaths, to)
             if key in _cache:
                 to_state = _cache[key]
             else:
-                to_state = self.get_content_info(paths=paths, ref=to)
+                to_state = self.get_content_info(paths=ppaths, ref=to)
                 _cache[key] = to_state
             # we do not need worktree modification detection in this case
             modified = None
         # origin state
-        key = _get_cache_key('ci', paths, fr)
+        key = _get_cache_key('ci', ppaths, fr)
         if key in _cache:
             from_state = _cache[key]
         else:
             if fr:
-                from_state = self.get_content_info(paths=paths, ref=fr)
+                from_state = self.get_content_info(paths=ppaths, ref=fr)
             else:
                 # no ref means from nothing
                 from_state = {}
@@ -3181,10 +3260,12 @@ class GitRepo(CoreGitRepo):
         else:
             return status
 
-    def _diffstatus_get_state_props(self, f, from_state, to_state,
-                                    against_commit,
-                                    modified_in_worktree,
-                                    eval_submodule_state):
+    def _diffstatus_get_state_props(self, f: Path,
+                                    from_state: Optional[dict[str, str]],
+                                    to_state: dict[str, str],
+                                    against_commit: bool,
+                                    modified_in_worktree: bool,
+                                    eval_submodule_state: str) -> dict[str, str]:
         """Helper to determine diff properties for a single path
 
         Parameters
@@ -3268,13 +3349,16 @@ class GitRepo(CoreGitRepo):
             if 'bytesize' in to_state:
                 # if we got this cheap, report it
                 props['bytesize'] = to_state['bytesize']
-            elif state == 'clean' and 'bytesize' in from_state:
-                # no change, we can take this old size info
-                props['bytesize'] = from_state['bytesize']
+            elif state == 'clean':
+                assert from_state is not None
+                if 'bytesize' in from_state:
+                    # no change, we can take this old size info
+                    props['bytesize'] = from_state['bytesize']
         if state in ('clean', 'modified', 'deleted', None):
             # assign previous gitsha to any record
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
+            assert from_sha is not None
             props['prev_gitshasum'] = from_sha
         if state:
             # only report a state if we could determine any
@@ -3283,10 +3367,10 @@ class GitRepo(CoreGitRepo):
             props['state'] = state
         return props
 
-    def _save_pre(self, paths, _status, **kwargs):
+    def _save_pre(self, paths: Optional[Sequence[str | PathLike[str]]], _status: Optional[dict[Path, dict[str, str]]], **kwargs: Any) -> Optional[dict[Path, dict[str, str]]]:
         # helper to get an actionable status report
         if paths is not None and not paths and not _status:
-            return
+            return None
         if _status is None:
             if 'untracked' not in kwargs:
                 kwargs['untracked'] = 'normal'
@@ -3300,7 +3384,7 @@ class GitRepo(CoreGitRepo):
             status = _status.copy()
         return status
 
-    def get_staged_paths(self):
+    def get_staged_paths(self) -> list[str]:
         """Returns a list of any stage repository path(s)
 
         This is a rather fast call, as it will not depend on what is going on
@@ -3314,8 +3398,8 @@ class GitRepo(CoreGitRepo):
             lgr.debug(CapturedException(e))
             return []
 
-    def _save_post(self, message, files, partial_commit, amend=False,
-                   allow_empty=False):
+    def _save_post(self, message: Optional[str], files: Iterable[Path], partial_commit: bool, amend: bool = False,
+                   allow_empty: bool = False) -> None:
         # helper to commit changes reported in status
 
         # TODO remove pathobj stringification when commit() can
@@ -3339,7 +3423,7 @@ class GitRepo(CoreGitRepo):
                 careless=True,
             )
 
-    def save(self, message=None, paths=None, _status=None, **kwargs):
+    def save(self, message: Optional[str] = None, paths: Optional[list[Path]] = None, _status: Optional[dict[Path, dict[str, str]]] = None, **kwargs: Any) -> list[dict]:
         """Save dataset content.
 
         Parameters
@@ -3378,7 +3462,7 @@ class GitRepo(CoreGitRepo):
             )
         )
 
-    def save_(self, message=None, paths=None, _status=None, **kwargs):
+    def save_(self, message: Optional[str] = None, paths: Optional[list[Path]] = None, _status: Optional[dict[Path, dict[str, str]]] = None, **kwargs: Any) -> Iterator[dict]:
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
@@ -3581,7 +3665,7 @@ class GitRepo(CoreGitRepo):
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
 
-    def _check_for_win_compat(self, files, config):
+    def _check_for_win_compat(self, files: dict[str, Any], config: str) -> tuple[dict[str, Any], Optional[list[str]]]:
         """Check file names for illegal characters or reserved names on Windows
 
         In the case that a non-Windows-compatible file is detected, warn users
@@ -3602,7 +3686,7 @@ class GitRepo(CoreGitRepo):
             return files, None
 
         from collections import defaultdict
-        problems = defaultdict(list)
+        problems: dict[str, list[str]] = defaultdict(list)
         for file in files:
             for part in Path(file).parts:
                 # check every component of the path for incompatibilities
@@ -3638,7 +3722,10 @@ class GitRepo(CoreGitRepo):
                 files.pop(path)
             return files, [*{*problems['paths']}]
 
-    def _save_add(self, files, git_opts=None):
+        else:
+            raise ValueError(f"Invalid 'config' value {config!r}")
+
+    def _save_add(self, files: dict[str, Any], git_opts: Optional[list[str]] = None) -> Iterator[dict]:
         """Simple helper to add files in save()"""
         from datalad.interface.results import get_status_dict
         try:
@@ -3664,14 +3751,15 @@ class GitRepo(CoreGitRepo):
                     # while there is no git-annex underneath here, we
                     # tend to fake its behavior, so we can also support
                     # this type of messaging
-                    message='\n'.join(r['error-messages'])
-                    if 'error-messages' in r else None,
+                    #message='\n'.join(r['error-messages'])
+                    #if 'error-messages' in r else None,
+                    message=None,
                     logger=lgr)
         except OSError as e:
             lgr.error("add: %s", e)
             raise
 
-    def _save_add_submodules(self, paths):
+    def _save_add_submodules(self, paths: list[Path] | dict[Path, dict]) -> Iterator[dict]:
         """Add new submodules, or updates records of existing ones
 
         This method does not use `git submodule add`, but aims to be more
@@ -3766,7 +3854,7 @@ class GitRepo(CoreGitRepo):
                     logger=lgr)
 
 
-def _get_save_status_state(status):
+def _get_save_status_state(status: dict[Path, dict[str, str]]) -> dict[Optional[str], dict[Path, dict[str, str]]]:
     """
     Returns
     -------
@@ -3777,7 +3865,7 @@ def _get_save_status_state(status):
     # (excluding clean we do not care about) we expect to be present
     # and which we know of (unless None), and modified_or_untracked hybrid
     # since it is used below
-    status_state = {
+    status_state: dict[Optional[str], dict[Path, dict[str, str]]] = {
         k: {}
         for k in (None,  # not cared of explicitly here
                   'added',  # not cared of explicitly here
@@ -3812,7 +3900,7 @@ def _get_save_status_state(status):
 
 # used in in the get command and GitRepo.add_submodule(), the
 # latter is not used outside the tests
-def _fixup_submodule_dotgit_setup(ds, relativepath):
+def _fixup_submodule_dotgit_setup(ds: Dataset, relativepath: str | Path) -> None:
     """Implementation of our current of .git in a subdataset
 
     Each subdataset/module has its own .git directory where a standalone
