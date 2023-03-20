@@ -1269,6 +1269,21 @@ class AnnexRepo(GitRepo, RepoInterface):
             files=files,
             protocol=StdOutErrCapture)['stdout']
 
+    def call_annex_success(self, args, files=None):
+        """Call git-annex and return true if the call exit code of 0.
+
+        All parameters match those described for `call_annex`.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            self.call_annex(args, files)
+        except CommandError:
+            return False
+        return True
+
     def call_annex_items_(self, args, files=None, sep=None):
         """Call git-annex, splitting output on `sep`.
 
@@ -2761,12 +2776,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         annex_input = [key_,] if not remote else [key_, remote]
 
         if not batch:
-            try:
-                out = self.call_annex(['checkpresentkey'] + annex_input)
-                assert(not out)
-                return True
-            except CommandError:
-                return False
+            return self.call_annex_success(['checkpresentkey'] + annex_input)
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
             try:
