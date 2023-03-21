@@ -54,7 +54,7 @@ class SignalingThread(threading.Thread):
         return self.__repr__()
 
     def signal(self,
-               content: Any
+               content: tuple[Any, IOState, Optional[bytes]]
                ) -> bool:
         error_occurred = False
         for signal_queue in self.signal_queues:
