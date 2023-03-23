@@ -3952,7 +3952,6 @@ class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
 
     def __init__(self, done_future=None, encoding=None):
         WitlessProtocol.__init__(self, done_future, encoding)
-        AssemblingDecoderMixIn.__init__(self)
 
     def pipe_data_received(self, fd, byts):
         line = self.decode(fd, byts, self.encoding)
