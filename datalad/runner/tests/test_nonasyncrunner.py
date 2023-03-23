@@ -69,34 +69,16 @@ from .utils import py2cmd
 
 
 # Protocol classes used for a set of generator tests later
-class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
-    def __init__(self,
-                 done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
-
-        StdOutErrCapture.__init__(
-            self,
-            done_future=done_future,
-            encoding=encoding)
-        GeneratorMixIn.__init__(self)
-
+class GenStdoutStderr(StdOutErrCapture, GeneratorMixIn):
     def timeout(self, fd: Optional[int]) -> bool:
         return True
 
 
-class GenNothing(GeneratorMixIn, NoCapture):
-    def __init__(self,
-                 done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
-
-        NoCapture.__init__(
-            self,
-            done_future=done_future,
-            encoding=encoding)
-        GeneratorMixIn.__init__(self)
+class GenNothing(NoCapture, GeneratorMixIn):
+    pass
 
 
-class GenStdoutLines(GeneratorMixIn, StdOutCapture):
+class GenStdoutLines(StdOutCapture, GeneratorMixIn):
     """A generator-based protocol yielding individual subprocess' stdout lines
 
     This is a simple implementation that is good enough for tests, i.e. with
@@ -111,7 +93,6 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
             self,
             done_future=done_future,
             encoding=encoding)
-        GeneratorMixIn.__init__(self)
         self.line_splitter = LineSplitter()
 
     def timeout(self, fd: Optional[int]) -> bool:

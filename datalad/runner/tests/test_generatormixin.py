@@ -26,19 +26,9 @@ from ..runner import WitlessRunner
 from .utils import py2cmd
 
 
-class TestProtocol(GeneratorMixIn, StdOutErrCapture):
+class TestProtocol(StdOutErrCapture, GeneratorMixIn):
 
     __test__ = False  # class is not a class of tests
-
-    def __init__(self,
-                 done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
-
-        StdOutErrCapture.__init__(
-            self,
-            done_future=done_future,
-            encoding=encoding)
-        GeneratorMixIn.__init__(self)
 
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         self.send_result((fd, data.decode()))
@@ -76,11 +66,7 @@ def test_generator_mixin_runner() -> None:
 def test_post_pipe_callbacks() -> None:
     # Expect that the process_exited and connection_lost callbacks
     # are also called in a GeneratorMixIn protocol
-    class TestPostPipeProtocol(GeneratorMixIn, StdOutErrCapture):
-        def __init__(self) -> None:
-            GeneratorMixIn.__init__(self)
-            StdOutErrCapture.__init__(self)
-
+    class TestPostPipeProtocol(StdOutErrCapture, GeneratorMixIn):
         def process_exited(self) -> None:
             self.send_result(1)
             self.send_result(2)
@@ -99,11 +85,7 @@ def test_file_number_activity_detection() -> None:
     # empty output queue without active threads
     # waits for the process and progresses the generator state
     # to `_ResultGenerator.GeneratorState.process_exited`.
-    class TestFNADProtocol(GeneratorMixIn, NoCapture):
-        def __init__(self) -> None:
-            GeneratorMixIn.__init__(self)
-            NoCapture.__init__(self)
-
+    class TestFNADProtocol(NoCapture, GeneratorMixIn):
         def process_exited(self) -> None:
             self.send_result(3)
 
@@ -127,10 +109,8 @@ def test_file_number_activity_detection() -> None:
 
 
 def test_failing_process():
-    class TestProtocol(GeneratorMixIn, NoCapture):
-        def __init__(self) -> None:
-            GeneratorMixIn.__init__(self)
-            NoCapture.__init__(self)
+    class TestProtocol(NoCapture, GeneratorMixIn):
+        pass
 
     try:
         for _ in run_command(py2cmd("exit(1)"),

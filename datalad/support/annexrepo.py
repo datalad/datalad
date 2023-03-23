@@ -1356,14 +1356,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         ------
         See `_call_annex()` for information on Exceptions.
         """
-        class GeneratorStdOutErrCapture(GeneratorMixIn,
-                                        AssemblingDecoderMixIn,
-                                        StdOutErrCapture):
-            def __init__(self):
-                GeneratorMixIn.__init__(self)
-                AssemblingDecoderMixIn.__init__(self)
-                StdOutErrCapture.__init__(self)
-
+        class GeneratorStdOutErrCapture(StdOutErrCapture,
+                                        GeneratorMixIn,
+                                        AssemblingDecoderMixIn):
             def pipe_data_received(self, fd, data):
                 if fd == 1:
                     self.send_result(
@@ -3925,13 +3920,7 @@ class AnnexJsonProtocol(WitlessProtocol):
         super().process_exited()
 
 
-class GeneratorAnnexJsonProtocol(GeneratorMixIn, AnnexJsonProtocol):
-    def __init__(self,
-                 done_future=None,
-                 total_nbytes=None):
-        GeneratorMixIn.__init__(self)
-        AnnexJsonProtocol.__init__(self, done_future, total_nbytes)
-
+class GeneratorAnnexJsonProtocol(AnnexJsonProtocol, GeneratorMixIn):
     def add_to_output(self, json_object):
         self.send_result(json_object)
 
@@ -3940,7 +3929,6 @@ class GeneratorAnnexJsonNoStderrProtocol(GeneratorAnnexJsonProtocol):
     def __init__(self,
                  done_future=None,
                  total_nbytes=None):
-        GeneratorMixIn.__init__(self)
         AnnexJsonProtocol.__init__(self, done_future, total_nbytes)
         self.stderr_output = bytearray()
 
