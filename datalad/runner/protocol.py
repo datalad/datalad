@@ -42,7 +42,7 @@ class GeneratorMixIn:
             # do something, for example write to stdin of the subprocess
 
 
-    Example usage to create a generator-version of teh StdOutCapture protocol:
+    Example usage to create a generator-version of the StdOutCapture protocol:
 
         class GeneratorStdOutCapture(StdOutCapture, GeneratorMixIn):
             pass
