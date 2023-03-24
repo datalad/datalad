@@ -1166,7 +1166,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         list(dict)
           List of parsed result records.
         """
-        protocol_class = GeneratorAnnexJsonNoStderrProtocol
+        protocol_class = GeneratorAnnexJsonProtocol
 
         args = args[:] + ['--json', '--json-error-messages']
         if progress:
