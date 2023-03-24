@@ -17,17 +17,17 @@ from .utils import py2cmd
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
-    def __init__(self):
+    def __init__(self) -> None:
         StdOutCapture.__init__(self)
         GeneratorMixIn.__init__(self)
 
 
 class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
-    def __init__(self):
+    def __init__(self) -> None:
         StdOutCapture.__init__(self)
         GeneratorMixIn.__init__(self)
 
-    def pipe_data_received(self, fd, data):
+    def pipe_data_received(self, fd: int, data: bytes) -> None:
         for line in data.decode().splitlines():
             self.send_result((fd, line))
 
@@ -41,7 +41,7 @@ def _runner_with_protocol(protocol: type[WitlessProtocol]) -> ThreadedRunner:
 
 def _run_on(runner: ThreadedRunner,
             iterate: bool,
-            exceptions: list
+            exceptions: list[type[BaseException]]
             ):
     try:
         gen = runner.run()
@@ -79,7 +79,7 @@ def _reentry_detection_run(protocol: type[WitlessProtocol],
     return exception
 
 
-def test_thread_serialization():
+def test_thread_serialization() -> None:
     # expect that two run calls on the same runner with a non-generator-protocol
     # do not create a runtime error (executions are serialized though)
 
@@ -87,13 +87,13 @@ def test_thread_serialization():
     assert exceptions == []
 
 
-def test_reentry_detection():
+def test_reentry_detection() -> None:
     runner = _runner_with_protocol(MinimalGeneratorProtocol)
     runner.run()
     assert_raises(RuntimeError, runner.run)
 
 
-def test_leave_handling():
+def test_leave_handling() -> None:
     runner = _runner_with_protocol(MinimalStdOutGeneratorProtocol)
     all_results = [
         "".join(e[1] for e in runner.run())
@@ -103,7 +103,7 @@ def test_leave_handling():
     assert all_results[0] == all_results[1]
 
 
-def test_thread_leave_handling():
+def test_thread_leave_handling() -> None:
     # expect no exception on repeated call to run of a runner with
     # generator-protocol, if the generator was exhausted before the second call
 
