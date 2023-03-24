@@ -397,7 +397,6 @@ def test_arg_missing(path=None, path2=None):
         annex_groupwanted='whatever')
 
 
-@pytest.mark.xfail(on_appveyor, reason="https://github.com/datalad/datalad/issues/7320")
 @with_sameas_remote
 @with_tempfile(mkdir=True)
 def test_sibling_enable_sameas(repo=None, clone_path=None):
