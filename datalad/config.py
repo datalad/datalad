@@ -908,7 +908,7 @@ class ConfigManager(object):
             # has modified the global scope, and is not itself the global
             # manager, we reload that one too in order to avoid stale
             # configuration reports
-            if scope == 'global' and id(self) != id(datalad.cfg):
+            if scope == 'global' and self is not datalad.cfg:
                 datalad.cfg.reload()
         return out['stdout'], out['stderr']
 
