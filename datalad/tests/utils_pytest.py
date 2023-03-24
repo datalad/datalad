@@ -1663,7 +1663,8 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     #        'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
-    ds = Dataset(path).create(force=True, **ckwa)
+    # Pass explicit `annex` to ensure that GitRepo does get .noannex
+    ds = Dataset(path).create(force=True, annex=repocls is AnnexRepo, **ckwa)
     # base content
     create_tree(
         ds.path,

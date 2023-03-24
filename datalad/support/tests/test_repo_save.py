@@ -45,7 +45,7 @@ def test_save_basics(path=None):
 
 
 def _test_save_all(path, repocls):
-    ds = get_convoluted_situation(path, GitRepo)
+    ds = get_convoluted_situation(path, repocls)
     orig_status = ds.repo.status(untracked='all')
     # TODO test the results when the are crafted
     res = ds.repo.save()
