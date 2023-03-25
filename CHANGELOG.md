@@ -1,4 +1,62 @@
 
+<a id='changelog-0.18.3'></a>
+# 0.18.3 (2023-03-25)
+
+## 🐛 Bug Fixes
+
+- Fixed that the `get` command would fail, when subdataset source-candidate-templates where using the `path` property from `.gitmodules`.
+  Also enhance the respective documentation for the `get` command.
+  Fixes [#7274](https://github.com/datalad/datalad/issues/7274) via
+  [PR #7280](https://github.com/datalad/datalad/pull/7280)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Improve up-to-dateness of config reports across manager instances.  Fixes [#7299](https://github.com/datalad/datalad/issues/7299) via [PR #7301](https://github.com/datalad/datalad/pull/7301) (by [@mih](https://github.com/mih))
+
+- BF: GitRepo.merge do not allow merging unrelated unconditionally.  [PR #7312](https://github.com/datalad/datalad/pull/7312) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Do not render (empty) WTF report on other records.  [PR #7322](https://github.com/datalad/datalad/pull/7322) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Fixed a bug where changing DataLad's log level could lead to failing git-annex calls.
+  Fixes [#7328](https://github.com/datalad/datalad/issues/7328) via
+  [PR #7329](https://github.com/datalad/datalad/pull/7329)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Fix an issue with uninformative error reporting by the datalad special remote.
+  Fixes [#7332](https://github.com/datalad/datalad/issues/7332) via
+  [PR #7333](https://github.com/datalad/datalad/pull/7333)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Fix save to not force committing into git if reference dataset is pure git (not git-annex).  Fixes [#7351](https://github.com/datalad/datalad/issues/7351) via [PR #7355](https://github.com/datalad/datalad/pull/7355) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Include a few previously missing commands in html API docs.
+  Fixes [#7288](https://github.com/datalad/datalad/issues/7288) via
+  [PR #7289](https://github.com/datalad/datalad/pull/7289)
+  (by [@mslw](https://github.com/mslw))
+
+## 🏠 Internal
+
+- Type-annotate almost all of `datalad/utils.py`; add `datalad/typing.py`.  [PR #7317](https://github.com/datalad/datalad/pull/7317) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate and fix `datalad/support/strings.py`.  [PR #7318](https://github.com/datalad/datalad/pull/7318) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate `datalad/support/globbedpaths.py`.  [PR #7327](https://github.com/datalad/datalad/pull/7327) (by [@jwodder](https://github.com/jwodder))
+
+- Extend type-annotations for `datalad/support/path.py`.  [PR #7336](https://github.com/datalad/datalad/pull/7336) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate various things in `datalad/runner/`.  [PR #7337](https://github.com/datalad/datalad/pull/7337) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate some more files in `datalad/support/`.  [PR #7339](https://github.com/datalad/datalad/pull/7339) (by [@jwodder](https://github.com/jwodder))
+
+## 🧪 Tests
+
+- Skip or xfail some currently failing or stalling tests.  [PR #7331](https://github.com/datalad/datalad/pull/7331) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Skip with_sameas_remote when rsync and annex are incompatible.  Fixes [#7320](https://github.com/datalad/datalad/issues/7320) via [PR #7342](https://github.com/datalad/datalad/pull/7342) (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Fix testing assumption - do create pure GitRepo superdataset and test against it.  [PR #7353](https://github.com/datalad/datalad/pull/7353) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.18.2'></a>
 # 0.18.2 (2023-02-27)
 
