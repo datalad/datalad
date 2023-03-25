@@ -68,6 +68,20 @@ def _test_save_all(path, repocls):
     for f, p in saved_status.items():
         if p.get('state', None) != 'clean':
             assert f.match('subds_modified'), f
+
+    # Since we already have rich filetree, now save at dataset level
+    # recursively and introspect some known gotchas
+    resr = ds.save(recursive=True)
+
+    # File within subdataset got committed to git-annex, which was not the
+    # case for GitRepo parent https://github.com/datalad/datalad/issues/7351
+    assert_in_results(
+        resr,
+        status='ok',
+        path=str(ds.pathobj / 'subds_modified' / 'someds' / 'dirtyds' / 'file_untracked'),
+        # if key is None -- was committed to git which should have not happened!
+        key="MD5E-s14--2c320e0c56ed653384a926292647f226")
+
     return ds
 
 
