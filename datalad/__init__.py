@@ -15,6 +15,7 @@ From an interactive Python session, import `datalad.api` and inspect its
 documentation with `help`.
 """
 
+
 if not __debug__:
     raise RuntimeError(
         'DataLad cannot run in "optimized" mode, i.e. python -O')
@@ -118,11 +119,18 @@ __runtime_mode = 'library' \
     if cfg.getbool('datalad.runtime', 'librarymode', False) \
     else 'application'
 
+
 from datalad.utils import (
     get_encoding_info,
     get_envvars_info,
     getpwd,
+    # is_interactive is imported here and supposed to be imported from here, b/c
+    # anything importing and calling it (like log and ui), must do so only after
+    # datalad.cfg has been instantiated. Therefore, ensure the correct order
+    # right here.
+    is_interactive,
 )
+
 
 from .log import lgr
 

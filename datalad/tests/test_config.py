@@ -18,10 +18,14 @@ from unittest.mock import patch
 
 import pytest
 
-from datalad import cfg as dl_cfg
+from datalad import (
+    cfg as dl_cfg,
+    is_interactive,
+)
 from datalad.api import create
 from datalad.cmd import CommandError
 from datalad.config import (
+    anything2bool,
     ConfigManager,
     _where_to_scope,
     parse_gitconfig_dump,

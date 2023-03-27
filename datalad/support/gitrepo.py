@@ -35,7 +35,10 @@ from os.path import (
 )
 
 import datalad.utils as ut
-from datalad import ssh_manager
+from datalad import (
+    is_interactive,
+    ssh_manager,
+)
 from datalad.cmd import (
     BatchedCommand,
     GitWitlessRunner,
@@ -70,7 +73,6 @@ from datalad.utils import (
     ensure_unicode,
     generate_file_chunks,
     getpwd,
-    is_interactive,
     on_windows,
     optional_args,
     path_is_subpath,

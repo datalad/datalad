@@ -39,7 +39,10 @@ from unittest.mock import patch
 
 import pytest
 
-from datalad import cfg as dl_cfg
+from datalad import (
+    cfg as dl_cfg,
+    is_interactive,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import (
     CMD_MAX_ARG,
@@ -68,7 +71,6 @@ from datalad.utils import (
     import_module_from_file,
     import_modules,
     is_explicit_path,
-    is_interactive,
     join_cmdline,
     knows_annex,
     line_profile,
@@ -1280,7 +1282,8 @@ def test_never_fail():
 
 @pytest.mark.xfail(reason="TODO: for some reason fails on Travis")
 @with_tempfile
-def test_is_interactive(fout=None):
+def test_is_interactive_detection(fout=None):
+
     # must not fail if one of the streams is no longer open:
     # https://github.com/datalad/datalad/issues/3267
     from datalad.cmd import (
@@ -1302,7 +1305,7 @@ def test_is_interactive(fout=None):
             [sys.executable,
              "-c",
              py_pre +
-             'from datalad.utils import is_interactive; '
+             'from datalad import is_interactive; '
              'f = open(%r, "w"); '
              'f.write(str(is_interactive())); '
              'f.close()'
@@ -1341,6 +1344,23 @@ def test_is_interactive(fout=None):
     # and it must not crash if smth is closed
     for o in ('stderr', 'stdin', 'stdout'):
         eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
+
+
+def test_is_interactive_propagation():
+
+    from datalad import is_interactive
+    from datalad.cmd import (
+        StdOutCapture,
+        WitlessRunner,
+    )
+    out = WitlessRunner().run([sys.executable,
+                               "-c",
+                               "import os; "
+                               "print(os.environ['DATALAD_UI_INTERACTIVE']);"],
+                              protocol=StdOutCapture)
+    # subprocess sees the result of parent's interactive detection in
+    # `DATALAD_UI_INTERACTIVE`:
+    eq_(out['stdout'].strip(), str(is_interactive()))
 
 
 def test_splitjoin_cmdline():

@@ -25,7 +25,7 @@ def test_setup_exceptionhook(interactive):
         post_mortem_tb.append(tb)
 
     with patch('sys.excepthook'), \
-            patch('datalad.utils.is_interactive', lambda: interactive), \
+            patch('datalad.is_interactive', lambda: interactive), \
             patch('pdb.post_mortem', our_post_mortem):
         setup_exceptionhook()
         our_exceptionhook = sys.excepthook

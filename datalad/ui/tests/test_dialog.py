@@ -35,6 +35,8 @@ from ..dialog import (
     ConsoleLog,
     DialogUI,
     IPythonUI,
+    NoDialogUnderAnnexUI,
+    SilentConsoleLog,
 )
 
 
@@ -169,12 +171,13 @@ def test_IPythonUI():
     assert_in('notebook', str(pbar._tqdm))
 
 
-def test_silent_question():
+@pytest.mark.parametrize("backend", [SilentConsoleLog, NoDialogUnderAnnexUI])
+def test_silent_question(backend):
     # SilentConsoleLog must not be asked questions.
     # If it is asked, RuntimeError would be thrown with details to help
     # troubleshooting WTF is happening
-    from ..dialog import SilentConsoleLog
-    ui = SilentConsoleLog()
+
+    ui = backend()
     with assert_raises(RuntimeError) as cme:
         ui.question("could you help me", title="Pretty please")
     assert_in('question: could you help me. Title: Pretty please.', str(cme.value))

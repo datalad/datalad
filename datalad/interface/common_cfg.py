@@ -30,7 +30,10 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
-from datalad.utils import on_windows
+from datalad.utils import (
+    is_interactive_failsafe,
+    on_windows,
+)
 
 lgr = logging.getLogger('datalad.interface.common_cfg')
 dirs = AppDirs("datalad", "datalad.org")
@@ -639,6 +642,19 @@ _definitions = {
                     "information."}),
         'default': 10,
         'type': EnsureInt(),
+    },
+    'datalad.ui.interactive': {
+        'ui': ('question', {
+            'title': 'Datalad user interface interactivity',
+            'text': "If enabled, datalad may prompt for user input. Disable for "
+                    "non-interactive usage. If not set, datalad will attempt to "
+                    "detect whether it is running in an interactive session "
+                    "based on python's sys.__stdXXX__.isatty(). This detection "
+                    "can be wrong, though, possibly making datalad wait for "
+                    "user input, even though it is impossible to receive such "
+                    "input."}),
+        'default': is_interactive_failsafe(),
+        'type': EnsureBool(),
     },
     'datalad.save.no-message': {
         'ui': ('question', {

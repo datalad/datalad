@@ -17,17 +17,18 @@ lgr = getLogger('datalad.ui')
 
 lgr.log(5, "Starting importing ui")
 
+from datalad import is_interactive
 from .dialog import (
     ConsoleLog,
     DialogUI,
     IPythonUI,
+    NoDialogUnderAnnexUI,
     UnderAnnexUI,
     UnderTestsUI,
     SilentConsoleLog,
     QuietConsoleLog,
 )
 from ..utils import (
-    is_interactive,
     get_ipython_shell,
 )
 
@@ -36,6 +37,7 @@ KNOWN_BACKENDS = {
     'dialog': DialogUI,
     'ipython': IPythonUI,
     'annex': UnderAnnexUI,
+    'annex-no-dialog': NoDialogUnderAnnexUI,
     'tests': UnderTestsUI,
     'tests-noninteractive': QuietConsoleLog,
     'no-progress': SilentConsoleLog,
@@ -82,6 +84,8 @@ class _UI_Switcher(object):
                     backend = 'dialog'
             else:
                 backend = 'dialog' if is_interactive() else 'no-progress'
+        if not is_interactive() and backend == 'annex':
+            backend = 'annex-no-dialog'
         self._ui = KNOWN_BACKENDS[backend]()
         lgr.debug("UI set to %s", self._ui)
         self._backend = backend

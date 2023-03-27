@@ -332,9 +332,17 @@ class IPythonUI(DialogUI):
                 *args, frontend=self._tqdm_frontend, **kwargs)
 
 
-# poor man thingie for now
-@auto_repr
-class UnderAnnexUI(DialogUI):
+class UnderAnnexMixIn(object):
+    """Mix-in for UnderAnnex UI backends
+
+    In order for the super() calls to work out, this should come first in
+    inheritance order:
+
+    class MyAnnexBackend(UnderAnnexMixIn, WhatEverElse)
+
+    This should lead to super().x() calling WhatEverElse.x()
+    """
+
     def __init__(self, specialremote=None, **kwargs):
         if 'out' not in kwargs:
             # to avoid buffering
@@ -342,7 +350,7 @@ class UnderAnnexUI(DialogUI):
             #kwargs['out'] = os.fdopen(sys.stderr.fileno(), 'w', 0)
             # but wasn't effective! sp kist straogjt for now
             kwargs['out'] = sys.stderr
-        super(UnderAnnexUI, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.specialremote = specialremote
 
     def set_specialremote(self, specialremote):
@@ -350,11 +358,23 @@ class UnderAnnexUI(DialogUI):
 
     def get_progressbar(self, *args, **kwargs):
         if self.specialremote:
+            # Report progress via git-annex
+            from .progressbars import AnnexSpecialRemoteProgressBar
             kwargs = kwargs.copy()
-            kwargs['backend'] = 'annex-remote'
             kwargs['remote'] = self.specialremote
-        return super(UnderAnnexUI, self).get_progressbar(
-                *args, **kwargs)
+            return AnnexSpecialRemoteProgressBar(*args, **kwargs)
+        else:
+            return super().get_progressbar(*args, **kwargs)
+
+
+@auto_repr
+class UnderAnnexUI(UnderAnnexMixIn, DialogUI):
+    pass
+
+
+@auto_repr
+class NoDialogUnderAnnexUI(UnderAnnexMixIn, SilentConsoleLog):
+    pass
 
 
 @auto_repr
