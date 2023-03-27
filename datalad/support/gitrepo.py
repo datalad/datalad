@@ -493,12 +493,12 @@ class GitProgress(WitlessProtocol):
                     # it to become a recognizable progress report
                     self._unprocessed = line
 
-    def _parse_progress_line(self, line: bytes) -> bool:
+    def _parse_progress_line(self, bytes_line: bytes) -> bool:
         """Process a single line
 
         Parameters
         ----------
-        line : bytes
+        bytes_line : bytes
 
         Returns
         -------
@@ -510,28 +510,28 @@ class GitProgress(WitlessProtocol):
         # Compressing objects:  50% (1/2)
         # Compressing objects: 100% (2/2)
         # Compressing objects: 100% (2/2), done.
-        sline = line.decode(self.encoding)
-        if sline.startswith(('warning:', 'error:', 'fatal:')):
+        line = bytes_line.decode(self.encoding)
+        if line.startswith(('warning:', 'error:', 'fatal:')):
             return False
 
         # find escape characters and cut them away - regex will not work with
         # them as they are non-ascii. As git might expect a tty, it will send them
         last_valid_index = None
-        for i, c in enumerate(reversed(sline)):
+        for i, c in enumerate(reversed(line)):
             if ord(c) < 32:
                 # its a slice index
                 last_valid_index = -i - 1
             # END character was non-ascii
-        # END for each character in sline
+        # END for each character in line
         if last_valid_index is not None:
-            sline = sline[:last_valid_index]
+            line = line[:last_valid_index]
         # END cut away invalid part
-        sline = sline.rstrip()
+        line = line.rstrip()
 
         cur_count, max_count = None, None
-        match = self.re_op_relative.match(sline)
+        match = self.re_op_relative.match(line)
         if match is None:
-            match = self.re_op_absolute.match(sline)
+            match = self.re_op_absolute.match(line)
 
         if not match:
             return False
@@ -564,7 +564,7 @@ class GitProgress(WitlessProtocol):
             # This can't really be prevented.
             lgr.debug(
                 'Output line matched a progress report of an unknown type: %s',
-                sline)
+                line)
             # TODO investigate if there is any chance that we might swallow
             # important info -- until them do not flag this line
             # as progress
@@ -610,7 +610,7 @@ class GitProgress(WitlessProtocol):
             log_progress(
                 lgr.info,
                 pbar_id,
-                sline,
+                line,
                 update=float(cur_count),
                 noninteractive_level=logging.DEBUG,
             )
