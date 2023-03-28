@@ -9,6 +9,8 @@
 """Test WitlessRunner
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import signal
@@ -22,6 +24,7 @@ from time import (
     sleep,
     time,
 )
+from typing import Any
 
 import pytest
 
@@ -55,17 +58,17 @@ from .. import (
 )
 from .utils import py2cmd
 
-
 result_counter = 0
 
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_runner(tempfile=None):
+def test_runner(tempfile: str = "") -> None:
     runner = Runner()
-    content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
+    content = 'Testing real run' if on_windows else 'Testing äöü東 real run'
     cmd = 'echo %s > %s' % (content, tempfile)
     res = runner.run(cmd)
+    assert isinstance(res, dict)
     # no capture of any kind, by default
     ok_(not res['stdout'])
     ok_(not res['stderr'])
@@ -73,30 +76,32 @@ def test_runner(tempfile=None):
     os.unlink(tempfile)
 
 
-def test_runner_stderr_capture():
+def test_runner_stderr_capture() -> None:
     runner = Runner()
     test_msg = "stderr-Message"
     res = runner.run(py2cmd(
         'import sys; print(%r, file=sys.stderr)' % test_msg),
         protocol=StdOutErrCapture,
     )
+    assert isinstance(res, dict)
     eq_(res['stderr'].rstrip(), test_msg)
     ok_(not res['stdout'])
 
 
-def test_runner_stdout_capture():
+def test_runner_stdout_capture() -> None:
     runner = Runner()
     test_msg = "stdout-Message"
     res = runner.run(py2cmd(
         'import sys; print(%r, file=sys.stdout)' % test_msg),
         protocol=StdOutErrCapture,
     )
+    assert isinstance(res, dict)
     eq_(res['stdout'].rstrip(), test_msg)
     ok_(not res['stderr'])
 
 
 @with_tempfile(mkdir=True)
-def test_runner_failure(dir_=None):
+def test_runner_failure(dir_: str = "") -> None:
     runner = Runner()
     with assert_raises(CommandError) as cme:
         runner.run(
@@ -106,7 +111,7 @@ def test_runner_failure(dir_=None):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_fix_PWD(path=None):
+def test_runner_fix_PWD(path: str = "") -> None:
     env = os.environ.copy()
     env['PWD'] = orig_cwd = os.getcwd()
     runner = Runner(cwd=path, env=env)
@@ -114,12 +119,13 @@ def test_runner_fix_PWD(path=None):
         py2cmd('import os; print(os.environ["PWD"])'),
         protocol=StdOutCapture,
     )
+    assert isinstance(res, dict)
     eq_(res['stdout'].strip(), path)  # was fixed up to point to point to cwd's path
     eq_(env['PWD'], orig_cwd)  # no side-effect
 
 
 @with_tempfile(mkdir=True)
-def test_runner_cwd_encoding(path=None):
+def test_runner_cwd_encoding(path: str = "") -> None:
     env = os.environ.copy()
     # Add PWD to env so that runner will temporarily adjust it to point to cwd.
     env['PWD'] = os.getcwd()
@@ -133,7 +139,7 @@ def test_runner_cwd_encoding(path=None):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_stdin(path=None):
+def test_runner_stdin(path: str = "") -> None:
     runner = Runner()
     fakestdin = Path(path) / 'io'
     # go for difficult content
@@ -144,6 +150,7 @@ def test_runner_stdin(path=None):
         stdin=fakestdin.open(),
         protocol=StdOutCapture,
     )
+    assert isinstance(res, dict)
     assert_in(OBSCURE_FILENAME, res['stdout'])
 
     # we can do the same without a tempfile, too
@@ -152,11 +159,12 @@ def test_runner_stdin(path=None):
         stdin=OBSCURE_FILENAME.encode('utf-8'),
         protocol=StdOutCapture,
     )
+    assert isinstance(res, dict)
     assert_in(OBSCURE_FILENAME, res['stdout'])
 
 
 @pytest.mark.fail_slow(3)
-def test_runner_stdin_no_capture():
+def test_runner_stdin_no_capture() -> None:
     # Ensure that stdin writing alone progresses
     runner = Runner()
     runner.run(
@@ -167,7 +175,7 @@ def test_runner_stdin_no_capture():
 
 
 @pytest.mark.fail_slow(3)
-def test_runner_no_stdin_no_capture():
+def test_runner_no_stdin_no_capture() -> None:
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
     runner.run(
@@ -178,7 +186,7 @@ def test_runner_no_stdin_no_capture():
 
 
 @pytest.mark.fail_slow(3)
-def test_runner_empty_stdin():
+def test_runner_empty_stdin() -> None:
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
     runner.run(
@@ -188,16 +196,16 @@ def test_runner_empty_stdin():
     )
 
 
-def test_runner_parametrized_protocol():
+def test_runner_parametrized_protocol() -> None:
     runner = Runner()
 
     # protocol returns a given value whatever it receives
     class ProtocolInt(StdOutCapture):
-        def __init__(self, value):
+        def __init__(self, value: bytes) -> None:
             self.value = value
             super().__init__()
 
-        def pipe_data_received(self, fd, data):
+        def pipe_data_received(self, fd: int, data: bytes) -> None:
             super().pipe_data_received(fd, self.value)
 
     res = runner.run(
@@ -206,20 +214,21 @@ def test_runner_parametrized_protocol():
         # value passed to protocol constructor
         value=b'5',
     )
+    assert isinstance(res, dict)
     eq_(res['stdout'], '5')
 
 
 @integration  # ~3 sec
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_asyncio_loop_noninterference1(path1=None, path2=None):
+def test_asyncio_loop_noninterference1(path1: str = "", path2: str = "") -> None:
     if on_windows and sys.version_info < (3, 8):
         raise SkipTest(
             "get_event_loop() raises "
             "RuntimeError: There is no current event loop in thread 'MainThread'.")
     # minimalistic use case provided by Dorota
     import datalad.api as dl
-    src = dl.create(path1)
+    src = dl.create(path1)  # type: ignore[attr-defined]
     reproducer = src.pathobj/ "reproducer.py"
     reproducer.write_text(f"""\
 import asyncio
@@ -237,11 +246,10 @@ ds.status()
 
 
 @with_tempfile
-def test_asyncio_forked(temp=None):
+def test_asyncio_forked(temp_: str = "") -> None:
     # temp will be used to communicate from child either it succeeded or not
-    temp = Path(temp)
+    temp = Path(temp_)
     runner = Runner()
-    import os
     try:
         pid = os.fork()
     except BaseException as exc:
@@ -277,7 +285,7 @@ def test_asyncio_forked(temp=None):
        sleep(10)
 
 
-def test_done_deprecation():
+def test_done_deprecation() -> None:
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
         _ = Protocol("done")
         warn_mock.assert_called_once()
@@ -287,30 +295,25 @@ def test_done_deprecation():
         warn_mock.assert_not_called()
 
 
-def test_faulty_poll_detection():
-
-    class PopenMock:
-        pid = 666
-
-        def poll(self):
-            return None
-
+def test_faulty_poll_detection() -> None:
+    popen_mock = unittest.mock.MagicMock(**{"pid": 666, "poll.return_value": None})
     protocol = Protocol()
-    protocol.process = PopenMock()
+    protocol.process = popen_mock
     assert_raises(CommandError, protocol._prepare_result)
 
 
-def test_kill_output():
+def test_kill_output() -> None:
     runner = Runner()
     res = runner.run(
         py2cmd('import sys; sys.stdout.write("aaaa\\n"); sys.stderr.write("bbbb\\n")'),
         protocol=KillOutput)
+    assert isinstance(res, dict)
     eq_(res['stdout'], '')
     eq_(res['stderr'], '')
 
 
 @skip_if_on_windows  # no "hint" on windows since no ulimit command there
-def test_too_long():
+def test_too_long() -> None:
     with swallow_logs(new_level=logging.ERROR) as cml:
         with assert_raises(OSError):  # we still raise an exception if we exceed too much
             Runner().run(
@@ -320,7 +323,7 @@ def test_too_long():
         cml.assert_logged('.*use.*ulimit.*')
 
 
-def test_path_to_str_conversion():
+def test_path_to_str_conversion() -> None:
     # Regression test to ensure that Path-objects are converted into strings
     # before they are put into the environment variable `$PWD`
     runner = Runner()
@@ -333,32 +336,32 @@ def test_path_to_str_conversion():
 
 
 @with_tempfile(mkdir=True)
-def test_environment(temp_dir_path=None):
+def test_environment(temp_dir_path: str = "") -> None:
     # Ensure that the subprocess sees a string in `$PWD`, even if a Path-object
     # is provided to `cwd`.
     cmd = py2cmd("import os; print(os.environ['PWD'])")
-    test_kwargs = {
-        'cwd': Path(temp_dir_path),
-        'env': dict(SYSTEMROOT=os.environ.get('SYSTEMROOT', ''))
-    }
+    cwd = Path(temp_dir_path)
+    env = dict(SYSTEMROOT=os.environ.get('SYSTEMROOT', ''))
     runner = Runner()
-    results = runner.run(cmd=cmd, protocol=StdOutCapture, **test_kwargs)
+    results = runner.run(cmd=cmd, protocol=StdOutCapture, cwd=cwd, env=env)
+    assert isinstance(results, dict)
     output = results['stdout'].splitlines()[0]
     assert output == temp_dir_path
 
-    runner = Runner(**test_kwargs)
+    runner = Runner(cwd=cwd, env=env)
     results = runner.run(cmd=cmd, protocol=StdOutCapture)
+    assert isinstance(results, dict)
     output = results['stdout'].splitlines()[0]
     assert output == temp_dir_path
 
 
-def test_argument_priority():
+def test_argument_priority() -> None:
     class X:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             self.args = args
             self.kwargs = kwargs
 
-        def run(self):
+        def run(self) -> dict:
             return dict(
                 code=0,
                 args=self.args,
@@ -376,6 +379,7 @@ def test_argument_priority():
         runner = Runner(cwd=test_path_1, env=test_env_1)
 
         result = runner.run("first-command")
+        assert isinstance(result, dict)
         assert result['kwargs']['cwd'] == test_path_1
         assert result['kwargs']['env'] == {
             **test_env_1,
@@ -383,6 +387,7 @@ def test_argument_priority():
         }
 
         result = runner.run("second-command", cwd=test_path_2, env=test_env_2)
+        assert isinstance(result, dict)
         assert result['kwargs']['cwd'] == test_path_2
         assert result['kwargs']['env'] == {
             **test_env_2,
@@ -390,14 +395,14 @@ def test_argument_priority():
         }
 
 
-def test_concurrent_execution():
+def test_concurrent_execution() -> None:
     runner = Runner()
     caller_threads = []
 
-    result_list = []
+    result_list: list[str] = []
     result_list_lock = Lock()
 
-    def target(count, r_list, r_list_lock):
+    def target(count: int, r_list: list[str], r_list_lock: Lock) -> None:
         result = runner.run(
             py2cmd(
                 "import time;"
@@ -408,6 +413,7 @@ def test_concurrent_execution():
             ),
             protocol=StdOutCapture,
         )
+        assert isinstance(result, dict)
         output = result["stdout"].strip()
         assert output == f"end {str(count)}"
         with r_list_lock:

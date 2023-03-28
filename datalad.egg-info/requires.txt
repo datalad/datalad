@@ -1,5 +1,5 @@
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -20,13 +20,14 @@ colorama
 
 [:python_version < "3.10"]
 importlib-metadata>=3.6
+typing_extensions
 
 [:python_version >= "3.8"]
 distro
 
 [core]
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -41,13 +42,14 @@ colorama
 
 [core:python_version < "3.10"]
 importlib-metadata>=3.6
+typing_extensions
 
 [core:python_version >= "3.8"]
 distro
 
 [devel]
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -68,7 +70,7 @@ pyperclip
 python-dateutil
 BeautifulSoup4
 httpretty>=0.9.4
-mypy~=0.900
+mypy
 pytest
 pytest-cov
 pytest-fail-slow~=0.2
@@ -84,6 +86,7 @@ coverage
 gprof2dot
 psutil
 pytest-xdist
+scriv
 
 [devel-docs]
 pypandoc
@@ -96,12 +99,14 @@ coverage
 gprof2dot
 psutil
 pytest-xdist
+scriv
 
 [devel:platform_system == "Windows"]
 colorama
 
 [devel:python_version < "3.10"]
 importlib-metadata>=3.6
+typing_extensions
 
 [devel:python_version >= "3.8"]
 distro
@@ -121,7 +126,7 @@ duecredit
 
 [full]
 platformdirs
-chardet<5.0.0,>=3.0.4
+chardet>=3.0.4
 iso8601
 humanize
 fasteners>=0.14
@@ -142,7 +147,7 @@ pyperclip
 python-dateutil
 BeautifulSoup4
 httpretty>=0.9.4
-mypy~=0.900
+mypy
 pytest
 pytest-cov
 pytest-fail-slow~=0.2
@@ -156,6 +161,7 @@ colorama
 
 [full:python_version < "3.10"]
 importlib-metadata>=3.6
+typing_extensions
 
 [full:python_version >= "3.8"]
 distro
@@ -171,7 +177,7 @@ python-gitlab
 [tests]
 BeautifulSoup4
 httpretty>=0.9.4
-mypy~=0.900
+mypy
 pytest
 pytest-cov
 pytest-fail-slow~=0.2

@@ -1,4 +1,87 @@
 
+<a id='changelog-0.18.3'></a>
+# 0.18.3 (2023-03-25)
+
+## 🐛 Bug Fixes
+
+- Fixed that the `get` command would fail, when subdataset source-candidate-templates where using the `path` property from `.gitmodules`.
+  Also enhance the respective documentation for the `get` command.
+  Fixes [#7274](https://github.com/datalad/datalad/issues/7274) via
+  [PR #7280](https://github.com/datalad/datalad/pull/7280)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Improve up-to-dateness of config reports across manager instances.  Fixes [#7299](https://github.com/datalad/datalad/issues/7299) via [PR #7301](https://github.com/datalad/datalad/pull/7301) (by [@mih](https://github.com/mih))
+
+- BF: GitRepo.merge do not allow merging unrelated unconditionally.  [PR #7312](https://github.com/datalad/datalad/pull/7312) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Do not render (empty) WTF report on other records.  [PR #7322](https://github.com/datalad/datalad/pull/7322) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Fixed a bug where changing DataLad's log level could lead to failing git-annex calls.
+  Fixes [#7328](https://github.com/datalad/datalad/issues/7328) via
+  [PR #7329](https://github.com/datalad/datalad/pull/7329)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Fix an issue with uninformative error reporting by the datalad special remote.
+  Fixes [#7332](https://github.com/datalad/datalad/issues/7332) via
+  [PR #7333](https://github.com/datalad/datalad/pull/7333)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Fix save to not force committing into git if reference dataset is pure git (not git-annex).  Fixes [#7351](https://github.com/datalad/datalad/issues/7351) via [PR #7355](https://github.com/datalad/datalad/pull/7355) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Include a few previously missing commands in html API docs.
+  Fixes [#7288](https://github.com/datalad/datalad/issues/7288) via
+  [PR #7289](https://github.com/datalad/datalad/pull/7289)
+  (by [@mslw](https://github.com/mslw))
+
+## 🏠 Internal
+
+- Type-annotate almost all of `datalad/utils.py`; add `datalad/typing.py`.  [PR #7317](https://github.com/datalad/datalad/pull/7317) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate and fix `datalad/support/strings.py`.  [PR #7318](https://github.com/datalad/datalad/pull/7318) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate `datalad/support/globbedpaths.py`.  [PR #7327](https://github.com/datalad/datalad/pull/7327) (by [@jwodder](https://github.com/jwodder))
+
+- Extend type-annotations for `datalad/support/path.py`.  [PR #7336](https://github.com/datalad/datalad/pull/7336) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate various things in `datalad/runner/`.  [PR #7337](https://github.com/datalad/datalad/pull/7337) (by [@jwodder](https://github.com/jwodder))
+
+- Type-annotate some more files in `datalad/support/`.  [PR #7339](https://github.com/datalad/datalad/pull/7339) (by [@jwodder](https://github.com/jwodder))
+
+## 🧪 Tests
+
+- Skip or xfail some currently failing or stalling tests.  [PR #7331](https://github.com/datalad/datalad/pull/7331) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Skip with_sameas_remote when rsync and annex are incompatible.  Fixes [#7320](https://github.com/datalad/datalad/issues/7320) via [PR #7342](https://github.com/datalad/datalad/pull/7342) (by [@bpoldrack](https://github.com/bpoldrack))
+
+- Fix testing assumption - do create pure GitRepo superdataset and test against it.  [PR #7353](https://github.com/datalad/datalad/pull/7353) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.18.2'></a>
+# 0.18.2 (2023-02-27)
+
+## 🐛 Bug Fixes
+
+- Fix `create-sibling` for non-English SSH remotes by providing `LC_ALL=C` for the `ls` call.  [PR #7265](https://github.com/datalad/datalad/pull/7265) (by [@nobodyinperson](https://github.com/nobodyinperson))
+
+- Fix EnsureListOf() and EnsureTupleOf() for string inputs.  [PR #7267](https://github.com/datalad/datalad/pull/7267) (by [@nobodyinperson](https://github.com/nobodyinperson))
+
+- create-sibling: Use C.UTF-8 locale instead of C on the remote end.  [PR #7273](https://github.com/datalad/datalad/pull/7273) (by [@nobodyinperson](https://github.com/nobodyinperson))
+
+- Address compatibility with most recent git-annex where info would exit with non-0.  [PR #7292](https://github.com/datalad/datalad/pull/7292) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🔩 Dependencies
+
+- Revert "Revert "Remove chardet version upper limit"".  [PR #7263](https://github.com/datalad/datalad/pull/7263) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Codespell more (CHANGELOGs etc) and remove custom CLI options from tox.ini.  [PR #7271](https://github.com/datalad/datalad/pull/7271) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Use older python 3.8 in testing nose utils in github-action test-nose.  Fixes [#7259](https://github.com/datalad/datalad/issues/7259) via [PR #7260](https://github.com/datalad/datalad/pull/7260) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.18.1'></a>
 # 0.18.1 (2023-01-16)
 
@@ -142,7 +225,7 @@
 
 ## 🧪 Tests
 
-- Reenable two now-passing core test on Windows CI.
+- Re-enable two now-passing core test on Windows CI.
   [PR #7152](https://github.com/datalad/datalad/pull/7152) (by [@adswa](https://api.github.com/users/adswa))
 
 - Remove the `with_testrepos` decorator and associated tests for it
@@ -218,7 +301,7 @@
 
 - Fix test failure with old annex.  Fixes [#7157](https://github.com/datalad/datalad/issues/7157) via [PR #7159](https://github.com/datalad/datalad/pull/7159) (by [@bpoldrack](https://github.com/bpoldrack))
 
-- Reenable now passing test_path_diff test on Windows.  Fixes [#3725](https://github.com/datalad/datalad/issues/3725) via [PR #7194](https://github.com/datalad/datalad/pull/7194) (by [@yarikoptic](https://github.com/yarikoptic))
+- Re-enable now passing test_path_diff test on Windows.  Fixes [#3725](https://github.com/datalad/datalad/issues/3725) via [PR #7194](https://github.com/datalad/datalad/pull/7194) (by [@yarikoptic](https://github.com/yarikoptic))
 
 - Use Plaintext keyring backend in tests to avoid the need for (interactive)
   authentication to unlock the keyring during (CI-) test runs.
@@ -850,7 +933,7 @@
 #### 🏠 Internal
 
 - The internal ``status()`` helper was equipped with docstrings and promotes "breadth-first" reporting with a new parameter ``reporting_order`` [#6006](https://github.com/datalad/datalad/pull/6006) (by @mih)
-- ``AnnexRepo.get_file_annexinfo()`` is introduced for more convinient queries for single files and replaces a now deprecated ``AnnexRepo.get_file_key()`` to receive information with fewer calls to Git [#6104](https://github.com/datalad/datalad/pull/6104) (by @mih)
+- ``AnnexRepo.get_file_annexinfo()`` is introduced for more convenient queries for single files and replaces a now deprecated ``AnnexRepo.get_file_key()`` to receive information with fewer calls to Git [#6104](https://github.com/datalad/datalad/pull/6104) (by @mih)
 - A new ``get_paths_by_ds()`` helper exposes ``status``' path normalization and sorting [#6110](https://github.com/datalad/datalad/pull/6110) (by @mih)
 - ``status`` is optimized with a cache for dataset roots [#6137](https://github.com/datalad/datalad/pull/6137) (by @yarikoptic)
 - The internal ``get_func_args_doc()`` helper with Python 2 is removed from DataLad core [#6175](https://github.com/datalad/datalad/pull/6175) (by @yarikoptic)
@@ -905,7 +988,7 @@
 - DataLad and its dependency stack were packaged for Gentoo Linux [#6088](https://github.com/datalad/datalad/pull/6088) (by @TheChymera)
 - The readthedocs configuration is modernized to version 2 [#6207](https://github.com/datalad/datalad/pull/6207) (by @adswa)
 - The Windows CI setup now runs on Appveyor's Visual Studio 2022 configuration [#6228](https://github.com/datalad/datalad/pull/6228) (by @adswa)
-- The ``readthedocs-theme`` and ``Sphinx`` versions were pinned to reenable rendering of bullet points in the documentation [#6346](https://github.com/datalad/datalad/pull/6346) (by @adswa)
+- The ``readthedocs-theme`` and ``Sphinx`` versions were pinned to re-enable rendering of bullet points in the documentation [#6346](https://github.com/datalad/datalad/pull/6346) (by @adswa)
 - The PR template was updated with a CHANGELOG template. Future PRs should use it to include a summary for the CHANGELOG [#6396](https://github.com/datalad/datalad/pull/6396) (by @mih)
 
 #### Authors: 11
@@ -1909,7 +1992,7 @@
   ([#5218][])
 
 - The internal command runner's handling of the event loop has been
-  tweaked to hopefully fix issues with runnning DataLad from IPython.
+  tweaked to hopefully fix issues with running DataLad from IPython.
   ([#5106][])
 
 - SSH cleanup wasn't reliably triggered by the ORA special remote on
@@ -2700,7 +2783,7 @@ only supported Python flavor.
   `--alternative-source` parameter has been removed, and a `clone_dataset`
   function with multi-source capabilities is provided instead. The
   `--reckless` parameter can now take literal mode labels instead of just
-  beeing a binary flag, but backwards compatibility is maintained.
+  being a binary flag, but backwards compatibility is maintained.
 
 - The `get_file_content` method of `GitRepo` was no longer used
   internally or in any known DataLad extensions and has been removed.
@@ -2937,7 +3020,7 @@ bet we will fix some bugs and make a world even a better place.
 
 - Correctly handle relative paths in [publish][]. ([#3799][]) ([#3102][])
 
-- Do not errorneously discover directory as a procedure. ([#3793][])
+- Do not erroneously discover directory as a procedure. ([#3793][])
 
 - Correctly extract version from manpage to trigger use of manpages for
   `--help`. ([#3798][])
@@ -3165,7 +3248,7 @@ local dataset operations (`create`, `run`, `save`, `status`, `diff`) is
 
 ## Enhancements and new features
 
-- `SSHConnection` now offers methods for file upload and dowload (`get()`,
+- `SSHConnection` now offers methods for file upload and download (`get()`,
   `put()`. The previous `copy()` method only supported upload and was
   discontinued ([#3401][])
 
@@ -3699,7 +3782,7 @@ Rushed out bugfix release to stay fully compatible with recent
     while considering subdataset metadata for re-aggregation ([#3007][])
 - `annex` commands are now chunked assuming 50% "safety margin" on the
   maximal command line length. Should resolve crashes while operating
-  ot too many files at ones ([#3001][])
+  of too many files at ones ([#3001][])
 - `run` sidecar config processing ([#2991][])
 - no double trailing period in docs ([#2984][])
 - correct identification of the repository with symlinks in the paths
@@ -3830,7 +3913,7 @@ of fixes and enhancements in the past months.
     with latency and locking issues on Windows.  ([#2795][])
 - Internal git fetch calls have been updated to work around a
   GitPython `BadName` issue.  ([#2712][]), ([#2794][])
-- The progess bar for annex file transferring was unable to handle an
+- The progress bar for annex file transferring was unable to handle an
   empty file.  ([#2717][])
 - `datalad add-readme` halted when no aggregated metadata was found
   rather than displaying a warning.  ([#2731][])
@@ -4172,7 +4255,7 @@ Minor bugfix release
   See [screencast](http://datalad.org/features.html#reproducible-science)
 - [save][] now uses Git for detecting with sundatasets need to be inspected for
   potential changes, instead of performing a complete traversal of a dataset tree
-- [add][] looks for changes relative to the last commited state of a dataset
+- [add][] looks for changes relative to the last committed state of a dataset
   to discover files to add more efficiently
 - [diff][] can now report untracked files in addition to modified files
 - [uninstall][] will check itself whether a subdataset is properly registered in a

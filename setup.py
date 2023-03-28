@@ -25,7 +25,7 @@ from _datalad_build_support.setup import (
 requires = {
     'core': [
         'platformdirs',
-        'chardet>=3.0.4, <5.0.0',      # rarely used but small/omnipresent
+        'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
@@ -35,6 +35,7 @@ requires = {
         'packaging',
         'patool>=1.7',
         'tqdm',
+        'typing_extensions; python_version < "3.10"',
         'annexremote',
         'looseversion',
     ],
@@ -59,7 +60,7 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
-        'mypy~=0.900',
+        'mypy',
         'pytest',
         'pytest-cov',
         'pytest-fail-slow~=0.2',
@@ -96,6 +97,7 @@ requires.update({
         # to the dbus whenever installed or smth like that, thus disabled here
         # but you might need it
         # 'dbus-python',
+        'scriv',  # changelog
     ],
 })
 requires['devel'] = sum(list(requires.values()), [])

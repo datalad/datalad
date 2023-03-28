@@ -787,6 +787,14 @@ class Get(Interface):
     submodule commit is available as `remote-<name>` properties, where `name`
     is the configured remote name.
 
+    Hence, such a template could be `http://example.org/datasets/{id}` or
+    `http://example.org/datasets/{path}`, where `{id}` and `{path}` would be
+    replaced by the `datalad-id` or `path` entry in the `.gitmodules` record.
+
+    If this config is committed in `.datalad/config`, a clone of a dataset can
+    look up any subdataset's URL according to such scheme(s) irrespective of
+    what URL is recorded in `.gitmodules`.
+
     Lastly, all candidates are sorted according to their cost (lower values
     first), and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
