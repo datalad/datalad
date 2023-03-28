@@ -36,7 +36,10 @@ from datalad import utils
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.dochelpers import borrowkwargs
 
-from datalad.support.external_versions import external_versions
+from datalad.support.external_versions import (
+    external_versions,
+    get_rsync_version,
+)
 from datalad.support.keyring_ import MemoryKeyring
 from datalad.support.network import RI
 from datalad.support.vcr_ import *
@@ -50,6 +53,8 @@ _TEMP_PATHS_CLONES = set()
 
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
+on_appveyor = bool(os.environ.get('APPVEYOR', False))
+on_nfs = 'nfs' in os.getenv('TMPDIR', '')
 
 if external_versions["cmd:git"] >= "2.28":
     # The specific value here doesn't matter, but it should not be the default
@@ -906,7 +911,7 @@ def with_tempfile(t, **tkwargs):
     ::
 
         @with_tempfile
-        def test_write(tfile):
+        def test_write(tfile=None):
             open(tfile, 'w').write('silly test')
     """
 
@@ -1062,9 +1067,20 @@ def known_failure_osx(func):
         return dm_func
     return func
 
+
 # ### ###
-# END known failure decorators
+# xfails - like known failures but never to be checked to pass etc.
+#   e.g. for specific versions of core tools with regressions
 # ### ###
+
+
+xfail_buggy_annex_info = pytest.mark.xfail(
+    # 10.20230127 is lower bound since bug was introduced before next 10.20230214
+    # release, and thus snapshot builds would fail. There were no release on
+    # '10.20230221' - but that is the next day after the fix
+    external_versions['cmd:annex'] and ('10.20230127' <= external_versions['cmd:annex'] < '10.20230221'),
+    reason="Regression in git-annex info. https://github.com/datalad/datalad/issues/7286"
+)
 
 
 def _get_resolved_flavors(flavors):
@@ -1110,6 +1126,16 @@ def with_sameas_remote(func, autoenabled=False):
         if external_versions['cmd:system-ssh'] < '7.4' and \
            '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
             pytest.skip("Test known to hang")
+
+        # A fix in rsync 3.2.4 broke compatibility with older annex versions.
+        # To make things a bit more complicated, ubuntu pulled that fix into
+        # their rsync package for 3.1.3-8.
+        # Issue: gh-7320
+        rsync_ver = get_rsync_version()
+        rsync_fixed = rsync_ver >= "3.1.3-8ubuntu" or rsync_ver >= "3.2.4"
+        if rsync_fixed and external_versions['cmd:annex'] < "10.20220504":
+            pytest.skip(f"rsync {rsync_ver} and git-annex "
+                        f"{external_versions['cmd:annex']} incompatible")
 
         sr_path, repo_path = args[-2:]
         fn_args = args[:-2]
@@ -1650,7 +1676,8 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     #        'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
-    ds = Dataset(path).create(force=True, **ckwa)
+    # Pass explicit `annex` to ensure that GitRepo does get .noannex
+    ds = Dataset(path).create(force=True, annex=repocls is AnnexRepo, **ckwa)
     # base content
     create_tree(
         ds.path,

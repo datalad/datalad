@@ -66,6 +66,7 @@ from datalad.tests.utils_pytest import (
     swallow_outputs,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     chpwd,
@@ -196,6 +197,7 @@ tree4uargs = dict(
 )
 
 
+@xfail_buggy_annex_info
 @known_failure_windows
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
@@ -631,6 +633,7 @@ class TestAddArchiveOptions():
             []
         )
 
+    @xfail_buggy_annex_info
     def test_override_existing_under_git(self):
         create_tree(self.ds.path, {'1.dat': 'load2'})
         self.ds.save('1.dat', to_git=True, message='added to git')

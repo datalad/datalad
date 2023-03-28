@@ -40,6 +40,7 @@ datalad/consts.py
 datalad/coreapi.py
 datalad/dochelpers.py
 datalad/log.py
+datalad/typing.py
 datalad/utils.py
 datalad/version.py
 datalad.egg-info/PKG-INFO

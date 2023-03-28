@@ -158,12 +158,14 @@ def test_listof():
     c = ct.EnsureListOf(str)
     assert_equal(c(['a', 'b']), ['a', 'b'])
     assert_equal(c(['a1', 'b2']), ['a1', 'b2'])
+    assert_equal(c('a1 b2'), ['a1 b2'])
 
 
 def test_tupleof():
     c = ct.EnsureTupleOf(str)
     assert_equal(c(('a', 'b')), ('a', 'b'))
     assert_equal(c(('a1', 'b2')), ('a1', 'b2'))
+    assert_equal(c('a1 b2'), ('a1 b2',))
 
 
 def test_constraints():

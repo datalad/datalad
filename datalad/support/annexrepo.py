@@ -1166,7 +1166,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         list(dict)
           List of parsed result records.
         """
-        protocol_class = GeneratorAnnexJsonNoStderrProtocol
+        protocol_class = GeneratorAnnexJsonProtocol
 
         args = args[:] + ['--json', '--json-error-messages']
         if progress:
@@ -1268,6 +1268,21 @@ class AnnexRepo(GitRepo, RepoInterface):
             args,
             files=files,
             protocol=StdOutErrCapture)['stdout']
+
+    def call_annex_success(self, args, files=None):
+        """Call git-annex and return true if the call exit code of 0.
+
+        All parameters match those described for `call_annex`.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            self.call_annex(args, files)
+        except CommandError:
+            return False
+        return True
 
     def call_annex_items_(self, args, files=None, sep=None):
         """Call git-annex, splitting output on `sep`.
@@ -2500,8 +2515,14 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not batch:
             json_objects = self._call_annex_records(
-                ['info'] + options, files=files, merge_annex_branches=False)
+                ['info'] + options, files=files, merge_annex_branches=False,
+                exception_on_error=False,
+            )
         else:
+            # according to passing of the test_AnnexRepo_is_under_annex
+            # test with batch=True, there is no need for explicit
+            # exception_on_error=False, batched process does not raise
+            # CommandError.
             json_objects = self._batched.get(
                 'info',
                 annex_options=options, json=True, path=self.path,
@@ -2755,12 +2776,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         annex_input = [key_,] if not remote else [key_, remote]
 
         if not batch:
-            try:
-                out = self.call_annex(['checkpresentkey'] + annex_input)
-                assert(not out)
-                return True
-            except CommandError:
-                return False
+            return self.call_annex_success(['checkpresentkey'] + annex_input)
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
             try:

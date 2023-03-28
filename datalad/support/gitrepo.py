@@ -2246,7 +2246,8 @@ class GitRepo(CoreGitRepo):
             options = []
         if msg:
             options = options + ["-m", msg]
-        options += ['--allow-unrelated-histories']
+        if allow_unrelated:
+            options += ['--allow-unrelated-histories']
         self.call_git(
             ['merge'] + options + [name],
             **kwargs
@@ -2353,7 +2354,7 @@ class GitRepo(CoreGitRepo):
                 continue
             modprops = {'gitmodule_{}'.format(k): v
                         for k, v in props.items()
-                        if not (k.startswith('__') or k == 'path')}
+                        if not k.startswith('__')}
             # Keep as PurePosixPath for possible normalization of / in the path etc
             modpath = PurePosixPath(props['path'])
             modprops['gitmodule_name'] = name

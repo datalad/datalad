@@ -89,7 +89,7 @@ def test_something(path=None, new_home=None):
         name='some.more',
         value='test')
     # Python tuple specs
-    # swallow outputs to be able to execise the result renderer
+    # swallow outputs to be able to exercise the result renderer
     with swallow_outputs():
         res = ds.configuration(
             'set',
