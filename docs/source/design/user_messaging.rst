@@ -9,7 +9,7 @@ User messaging: result records vs exceptions vs logging
 
 .. topic:: Specification scope and status
 
-   This specification provides a partial overview of the current implementation.
+   This specification provides a partial overview of the implementation goal.
 
 Motivation
 ==========
@@ -98,10 +98,9 @@ The :mod:`~datalad.ui` module provides the means to communicate information
 to the user in a user-interface-specific manner, e.g. via a console, dialog, or an iPython interface.
 Internally, all DataLad results processed by the result renderer are passed through the UI module.
 
-Therefore: in cases where existing user communication processes are not appropriate,
-developers should let explicit user communication happen through the UI module
-as it provides the flexibility to adjust to the present UI. Specifically,
-:py:func:`datalad.ui.message` allows passing a simple message via the UI module.
+Therefore: unless the criteria for logging apply, developers should let explicit user communication
+happen through the UI module as it provides the flexibility to adjust to the present UI.
+Specifically, :py:func:`datalad.ui.message` allows passing a simple message via the UI module.
 
 
 Examples
