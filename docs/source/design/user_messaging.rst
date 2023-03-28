@@ -28,8 +28,9 @@ Result records
 
 **Result records are the only return value format** for all DataLad interfaces.
 
-Constrasting with classic Python interfaces that return specific non-annotated values,
-DataLad interfaces implement message passing by yielding :ref:`result records <chap_design_result_records>`
+Contrasting with classic Python interfaces that return specific non-annotated values,
+DataLad interfaces (i.e. subclasses of :py:class:`datalad.interface.base.Interface`)
+implement message passing by yielding :ref:`result records <chap_design_result_records>`
 that are associated with individual operations. Result records are routinely inspected throughout
 the code base and their annotations are used to inform general program flow and error handling.
 
@@ -55,7 +56,7 @@ the offending action**.
 More specifically, raise an exception when:
 
 1. A DataLad interface's parameter specifications are violated
-2. An additional requirement (beyond parameters) for the successful running of a
+2. An additional requirement (beyond parameters) for the meaningful continuation of a
    command, function, or process is not met
 
 It must be made clear to the user/caller what the exact cause of the exception
@@ -106,5 +107,15 @@ as it provides the flexibility to adjust to the present UI. Specifically,
 Examples
 ========
 
-.. note::
-   TODO
+The following links point to actual code implementations of the respective user
+messaging methods:
+
+- `Result yielding`_
+- `Exception handling`_
+- `Logging`_
+- `UI messaging`_
+
+.. _Result yielding: https://github.com/datalad/datalad/blob/a8d7c63b763aacfbca15925bb1562a62b4448ea6/datalad/core/local/status.py#L402-L426
+.. _Exception handling: https://github.com/datalad/datalad/blob/a8d7c63b763aacfbca15925bb1562a62b4448ea6/datalad/core/local/status.py#L149-L150
+.. _Logging: https://github.com/datalad/datalad/blob/a8d7c63b763aacfbca15925bb1562a62b4448ea6/datalad/core/local/status.py#L158
+.. _UI messaging: https://github.com/datalad/datalad/blob/a8d7c63b763aacfbca15925bb1562a62b4448ea6/datalad/core/local/status.py#L438-L457
