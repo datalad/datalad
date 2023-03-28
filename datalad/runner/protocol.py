@@ -42,10 +42,13 @@ class GeneratorMixIn:
             # do something, for example write to stdin of the subprocess
 
 
-    Example usage to create a generator-version of the StdOutCapture protocol:
+    Example for creating a generator-version of the StdOutCapture protocol, that
+    will yield tuples of (fd, data):
 
         class GeneratorStdOutCapture(StdOutCapture, GeneratorMixIn):
-            pass
+            def pipe_data_received(self, fd, data):
+                self.send_result((fd, data))
+
     """
     @property
     def result_queue(self):
