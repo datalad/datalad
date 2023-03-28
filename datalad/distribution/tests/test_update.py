@@ -490,6 +490,23 @@ def test_multiway_merge(path=None):
     assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
 
 
+def test_unrelated_history_merge(tmp_path):
+    # prepare two independent datasets and try merging one into another
+    ds = Dataset(tmp_path / 'ds').create()
+    repo = AnnexRepo(tmp_path / 'repo')
+    f = (tmp_path / 'repo' / 'file.dat')
+    f.write_text("data")
+    repo.add(str(f))
+    repo.commit()
+    # ATM we do not do any checks and allow such addition
+    assert_status('ok', ds.siblings(action='add', name='repo', url=repo.path))
+    res = ds.update(how='merge', on_failure='ignore')
+    # ATM we do not have any special handling, just that the first result record
+    # would have that error in "message" field
+    assert_status('error', res[0])
+    assert_in('refusing to merge unrelated histories', res[0]['message'])
+
+
 # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
 # adjusted branch, so we don't give an error if TARGET can't be
 # determined.

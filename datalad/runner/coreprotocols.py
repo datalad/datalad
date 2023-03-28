@@ -48,7 +48,8 @@ class KillOutput(WitlessProtocol):
     proc_out = True
     proc_err = True
 
-    def pipe_data_received(self, fd, data):
+    def pipe_data_received(self, fd: int, data: bytes) -> None:
+        assert self.process is not None
         if lgr.isEnabledFor(5):
             lgr.log(
                 5,

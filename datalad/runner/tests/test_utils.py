@@ -17,7 +17,6 @@ from ..utils import (
     LineSplitter,
 )
 
-
 test_lines = [
     "first line",
     "second line",
@@ -30,7 +29,7 @@ def _check_splitting_endings_separator(endings: list[str],
                                        separator: Optional[str] = None,
                                        keep_ends: bool = False,
                                        check_continuation: bool = False
-                                       ):
+                                       ) -> None:
     for line_ending in endings:
         line_splitter = LineSplitter(separator=separator, keep_ends=keep_ends)
         full_end = line_ending + separator if separator else line_ending
@@ -60,13 +59,13 @@ def _check_splitting_endings_separator(endings: list[str],
             assert_is_none(line_splitter.finish_processing())
 
 
-def test_line_splitter_basic():
+def test_line_splitter_basic() -> None:
     # expect lines without endings, split at standard line-endings
     _check_splitting_endings_separator(["\n", "\r\n"])
     _check_splitting_endings_separator(["\n", "\r\n"], check_continuation=True)
 
 
-def test_line_splitter_basic_keep():
+def test_line_splitter_basic_keep() -> None:
     # expect lines without endings, split at standard line-endings
     _check_splitting_endings_separator(["\n", "\r\n"], keep_ends=True)
     _check_splitting_endings_separator(
@@ -75,7 +74,7 @@ def test_line_splitter_basic_keep():
         check_continuation=True)
 
 
-def test_line_splitter_zero():
+def test_line_splitter_zero() -> None:
     # expect lines without endings, split at standard line-endings
     _check_splitting_endings_separator(["\n", "\r\n"], separator="\x00")
     _check_splitting_endings_separator(
@@ -84,7 +83,7 @@ def test_line_splitter_zero():
         check_continuation=True)
 
 
-def test_line_splitter_zero_keep():
+def test_line_splitter_zero_keep() -> None:
     # expect lines without endings, split at standard line-endings
     _check_splitting_endings_separator(
         ["\n", "\r\n"],
@@ -97,7 +96,7 @@ def test_line_splitter_zero_keep():
         check_continuation=True)
 
 
-def test_line_splitter_corner_cases():
+def test_line_splitter_corner_cases() -> None:
     line_splitter = LineSplitter()
     lines = line_splitter.process("")
     assert_equal(lines, [])
@@ -115,7 +114,7 @@ def test_line_splitter_corner_cases():
     assert_equal(lines, ["  a   ", " "])
 
 
-def test_assembling_decoder_mix_in_basic():
+def test_assembling_decoder_mix_in_basic() -> None:
 
     encoding = "utf-8"
     unicode_str = "These are not ASCII: ä, ö, ü. These can be ASCII: a, o, u."
@@ -148,7 +147,7 @@ def _decode_multiple(adm: AssemblingDecoderMixIn,
     return ["".join(decoded_list) for decoded_list in decoded_chars]
 
 
-def test_assembling_decoder_mix_in_multiple():
+def test_assembling_decoder_mix_in_multiple() -> None:
     encoding = "utf-8"
     unicode_strings = [
         "These are not ASCII: ä, ö, ü. These can be ASCII: a, o, u.",
@@ -165,7 +164,7 @@ def test_assembling_decoder_mix_in_multiple():
     assert_equal(unicode_strings, decoded_strings)
 
 
-def test_assembling_decoder_mix_in_multiple_fail():
+def test_assembling_decoder_mix_in_multiple_fail() -> None:
     encoding = "utf-8"
     unicode_strings = [
         "A: ä, ö, ü.",
@@ -184,7 +183,7 @@ def test_assembling_decoder_mix_in_multiple_fail():
     assert_equal(decoded_strings, ["A: ", "B: ", "C: "])
 
 
-def test_assembling_decoder_mix_in_warning():
+def test_assembling_decoder_mix_in_warning() -> None:
     encoding = "utf-8"
     data_bytes = "🐷🐶.".encode(encoding)
 
