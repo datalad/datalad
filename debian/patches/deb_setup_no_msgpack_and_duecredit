@@ -12,7 +12,7 @@ Last-Update: 2018-03-03
 
 --- a/setup.py
 +++ b/setup.py
-@@ -39,9 +39,10 @@ requires = {
+@@ -40,9 +40,10 @@ requires = {
      ],
      'downloaders': [
          'boto',

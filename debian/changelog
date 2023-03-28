@@ -1,3 +1,11 @@
+datalad (0.18.3-1) experimental; urgency=medium
+
+  * Fresh upstream bugfix release
+  * debian/patches
+    - refreshed and deb_no_chardet_depends dropped (upstream has the same now)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 27 Mar 2023 21:57:13 -0400
+
 datalad (0.18.1-2) unstable; urgency=medium
 
   * Exclude flaky test_gracefull_death from testing (Closes: #1029450)

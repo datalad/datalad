@@ -116,18 +116,18 @@ Last-Update: 2018-06-05
  # so Й might get recoded
 --- a/datalad/runner/tests/test_witless_runner.py
 +++ b/datalad/runner/tests/test_witless_runner.py
-@@ -63,7 +63,7 @@ result_counter = 0
+@@ -65,7 +65,7 @@ result_counter = 0
  @with_tempfile
- def test_runner(tempfile=None):
+ def test_runner(tempfile: str = "") -> None:
      runner = Runner()
--    content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
+-    content = 'Testing real run' if on_windows else 'Testing äöü東 real run'
 +    content = 'Testing real run'
      cmd = 'echo %s > %s' % (content, tempfile)
      res = runner.run(cmd)
-     # no capture of any kind, by default
+     assert isinstance(res, dict)
 --- a/datalad/tests/utils_pytest.py
 +++ b/datalad/tests/utils_pytest.py
-@@ -1427,7 +1427,7 @@ with_parametric_batch = pytest.mark.para
+@@ -1453,7 +1453,7 @@ with_parametric_batch = pytest.mark.para
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']

@@ -74,16 +74,16 @@
  
 --- a/datalad/support/cookies.py
 +++ b/datalad/support/cookies.py
-@@ -11,7 +11,7 @@
- import atexit
- import logging
- import shelve
+@@ -20,7 +20,7 @@ from typing import (
+     Optional,
+ )
+ 
 -import platformdirs
 +import appdirs
- import os.path
  
- from .network import get_tld
-@@ -46,7 +46,7 @@ class CookiesDB(object):
+ from datalad.support.exceptions import CapturedException
+ 
+@@ -55,7 +55,7 @@ class CookiesDB:
              filename = self._filename
              cookies_dir = os.path.dirname(filename)
          else:
@@ -94,7 +94,7 @@
          # TODO: guarantee restricted permissions
 --- a/datalad/support/external_versions.py
 +++ b/datalad/support/external_versions.py
-@@ -182,7 +182,7 @@ class ExternalVersions(object):
+@@ -209,7 +209,7 @@ class ExternalVersions(object):
      }
      _INTERESTING = (
          'annexremote',
@@ -110,6 +110,6 @@
  requires = {
      'core': [
 -        'platformdirs',
-         'chardet>=3.0.4, <5.0.0',      # rarely used but small/omnipresent
+         'chardet>=3.0.4',      # rarely used but small/omnipresent
          'colorama; platform_system=="Windows"',
          'distro; python_version >= "3.8"',
