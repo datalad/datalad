@@ -1,3 +1,11 @@
+datalad (0.18.3-2) neurodebian; urgency=medium
+
+  * debian/control
+    - add python3-typing-extensions to Depends also of the python3-datalad
+      (needed for older python < 3.10)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 04 Apr 2023 10:06:35 -0400
+
 datalad (0.18.3-1) experimental; urgency=medium
 
   * Fresh upstream bugfix release
