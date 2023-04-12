@@ -748,7 +748,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return remotes
 
-    def get_special_remotes(self, include_dead:bool =False) -> dict[str, dict]:
+    def get_special_remotes(self, include_dead:bool = False) -> dict[str, dict]:
         """Get info about all known (not just enabled) special remotes.
 
         The present implementation is not able to report on special remotes
