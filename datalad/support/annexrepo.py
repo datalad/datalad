@@ -30,6 +30,7 @@ from os.path import (
     lexists,
     normpath,
 )
+from typing import Dict
 from weakref import (
     WeakValueDictionary,
     finalize,
@@ -748,12 +749,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return remotes
 
-    def get_special_remotes(self):
+    def get_special_remotes(self, include_dead:bool = False) -> Dict[str, dict]:
         """Get info about all known (not just enabled) special remotes.
 
         The present implementation is not able to report on special remotes
         that have only been configured in a private annex repo
         (annex.private=true).
+
+        Parameters
+        ----------
+        include_dead: bool, optional
+          Whether to include remotes announced dead.
 
         Returns
         -------
@@ -821,6 +827,21 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else:
                     sr_info["name"] = name
             srs[sr_id] = sr_info
+
+        # remove dead ones
+        if not include_dead:
+            # code largely copied from drop.py:_detect_nondead_annex_at_remotes
+            # but not using -p and rather blob as above
+            try:
+                for line in self.call_git_items_(
+                        ['cat-file', 'blob', 'git-annex:trust.log']):
+                    columns = line.split()
+                    if columns[1] == 'X':
+                        # .pop if present
+                        srs.pop(columns[0], None)
+            except CommandError as e:
+                # this is not a problem per-se, probably file is not there, just log
+                CapturedException(e)
         return srs
 
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,
