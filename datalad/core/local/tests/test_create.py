@@ -32,6 +32,7 @@ from datalad.tests.utils_pytest import (
     has_symlink_capability,
     ok_,
     ok_exists,
+    skip_if,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -61,6 +62,10 @@ def test_create_raises(path=None, outside_path=None):
     # incompatible arguments (annex only):
     assert_raises(ValueError, ds.create, annex=False, description='some')
     assert_raises(ValueError, ds.create, annex=False, private=True)
+
+    # unsupported feature:
+    if not AnnexRepo._check_version_kludges("annex-supports-private"):
+        assert_raises(ValueError, ds.create, private=True)
 
     with open(op.join(path, "somefile.tst"), 'w') as f:
         f.write("some")
@@ -544,6 +549,8 @@ def test_bad_cfg_proc(path=None):
     assert not op.isdir(path)
 
 
+@skip_if(cond=not AnnexRepo._check_version_kludges("annex-supports-private"),
+         msg="Private mode not supported by git-annex version")
 @with_tempfile
 def test_create_private(path=None):
     ds = Dataset(path).create(private=True)

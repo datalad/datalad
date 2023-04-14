@@ -239,6 +239,12 @@ class Create(Interface):
             if private:
                 raise ValueError("Incompatible arguments: cannot specify "
                                  "annex to be private and declare no annex.")
+        if private and not \
+                AnnexRepo._check_version_kludges("annex-supports-private"):
+            raise ValueError("git-annex version does not support private mode. "
+                             "This requires at least git-annex 8.20210428. "
+                             "Note, that 'git annex dead here' may serve the "
+                             "purpose under some circumstances.")
 
         if (isinstance(initopts, (list, tuple)) and '--bare' in initopts) or (
                 isinstance(initopts, dict) and 'bare' in initopts):

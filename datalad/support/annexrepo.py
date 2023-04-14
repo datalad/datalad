@@ -557,7 +557,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
         # applies to find, findref to list all known.
         # was added in 10.20221212-17-g0b2dd374d on 20221220.
-        kludges["find-supports-anything"] = ver >= "10.20221212+git18"
+        kludges["find-supports-anything"] = ver >= "10.20221213"
+        kludges["annex-supports-private"] = ver >= "8.20210428"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -1478,7 +1479,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # If requested, set annex.private before git annex init
         if private:
-            self._call_git(['config', '--local', 'annex.private', 'true'])
+            if self._check_version_kludges("annex-supports-private"):
+                self.config.add("annex.private", 'true', scope='local')
+            else:
+                raise ValueError("Installed git-annex does not support private "
+                                 "mode repositories. Requires at least "
+                                 "git-annex 8.20210428. Note, that 'git annex "
+                                 "dead here' may serve the purpose if "
+                                 "recording the existence of this location is "
+                                 "not an issue.")
 
         self._call_annex(['init'] + opts, protocol=AnnexInitOutput)
         # TODO: When to expect stderr?
