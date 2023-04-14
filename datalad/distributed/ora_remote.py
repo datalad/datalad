@@ -1095,7 +1095,7 @@ class ORARemote(SpecialRemote):
             # version.
             # Lets try to find ourselves: Find remote with matching annex uuid
             response = _get_gitcfg(self.gitdir,
-                                   "^remote\..*\.annex-uuid",
+                                   r"^remote\..*\.annex-uuid",
                                    regex=True)
             response = response.splitlines() if response else []
             candidates = set()

@@ -108,6 +108,7 @@ from datalad.tests.utils_pytest import (
     ok_file_has_content,
     ok_file_under_git,
     ok_git_config_not_empty,
+    on_nfs,
     on_travis,
     serve_path_via_http,
     set_annex_version,
@@ -123,6 +124,7 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -349,6 +351,7 @@ def test_AnnexRepo_file_has_content(src=None, annex_path=None, *, batch):
 
 
 # 1 is enough to test
+@xfail_buggy_annex_info
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
@@ -386,6 +389,7 @@ def test_AnnexRepo_is_under_annex(src=None, annex_path=None, *, batch):
         [False])
 
 
+@xfail_buggy_annex_info
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -1614,6 +1618,7 @@ def test_get_urls_none(path=None):
     eq_(ar.get_urls("afile"), [])
 
 
+@xfail_buggy_annex_info
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path=None):
     ar = AnnexRepo(path, create=True)
@@ -2308,7 +2313,7 @@ def test_annexjson_protocol_incorrect(path=None, *, print_opt, caplog):
 # see https://github.com/datalad/datalad/pull/5400 for troubleshooting
 # for stalling with unlock=False, and then with unlock=True it took >= 300 sec
 # https://github.com/datalad/datalad/pull/5433#issuecomment-784470028
-@skip_if(on_travis and 'nfs' in os.getenv('TMPDIR', ''))  # TODO. stalls
+@skip_if(on_travis and on_nfs)  # TODO. stalls
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
 @known_failure_githubci_win

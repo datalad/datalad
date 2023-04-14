@@ -43,7 +43,7 @@ for setup_py_path in (opj(pardir, 'setup.py'),  # travis
                       opj(pardir, pardir, 'setup.py')):  # RTD
     if exists(setup_py_path):
         try:
-            for cmd in 'manpage', 'cfginfo', 'schema':
+            for cmd in 'manpage', 'cfginfo':
                 os.system('{} build_{}'.format(setup_py_path, cmd))
         except:
             # shut up and do your best

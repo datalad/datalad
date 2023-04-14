@@ -235,7 +235,15 @@ type = {credential_type}
         can also be called to reset the cached providers.
         """
         # lazy part
-        dsroot = get_dataset_root("")
+        # Note, that "" is effectively the same as ".". If CWD is in a dataset's
+        # root already, `get_dataset_root` will just return its input. While
+        # this is technically correct, we want to use it here in order to
+        # figure, whether the dsroot is the same as when we called last time.
+        # However, "", ".", etc. would stay the same, whenever we switch into
+        # another dataset, causing `from_config_files` to "think" nothing
+        # changed. Therefore use abspath here.
+        dsroot_rel = get_dataset_root("")
+        dsroot = abspath(dsroot_rel) if dsroot_rel is not None else None
         if files is None and cls._DEFAULT_PROVIDERS and not reload and dsroot==cls._DS_ROOT:
             return cls._DEFAULT_PROVIDERS
 

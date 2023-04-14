@@ -206,7 +206,7 @@ case "$scenario" in
           exit 1
         fi
         # We are interested only to get git-annex into our environment
-        # So to not interfer with "system wide" Python etc, we will add miniconda at the
+        # So to not interfere with "system wide" Python etc, we will add miniconda at the
         # end of the path
         export PATH="$PATH:${_annex_bin}";;
       conda-forge)

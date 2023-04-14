@@ -38,6 +38,7 @@ from datalad.tests.utils_pytest import (
     create_tree,
     eq_,
     ok_,
+    on_appveyor,
     serve_path_via_http,
     with_sameas_remote,
     with_tempfile,
@@ -46,6 +47,8 @@ from datalad.utils import (
     Path,
     on_windows,
 )
+
+import pytest
 
 
 @with_tempfile(mkdir=True)

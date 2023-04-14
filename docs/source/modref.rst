@@ -31,6 +31,7 @@ Dataset operations
    api.create_sibling_gogs
    api.create_sibling_gitea
    api.create_sibling_gin
+   api.create_sibling_ria
    api.drop
    api.get
    api.install
@@ -67,8 +68,9 @@ Plumbing commands
    api.create_test_dataset
    api.diff
    api.download_url
-   api.sshrun
+   api.foreach_dataset
    api.siblings
+   api.sshrun
    api.subdatasets
 
 Miscellaneous commands
@@ -84,8 +86,10 @@ Miscellaneous commands
    api.check_dates
    api.configuration
    api.export_archive
+   api.export_archive_ora
    api.export_to_figshare
    api.no_annex
+   api.shell_completion
    api.wtf
 
 Support functionality

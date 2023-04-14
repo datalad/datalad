@@ -58,8 +58,6 @@ jobs:
         DL_NEED_SINGULARITY=
         # TODO: just reuse information from datalad-extensions!!
         case ${{ matrix.extension }} in
-          datalad-metalad)
-            DL_PIP_INSTALLS+=" nose";;
           datalad-container)
             DL_NEED_SINGULARITY=1;;
         esac
@@ -97,12 +95,6 @@ jobs:
     - name: WTF!?
       run: |
         datalad wtf
-
-    - name: ${{ matrix.extension }} tests using nose
-      run: |
-        cd __testhome__
-        python -m nose -s -v --with-cov --cover-package datalad ${DL_PACKAGE}
-      if: env.DL_TESTER == 'nose'
 
     - name: ${{ matrix.extension }} tests using pytest
       run: |

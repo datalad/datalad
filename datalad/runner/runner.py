@@ -125,13 +125,14 @@ class WitlessRunner(object):
           `ThreadedRunner` descriptions for a more detailed discussion
           on timeouts.
         exception_on_error : bool, optional
-          This argument is only interpreted if the protocol is a subclass
+          This argument is first interpreted if the protocol is a subclass
           of `GeneratorMixIn`. If it is `True` (default), a
           `CommandErrorException` is raised by the generator if the
           sub process exited with a return code not equal to zero. If the
           parameter is `False`, no exception is raised. In both cases the
           return code can be read from the attribute `return_code` of
-          the generator.
+          the generator. Then this argument interpreted within this function
+          to not raise `CommandError` if value is False in case of non-0 exit.
         kwargs :
           Passed to the Protocol class constructor.
 
@@ -211,8 +212,10 @@ class WitlessRunner(object):
         lgr.debug("Finished %r with status %s", cmd, results['code'])
 
         # make it such that we always blow if a protocol did not report
-        # a return code at all
-        if results.get('code', True) not in [0, None]:
+        # a return code at all or it was non-0 and we were not asked ignore
+        # errors
+        return_code = results.get('code', None)
+        if return_code is None or (return_code and exception_on_error):
             # the runner has a better idea, doc string warns Protocol
             # implementations not to return these
             results.pop('cmd', None)

@@ -65,9 +65,11 @@ from datalad.tests.utils_pytest import (
     ok_exists,
     ok_file_has_content,
     ok_startswith,
+    on_travis,
     patch_config,
     serve_path_via_http,
     set_date,
+    skip_if,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
@@ -77,6 +79,7 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -304,6 +307,7 @@ def test_clone_isnot_recursive(path_src=None, path_nr=None, path_r=None):
         {'subm 1', '2'})
 
 
+@skip_if(on_travis)  # xfails -- stalls, https://github.com/datalad/datalad/issues/6845
 @with_tempfile
 @with_tempfile
 def test_clone_into_dataset(source_path=None, top_path=None):
@@ -1576,6 +1580,7 @@ def test_clone_unborn_head_sub(path=None):
     eq_(managed, ds_cloned_sub.repo.is_managed_branch())
 
 
+@xfail_buggy_annex_info
 @skip_if_no_network
 @with_tempfile
 def test_gin_cloning(path=None):

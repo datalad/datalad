@@ -510,7 +510,8 @@ class WTF(Interface):
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
         out = _render_report(res)
-        ui.message(out)
+        if out:
+            ui.message(out)
         # add any necessary hints afterwards
         maybe_show_hints(res)
 
@@ -532,6 +533,9 @@ def maybe_show_hints(res):
 
 def _render_report(res):
     report = u'# WTF'
+    if not (res.get('status') == 'ok' and 'infos' in res):
+        # some other record not intended to be rendered
+        return
 
     def _unwind(text, val, top):
         if isinstance(val, dict):

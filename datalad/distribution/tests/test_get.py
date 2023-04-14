@@ -148,6 +148,18 @@ def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
                 dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
                      from_config=True),
         ])
+    # template using the "regular" property `path` (`id` above is shortened from
+    # actual record `datalad-id` in .gitmodules)
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'somewhe.re/{path}'}):
+        eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+            [
+                dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
+                dict(cost=700, name='bang', url='somewhe.re/sub',
+                     from_config=True),
+        ])
+
     # now again, but have an additional remote besides origin that
     # actually has the relevant commit
     clone3 = install(

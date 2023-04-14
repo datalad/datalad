@@ -9,16 +9,24 @@
 """Wrapper for globbing paths.
 """
 
+from __future__ import annotations
+
 import glob
-from functools import lru_cache
-from itertools import chain
 import logging
 import os.path as op
+from functools import lru_cache
+from itertools import chain
+from typing import (
+    Iterable,
+    Optional,
+)
 
-from datalad.utils import chpwd
-from datalad.utils import ensure_unicode
-from datalad.utils import getpwd
-from datalad.utils import partition
+from datalad.utils import (
+    chpwd,
+    ensure_unicode,
+    getpwd,
+    partition,
+)
 
 lgr = logging.getLogger('datalad.support.globbedpaths')
 
@@ -39,27 +47,30 @@ class GlobbedPaths(object):
        Whether the `paths` property returns unexpanded or expanded paths.
     """
 
-    def __init__(self, patterns, pwd=None, expand=False):
+    def __init__(self, patterns: Optional[Iterable[str | bytes]], pwd: Optional[str] = None, expand: bool = False) -> None:
         self.pwd = pwd or getpwd()
         self._expand = expand
 
+        self._maybe_dot: list[str]
+        self._patterns: list[str]
         if patterns is None:
             self._maybe_dot = []
             self._patterns = []
         else:
-            patterns = list(map(ensure_unicode, patterns))
-            patterns, dots = partition(patterns, lambda i: i.strip() == ".")
+            pattern_strs = list(map(ensure_unicode, patterns))
+            pattern_iter, dots = partition(pattern_strs, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._patterns = [op.relpath(p, start=pwd) if op.isabs(p) else p
-                              for p in patterns]
-        self._cache = {}
+                              for p in pattern_iter]
+        self._cache: dict[str, dict[str, list[str]]] = {}
+        self._expanded_cache: dict[tuple[str, bool, bool], list[str]] = {}
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return bool(self._maybe_dot or self._patterns)
 
     @staticmethod
     @lru_cache()
-    def _get_sub_patterns(pattern):
+    def _get_sub_patterns(pattern: str) -> list[str]:
         """Extract sub-patterns from the leading path of `pattern`.
 
         The right-most path component is successively peeled off until there
@@ -85,17 +96,17 @@ class GlobbedPaths(object):
             head = new_head
         return sub_patterns
 
-    def _expand_globs(self):
-        def normalize_hit(h):
+    def _expand_globs(self) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
+        def normalize_hit(h: str) -> str:
             normalized = op.relpath(h) + ("" if op.basename(h) else op.sep)
             if h == op.curdir + op.sep + normalized:
                 # Don't let relpath prune "./fname" (gh-3034).
                 return h
             return normalized
 
-        hits = {}
-        partial_hits = {}
-        misses = {}
+        hits: dict[str, list[str]] = {}
+        partial_hits: dict[str, list[str]] = {}
+        misses: dict[str, list[str]] = {}
         with chpwd(self.pwd):
             for pattern in self._patterns:
                 full_hits = glob.glob(pattern, recursive=True)
@@ -116,8 +127,8 @@ class GlobbedPaths(object):
                         misses[pattern] = [pattern]
         return hits, partial_hits, misses
 
-    def expand(self, full=False, dot=True, refresh=False,
-               include_partial=True, include_misses=True):
+    def expand(self, full: bool = False, dot: bool = True, refresh: bool = False,
+               include_partial: bool = True, include_misses: bool = True) -> list[str]:
         """Return paths with the globs expanded.
 
         Globbing is done with `glob.glob`. If a pattern doesn't have a match,
@@ -144,6 +155,7 @@ class GlobbedPaths(object):
         """
         if refresh:
             self._cache = {}
+            self._expanded_cache = {}
 
         maybe_dot = self._maybe_dot if dot else []
         if not self._patterns:
@@ -161,7 +173,7 @@ class GlobbedPaths(object):
 
         key_suffix = (include_partial, include_misses)
         key_expanded = ("expanded",) + key_suffix
-        if key_expanded not in self._cache:
+        if key_expanded not in self._expanded_cache:
             sources = [hits]
             if include_partial:
                 sources.append(partial_hits)
@@ -174,25 +186,25 @@ class GlobbedPaths(object):
                     if pattern in source:
                         paths.extend(source[pattern])
                         break
-            self._cache[key_expanded] = paths
+            self._expanded_cache[key_expanded] = paths
         else:
-            paths = self._cache[key_expanded]
+            paths = self._expanded_cache[key_expanded]
 
         if full:
             key_full = ("expanded_full",) + key_suffix
-            if key_full not in self._cache:
+            if key_full not in self._expanded_cache:
                 paths = [op.join(self.pwd, p) for p in paths]
-                self._cache[key_full] = paths
+                self._expanded_cache[key_full] = paths
             else:
-                paths = self._cache[key_full]
+                paths = self._expanded_cache[key_full]
 
         return maybe_dot + paths
 
-    def expand_strict(self, full=False, dot=True, refresh=False):
+    def expand_strict(self, full: bool = False, dot: bool = True, refresh: bool = False) -> list[str]:
         return self.expand(full=full, dot=dot, refresh=refresh,
                            include_partial=False, include_misses=False)
 
-    def _chain(self, what):
+    def _chain(self, what: str) -> list[str]:
         if self._patterns:
             if "hits" not in self._cache:
                 self.expand()
@@ -203,13 +215,13 @@ class GlobbedPaths(object):
         return []
 
     @property
-    def partial_hits(self):
+    def partial_hits(self) -> list[str]:
         """Return patterns that had a partial but not complete match.
         """
         return self._chain("partial_hits")
 
     @property
-    def misses(self):
+    def misses(self) -> list[str]:
         """Return patterns that didn't have any complete or partial matches.
 
         This doesn't include patterns where a sub-pattern matched. Those are
@@ -218,7 +230,7 @@ class GlobbedPaths(object):
         return self._chain("misses")
 
     @property
-    def paths(self):
+    def paths(self) -> list[str]:
         """Return paths relative to `pwd`.
 
         Globs are expanded if `expand` was set to true during instantiation.

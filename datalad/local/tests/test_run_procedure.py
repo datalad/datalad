@@ -42,6 +42,7 @@ from datalad.tests.utils_pytest import (
     patch_config,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     chpwd,
@@ -345,6 +346,7 @@ def test_quoting(path=None):
                 protocol=KillOutput)
 
 
+@xfail_buggy_annex_info
 @with_tree(tree={
     # "TEXT" ones
     'empty': '',  # we have special rule to treat empty ones as text

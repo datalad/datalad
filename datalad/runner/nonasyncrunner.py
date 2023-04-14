@@ -25,8 +25,8 @@ from queue import (
 )
 from subprocess import Popen
 from typing import (
-    Any,
     IO,
+    Any,
     Optional,
 )
 
@@ -38,11 +38,11 @@ from .protocol import (
     WitlessProtocol,
 )
 from .runnerthreads import (
-    _try_close,
     IOState,
     ReadThread,
     WaitThread,
     WriteThread,
+    _try_close,
 )
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
@@ -79,7 +79,7 @@ class _ResultGenerator(Generator):
     def __init__(self,
                  runner: ThreadedRunner,
                  result_queue: deque
-                 ):
+                 ) -> None:
 
         super().__init__()
         self.runner = runner
@@ -170,7 +170,7 @@ class ThreadedRunner:
     def __init__(self,
                  cmd: str | list,
                  protocol_class: type[WitlessProtocol],
-                 stdin: Any,
+                 stdin: int | IO | bytes | Queue[Optional[bytes]] | None,
                  protocol_kwargs: Optional[dict] = None,
                  timeout: Optional[float] = None,
                  exception_on_error: bool = True,
@@ -729,7 +729,7 @@ class ThreadedRunner:
 
 def run_command(cmd: str | list,
                 protocol: type[WitlessProtocol],
-                stdin: Any,
+                stdin: int | IO | bytes | Queue[Optional[bytes]] | None,
                 protocol_kwargs: Optional[dict] = None,
                 timeout: Optional[float] = None,
                 exception_on_error: bool = True,

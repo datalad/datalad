@@ -1,12 +1,20 @@
+from __future__ import annotations
+
 import sys
 from queue import Queue
-from typing import Optional
+from typing import (
+    Any,
+    Optional,
+)
 
 from datalad.runner.coreprotocols import (
     NoCapture,
     StdOutErrCapture,
 )
-from datalad.runner.nonasyncrunner import run_command
+from datalad.runner.nonasyncrunner import (
+    _ResultGenerator,
+    run_command,
+)
 from datalad.runner.protocol import GeneratorMixIn
 from datalad.tests.utils_pytest import (
     assert_equal,
@@ -23,8 +31,8 @@ class TestProtocol(GeneratorMixIn, StdOutErrCapture):
     __test__ = False  # class is not a class of tests
 
     def __init__(self,
-                 done_future=None,
-                 encoding=None):
+                 done_future: Any = None,
+                 encoding: Optional[str] = None) -> None:
 
         StdOutErrCapture.__init__(
             self,
@@ -32,13 +40,13 @@ class TestProtocol(GeneratorMixIn, StdOutErrCapture):
             encoding=encoding)
         GeneratorMixIn.__init__(self)
 
-    def pipe_data_received(self, fd, data):
+    def pipe_data_received(self, fd: int, data: bytes) -> None:
         self.send_result((fd, data.decode()))
 
 
-def test_generator_mixin_basic():
+def test_generator_mixin_basic() -> None:
 
-    stdin_queue = Queue()
+    stdin_queue: Queue[Optional[bytes]] = Queue()
 
     i = 0
     for fd, data in run_command([sys.executable, "-i", "-"], TestProtocol, stdin_queue):
@@ -50,9 +58,9 @@ def test_generator_mixin_basic():
         i += 1
 
 
-def test_generator_mixin_runner():
+def test_generator_mixin_runner() -> None:
 
-    stdin_queue = Queue()
+    stdin_queue: Queue[Optional[bytes]] = Queue()
 
     runner = WitlessRunner()
     i = 0
@@ -65,19 +73,19 @@ def test_generator_mixin_runner():
         i += 1
 
 
-def test_post_pipe_callbacks():
+def test_post_pipe_callbacks() -> None:
     # Expect that the process_exited and connection_lost callbacks
     # are also called in a GeneratorMixIn protocol
     class TestPostPipeProtocol(GeneratorMixIn, StdOutErrCapture):
-        def __init__(self):
+        def __init__(self) -> None:
             GeneratorMixIn.__init__(self)
             StdOutErrCapture.__init__(self)
 
-        def process_exited(self):
+        def process_exited(self) -> None:
             self.send_result(1)
             self.send_result(2)
 
-        def connection_lost(self, exc: Optional[Exception]) -> None:
+        def connection_lost(self, exc: Optional[BaseException]) -> None:
             self.send_result(3)
             self.send_result(4)
 
@@ -86,24 +94,25 @@ def test_post_pipe_callbacks():
     assert_equal(results, [1, 2, 3, 4])
 
 
-def test_file_number_activity_detection():
+def test_file_number_activity_detection() -> None:
     # Expect an output queue that just has the process exit notification.
     # empty output queue without active threads
     # waits for the process and progresses the generator state
     # to `_ResultGenerator.GeneratorState.process_exited`.
     class TestFNADProtocol(GeneratorMixIn, NoCapture):
-        def __init__(self):
+        def __init__(self) -> None:
             GeneratorMixIn.__init__(self)
             NoCapture.__init__(self)
 
-        def process_exited(self):
+        def process_exited(self) -> None:
             self.send_result(3)
 
-        def connection_lost(self, exc: Optional[Exception]) -> None:
+        def connection_lost(self, exc: Optional[BaseException]) -> None:
             self.send_result(4)
 
     wl_runner = WitlessRunner()
     result_generator = wl_runner.run(cmd=["echo", "a"], protocol=TestFNADProtocol)
+    assert isinstance(result_generator, _ResultGenerator)
 
     runner = result_generator.runner
     output_queue = runner.output_queue
@@ -119,7 +128,7 @@ def test_file_number_activity_detection():
 
 def test_failing_process():
     class TestProtocol(GeneratorMixIn, NoCapture):
-        def __init__(self):
+        def __init__(self) -> None:
             GeneratorMixIn.__init__(self)
             NoCapture.__init__(self)
 

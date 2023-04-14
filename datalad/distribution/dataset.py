@@ -313,7 +313,11 @@ class Dataset(object, metaclass=PathBasedFlyweight):
 
     @property
     def config(self):
-        """Get an instance of the parser for the persistent dataset configuration.
+        """Get a ``ConfigManager`` instance for a dataset's configuration
+
+        In case a dataset does not (yet) have an existing corresponding
+        repository, the returned ``ConfigManager`` is the global instance
+        that is also provided via ``datalad.cfg``.
 
         Note, that this property is evaluated every time it is used. If used
         multiple times within a function it's probably a good idea to store its
@@ -329,9 +333,10 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             # if there's no repo (yet or anymore), we can't read/write config at
             # dataset level, but only at user/system level
             # However, if this was the case before as well, we don't want a new
-            # instance of ConfigManager
+            # instance of ConfigManager, but use the global one
             if self._cfg_bound in (True, None):
-                self._cfg = ConfigManager(dataset=None)
+                # for the sake of uniformity assign datalad.cfg to self._cfg
+                self._cfg = cfg
                 self._cfg_bound = False
 
         else:

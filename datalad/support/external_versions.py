@@ -150,6 +150,33 @@ def _get_system_7z_version():
     lgr.debug("Could not determine version of 7z from stdout. %s", out)
 
 
+def get_rsync_version():
+
+    # This does intentionally not query the version of rsync itself, but
+    # that of the debian package it's installed with. Reason is in gh-7320,
+    # which results in the need to detect a patched-by-ubuntu version of rsync
+    # and therefore the package version, not the result of `rsync --version`.
+    from datalad.utils import on_linux, get_linux_distribution
+    if on_linux:
+        dist = get_linux_distribution()[0]
+        if dist in ['debian', 'ubuntu']:
+            out = _runner.run(['apt-cache', 'policy', 'rsync'],
+                              protocol=StdOutErrCapture)
+            for line in out['stdout'].splitlines():
+                parts = line.split()
+                if parts[0] == 'Installed:':
+                    ver = LooseVersion(parts[1])
+                    break
+        # If we have a debian package version, use this as rsync version.
+        # Otherwise report what `rsync --version` itself has to say.
+        if ver:
+            return ver
+    out = _runner.run(['rsync', '--version'], protocol=StdOutErrCapture)
+    # Expected first line:
+    # rsync version x protocol version y
+    return LooseVersion(out['stdout'].splitlines()[0].split()[2])
+
+
 class ExternalVersions(object):
     """Helper to figure out/use versions of the externals (modules, cmdline tools, etc).
 

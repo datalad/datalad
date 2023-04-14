@@ -66,6 +66,7 @@ from datalad.tests.utils_pytest import (
     swallow_logs,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -1507,6 +1508,7 @@ def test_GitRepo_get_revisions(path=None):
     eq_(gr.get_revisions(DEFAULT_BRANCH + ".."), [])
 
 
+@xfail_buggy_annex_info
 @with_tree({"foo": "foo",
             ".gitattributes": "* annex.largefiles=anything"})
 def test_gitrepo_add_to_git_with_annex_v7(path=None):

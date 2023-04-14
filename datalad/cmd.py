@@ -14,13 +14,13 @@ returned. The response structure is determined by "output_proc"
 """
 from __future__ import annotations
 
-from __future__ import annotations
-
 import logging
 import os
 import queue
 import sys
 import warnings
+from datetime import datetime
+from operator import attrgetter
 from queue import Queue
 from subprocess import TimeoutExpired
 from typing import (
@@ -31,9 +31,11 @@ from typing import (
     Tuple,
     Union,
 )
-from datetime import datetime
-from operator import attrgetter
-from weakref import WeakValueDictionary, ReferenceType, ref
+from weakref import (
+    ReferenceType,
+    WeakValueDictionary,
+    ref,
+)
 
 from datalad import cfg
 # start of legacy import block
@@ -50,25 +52,26 @@ from datalad.runner.gitrunner import (
     GitRunnerBase,
     GitWitlessRunner,
 )
-from datalad.runner.nonasyncrunner import run_command
-from datalad.runner.protocol import WitlessProtocol
-from datalad.runner.runner import WitlessRunner
-from datalad.support.exceptions import CommandError
-# end of legacy import block
-
-from datalad.runner.coreprotocols import StdOutErrCapture
 from datalad.runner.nonasyncrunner import (
     STDERR_FILENO,
     STDOUT_FILENO,
     _ResultGenerator,
+    run_command,
 )
-from datalad.runner.protocol import GeneratorMixIn
+from datalad.runner.protocol import (
+    GeneratorMixIn,
+    WitlessProtocol,
+)
 from datalad.runner.runner import WitlessRunner
 from datalad.runner.utils import LineSplitter
+from datalad.support.exceptions import CommandError
 from datalad.utils import (
     auto_repr,
     ensure_unicode,
 )
+
+# end of legacy import block
+
 
 
 __docformat__ = "restructuredtext"
@@ -165,7 +168,7 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
         else:
             raise ValueError(f"unknown file descriptor: {fd}")
 
-    def pipe_connection_lost(self, fd: int, exc: Optional[Exception]):
+    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]):
         if fd == STDOUT_FILENO:
             remaining_line = self.line_splitter.finish_processing()
             if remaining_line is not None:
