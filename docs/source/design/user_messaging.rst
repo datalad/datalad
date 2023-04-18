@@ -46,6 +46,10 @@ yield meaningful result records. If, in turn, the process itself receives a set 
 records from a sub-process, these should be inspected individually in order to identify result
 values that could require re-annotation or status re-classification.
 
+For user messaging purposes, result records can also be enriched with additional human-readable
+information on the nature of the result, via the ``message`` key, and human-readable hints to
+the user, via the ``hints`` key. Both of these are rendered via the `UI Module`_.
+
 
 Exception handling
 ------------------
@@ -86,7 +90,7 @@ cannot be used to control the logic or flow of a program.
 Importantly, logging should not be the primary user messaging method for command outcomes,
 Therefore:
 
-1. No command should rely solely on logging for user communication
+1. No interface should rely solely on logging for user communication
 2. Use logging for in-progress user communication via the mechanism for :ref:`progress reporting <chap_design_progress_reporting>`
 3. Use logging to inform debugging processes
 
@@ -98,7 +102,8 @@ The :mod:`~datalad.ui` module provides the means to communicate information
 to the user in a user-interface-specific manner, e.g. via a console, dialog, or an iPython interface.
 Internally, all DataLad results processed by the result renderer are passed through the UI module.
 
-Therefore: unless the criteria for logging apply, developers should let explicit user communication
+Therefore: unless the criteria for logging apply, and unless the message to be delivered to the user
+is specified via the ``message`` key of a result record, developers should let explicit user communication
 happen through the UI module as it provides the flexibility to adjust to the present UI.
 Specifically, :py:func:`datalad.ui.message` allows passing a simple message via the UI module.
 
