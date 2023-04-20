@@ -2560,7 +2560,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             # annex started to normalize relative paths.
             # ref: https://github.com/datalad/datalad/issues/4431
             # Use normpath around each side to ensure it is the same file
-            assert normpath(j.pop('file')) == normpath(f)
+            if j.get("file"):
+                # since somewhere around 10.20230407+git63-g3d1d77a1bb
+                # there is no file if not matching smth known to annex.
+                # ref: https://github.com/datalad/datalad/issues/7370
+                assert normpath(j.pop('file')) == normpath(f)
+            else:
+                # we can verify based on "input"
+                assert len(j["input"]) == 1
+                assert normpath(j["input"][0]) == normpath(f)
+
             if not j['success']:
                 j = None
             else:
