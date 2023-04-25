@@ -417,6 +417,18 @@ _definitions = {
         'destination': 'global',
         'default_fn': lambda: opj(dirs.user_cache_dir, 'tests')
     },
+    'datalad.tests.credentials': {
+        'ui': ('question', {
+            'title': 'Credentials to use during tests',
+            'text': 'Which credentials should be available while running tests? If "plaintext" (default), '
+                    'a new plaintext keyring would be created in tests temporary HOME. If "system", '
+                    'no custom configuration would be passed to keyring and known to system credentials '
+                    'could be used.'
+                    }),
+        'destination': 'global',
+        'type': EnsureChoice('plaintext', 'system'),
+        'default': "plaintext"
+    },
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
