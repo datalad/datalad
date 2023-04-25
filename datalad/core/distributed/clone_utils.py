@@ -843,7 +843,7 @@ def _check_autoenable_special_remotes(repo: AnnexRepo):
             CapturedException(e)
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
-                'dataset %s as bool.'
+                'dataset %s as bool. '
                 'You might need to enable it later manually and/or fix it up '
                 'to avoid this message in the future.',
                 sr_autoenable, sr_name, repo.path)

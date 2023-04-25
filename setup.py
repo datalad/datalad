@@ -35,7 +35,7 @@ requires = {
         'packaging',
         'patool>=1.7',
         'tqdm>=4.32.0',
-        'typing_extensions>=3.10.0.0; python_version < "3.10"',
+        'typing_extensions>=4.0.0; python_version < "3.11"',
         'annexremote',
         'looseversion',
     ],
