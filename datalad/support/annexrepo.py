@@ -288,7 +288,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 self,
                 "datalad.repo.direct configuration instructs to use direct mode"
             )
-
+        shared = config.get("core.sharedrepository", "")
+        if shared.isnumeric():
+            lgr.warning(
+                "%s found to have numeric specification %r of shared mode which is not supported by git-annex. "
+                "See https://git-annex.branchable.com/todo/sharedRepository_mode_not_supported_by_git-annex/",
+                self, shared)
         self._batched = BatchedAnnexes(
             batch_size=batch_size, git_options=self._ANNEX_GIT_COMMON_OPTIONS)
 
