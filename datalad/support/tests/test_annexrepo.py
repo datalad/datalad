@@ -2197,16 +2197,23 @@ def _test_add_under_subdir(path):
 def test_error_reporting(path=None):
     ar = AnnexRepo(path, create=True)
     res = ar.call_annex_records(['add'], files='gl\\orious BS')
-    eq_(
-        res,
-        [{
-            'command': 'add',
-            # whole thing, despite space, properly quotes backslash
-            'file': 'gl\\orious BS',
-            'note': 'not found',
-            'error-messages': ['File unknown to git'],
-            'success': False}]
-    )
+    target = {
+        'command': 'add',
+        # whole thing, despite space, properly quotes backslash
+        'file': 'gl\\orious BS',
+        'note': 'not found',
+        'success': False
+    }
+    assert len(res) >= 1
+    if 'message-id' in res[0]:
+        # new since ~ 10.20230407-99-gbe36e208c2
+        target['message-id'] = 'FileNotFound'
+        target['input'] = ['gl\\orious BS']
+        target['error-messages'] = ['git-annex: gl\\orious BS not found']
+    else:
+        # our own produced record
+        target['error-messages'] = ['File unknown to git']
+    eq_(res, [target])
 
 
 @with_tree(tree={

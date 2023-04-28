@@ -1070,19 +1070,28 @@ class AnnexRepo(GitRepo, RepoInterface):
                 **kwargs,
             )
         except CommandError as e:
-            # Note: Workaround for not existing files as long as annex doesn't
-            # report it within JSON.
-            # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
-            not_existing = _get_non_existing_from_annex_output(e.stderr)
-            if not_existing:
-                if out is None:
-                    # we create the error reporting herein. If all files were
-                    # not found, there is nothing on stdout and we don't need
-                    # anything
-                    out = {'stdout_json': []}
-                out['stdout_json'].extend(
-                    _fake_json_for_non_existing(not_existing, args[0])
-                )
+            not_existing = None
+            if e.kwargs.get('stdout_json'):
+                # See if may be it was within stdout_json, as e.g. was added around
+                # 10.20230407-99-gbe36e208c2 to 'add' together with
+                # 'message-id': 'FileNotFound'
+                out = {'stdout_json': e.kwargs.get('stdout_json', [])}
+                not_existing = []
+                for j in out['stdout_json']:
+                    if j.get('message-id') == 'FileNotFound':
+                        not_existing.append(j['file'])
+                        # for consistency with our "_fake_json_for_non_existing" records
+                        # but not overloading one if there is one
+                        j.setdefault('note', 'not found')
+
+            if not not_existing:
+                # Workaround for not existing files as long as older annex doesn't
+                # report it within JSON.
+                # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+                not_existing = _get_non_existing_from_annex_output(e.stderr)
+                if not_existing:
+                    assert not out  # just paranoia so we do not redefine if code above changes
+                    out = {'stdout_json': _fake_json_for_non_existing(not_existing, args[0])}
 
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
@@ -1096,12 +1105,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Or if we had empty stdout but there was stderr
             if out is None or (not out and e.stderr):
                 raise e
-
-            records = e.kwargs.get('stdout_json', [])
-            if records:
-                have = out.get('stdout_json', [])
-                have.extend(records)
-                out['stdout_json'] = have
 
             #if e.stderr:
             #    # else just warn about present errors
