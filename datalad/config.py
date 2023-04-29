@@ -144,6 +144,7 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
       For actual files a Path object is included in the set, for a git-blob
       a Git blob ID prefixed with 'blob:' is reported.
     """
+    cwd = Path.cwd() if cwd is None else Path(cwd)
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
@@ -152,19 +153,11 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
         # in anticipation of output contamination, process within a loop
         # where we can reject non syntax compliant pieces
         while line:
-            if line.startswith('file:'):
-                # origin line
-                fname = Path(line[5:])
-                if not fname.is_absolute():
-                    fname = Path(cwd) / fname if cwd else Path.cwd() / fname
-                fileset.add(fname)
+            if line.startswith('file:') or line.startswith('blob:'):
+                fileset.add(line)
                 break
             if line.startswith('command line:'):
                 # no origin that we could as a pathobj
-                break
-            if line.startswith('blob:'):
-                # take verbatim to allow distinguishing files from blobs
-                fileset.add(line)
                 break
             # try getting key/value pair from the present chunk
             k, v = _gitcfg_rec_to_keyvalue(line)
@@ -186,7 +179,12 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
                 dct[k] = present_v + (v,)
             else:
                 dct[k] = (present_v, v)
-    return dct, fileset
+    # take blobs with verbatim markup
+    origin_blobs = set(f for f in fileset if f.startswith('blob:'))
+    # convert file specifications to Path objects with absolute paths
+    origin_paths = set(Path(f[5:]) for f in fileset if f.startswith('file:'))
+    origin_paths = set(f if f.is_absolute() else cwd / f for f in origin_paths)
+    return dct, origin_paths.union(origin_blobs)
 
 
 # keep alias with previous name for now
