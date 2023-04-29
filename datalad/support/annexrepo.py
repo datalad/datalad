@@ -1097,14 +1097,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
 
-            # if we didn't raise before, just depend on whether or not we seem
-            # to have some json to return. It should contain information on
-            # failure in keys 'success' and 'note'
-            # TODO: This is not entirely true. 'annex status' may return empty,
-            # while there was a 'fatal:...' in stderr, which should be a
-            # failure/exception
-            # Or if we had empty stdout but there was stderr
-            if out is None or (not out and e.stderr):
+            # If it was not about non-existing but running failed -- re-raise
+            if not not_existing:
                 raise e
 
             #if e.stderr:
