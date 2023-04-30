@@ -1090,8 +1090,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
                 not_existing = _get_non_existing_from_annex_output(e.stderr)
                 if not_existing:
-                    assert not out  # just paranoia so we do not redefine if code above changes
-                    out = {'stdout_json': _fake_json_for_non_existing(not_existing, args[0])}
+                    if not out:
+                        out = {'stdout_json': []}
+                    out['stdout_json'].extend(_fake_json_for_non_existing(not_existing, args[0]))
 
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
