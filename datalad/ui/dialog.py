@@ -346,6 +346,7 @@ class UnderAnnexUI(DialogUI):
         self.specialremote = specialremote
 
     def set_specialremote(self, specialremote):
+        lgr.debug("Setting specialremote of UI %s to %s", self, specialremote)
         self.specialremote = specialremote
 
     def get_progressbar(self, *args, **kwargs):
