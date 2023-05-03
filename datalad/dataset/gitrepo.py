@@ -105,7 +105,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """
     # Could be used to e.g. disable automatic garbage and autopacking
     # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    _GIT_COMMON_OPTIONS = ["-c", "diff.ignoreSubmodules=none"]
+    _GIT_COMMON_OPTIONS = [
+        "-c", "diff.ignoreSubmodules=none",
+        # To gain consistent, albeit possibly insecure (?) behavior of git/git-annex
+        # in quoting or note the paths.
+        # Behavior of git-annex on treating this setting has changed around
+        # 10.20230407-18-gdf6f9f1ee8 where it started to respect default =true and
+        # quote.  See https://github.com/datalad/datalad/pull/7372#issuecomment-1533507701
+        "-c", "core.quotepath=false",
+    ]
     _git_cmd_prefix = ["git"] + _GIT_COMMON_OPTIONS
 
     # Begin Flyweight:

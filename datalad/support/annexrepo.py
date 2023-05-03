@@ -555,8 +555,41 @@ class AnnexRepo(GitRepo, RepoInterface):
         # applies to find, findref to list all known.
         # was added in 10.20221212-17-g0b2dd374d on 20221220.
         kludges["find-supports-anything"] = ver >= "10.20221213"
+        # applies to log, unannex and may be other commands,
+        # was added 10.20230407 release, respecting core.quotepath
+        kludges["quotepath-respected"] = \
+            "yes" if ver >= '10.20230408' else \
+            "maybe" if ver > '10.20230407' else \
+            "no"
         cls._version_kludges = kludges
         return kludges[key]
+
+    @classmethod
+    def _unquote_annex_path(cls, s):
+        """Remove surrounding "" around the filename, and unquote \"
+
+        This is minimal necessary transformation of the quoted filename in care of
+        core.quotepath=false, i.e. whenever all unicode characters remain as is.
+
+        All interfaces should aim to operate on --json machine readable output,
+        so we are not striving to have it super efficient here since should not be used
+        often.
+        """
+        respected = cls._check_version_kludges('quotepath-respected')
+        if respected == 'no':
+            return s
+        quoted = s.startswith('"') and s.endswith('"')
+        if respected == 'maybe':
+            # not necessarily correct if e.g. filename has "" around it originally
+            # but this is a check only for a range of development versions, so mostly
+            # for local/CI runs ATM
+            if not quoted:
+                return s
+        elif respected == 'yes':
+            assert quoted
+        else:
+            raise RuntimeError(f"Got unknown {respected}")
+        return s[1:-1].replace(r'\"', '"')
 
     @staticmethod
     def get_size_from_key(key):
@@ -1899,11 +1932,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-
+        prefix = 'unannex'
+        suffix = 'ok'
         return [
-            line.split()[1]
+            # we cannot .split here since filename could have spaces
+            self._unquote_annex_path(line[len(prefix) + 1 : -(len(suffix) + 1)])
             for line in self.call_annex_items_(['unannex'] + options, files=files)
-            if line.split()[0] == 'unannex' and line.split()[-1] == 'ok'
+            if line.split()[0] == prefix and line.split()[-1] == suffix
         ]
 
     @normalize_paths(map_filenames_back=True)
