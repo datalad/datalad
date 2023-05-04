@@ -2403,7 +2403,9 @@ _test_unannex_tree = {
     OBSCURE_FILENAME: 'content1',
     OBSCURE_FILENAME + ".dat": 'content2',
 }
-if external_versions['cmd:annex'] <= '10.20230407' or external_versions['cmd:annex'] >= '10.20230408':
+if not on_windows and (
+        external_versions['cmd:annex'] <= '10.20230407' or external_versions['cmd:annex'] >= '10.20230408'
+):
     # Only whenever we are not within the development versions of the 10.20230407
     # where we cannot do version comparison relibalye,
     # the case where we have entire filename within ""
