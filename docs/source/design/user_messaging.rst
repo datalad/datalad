@@ -34,13 +34,13 @@ implement message passing by yielding :ref:`result records <chap_design_result_r
 that are associated with individual operations. Result records are routinely inspected throughout
 the code base and their annotations are used to inform general program flow and error handling.
 
-Command calls can include an ``on_failure`` parameterization to specify how to
+DataLad interface calls can include an ``on_failure`` parameterization to specify how to
 proceed with a particular operation if a returned result record is
-:ref:`classified as a failure result <target-result-status>`. Command calls can
+:ref:`classified as a failure result <target-result-status>`. DataLad interface calls can
 also include a ``result_renderer`` parameterization to explicitly enable or
 disable the rendering of result records.
 
-Developers should be aware that external callers will use command call parameterizations
+Developers should be aware that external callers will use DataLad interface call parameterizations
 that can selectively ignore or act on result records, and that the process should therefore
 yield meaningful result records. If, in turn, the process itself receives a set of result
 records from a sub-process, these should be inspected individually in order to identify result
@@ -61,7 +61,7 @@ More specifically, raise an exception when:
 
 1. A DataLad interface's parameter specifications are violated
 2. An additional requirement (beyond parameters) for the meaningful continuation of a
-   command, function, or process is not met
+   DataLad interface, function, or process is not met
 
 It must be made clear to the user/caller what the exact cause of the exception
 is, given the context within which the user/caller triggered the action.
