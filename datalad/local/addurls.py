@@ -305,8 +305,7 @@ class AnnexKeyParser(object):
         try:
             key = self.format_fn(self.format_string, row)
         except KeyError as exc:
-            ce = CapturedException(exc)
-            lgr.debug("Row missing fields for --key: %s", ce)
+            lgr.warning("Row missing fields for --key: %s", exc)
             return {}
 
         if key == self.empty:
