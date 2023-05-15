@@ -779,8 +779,13 @@ def extract(rows, colidx_to_name=None,
     info_fns = []
     if formats_meta:
         def set_meta_args(info, row):
-            info["meta_args"] = clean_meta_args(fmt(row)
-                                                for fmt in formats_meta)
+            formatted = []
+            for fmt in formats_meta:
+                try:
+                    formatted.append(fmt(row))
+                except KeyError as exc:
+                    lgr.warning("Row is missing a key to add a metadata field: %s", exc)
+            info["meta_args"] = clean_meta_args(formatted)
         info_fns.append(set_meta_args)
     if key:
         key_parser = AnnexKeyParser(fmt.format, key)
