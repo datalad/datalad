@@ -81,6 +81,8 @@ extensions = [
     'sphinx.ext.inheritance_diagram',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
+    # github.com/readthedocs/sphinx_rtd_theme/issues/1452 (rm next line when fixed)
+    'sphinxcontrib.jquery',
 ]
 
 # for the module reference
