@@ -1,4 +1,34 @@
 
+<a id='changelog-0.18.4'></a>
+# 0.18.4 (2023-05-16)
+
+## 🐛 Bug Fixes
+
+- Provider config files were ignored, when CWD changed between different datasets during runtime.
+  Fixes [#7347](https://github.com/datalad/datalad/issues/7347) via
+  [PR #7357](https://github.com/datalad/datalad/pull/7357)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 📝 Documentation
+
+- Added a workaround for an issue with documentation theme (search
+  function not working on Read the Docs).
+  Fixes [#7374](https://github.com/datalad/datalad/issues/7374) via
+  [PR #7385](https://github.com/datalad/datalad/pull/7385)
+  (by [@mslw](https://github.com/mslw))
+
+## 🏠 Internal
+
+- Type-annotate `datalad/support/gitrepo.py`.  [PR #7341](https://github.com/datalad/datalad/pull/7341) (by [@jwodder](https://github.com/jwodder))
+
+## 🧪 Tests
+
+- Fix failing testing on CI
+  [PR #7379](https://github.com/datalad/datalad/pull/7379) (by [@yarikoptic](https://github.com/yarikoptic))
+  - use sample S3 url DANDI archive,
+  - use our copy of old .deb from datasets.datalad.org instead of snapshots.d.o
+  - use specific miniconda installer for py 3.7.
+
 <a id='changelog-0.18.3'></a>
 # 0.18.3 (2023-03-25)
 
