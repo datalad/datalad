@@ -2,8 +2,52 @@
 
 Change log
 **********
+0.18.4 (2023-05-16)
+===================
+
+Bug Fixes
+---------
+
+-  Provider config files were ignored, when CWD changed between
+   different datasets during runtime. Fixes
+   `#7347 <https://github.com/datalad/datalad/issues/7347>`__ via `PR
+   #7357 <https://github.com/datalad/datalad/pull/7357>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+Documentation
+-------------
+
+-  Added a workaround for an issue with documentation theme (search
+   function not working on Read the Docs). Fixes
+   `#7374 <https://github.com/datalad/datalad/issues/7374>`__ via `PR
+   #7385 <https://github.com/datalad/datalad/pull/7385>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+Internal
+--------
+
+-  Type-annotate ``datalad/support/gitrepo.py``. `PR
+   #7341 <https://github.com/datalad/datalad/pull/7341>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+Tests
+-----
+
+-  Fix failing testing on CI `PR
+   #7379 <https://github.com/datalad/datalad/pull/7379>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+   -  use sample S3 url DANDI archive,
+   -  use our copy of old .deb from datasets.datalad.org instead of
+      snapshots.d.o
+   -  use specific miniconda installer for py 3.7.
+
+.. _section-1:
+
 0.18.3 (2023-03-25)
 ===================
+
+.. _bug-fixes-1:
 
 Bug Fixes
 ---------
@@ -47,6 +91,8 @@ Bug Fixes
    #7355 <https://github.com/datalad/datalad/pull/7355>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _documentation-1:
+
 Documentation
 -------------
 
@@ -54,6 +100,8 @@ Documentation
    `#7288 <https://github.com/datalad/datalad/issues/7288>`__ via `PR
    #7289 <https://github.com/datalad/datalad/pull/7289>`__ (by
    `@mslw <https://github.com/mslw>`__)
+
+.. _internal-1:
 
 Internal
 --------
@@ -83,6 +131,8 @@ Internal
    #7339 <https://github.com/datalad/datalad/pull/7339>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
+.. _tests-1:
+
 Tests
 -----
 
@@ -100,12 +150,12 @@ Tests
    #7353 <https://github.com/datalad/datalad/pull/7353>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-1:
+.. _section-2:
 
 0.18.2 (2023-02-27)
 ===================
 
-.. _bug-fixes-1:
+.. _bug-fixes-2:
 
 Bug Fixes
 ---------
@@ -135,7 +185,7 @@ Dependencies
    #7263 <https://github.com/datalad/datalad/pull/7263>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-1:
+.. _internal-2:
 
 Internal
 --------
@@ -144,7 +194,7 @@ Internal
    tox.ini. `PR #7271 <https://github.com/datalad/datalad/pull/7271>`__
    (by `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-1:
+.. _tests-2:
 
 Tests
 -----
@@ -155,12 +205,12 @@ Tests
    #7260 <https://github.com/datalad/datalad/pull/7260>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-2:
+.. _section-3:
 
 0.18.1 (2023-01-16)
 ===================
 
-.. _bug-fixes-2:
+.. _bug-fixes-3:
 
 Bug Fixes
 ---------
@@ -172,7 +222,7 @@ Bug Fixes
    #7249 <https://github.com/datalad/datalad/pull/7249>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-1:
+.. _documentation-2:
 
 Documentation
 -------------
@@ -190,7 +240,7 @@ Performance
    #7250 <https://github.com/datalad/datalad/pull/7250>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-3:
+.. _section-4:
 
 0.18.0 (2022-12-31)
 ===================
@@ -263,7 +313,7 @@ Enhancements and New Features
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-3:
+.. _bug-fixes-4:
 
 Bug Fixes
 ---------
@@ -275,7 +325,7 @@ Bug Fixes
    #6952 <https://github.com/datalad/datalad/pull/6952>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _documentation-2:
+.. _documentation-3:
 
 Documentation
 -------------
@@ -310,7 +360,7 @@ Documentation
    #7204 <https://github.com/datalad/datalad/pull/7204>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-2:
+.. _internal-3:
 
 Internal
 --------
@@ -380,7 +430,7 @@ Performance
    #7230 <https://github.com/datalad/datalad/pull/7230>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-2:
+.. _tests-3:
 
 Tests
 -----
@@ -394,7 +444,7 @@ Tests
    `PR #7176 <https://github.com/datalad/datalad/pull/7176>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _section-4:
+.. _section-5:
 
 0.17.10 (2022-12-14)
 ====================
@@ -418,7 +468,7 @@ Enhancements and New Features
    #7210 <https://github.com/datalad/datalad/pull/7210>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-4:
+.. _bug-fixes-5:
 
 Bug Fixes
 ---------
@@ -476,7 +526,7 @@ Bug Fixes
    #7226 <https://github.com/datalad/datalad/pull/7226>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-3:
+.. _documentation-4:
 
 Documentation
 -------------
@@ -487,7 +537,7 @@ Documentation
    #7155 <https://github.com/datalad/datalad/pull/7155>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _internal-3:
+.. _internal-4:
 
 Internal
 --------
@@ -503,7 +553,7 @@ Internal
    #7161 <https://github.com/datalad/datalad/pull/7161>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-3:
+.. _tests-4:
 
 Tests
 -----
@@ -525,12 +575,12 @@ Tests
    #7209 <https://github.com/datalad/datalad/pull/7209>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-5:
+.. _section-6:
 
 0.17.9 (2022-11-07)
 ===================
 
-.. _bug-fixes-5:
+.. _bug-fixes-6:
 
 Bug Fixes
 ---------
@@ -570,7 +620,7 @@ Dependencies
    #7136 <https://github.com/datalad/datalad/pull/7136>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _internal-4:
+.. _internal-5:
 
 Internal
 --------
@@ -586,7 +636,7 @@ Internal
    #7118 <https://github.com/datalad/datalad/pull/7118>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-4:
+.. _tests-5:
 
 Tests
 -----
@@ -606,12 +656,12 @@ Tests
    #7130 <https://github.com/datalad/datalad/pull/7130>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-6:
+.. _section-7:
 
 0.17.8 (2022-10-24)
 ===================
 
-.. _bug-fixes-6:
+.. _bug-fixes-7:
 
 Bug Fixes
 ---------
@@ -653,12 +703,12 @@ Bug Fixes
    #7103 <https://github.com/datalad/datalad/pull/7103>`__ (by
    `@mslw <https://github.com/mslw>`__)
 
-.. _section-7:
+.. _section-8:
 
 0.17.7 (2022-10-14)
 ===================
 
-.. _bug-fixes-7:
+.. _bug-fixes-8:
 
 Bug Fixes
 ---------
@@ -677,7 +727,7 @@ Bug Fixes
    `PR #7075 <https://github.com/datalad/datalad/pull/7075>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-5:
+.. _internal-6:
 
 Internal
 --------
@@ -705,7 +755,7 @@ Internal
    #7082 <https://github.com/datalad/datalad/pull/7082>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-5:
+.. _tests-6:
 
 Tests
 -----
@@ -714,12 +764,12 @@ Tests
    pass. `PR #7002 <https://github.com/datalad/datalad/pull/7002>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-8:
+.. _section-9:
 
 0.17.6 (2022-09-21)
 ===================
 
-.. _bug-fixes-8:
+.. _bug-fixes-9:
 
 Bug Fixes
 ---------
@@ -751,7 +801,7 @@ Bug Fixes
    `PR #7049 <https://github.com/datalad/datalad/pull/7049>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-6:
+.. _internal-7:
 
 Internal
 --------
@@ -764,7 +814,7 @@ Internal
    #7024 <https://github.com/datalad/datalad/pull/7024>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-6:
+.. _tests-7:
 
 Tests
 -----
@@ -838,7 +888,7 @@ Bug Fix
    `#6978 <https://github.com/datalad/datalad/pull/6978>`__
    (`@christian-monch <https://github.com/christian-monch>`__)
 
-.. _tests-7:
+.. _tests-8:
 
 Tests
 -----
@@ -1003,7 +1053,7 @@ Pushed to ``maint``
 -  DOC: fix capitalization of service names
    (`@aqw <https://github.com/aqw>`__)
 
-.. _tests-8:
+.. _tests-9:
 
 Tests
 -----
@@ -1162,7 +1212,7 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
-.. _bug-fixes-9:
+.. _bug-fixes-10:
 
 Bug Fixes
 ---------
@@ -1182,7 +1232,7 @@ Bug Fixes
    prior recording a new dataset state. Fixes #4967
    `#6795 <https://github.com/datalad/datalad/pull/6795>`__ (by @mih)
 
-.. _documentation-4:
+.. _documentation-5:
 
 Documentation
 -------------
@@ -1196,7 +1246,7 @@ Documentation
    ``addurls``. `#6684 <https://github.com/datalad/datalad/pull/6684>`__
    (by @jdkent)
 
-.. _internal-7:
+.. _internal-8:
 
 Internal
 --------
@@ -1810,7 +1860,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-10:
+.. _bug-fixes-11:
 
 Bug Fixes
 ---------
@@ -1933,7 +1983,7 @@ Bug Fixes
    `#6603 <https://github.com/datalad/datalad/pull/6603>`__ (by
    @yarikoptic)
 
-.. _documentation-5:
+.. _documentation-6:
 
 Documentation
 -------------
@@ -1994,7 +2044,7 @@ Documentation
    now `#6436 <https://github.com/datalad/datalad/pull/6436>`__ (by
    @yarikoptic)
 
-.. _internal-8:
+.. _internal-9:
 
 Internal
 --------
@@ -2106,7 +2156,7 @@ Internal
    previous implementations.
    `#6591 <https://github.com/datalad/datalad/pull/6591>`__ (by @mih)
 
-.. _tests-9:
+.. _tests-10:
 
 Tests
 -----
@@ -2352,7 +2402,7 @@ Bug Fix
    `#6140 <https://github.com/datalad/datalad/pull/6140>`__
    (`@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-10:
+.. _tests-11:
 
 Tests
 -----
@@ -2424,7 +2474,7 @@ Pushed to ``maint``
 -  CI: Enable new codecov uploader in Appveyor CI
    (`@adswa <https://github.com/adswa>`__)
 
-.. _internal-9:
+.. _internal-10:
 
 Internal
 --------
@@ -2440,7 +2490,7 @@ Internal
    `#6072 <https://github.com/datalad/datalad/pull/6072>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-6:
+.. _documentation-7:
 
 Documentation
 -------------
@@ -2449,7 +2499,7 @@ Documentation
    `#6065 <https://github.com/datalad/datalad/pull/6065>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-11:
+.. _tests-12:
 
 Tests
 -----
@@ -2518,7 +2568,7 @@ Bug Fix
    `#6007 <https://github.com/datalad/datalad/pull/6007>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-12:
+.. _tests-13:
 
 Tests
 -----
@@ -2580,7 +2630,7 @@ Pushed to ``maint``
 -  Discontinue testing of hirni extension
    (`@mih <https://github.com/mih>`__)
 
-.. _internal-10:
+.. _internal-11:
 
 Internal
 --------
@@ -2589,7 +2639,7 @@ Internal
    `#5980 <https://github.com/datalad/datalad/pull/5980>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-7:
+.. _documentation-8:
 
 Documentation
 -------------
@@ -2598,7 +2648,7 @@ Documentation
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-13:
+.. _tests-14:
 
 Tests
 -----
@@ -2954,7 +3004,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-14:
+.. _tests-15:
 
 Tests
 -----
@@ -3025,7 +3075,7 @@ Pushed to ``maint``
 -  RF(BF?)+DOC: provide User-Agent to entire session headers + use those
    if provided (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-11:
+.. _internal-12:
 
 Internal
 --------
@@ -3046,7 +3096,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-15:
+.. _tests-16:
 
 Tests
 -----
@@ -3115,7 +3165,7 @@ Bug Fix
    `#5776 <https://github.com/datalad/datalad/pull/5776>`__
    (s.heunis@fz-juelich.de)
 
-.. _internal-12:
+.. _internal-13:
 
 Internal
 --------
@@ -3127,7 +3177,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-16:
+.. _tests-17:
 
 Tests
 -----
@@ -3155,7 +3205,7 @@ Authors: 4
 0.14.6 (Sun Jun 27 2021)
 ========================
 
-.. _internal-13:
+.. _internal-14:
 
 Internal
 --------
@@ -3266,7 +3316,7 @@ Pushed to ``maint``
 
 -  MNT: Post-release dance (`@kyleam <https://github.com/kyleam>`__)
 
-.. _internal-14:
+.. _internal-15:
 
 Internal
 --------
@@ -3279,7 +3329,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-17:
+.. _tests-18:
 
 Tests
 -----
