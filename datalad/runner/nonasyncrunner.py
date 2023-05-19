@@ -558,7 +558,7 @@ class ThreadedRunner:
         current_time = time.time()
         timeout_occurred = False
         for source, last_time in last_touched:
-            if current_time - last_time >= self.timeout:
+            if self.timeout is not None and current_time - last_time >= self.timeout:
                 new_times[source] = current_time
                 self._handle_source_timeout(source)
                 timeout_occurred = True
