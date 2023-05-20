@@ -568,6 +568,16 @@ class ThreadedRunner:
         return timeout_occurred
 
     def process_timeouts(self) -> bool:
+        """Check for timeouts
+
+        This method checks whether a timeout occurred since
+        it was called last. If a timeout occurred, the timeout
+        handler is called.
+
+        Returns: bool
+            Return `True` if at least one timeout occurred,
+            `False` if no timeout occurred.
+        """
         if self.timeout is not None:
             return self._update_timeouts()
         return False
