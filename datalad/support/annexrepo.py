@@ -3962,13 +3962,16 @@ class BatchedAnnex(BatchedCommand):
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
             [batch_opt] + \
+            ['-z'] + \
             (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None
         super(BatchedAnnex, self).__init__(
             cmd,
             path=path,
-            output_proc=output_proc)
+            output_proc=output_proc,
+            request_terminator=b'\x00',
+        )
 
 
 # TODO: Why was this commented out?

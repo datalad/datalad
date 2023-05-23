@@ -24,11 +24,11 @@ from time import (
     sleep,
     time,
 )
+from typing import Any
 
 import pytest
 
 from datalad.tests.utils_pytest import (
-    OBSCURE_DIRNAME,
     OBSCURE_FILENAME,
     SkipTest,
     assert_cwd_unchanged,
