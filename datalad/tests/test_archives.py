@@ -25,7 +25,7 @@ from datalad.support.archives import (
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
-    OBSCURE_DIRNAME,
+    OBSCURE_FILENAME,
     SkipTest,
     assert_false,
     assert_raises,
@@ -42,7 +42,7 @@ from datalad.tests.utils_pytest import (
     with_tree,
 )
 
-fn_in_archive_obscure = OBSCURE_DIRNAME
+fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
 # Debian sid version of python (3.7.5rc1) introduced a bug in mimetypes
 # Reported to cPython: https://bugs.python.org/issue38449

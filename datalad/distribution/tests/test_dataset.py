@@ -33,7 +33,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
-    OBSCURE_DIRNAME,
+    OBSCURE_FILENAME,
     SkipTest,
     assert_equal,
     assert_false,
@@ -267,7 +267,7 @@ def test_hat_dataset_more(path=None):
         eq_(Dataset('^'), ds)
 
 
-@pytest.mark.parametrize("ds_path", ["simple-path", OBSCURE_DIRNAME])
+@pytest.mark.parametrize("ds_path", ["simple-path", OBSCURE_FILENAME])
 @with_tempfile(mkdir=True)
 def test_require_dataset(topdir=None, *, ds_path):
     path = opj(topdir, ds_path)

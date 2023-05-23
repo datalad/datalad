@@ -1474,7 +1474,7 @@ DIRECTORY_EXCLUDED_PARTS = ['\n']
 
 
 @with_tempfile(mkdir=True)
-def get_most_obscure_supported_name(tdir, return_candidates=False, directory_name=False):
+def get_most_obscure_supported_name(tdir, return_candidates=False):
     """Return the most obscure filename that the filesystem would support under TEMPDIR
 
     Parameters
@@ -1482,13 +1482,6 @@ def get_most_obscure_supported_name(tdir, return_candidates=False, directory_nam
     return_candidates: bool, optional
       if True, return a tuple of (good, candidates) where candidates are "partially"
       sorted from trickiest considered
-
-    directory_name: bool, optional
-      if True, return an obscure directory name. Directories might have
-      different obscurity profiles. Currently, directory names will not
-      contain newline characters. The reason for that is that git-annex
-      will not work properly in an annexed repository, if the root-directory
-      of the repository has a newline in its name.
 
     TODO: we might want to use it as a function where we would provide tdir
     """
@@ -1504,23 +1497,17 @@ def get_most_obscure_supported_name(tdir, return_candidates=False, directory_nam
             # ATM we do not distinguish obscure filename and dirname.
             # So here we will test for both - being able to create dir
             # with obscure name and obscure filename under
-            if directory_name is True:
-                os.mkdir(opj(tdir, filename))
-            else:
-                with open(opj(tdir, filename), 'w') as f:
-                    f.write("TEST LOAD")
+            with open(opj(tdir, filename), 'w') as f:
+                f.write("TEST LOAD")
             return True
         except:
             lgr.debug(
-                f"{'Dir' if directory_name else 'File'}name %r is "
-                "not supported on %s under %s",
+                f"File name %r is not supported on %s under %s",
                 filename, system, tdir)
             return False
 
     # incrementally build up the most obscure filename from parts
     for part in OBSCURE_FILENAME_PARTS:
-        if directory_name and part in DIRECTORY_EXCLUDED_PARTS:
-            continue
         candidate = good + part
         if good_filename(candidate):
             good = candidate
@@ -1535,8 +1522,8 @@ def get_most_obscure_supported_name(tdir, return_candidates=False, directory_nam
         return good
 
 
-OBSCURE_FILENAME, OBSCURE_FILENAMES = get_most_obscure_supported_name(return_candidates=True)
-OBSCURE_DIRNAME, OBSCURE_DIRNAMES = get_most_obscure_supported_name(return_candidates=True, directory_name=True)
+OBSCURE_FILENAME, OBSCURE_FILENAMES = get_most_obscure_supported_name(
+    return_candidates=True)
 
 
 @optional_args
@@ -1849,7 +1836,7 @@ def get_deeply_nested_structure(path):
     |      ├── subdir
     |      │   └── annexed_file.txt -> ../.git/annex/objects/...
     |      └── subds_lvl1_modified
-    |          └── OBSCURE_DIRNAME_directory_untracked
+    |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
 
     When a system has no symlink support, the link2... components are not
@@ -1876,7 +1863,7 @@ def get_deeply_nested_structure(path):
     )
     create_tree(
         str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
-        {OBSCURE_DIRNAME + u'_directory_untracked': {"untracked_file": ""}}
+        {OBSCURE_FILENAME + u'_directory_untracked': {"untracked_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
