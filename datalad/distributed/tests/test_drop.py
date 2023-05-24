@@ -30,7 +30,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
-    OBSCURE_FILENAME,
+    OBSCURE_DIRNAME,
     assert_in,
     assert_in_results,
     assert_raises,
@@ -139,7 +139,7 @@ def test_drop_file_content(path=None, outside_path=None):
 
     # detection of untracked content
     untrackeddir = ds.pathobj / 'subds_modified' / 'subds_lvl1_modified' / \
-        f'{OBSCURE_FILENAME}_directory_untracked'
+        f'{OBSCURE_DIRNAME}_directory_untracked'
     res = ds.drop(untrackeddir, on_failure='ignore')
     assert_in_results(
         res,
