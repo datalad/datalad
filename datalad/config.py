@@ -205,7 +205,7 @@ def _gitcfg_rec_to_keyvalue(rec):
     -------
     str, str
       Parsed key and value. Key and/or value could be None
-      if not snytax-compliant (former) or absent (latter).
+      if not syntax-compliant (former) or absent (latter).
     """
     kv_match = cfg_kv_regex.match(rec)
     if kv_match:
