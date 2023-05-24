@@ -110,13 +110,8 @@ def _where_to_scope(func):
     return wrapper
 
 
-def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
+def parse_gitconfig_dump(dump, cwd=None, multi_value=True, with_origin=None):
     """Parse a dump-string from `git config -z --list`
-
-    This parser has limited support for discarding unrelated output
-    that may contaminate the given dump. It does so performing a
-    relatively strict matching of configuration key syntax, and discarding
-    lines in the output that are not valid git-config keys.
 
     There is also built-in support for parsing outputs generated
     with --show-origin (see return value).
@@ -133,6 +128,13 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
       If True, report values from multiple specifications of the
       same key as a tuple of values assigned to this key. Otherwise,
       the last configuration is reported.
+    with_origin: bool or None, optional
+      If True, the dump is of the run with `--show-origin` option, and is
+      expected to have interleaved entries of the  'origin' and 'item' entries.
+      If False, the dump is just of the items (still \\0 separated).
+      If None, no information on either was ran with `--show-origin` was
+      provided, and it is deduced by looking at the first entry to have one
+      of the known origin "tags" like 'file:' 'command line:' or 'blob:'.
 
     Returns:
     --------
@@ -146,78 +148,83 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     """
     dct = {}
     fileset = set()
-    for line in dump.split('\0'):
-        # line is a null-delimited chunk
-        k = None
-        # in anticipation of output contamination, process within a loop
-        # where we can reject non syntax compliant pieces
-        while line:
+    # TODO: pass with_origin in all invocations, remove `None` magic
+    for iline, line in enumerate(dump.split('\0')):
+
+        # Deal with possible contamination in the prefix only: and if needed figure out with_origin
+        if not iline:
+            line, skip_line, with_origin = _process_first_dump_line(iline, line, with_origin)
+            if skip_line or not line:
+                continue
+
+        # In the format with origin, the origin is interleaved with the value
+        if with_origin and not iline % 2:
             if line.startswith('file:'):
                 # origin line
                 fname = Path(line[5:])
                 if not fname.is_absolute():
                     fname = Path(cwd) / fname if cwd else Path.cwd() / fname
                 fileset.add(fname)
-                break
-            if line.startswith('command line:'):
-                # no origin that we could as a pathobj
-                break
-            if line.startswith('blob:'):
+            elif line.startswith('command line:'):
+                # no origin that we could as a pathobj - not adding
+                pass
+            elif line.startswith('blob:'):
                 # take verbatim to allow distinguishing files from blobs
                 fileset.add(line)
-                break
-            # try getting key/value pair from the present chunk
-            k, v = _gitcfg_rec_to_keyvalue(line)
-            if k is not None:
-                # we are done with this chunk when there is a good key
-                break
-            # discard the first line and start over
-            ignore, line = line.split('\n', maxsplit=1)
-            lgr.debug('Non-standard git-config output, ignoring: %s', ignore)
-        if not k:
-            # nothing else to log, all ignored dump was reported before
-            continue
-        # multi-value reporting
-        present_v = dct.get(k, None)
-        if present_v is None or not multi_value:
-            dct[k] = v
-        else:
-            if isinstance(present_v, tuple):
-                dct[k] = present_v + (v,)
             else:
-                dct[k] = (present_v, v)
+                lgr.debug('Non-standard git-config output origin specification, ignoring line %d: %s',
+                          iline, line)
+        else:
+            spl = line.split('\n', maxsplit=1)
+            if len(spl) == 1:
+                # just a key
+                k, v = spl[0], None
+            else:
+                k, v = spl
+            if not k:
+                continue
+            # multi-value reporting
+            present_v = dct.get(k, None)
+            if present_v is None or not multi_value:
+                dct[k] = v
+            else:
+                if isinstance(present_v, tuple):
+                    dct[k] = present_v + (v,)
+                else:
+                    dct[k] = (present_v, v)
     return dct, fileset
+
+
+def _process_first_dump_line(iline, line, with_origin):
+    res = re.search('(file|command line|blob):\S', line, flags=re.MULTILINE)
+    if with_origin is None:
+        # not golden but it is just heuristic on how to deal with contamination!
+        with_origin = bool(res)
+    skip_line = False
+    if not with_origin:  # no origin, config key cannot have spaces or newlines
+        # discard all lines which contain spaces
+        while line:
+            spl = line.split('\n', maxsplit=1)
+            if ' ' in spl[0]:
+                if len(spl) > 1:
+                    line = spl[1]
+                else:
+                    # only contaminant, skipping this line
+                    skip_line = True
+                    break
+            else:
+                break
+    else:
+        if res:
+            line = line[res.start():]  # strip away contaminant
+        else:
+            lgr.debug("Cannot deal with contamination in line %d: %s. Skipping", iline, line)
+            skip_line = True
+    return line, skip_line, with_origin
 
 
 # keep alias with previous name for now
 _parse_gitconfig_dump = parse_gitconfig_dump
-
-
-def _gitcfg_rec_to_keyvalue(rec):
-    """Helper for parse_gitconfig_dump()
-
-    Parameters
-    ----------
-    rec: str
-      Key/value specification string
-
-    Returns
-    -------
-    str, str
-      Parsed key and value. Key and/or value could be None
-      if not syntax-compliant (former) or absent (latter).
-    """
-    kv_match = cfg_kv_regex.match(rec)
-    if kv_match:
-        k, v = kv_match.groups()
-    elif cfg_k_regex.match(rec):
-        # could be just a key without = value, which git treats as True
-        # if asked for a bool
-        k, v = rec, None
-    else:
-        # no value, no good key
-        k = v = None
-    return k, v
 
 
 def _update_from_env(store):

@@ -2392,7 +2392,7 @@ class GitRepo(CoreGitRepo):
         # anyways, and they should not appear in a normal .gitmodules file
         # but could easily appear when duplicates are included. In this case,
         # we better not crash
-        db, _ = parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
+        db, _ = parse_gitconfig_dump(out, cwd=self.path, multi_value=False, with_origin=False)
         mods: dict[str, dict[str, str]] = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):

@@ -80,7 +80,7 @@ gitcfg_dump_w_origin = """\
 file:.git/config\0core.withdot
 true\0file:.git/config\0just.a.key\0file:/home/me/.gitconfig\0annex.version
 8\0file:.git/config\0filter.with2dots.some
-long\ntext with\nnewlines\0file:.git/config\0command line:\0annex.something
+long\ntext with\nnewlines\0file:.git/config\0\0command line:\0annex.something
 abcdef\0"""
 
 
@@ -114,11 +114,19 @@ def test_parse_gitconfig_dump():
 
     # now contaminate the output with a prepended error message
     # https://github.com/datalad/datalad/issues/5502
-    # must work, but really needs the trailing newline
-    parsed, files = parse_gitconfig_dump(
-        "unfortunate stdout\non more lines\n" + gitcfg_dump_w_origin)
-    assert_equal(gitcfg_parsetarget, parsed)
-
+    # must work, but really needs the trailing newline and spaces in the lines
+    for with_origin in True, None:
+        parsed, files = parse_gitconfig_dump(
+            "unfortunate stdout\non more lines\n" + gitcfg_dump_w_origin,
+            with_origin=with_origin
+        )
+        assert_equal(gitcfg_parsetarget, parsed)
+    for with_origin in False, None:
+        parsed, files = parse_gitconfig_dump(
+            "unfortunate stdout\non more lines\n" + gitcfg_dump,
+            with_origin=with_origin
+        )
+        assert_equal(gitcfg_parsetarget, parsed)
 
 @pytest.mark.filterwarnings("ignore: 'where=\"dataset\"' is deprecated")
 @pytest.mark.filterwarnings("ignore: 'source=\"dataset\"' is deprecated")
