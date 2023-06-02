@@ -27,9 +27,9 @@ from datalad.utils import (
     path_is_subpath,
     PurePosixPath,
 )
-from datalad.support.exceptions import CommandError
 from datalad.support.path import robust_abspath
 from datalad.support.exceptions import (
+    CommandError,
     format_oneline_tb,
     CapturedException,
 )
@@ -48,8 +48,9 @@ success_status_map = {
 }
 
 
-def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
-                    refds=None, status=None, message=None, exception=None,
+def get_status_dict(action=None, ds: Dataset=None, path=None, type=None, logger=None,
+                    refds=None, status=None, message=None,
+                    exception: Exception | CapturedException | None=None,
                     error_message=None, **kwargs):
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
@@ -62,11 +63,11 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
 
     Parameters
     ----------
-    ds : Dataset instance
+    ds
       If given, the `path` and `type` values are populated with the path of the
       datasets and 'dataset' as the type. Giving additional values for both
       keys will overwrite these pre-populated values.
-    exception : Exception
+    exception
       Exceptions that occurred while generating a result should be captured
       by immediately instantiating a CapturedException. This instance can
       be passed here to yield more comprehensive error reporting, including
