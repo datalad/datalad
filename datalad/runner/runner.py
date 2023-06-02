@@ -63,14 +63,33 @@ class WitlessRunner(object):
     def _get_adjusted_env(self,
                           env: dict | None = None,
                           cwd: str | PathLike | None = None,
-                          copy: bool = True):
-        """Return an adjusted copy of an execution environment
+                          copy: bool = True
+                          ) -> dict | None:
+        """Return an adjusted execution environment
 
-        Or return an unaltered copy of the environment, if no adjustments
-        need to be made.
+        This method adjusts the environment provided in `env` to
+        reflect the configuration of the runner. It returns
+        an altered copy or an altered original, if `copy` is
+        `False`.
+
+        Parameters
+        ----------
+        env: dict
+          The environment that should be adjusted
+
+        cwd: str | PathLike | None (default: None)
+          If not None, the content of this variable will be
+          put into the environment variable 'PWD'.
+
+        copy: bool (default: True)
+          if True, the returned environment will be a
+          copy of `env`. Else the passed in environment
+          is modified. Note: if `env` is not `None` and
+          `cwd` is `None` and `copy` is `True`, the
+          returned dictionary is still a copy
         """
-        env = env.copy() if env else None
-        if cwd and env is not None:
+        env = env.copy() if env is not None and copy is True else env
+        if cwd is not None and env is not None:
             # If an environment and 'cwd' is provided, ensure the 'PWD' in the
             # environment is set to the value of 'cwd'.
             env['PWD'] = str(cwd)
