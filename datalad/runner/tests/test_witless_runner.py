@@ -332,6 +332,7 @@ def test_path_to_str_conversion() -> None:
         cwd=test_path,
         env=dict(some_key="value")
     )
+    assert adjusted_env is not None
     assert str(test_path) == adjusted_env['PWD']
 
 
