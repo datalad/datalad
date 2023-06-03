@@ -304,9 +304,6 @@ class ConfigManager(object):
       Note: 'dataset' and 'dataset-local' are deprecated in favor of 'branch'
       and 'branch-local'.
     """
-
-    _checked_git_identity = False
-
     # Lock for running changing operation across multiple threads.
     # Since config itself to the same path could
     # potentially be created independently in multiple threads, and we might be
@@ -399,20 +396,6 @@ class ConfigManager(object):
             self._runner = GitRunner(**run_kwargs)
 
         self.reload(force=True)
-
-        if not ConfigManager._checked_git_identity:
-            for cfg, envs in (
-                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
-                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
-                if cfg not in self \
-                        and not any(e in os.environ for e in envs):
-                    lgr.warning(
-                        "It is highly recommended to configure Git before using "
-                        "DataLad. Set both 'user.name' and 'user.email' "
-                        "configuration variables."
-                    )
-                    break  # one warning enough
-            ConfigManager._checked_git_identity = True
 
     def reload(self, force=False):
         """Reload all configuration items from the configured sources
@@ -1166,3 +1149,18 @@ def write_config_section(fobj, suite, name, props):
             _q_='' if quoted_name.startswith('"') else '"',
             _name_=quoted_name,
             **{k: quote_config(v) for k, v in props.items()}))
+
+
+def warn_on_undefined_git_identity(cfg: ConfigManager):
+    """Check whether a Git identity is defined, and warn if not"""
+    for cfgkey, envs in (
+            ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
+            ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
+        if cfgkey not in cfg \
+                and not any(e in os.environ for e in envs):
+            lgr.warning(
+                "It is highly recommended to configure Git before using "
+                "DataLad. Set both 'user.name' and 'user.email' "
+                "configuration variables."
+            )
+            break  # one warning enough
