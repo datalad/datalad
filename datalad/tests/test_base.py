@@ -9,8 +9,10 @@
 
 import os
 import os.path as op
+import sys
 from unittest.mock import patch
 
+from datalad.cmd import WitlessRunner, StdOutErrCapture
 from datalad.tests.utils_pytest import (
     SkipTest,
     assert_in,
@@ -83,10 +85,7 @@ def test_git_config_warning(path=None):
     with chpwd(path), \
             patch.dict('os.environ', patched_env, clear=True), \
             swallow_logs(new_level=30) as cml:
-        # no configs in that empty HOME
-        from datalad.config import ConfigManager
-        # reach into the class and disable the "checked" flag that
-        # has already been tripped before we get here
-        with patch.object(ConfigManager, "_checked_git_identity", False):
-            ConfigManager()
-            assert_in("configure Git before", cml.out)
+        out = WitlessRunner().run(
+            [sys.executable, '-c', 'import datalad'],
+            protocol=StdOutErrCapture)
+        assert_in("configure Git before", out['stderr'])
