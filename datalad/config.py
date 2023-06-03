@@ -32,7 +32,10 @@ from datalad.runner import (
     KillOutput,
     StdOutErrCapture,
 )
-from datalad.utils import on_windows
+from datalad.utils import (
+    getpwd,
+    on_windows,
+)
 
 lgr = logging.getLogger('datalad.config')
 
@@ -144,7 +147,7 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
       For actual files a Path object is included in the set, for a git-blob
       a Git blob ID prefixed with 'blob:' is reported.
     """
-    cwd = Path.cwd() if cwd is None else Path(cwd)
+    cwd = Path(getpwd() if cwd is None else cwd)
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
