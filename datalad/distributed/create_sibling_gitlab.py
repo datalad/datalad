@@ -79,19 +79,22 @@ class CreateSiblingGitlab(Interface):
 
     "hierarchy"
       Each dataset is placed into its own group, and the actual GitLab
-      project for a dataset is put in a project named "_repo_" inside
-      this group. Using this layout, arbitrarily deep hierarchies of
+      project for a dataset is put in a project named "project" inside
+      this group. This project name is configurable (see Configuration).
+      Using this layout, arbitrarily deep hierarchies of
       nested datasets can be represented, while the hierarchical structure
       is reflected in the project path. This is the default layout, if
       no project path is specified.
     "flat"
       All datasets are placed in the same group. The name of a project
       is its relative path within the root dataset, with all path separator
-      characters replaced by '--'.
+      characters replaced by '-'. This path separator is configurable
+      (see Configuration).
     "collection"
-      This is a hybrid layout, where the root dataset is placed in a "_repo_"
+      This is a hybrid layout, where the root dataset is placed in a "project"
       project inside a group, and all nested subdatasets are represented
-      inside the group using a "flat" layout.
+      inside the group using a "flat" layout. The project name is configurable
+      (see Configuration).
 
     GitLab cannot host dataset content. However, in combination with
     other data sources (and siblings), publishing a dataset to GitLab can
@@ -100,7 +103,7 @@ class CreateSiblingGitlab(Interface):
 
     *Configuration*
 
-    All configuration switches and options for GitLab sibling creation can
+    Many configuration switches and options for GitLab sibling creation can
     be provided arguments to the command. However, it is also possible to
     specify a particular setup in a dataset's configuration. This is
     particularly important when managing large collections of datasets.
@@ -119,6 +122,15 @@ class CreateSiblingGitlab(Interface):
         Project location/path used for a datasets at GitLab instance
         SITENAME (see --project). Configuring this is useful for deriving
         project paths for subdatasets, relative to superdataset.
+    "datalad.gitlab-default-projectname"
+        The hierarchy and collection layouts publish (sub)datasets as projects
+        with a custom name. The default name "project" can be overridden with
+        this configuration.
+    "datalad.gitlab-default-pathseparator"
+        The flat and collection layout represent subdatasets with project names
+        that correspond to the path, with the regular path separator replaced
+        with a "-": superdataset-subdataset. This configuration can override
+        this default separator.
 
     This command can be configured with
     "datalad.create-sibling-ghlike.extra-remote-settings.NETLOC.KEY=VALUE" in
