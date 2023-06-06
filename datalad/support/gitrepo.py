@@ -1545,7 +1545,7 @@ class GitRepo(CoreGitRepo):
 
         # handle interactive message entry by running another `git-commit`
         self._git_runner.run(
-            ['git'] + cmd + ['--amend', '--edit'],
+            self._git_cmd_prefix + cmd + ['--amend', '--edit'],
             protocol=NoCapture,
             stdin=None,
             env=env,
