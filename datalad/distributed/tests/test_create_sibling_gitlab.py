@@ -40,7 +40,7 @@ def _get_nested_collections(path):
     return dict(
         root=ds,
         c1=c1,
-        c1s1=c1s2,
+        c1s1=c1s1,
         c1s2=c1s2,
         c2=c2,
         c2s1=c2s1,
