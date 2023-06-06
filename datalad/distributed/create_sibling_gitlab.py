@@ -427,6 +427,13 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # the reference dataset configuration
             rproject = ds.pathobj.relative_to(refds.pathobj).as_posix()
             if layout == 'hierarchy':
+                # if a subdataset is in a subdirectory, we need to prevent #7411
+                superds_distance = \
+                    ds.pathobj.relative_to(ds.get_superdataset().pathobj).as_posix()
+                if len(superds_distance.split('/')) > 1:
+                    # the subdataset is in a subdirectory. We only keep the
+                    # dataset name, which is the last:
+                    rproject = rproject.split('/')[-1]
                 project = f'{ref_project}/{rproject}/{project_stub}'
             elif layout == 'collection':
                 project = '{}/{}'.format(
