@@ -252,6 +252,7 @@
     "matrss": {
         "name": "Matthias Riße",
         "blog": "https://github.com/matrss",
-        "orcid": "0009-0006-6081-9327"
+        "orcid": "0009-0006-6081-9327",
+        "affiliation": "Institute of Energy and Climate Research - Stratosphere (IEK-7), Research Centre Jülich, Jülich, Germany"
     }
 }
