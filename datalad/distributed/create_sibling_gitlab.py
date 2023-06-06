@@ -63,8 +63,8 @@ class CreateSiblingGitlab(Interface):
     access and authentication are implemented via python-gitlab, and all its
     features are supported. A particular GitLab site must be configured in a
     named section of a python-gitlab.cfg file (see
-    https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration for
-    details), such as::
+    https://python-gitlab.readthedocs.io/en/stable/cli-usage.html#configuration-file-format
+    for details), such as::
 
       [mygit]
       url = https://git.example.com
