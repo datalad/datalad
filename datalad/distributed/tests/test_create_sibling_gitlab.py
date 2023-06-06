@@ -160,7 +160,7 @@ def test_dryrun(path=None):
         site='theone', sibling='dieter',
         # collection setup: superdataset becomes group name and "project"
         # project underneath, subdirectories and subdatasets are projects
-        # with path seperators replaced underneath the group.
+        # with path separators replaced underneath the group.
         project='secret/{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
                 os.sep, '-')),
