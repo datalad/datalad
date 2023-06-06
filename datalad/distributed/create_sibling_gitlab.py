@@ -403,7 +403,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     if project and process_root and layout == 'collection':
         # the root of a collection
-        project = '{}/_repo_'.format(project)
+        project = '{}/repo'.format(project)
     elif project is None and not process_root:
         # check if we can build one from the refds config
         ref_project = refds.config.get(project_var, None)
@@ -412,15 +412,15 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # the reference dataset configuration
             rproject = ds.pathobj.relative_to(refds.pathobj).as_posix()
             if layout == 'hierarchy':
-                project = '{}/{}/_repo_'.format(ref_project, rproject)
+                project = '{}/{}/repo'.format(ref_project, rproject)
             elif layout == 'collection':
                 project = '{}/{}'.format(
                     ref_project,
-                    rproject.replace('/', '--'))
+                    rproject.replace('/', '-'))
             else:
-                project = '{}--{}'.format(
+                project = '{}-{}'.format(
                     ref_project,
-                    rproject.replace('/', '--'))
+                    rproject.replace('/', '-'))
 
     if project is None:
         yield dict(
