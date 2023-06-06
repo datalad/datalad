@@ -92,7 +92,7 @@ def test_dryrun(path=None):
         assert_result_count(res, 1)
         assert_result_count(
             res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-            site='dummy', sibling='dummy', project='here',
+            site='dummy', sibling='dummy', project='here/_repo_',
         )
 
     # now configure a default gitlab site
@@ -106,7 +106,7 @@ def test_dryrun(path=None):
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='theone', sibling='ursula', project='here',
+        site='theone', sibling='ursula', project='here/_repo_',
     )
     # now configure a sibling name for this site
     ctlg['root'].config.set('datalad.gitlab-theone-siblingname', 'dieter')
@@ -119,7 +119,7 @@ def test_dryrun(path=None):
     )
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='theone', sibling='dieter', project='here',
+        site='theone', sibling='dieter', project='here/_repo_',
     )
     # properly switches the name based on site
     res = ctlg['root'].create_sibling_gitlab(
@@ -128,7 +128,7 @@ def test_dryrun(path=None):
     )
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='otherone', sibling='ulf', project='here',
+        site='otherone', sibling='ulf', project='here/_repo_',
     )
     # reports notneeded on existing='skip' with an existing remote
     ctlg['root'].repo.add_remote('dieter', 'http://example.com')
@@ -148,7 +148,7 @@ def test_dryrun(path=None):
     res = ctlg['root'].create_sibling_gitlab(dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='theone', sibling='dieter', project='secret',
+        site='theone', sibling='dieter', project='secret/_repo_',
     )
     # we can make use of the config in the base dataset to drive
     # calls on subdatasets: use -d plus a path
@@ -226,7 +226,7 @@ def test_dryrun(path=None):
     eq_(
         sorted(r['project'] for r in res),
         [
-            'secret',
+            'secret/_repo_',
             'secret/collection2/_repo_',
             'secret/collection2/sub1/_repo_',
             'secret/collection2/sub1/deepsub1/_repo_',
@@ -318,7 +318,7 @@ def test_fake_gitlab(path=None):
         # GitLab success
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path, type='dataset',
-            site='dummy', sibling='dummy', project='here', description='thisisit',
+            site='dummy', sibling='dummy', project='here/_repo_', description='thisisit',
             project_attributes={
                 'http_url_to_repo': 'http://example.com',
                 'ssh_url_to_repo': 'example.com',
@@ -371,7 +371,7 @@ def test_fake_gitlab(path=None):
         assert_result_count(res, 1)
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path,
-            site='dummy', sibling='othername', project='here',
+            site='dummy', sibling='othername', project='here/_repo_',
             project_attributes={
                 'http_url_to_repo': 'http://example.com',
                 'ssh_url_to_repo': 'example.com'
@@ -390,7 +390,7 @@ def test_fake_gitlab(path=None):
         assert_result_count(res, 2)
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path, type='dataset',
-            site='sshsite', sibling='sshsite', project='here',
+            site='sshsite', sibling='sshsite', project='here/_repo_',
             project_attributes={
                 'http_url_to_repo': 'http://example.com',
                 'ssh_url_to_repo': 'example.com',
@@ -415,7 +415,7 @@ def test_fake_gitlab(path=None):
                      "sshsite2"],
             path=path,
             refds=path,
-            site='sshsite', sibling='sshsite2', project='here',
+            site='sshsite', sibling='sshsite2', project='here/_repo_',
             project_attributes={
                 'http_url_to_repo': 'http://example2.com',
                 'ssh_url_to_repo': 'example2.com'
