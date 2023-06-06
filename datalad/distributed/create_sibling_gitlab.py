@@ -401,7 +401,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
         # look for a specific config in the dataset
         project = ds.config.get(project_var, None)
 
-    if project and process_root and layout == 'collection':
+    if project and process_root and layout != 'flat':
         # the root of a collection
         project = '{}/_repo_'.format(project)
     elif project is None and not process_root:
