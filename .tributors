@@ -210,7 +210,8 @@
         "name": "Stephan Heunis",
         "bio": "DataLad, decentralised (research) data management, real-time fMRI analysis, data quality control, Matlab and Python bits and pieces",
         "blog": "https://jsheunis.github.io/",
-        "orcid": "0000-0003-3503-9872"
+        "orcid": "0000-0003-3503-9872",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behavior (INM-7), Research Center Juelich, Germany"
     },
     "lamby": {
         "name": "Chris Lamb",
@@ -229,7 +230,8 @@
     "vickychenglau": {
         "name": "Vicky C Lau",
         "email": "vickychenglau@gmail.com",
-        "blog": "https://github.com/vickychenglau"
+        "blog": "https://github.com/vickychenglau",
+        "orcid": "0000-0002-1197-1887"
     },
     "xgui3783": {
         "name": "xgui3783",
@@ -249,6 +251,7 @@
     },
     "matrss": {
         "name": "Matthias Riße",
-        "blog": "https://github.com/matrss"
+        "blog": "https://github.com/matrss",
+        "orcid": "0009-0006-6081-9327"
     }
 }
