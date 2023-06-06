@@ -395,6 +395,9 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             "Unknown site access '{}' given or configured, "
             "known ones are: {}".format(access, known_access_labels))
 
+    pathsep = ds.config.get("datalad.gitlab-default-pathseparator", None) or "-"
+    project_stub = \
+        ds.config.get("datalad.gitlab-default-projectname", None) or "project"
     project_var = 'datalad.gitlab-{}-project'.format(site)
     process_root = refds == ds
     if project is None:
@@ -403,7 +406,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     if project and process_root and layout == 'collection':
         # the root of a collection
-        project = '{}/repo'.format(project)
+        project = f'{project}/{project_stub}'
     elif project is None and not process_root:
         # check if we can build one from the refds config
         ref_project = refds.config.get(project_var, None)
@@ -412,15 +415,15 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # the reference dataset configuration
             rproject = ds.pathobj.relative_to(refds.pathobj).as_posix()
             if layout == 'hierarchy':
-                project = '{}/{}/repo'.format(ref_project, rproject)
+                project = f'{ref_project}/{rproject}/{project_stub}'
             elif layout == 'collection':
                 project = '{}/{}'.format(
                     ref_project,
-                    rproject.replace('/', '-'))
+                    rproject.replace('/', pathsep))
             else:
                 project = '{}-{}'.format(
                     ref_project,
-                    rproject.replace('/', '-'))
+                    rproject.replace('/', pathsep))
 
     if project is None:
         yield dict(
