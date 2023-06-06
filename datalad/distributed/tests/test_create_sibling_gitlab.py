@@ -265,6 +265,55 @@ def test_dryrun(path=None):
             'secret-subdir-collection1-sub2',
         ],
     )
+    # test that the configurations work
+    ctlg['root'].config.set("datalad.gitlab-default-projectname", 'myownname')
+    ctlg['c1s1'].config.set("datalad.gitlab-default-pathseparator", '+')
+    #import pdb; pdb.set_trace()
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='flat', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret',
+            'secret-collection2',
+            'secret-collection2-sub1',
+            'secret-collection2-sub1-deepsub1',
+            'secret-subdir+collection1+sub1',
+            'secret-subdir-collection1',
+            'secret-subdir-collection1-sub2',
+        ],
+    )
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='collection', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret/collection2',
+            'secret/collection2-sub1',
+            'secret/collection2-sub1-deepsub1',
+            'secret/myownname',
+            'secret/subdir+collection1+sub1',
+            'secret/subdir-collection1',
+            'secret/subdir-collection1-sub2',
+        ],
+    )
+    ctlg['c1s1'].config.set("datalad.gitlab-default-projectname", 'myownname')
+    res = ctlg['root'].create_sibling_gitlab(recursive=True, dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret',
+            'secret/collection2/project',
+            'secret/collection2/sub1/deepsub1/project',
+            'secret/collection2/sub1/project',
+            'secret/subdir/collection1/project',
+            'secret/subdir/collection1/sub1/myownname',
+            'secret/subdir/collection1/sub2/project',
+        ]
+    )
 
 
 class _FakeGitLab(object):
