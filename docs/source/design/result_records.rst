@@ -176,8 +176,10 @@ A string label categorizing the state of an entity. Common values are:
 ``error_message``
 -----------------
 
-List of any error messages that were captured or produced while achieving a
-result.
+An error message that was captured or produced while achieving a result.
+
+An error message can be a string or a tuple.  In the case of a tuple, the
+second item can contain values for ``%``-expansion of the message string.
 
 
 ``exception``
