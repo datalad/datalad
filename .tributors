@@ -34,7 +34,8 @@
         "name": "Michael Hanke",
         "blog": "https://github.com/mih",
         "email": "michael.hanke@gmail.com",
-        "orcid": "0000-0001-6398-6370"
+        "orcid": "0000-0001-6398-6370",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany"
     },
     "yarikoptic": {
         "name": "Yaroslav Halchenko",
@@ -81,7 +82,9 @@
         "name": "Horea-Ioan Ioanas",
         "blog": "https://github.com/TheChymera",
         "email": "chr@chymera.eu",
-        "bio": "I bring Reproducibility, Freedom, and Open Source to Neuroscience, Academic Publishing, Software, and Life."
+        "bio": "I bring Reproducibility, Freedom, and Open Source to Neuroscience, Academic Publishing, Software, and Life.",
+        "orcid": "0000-0001-7037-2449",
+        "affiliation": "Dartmouth College"
     },
     "effigies": {
         "name": "Chris Markiewicz",
@@ -94,7 +97,9 @@
     },
     "debanjum": {
         "name": "Debanjum Singh Solanky",
-        "blog": "https://github.com/debanjum"
+        "blog": "https://github.com/debanjum",
+        "orcid": "0000-0002-0774-6564",
+        "affiliation": "Dartmouth College, Hanover, NH, United States"
     },
     "nellh": {
         "name": "nellh",
@@ -113,7 +118,8 @@
     "vsoch": {
         "name": "Vanessa Sochat",
         "blog": "https://github.com/vsoch",
-        "bio": "I'm the Vanessasaurus!"
+        "bio": "I'm the Vanessasaurus!",
+        "orcid": "0000-0002-4387-3819"
     },
     "kyleam": {
         "name": "Kyle Meyer",
@@ -124,7 +130,9 @@
         "name": "Dave MacFarlane",
         "blog": "https://github.com/driusan",
         "email": "driusan@gmail.com",
-        "bio": "Professional Rubber Duck"
+        "bio": "Professional Rubber Duck",
+        "orcid": "0000-0001-9258-8099",
+        "affiliation": "McGill University"
     },
     "overlake333": {
         "name": "Taylor M. Olson",
@@ -141,7 +149,9 @@
     },
     "bpoldrack": {
         "name": "Benjamin Poldrack",
-        "blog": "https://github.com/bpoldrack"
+        "blog": "https://github.com/bpoldrack",
+        "orcid": "0000-0001-7628-0801",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany"
     },
     "yetanothertestuser": {
         "name": "yetanothertestuser",
