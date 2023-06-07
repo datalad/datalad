@@ -158,17 +158,16 @@ def test_dryrun(path=None):
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
         site='theone', sibling='dieter',
-        # hierarchical setup: directories becomes groups
-        # which implies each dataset is in its own group
-        # project itself is placed at 'project' to give URLs like
-        # http://site/dir/dir/dir/project.git
-        # as a balance between readability and name conflict minimization
-        project='secret/{}/project'.format(
-            ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj).as_posix()),
+        # collection setup: superdataset becomes group name and "project"
+        # project underneath, subdirectories and subdatasets are projects
+        # with path seperators replaced underneath the group.
+        project='secret/{}'.format(str(
+            ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
+                os.sep, '-')),
     )
     # we get the same result with an explicit layout request
     expl_res = ctlg['root'].create_sibling_gitlab(
-        path='subdir', layout='hierarchy', dry_run=True)
+        path='subdir', layout='collection', dry_run=True)
     eq_(res, expl_res)
     # layout can be configured too, "collection" is "flat" in a group
     ctlg['root'].config.set('datalad.gitlab-theone-layout', 'collection')
@@ -222,25 +221,8 @@ def test_dryrun(path=None):
     # one result per dataset
     assert_result_count(res, len(ctlg))
     # verbose check of target layout (easier to see target pattern for humans)
-    # default layout: hierarchy
-    eq_(
-        sorted(r['project'] for r in res),
-        [
-            'secret/collection2/project',
-            'secret/collection2/sub1/deepsub1/project',
-            'secret/collection2/sub1/project',
-            'secret/project',
-            'secret/subdir/collection1/project',
-            'secret/subdir/collection1/sub1/project',
-            'secret/subdir/collection1/sub2/project',
-        ]
-    )
-    res = ctlg['root'].create_sibling_gitlab(
-        recursive=True, layout='collection', dry_run=True)
-    assert_result_count(res, len(ctlg))
-    eq_(
-        sorted(r['project'] for r in res),
-        [
+    # default layout: collection
+    expected_collection_res = [
             'secret/collection2',
             'secret/collection2-sub1',
             'secret/collection2-sub1-deepsub1',
@@ -248,7 +230,18 @@ def test_dryrun(path=None):
             'secret/subdir-collection1',
             'secret/subdir-collection1-sub1',
             'secret/subdir-collection1-sub2',
-        ],
+        ]
+    eq_(
+        sorted(r['project'] for r in res),
+        expected_collection_res
+    )
+    # should be the same when explicitly requested
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='collection', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        expected_collection_res
     )
     res = ctlg['root'].create_sibling_gitlab(
         recursive=True, layout='flat', dry_run=True)
@@ -297,21 +290,6 @@ def test_dryrun(path=None):
             'secret/subdir-collection1',
             'secret/subdir-collection1-sub2',
         ],
-    )
-    ctlg['c1s1'].config.set("datalad.gitlab-default-projectname", 'myownname')
-    res = ctlg['root'].create_sibling_gitlab(recursive=True, dry_run=True)
-    assert_result_count(res, len(ctlg))
-    eq_(
-        sorted(r['project'] for r in res),
-        [
-            'secret/collection2/project',
-            'secret/collection2/sub1/deepsub1/project',
-            'secret/collection2/sub1/project',
-            'secret/myownname',
-            'secret/subdir/collection1/project',
-            'secret/subdir/collection1/sub1/myownname',
-            'secret/subdir/collection1/sub2/project',
-        ]
     )
 
 
