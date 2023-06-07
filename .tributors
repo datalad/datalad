@@ -31,9 +31,10 @@
         "bio": "Postdoc 🧠👨🏻‍💻 in the Gallant Lab at UC Berkeley"
     },
     "mih": {
-        "name": "mih",
+        "name": "Michael Hanke",
         "blog": "https://github.com/mih",
-        "email": "michael.hanke@gmail.com"
+        "email": "michael.hanke@gmail.com",
+        "orcid": "0000-0001-6398-6370"
     },
     "yarikoptic": {
         "name": "Yaroslav Halchenko",
@@ -44,12 +45,12 @@
         "affiliation": "Dartmouth College"
     },
     "loj": {
-        "name": "loj",
+        "name": "Laura Waite",
         "blog": "https://github.com/loj",
         "email": "laura@waite.eu"
     },
     "feilong": {
-        "name": "feilong",
+        "name": "Feilong Ma",
         "blog": "https://github.com/feilong"
     },
     "jhpoelen": {
@@ -57,11 +58,11 @@
         "blog": "https://github.com/jhpoelen"
     },
     "andycon": {
-        "name": "andycon",
+        "name": "Andrew Connolly",
         "blog": "https://github.com/andycon"
     },
     "nicholsn": {
-        "name": "nicholsn",
+        "name": "Nolan Nichols",
         "blog": "https://github.com/nicholsn"
     },
     "adelavega": {
@@ -77,22 +78,22 @@
         "blog": "https://github.com/kskyten"
     },
     "TheChymera": {
-        "name": "TheChymera",
+        "name": "Horea-Ioan Ioanas",
         "blog": "https://github.com/TheChymera",
         "email": "chr@chymera.eu",
         "bio": "I bring Reproducibility, Freedom, and Open Source to Neuroscience, Academic Publishing, Software, and Life."
     },
     "effigies": {
-        "name": "effigies",
+        "name": "Chris Markiewicz",
         "blog": "https://github.com/effigies",
         "email": "effigies@gmail.com"
     },
     "jgors": {
-        "name": "jgors",
+        "name": "Jasong Gors",
         "blog": "https://github.com/jgors"
     },
     "debanjum": {
-        "name": "debanjum",
+        "name": "Debanjum Singh Solanky",
         "blog": "https://github.com/debanjum"
     },
     "nellh": {
@@ -100,33 +101,33 @@
         "blog": "https://github.com/nellh"
     },
     "emdupre": {
-        "name": "emdupre",
+        "name": "Elizabeth DuPre",
         "blog": "https://github.com/emdupre",
         "bio": "Neuroscience graduate student at McGill University"
     },
     "aqw": {
-        "name": "aqw",
+        "name": "Alex Waite",
         "blog": "https://github.com/aqw",
         "email": "alex@waite.eu"
     },
     "vsoch": {
-        "name": "vsoch",
+        "name": "Vanessa Sochat",
         "blog": "https://github.com/vsoch",
         "bio": "I'm the Vanessasaurus!"
     },
     "kyleam": {
-        "name": "kyleam",
+        "name": "Kyle Meyer",
         "blog": "https://github.com/kyleam",
         "email": "kyle@kyleam.com"
     },
     "driusan": {
-        "name": "driusan",
+        "name": "Dave MacFarlane",
         "blog": "https://github.com/driusan",
         "email": "driusan@gmail.com",
         "bio": "Professional Rubber Duck"
     },
     "overlake333": {
-        "name": "overlake333",
+        "name": "Taylor M. Olson",
         "blog": "https://github.com/overlake333",
         "email": "taylor.m.olson.21@dartmouth.edu"
     },
@@ -135,11 +136,11 @@
         "blog": "https://github.com/akeshavan"
     },
     "jwodder": {
-        "name": "jwodder",
+        "name": "John T. Wodder II",
         "blog": "https://github.com/jwodder"
     },
     "bpoldrack": {
-        "name": "bpoldrack",
+        "name": "Benjamin Poldrack",
         "blog": "https://github.com/bpoldrack"
     },
     "yetanothertestuser": {
