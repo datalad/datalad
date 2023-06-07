@@ -115,9 +115,11 @@ class CreateSiblingGitlab(Interface):
     "datalad.gitlab-SITENAME-access"
         Access method used for the GitLab instance SITENAME (see --access)
     "datalad.gitlab-SITENAME-project"
-        Project location/path used for a datasets at GitLab instance
+        Project "location/path" used for a datasets at GitLab instance
         SITENAME (see --project). Configuring this is useful for deriving
         project paths for subdatasets, relative to superdataset.
+        The root-level group ("location") needs to be created beforehand via
+        GitLab's web interface.
     "datalad.gitlab-default-projectname"
         The collection layout publishes (sub)datasets as projects
         with a custom name. The default name "project" can be overridden with
@@ -172,7 +174,9 @@ class CreateSiblingGitlab(Interface):
             metavar='NAME/LOCATION',
             doc="""project name/location at the GitLab site. If a subdataset of the
             reference dataset is processed, its project path is automatically
-            determined by the `layout` configuration, by default.
+            determined by the `layout` configuration, by default. Users need to
+            create the root-level GitLab group (NAME) via the webinterface
+            before running the command.
             """,
             constraints=EnsureNone() | EnsureStr()),
         layout=Parameter(
