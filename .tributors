@@ -68,7 +68,9 @@
         "name": "Alejandro de la Vega",
         "blog": "https://github.com/adelavega",
         "email": "delavega@utexas.edu",
-        "bio": "Research Scientist @ UT Austin. "
+        "bio": "Research Scientist @ UT Austin. ",
+        "orcid": "0000-0001-9062-3778",
+        "affiliation": "The University of Texas at Austin"
     },
     "kskyten": {
         "name": "kskyten",
@@ -147,7 +149,9 @@
     "christian-monch": {
         "name": "Christian Mönch",
         "email": "christian.moench@web.de",
-        "blog": "https://github.com/christian-monch"
+        "blog": "https://github.com/christian-monch",
+        "orcid": "0000-0002-3092-0612",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany"
     },
     "mikapfl": {
         "name": "Mika Pflüger",
@@ -171,7 +175,8 @@
     "kimsin98": {
         "name": "Sin Kim",
         "blog": "https://orcid.org/0000-0003-4652-3758",
-        "bio": "I like coding, data, and open science. Current interests are adolescent development and psychiatry."
+        "bio": "I like coding, data, and open science. Current interests are adolescent development and psychiatry.",
+        "orcid": "0000-0003-4652-3758"
     },
     "DisasterMo": {
         "name": "Michael Burgardt",
@@ -189,7 +194,9 @@
     "mslw": {
         "name": "Michał Szczepanik",
         "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich",
-        "blog": "https://github.com/mslw"
+        "blog": "https://github.com/mslw",
+        "orcid": "0000-0002-4028-2087",
+        "affiliation": "Forschungszentrum Jülich"
     },
     "bpinsard": {
         "name": "Basile",
@@ -210,7 +217,8 @@
         "name": "Stephan Heunis",
         "bio": "DataLad, decentralised (research) data management, real-time fMRI analysis, data quality control, Matlab and Python bits and pieces",
         "blog": "https://jsheunis.github.io/",
-        "orcid": "0000-0003-3503-9872"
+        "orcid": "0000-0003-3503-9872",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behavior (INM-7), Research Center Juelich, Germany"
     },
     "lamby": {
         "name": "Chris Lamb",
@@ -220,7 +228,9 @@
     },
     "thewtex": {
         "name": "Matt McCormick",
-        "blog": "https://www.mmmccormick.com"
+        "blog": "https://www.mmmccormick.com",
+        "orcid": "0000-0001-9475-3756",
+        "affiliation": "Kitware Inc"
     },
     "tstoeter": {
         "name": "tstoeter",
@@ -229,7 +239,8 @@
     "vickychenglau": {
         "name": "Vicky C Lau",
         "email": "vickychenglau@gmail.com",
-        "blog": "https://github.com/vickychenglau"
+        "blog": "https://github.com/vickychenglau",
+        "orcid": "0000-0002-1197-1887"
     },
     "xgui3783": {
         "name": "xgui3783",
@@ -237,7 +248,9 @@
     },
     "asmacdo": {
         "name": "Austin Macdonald",
-        "blog": "https://github.com/asmacdo"
+        "blog": "https://github.com/asmacdo",
+        "orcid": "0000-0002-8124-807X",
+        "affiliation": "Dartmouth College"
     },
     "nobodyinperson": {
         "name": "Yann Büchau",
@@ -249,6 +262,8 @@
     },
     "matrss": {
         "name": "Matthias Riße",
-        "blog": "https://github.com/matrss"
+        "blog": "https://github.com/matrss",
+        "orcid": "0009-0006-6081-9327",
+        "affiliation": "Institute of Energy and Climate Research - Stratosphere (IEK-7), Research Centre Jülich, Jülich, Germany"
     }
 }
