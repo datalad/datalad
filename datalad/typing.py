@@ -8,12 +8,32 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import sys
+import typing
 from typing import TypeVar
 
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
-    from typing_extensions import Self
+    # needs typing_extensions >= 4
+    # from typing_extensions import Self
+
+    # to make packagers life easier - just duplicating verbatim
+    @typing._SpecialForm
+    def Self(self, params):
+        """Used to spell the type of "self" in classes.
+
+        Example::
+
+          from typing import Self
+
+          class ReturnsSelf:
+              def parse(self, data: bytes) -> Self:
+                  ...
+                  return self
+
+        """
+
+        raise TypeError(f"{self} is not subscriptable")
 
 if sys.version_info >= (3, 10):
     from typing import (
