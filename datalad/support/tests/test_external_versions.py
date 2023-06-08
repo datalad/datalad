@@ -11,6 +11,7 @@ import logging
 from os import linesep
 
 from datalad import __version__
+from datalad.cmd import StdOutErrCapture, WitlessRunner
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CommandError,
@@ -231,9 +232,15 @@ def test_list_tuple():
 
 
 def test_system_ssh_version():
+    try:
+        WitlessRunner().run(['ssh', '-V'], protocol=StdOutErrCapture)
+    except FileNotFoundError as exc:
+        raise SkipTest(f"no ssh binary available: {exc}")
     ev = ExternalVersions()
     assert ev['cmd:system-ssh']  # usually we have some available at boxes we test
 
+
+def test_ssh_versions():
     for s, v in [
         ('OpenSSH_7.4p1 Debian-6, OpenSSL 1.0.2k  26 Jan 2017', '7.4p1'),
         ('OpenSSH_8.1p1, LibreSSL 2.7.3', '8.1p1'),
