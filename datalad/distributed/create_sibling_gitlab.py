@@ -79,19 +79,22 @@ class CreateSiblingGitlab(Interface):
 
     "hierarchy"
       Each dataset is placed into its own group, and the actual GitLab
-      project for a dataset is put in a project named "_repo_" inside
-      this group. Using this layout, arbitrarily deep hierarchies of
+      project for a dataset is put in a project named "project" inside
+      this group. This project name is configurable (see Configuration).
+      Using this layout, arbitrarily deep hierarchies of
       nested datasets can be represented, while the hierarchical structure
       is reflected in the project path. This is the default layout, if
       no project path is specified.
     "flat"
       All datasets are placed in the same group. The name of a project
       is its relative path within the root dataset, with all path separator
-      characters replaced by '--'.
+      characters replaced by '-'. This path separator is configurable
+      (see Configuration).
     "collection"
-      This is a hybrid layout, where the root dataset is placed in a "_repo_"
+      This is a hybrid layout, where the root dataset is placed in a "project"
       project inside a group, and all nested subdatasets are represented
-      inside the group using a "flat" layout.
+      inside the group using a "flat" layout. The project name is configurable
+      (see Configuration).
 
     GitLab cannot host dataset content. However, in combination with
     other data sources (and siblings), publishing a dataset to GitLab can
@@ -100,8 +103,8 @@ class CreateSiblingGitlab(Interface):
 
     *Configuration*
 
-    All configuration switches and options for GitLab sibling creation can
-    be provided arguments to the command. However, it is also possible to
+    Many configuration switches and options for GitLab sibling creation can
+    be provided as arguments to the command. However, it is also possible to
     specify a particular setup in a dataset's configuration. This is
     particularly important when managing large collections of datasets.
     Configuration options are:
@@ -116,9 +119,18 @@ class CreateSiblingGitlab(Interface):
     "datalad.gitlab-SITENAME-access"
         Access method used for the GitLab instance SITENAME (see --access)
     "datalad.gitlab-SITENAME-project"
-        Project location/path used for a datasets at GitLab instance
+        Project location/path used for datasets at GitLab instance
         SITENAME (see --project). Configuring this is useful for deriving
-        project paths for subdatasets, relative to superdataset.
+        project paths for subdatasets, relative to a superdataset.
+    "datalad.gitlab-default-projectname"
+        The hierarchy and collection layouts publish (super)datasets as projects
+        with a custom name. The default name "project" can be overridden with
+        this configuration.
+    "datalad.gitlab-default-pathseparator"
+        The flat and collection layout represent subdatasets with project names
+        that correspond to their path within the superdataset, with the regular path separator replaced
+        with a "-": superdataset-subdataset. This configuration can be used to override
+        this default separator.
 
     This command can be configured with
     "datalad.create-sibling-ghlike.extra-remote-settings.NETLOC.KEY=VALUE" in
@@ -395,6 +407,9 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             "Unknown site access '{}' given or configured, "
             "known ones are: {}".format(access, known_access_labels))
 
+    pathsep = ds.config.get("datalad.gitlab-default-pathseparator", "-")
+    project_stub = \
+        ds.config.get("datalad.gitlab-default-projectname", "project")
     project_var = 'datalad.gitlab-{}-project'.format(site)
     process_root = refds == ds
     if project is None:
@@ -403,7 +418,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     if project and process_root and layout == 'collection':
         # the root of a collection
-        project = '{}/_repo_'.format(project)
+        project = f'{project}/{project_stub}'
     elif project is None and not process_root:
         # check if we can build one from the refds config
         ref_project = refds.config.get(project_var, None)
@@ -412,15 +427,16 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # the reference dataset configuration
             rproject = ds.pathobj.relative_to(refds.pathobj).as_posix()
             if layout == 'hierarchy':
-                project = '{}/{}/_repo_'.format(ref_project, rproject)
+                project = f'{ref_project}/{rproject}/{project_stub}'
             elif layout == 'collection':
                 project = '{}/{}'.format(
                     ref_project,
-                    rproject.replace('/', '--'))
+                    rproject.replace('/', pathsep))
             else:
-                project = '{}--{}'.format(
+                project = '{}{}{}'.format(
                     ref_project,
-                    rproject.replace('/', '--'))
+                    pathsep,
+                    rproject.replace('/', pathsep))
 
     if project is None:
         yield dict(

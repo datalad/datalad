@@ -40,7 +40,7 @@ def _get_nested_collections(path):
     return dict(
         root=ds,
         c1=c1,
-        c1s1=c1s2,
+        c1s1=c1s1,
         c1s2=c1s2,
         c2=c2,
         c2s1=c2s1,
@@ -160,10 +160,10 @@ def test_dryrun(path=None):
         site='theone', sibling='dieter',
         # hierarchical setup: directories becomes groups
         # which implies each dataset is in its own group
-        # project itself is placed at '_repo'_ to give URLs like
-        # http://site/dir/dir/dir/_repo_.git
+        # project itself is placed at 'project' to give URLs like
+        # http://site/dir/dir/dir/project.git
         # as a balance between readability and name conflict minimization
-        project='secret/{}/_repo_'.format(
+        project='secret/{}/project'.format(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj).as_posix()),
     )
     # we get the same result with an explicit layout request
@@ -176,27 +176,27 @@ def test_dryrun(path=None):
         path='subdir', dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
-        # http://site/group/dir--dir--dir--name.git
+        # http://site/group/dir-dir-dir-name.git
         project='secret/{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
-                os.sep, '--')),
+                os.sep, '-')),
     )
     # make sure the reference dataset does not conflict with its group in this
     # case
     res = ctlg['root'].create_sibling_gitlab(dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        project='secret/_repo_')
+        project='secret/project')
     # "flat" does GitHub-style
     ctlg['root'].config.set('datalad.gitlab-theone-layout', 'flat')
     res = ctlg['root'].create_sibling_gitlab(
         path='subdir', dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
-        # http://site/base--dir--dir--dir--name.git
-        project='secret--{}'.format(str(
+        # http://site/base-dir-dir-dir-name.git
+        project='secret-{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
-                os.sep, '--')),
+                os.sep, '-')),
     )
 
     # the results do not depend on explicitly given datasets, if we just enter
@@ -227,12 +227,12 @@ def test_dryrun(path=None):
         sorted(r['project'] for r in res),
         [
             'secret',
-            'secret/collection2/_repo_',
-            'secret/collection2/sub1/_repo_',
-            'secret/collection2/sub1/deepsub1/_repo_',
-            'secret/subdir/collection1/_repo_',
-            'secret/subdir/collection1/sub1/_repo_',
-            'secret/subdir/collection1/sub2/_repo_',
+            'secret/collection2/project',
+            'secret/collection2/sub1/deepsub1/project',
+            'secret/collection2/sub1/project',
+            'secret/subdir/collection1/project',
+            'secret/subdir/collection1/sub1/project',
+            'secret/subdir/collection1/sub2/project',
         ]
     )
     res = ctlg['root'].create_sibling_gitlab(
@@ -241,13 +241,13 @@ def test_dryrun(path=None):
     eq_(
         sorted(r['project'] for r in res),
         [
-            'secret/_repo_',
             'secret/collection2',
-            'secret/collection2--sub1',
-            'secret/collection2--sub1--deepsub1',
-            'secret/subdir--collection1',
-            'secret/subdir--collection1--sub1',
-            'secret/subdir--collection1--sub2',
+            'secret/collection2-sub1',
+            'secret/collection2-sub1-deepsub1',
+            'secret/project',
+            'secret/subdir-collection1',
+            'secret/subdir-collection1-sub1',
+            'secret/subdir-collection1-sub2',
         ],
     )
     res = ctlg['root'].create_sibling_gitlab(
@@ -257,13 +257,62 @@ def test_dryrun(path=None):
         sorted(r['project'] for r in res),
         [
             'secret',
-            'secret--collection2',
-            'secret--collection2--sub1',
-            'secret--collection2--sub1--deepsub1',
-            'secret--subdir--collection1',
-            'secret--subdir--collection1--sub1',
-            'secret--subdir--collection1--sub2',
+            'secret-collection2',
+            'secret-collection2-sub1',
+            'secret-collection2-sub1-deepsub1',
+            'secret-subdir-collection1',
+            'secret-subdir-collection1-sub1',
+            'secret-subdir-collection1-sub2',
         ],
+    )
+    # test that the configurations work
+    ctlg['root'].config.set("datalad.gitlab-default-projectname", 'myownname')
+    ctlg['c1s1'].config.set("datalad.gitlab-default-pathseparator", '+')
+    #import pdb; pdb.set_trace()
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='flat', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret',
+            'secret+subdir+collection1+sub1',
+            'secret-collection2',
+            'secret-collection2-sub1',
+            'secret-collection2-sub1-deepsub1',
+            'secret-subdir-collection1',
+            'secret-subdir-collection1-sub2',
+        ],
+    )
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='collection', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret/collection2',
+            'secret/collection2-sub1',
+            'secret/collection2-sub1-deepsub1',
+            'secret/myownname',
+            'secret/subdir+collection1+sub1',
+            'secret/subdir-collection1',
+            'secret/subdir-collection1-sub2',
+        ],
+    )
+    ctlg['c1s1'].config.set("datalad.gitlab-default-projectname", 'myownname')
+    res = ctlg['root'].create_sibling_gitlab(recursive=True, dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret',
+            'secret/collection2/project',
+            'secret/collection2/sub1/deepsub1/project',
+            'secret/collection2/sub1/project',
+            'secret/subdir/collection1/project',
+            'secret/subdir/collection1/sub1/myownname',
+            'secret/subdir/collection1/sub2/project',
+        ]
     )
 
 
