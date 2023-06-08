@@ -433,8 +433,9 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
                     ref_project,
                     rproject.replace('/', pathsep))
             else:
-                project = '{}-{}'.format(
+                project = '{}{}{}'.format(
                     ref_project,
+                    pathsep,
                     rproject.replace('/', pathsep))
 
     if project is None:
