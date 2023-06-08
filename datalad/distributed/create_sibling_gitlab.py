@@ -104,7 +104,7 @@ class CreateSiblingGitlab(Interface):
     *Configuration*
 
     Many configuration switches and options for GitLab sibling creation can
-    be provided arguments to the command. However, it is also possible to
+    be provided as arguments to the command. However, it is also possible to
     specify a particular setup in a dataset's configuration. This is
     particularly important when managing large collections of datasets.
     Configuration options are:
@@ -119,17 +119,17 @@ class CreateSiblingGitlab(Interface):
     "datalad.gitlab-SITENAME-access"
         Access method used for the GitLab instance SITENAME (see --access)
     "datalad.gitlab-SITENAME-project"
-        Project location/path used for a datasets at GitLab instance
+        Project location/path used for datasets at GitLab instance
         SITENAME (see --project). Configuring this is useful for deriving
-        project paths for subdatasets, relative to superdataset.
+        project paths for subdatasets, relative to a superdataset.
     "datalad.gitlab-default-projectname"
-        The hierarchy and collection layouts publish (sub)datasets as projects
+        The hierarchy and collection layouts publish (super)datasets as projects
         with a custom name. The default name "project" can be overridden with
         this configuration.
     "datalad.gitlab-default-pathseparator"
         The flat and collection layout represent subdatasets with project names
-        that correspond to the path, with the regular path separator replaced
-        with a "-": superdataset-subdataset. This configuration can override
+        that correspond to their path within the superdataset, with the regular path separator replaced
+        with a "-": superdataset-subdataset. This configuration can be used to override
         this default separator.
 
     This command can be configured with
