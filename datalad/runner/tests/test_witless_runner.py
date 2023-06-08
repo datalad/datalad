@@ -100,8 +100,7 @@ def test_runner_stdout_capture() -> None:
     ok_(not res['stderr'])
 
 
-@with_tempfile(mkdir=True)
-def test_runner_failure(dir_: str = "") -> None:
+def test_runner_failure() -> None:
     runner = Runner()
     with assert_raises(CommandError) as cme:
         runner.run(
