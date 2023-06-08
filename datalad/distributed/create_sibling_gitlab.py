@@ -407,9 +407,9 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             "Unknown site access '{}' given or configured, "
             "known ones are: {}".format(access, known_access_labels))
 
-    pathsep = ds.config.get("datalad.gitlab-default-pathseparator", None) or "-"
+    pathsep = ds.config.get("datalad.gitlab-default-pathseparator", "-")
     project_stub = \
-        ds.config.get("datalad.gitlab-default-projectname", None) or "project"
+        ds.config.get("datalad.gitlab-default-projectname", "project")
     project_var = 'datalad.gitlab-{}-project'.format(site)
     process_root = refds == ds
     if project is None:
