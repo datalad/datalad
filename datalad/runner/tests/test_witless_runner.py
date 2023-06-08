@@ -108,6 +108,10 @@ def test_runner_failure() -> None:
         )
     eq_(53, cme.value.code)
 
+    # but we bubble up FileNotFoundError if executable does not exist at all
+    with assert_raises(FileNotFoundError) as cme:
+        runner.run(['dne1l2k3j4'])  # be damned the one who makes such a command
+
 
 @with_tempfile(mkdir=True)
 def test_runner_fix_PWD(path: str = "") -> None:
