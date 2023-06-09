@@ -100,14 +100,17 @@ def test_runner_stdout_capture() -> None:
     ok_(not res['stderr'])
 
 
-@with_tempfile(mkdir=True)
-def test_runner_failure(dir_: str = "") -> None:
+def test_runner_failure() -> None:
     runner = Runner()
     with assert_raises(CommandError) as cme:
         runner.run(
             py2cmd('import sys; sys.exit(53)')
         )
     eq_(53, cme.value.code)
+
+    # but we bubble up FileNotFoundError if executable does not exist at all
+    with assert_raises(FileNotFoundError) as cme:
+        runner.run(['dne1l2k3j4'])  # be damned the one who makes such a command
 
 
 @with_tempfile(mkdir=True)
