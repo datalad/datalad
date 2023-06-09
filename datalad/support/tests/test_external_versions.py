@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
+import pytest
 from os import linesep
 
 from datalad import __version__
@@ -235,7 +236,7 @@ def test_system_ssh_version():
     try:
         WitlessRunner().run(['ssh', '-V'], protocol=StdOutErrCapture)
     except FileNotFoundError as exc:
-        raise SkipTest(f"no ssh binary available: {exc}")
+        pytest.skip(f"no ssh binary available: {exc}")
     ev = ExternalVersions()
     assert ev['cmd:system-ssh']  # usually we have some available at boxes we test
 
