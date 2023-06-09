@@ -78,7 +78,7 @@ class CreateSiblingGitlab(Interface):
     is supported with two different project layouts (see --layout):
 
     "flat"
-      All datasets are placed in the same group as projects. The project name
+      All datasets are placed as GitLab projects in the same group. The project name
       of the top-level dataset follows the configured
       datalad.gitlab-SITENAME-project configuration. The project names of
       contained subdatasets extend the configured name with the subdatasets'
