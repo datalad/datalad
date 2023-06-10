@@ -63,8 +63,8 @@ class CreateSiblingGitlab(Interface):
     access and authentication are implemented via python-gitlab, and all its
     features are supported. A particular GitLab site must be configured in a
     named section of a python-gitlab.cfg file (see
-    https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration for
-    details), such as::
+    https://python-gitlab.readthedocs.io/en/stable/cli-usage.html#configuration-file-format
+    for details), such as::
 
       [mygit]
       url = https://git.example.com
@@ -100,7 +100,7 @@ class CreateSiblingGitlab(Interface):
     *Configuration*
 
     Many configuration switches and options for GitLab sibling creation can
-    be provided arguments to the command. However, it is also possible to
+    be provided as arguments to the command. However, it is also possible to
     specify a particular setup in a dataset's configuration. This is
     particularly important when managing large collections of datasets.
     Configuration options are:
@@ -126,8 +126,8 @@ class CreateSiblingGitlab(Interface):
         this configuration.
     "datalad.gitlab-default-pathseparator"
         The flat and collection layout represent subdatasets with project names
-        that correspond to the path, with the regular path separator replaced
-        with a "-": superdataset-subdataset. This configuration can override
+        that correspond to their path within the superdataset, with the regular path separator replaced
+        with a "-": superdataset-subdataset. This configuration can be used to override
         this default separator.
 
     This command can be configured with
@@ -407,9 +407,9 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             "Unknown site access '{}' given or configured, "
             "known ones are: {}".format(access, known_access_labels))
 
-    pathsep = ds.config.get("datalad.gitlab-default-pathseparator", None) or "-"
+    pathsep = ds.config.get("datalad.gitlab-default-pathseparator", "-")
     project_stub = \
-        ds.config.get("datalad.gitlab-default-projectname", None) or "project"
+        ds.config.get("datalad.gitlab-default-projectname", "project")
     project_var = 'datalad.gitlab-{}-project'.format(site)
     process_root = refds == ds
     if project is None:
@@ -431,8 +431,9 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
                     ref_project,
                     rproject.replace('/', pathsep))
             else:
-                project = '{}-{}'.format(
+                project = '{}{}{}'.format(
                     ref_project,
+                    pathsep,
                     rproject.replace('/', pathsep))
 
     if project is None:

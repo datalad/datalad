@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Tributors Update
-        uses: con/tributors@0.0.21
+        uses: con/tributors@0.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

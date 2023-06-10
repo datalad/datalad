@@ -552,21 +552,35 @@ class ThreadedRunner:
         else:
             self._handle_file_timeout(source)
 
-    def _update_timeouts(self):
+    def _update_timeouts(self) -> bool:
         last_touched = list(self.last_touched.items())
         new_times = dict()
         current_time = time.time()
+        timeout_occurred = False
         for source, last_time in last_touched:
-            if current_time - last_time >= self.timeout:
+            if self.timeout is not None and current_time - last_time >= self.timeout:
                 new_times[source] = current_time
                 self._handle_source_timeout(source)
+                timeout_occurred = True
         self.last_touched = {
             **self.last_touched,
             **new_times}
+        return timeout_occurred
 
-    def process_timeouts(self):
+    def process_timeouts(self) -> bool:
+        """Check for timeouts
+
+        This method checks whether a timeout occurred since
+        it was called last. If a timeout occurred, the timeout
+        handler is called.
+
+        Returns: bool
+            Return `True` if at least one timeout occurred,
+            `False` if no timeout occurred.
+        """
         if self.timeout is not None:
-            self._update_timeouts()
+            return self._update_timeouts()
+        return False
 
     def should_continue(self) -> bool:
         # Continue with queue processing if there is still a process or
@@ -626,7 +640,8 @@ class ThreadedRunner:
             except Empty:
                 if self.check_for_stall() is True:
                     return
-                self.process_timeouts()
+                if self.process_timeouts():
+                    return
                 continue
 
         if state == IOState.process_exit:

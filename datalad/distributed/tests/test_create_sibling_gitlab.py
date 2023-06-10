@@ -268,10 +268,10 @@ def test_dryrun(path=None):
         sorted(r['project'] for r in res),
         [
             'secret',
+            'secret+subdir+collection1+sub1',
             'secret-collection2',
             'secret-collection2-sub1',
             'secret-collection2-sub1-deepsub1',
-            'secret-subdir+collection1+sub1',
             'secret-subdir-collection1',
             'secret-subdir-collection1-sub2',
         ],
