@@ -12,21 +12,22 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
-import os
 import datetime
-from os.path import join as opj, exists
-from os import pardir
+import os
+import sys
 from glob import glob
+from os import pardir
+from os.path import exists
+from os.path import join as opj
 
 
 def setup(sphinx):
     sys.path.insert(0, os.path.abspath('utils'))  # travis
     sys.path.insert(0, os.path.abspath(opj(pardir, 'utils')))  # RTD
-    from pygments_ansi_color import AnsiColorLexer
     # As of Sphinx v2.1, passing an instance is deprecated.
     # TODO: Remove when minimum sphinx version is at least 2.1.
     import sphinx as sphinx_mod
+    from pygments_ansi_color import AnsiColorLexer
     sphinx_ver = int(sphinx_mod.__version__.split('.')[0])
     if sphinx_ver < 3:  # Check against 3 rather than 2.1 for simplicity.
         AnsiColorLexer = AnsiColorLexer()
@@ -83,6 +84,7 @@ extensions = [
     'sphinx.ext.napoleon',
     # github.com/readthedocs/sphinx_rtd_theme/issues/1452 (rm next line when fixed)
     'sphinxcontrib.jquery',
+    'sphinx_autodoc_typehints',
 ]
 
 # for the module reference
@@ -354,16 +356,21 @@ intersphinx_mapping = {
         None),
 }
 
+# sphinx-autodoc-typehints config:
+always_document_param_types = True
+
 
 import sphinx
+
 if sphinx.__version__ == '5.1.0':
     # see https://github.com/sphinx-doc/sphinx/issues/10701
     # hope is it would get fixed for the next release
 
     # Although crash happens within NumpyDocstring, it is subclass of GoogleDocstring
     # so we need to overload method there
-    from sphinx.ext.napoleon.docstring import GoogleDocstring
     from functools import wraps
+
+    from sphinx.ext.napoleon.docstring import GoogleDocstring
 
 
     @wraps(GoogleDocstring._consume_inline_attribute)

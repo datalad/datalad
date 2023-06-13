@@ -1727,6 +1727,10 @@ def test_url_mapping_specs():
             ({},
              'https://github.com/datalad/testrepo_gh/sub _1',
              'https://github.com/datalad/testrepo_gh-sub__1'),
+            # trailing slash is not mapped
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1/',
+             'https://github.com/datalad/testrepo_gh-sub__1/'),
             # and on deep subdataset too
             ({},
              'https://github.com/datalad/testrepo_gh/sub _1/d/sub_-  1',

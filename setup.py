@@ -82,6 +82,7 @@ requires.update({
         'pypandoc',
         # Documentation
         'sphinx>=4.3.0',
+        'sphinx-autodoc-typehints',
         'sphinx-rtd-theme>=0.5.1',
     ],
     'devel-utils': [
