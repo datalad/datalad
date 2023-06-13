@@ -57,6 +57,8 @@ from typing import (
     overload,
 )
 
+from looseversion import LooseVersion
+
 import datalad.utils as ut
 from datalad import ssh_manager
 from datalad.cmd import (
@@ -835,7 +837,7 @@ class GitRepo(CoreGitRepo):
     _config_checked = False
 
     GIT_MIN_VERSION = "2.19.1"
-    git_version = None
+    git_version: Optional[LooseVersion] = None
 
     @classmethod
     def _check_git_version(cls) -> None:
