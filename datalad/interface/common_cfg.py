@@ -180,7 +180,7 @@ _definitions = {
             # take any github project URL apart into <org>###<identifier>
             r',https?://github.com/([^/]+)/(.*)$,\1###\2',
             # replace any (back)slashes with a single dash
-            r',[/\\]+,-',
+            r',[/\\]+(?!$),-',
             # replace any whitespace (include urlquoted variant)
             # with a single underscore
             r',\s+|(%2520)+|(%20)+,_',
