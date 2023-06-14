@@ -47,7 +47,7 @@ from ..utils import ensure_list
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gitlab')
 
-known_layout_labels = ('hierarchy', 'collection', 'flat')
+known_layout_labels = ('collection', 'flat')
 known_access_labels = ('http', 'ssh', 'ssh+http')
 
 
@@ -75,26 +75,22 @@ class CreateSiblingGitlab(Interface):
     above).
 
     (Recursive) sibling creation for all, or a selected subset of subdatasets
-    is supported with three different project layouts (see --layout):
+    is supported with two different project layouts (see --layout):
 
-    "hierarchy"
-      Each dataset is placed into its own group, and the actual GitLab
-      project for a dataset is put in a project named "project" inside
-      this group. This project name is configurable (see Configuration).
-      Using this layout, arbitrarily deep hierarchies of
-      nested datasets can be represented, while the hierarchical structure
-      is reflected in the project path. This is the default layout, if
-      no project path is specified.
     "flat"
-      All datasets are placed in the same group. The name of a project
-      is its relative path within the root dataset, with all path separator
+      All datasets are placed as GitLab projects in the same group. The project name
+      of the top-level dataset follows the configured
+      datalad.gitlab-SITENAME-project configuration. The project names of
+      contained subdatasets extend the configured name with the subdatasets'
+      s relative path within the root dataset, with all path separator
       characters replaced by '-'. This path separator is configurable
       (see Configuration).
     "collection"
-      This is a hybrid layout, where the root dataset is placed in a "project"
-      project inside a group, and all nested subdatasets are represented
-      inside the group using a "flat" layout. The project name is configurable
-      (see Configuration).
+      A new group is created for the dataset hierarchy, following the
+      datalad.gitlab-SITENAME-project configuration. The root dataset is placed
+      in a "project" project inside this group, and all nested subdatasets are
+      represented inside the group using a "flat" layout. The root datasets
+      project name is configurable (see Configuration).
 
     GitLab cannot host dataset content. However, in combination with
     other data sources (and siblings), publishing a dataset to GitLab can
@@ -119,11 +115,13 @@ class CreateSiblingGitlab(Interface):
     "datalad.gitlab-SITENAME-access"
         Access method used for the GitLab instance SITENAME (see --access)
     "datalad.gitlab-SITENAME-project"
-        Project location/path used for datasets at GitLab instance
+        Project "location/path" used for a datasets at GitLab instance
         SITENAME (see --project). Configuring this is useful for deriving
-        project paths for subdatasets, relative to a superdataset.
+        project paths for subdatasets, relative to superdataset.
+        The root-level group ("location") needs to be created beforehand via
+        GitLab's web interface.
     "datalad.gitlab-default-projectname"
-        The hierarchy and collection layouts publish (super)datasets as projects
+        The collection layout publishes (sub)datasets as projects
         with a custom name. The default name "project" can be overridden with
         this configuration.
     "datalad.gitlab-default-pathseparator"
@@ -176,7 +174,9 @@ class CreateSiblingGitlab(Interface):
             metavar='NAME/LOCATION',
             doc="""project name/location at the GitLab site. If a subdataset of the
             reference dataset is processed, its project path is automatically
-            determined by the `layout` configuration, by default.
+            determined by the `layout` configuration, by default. Users need to
+            create the root-level GitLab group (NAME) via the webinterface
+            before running the command.
             """,
             constraints=EnsureNone() | EnsureStr()),
         layout=Parameter(
@@ -386,12 +386,12 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
     if layout is None:
         # figure out the layout of projects on the site
         # use the reference dataset as default, and fall back
-        # on 'hierarchy' as the most generic method of representing
-        # the filesystem in a group/subgroup structure
+        # on 'collection' as the most generic method of representing
+        # the filesystem in a group/subproject structure
         layout_var = 'datalad.gitlab-{}-layout'.format(site)
         layout = ds.config.get(
             layout_var, refds.config.get(
-                layout_var, 'hierarchy'))
+                layout_var, 'collection'))
     if layout not in known_layout_labels:
         raise ValueError(
             "Unknown site layout '{}' given or configured, "
@@ -416,7 +416,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
         # look for a specific config in the dataset
         project = ds.config.get(project_var, None)
 
-    if project and process_root and layout == 'collection':
+    if project and process_root and layout != 'flat':
         # the root of a collection
         project = f'{project}/{project_stub}'
     elif project is None and not process_root:
@@ -426,9 +426,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             # layout-specific derivation of a path from
             # the reference dataset configuration
             rproject = ds.pathobj.relative_to(refds.pathobj).as_posix()
-            if layout == 'hierarchy':
-                project = f'{ref_project}/{rproject}/{project_stub}'
-            elif layout == 'collection':
+            if layout == 'collection':
                 project = '{}/{}'.format(
                     ref_project,
                     rproject.replace('/', pathsep))
