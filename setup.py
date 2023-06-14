@@ -34,7 +34,7 @@ requires = {
         'fasteners>=0.14',
         'packaging',
         'patool>=1.7',
-        'tqdm',
+        'tqdm>=4.32.0',
         'typing_extensions>=4.0.0; python_version < "3.11"',
         'annexremote',
         'looseversion',

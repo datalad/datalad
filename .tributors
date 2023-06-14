@@ -31,9 +31,11 @@
         "bio": "Postdoc 🧠👨🏻‍💻 in the Gallant Lab at UC Berkeley"
     },
     "mih": {
-        "name": "mih",
+        "name": "Michael Hanke",
         "blog": "https://github.com/mih",
-        "email": "michael.hanke@gmail.com"
+        "email": "michael.hanke@gmail.com",
+        "orcid": "0000-0001-6398-6370",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany"
     },
     "yarikoptic": {
         "name": "Yaroslav Halchenko",
@@ -44,12 +46,12 @@
         "affiliation": "Dartmouth College"
     },
     "loj": {
-        "name": "loj",
+        "name": "Laura Waite",
         "blog": "https://github.com/loj",
         "email": "laura@waite.eu"
     },
     "feilong": {
-        "name": "feilong",
+        "name": "Feilong Ma",
         "blog": "https://github.com/feilong"
     },
     "jhpoelen": {
@@ -57,74 +59,83 @@
         "blog": "https://github.com/jhpoelen"
     },
     "andycon": {
-        "name": "andycon",
+        "name": "Andrew Connolly",
         "blog": "https://github.com/andycon"
     },
     "nicholsn": {
-        "name": "nicholsn",
+        "name": "Nolan Nichols",
         "blog": "https://github.com/nicholsn"
     },
     "adelavega": {
         "name": "Alejandro de la Vega",
         "blog": "https://github.com/adelavega",
         "email": "delavega@utexas.edu",
-        "bio": "Research Scientist @ UT Austin. "
+        "bio": "Research Scientist @ UT Austin. ",
+        "orcid": "0000-0001-9062-3778",
+        "affiliation": "The University of Texas at Austin"
     },
     "kskyten": {
         "name": "kskyten",
         "blog": "https://github.com/kskyten"
     },
     "TheChymera": {
-        "name": "TheChymera",
+        "name": "Horea-Ioan Ioanas",
         "blog": "https://github.com/TheChymera",
         "email": "chr@chymera.eu",
-        "bio": "I bring Reproducibility, Freedom, and Open Source to Neuroscience, Academic Publishing, Software, and Life."
+        "bio": "I bring Reproducibility, Freedom, and Open Source to Neuroscience, Academic Publishing, Software, and Life.",
+        "orcid": "0000-0001-7037-2449",
+        "affiliation": "Dartmouth College"
     },
     "effigies": {
-        "name": "effigies",
+        "name": "Chris Markiewicz",
         "blog": "https://github.com/effigies",
         "email": "effigies@gmail.com"
     },
     "jgors": {
-        "name": "jgors",
+        "name": "Jasong Gors",
         "blog": "https://github.com/jgors"
     },
     "debanjum": {
-        "name": "debanjum",
-        "blog": "https://github.com/debanjum"
+        "name": "Debanjum Singh Solanky",
+        "blog": "https://github.com/debanjum",
+        "orcid": "0000-0002-0774-6564",
+        "affiliation": "Dartmouth College, Hanover, NH, United States"
     },
     "nellh": {
         "name": "nellh",
         "blog": "https://github.com/nellh"
     },
     "emdupre": {
-        "name": "emdupre",
+        "name": "Elizabeth DuPre",
         "blog": "https://github.com/emdupre",
         "bio": "Neuroscience graduate student at McGill University"
     },
     "aqw": {
-        "name": "aqw",
+        "name": "Alex Waite",
         "blog": "https://github.com/aqw",
         "email": "alex@waite.eu"
     },
     "vsoch": {
-        "name": "vsoch",
+        "name": "Vanessa Sochat",
         "blog": "https://github.com/vsoch",
-        "bio": "I'm the Vanessasaurus!"
+        "bio": "I'm the Vanessasaurus!",
+        "orcid": "0000-0002-4387-3819"
     },
     "kyleam": {
-        "name": "kyleam",
+        "name": "Kyle Meyer",
         "blog": "https://github.com/kyleam",
         "email": "kyle@kyleam.com"
     },
     "driusan": {
-        "name": "driusan",
+        "name": "Dave MacFarlane",
         "blog": "https://github.com/driusan",
         "email": "driusan@gmail.com",
-        "bio": "Professional Rubber Duck"
+        "bio": "Professional Rubber Duck",
+        "orcid": "0000-0001-9258-8099",
+        "affiliation": "McGill University"
     },
     "overlake333": {
-        "name": "overlake333",
+        "name": "Taylor M. Olson",
         "blog": "https://github.com/overlake333",
         "email": "taylor.m.olson.21@dartmouth.edu"
     },
@@ -133,12 +144,14 @@
         "blog": "https://github.com/akeshavan"
     },
     "jwodder": {
-        "name": "jwodder",
+        "name": "John T. Wodder II",
         "blog": "https://github.com/jwodder"
     },
     "bpoldrack": {
-        "name": "bpoldrack",
-        "blog": "https://github.com/bpoldrack"
+        "name": "Benjamin Poldrack",
+        "blog": "https://github.com/bpoldrack",
+        "orcid": "0000-0001-7628-0801",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany"
     },
     "yetanothertestuser": {
         "name": "yetanothertestuser",
@@ -147,7 +160,9 @@
     "christian-monch": {
         "name": "Christian Mönch",
         "email": "christian.moench@web.de",
-        "blog": "https://github.com/christian-monch"
+        "blog": "https://github.com/christian-monch",
+        "orcid": "0000-0002-3092-0612",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany"
     },
     "mikapfl": {
         "name": "Mika Pflüger",
@@ -171,7 +186,8 @@
     "kimsin98": {
         "name": "Sin Kim",
         "blog": "https://orcid.org/0000-0003-4652-3758",
-        "bio": "I like coding, data, and open science. Current interests are adolescent development and psychiatry."
+        "bio": "I like coding, data, and open science. Current interests are adolescent development and psychiatry.",
+        "orcid": "0000-0003-4652-3758"
     },
     "DisasterMo": {
         "name": "Michael Burgardt",
@@ -189,7 +205,9 @@
     "mslw": {
         "name": "Michał Szczepanik",
         "bio": "Neuroinformatician.\r\nPhD candidate at Laboratory of Brain Imaging, Nencki Institute; \r\nResearch Associate at Psychoinformatics Lab, INM-7, FZ Jülich",
-        "blog": "https://github.com/mslw"
+        "blog": "https://github.com/mslw",
+        "orcid": "0000-0002-4028-2087",
+        "affiliation": "Forschungszentrum Jülich"
     },
     "bpinsard": {
         "name": "Basile",
@@ -204,13 +222,15 @@
         "name": "James Kent",
         "email": "jamesdkent21@gmail.com",
         "bio": "Postdoc",
+        "orcid": "0000-0002-4892-2659",
         "blog": "https://jdkent.github.io/"
     },
     "jsheunis": {
         "name": "Stephan Heunis",
         "bio": "DataLad, decentralised (research) data management, real-time fMRI analysis, data quality control, Matlab and Python bits and pieces",
         "blog": "https://jsheunis.github.io/",
-        "orcid": "0000-0003-3503-9872"
+        "orcid": "0000-0003-3503-9872",
+        "affiliation": "Institute of Neuroscience and Medicine, Brain & Behavior (INM-7), Research Center Juelich, Germany"
     },
     "lamby": {
         "name": "Chris Lamb",
@@ -220,7 +240,9 @@
     },
     "thewtex": {
         "name": "Matt McCormick",
-        "blog": "https://www.mmmccormick.com"
+        "blog": "https://www.mmmccormick.com",
+        "orcid": "0000-0001-9475-3756",
+        "affiliation": "Kitware Inc"
     },
     "tstoeter": {
         "name": "tstoeter",
@@ -229,7 +251,8 @@
     "vickychenglau": {
         "name": "Vicky C Lau",
         "email": "vickychenglau@gmail.com",
-        "blog": "https://github.com/vickychenglau"
+        "blog": "https://github.com/vickychenglau",
+        "orcid": "0000-0002-1197-1887"
     },
     "xgui3783": {
         "name": "xgui3783",
@@ -237,6 +260,22 @@
     },
     "asmacdo": {
         "name": "Austin Macdonald",
-        "blog": "https://github.com/asmacdo"
+        "blog": "https://github.com/asmacdo",
+        "orcid": "0000-0002-8124-807X",
+        "affiliation": "Dartmouth College"
+    },
+    "nobodyinperson": {
+        "name": "Yann Büchau",
+        "email": "nobodyinperson@posteo.de",
+        "bio": "GitLab: https://gitlab.com/nobodyinperson\r\nPhD student at the University of Tübingen.\r\nHobbies: tinkering, coding, guitar\r\n/\r\ngpg key id: 1E1F9E",
+        "blog": "https://nobodyinperson.de",
+        "orcid": "0000-0003-2472-2051",
+        "affiliation": "Eberhard Karls Universität Tübingen"
+    },
+    "matrss": {
+        "name": "Matthias Riße",
+        "blog": "https://github.com/matrss",
+        "orcid": "0009-0006-6081-9327",
+        "affiliation": "Institute of Energy and Climate Research - Stratosphere (IEK-7), Research Centre Jülich, Jülich, Germany"
     }
 }
