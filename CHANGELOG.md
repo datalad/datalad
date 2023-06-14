@@ -1,4 +1,33 @@
 
+<a id='changelog-0.19.0'></a>
+# 0.19.0 (2023-06-14)
+
+## 🚀 Enhancements and New Features
+
+- Address gitlab API special character restrictions.  [PR #7407](https://github.com/datalad/datalad/pull/7407) (by [@jsheunis](https://github.com/jsheunis))
+
+- BF: The default layout of create-sibling-gitlab is now ``collection``. The previous default, ``hierarchy`` has been removed as it failed in --recursive mode in different edgecases. For single-level datasets, the outcome of ``collection`` and ``hierarchy`` is identical.  [PR #7410](https://github.com/datalad/datalad/pull/7410) (by [@jsheunis](https://github.com/jsheunis)  and [@adswa](https://github.com/adswa))
+
+## 🐛 Bug Fixes
+
+- WTF - bring back and extend information on metadata extractors etc, and allow for sections to have subsections and be selected at both levels  [PR #7309](https://github.com/datalad/datalad/pull/7309) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Run an actual git invocation with interactive commit config.  [PR #7398](https://github.com/datalad/datalad/pull/7398) (by [@adswa](https://github.com/adswa))
+
+## 🔩 Dependencies
+
+- Raise minimal version of tqdm (progress bars) to v.4.32.0
+  [PR #7330](https://github.com/datalad/datalad/pull/7330)
+  (by [@mslw](https://github.com/mslw))
+
+## 📝 Documentation
+
+- DOC: Add a "User messaging" design doc.  [PR #7310](https://github.com/datalad/datalad/pull/7310) (by [@jsheunis](https://github.com/jsheunis))
+
+## 🧪 Tests
+
+- Remove nose-based testing utils and possibility to test extensions using nose.  [PR #7261](https://github.com/datalad/datalad/pull/7261) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.18.5'></a>
 # 0.18.5 (2023-06-13)
 
