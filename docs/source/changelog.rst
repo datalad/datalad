@@ -2,8 +2,65 @@
 
 Change log
 **********
+0.19.0 (2023-06-14)
+===================
+
+Enhancements and New Features
+-----------------------------
+
+-  Address gitlab API special character restrictions. `PR
+   #7407 <https://github.com/datalad/datalad/pull/7407>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__)
+
+-  BF: The default layout of create-sibling-gitlab is now
+   ``collection``. The previous default, ``hierarchy`` has been removed
+   as it failed in –recursive mode in different edgecases. For
+   single-level datasets, the outcome of ``collection`` and
+   ``hierarchy`` is identical. `PR
+   #7410 <https://github.com/datalad/datalad/pull/7410>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__ and
+   `@adswa <https://github.com/adswa>`__)
+
+Bug Fixes
+---------
+
+-  WTF - bring back and extend information on metadata extractors etc,
+   and allow for sections to have subsections and be selected at both
+   levels `PR #7309 <https://github.com/datalad/datalad/pull/7309>`__
+   (by `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  BF: Run an actual git invocation with interactive commit config. `PR
+   #7398 <https://github.com/datalad/datalad/pull/7398>`__ (by
+   `@adswa <https://github.com/adswa>`__)
+
+Dependencies
+------------
+
+-  Raise minimal version of tqdm (progress bars) to v.4.32.0 `PR
+   #7330 <https://github.com/datalad/datalad/pull/7330>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+Documentation
+-------------
+
+-  DOC: Add a “User messaging” design doc. `PR
+   #7310 <https://github.com/datalad/datalad/pull/7310>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__)
+
+Tests
+-----
+
+-  Remove nose-based testing utils and possibility to test extensions
+   using nose. `PR
+   #7261 <https://github.com/datalad/datalad/pull/7261>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-1:
+
 0.18.5 (2023-06-13)
 ===================
+
+.. _bug-fixes-1:
 
 Bug Fixes
 ---------
@@ -26,6 +83,8 @@ Bug Fixes
    #7418 <https://github.com/datalad/datalad/pull/7418>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _documentation-1:
+
 Documentation
 -------------
 
@@ -43,6 +102,8 @@ Internal
    #7392 <https://github.com/datalad/datalad/pull/7392>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _tests-1:
+
 Tests
 -----
 
@@ -55,12 +116,12 @@ Tests
    #7422 <https://github.com/datalad/datalad/pull/7422>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-1:
+.. _section-2:
 
 0.18.4 (2023-05-16)
 ===================
 
-.. _bug-fixes-1:
+.. _bug-fixes-2:
 
 Bug Fixes
 ---------
@@ -71,7 +132,7 @@ Bug Fixes
    #7357 <https://github.com/datalad/datalad/pull/7357>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-1:
+.. _documentation-2:
 
 Documentation
 -------------
@@ -91,7 +152,7 @@ Internal
    #7341 <https://github.com/datalad/datalad/pull/7341>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-1:
+.. _tests-2:
 
 Tests
 -----
@@ -105,12 +166,12 @@ Tests
       snapshots.d.o
    -  use specific miniconda installer for py 3.7.
 
-.. _section-2:
+.. _section-3:
 
 0.18.3 (2023-03-25)
 ===================
 
-.. _bug-fixes-2:
+.. _bug-fixes-3:
 
 Bug Fixes
 ---------
@@ -154,7 +215,7 @@ Bug Fixes
    #7355 <https://github.com/datalad/datalad/pull/7355>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _documentation-2:
+.. _documentation-3:
 
 Documentation
 -------------
@@ -194,7 +255,7 @@ Internal
    #7339 <https://github.com/datalad/datalad/pull/7339>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-2:
+.. _tests-3:
 
 Tests
 -----
@@ -213,12 +274,12 @@ Tests
    #7353 <https://github.com/datalad/datalad/pull/7353>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-3:
+.. _section-4:
 
 0.18.2 (2023-02-27)
 ===================
 
-.. _bug-fixes-3:
+.. _bug-fixes-4:
 
 Bug Fixes
 ---------
@@ -241,6 +302,8 @@ Bug Fixes
    #7292 <https://github.com/datalad/datalad/pull/7292>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _dependencies-1:
+
 Dependencies
 ------------
 
@@ -257,7 +320,7 @@ Internal
    tox.ini. `PR #7271 <https://github.com/datalad/datalad/pull/7271>`__
    (by `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-3:
+.. _tests-4:
 
 Tests
 -----
@@ -268,12 +331,12 @@ Tests
    #7260 <https://github.com/datalad/datalad/pull/7260>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-4:
+.. _section-5:
 
 0.18.1 (2023-01-16)
 ===================
 
-.. _bug-fixes-4:
+.. _bug-fixes-5:
 
 Bug Fixes
 ---------
@@ -285,7 +348,7 @@ Bug Fixes
    #7249 <https://github.com/datalad/datalad/pull/7249>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-3:
+.. _documentation-4:
 
 Documentation
 -------------
@@ -303,7 +366,7 @@ Performance
    #7250 <https://github.com/datalad/datalad/pull/7250>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-5:
+.. _section-6:
 
 0.18.0 (2022-12-31)
 ===================
@@ -323,6 +386,8 @@ Breaking Changes
    RIA stores now only applies locally rather than being committed. `PR
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
+
+.. _enhancements-and-new-features-1:
 
 Enhancements and New Features
 -----------------------------
@@ -376,7 +441,7 @@ Enhancements and New Features
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-5:
+.. _bug-fixes-6:
 
 Bug Fixes
 ---------
@@ -388,7 +453,7 @@ Bug Fixes
    #6952 <https://github.com/datalad/datalad/pull/6952>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _documentation-4:
+.. _documentation-5:
 
 Documentation
 -------------
@@ -493,7 +558,7 @@ Performance
    #7230 <https://github.com/datalad/datalad/pull/7230>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-4:
+.. _tests-5:
 
 Tests
 -----
@@ -507,12 +572,12 @@ Tests
    `PR #7176 <https://github.com/datalad/datalad/pull/7176>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _section-6:
+.. _section-7:
 
 0.17.10 (2022-12-14)
 ====================
 
-.. _enhancements-and-new-features-1:
+.. _enhancements-and-new-features-2:
 
 Enhancements and New Features
 -----------------------------
@@ -531,7 +596,7 @@ Enhancements and New Features
    #7210 <https://github.com/datalad/datalad/pull/7210>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-6:
+.. _bug-fixes-7:
 
 Bug Fixes
 ---------
@@ -589,7 +654,7 @@ Bug Fixes
    #7226 <https://github.com/datalad/datalad/pull/7226>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-5:
+.. _documentation-6:
 
 Documentation
 -------------
@@ -616,7 +681,7 @@ Internal
    #7161 <https://github.com/datalad/datalad/pull/7161>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-5:
+.. _tests-6:
 
 Tests
 -----
@@ -638,12 +703,12 @@ Tests
    #7209 <https://github.com/datalad/datalad/pull/7209>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-7:
+.. _section-8:
 
 0.17.9 (2022-11-07)
 ===================
 
-.. _bug-fixes-7:
+.. _bug-fixes-8:
 
 Bug Fixes
 ---------
@@ -668,7 +733,7 @@ Bug Fixes
    #7129 <https://github.com/datalad/datalad/pull/7129>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _dependencies-1:
+.. _dependencies-2:
 
 Dependencies
 ------------
@@ -699,7 +764,7 @@ Internal
    #7118 <https://github.com/datalad/datalad/pull/7118>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-6:
+.. _tests-7:
 
 Tests
 -----
@@ -719,12 +784,12 @@ Tests
    #7130 <https://github.com/datalad/datalad/pull/7130>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-8:
+.. _section-9:
 
 0.17.8 (2022-10-24)
 ===================
 
-.. _bug-fixes-8:
+.. _bug-fixes-9:
 
 Bug Fixes
 ---------
@@ -766,12 +831,12 @@ Bug Fixes
    #7103 <https://github.com/datalad/datalad/pull/7103>`__ (by
    `@mslw <https://github.com/mslw>`__)
 
-.. _section-9:
+.. _section-10:
 
 0.17.7 (2022-10-14)
 ===================
 
-.. _bug-fixes-9:
+.. _bug-fixes-10:
 
 Bug Fixes
 ---------
@@ -818,7 +883,7 @@ Internal
    #7082 <https://github.com/datalad/datalad/pull/7082>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-7:
+.. _tests-8:
 
 Tests
 -----
@@ -827,12 +892,12 @@ Tests
    pass. `PR #7002 <https://github.com/datalad/datalad/pull/7002>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-10:
+.. _section-11:
 
 0.17.6 (2022-09-21)
 ===================
 
-.. _bug-fixes-10:
+.. _bug-fixes-11:
 
 Bug Fixes
 ---------
@@ -877,7 +942,7 @@ Internal
    #7024 <https://github.com/datalad/datalad/pull/7024>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-8:
+.. _tests-9:
 
 Tests
 -----
@@ -951,7 +1016,7 @@ Bug Fix
    `#6978 <https://github.com/datalad/datalad/pull/6978>`__
    (`@christian-monch <https://github.com/christian-monch>`__)
 
-.. _tests-9:
+.. _tests-10:
 
 Tests
 -----
@@ -1116,7 +1181,7 @@ Pushed to ``maint``
 -  DOC: fix capitalization of service names
    (`@aqw <https://github.com/aqw>`__)
 
-.. _tests-10:
+.. _tests-11:
 
 Tests
 -----
@@ -1228,7 +1293,7 @@ Authors: 3
 0.17.0 (Thu Jul 7 2022) – pytest migration
 ==========================================
 
-.. _enhancements-and-new-features-2:
+.. _enhancements-and-new-features-3:
 
 Enhancements and new features
 -----------------------------
@@ -1275,7 +1340,7 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
-.. _bug-fixes-11:
+.. _bug-fixes-12:
 
 Bug Fixes
 ---------
@@ -1295,7 +1360,7 @@ Bug Fixes
    prior recording a new dataset state. Fixes #4967
    `#6795 <https://github.com/datalad/datalad/pull/6795>`__ (by @mih)
 
-.. _documentation-6:
+.. _documentation-7:
 
 Documentation
 -------------
@@ -1632,7 +1697,7 @@ Authors: 5
 0.16.0 (Fr Apr 8 2022) – Spring cleaning!
 =========================================
 
-.. _enhancements-and-new-features-3:
+.. _enhancements-and-new-features-4:
 
 Enhancements and new features
 -----------------------------
@@ -1923,7 +1988,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-12:
+.. _bug-fixes-13:
 
 Bug Fixes
 ---------
@@ -2046,7 +2111,7 @@ Bug Fixes
    `#6603 <https://github.com/datalad/datalad/pull/6603>`__ (by
    @yarikoptic)
 
-.. _documentation-7:
+.. _documentation-8:
 
 Documentation
 -------------
@@ -2219,7 +2284,7 @@ Internal
    previous implementations.
    `#6591 <https://github.com/datalad/datalad/pull/6591>`__ (by @mih)
 
-.. _tests-11:
+.. _tests-12:
 
 Tests
 -----
@@ -2465,7 +2530,7 @@ Bug Fix
    `#6140 <https://github.com/datalad/datalad/pull/6140>`__
    (`@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-12:
+.. _tests-13:
 
 Tests
 -----
@@ -2553,7 +2618,7 @@ Internal
    `#6072 <https://github.com/datalad/datalad/pull/6072>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-8:
+.. _documentation-9:
 
 Documentation
 -------------
@@ -2562,7 +2627,7 @@ Documentation
    `#6065 <https://github.com/datalad/datalad/pull/6065>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-13:
+.. _tests-14:
 
 Tests
 -----
@@ -2631,7 +2696,7 @@ Bug Fix
    `#6007 <https://github.com/datalad/datalad/pull/6007>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-14:
+.. _tests-15:
 
 Tests
 -----
@@ -2702,7 +2767,7 @@ Internal
    `#5980 <https://github.com/datalad/datalad/pull/5980>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-9:
+.. _documentation-10:
 
 Documentation
 -------------
@@ -2711,7 +2776,7 @@ Documentation
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-15:
+.. _tests-16:
 
 Tests
 -----
@@ -2735,7 +2800,7 @@ Authors: 3
 0.15.0 (Tue Sep 14 2021) – We miss you Kyle!
 ============================================
 
-.. _enhancements-and-new-features-4:
+.. _enhancements-and-new-features-5:
 
 Enhancements and new features
 -----------------------------
@@ -3067,7 +3132,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-16:
+.. _tests-17:
 
 Tests
 -----
@@ -3159,7 +3224,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-17:
+.. _tests-18:
 
 Tests
 -----
@@ -3240,7 +3305,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-18:
+.. _tests-19:
 
 Tests
 -----
@@ -3392,7 +3457,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-19:
+.. _tests-20:
 
 Tests
 -----
@@ -3473,7 +3538,7 @@ Fixes
    (`#5603 <https://github.com/datalad/datalad/issues/5603>`__)
    (`#5609 <https://github.com/datalad/datalad/issues/5609>`__)
 
-.. _enhancements-and-new-features-5:
+.. _enhancements-and-new-features-6:
 
 Enhancements and new features
 -----------------------------
@@ -3569,7 +3634,7 @@ Fixes
    used in a positional argument.
    (`#5525 <https://github.com/datalad/datalad/issues/5525>`__)
 
-.. _enhancements-and-new-features-6:
+.. _enhancements-and-new-features-7:
 
 Enhancements and new features
 -----------------------------
@@ -3715,7 +3780,7 @@ Fixes
    asyncio. (`#5350 <https://github.com/datalad/datalad/issues/5350>`__)
    (`#5367 <https://github.com/datalad/datalad/issues/5367>`__)
 
-.. _enhancements-and-new-features-7:
+.. _enhancements-and-new-features-8:
 
 Enhancements and new features
 -----------------------------
@@ -3917,7 +3982,7 @@ Fixes
 -  Update tests for compatibility with latest git-annex.
    (`#5254 <https://github.com/datalad/datalad/issues/5254>`__)
 
-.. _enhancements-and-new-features-8:
+.. _enhancements-and-new-features-9:
 
 Enhancements and new features
 -----------------------------
@@ -3984,7 +4049,7 @@ Fixes
    8.20201127.)
    (`#5151 <https://github.com/datalad/datalad/issues/5151>`__)
 
-.. _enhancements-and-new-features-9:
+.. _enhancements-and-new-features-10:
 
 Enhancements and new features
 -----------------------------
@@ -4053,7 +4118,7 @@ Fixes
    anonymous access.
    (`#5045 <https://github.com/datalad/datalad/issues/5045>`__)
 
-.. _enhancements-and-new-features-10:
+.. _enhancements-and-new-features-11:
 
 Enhancements and new features
 -----------------------------
@@ -4117,7 +4182,7 @@ Fixes
    (`#4931 <https://github.com/datalad/datalad/issues/4931>`__)
    (`#4952 <https://github.com/datalad/datalad/issues/4952>`__)
 
-.. _enhancements-and-new-features-11:
+.. _enhancements-and-new-features-12:
 
 Enhancements and new features
 -----------------------------
@@ -4183,7 +4248,7 @@ Fixes
    particular case.
    (`#4817 <https://github.com/datalad/datalad/issues/4817>`__)
 
-.. _enhancements-and-new-features-12:
+.. _enhancements-and-new-features-13:
 
 Enhancements and new features
 -----------------------------
@@ -4318,7 +4383,7 @@ Fixes
    changes to the process environment that occurred after instantiation.
    (`#4703 <https://github.com/datalad/datalad/issues/4703>`__)
 
-.. _enhancements-and-new-features-13:
+.. _enhancements-and-new-features-14:
 
 Enhancements and new features
 -----------------------------
@@ -4460,7 +4525,7 @@ Fixes
    parameters such as ``result_renderer``.
    (`#4480 <https://github.com/datalad/datalad/issues/4480>`__)
 
-.. _enhancements-and-new-features-14:
+.. _enhancements-and-new-features-15:
 
 Enhancements and new features
 -----------------------------
@@ -4721,7 +4786,7 @@ Fixes
    call logged at the debug level.
    (`#4568 <https://github.com/datalad/datalad/issues/4568>`__)
 
-.. _enhancements-and-new-features-15:
+.. _enhancements-and-new-features-16:
 
 Enhancements and new features
 -----------------------------
@@ -4796,7 +4861,7 @@ Fixes
    permissions.
    (`#4400 <https://github.com/datalad/datalad/issues/4400>`__)
 
-.. _enhancements-and-new-features-16:
+.. _enhancements-and-new-features-17:
 
 Enhancements and new features
 -----------------------------
@@ -4918,7 +4983,7 @@ Fixes
    connections but failed to do so.
    (`#4262 <https://github.com/datalad/datalad/issues/4262>`__)
 
-.. _enhancements-and-new-features-17:
+.. _enhancements-and-new-features-18:
 
 Enhancements and new features
 -----------------------------
@@ -4984,7 +5049,7 @@ Fixes
    some scenarios.
    (`#4060 <https://github.com/datalad/datalad/issues/4060>`__)
 
-.. _enhancements-and-new-features-18:
+.. _enhancements-and-new-features-19:
 
 Enhancements and new features
 -----------------------------
@@ -5491,7 +5556,7 @@ Fixes
    different drive letters.
    (`#3728 <https://github.com/datalad/datalad/issues/3728>`__)
 
-.. _enhancements-and-new-features-19:
+.. _enhancements-and-new-features-20:
 
 Enhancements and new features
 -----------------------------
@@ -5659,7 +5724,7 @@ Fixes
    arguments to avoid exceeding the command-line character limit.
    (`#3587 <https://github.com/datalad/datalad/issues/3587>`__)
 
-.. _enhancements-and-new-features-20:
+.. _enhancements-and-new-features-21:
 
 Enhancements and new features
 -----------------------------
@@ -5751,7 +5816,7 @@ Fixes
    exists yet
    (`#3403 <https://github.com/datalad/datalad/issues/3403>`__)
 
-.. _enhancements-and-new-features-21:
+.. _enhancements-and-new-features-22:
 
 Enhancements and new features
 -----------------------------
@@ -5829,7 +5894,7 @@ Fixes
 -  The new pathlib-based code had various encoding issues on Python 2.
    (`#3332 <https://github.com/datalad/datalad/issues/3332>`__)
 
-.. _enhancements-and-new-features-22:
+.. _enhancements-and-new-features-23:
 
 Enhancements and new features
 -----------------------------
@@ -5918,7 +5983,7 @@ Fixes
 
 -  ``GitRepo.save()`` reports results on deleted files.
 
-.. _enhancements-and-new-features-23:
+.. _enhancements-and-new-features-24:
 
 Enhancements and new features
 -----------------------------
@@ -5944,7 +6009,7 @@ Major refactoring and deprecations
 -  Discontinued support for git-annex direct-mode (also no longer
    supported upstream).
 
-.. _enhancements-and-new-features-24:
+.. _enhancements-and-new-features-25:
 
 Enhancements and new features
 -----------------------------
@@ -5970,7 +6035,7 @@ Fixes
    (`#3769 <https://github.com/datalad/datalad/issues/3769>`__)
    (`#3770 <https://github.com/datalad/datalad/issues/3770>`__)
 
-.. _enhancements-and-new-features-25:
+.. _enhancements-and-new-features-26:
 
 Enhancements and new features
 -----------------------------
@@ -6041,7 +6106,7 @@ Fixes
    now will create leading directories of the output path if they do not
    exist (`#3646 <https://github.com/datalad/datalad/issues/3646>`__)
 
-.. _enhancements-and-new-features-26:
+.. _enhancements-and-new-features-27:
 
 Enhancements and new features
 -----------------------------
@@ -6110,7 +6175,7 @@ Fixes
    the remote not being enabled.
    (`#3547 <https://github.com/datalad/datalad/issues/3547>`__)
 
-.. _enhancements-and-new-features-27:
+.. _enhancements-and-new-features-28:
 
 Enhancements and new features
 -----------------------------
@@ -6179,7 +6244,7 @@ Fixes
 -  The detection of SSH RIs has been improved.
    (`#3425 <https://github.com/datalad/datalad/issues/3425>`__)
 
-.. _enhancements-and-new-features-28:
+.. _enhancements-and-new-features-29:
 
 Enhancements and new features
 -----------------------------
@@ -6292,7 +6357,7 @@ Fixes
    ``.isatty``.
    (`#3268 <https://github.com/datalad/datalad/issues/3268>`__)
 
-.. _enhancements-and-new-features-29:
+.. _enhancements-and-new-features-30:
 
 Enhancements and new features
 -----------------------------
@@ -6353,7 +6418,7 @@ Fixes
    to avoid these failures.
    (`#3164 <https://github.com/datalad/datalad/issues/3164>`__)
 
-.. _enhancements-and-new-features-30:
+.. _enhancements-and-new-features-31:
 
 Enhancements and new features
 -----------------------------
@@ -6448,7 +6513,7 @@ Fixes
 -  Pass ``GIT_SSH_VARIANT=ssh`` to git processes to be able to specify
    alternative ports in SSH urls
 
-.. _enhancements-and-new-features-31:
+.. _enhancements-and-new-features-32:
 
 Enhancements and new features
 -----------------------------
@@ -6560,7 +6625,7 @@ Fixes
    (`#2960 <https://github.com/datalad/datalad/issues/2960>`__)
    (`#2950 <https://github.com/datalad/datalad/issues/2950>`__)
 
-.. _enhancements-and-new-features-32:
+.. _enhancements-and-new-features-33:
 
 Enhancements and new features
 -----------------------------
@@ -6673,7 +6738,7 @@ Fixes
    paths when called more than once
    (`#2921 <https://github.com/datalad/datalad/issues/2921>`__)
 
-.. _enhancements-and-new-features-33:
+.. _enhancements-and-new-features-34:
 
 Enhancements and new features
 -----------------------------
@@ -6788,7 +6853,7 @@ Fixes
    error message now.
    (`#2815 <https://github.com/datalad/datalad/issues/2815>`__)
 
-.. _enhancements-and-new-features-34:
+.. _enhancements-and-new-features-35:
 
 Enhancements and new features
 -----------------------------
@@ -6866,7 +6931,7 @@ Fixes
    will now download to current directory instead of the top of the
    dataset
 
-.. _enhancements-and-new-features-35:
+.. _enhancements-and-new-features-36:
 
 Enhancements and new features
 -----------------------------
@@ -6958,7 +7023,7 @@ A number of fixes did not make it into the 0.9.x series:
 -  More robust URL handling in ``simple_with_archives`` crawler
    pipeline.
 
-.. _enhancements-and-new-features-36:
+.. _enhancements-and-new-features-37:
 
 Enhancements and new features
 -----------------------------
@@ -7056,7 +7121,7 @@ Fixes
    “git mv”ed, so you can now ``datalad run git mv old new`` and have
    changes recorded
 
-.. _enhancements-and-new-features-37:
+.. _enhancements-and-new-features-38:
 
 Enhancements and new features
 -----------------------------
@@ -7101,7 +7166,7 @@ Fixes
 -  Assure that extracted from tarballs directories have executable bit
    set
 
-.. _enhancements-and-new-features-38:
+.. _enhancements-and-new-features-39:
 
 Enhancements and new features
 -----------------------------
@@ -7204,7 +7269,7 @@ Fixes
 -  crawl templates should not now override settings for ``largefiles``
    if specified in ``.gitattributes``
 
-.. _enhancements-and-new-features-39:
+.. _enhancements-and-new-features-40:
 
 Enhancements and new features
 -----------------------------
@@ -7262,7 +7327,7 @@ Fixes
 -  More robust handling of unicode output in terminals which might not
    support it
 
-.. _enhancements-and-new-features-40:
+.. _enhancements-and-new-features-41:
 
 Enhancements and new features
 -----------------------------
@@ -7297,7 +7362,7 @@ Fixes
    should better tollerate publishing to pure git and ``git-annex``
    special remotes
 
-.. _enhancements-and-new-features-41:
+.. _enhancements-and-new-features-42:
 
 Enhancements and new features
 -----------------------------
@@ -7337,7 +7402,7 @@ Major refactoring and deprecations
    have been re-written to support the same common API as most other
    commands
 
-.. _enhancements-and-new-features-42:
+.. _enhancements-and-new-features-43:
 
 Enhancements and new features
 -----------------------------
@@ -7410,7 +7475,7 @@ Fixes
    closed <https://github.com/datalad/datalad/milestone/41?closed=1>`__
    for more information
 
-.. _enhancements-and-new-features-43:
+.. _enhancements-and-new-features-44:
 
 Enhancements and new features
 -----------------------------
@@ -7483,7 +7548,7 @@ Fixes
       speeds
    -  should provide progress reports while using Python 3.x
 
-.. _enhancements-and-new-features-44:
+.. _enhancements-and-new-features-45:
 
 Enhancements and new features
 -----------------------------
@@ -7565,7 +7630,7 @@ Fixes
    operation outside of the datasets
 -  A number of fixes for direct and v6 mode of annex
 
-.. _enhancements-and-new-features-45:
+.. _enhancements-and-new-features-46:
 
 Enhancements and new features
 -----------------------------
@@ -7615,7 +7680,7 @@ Fixes
 -  do not log calls to ``git config`` to avoid leakage of possibly
    sensitive settings to the logs
 
-.. _enhancements-and-new-features-46:
+.. _enhancements-and-new-features-47:
 
 Enhancements and new features
 -----------------------------
@@ -7665,7 +7730,7 @@ Fixes
 -  robust detection of outdated
    `git-annex <http://git-annex.branchable.com/>`__
 
-.. _enhancements-and-new-features-47:
+.. _enhancements-and-new-features-48:
 
 Enhancements and new features
 -----------------------------
@@ -7704,7 +7769,7 @@ Fixes
 -  `install <http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html>`__
    can be called on already installed dataset (with ``-r`` or ``-g``)
 
-.. _enhancements-and-new-features-48:
+.. _enhancements-and-new-features-49:
 
 Enhancements and new features
 -----------------------------
