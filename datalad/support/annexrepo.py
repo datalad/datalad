@@ -33,7 +33,11 @@ from os.path import (
     lexists,
     normpath,
 )
-from typing import Dict
+from typing import (
+    IO,
+    Any,
+    Optional,
+)
 from weakref import (
     WeakValueDictionary,
     finalize,
@@ -1325,7 +1329,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             files=files,
             protocol=StdOutErrCapture)['stdout']
 
-    def call_annex_success(self, args: list[str], files: Optiona[list[str]] = None) -> bool:
+    def call_annex_success(self, args: list[str], files: Optional[list[str]] = None) -> bool:
         """
         Call git-annex and return true if the call returned an exit code of 0.
 
@@ -1341,7 +1345,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return False
         return True
 
-    def call_annex_items_(self, args: list[str], files: Optiona[list[str]] = None, sep: Optional[str] = None) -> Iterator[str]:
+    def call_annex_items_(self, args: list[str], files: Optional[list[str]] = None, sep: Optional[str] = None) -> Iterator[str]:
         """Call git-annex, splitting output on `sep`.
 
         Parameters
@@ -2123,8 +2127,16 @@ class AnnexRepo(GitRepo, RepoInterface):
     def merge_annex(self, remote: Optional[str] = None) -> None:  # do not use anymore, use localsync()
         self.localsync(remote)
 
-    def sync(self, remotes=None, push=True, pull=True, commit=True,
-             content=False, all=False, fast=False):
+    def sync(
+        self,
+        remotes: str | list[str] | None = None,
+        push: bool = True,
+        pull: bool = True,
+        commit: bool = True,
+        content: bool = False,
+        all: bool = False,
+        fast: bool = False,
+    ) -> None:
         """This method is deprecated, use call_annex(['sync', ...]) instead.
 
         Synchronize local repository with remotes
@@ -2174,9 +2186,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.call_annex(['sync'] + args)
 
     @normalize_path
-    def add_url_to_file(self, file_, url, options=None, backend=None,
-                        batch=False, git_options=None, annex_options=None,
-                        unlink_existing=False):
+    def add_url_to_file(
+        self,
+        file_: str,
+        url: str,
+        options: Optional[list[str]] = None,
+        backend: Optional[str] = None,
+        batch: bool = False,
+        git_options: Any = None,
+        annex_options: Any = None,
+        unlink_existing: bool = False,
+    ) -> dict[str, Any]:
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -2277,9 +2297,16 @@ class AnnexRepo(GitRepo, RepoInterface):
                     % (url, str(out_json)))
         return out_json
 
-    def add_urls(self, urls, options=None, backend=None, cwd=None,
-                 jobs=None,
-                 git_options=None, annex_options=None):
+    def add_urls(
+        self,
+        urls: list[str],
+        options: Optional[list[str]] = None,
+        backend: Optional[str] = None,
+        cwd: Optional[str] = None,
+        jobs: Any = None,
+        git_options: Any = None,
+        annex_options: Any = None,
+    ) -> list[dict[str, Any]]:
         """Downloads each url to its own file, which is added to the annex.
 
         .. deprecated:: 0.17
@@ -2322,7 +2349,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             progress=True)
 
     @normalize_path
-    def rm_url(self, file_, url):
+    def rm_url(self, file_: str, url: str) -> None:
         """Record that the file is no longer available at the url.
 
         Parameters
@@ -2334,7 +2361,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.call_annex(['rmurl'], files=[file_, url])
 
     @normalize_path
-    def get_urls(self, file_, key=False, batch=False):
+    def get_urls(self, file_: str, key: bool = False, batch: bool = False) -> list[str]:
         """Get URLs for a file/key
 
         Parameters
@@ -2351,7 +2378,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return locations.get(WEB_SPECIAL_REMOTE_UUID, {}).get('urls', [])
 
     @normalize_paths
-    def drop(self, files, options=None, key=False, jobs=None):
+    def drop(self, files: list[str], options: Optional[list[str]] = None, key: bool = False, jobs: Optional[int] = None) -> list[dict[str, Any]]:
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -2408,7 +2435,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files=files,
                 jobs=jobs)
 
-    def drop_key(self, keys, options=None, batch=False):
+    def drop_key(self, keys: str | list[str], options: Optional[list[str]] = None, batch: bool = False) -> None:
         """Drops the content of annexed files from this repository referenced by keys
 
         Dangerous: it drops without checking for required minimal number of
@@ -2572,7 +2599,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # and globs.
     # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
     @normalize_paths(map_filenames_back=True)
-    def info(self, files, batch=False, fast=False):
+    def info(self, files: list[str], batch: bool = False, fast: bool = False) -> dict[str, Any]:
         """Provide annex info for file(s).
 
         Parameters
@@ -2626,7 +2653,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             out[f] = j
         return out
 
-    def repo_info(self, fast=False, merge_annex_branches=True):
+    def repo_info(self, fast: bool = False, merge_annex_branches: bool = True) -> dict[str, Any]:
         """Provide annex info for the entire repository.
 
         Parameters
@@ -2665,7 +2692,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
-    def get_annexed_files(self, with_content_only=False, patterns=None):
+    def get_annexed_files(self, with_content_only: bool = False, patterns: Optional[list[str]] = None) -> list[str]:
         """Get a list of files in annex
 
         Parameters
@@ -2699,7 +2726,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.call_annex_items_(
                 ['find', '-c', 'annex.merge-annex-branches=false'] + args))
 
-    def get_preferred_content(self, property, remote=None):
+    def get_preferred_content(self, property: str, remote: Optional[str] = None) -> Optional[str]:
         """Get preferred content configuration of a repository or remote
 
         Parameters
@@ -2728,7 +2755,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'unknown preferred content property: {}'.format(property))
         return self.call_annex_oneline([property, remote or '.']) or None
 
-    def set_preferred_content(self, property, expr, remote=None):
+    def set_preferred_content(self, property: str, expr: str, remote: Optional[str] = None) -> str:
         """Set preferred content configuration of a repository or remote
 
         Parameters
@@ -2760,7 +2787,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'unknown preferred content property: {}'.format(property))
         return self.call_annex_oneline([property, remote or '.', expr])
 
-    def get_groupwanted(self, name):
+    def get_groupwanted(self, name: str) -> str:
         """Get `groupwanted` expression for a group `name`
 
         Parameters
@@ -2770,11 +2797,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         return self.call_annex_oneline(['groupwanted', name])
 
-    def set_groupwanted(self, name, expr):
+    def set_groupwanted(self, name: str, expr: str) -> str:
         """Set `expr` for the `name` groupwanted"""
         return self.call_annex_oneline(['groupwanted', name, expr])
 
-    def precommit(self):
+    def precommit(self) -> None:
         """Perform pre-commit maintenance tasks, such as closing all batched annexes
         since they might still need to flush their changes into index
         """
@@ -2782,7 +2809,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def get_contentlocation(self, key, batch=False):
+    def get_contentlocation(self, key: str, batch: bool = False) -> str:
         """Get location of the key content
 
         Normally under .git/annex objects in indirect mode and within file
@@ -2816,7 +2843,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self._batched.get('contentlocation', path=self.path)(key)
 
     @normalize_paths(serialize=True)
-    def is_available(self, file_, remote=None, key=False, batch=False):
+    def is_available(self, file_: str, remote: Optional[str] = None, key: bool = False, batch: bool = False) -> bool:
         """Check if file or key is available (from a remote)
 
         In case if key or remote is misspecified, it wouldn't fail but just keep
@@ -2882,7 +2909,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
 
     @normalize_paths
-    def migrate_backend(self, files, backend=None):
+    def migrate_backend(self, files: list[str], backend: Optional[str] = None) -> None:
         """Changes the backend used for `file`.
 
         The backend used for the key-value of `files`. Only files currently
@@ -2909,12 +2936,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         )
 
     @classmethod
-    def get_key_backend(cls, key):
+    def get_key_backend(cls, key: str) -> str:
         """Get the backend from a given key"""
         return key.split('-', 1)[0]
 
     @normalize_paths
-    def get_file_backend(self, files):
+    def get_file_backend(self, files: list[str]) -> list[str]:
         """Get the backend currently used for file(s).
 
         Parameters
@@ -2934,7 +2961,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         ]
 
     @property
-    def default_backends(self):
+    def default_backends(self) -> Optional[list[str]]:
         self.config.reload()
         # TODO: Deprecate and remove this property? It's used in the tests and
         # datalad-crawler.
@@ -3124,7 +3151,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._uuid = self.config.get('annex.uuid', default=None)
         return self._uuid
 
-    def get_description(self, uuid=None):
+    def get_description(self, uuid: Optional[str] = None) -> Optional[str]:
         """Get annex repository description
 
         Parameters
