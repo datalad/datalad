@@ -2420,7 +2420,7 @@ def test_unannex_etc(path=None):
     files = list(_test_unannex_tree)
     # here it is through json so kinda guaranteed to work but let's check too
     assert files == [x['file'] for x in repo.add(files)]
-    assert files == repo.get_annexed_files()
+    assert sorted(files) == sorted(repo.get_annexed_files())
     assert files == repo.unannex(files)
 
 
