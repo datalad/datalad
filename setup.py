@@ -29,6 +29,7 @@ requires = {
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
+        'importlib-resources >= 3.0; python_version < "3.9"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
