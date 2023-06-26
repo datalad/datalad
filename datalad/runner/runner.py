@@ -74,7 +74,7 @@ class WitlessRunner(object):
 
         Parameters
         ----------
-        env: dict
+        env
           The environment that should be adjusted
 
         cwd: str | PathLike | None (default: None)
