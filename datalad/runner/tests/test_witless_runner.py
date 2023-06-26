@@ -358,9 +358,9 @@ def test_env_copying() -> None:
                     else:
                         assert adjusted_env is original_env
                     if cwd is None:
-                        assert 'PWD' not in adjusted_env
+                        assert 'PWD' not in (adjusted_env or {})
                     else:
-                        assert 'PWD' in adjusted_env
+                        assert 'PWD' in (adjusted_env or {})
 
 
 @with_tempfile(mkdir=True)
