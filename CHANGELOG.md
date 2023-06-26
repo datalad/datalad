@@ -1,4 +1,19 @@
 
+<a id='changelog-0.19.1'></a>
+# 0.19.1 (2023-06-26)
+
+## 🏠 Internal
+
+- Make compatible with upcoming release of git-annex (next after 10.20230407) and pass explicit core.quotepath=false to all git calls. Also added `tools/find-hanged-tests` helper.
+  [PR #7372](https://github.com/datalad/datalad/pull/7372)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Adjust tests for upcoming release of git-annex (next after 10.20230407) and ignore DeprecationWarning for pkg_resources for now.
+  [PR #7372](https://github.com/datalad/datalad/pull/7372)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.0'></a>
 # 0.19.0 (2023-06-14)
 
