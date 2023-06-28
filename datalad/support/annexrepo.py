@@ -579,14 +579,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         if respected == 'no':
             return s
         quoted = s.startswith('"') and s.endswith('"')
-        if respected == 'maybe':
+        if respected in ('maybe', 'yes'):
             # not necessarily correct if e.g. filename has "" around it originally
             # but this is a check only for a range of development versions, so mostly
             # for local/CI runs ATM
             if not quoted:
                 return s
-        elif respected == 'yes':
-            assert quoted
         else:
             raise RuntimeError(f"Got unknown {respected}")
         return s[1:-1].replace(r'\"', '"')
