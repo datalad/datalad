@@ -61,16 +61,27 @@ lgr = logging.getLogger('datalad.distribution.install')
 
 @build_doc
 class Install(Interface):
-    """Install a dataset from a (remote) source.
+    """Install one or many datasets from remote URL(s) or local PATH source(s).
 
-    This command creates a local :term:`sibling` of an existing dataset from a
-    (remote) location identified via a URL or path. Optional recursion into
+    This command creates local :term:`sibling`(s) of existing dataset(s) from
+    (remote) locations specified as URL(s) or path(s). Optional recursion into
     potential subdatasets, and download of all referenced data is supported.
-    The new dataset can be optionally registered in an existing
+    The new dataset(s) can be optionally registered in an existing
     :term:`superdataset` by identifying it via the `dataset` argument (the new
     dataset's path needs to be located within the superdataset for that).
 
-    It is recommended to provide a brief description to label the dataset's
+    || REFLOW >>
+    If no explicit [CMD: -s|--source CMD][PY: `source` PY] option is specified,
+    then all positional URL-OR-PATH
+    arguments are considered to be "sources" if they are URLs or target locations
+    if they are paths.
+    If a target location path corresponds to a submodule, the source location for it
+    is figured out from its record in the `.gitmodules`.
+    If [CMD: -s|--source CMD][PY: `source` PY] is specified, then a single optional
+    positional PATH would be taken as the destination path for that dataset.
+    << REFLOW ||
+
+    It is possible to provide a brief description to label the dataset's
     nature *and* location, e.g. "Michael's music on black laptop". This helps
     humans to identify data locations in distributed scenarios.  By default an
     identifier comprised of user and machine name, plus path will be generated.
@@ -113,13 +124,15 @@ class Install(Interface):
              code_cmd="""\
              datalad install -d . \\
              --source='https://github.com/datalad-datasets/longnow-podcasts.git'"""),
-        dict(text="Install a dataset, and get all content right away",
+        dict(text="Install a dataset into 'podcasts' (not 'longnow-podcasts') directory,"
+                  " and get all content right away",
              code_py="""\
-             install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
+             install(path='podcasts',
+                     source='https://github.com/datalad-datasets/longnow-podcasts.git',
                      get_data=True)""",
              code_cmd="""\
              datalad install --get-data \\
-             -s https://github.com/datalad-datasets/longnow-podcasts.git"""),
+             -s https://github.com/datalad-datasets/longnow-podcasts.git podcasts"""),
         dict(text="Install a dataset with all its subdatasets",
              code_py="""\
              install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
@@ -143,7 +156,7 @@ class Install(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            metavar='PATH',
+            metavar='URL-OR-PATH',
             nargs="*",
             # doc: TODO
             doc="""path/name of the installation target.  If no `path` is
@@ -151,7 +164,7 @@ class Install(Interface):
             similar to :command:`git clone`"""),
         source=Parameter(
             args=("-s", "--source"),
-            metavar='SOURCE',
+            metavar='URL-OR-PATH',
             doc="URL or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
         branch=Parameter(
