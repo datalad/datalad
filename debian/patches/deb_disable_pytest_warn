@@ -9,11 +9,14 @@ Last-Update: 2022-09-23
 
 --- a/tox.ini
 +++ b/tox.ini
-@@ -59,7 +59,6 @@ commands = {posargs}
+@@ -68,10 +68,6 @@ commands = sphinx-build -E -W -b html so
  [pytest]
  filterwarnings =
      error::DeprecationWarning:^datalad
+-    # TODO: https://github.com/datalad/datalad/issues/7435
+-    ignore:pkg_resources is deprecated:DeprecationWarning:
 -    error:.*yield tests:pytest.PytestCollectionWarning
-     ignore:distutils Version classes are deprecated:DeprecationWarning
+-    ignore:distutils Version classes are deprecated:DeprecationWarning
      # comes from boto
      ignore:the imp module is deprecated
+     # workaround for https://github.com/datalad/datalad/issues/6307

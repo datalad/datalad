@@ -247,8 +247,8 @@ waiting for an approved package of looseversions (e.g. as in Debian)
 --- a/setup.py
 +++ b/setup.py
 @@ -35,7 +35,6 @@ requires = {
-         'tqdm',
-         'typing_extensions; python_version < "3.10"',
+         'tqdm>=4.32.0',
+         'typing_extensions>=4.0.0; python_version < "3.11"',
          'annexremote',
 -        'looseversion',
      ],

@@ -101,19 +101,6 @@ Last-Update: 2018-06-05
          status="error", action="run")
  
  
---- a/datalad/tests/utils.py
-+++ b/datalad/tests/utils.py
-@@ -1707,7 +1707,9 @@ def with_parametric_batch(t):
- OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
- # Those will be tried to be added to the base name if filesystem allows
- OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
--UNICODE_FILENAME = u"ΔЙקم๗あ"
-+# Debian: unfortunately unicode without locales setup causes git-annex to puke
-+# https://git-annex.branchable.com/bugs/fails_to_init_under_a_directory_with_a___34__tricky__34___name/
-+UNICODE_FILENAME = u""
- 
- # OSX is exciting -- some I guess FS might be encoding differently from decoding
- # so Й might get recoded
 --- a/datalad/runner/tests/test_witless_runner.py
 +++ b/datalad/runner/tests/test_witless_runner.py
 @@ -65,7 +65,7 @@ result_counter = 0

@@ -1,3 +1,9 @@
+datalad (0.19.2-1) experimental; urgency=medium
+
+  * Fresh upstream release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 03 Jul 2023 13:40:41 -0400
+
 datalad (0.18.3-2) neurodebian; urgency=medium
 
   * debian/control
