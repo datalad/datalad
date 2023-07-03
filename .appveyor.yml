@@ -168,9 +168,9 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Test alternative Python versions
-    - ID: Ubu20P37a
+    - ID: Ubu20P38a
       # ~35min
-      PY: 3.7
+      PY: 3.8
       DTS: >
           datalad.cli
           datalad.core
@@ -183,9 +183,9 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
-    - ID: Ubu20P37b
+    - ID: Ubu20P38b
       # ~25min
-      PY: 3.7
+      PY: 3.8
       DTS: >
           datalad.downloaders
           datalad.interface
