@@ -1,4 +1,15 @@
 
+<a id='changelog-0.19.2'></a>
+# 0.19.2 (2023-07-03)
+
+## 🐛 Bug Fixes
+
+- Remove surrounding quotes in output filenames even for newer version of annex.  Fixes [#7440](https://github.com/datalad/datalad/issues/7440) via [PR #7443](https://github.com/datalad/datalad/pull/7443) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- DOC: clarify description of the "install" interface to reflect its convoluted behavior.  [PR #7445](https://github.com/datalad/datalad/pull/7445) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.1'></a>
 # 0.19.1 (2023-06-26)
 
