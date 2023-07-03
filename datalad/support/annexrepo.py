@@ -30,6 +30,7 @@ from os.path import (
     lexists,
     normpath,
 )
+from typing import Dict
 from weakref import (
     WeakValueDictionary,
     finalize,
@@ -554,8 +555,39 @@ class AnnexRepo(GitRepo, RepoInterface):
         # applies to find, findref to list all known.
         # was added in 10.20221212-17-g0b2dd374d on 20221220.
         kludges["find-supports-anything"] = ver >= "10.20221213"
+        # applies to log, unannex and may be other commands,
+        # was added 10.20230407 release, respecting core.quotepath
+        kludges["quotepath-respected"] = \
+            "yes" if ver >= '10.20230408' else \
+            "maybe" if ver > '10.20230407' else \
+            "no"
         cls._version_kludges = kludges
         return kludges[key]
+
+    @classmethod
+    def _unquote_annex_path(cls, s):
+        """Remove surrounding "" around the filename, and unquote \"
+
+        This is minimal necessary transformation of the quoted filename in care of
+        core.quotepath=false, i.e. whenever all unicode characters remain as is.
+
+        All interfaces should aim to operate on --json machine readable output,
+        so we are not striving to have it super efficient here since should not be used
+        often.
+        """
+        respected = cls._check_version_kludges('quotepath-respected')
+        if respected == 'no':
+            return s
+        quoted = s.startswith('"') and s.endswith('"')
+        if respected in ('maybe', 'yes'):
+            # not necessarily correct if e.g. filename has "" around it originally
+            # but this is a check only for a range of development versions, so mostly
+            # for local/CI runs ATM
+            if not quoted:
+                return s
+        else:
+            raise RuntimeError(f"Got unknown {respected}")
+        return s[1:-1].replace(r'\"', '"')
 
     @staticmethod
     def get_size_from_key(key):
@@ -748,12 +780,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return remotes
 
-    def get_special_remotes(self):
+    def get_special_remotes(self, include_dead:bool = False) -> Dict[str, dict]:
         """Get info about all known (not just enabled) special remotes.
 
         The present implementation is not able to report on special remotes
         that have only been configured in a private annex repo
         (annex.private=true).
+
+        Parameters
+        ----------
+        include_dead: bool, optional
+          Whether to include remotes announced dead.
 
         Returns
         -------
@@ -821,6 +858,21 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else:
                     sr_info["name"] = name
             srs[sr_id] = sr_info
+
+        # remove dead ones
+        if not include_dead:
+            # code largely copied from drop.py:_detect_nondead_annex_at_remotes
+            # but not using -p and rather blob as above
+            try:
+                for line in self.call_git_items_(
+                        ['cat-file', 'blob', 'git-annex:trust.log']):
+                    columns = line.split()
+                    if columns[1] == 'X':
+                        # .pop if present
+                        srs.pop(columns[0], None)
+            except CommandError as e:
+                # this is not a problem per-se, probably file is not there, just log
+                CapturedException(e)
         return srs
 
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,
@@ -1049,38 +1101,36 @@ class AnnexRepo(GitRepo, RepoInterface):
                 **kwargs,
             )
         except CommandError as e:
-            # Note: Workaround for not existing files as long as annex doesn't
-            # report it within JSON.
-            # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
-            not_existing = _get_non_existing_from_annex_output(e.stderr)
-            if not_existing:
-                if out is None:
-                    # we create the error reporting herein. If all files were
-                    # not found, there is nothing on stdout and we don't need
-                    # anything
-                    out = {'stdout_json': []}
-                out['stdout_json'].extend(
-                    _fake_json_for_non_existing(not_existing, args[0])
-                )
+            not_existing = None
+            if e.kwargs.get('stdout_json'):
+                # See if may be it was within stdout_json, as e.g. was added around
+                # 10.20230407-99-gbe36e208c2 to 'add' together with
+                # 'message-id': 'FileNotFound'
+                out = {'stdout_json': e.kwargs.get('stdout_json', [])}
+                not_existing = []
+                for j in out['stdout_json']:
+                    if j.get('message-id') == 'FileNotFound':
+                        not_existing.append(j['file'])
+                        # for consistency with our "_fake_json_for_non_existing" records
+                        # but not overloading one if there is one
+                        j.setdefault('note', 'not found')
+
+            if not not_existing:
+                # Workaround for not existing files as long as older annex doesn't
+                # report it within JSON.
+                # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+                not_existing = _get_non_existing_from_annex_output(e.stderr)
+                if not_existing:
+                    if not out:
+                        out = {'stdout_json': []}
+                    out['stdout_json'].extend(_fake_json_for_non_existing(not_existing, args[0]))
 
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
 
-            # if we didn't raise before, just depend on whether or not we seem
-            # to have some json to return. It should contain information on
-            # failure in keys 'success' and 'note'
-            # TODO: This is not entirely true. 'annex status' may return empty,
-            # while there was a 'fatal:...' in stderr, which should be a
-            # failure/exception
-            # Or if we had empty stdout but there was stderr
-            if out is None or (not out and e.stderr):
+            # If it was not about non-existing but running failed -- re-raise
+            if not not_existing:
                 raise e
-
-            records = e.kwargs.get('stdout_json', [])
-            if records:
-                have = out.get('stdout_json', [])
-                have.extend(records)
-                out['stdout_json'] = have
 
             #if e.stderr:
             #    # else just warn about present errors
@@ -1880,11 +1930,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-
+        prefix = 'unannex'
+        suffix = 'ok'
         return [
-            line.split()[1]
+            # we cannot .split here since filename could have spaces
+            self._unquote_annex_path(line[len(prefix) + 1 : -(len(suffix) + 1)])
             for line in self.call_annex_items_(['unannex'] + options, files=files)
-            if line.split()[0] == 'unannex' and line.split()[-1] == 'ok'
+            if line.split()[0] == prefix and line.split()[-1] == suffix
         ]
 
     @normalize_paths(map_filenames_back=True)

@@ -60,6 +60,7 @@ be downloaded), to ``path`` value should be determined with respect to the
 potential impact of the result on any local entity (e.g., a URL downloaded
 to a local file path, a local dataset modified based on remote information).
 
+.. _target-result-status:
 
 ``status``
 ----------

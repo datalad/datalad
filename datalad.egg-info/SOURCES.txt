@@ -373,13 +373,11 @@ datalad/tests/test_log.py
 datalad/tests/test_misc.py
 datalad/tests/test_s3.py
 datalad/tests/test_strings.py
-datalad/tests/test_tests_utils.py
 datalad/tests/test_tests_utils_pytest.py
 datalad/tests/test_utils.py
 datalad/tests/test_utils_cached_dataset.py
 datalad/tests/test_utils_testrepos.py
 datalad/tests/test_version.py
-datalad/tests/utils.py
 datalad/tests/utils_cached_dataset.py
 datalad/tests/utils_pytest.py
 datalad/tests/utils_testdatasets.py
@@ -455,6 +453,7 @@ docs/source/design/standard_parameters.rst
 docs/source/design/testing.rst
 docs/source/design/threaded_runner.rst
 docs/source/design/url_substitution.rst
+docs/source/design/user_messaging.rst
 docs/utils/pygments_ansi_color.py
 tools/Dockerfile.fullmaster
 tools/Singularity
@@ -470,6 +469,7 @@ tools/downgrade-annex
 tools/dtime
 tools/eval_under_nfs
 tools/eval_under_testloopfs
+tools/find-hanged-tests
 tools/git-web-submodules.sh
 tools/link_issues_CHANGELOG
 tools/mimic_merges

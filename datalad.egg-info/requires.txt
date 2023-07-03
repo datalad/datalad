@@ -5,7 +5,7 @@ humanize
 fasteners>=0.14
 packaging
 patool>=1.7
-tqdm
+tqdm>=4.32.0
 annexremote
 looseversion
 boto
@@ -20,7 +20,9 @@ colorama
 
 [:python_version < "3.10"]
 importlib-metadata>=3.6
-typing_extensions
+
+[:python_version < "3.11"]
+typing_extensions>=4.0.0
 
 [:python_version >= "3.8"]
 distro
@@ -33,7 +35,7 @@ humanize
 fasteners>=0.14
 packaging
 patool>=1.7
-tqdm
+tqdm>=4.32.0
 annexremote
 looseversion
 
@@ -42,7 +44,9 @@ colorama
 
 [core:python_version < "3.10"]
 importlib-metadata>=3.6
-typing_extensions
+
+[core:python_version < "3.11"]
+typing_extensions>=4.0.0
 
 [core:python_version >= "3.8"]
 distro
@@ -55,7 +59,7 @@ humanize
 fasteners>=0.14
 packaging
 patool>=1.7
-tqdm
+tqdm>=4.32.0
 annexremote
 looseversion
 boto
@@ -80,6 +84,7 @@ vcrpy
 duecredit
 pypandoc
 sphinx>=4.3.0
+sphinx-autodoc-typehints
 sphinx-rtd-theme>=0.5.1
 asv
 coverage
@@ -91,6 +96,7 @@ scriv
 [devel-docs]
 pypandoc
 sphinx>=4.3.0
+sphinx-autodoc-typehints
 sphinx-rtd-theme>=0.5.1
 
 [devel-utils]
@@ -106,7 +112,9 @@ colorama
 
 [devel:python_version < "3.10"]
 importlib-metadata>=3.6
-typing_extensions
+
+[devel:python_version < "3.11"]
+typing_extensions>=4.0.0
 
 [devel:python_version >= "3.8"]
 distro
@@ -132,7 +140,7 @@ humanize
 fasteners>=0.14
 packaging
 patool>=1.7
-tqdm
+tqdm>=4.32.0
 annexremote
 looseversion
 boto
@@ -161,7 +169,9 @@ colorama
 
 [full:python_version < "3.10"]
 importlib-metadata>=3.6
-typing_extensions
+
+[full:python_version < "3.11"]
+typing_extensions>=4.0.0
 
 [full:python_version >= "3.8"]
 distro

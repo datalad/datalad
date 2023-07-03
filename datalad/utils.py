@@ -2077,6 +2077,9 @@ def get_dataset_root(path: str | Path) -> Optional[str]:
     -------
     str or None
     """
+
+    # NOTE: path = "" is effectively "."
+
     path = str(path)
     suffix = '.git'
     altered = None
