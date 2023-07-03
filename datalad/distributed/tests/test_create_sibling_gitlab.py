@@ -40,7 +40,7 @@ def _get_nested_collections(path):
     return dict(
         root=ds,
         c1=c1,
-        c1s1=c1s2,
+        c1s1=c1s1,
         c1s2=c1s2,
         c2=c2,
         c2s1=c2s1,
@@ -92,7 +92,7 @@ def test_dryrun(path=None):
         assert_result_count(res, 1)
         assert_result_count(
             res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-            site='dummy', sibling='dummy', project='here',
+            site='dummy', sibling='dummy', project='here/project',
         )
 
     # now configure a default gitlab site
@@ -106,7 +106,7 @@ def test_dryrun(path=None):
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='theone', sibling='ursula', project='here',
+        site='theone', sibling='ursula', project='here/project',
     )
     # now configure a sibling name for this site
     ctlg['root'].config.set('datalad.gitlab-theone-siblingname', 'dieter')
@@ -119,7 +119,7 @@ def test_dryrun(path=None):
     )
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='theone', sibling='dieter', project='here',
+        site='theone', sibling='dieter', project='here/project',
     )
     # properly switches the name based on site
     res = ctlg['root'].create_sibling_gitlab(
@@ -128,7 +128,7 @@ def test_dryrun(path=None):
     )
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='otherone', sibling='ulf', project='here',
+        site='otherone', sibling='ulf', project='here/project',
     )
     # reports notneeded on existing='skip' with an existing remote
     ctlg['root'].repo.add_remote('dieter', 'http://example.com')
@@ -148,7 +148,7 @@ def test_dryrun(path=None):
     res = ctlg['root'].create_sibling_gitlab(dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='theone', sibling='dieter', project='secret',
+        site='theone', sibling='dieter', project='secret/project',
     )
     # we can make use of the config in the base dataset to drive
     # calls on subdatasets: use -d plus a path
@@ -158,17 +158,16 @@ def test_dryrun(path=None):
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
         site='theone', sibling='dieter',
-        # hierarchical setup: directories becomes groups
-        # which implies each dataset is in its own group
-        # project itself is placed at '_repo'_ to give URLs like
-        # http://site/dir/dir/dir/_repo_.git
-        # as a balance between readability and name conflict minimization
-        project='secret/{}/_repo_'.format(
-            ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj).as_posix()),
+        # collection setup: superdataset becomes group name and "project"
+        # project underneath, subdirectories and subdatasets are projects
+        # with path separators replaced underneath the group.
+        project='secret/{}'.format(str(
+            ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
+                os.sep, '-')),
     )
     # we get the same result with an explicit layout request
     expl_res = ctlg['root'].create_sibling_gitlab(
-        path='subdir', layout='hierarchy', dry_run=True)
+        path='subdir', layout='collection', dry_run=True)
     eq_(res, expl_res)
     # layout can be configured too, "collection" is "flat" in a group
     ctlg['root'].config.set('datalad.gitlab-theone-layout', 'collection')
@@ -176,27 +175,27 @@ def test_dryrun(path=None):
         path='subdir', dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
-        # http://site/group/dir--dir--dir--name.git
+        # http://site/group/dir-dir-dir-name.git
         project='secret/{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
-                os.sep, '--')),
+                os.sep, '-')),
     )
     # make sure the reference dataset does not conflict with its group in this
     # case
     res = ctlg['root'].create_sibling_gitlab(dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        project='secret/_repo_')
+        project='secret/project')
     # "flat" does GitHub-style
     ctlg['root'].config.set('datalad.gitlab-theone-layout', 'flat')
     res = ctlg['root'].create_sibling_gitlab(
         path='subdir', dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
-        # http://site/base--dir--dir--dir--name.git
-        project='secret--{}'.format(str(
+        # http://site/base-dir-dir-dir-name.git
+        project='secret-{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
-                os.sep, '--')),
+                os.sep, '-')),
     )
 
     # the results do not depend on explicitly given datasets, if we just enter
@@ -222,33 +221,27 @@ def test_dryrun(path=None):
     # one result per dataset
     assert_result_count(res, len(ctlg))
     # verbose check of target layout (easier to see target pattern for humans)
-    # default layout: hierarchy
+    # default layout: collection
+    expected_collection_res = [
+            'secret/collection2',
+            'secret/collection2-sub1',
+            'secret/collection2-sub1-deepsub1',
+            'secret/project',
+            'secret/subdir-collection1',
+            'secret/subdir-collection1-sub1',
+            'secret/subdir-collection1-sub2',
+        ]
     eq_(
         sorted(r['project'] for r in res),
-        [
-            'secret',
-            'secret/collection2/_repo_',
-            'secret/collection2/sub1/_repo_',
-            'secret/collection2/sub1/deepsub1/_repo_',
-            'secret/subdir/collection1/_repo_',
-            'secret/subdir/collection1/sub1/_repo_',
-            'secret/subdir/collection1/sub2/_repo_',
-        ]
+        expected_collection_res
     )
+    # should be the same when explicitly requested
     res = ctlg['root'].create_sibling_gitlab(
         recursive=True, layout='collection', dry_run=True)
     assert_result_count(res, len(ctlg))
     eq_(
         sorted(r['project'] for r in res),
-        [
-            'secret/_repo_',
-            'secret/collection2',
-            'secret/collection2--sub1',
-            'secret/collection2--sub1--deepsub1',
-            'secret/subdir--collection1',
-            'secret/subdir--collection1--sub1',
-            'secret/subdir--collection1--sub2',
-        ],
+        expected_collection_res
     )
     res = ctlg['root'].create_sibling_gitlab(
         recursive=True, layout='flat', dry_run=True)
@@ -257,12 +250,45 @@ def test_dryrun(path=None):
         sorted(r['project'] for r in res),
         [
             'secret',
-            'secret--collection2',
-            'secret--collection2--sub1',
-            'secret--collection2--sub1--deepsub1',
-            'secret--subdir--collection1',
-            'secret--subdir--collection1--sub1',
-            'secret--subdir--collection1--sub2',
+            'secret-collection2',
+            'secret-collection2-sub1',
+            'secret-collection2-sub1-deepsub1',
+            'secret-subdir-collection1',
+            'secret-subdir-collection1-sub1',
+            'secret-subdir-collection1-sub2',
+        ],
+    )
+    # test that the configurations work
+    ctlg['root'].config.set("datalad.gitlab-default-projectname", 'myownname')
+    ctlg['c1s1'].config.set("datalad.gitlab-default-pathseparator", '+')
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='flat', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret',
+            'secret+subdir+collection1+sub1',
+            'secret-collection2',
+            'secret-collection2-sub1',
+            'secret-collection2-sub1-deepsub1',
+            'secret-subdir-collection1',
+            'secret-subdir-collection1-sub2',
+        ],
+    )
+    res = ctlg['root'].create_sibling_gitlab(
+        recursive=True, layout='collection', dry_run=True)
+    assert_result_count(res, len(ctlg))
+    eq_(
+        sorted(r['project'] for r in res),
+        [
+            'secret/collection2',
+            'secret/collection2-sub1',
+            'secret/collection2-sub1-deepsub1',
+            'secret/myownname',
+            'secret/subdir+collection1+sub1',
+            'secret/subdir-collection1',
+            'secret/subdir-collection1-sub2',
         ],
     )
 
@@ -318,7 +344,7 @@ def test_fake_gitlab(path=None):
         # GitLab success
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path, type='dataset',
-            site='dummy', sibling='dummy', project='here', description='thisisit',
+            site='dummy', sibling='dummy', project='here/project', description='thisisit',
             project_attributes={
                 'http_url_to_repo': 'http://example.com',
                 'ssh_url_to_repo': 'example.com',
@@ -371,7 +397,7 @@ def test_fake_gitlab(path=None):
         assert_result_count(res, 1)
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path,
-            site='dummy', sibling='othername', project='here',
+            site='dummy', sibling='othername', project='here/project',
             project_attributes={
                 'http_url_to_repo': 'http://example.com',
                 'ssh_url_to_repo': 'example.com'
@@ -390,7 +416,7 @@ def test_fake_gitlab(path=None):
         assert_result_count(res, 2)
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path, type='dataset',
-            site='sshsite', sibling='sshsite', project='here',
+            site='sshsite', sibling='sshsite', project='here/project',
             project_attributes={
                 'http_url_to_repo': 'http://example.com',
                 'ssh_url_to_repo': 'example.com',
@@ -415,7 +441,7 @@ def test_fake_gitlab(path=None):
                      "sshsite2"],
             path=path,
             refds=path,
-            site='sshsite', sibling='sshsite2', project='here',
+            site='sshsite', sibling='sshsite2', project='here/project',
             project_attributes={
                 'http_url_to_repo': 'http://example2.com',
                 'ssh_url_to_repo': 'example2.com'

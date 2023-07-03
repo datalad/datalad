@@ -189,6 +189,8 @@ class ExportArchiveORA(Interface):
             find_filters.extend(expr_to_opts(annex_wanted))
         # git-annex find results need to be uniqued with set, as git-annex find
         # will return duplicates if multiple symlinks point to the same key.
+        #
+        # TODO: use --json which was already added, checked with 10.20230407+git131-gb90c2156a6
         if froms:
             keypaths = set([
                 annex_objs.joinpath(k) for treeish in froms for k in ds_repo.call_annex_items_([

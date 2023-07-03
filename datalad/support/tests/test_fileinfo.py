@@ -26,7 +26,10 @@ from datalad.tests.utils_pytest import (
     get_annexstatus,
     get_convoluted_situation,
     known_failure_githubci_win,
+    on_nfs,
+    on_travis,
     slow,
+    skip_if,
     with_tempfile,
     with_tree,
 )
@@ -190,6 +193,7 @@ def test_subds_path(path=None):
     assert_equal(stat[subds.repo.pathobj]['state'], 'clean')
 
 
+@skip_if(on_travis and on_nfs)  # TODO. stalls  https://github.com/datalad/datalad/pull/7372
 @with_tempfile
 def test_report_absent_keys(path=None):
     ds = Dataset(path).create()
