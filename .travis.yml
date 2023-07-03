@@ -14,7 +14,7 @@ services:
   - docker
 
 python:
-  - 3.7
+  - 3.8
 
 cache:
   - apt
@@ -35,13 +35,13 @@ env:
     - DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
-    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20201007 -m conda"
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py38_23.3.1-0 --python-match minor --batch git-annex=8.20201007 -m conda"
 
 matrix:
   include:
   # Additional custom ones
   - python: 3.8
-    # Single run for Python 3.7
+    # Single run for Python 3.8
     env:
     # Run all tests in a single whoop here
     # We cannot have empty -A selector, so the one which always will be fulfilled
@@ -50,7 +50,7 @@ matrix:
     # To test https://github.com/datalad/datalad/pull/4342 fix.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LC_ALL=ru_RU.UTF-8
-  - python: 3.9
+  - python: 3.10
     dist: bionic # Xenial doesn't have 3.8 pre-installed (only 3.8-dev).
     env:
     - PYTEST_SELECTION=
@@ -74,30 +74,30 @@ matrix:
       - _DL_ANNEX_INSTALL_SCENARIO="miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
       - DATALAD_TESTS_GITCONFIG="\n[annex]\n stalldetection = 1KB/120s\n"
   - if: type = cron
-    python: 3.7
-    # Single run for Python 3.7
+    python: 3.8
+    # Single run for Python 3.8
     env:
     # Run all tests in a single whoop here
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - PYTEST_SELECTION=
     - PYTEST_SELECTION_OP=not
-  - python: 3.7
+  - python: 3.8
     # Split runs for v6 since a single one is too long now
     env:
     - PYTEST_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
     - DATALAD_RUNTIME_PATHSPEC__FROM__FILE=always
-    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=10.20220525 -m conda"
-  - python: 3.7
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py38_23.3.1-0 --python-match minor --batch git-annex=10.20220525 -m conda"
+  - python: 3.8
     env:
     - PYTEST_SELECTION_OP=""
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
     - DATALAD_RUNTIME_PATHSPEC__FROM__FILE=always
-    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20210310 -m conda"
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py38_23.3.1-0 --python-match minor --batch git-annex=8.20210310 -m conda"
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for pytest.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
-  - python: 3.7
+  - python: 3.8
    # Run slow etc tests under a single tricky scenario
     env:
     - _DL_TMPDIR="/var/tmp/sym link"
@@ -105,7 +105,7 @@ matrix:
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
-  - python: 3.7
+  - python: 3.8
     # A run loaded with various customizations to smoke test those functionalities
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
@@ -120,7 +120,7 @@ matrix:
     - DATALAD_LOG_VMEM=1
     - DATALAD_RUNTIME_MAX__BATCHED=2
     - DATALAD_RUNTIME_MAX__INACTIVE__AGE=10
-  - python: 3.7
+  - python: 3.8
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
@@ -140,7 +140,7 @@ matrix:
     - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
-  - python: 3.7
+  - python: 3.8
     # Test some under NFS mount  (only selected sub-set)
     env:
     # do not run SSH-based tests due to stall(s)
@@ -156,24 +156,24 @@ matrix:
   # TODO: ATM we do not have that minimal version as a Debian package in
   # snapshots!
   - if: type = cron
-    python: 3.7
+    python: 3.8
     env:
-    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20200309 -m conda"
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda=py38_23.3.1-0 --python-match minor --batch git-annex=8.20200309 -m conda"
   # Run with git's master branch rather the default one on the system.
   - if: type = cron
-    python: 3.7
+    python: 3.8
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
   # Run with our reported minimum Git version.
   - if: type = cron
-    python: 3.7
+    python: 3.8
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_MIN_GIT=1
     - PATH="$PWD/git-src/bin-wrappers/:$PATH"
   - if: type = cron
-    python: 3.7
+    python: 3.8
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
@@ -181,14 +181,14 @@ matrix:
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
   - if: type = cron
-    python: 3.7
+    python: 3.8
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
   - if: type = cron
-    python: 3.7
+    python: 3.8
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
