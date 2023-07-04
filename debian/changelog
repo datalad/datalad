@@ -2,7 +2,7 @@ datalad (0.19.2-1) experimental; urgency=medium
 
   * Fresh upstream release
   * d/control
-    - needs typing-extensions > 4 if python < 3.11, and also tqdm >= 4.32 
+    - needs tqdm >= 4.32 
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 03 Jul 2023 13:40:41 -0400
 

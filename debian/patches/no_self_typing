@@ -1,0 +1,52 @@
+--- a/datalad/support/gitrepo.py
++++ b/datalad/support/gitrepo.py
+@@ -90,7 +90,7 @@ from datalad.typing import (
+     Literal,
+     P,
+     Protocol,
+-    Self,
++    # Self,
+     T,
+     TypedDict,
+ )
+@@ -978,7 +978,7 @@ class GitRepo(CoreGitRepo):
+         return self.pathobj == self.dot_git
+ 
+     @classmethod
+-    def clone(cls, url: str, path: str, *args: Any, clone_options: Optional[list[str] | dict[str, Option]] = None, **kwargs: Any) -> Self:
++    def clone(cls, url: str, path: str, *args: Any, clone_options: Optional[list[str] | dict[str, Option]] = None, **kwargs: Any) -> GitRepo: #  -> Self:
+         """Clone url into path
+ 
+         Provides workarounds for known issues (e.g.
+--- a/datalad/typing.py
++++ b/datalad/typing.py
+@@ -10,10 +10,12 @@
+ import sys
+ from typing import TypeVar
+ 
+-if sys.version_info >= (3, 11):
+-    from typing import Self
+-else:
+-    from typing_extensions import Self
++# Debian: Requires typing extensions >= 4.x and backporting was not streamlined,
++# so let's just not use it
++#if sys.version_info >= (3, 11):
++#    from typing import Self
++#else:
++#    from typing_extensions import Self
+ 
+ if sys.version_info >= (3, 10):
+     from typing import (
+--- a/setup.py
++++ b/setup.py
+@@ -35,7 +35,9 @@ requires = {
+         'packaging',
+         'patool>=1.7',
+         'tqdm>=4.32.0',
+-        'typing_extensions>=4.0.0; python_version < "3.11"',
++        # patched away in debian
++        # 'typing_extensions>=4.0.0; python_version < "3.11"',
++        'typing_extensions; python_version < "3.10"',
+         'annexremote',
+         'looseversion',
+     ],
