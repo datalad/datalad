@@ -1,3 +1,10 @@
+datalad (0.19.2-2) UNRELEASED; urgency=medium
+
+  * Declare minimal version for typing-extensions to be 3.10.0.2~.
+    Note: for the 0.18.4 it needs to be >= 4.0.0~
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 07 Jun 2023 13:04:43 -0400
+
 datalad (0.19.2-1) experimental; urgency=medium
 
   * Fresh upstream release

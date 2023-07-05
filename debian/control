@@ -41,7 +41,7 @@ Build-Depends: debhelper (>= 11),
                python3-setuptools,
                python3-six,
                python3-tqdm (>= 4.32.0),
-               python3-typing-extensions,
+               python3-typing-extensions (>= 3.10.0.2~),
                python3-vcr,
 Build-Conflicts: git-annex (= 8.20200226-1)
 Standards-Version: 4.4.1
@@ -99,7 +99,7 @@ Depends: git-annex (>= 8.20200309~) | git-annex-standalone (>= 8.20200309~),
          python3-requests (>=1.2),
          python3-secretstorage,
          python3-six,
-         python3-typing-extensions,
+         python3-typing-extensions (>= 3.10.0.2~),
          python3-tqdm (>= 4.32.0),
          ${misc:Depends},
          ${python3:Depends}
