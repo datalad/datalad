@@ -51,7 +51,7 @@ matrix:
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LC_ALL=ru_RU.UTF-8
   - python: 3.10
-    dist: bionic # Xenial doesn't have 3.8 pre-installed (only 3.8-dev).
+    dist: focal
     env:
     - PYTEST_SELECTION=
     - PYTEST_SELECTION_OP=not
