@@ -50,7 +50,7 @@ matrix:
     # To test https://github.com/datalad/datalad/pull/4342 fix.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LC_ALL=ru_RU.UTF-8
-  - python: 3.10
+  - python: 3.11
     dist: focal
     env:
     - PYTEST_SELECTION=
