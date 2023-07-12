@@ -8,7 +8,7 @@
 """Test create publication target on gitlab"""
 
 import os
-
+import pytest
 # this must import ok with and without gitlab
 from datalad.api import (
     Dataset,
@@ -291,6 +291,16 @@ def test_dryrun(path=None):
             'secret/subdir-collection1-sub2',
         ],
     )
+    # test for #7429: when a subdataset is uninstalled, recursion must
+    # not crash with KeyError
+    ctlg['root'].drop(['subdir/collection1', 'collection2'],
+                      what='datasets', recursive=True, reckless='kill')
+    try:
+        res = ctlg['root'].create_sibling_gitlab(
+            recursive=True, layout='collection', dry_run=True,
+            on_failure='ignore')
+    except TypeError:
+        pytest.fail("Crashed with TypeError on uninstalled datasets")
 
 
 class _FakeGitLab(object):
