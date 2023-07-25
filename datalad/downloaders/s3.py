@@ -29,6 +29,7 @@ from ..support.network import (
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
 from ..support.exceptions import (
+    AccessDeniedError,
     AccessPermissionExpiredError,
     TargetFileAbsent,
 )
@@ -155,12 +156,14 @@ class S3Authenticator(Authenticator):
             s3client.head_bucket(Bucket=bucket_name)
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
-            if error_code == "404":
+            if error_code == "403":
+                raise AccessDeniedError(e) from e
+            elif error_code == "404":
                 raise TargetFileAbsent(
                     "Bucket " + bucket_name + " does not exist"
                 ) from e
             else:
-                raise e
+                raise
 
         self.client = s3client
         return s3client
@@ -319,11 +322,21 @@ class S3Downloader(BaseDownloader):
         # this is where the *real* access check (for the object) will happen;
         # may raise botocore.exceptions.ClientError for 404 not found
         # or 403 forbidden
-        object_meta = self.client.head_object(
-            Bucket=bucket_name,
-            Key=url_filepath,
-            **extra_args,
-        )
+        try:
+            object_meta = self.client.head_object(
+                Bucket=bucket_name,
+                Key=url_filepath,
+                **extra_args,
+            )
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "403":
+                raise AccessDeniedError(e) from e
+            elif error_code == "404":
+                raise TargetFileAbsent(url + " does not exist") from e
+            else:
+                raise
+
 
         target_size = object_meta.get('ContentLength')  # S3 specific
         headers = self.get_obj_headers(
