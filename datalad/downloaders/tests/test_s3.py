@@ -123,9 +123,13 @@ def test_deny_access():
     def deny_access(*args, **kwargs):
         raise AccessDeniedError
 
+    def return_false(*args, **kwargs):
+        return False
+
     with assert_raises(DownloadError):
-        with patch.object(downloader, '_download', deny_access):
-            downloader.download("doesn't matter")
+        with patch.object(downloader, '_establish_session', return_false):
+            with patch.object(downloader, '_download', deny_access):
+                downloader.download("doesn't matter")
 
 
 @with_tempfile
