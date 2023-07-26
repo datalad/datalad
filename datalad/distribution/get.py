@@ -146,7 +146,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     under the shortened name `id`.
 
     Additionally, the URL of any configured remote that contains the respective
-    submodule commit is available as `remote-<name>` properties, where `name`
+    submodule commit is available as `remoteurl-<name>` property, where `name`
     is the configured remote name.
 
     Lastly, all candidates are sorted according to their cost (lower values
@@ -784,7 +784,7 @@ class Get(Interface):
     under the shortened name `id`.
 
     Additionally, the URL of any configured remote that contains the respective
-    submodule commit is available as `remote-<name>` properties, where `name`
+    submodule commit is available as `remoteurl-<name>` property, where `name`
     is the configured remote name.
 
     Hence, such a template could be `http://example.org/datasets/{id}` or
