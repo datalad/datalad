@@ -986,8 +986,9 @@ def test_relpath_semantics(path=None):
         eq_(sub.path, op.join(super.path, 'sub'))
 
 
-@with_tempfile
-def test_install_branch(path=None):
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_install_branch(path=None, url=None):
     path = Path(path)
     ds_a = create(path / "ds_a")
     ds_a.create("sub")
@@ -997,6 +998,16 @@ def test_install_branch(path=None):
     repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
     repo_a.commit(msg="c2", options=["--allow-empty"])
     repo_a.checkout(DEFAULT_BRANCH)
+
+    # Clone from URL with custom branch specified should work
+    assert ds_a.repo.call_git_success(['update-server-info'])
+    tmp_path = path / "tmp"
+    os.mkdir(tmp_path)
+    with chpwd(tmp_path):
+        ds_b = install(url + "ds_a/.git", branch=DEFAULT_BRANCH + "-other")
+    repo_b = ds_b.repo
+    eq_(repo_b.get_corresponding_branch() or repo_b.get_active_branch(),
+        DEFAULT_BRANCH + "-other")
 
     ds_b = install(source=ds_a.path, path=str(path / "ds_b"),
                    branch=DEFAULT_BRANCH + "-other", recursive=True)
