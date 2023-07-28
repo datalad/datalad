@@ -50,7 +50,7 @@ KNOWN_BACKENDS = {
 
 
 # TODO: singleton
-class _UI_Switcher(object):
+class _UI_Switcher:
     """
     Poor man helper to switch between different backends at run-time.
     """
@@ -97,12 +97,12 @@ class _UI_Switcher(object):
     # Delegate other methods to the actual UI
     def __getattribute__(self, key):
         if key.startswith('_') or key in {'set_backend', 'backend', 'ui'}:
-            return super(_UI_Switcher, self).__getattribute__(key)
+            return super().__getattribute__(key)
         return getattr(self._ui, key)
 
     def __setattr__(self, key, value):
         if key.startswith('_') or key in {'set_backend', 'backend', 'ui'}:
-            return super(_UI_Switcher, self).__setattr__(key, value)
+            return super().__setattr__(key, value)
         return setattr(self._ui, key, value)
 
 lgr.log(5, "Initiating UI switcher")

@@ -57,12 +57,12 @@ def mbasename(s):
     base = basename(s)
     if base.endswith('.py'):
         base = base[:-3]
-    if base in set(['base', '__init__', 'utils']):
+    if base in {'base', '__init__', 'utils'}:
         base = basename(dirname(s)) + '.' + base
     return base
 
 
-class TraceBack(object):
+class TraceBack:
     """Customizable traceback for inclusion debug log messages
     """
 
@@ -148,7 +148,7 @@ class TraceBack(object):
 
         # format the traceback in a compact form
         sftb += '>'.join(
-            ['%s:%s' % (mbasename(x[0]), x[1]) for x in entries_out]
+            ['{}:{}'.format(mbasename(x[0]), x[1]) for x in entries_out]
         )
 
         if self.collide:
@@ -164,7 +164,7 @@ class TraceBack(object):
         return sftb
 
 
-class MemoryInfo(object):
+class MemoryInfo:
     def __init__(self):
         try:
             from psutil import Process
@@ -250,7 +250,7 @@ class ColorFormatter(logging.Formatter):
 
         if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
             record.levelname = colors.color_word(
-                "{:7}".format(levelname),
+                f"{levelname:7}",
                 colors.LOG_LEVEL_COLORS[levelname],
                 force=True)
         record.msg = record.msg.replace("\n", "\n| ")
@@ -258,7 +258,7 @@ class ColorFormatter(logging.Formatter):
             if not getattr(record, 'notraceback', False):
                 record.msg = self._tb() + "  " + record.msg
         if self._mem:
-            record.msg = "%s %s" % (self._mem(), record.msg)
+            record.msg = "{} {}".format(self._mem(), record.msg)
 
         return logging.Formatter.format(self, record)
 
@@ -424,7 +424,7 @@ def log_progress(lgrcall, pid, *args, **kwargs):
     """
     d = dict(
         # inject progress-related result properties as extra data
-        {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
+        {f'dlm_progress_{n}': v for n, v in kwargs.items()
          # initial progress might be zero, but not sending it further
          # would signal to destroy the progress bar, hence test for 'not None'
          if v is not None},
@@ -461,7 +461,7 @@ def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
 
     def count_str(count, verb, omg=False):
         if count:
-            msg = "{:d} {}".format(count, verb)
+            msg = f"{count:d} {verb}"
             if omg:
                 msg = colors.color_word(msg, colors.RED)
             return msg
@@ -472,7 +472,7 @@ def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
     def _wrap_with_result_progress_(items, *args, **kwargs):
         counts = defaultdict(int)
 
-        pid = "%s:%s" % (fn, random.randint(0, 100000))
+        pid = "{}:{}".format(fn, random.randint(0, 100000))
 
         label = base_label
         log_progress(lgr.info, pid,
@@ -559,7 +559,7 @@ def no_progress():
                  noninteractive_level=5)
 
 
-class LoggerHelper(object):
+class LoggerHelper:
     """Helper to establish and control a Logger"""
 
     def __init__(self, name='datalad', logtarget=None):
@@ -650,10 +650,10 @@ class LoggerHelper(object):
             if names:
                 import re
                 # add a filter which would catch those
-                class LogFilter(object):
+                class LogFilter:
                     """A log filter to filter based on the log target name(s)"""
                     def __init__(self, names):
-                        self.target_names = set(n for n in names.split(',')) \
+                        self.target_names = {n for n in names.split(',')} \
                             if names_filter == 'names' \
                             else re.compile(names)
                     if names_filter == 'names':

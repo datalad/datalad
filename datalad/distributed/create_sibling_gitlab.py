@@ -275,11 +275,10 @@ class CreateSiblingGitlab(Interface):
 
         # which datasets to process?
         if path is None or ds.pathobj in path:
-            for r in _proc_dataset(
+            yield from _proc_dataset(
                     ds, ds,
                     site, project, name, layout, existing, access,
-                    dry_run, siteobjs, publish_depends, description):
-                yield r
+                    dry_run, siteobjs, publish_depends, description)
         # we need to find a subdataset when recursing, or when there is a path that
         # could point to one, we have to exclude the parent dataset in this test
         # to avoid undesired level-1 recursion into subdatasets
@@ -310,11 +309,10 @@ class CreateSiblingGitlab(Interface):
                     )
             else:
                 for sub in subds:
-                    for r in _proc_dataset(
+                    yield from _proc_dataset(
                             ds, sub,
                             site, project, name, layout, existing, access,
-                            dry_run, siteobjs, publish_depends, description):
-                        yield r
+                            dry_run, siteobjs, publish_depends, description)
 
         return
 
@@ -354,7 +352,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     # determine target remote name, unless given
     if remotename is None:
-        remotename_var = 'datalad.gitlab-{}-siblingname'.format(site)
+        remotename_var = f'datalad.gitlab-{site}-siblingname'
         remotename = ds.config.get(
             remotename_var,
             # use config from parent, if needed
@@ -388,7 +386,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
         # use the reference dataset as default, and fall back
         # on 'collection' as the most generic method of representing
         # the filesystem in a group/subproject structure
-        layout_var = 'datalad.gitlab-{}-layout'.format(site)
+        layout_var = f'datalad.gitlab-{site}-layout'
         layout = ds.config.get(
             layout_var, refds.config.get(
                 layout_var, 'collection'))
@@ -398,7 +396,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             "known ones are: {}".format(layout, known_layout_labels))
 
     if access is None:
-        access_var = 'datalad.gitlab-{}-access'.format(site)
+        access_var = f'datalad.gitlab-{site}-access'
         access = ds.config.get(
             access_var, refds.config.get(
                 access_var, 'http'))
@@ -410,7 +408,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
     pathsep = ds.config.get("datalad.gitlab-default-pathseparator", "-")
     project_stub = \
         ds.config.get("datalad.gitlab-default-projectname", "project")
-    project_var = 'datalad.gitlab-{}-project'.format(site)
+    project_var = f'datalad.gitlab-{site}-project'
     process_root = refds == ds
     if project is None:
         # look for a specific config in the dataset
@@ -552,11 +550,11 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     # first make sure that annex doesn't touch this one
     # but respect any existing config
-    ignore_var = 'remote.{}.annex-ignore'.format(remotename)
+    ignore_var = f'remote.{remotename}.annex-ignore'
     if ignore_var not in ds.config:
         ds.config.add(ignore_var, 'true', scope='local')
 
-    for res in ds.siblings(
+    yield from ds.siblings(
             'configure',
             name=remotename,
             url=site_project['http_url_to_repo']
@@ -568,11 +566,10 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             recursive=False,
             publish_depends=depends,
             result_renderer='disabled',
-            return_type='generator'):
-        yield res
+            return_type='generator')
 
 
-class GitLabSite(object):
+class GitLabSite:
     def __init__(self, site):
         import gitlab
         self.gitlab = gitlab

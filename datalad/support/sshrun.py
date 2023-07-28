@@ -101,7 +101,7 @@ class SSHRun(Interface):
             cmd = cmd_[0]
         sshurl = 'ssh://{}{}'.format(
             login,
-            ':{}'.format(port) if port else '')
+            f':{port}' if port else '')
 
         if ipv4 and ipv6:
             raise ValueError("Cannot force both IPv4 and IPv6")

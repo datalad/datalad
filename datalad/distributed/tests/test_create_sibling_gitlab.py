@@ -293,7 +293,7 @@ def test_dryrun(path=None):
     )
 
 
-class _FakeGitLab(object):
+class _FakeGitLab:
     def __init__(self, site):
         pass
 

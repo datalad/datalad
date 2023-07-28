@@ -24,7 +24,7 @@ from datalad.utils import COPY_BUFSIZE
 lgr = logging.getLogger("datalad.runner.runnerthreads")
 
 
-def _try_close(file_object: Optional[IO]) -> None:
+def _try_close(file_object: IO | None) -> None:
     if file_object is not None:
         try:
             file_object.close()
@@ -40,7 +40,7 @@ class IOState(Enum):
 class SignalingThread(threading.Thread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: list[Queue[tuple[Any, IOState, Optional[bytes]]]]
+                 signal_queues: list[Queue[tuple[Any, IOState, bytes | None]]]
                  ) -> None:
 
         super().__init__(daemon=True)
@@ -54,7 +54,7 @@ class SignalingThread(threading.Thread):
         return self.__repr__()
 
     def signal(self,
-               content: tuple[Any, IOState, Optional[bytes]]
+               content: tuple[Any, IOState, bytes | None]
                ) -> bool:
         error_occurred = False
         for signal_queue in self.signal_queues:
@@ -73,7 +73,7 @@ class WaitThread(SignalingThread):
     """
     def __init__(self,
                  identifier: str,
-                 signal_queues: list[Queue[tuple[Any, IOState, Optional[bytes]]]],
+                 signal_queues: list[Queue[tuple[Any, IOState, bytes | None]]],
                  process: Popen
                  ) -> None:
         super().__init__(identifier, signal_queues)
@@ -92,7 +92,7 @@ class WaitThread(SignalingThread):
 class ExitingThread(SignalingThread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: list[Queue[tuple[Any, IOState, Optional[bytes]]]]
+                 signal_queues: list[Queue[tuple[Any, IOState, bytes | None]]]
                  ) -> None:
 
         super().__init__(identifier, signal_queues)
@@ -111,7 +111,7 @@ class ExitingThread(SignalingThread):
 class TransportThread(ExitingThread, metaclass=ABCMeta):
     def __init__(self,
                  identifier: str,
-                 signal_queues: list[Queue[tuple[Any, IOState, Optional[bytes]]]],
+                 signal_queues: list[Queue[tuple[Any, IOState, bytes | None]]],
                  user_info: Any
                  ) -> None:
 
@@ -126,12 +126,12 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
 
     def signal_event(self,
                      state: IOState,
-                     data: Optional[bytes]
+                     data: bytes | None
                      ) -> bool:
         return self.signal((self.user_info, state, data))
 
     @abstractmethod
-    def read(self) -> Optional[bytes]:
+    def read(self) -> bytes | None:
         """
         Read data from source return None, if source is close,
         or destination close is required.
@@ -155,7 +155,7 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
         # Copy data from source queue to destination queue
         # until exit is requested. If timeouts arise, signal
         # them to the receiver via the signal queue.
-        data: Optional[bytes] = b""
+        data: bytes | None = b""
         while not self.exit_requested:
 
             data = self.read()
@@ -186,7 +186,7 @@ class TransportThread(ExitingThread, metaclass=ABCMeta):
 class ReadThread(TransportThread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: list[Queue[tuple[Any, IOState, Optional[bytes]]]],
+                 signal_queues: list[Queue[tuple[Any, IOState, bytes | None]]],
                  user_info: Any,
                  source: IO,
                  destination_queue: Queue[tuple[Any, IOState, bytes]],
@@ -198,7 +198,7 @@ class ReadThread(TransportThread):
         self.destination_queue = destination_queue
         self.length = length
 
-    def read(self) -> Optional[bytes]:
+    def read(self) -> bytes | None:
         try:
             data = os.read(self.source.fileno(), self.length)
         except (ValueError, OSError):
@@ -220,9 +220,9 @@ class ReadThread(TransportThread):
 class WriteThread(TransportThread):
     def __init__(self,
                  identifier: str,
-                 signal_queues: list[Queue[tuple[Any, IOState, Optional[bytes]]]],
+                 signal_queues: list[Queue[tuple[Any, IOState, bytes | None]]],
                  user_info: Any,
-                 source_queue: Queue[Optional[bytes]],
+                 source_queue: Queue[bytes | None],
                  destination: IO
                  ) -> None:
 
@@ -230,7 +230,7 @@ class WriteThread(TransportThread):
         self.source_queue = source_queue
         self.destination = destination
 
-    def read(self) -> Optional[bytes]:
+    def read(self) -> bytes | None:
         data = self.source_queue.get()
         if data is None:
             # Close stdin file descriptor here, since we know that no more

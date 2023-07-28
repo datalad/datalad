@@ -20,7 +20,7 @@ from .constraints import expand_constraint_spec
 _whitespace_re = re.compile(r'\n\s+|^\s+')
 
 
-class Parameter(object):
+class Parameter:
     """This class shall serve as a representation of a parameter.
     """
 
@@ -105,13 +105,13 @@ class Parameter(object):
                 sdoc = sdoc[1:-1]
             nargs = self.cmd_kwargs.get('nargs', '')
             if isinstance(nargs, int):
-                sdoc = '{}-item sequence of {}'.format(nargs, sdoc)
+                sdoc = f'{nargs}-item sequence of {sdoc}'
             elif nargs == '+':
-                sdoc = 'non-empty sequence of {}'.format(sdoc)
+                sdoc = f'non-empty sequence of {sdoc}'
             elif nargs == '*':
-                sdoc = 'sequence of {}'.format(sdoc)
+                sdoc = f'sequence of {sdoc}'
             if self.cmd_kwargs.get('action', None) == 'append':
-                sdoc = 'list of {}'.format(sdoc)
+                sdoc = f'list of {sdoc}'
             paramsdoc += " : %s" % sdoc
             if has_default:
                 paramsdoc += ", optional"
@@ -124,7 +124,7 @@ class Parameter(object):
         if len(doc) and not doc.endswith('.'):
             doc += '.'
         if has_default:
-            doc += " [Default: %r]" % (default,)
+            doc += " [Default: {!r}]".format(default)
         # Explicitly deal with multiple spaces, for some reason
         # replace_whitespace is non-effective
         doc = _whitespace_re.sub(' ', doc)

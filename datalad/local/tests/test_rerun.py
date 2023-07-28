@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -583,7 +582,7 @@ def test_rerun_script(path=None):
         assert_in(touch_command + "bar\n", lines)
         # The commit message is there too.
         assert_in("# BAR\n", lines)
-        assert_in("# (record: {})\n".format(bar_hexsha), lines)
+        assert_in(f"# (record: {bar_hexsha})\n", lines)
         assert_not_in("echo a >foo\n", lines)
 
     ds.rerun(since="", script=script_file)
@@ -673,7 +672,7 @@ def test_run_inputs_outputs(src=None, path=None):
     for idx, (inputs_arg, expected_present) in enumerate(test_cases):
         assert_false(any(ds.repo.file_has_content(i) for i in inputs))
 
-        ds.run("cd .> dummy{}".format(idx), inputs=inputs_arg)
+        ds.run(f"cd .> dummy{idx}", inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
         assert_in(inputs_arg[0], last_commit_msg(ds.repo))
@@ -888,9 +887,9 @@ def test_placeholders(path=None):
         ds.rerun(script="-", since="")
         script_out = cmout.getvalue()
         assert_in("echo a.in b.in>c.out", script_out)
-        assert_in("echo {} >expanded-pwd".format(subdir_path),
+        assert_in(f"echo {subdir_path} >expanded-pwd",
                   script_out)
-        assert_in("echo {} >expanded-dspath".format(ds.path),
+        assert_in(f"echo {ds.path} >expanded-dspath",
                   script_out)
 
     assert_result_count(

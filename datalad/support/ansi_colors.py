@@ -71,7 +71,7 @@ def format_msg(fmt: str, use_color: bool = False) -> str:
         return fmt.replace("$RESET", "").replace("$BOLD", "")
 
 
-def color_word(s: str, color: Optional[int], force: bool = False) -> str:
+def color_word(s: str, color: int | None, force: bool = False) -> str:
     """Color `s` with `color`.
 
     Parameters
@@ -88,7 +88,7 @@ def color_word(s: str, color: Optional[int], force: bool = False) -> str:
     str
     """
     if color and (force or color_enabled()):
-        return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ)
+        return "{}{}{}".format(COLOR_SEQ % color, s, RESET_SEQ)
     return s
 
 

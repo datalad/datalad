@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -170,9 +169,9 @@ def check_push(annex, src_path, dst_path):
         list(src_repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # configure a default merge/upstream target
-    src.config.set('branch.{}.remote'.format(DEFAULT_BRANCH),
+    src.config.set(f'branch.{DEFAULT_BRANCH}.remote',
                    'target', scope='local')
-    src.config.set('branch.{}.merge'.format(DEFAULT_BRANCH),
+    src.config.set(f'branch.{DEFAULT_BRANCH}.merge',
                    DEFAULT_BRANCH, scope='local')
 
     # don't fail when doing it again, no explicit target specification
@@ -859,7 +858,7 @@ def test_push_git_annex_branch_many_paths_same_data(path=None):
                            ds.repo.pathobj / "f4"])
     with swallow_logs(new_level=logging.DEBUG) as cml:
         res = ds.push(to="target")
-    assert_in("{} bytes of annex data".format(nbytes), cml.out)
+    assert_in(f"{nbytes} bytes of annex data", cml.out)
     # 3 files point to content already covered by another file.
     assert_result_count(res, 3,
                         action="copy", type="file", status="notneeded")
@@ -951,7 +950,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath=None, storepath=None, clon
     # both datasets in the store only carry the real branches, and nothing
     # adjusted
     for r in (store_super, store_sub):
-        eq_(set(r.get_branches()), set([orig_sub_corr_branch, 'git-annex']))
+        eq_(set(r.get_branches()), {orig_sub_corr_branch, 'git-annex'})
 
     # and reobtain from a store
     cloneurl = 'ria+' + get_local_file_url(str(storepath), compatibility='git')

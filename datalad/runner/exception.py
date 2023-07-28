@@ -32,7 +32,7 @@ class CommandError(RuntimeError):
         self,
         cmd: str | list[str] = "",
         msg: str = "",
-        code: Optional[int] = None,
+        code: int | None = None,
         stdout: str | bytes = "",
         stderr: str | bytes = "",
         cwd: str | os.PathLike | None = None,
@@ -52,7 +52,7 @@ class CommandError(RuntimeError):
             ensure_unicode,
             join_cmdline,
         )
-        to_str = "{}: ".format(self.__class__.__name__)
+        to_str = f"{self.__class__.__name__}: "
         cmd = self.cmd
         if cmd:
             to_str += "'{}'".format(
@@ -61,13 +61,13 @@ class CommandError(RuntimeError):
                 join_cmdline(cmd) if isinstance(cmd, list) else cmd
             )
         if self.code:
-            to_str += " failed with exitcode {}".format(self.code)
+            to_str += f" failed with exitcode {self.code}"
         if self.cwd:
             # only if not under standard PWD
-            to_str += " under {}".format(self.cwd)
+            to_str += f" under {self.cwd}"
         if self.msg:
             # typically a command error has no specific idea
-            to_str += " [{}]".format(ensure_unicode(self.msg))
+            to_str += f" [{ensure_unicode(self.msg)}]"
 
         if self.kwargs:
             to_str += " [info keys: {}]".format(
@@ -81,9 +81,9 @@ class CommandError(RuntimeError):
             return to_str
 
         if self.stdout:
-            to_str += " [out: '{}']".format(ensure_unicode(self.stdout).strip())
+            to_str += f" [out: '{ensure_unicode(self.stdout).strip()}']"
         if self.stderr:
-            to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
+            to_str += f" [err: '{ensure_unicode(self.stderr).strip()}']"
 
         return to_str
 
@@ -111,7 +111,7 @@ def _format_json_error_messages(recs: list[dict]) -> str:
         '\n> '.join(
             '{}{}'.format(
                 m,
-                ' [{} times]'.format(n) if n > 1 else '',
+                f' [{n} times]' if n > 1 else '',
             )
             for m, n in msgs.items()
         )

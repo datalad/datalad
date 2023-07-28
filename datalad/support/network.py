@@ -244,7 +244,7 @@ def retry_urlopen(url, retries=3):
         try:
             return __urlopen_requests(url)
         except URLError as e:
-            lgr.warning("Received exception while reading %s: %s" % (url, e))
+            lgr.warning("Received exception while reading {}: {}".format(url, e))
             if t == retries - 1:
                 # if we have reached allowed number of retries -- reraise
                 raise
@@ -300,7 +300,7 @@ def dlurljoin(u_path, url):
 
 
 # TODO should it be a node maybe?
-class SimpleURLStamper(object):
+class SimpleURLStamper:
     """Gets a simple stamp about the URL: {url, time, size} of whatever was provided in the header
     """
     def __init__(self, mode='full'):
@@ -404,7 +404,7 @@ def _guess_ri_cls(ri):
     return cls
 
 
-class RI(object):
+class RI:
     """Resource Identifier - base class and a factory for URL, SSHRI, etc
 
     Intended to be a R/O object (i.e. no fields should be changed in-place).
@@ -461,7 +461,7 @@ class RI(object):
             raise ValueError(
                 f"Could not determine resource identifier type for {ri!r}")
 
-        ri_obj = super(RI, cls).__new__(cls)
+        ri_obj = super().__new__(cls)
         # Store internally original str
         ri_obj._str = str(ri) if isinstance(ri, PurePath) else ri
         return ri_obj
@@ -499,7 +499,7 @@ class RI(object):
 
     @classmethod
     def _get_blank_fields(cls, **fields):
-        return dict(((f, fields.get(f, '')) for f in cls._FIELDS))
+        return {f: fields.get(f, '') for f in cls._FIELDS}
 
     @property
     def fields(self):
@@ -508,9 +508,9 @@ class RI(object):
 
     def __repr__(self):
         # since auto_repr doesn't support "non-0" values atm
-        return "%s(%s)" % (
+        return "{}({})".format(
             self.__class__.__name__,
-            ", ".join(["%s=%r" % (k, v)
+            ", ".join(["{}={!r}".format(k, v)
                        for k, v in sorted(self._fields.items())
                        if v]))
 
@@ -591,13 +591,13 @@ class RI(object):
 
     def __getattribute__(self, item):
         if item.startswith('_') or item not in self._FIELDS:
-            return super(RI, self).__getattribute__(item)
+            return super().__getattribute__(item)
         else:
             return self._fields[item]
 
     def __setattr__(self, item, value):
         if item.startswith('_') or item not in self._FIELDS:
-            super(RI, self).__setattr__(item, value)
+            super().__setattr__(item, value)
         else:
             self._fields[item] = value
             self._str = None
@@ -654,7 +654,7 @@ class URL(RI):
         if fields['port']:
             if fields['hostname'].count(':') >= 2:
                 # ipv6 -- need to enclose in []
-                netloc = '[%s]:%s' % (netloc, fields['port'])
+                netloc = '[{}]:{}'.format(netloc, fields['port'])
             else:
                 netloc += ':%s' % fields['port']
 
@@ -805,7 +805,7 @@ class PathRI(RI):
             return self.path
 
 
-class RegexBasedURLMixin(object):
+class RegexBasedURLMixin:
     """Base class for URLs which we could simple parse using regular expressions"""
 
     _REGEX = None
@@ -896,7 +896,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
         """
         if self.remote:
             raise NotImplementedError("not supported ATM to reference additional remotes")
-        return "{}{}".format(consts.DATASETS_TOPURL, urlquote(self.path))
+        return f"{consts.DATASETS_TOPURL}{urlquote(self.path)}"
 
 
 class GitTransportRI(RI, RegexBasedURLMixin):

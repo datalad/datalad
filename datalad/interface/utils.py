@@ -81,14 +81,14 @@ def handle_dirty_dataset(ds, mode, msg=None):
         return
     elif mode == 'fail':
         if not ds.repo or ds.repo.dirty:
-            raise RuntimeError('dataset {} has unsaved changes'.format(ds))
+            raise RuntimeError(f'dataset {ds} has unsaved changes')
     elif mode == 'save-before':
         if not ds.is_installed():
-            raise RuntimeError('dataset {} is not yet installed'.format(ds))
+            raise RuntimeError(f'dataset {ds} is not yet installed')
         from datalad.core.local.save import Save
         Save.__call__(dataset=ds, message=msg, updated=True)
     else:
-        raise ValueError("unknown if-dirty mode '{}'".format(mode))
+        raise ValueError(f"unknown if-dirty mode '{mode}'")
 
 
 def get_tree_roots(paths):
@@ -166,7 +166,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
         current_trace = current_trace + [basepath]
     # this edge is not done, we need to try to reach any downstream
     # dataset
-    undiscovered_ds = set(t for t in targetpaths)  # if t != basepath)
+    undiscovered_ds = {t for t in targetpaths}  # if t != basepath)
     # whether anything in this directory matched a targetpath
     filematch = False
     if isdir(basepath):
@@ -181,8 +181,8 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
             # in `targetpaths` -- so traverse only those in spec which have
             # leading dir basepath
             # filter targets matching this downward path
-            downward_targets = set(
-                t for t in targetpaths if path_startswith(t, p))
+            downward_targets = {
+                t for t in targetpaths if path_startswith(t, p)}
             if not downward_targets:
                 continue
             # remove the matching ones from the "todo" list
@@ -241,7 +241,7 @@ def generic_result_renderer(res):
                 res.get('action', '<action-unspecified>'),
                 ac.BOLD),
             status=ac.color_status(res.get('status', '<status-unspecified>')),
-            path=' {}'.format(path) if path else '',
+            path=f' {path}' if path else '',
             type=' ({})'.format(
                 ac.color_word(res['type'], ac.MAGENTA)
             ) if 'type' in res else '',
@@ -265,7 +265,7 @@ def render_action_summary(action_summary):
     ui.message("action summary:\n  {}".format(
         '\n  '.join('{} ({})'.format(
             act,
-            ', '.join('{}: {}'.format(status, action_summary[act][status])
+            ', '.join(f'{status}: {action_summary[act][status]}'
                       for status in sorted(action_summary[act])))
                     for act in sorted(action_summary))))
 
@@ -406,7 +406,7 @@ def _render_result_generic(
         last_result_reps, last_result, last_result_ts):
     # which result dict keys to inspect for changes to discover repetitions
     # of similar messages
-    repetition_keys = set(('action', 'status', 'type', 'refds'))
+    repetition_keys = {'action', 'status', 'type', 'refds'}
 
     trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
     if res.get('status', None) != 'notneeded' \
@@ -453,7 +453,7 @@ def keep_result(res, rfilter, **kwargs):
         if not rfilter(res, **kwargs):
             # give the slightest indication which filter was employed
             raise ValueError(
-                'excluded by filter {} with arguments {}'.format(rfilter, kwargs))
+                f'excluded by filter {rfilter} with arguments {kwargs}')
     except ValueError as e:
         # make sure to report the excluded result to massively improve
         # debugging experience

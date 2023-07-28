@@ -248,7 +248,7 @@ class Rerun(Interface):
         if branch and branch in ds_repo.get_branches():
             yield get_status_dict(
                 "run", ds=ds, status="error",
-                message="branch '{}' already exists".format(branch))
+                message=f"branch '{branch}' already exists")
             return
 
         if revision is None:
@@ -264,7 +264,7 @@ class Rerun(Interface):
         elif since.strip() == "":
             revrange = revision
         else:
-            revrange = "{}..{}".format(since, revision)
+            revrange = f"{since}..{revision}"
 
         results = _rerun_as_results(ds, revrange, since, branch, onto, message)
         if script:
@@ -275,8 +275,7 @@ class Rerun(Interface):
             handler = partial(_rerun, assume_ready=assume_ready,
                               explicit=explicit, jobs=jobs)
 
-        for res in handler(ds, results):
-            yield res
+        yield from handler(ds, results)
 
 
 def _revrange_as_results(dset, revrange):
@@ -299,7 +298,7 @@ def _revrange_as_results(dset, revrange):
         except ValueError as exc:
             # Recast the error so the message includes the revision.
             raise ValueError(
-                "Error on {}'s message".format(rev)) from exc
+                f"Error on {rev}'s message") from exc
 
         if info is not None:
             if len(parents) != 1:
@@ -513,7 +512,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                             if op.relpath(p, outputs_dir) not in outputs]
 
             message = res["rerun_message"] or res["run_message"]
-            for r in run_command(run_info['cmd'],
+            yield from run_command(run_info['cmd'],
                                  dataset=dset,
                                  inputs=run_info.get("inputs", []),
                                  extra_inputs=run_info.get("extra_inputs", []),
@@ -523,8 +522,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                                  rerun_outputs=auto_outputs,
                                  message=message,
                                  jobs=jobs,
-                                 rerun_info=run_info):
-                yield r
+                                 rerun_info=run_info)
         new_head = ds_repo.get_hexsha()
         if new_head not in [head, res_hexsha]:
             new_bases[res_hexsha] = new_head
@@ -588,7 +586,7 @@ def _get_script_handler(script, since, revision):
             script=script,
             since="" if since is None else " --since=" + since,
             revision=ds_repo.get_hexsha(revision),
-            ds='dataset {} at '.format(dset.id) if dset.id else '',
+            ds=f'dataset {dset.id} at ' if dset.id else '',
             path=dset.path))
 
         for res in results:
@@ -673,7 +671,7 @@ def get_run_info(dset, message):
             default=op.join('.datalad', 'runinfo'))
         record_path = op.join(dset.path, record_dir, runinfo)
         if not op.lexists(record_path):
-            raise ValueError("Run record sidecar file not found: {}".format(record_path))
+            raise ValueError(f"Run record sidecar file not found: {record_path}")
         # TODO `get` the file
         recs = load_stream(record_path, compressed=True)
         # TODO check if there is a record
@@ -710,8 +708,7 @@ def diff_revision(dataset, revision="HEAD"):
                         fr=fr, to=revision,
                         result_filter=changed,
                         return_type='generator', result_renderer='disabled')
-    for r in diff:
-        yield r
+    yield from diff
 
 
 def new_or_modified(diff_results):

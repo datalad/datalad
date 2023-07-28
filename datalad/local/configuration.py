@@ -294,7 +294,7 @@ def configuration(action, scope, specs, res_kwargs, ds=None):
         cfg = ds.config
 
     if action not in config_actions:
-        raise ValueError("Unsupported action '{}'".format(action))
+        raise ValueError(f"Unsupported action '{action}'")
 
     if action == 'dump':
         if not specs:

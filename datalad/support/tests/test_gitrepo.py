@@ -248,7 +248,7 @@ def test_GitRepo_add(src=None, path=None):
 
     eq_(added, {'success': True, 'file': filename})
     assert_in(filename, gr.get_indexed_files(),
-              "%s not successfully added to %s" % (filename, path))
+              "{} not successfully added to {}".format(filename, path))
     # uncommitted:
     ok_(gr.dirty)
 
@@ -262,7 +262,7 @@ def test_GitRepo_add(src=None, path=None):
     eq_(added2, {'success': True, 'file': filename})
 
     assert_in(filename, gr.get_indexed_files(),
-              "%s not successfully added to %s" % (filename, path))
+              "{} not successfully added to {}".format(filename, path))
     assert_repo_status(path)
 
 
@@ -363,9 +363,9 @@ def test_GitRepo_get_indexed_files(path=None):
     out_list = list(filter(bool, out['stdout'].split('\n')))
 
     for item in idx_list:
-        assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
+        assert_in(item, out_list, "{} not found in output of git ls-files in {}".format(item, path))
     for item in out_list:
-        assert_in(item, idx_list, "%s not found in output of get_indexed_files in %s" % (item, path))
+        assert_in(item, idx_list, "{} not found in output of get_indexed_files in {}".format(item, path))
 
 
 @with_tree([
@@ -432,7 +432,7 @@ def test_normalize_path(git_path=None):
 
 def test_GitRepo_files_decorator():
 
-    class testclass(object):
+    class testclass:
         def __init__(self):
             self.path = op.join('some', 'where')
 
@@ -560,8 +560,8 @@ def _path2localsshurl(path):
     path = op.abspath(path)
     p = Path(path)
     if p.drive:
-        path = '/'.join(('/{}'.format(p.drive[0]),) + p.parts[1:])
-    url = "ssh://datalad-test{}".format(path)
+        path = '/'.join((f'/{p.drive[0]}',) + p.parts[1:])
+    url = f"ssh://datalad-test{path}"
     return url
 
 
@@ -674,7 +674,7 @@ def test_GitRepo_push_n_checkout(orig_path=None, clone_path=None):
     clone.add(filename)
     clone.commit("new file added.")
     # TODO: need checkout first:
-    clone.push(DEFAULT_REMOTE, '+{}:new-branch'.format(DEFAULT_BRANCH))
+    clone.push(DEFAULT_REMOTE, f'+{DEFAULT_BRANCH}:new-branch')
     origin.checkout('new-branch')
     ok_(op.exists(op.join(orig_path, filename)))
 
@@ -769,13 +769,13 @@ def test_GitRepo_get_files(src_path=None, path=None):
     remote_files = set(gr.get_files(
         branch=f"{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"))
     eq_(remote_files, os_files)
-    eq_(set([filename]), local_files.difference(remote_files))
+    eq_({filename}, local_files.difference(remote_files))
 
     # switch back and query non-active branch:
     gr.checkout(DEFAULT_BRANCH)
     local_files = set(gr.get_files())
     branch_files = set(gr.get_files(branch="new_branch"))
-    eq_(set([filename]), branch_files.difference(local_files))
+    eq_({filename}, branch_files.difference(local_files))
 
 
 @with_tempfile
@@ -834,11 +834,11 @@ def test_GitRepo_dirty(path=None):
     ok_(not repo.dirty)
 
     subm = GitRepo(repo.pathobj / "subm", create=True)
-    (subm.pathobj / "subfile").write_text(u"")
+    (subm.pathobj / "subfile").write_text("")
     subm.save()
     repo.save()
     ok_(not repo.dirty)
-    (subm.pathobj / "subfile").write_text(u"changed")
+    (subm.pathobj / "subfile").write_text("changed")
     ok_(repo.dirty)
 
     # User configuration doesn't affect .dirty's answer.
@@ -993,7 +993,7 @@ def test_get_submodules_parent_on_unborn_branch(path=None):
 
 def test_to_options():
 
-    class Some(object):
+    class Some:
 
         def cmd_func(self, git_options=None, annex_options=None, options=None):
 
@@ -1074,12 +1074,12 @@ def test_optimized_cloning(path=None):
     from glob import glob
 
     def _get_inodes(repo):
-        return dict(
-            [(os.path.join(*o.split(os.sep)[-2:]),
-              os.stat(o).st_ino)
+        return {
+            os.path.join(*o.split(os.sep)[-2:]):
+              os.stat(o).st_ino
              for o in glob(os.path.join(repo.path,
                                         repo.get_git_dir(repo),
-                                        'objects', '*', '*'))])
+                                        'objects', '*', '*'))}
 
     origin_inodes = _get_inodes(repo)
     # now clone it in different ways and see what happens to the object storage
@@ -1088,7 +1088,7 @@ def test_optimized_cloning(path=None):
     for src in (originpath, get_local_file_url(originpath, compatibility='git')):
         clone = GitRepo.clone(url=src, path=clonepath, create=True)
         clone_inodes = _get_inodes(clone)
-        eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
+        eq_(origin_inodes, clone_inodes, msg=f'with src={src}')
         rmtree(clonepath)
 #        del clone
 #        gc.collect()
@@ -1274,7 +1274,7 @@ def test_gitattributes(path=None):
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths
         # with spaces and other funky stuff are just fine
-        funky = u'{} {}'.format(
+        funky = '{} {}'.format(
             get_most_obscure_supported_name(),
             get_most_obscure_supported_name())
         gr.set_gitattributes([(funky, {'this': 'that'})])

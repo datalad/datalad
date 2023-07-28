@@ -1,4 +1,3 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -66,7 +65,7 @@ result_counter = 0
 def test_runner(tempfile: str = "") -> None:
     runner = Runner()
     content = 'Testing real run' if on_windows else 'Testing äöü東 real run'
-    cmd = 'echo %s > %s' % (content, tempfile)
+    cmd = 'echo {} > {}'.format(content, tempfile)
     res = runner.run(cmd)
     assert isinstance(res, dict)
     # no capture of any kind, by default

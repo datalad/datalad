@@ -86,5 +86,5 @@ def main(args=None, cls=None, remote_name=None, description=None):
             # In any case, exiting the special remote process should be
             # accompanied by such an ERROR message to annex rather than a log
             # message.
-            print("ERROR %s (%s)" % (str(exc), exc.__class__.__name__))
+            print("ERROR {} ({})".format(str(exc), exc.__class__.__name__))
             sys.exit(1)

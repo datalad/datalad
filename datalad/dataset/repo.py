@@ -246,7 +246,7 @@ class PathBasedFlyweight(Flyweight):
 
 
 # TODO: see issue #1100
-class RepoInterface(object):
+class RepoInterface:
     """common operations for annex and plain git repositories
 
     Especially provides "annex operations" on plain git repos, that just do
@@ -286,14 +286,14 @@ def path_based_str_repr(cls):
         s = self._str
         if s is None:
             s = self._str = \
-                '%s(%s)' % (self.__class__.__name__, ut.quote_cmdlinearg(self.path))
+                '{}({})'.format(self.__class__.__name__, ut.quote_cmdlinearg(self.path))
         return s
 
     def __repr__(self):
         s = self._repr
         if s is None:
             s = self._repr = \
-                '%s(%r)' % (self.__class__.__name__, self.path)
+                '{}({!r})'.format(self.__class__.__name__, self.path)
         return s
 
     cls._str = None

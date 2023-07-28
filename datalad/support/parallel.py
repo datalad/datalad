@@ -33,7 +33,7 @@ lgr = logging.getLogger('datalad.parallel')
 
 def _count_str(count, verb, omg=False):
     if count:
-        msg = "{:d} {}".format(count, verb)
+        msg = f"{count:d} {verb}"
         if omg:
             msg = colors.color_word(msg, colors.RED)
         return msg

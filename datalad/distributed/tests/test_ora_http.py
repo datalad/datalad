@@ -40,7 +40,7 @@ def test_initremote(store_path=None, store_url=None, ds_path=None):
     ds = Dataset(ds_path).create()
     store_path = Path(store_path)
     url = "ria+" + store_url
-    init_opts = common_init_opts + ['url={}'.format(url)]
+    init_opts = common_init_opts + [f'url={url}']
 
     # fail when there's no RIA store at the destination
     assert_raises(CommandError, ds.repo.init_remote, 'ora-remote',
@@ -79,9 +79,9 @@ def test_initremote(store_path=None, store_url=None, ds_path=None):
     #   - archive_id (which equals ds id)
     remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
                                   read_only=True)
-    assert_in("url={}".format(url), remote_log)
+    assert_in(f"url={url}", remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
-    assert_in("archive-id={}".format(ds.id), remote_log)
+    assert_in(f"archive-id={ds.id}", remote_log)
 
 
 # TODO: on crippled FS copytree to populate store doesn't seem to work.
@@ -101,7 +101,7 @@ def test_read_access(store_path=None, store_url=None, ds_path=None):
     files = [Path('one.txt'), Path('subdir') / 'two']
     store_path = Path(store_path)
     url = "ria+" + store_url
-    init_opts = common_init_opts + ['url={}'.format(url)]
+    init_opts = common_init_opts + [f'url={url}']
 
     io = LocalIO()
     create_store(io, store_path, '1')

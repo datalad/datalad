@@ -363,7 +363,7 @@ class CreateSiblingRia(Interface):
             )
 
         if storage_sibling and not storage_name:
-            storage_name = "{}-storage".format(name)
+            storage_name = f"{name}-storage"
 
         if storage_sibling and name == storage_name:
             # leads to unresolvable, circular dependency with publish-depends
@@ -512,11 +512,11 @@ def _create_sibling_ria(
 
     git_url = decode_source_spec(
         # append dataset id to url and use magic from clone-helper:
-        url + '#{}'.format(ds.id),
+        url + f'#{ds.id}',
         cfg=ds.config
     )['giturl']
     git_push_url = decode_source_spec(
-        push_url + '#{}'.format(ds.id),
+        push_url + f'#{ds.id}',
         cfg=ds.config
     )['giturl'] if push_url else None
 
@@ -559,7 +559,7 @@ def _create_sibling_ria(
         # an empty repo dir or a non-bare repo or whatever else.
         if ssh_host:
             try:
-                ssh('[ -e {p} ]'.format(p=quote_cmdlinearg(str(config_path))))
+                ssh(f'[ -e {quote_cmdlinearg(str(config_path))} ]')
                 exists = True
             except CommandError:
                 exists = False
@@ -596,7 +596,7 @@ def _create_sibling_ria(
         lgr.info("create sibling%s '%s'%s ...",
             's' if storage_name else '',
             name,
-            " and '{}'".format(storage_name) if storage_name else '',
+            f" and '{storage_name}'" if storage_name else '',
         )
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                        local_base_path, ds.id, '2', '1', alias,
@@ -612,9 +612,9 @@ def _create_sibling_ria(
             'externaltype=ora',
             'encryption=none',
             'autoenable=true',
-            'url={}'.format(url)]
+            f'url={url}']
         if push_url:
-            special_remote_options.append('push-url={}'.format(push_url))
+            special_remote_options.append(f'push-url={push_url}')
         try:
             ds.repo.init_remote(
                 srname,
@@ -650,7 +650,7 @@ def _create_sibling_ria(
                 trust_cmd.append('--force')
             ds.repo.call_annex(trust_cmd + [srname])
         # get uuid for use in bare repo's config
-        uuid = ds.config.get("remote.{}.annex-uuid".format(srname))
+        uuid = ds.config.get(f"remote.{srname}.annex-uuid")
 
     if storage_sibling == 'only':
         # we can stop here, the rest of the function is about setting up
@@ -748,7 +748,7 @@ def _create_sibling_ria(
         # otherwise we should have skipped or failed before
         assert existing == 'reconfigure'
     ds.config.set(
-        "remote.{}.annex-ignore".format(name),
+        f"remote.{name}.annex-ignore",
         value="true",
         scope="local")
     yield from ds.siblings(

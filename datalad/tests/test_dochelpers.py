@@ -33,7 +33,7 @@ def test_basic():
 
 def test_borrow_doc():
 
-    class A(object):
+    class A:
         def met1(self):
             """met1doc"""
             pass  # pragma: no cover
@@ -41,7 +41,7 @@ def test_borrow_doc():
             """met2doc"""
             pass  # pragma: no cover
 
-    class B(object):
+    class B:
         @borrowdoc(A)
         def met1(self):
             pass  # pragma: no cover
@@ -55,7 +55,7 @@ def test_borrow_doc():
 
 def test_borrow_kwargs():
 
-    class A(object):
+    class A:
         def met1(self, kp1=None, kp2=1):
             """met1 doc
 
@@ -72,7 +72,7 @@ def test_borrow_kwargs():
             """met2doc"""
             pass  # pragma: no cover
 
-    class B(object):
+    class B:
 
         @borrowkwargs(A)
         def met1(self, desc, **kwargs):
@@ -133,8 +133,8 @@ def test_borrow_kwargs():
             msg="We shouldn't carry kwargs in docstring now,"
                 "Got %r for %s" % (docstring, m))
         assert_true('kp2 ' in docstring)
-        assert_true((('kp1 ' in docstring)
-                             ^ (m == B.met_excludes)))
+        assert_true(('kp1 ' in docstring)
+                             ^ (m == B.met_excludes))
         # indentation should have been squashed properly
         assert_true(not '   ' in docstring)
 

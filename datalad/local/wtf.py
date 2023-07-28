@@ -309,7 +309,7 @@ def _describe_dataset(ds, sensitive):
         }
         # describe available branches and their states
         branches = [
-            '%s@%s' % (b, next(ds.repo.get_branch_commits_(branch=b))[:7])
+            '{}@{}'.format(b, next(ds.repo.get_branch_commits_(branch=b))[:7])
             for b in ds.repo.get_branches()]
         infos['branches'] = branches
         return infos
@@ -568,7 +568,7 @@ def maybe_show_hints(res):
 
 
 def _render_report(res):
-    report = u'# WTF'
+    report = '# WTF'
     if not (res.get('status') == 'ok' and 'infos' in res):
         # some other record not intended to be rendered
         return
@@ -576,18 +576,18 @@ def _render_report(res):
     def _unwind(text, val, top):
         if isinstance(val, dict):
             for k in sorted(val):
-                text += u'\n{}{} {}{} '.format(
+                text += '\n{}{} {}{} '.format(
                     '##' if not top else top,
                     '-' if top else '',
                     k,
                     ':' if top else '')
-                text = _unwind(text, val[k], u'{}  '.format(top))
+                text = _unwind(text, val[k], f'{top}  ')
         elif isinstance(val, (list, tuple)):
             for i, v in enumerate(val):
-                text += u'\n{}{} '.format(top, '-')
-                text = _unwind(text, v, u'{}  '.format(top))
+                text += '\n{}{} '.format(top, '-')
+                text = _unwind(text, v, f'{top}  ')
         else:
-            text += u'{}'.format(val)
+            text += f'{val}'
         return text
 
     def _unwind_short(text, val, top):
@@ -601,7 +601,7 @@ def _render_report(res):
         elif isinstance(val, (list, tuple)):
             text += (' ' if not top else '\n').join(map(str, val))
         else:
-            text += u'{}'.format(val)
+            text += f'{val}'
         return text
 
     unwinder = {'full': _unwind, 'short': _unwind_short}[res.get('flavor', 'full')]
@@ -613,11 +613,11 @@ def _render_report(res):
 
     if decor == 'html_details':
         report = """\
-<details><summary>DataLad %s WTF (%s)</summary>
+<details><summary>DataLad {} WTF ({})</summary>
 
-%s
+{}
 </details>
-        """ % (__version__, ', '.join(res.get('infos', {})), report)
+        """.format(__version__, ', '.join(res.get('infos', {})), report)
     else:
         raise ValueError("Unknown value of decor=%s" % decor)
     return report

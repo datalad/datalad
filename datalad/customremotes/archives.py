@@ -70,7 +70,7 @@ def link_file_load(src, dst, dry_run=False):
         # (e.g. Windows) will not cover scenarios where a particular
         # filesystem simply does not implement it on an otherwise
         # sane platform (e.g. exfat on Linux)
-        lgr.warning("Linking of %s failed (%s), copying file" % (src, e))
+        lgr.warning("Linking of {} failed ({}), copying file".format(src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
     else:
@@ -193,8 +193,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             akey_afiles = unique(akey_afiles, key=itemgetter(0))
 
         if not sorted:
-            for pair in akey_afiles:
-                yield pair
+            yield from akey_afiles
             return
 
         # Otherwise we will go through each one
@@ -431,8 +430,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 continue
 
         raise RemoteError(
-            "Failed to fetch any archive containing {key}. "
-            "Tried: {akeys_tried}".format(**locals())
+            f"Failed to fetch any archive containing {key}. "
+            f"Tried: {akeys_tried}"
         )
 
     def claimurl(self, url):

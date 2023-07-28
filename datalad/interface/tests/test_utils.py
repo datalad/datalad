@@ -367,28 +367,28 @@ def test_discover_ds_trace(path=None, otherdir=None):
             ([opj(d, 'nothere')], None, {}),
             ([opj(db, 'nothere')], None, {}),
             ([a], None,
-             {ds.path: set([a])}),
+             {ds.path: {a}}),
             ([aa, a], None,
-             {ds.path: set([a]), a: set([aa])}),
+             {ds.path: {a}, a: {aa}}),
             ([db], None,
-             {ds.path: set([d]), d: set([db])}),
+             {ds.path: {d}, d: {db}}),
             ([opj(db, 'file_db')], None,
-             {ds.path: set([d]), d: set([db])}),
+             {ds.path: {d}, d: {db}}),
             # just a regular non-existing path
             ([dba], None, {}),
             # but if we inject this knowledge it must come back out
             # as the child of the closest existing dataset
             ([dba], [dba],
-             {ds.path: set([d]), d: set([db]), db: set([dba])}),
+             {ds.path: {d}, d: {db}, db: {dba}}),
             # regardless of the depth
             ([dbaa], [dbaa],
-             {ds.path: set([d]), d: set([db]), db: set([dbaa])}),
+             {ds.path: {d}, d: {db}, db: {dbaa}}),
             ([dba, dbaa], [dba, dbaa],
-             {ds.path: set([d]), d: set([db]), db: set([dba, dbaa])}),
+             {ds.path: {d}, d: {db}, db: {dba, dbaa}}),
             # we can simply add existing and non-existing datasets to the
             # include list get the desired result
             ([d, dba, dbaa], [d, dba, dbaa],
-             {ds.path: set([d]), d: set([db]), db: set([dba, dbaa])}),
+             {ds.path: {d}, d: {db}, db: {dba, dbaa}}),
     ):
         spec = {}
         discover_dataset_trace_to_targets(ds.path, input, [], spec, includeds=eds)
@@ -416,7 +416,7 @@ def test_utils_suppress_similar():
         for i in range(number):
             yield dict(action="foo",
                        status="ok",
-                       path="path{}".format(i))
+                       path=f"path{i}")
             sleep(sleep_dur)
 
 
@@ -462,7 +462,7 @@ def test_utils_suppress_similar():
         for i in range(number):
             yield dict(action="foo",
                        status="ok",
-                       path="path{}".format(i))
+                       path=f"path{i}")
             if i == half:
                 yield dict(action="bar",
                            status="ok",

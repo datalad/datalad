@@ -59,13 +59,13 @@ success_status_map = {
 
 
 def get_status_dict(
-    action: Optional[str] = None,
-    ds: Optional[Dataset] = None,
-    path: Optional[str] = None,
-    type: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
-    refds: Optional[str] = None,
-    status: Optional[str] = None,
+    action: str | None = None,
+    ds: Dataset | None = None,
+    path: str | None = None,
+    type: str | None = None,
+    logger: logging.Logger | None = None,
+    refds: str | None = None,
+    status: str | None = None,
     message: str | tuple | None = None,
     exception: Exception | CapturedException | None = None,
     error_message: str | tuple | None = None,
@@ -138,12 +138,12 @@ def get_status_dict(
 
 def results_from_paths(
     paths: str | list[str],
-    action: Optional[str] = None,
-    type: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
-    refds: Optional[str]=None,
-    status: Optional[str] = None,
-    message: Optional[str] = None,
+    action: str | None = None,
+    type: str | None = None,
+    logger: logging.Logger | None = None,
+    refds: str | None=None,
+    status: str | None = None,
+    message: str | None = None,
     exception: Exception | CapturedException | None = None,
 ) -> Iterator[dict[str, Any]]:
     """
@@ -192,7 +192,7 @@ class YieldDatasets(ResultXFM):
     def __init__(self, success_only: bool = False) -> None:
         self.success_only = success_only
 
-    def __call__(self, res: dict[str, Any]) -> Optional[Dataset]:
+    def __call__(self, res: dict[str, Any]) -> Dataset | None:
         if res.get('type', None) == 'dataset':
             if not self.success_only or \
                     res.get('status', None) in ('ok', 'notneeded'):
@@ -210,7 +210,7 @@ class YieldRelativePaths(ResultXFM):
     Relative paths are determined from the 'refds' value in the result. If
     no such value is found, `None` is returned.
     """
-    def __call__(self, res: dict[str, Any]) -> Optional[str]:
+    def __call__(self, res: dict[str, Any]) -> str | None:
         refpath = res.get('refds', None)
         if refpath:
             return relpath(res['path'], start=refpath)

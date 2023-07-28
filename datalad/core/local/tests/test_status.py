@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -166,7 +165,7 @@ def test_status(_path=None, linkpath=None):
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
-                    OBSCURE_FILENAME + u'_directory_untracked')
+                    OBSCURE_FILENAME + '_directory_untracked')
     apathobj = ds.pathobj / rpath
     apath = str(apathobj)
     # ds.repo.pathobj will have the symlink resolved
@@ -228,7 +227,7 @@ def test_status(_path=None, linkpath=None):
 def test_untracked_annex_query(path=None):
     # test for #7032
     ds = Dataset(path).create()
-    (ds.pathobj / 'untracked_file.txt').write_text(u'dummy')
+    (ds.pathobj / 'untracked_file.txt').write_text('dummy')
     res = ds.status(annex='basic', path='untracked_file.txt')
     assert_not_in_results(
         res,

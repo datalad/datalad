@@ -129,19 +129,19 @@ def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
     content = git_config.read_text()
     assert_in("[datalad \"ora-remote\"]", content)
     super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-storage'))
-    assert_in("uuid = {}".format(super_uuid), content)
+    assert_in(f"uuid = {super_uuid}", content)
 
     # implicit test of success by ria-installing from store:
     ds.push(to="datastore")
     with chpwd(clone_path):
         if host:
             # note, we are not using the "test-store"-label here
-            clone('ria+ssh://{}{}#{}'.format(host, base_path, ds.id),
+            clone(f'ria+ssh://{host}{base_path}#{ds.id}',
                   path='test_install')
         else:
             # TODO: Whenever ria+file supports special remote config (label),
             # change here:
-            clone('ria+file://{}#{}'.format(base_path, ds.id),
+            clone(f'ria+file://{base_path}#{ds.id}',
                   path='test_install')
         installed_ds = Dataset(op.join(clone_path, 'test_install'))
         assert installed_ds.is_installed()
@@ -191,7 +191,7 @@ def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
         res = ds.repo.repo_info()
         assert_in('[datastore-storage]',
                   [r['description']
-                   for r in res['{}ed repositories'.format(trust)]])
+                   for r in res[f'{trust}ed repositories']])
 
 
 @slow  # 11 + 42 sec on travis
@@ -227,8 +227,8 @@ def test_create_push_url(detection_path=None, ds_path=None, store_path=None):
             return f(*args, **kwargs)
         return _wrapper
 
-    url = "ria+{}".format(store_path.as_uri())
-    push_url = "ria+ssh://datalad-test{}".format(store_path.as_posix())
+    url = f"ria+{store_path.as_uri()}"
+    push_url = f"ria+ssh://datalad-test{store_path.as_posix()}"
     assert not detection_path.exists()
 
     with patch('datalad.support.sshconnector.SSHManager.get_connection',
@@ -249,7 +249,7 @@ def test_create_push_url(detection_path=None, ds_path=None, store_path=None):
         eq_(ds.config.get("remote.datastore.url"),
             (store_path / ds.id[:3] / ds.id[3:]).as_posix())
         eq_(ds.config.get("remote.datastore.pushurl"),
-            "ssh://datalad-test{}".format((store_path / ds.id[:3] / ds.id[3:]).as_posix()))
+            f"ssh://datalad-test{(store_path / ds.id[:3] / ds.id[3:]).as_posix()}")
 
         # git-push uses SSH:
         detection_path.unlink()
@@ -276,26 +276,26 @@ def test_create_alias(ds_path=None, ria_path=None, clone_path=None):
     ds_path.mkdir()
     dsa = Dataset(ds_path / "a").create()
 
-    res = dsa.create_sibling_ria(url="ria+file://{}".format(ria_path),
+    res = dsa.create_sibling_ria(url=f"ria+file://{ria_path}",
                                  name="origin",
                                  alias="ds-a",
                                  new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
 
-    ds_clone = clone(source="ria+file://{}#~ds-a".format(ria_path),
+    ds_clone = clone(source=f"ria+file://{ria_path}#~ds-a",
                      path=clone_path / "a")
     assert_repo_status(ds_clone.path)
 
     # multiple datasets in a RIA store with different aliases work
     dsb = Dataset(ds_path / "b").create()
 
-    res = dsb.create_sibling_ria(url="ria+file://{}".format(ria_path),
+    res = dsb.create_sibling_ria(url=f"ria+file://{ria_path}",
                                  name="origin",
                                  alias="ds-b",
                                  new_store_ok=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
 
-    ds_clone = clone(source="ria+file://{}#~ds-b".format(ria_path),
+    ds_clone = clone(source=f"ria+file://{ria_path}#~ds-b",
                      path=clone_path / "b")
     assert_repo_status(ds_clone.path)
 
@@ -303,7 +303,7 @@ def test_create_alias(ds_path=None, ria_path=None, clone_path=None):
     dsc = Dataset(ds_path / "c").create()
 
     with swallow_logs(logging.WARNING) as cml:
-        res = dsc.create_sibling_ria(url="ria+file://{}".format(ria_path),
+        res = dsc.create_sibling_ria(url=f"ria+file://{ria_path}",
                                      name="origin",
                                      alias="ds-a",
                                      new_store_ok=True)

@@ -322,7 +322,7 @@ class AddArchiveContent(Interface):
                 ds=ds,
                 status='impossible',
                 message=(
-                    'No such file: {}'.format(archive_path),
+                    f'No such file: {archive_path}',
                 ),
                 **res_kwargs
             )

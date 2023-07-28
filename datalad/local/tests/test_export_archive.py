@@ -1,5 +1,4 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -55,7 +54,7 @@ def test_archive(path=None):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save()
     committed_date = ds.repo.get_commit_date()
-    default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
+    default_outname = opj(path, f'datalad_{ds.id}.tar.gz')
     with chpwd(path):
         res = list(ds.export_archive())
         assert_status('ok', res)
@@ -115,5 +114,5 @@ def test_zip_archive(path=None):
 
     # should be able to export without us cd'ing to that ds directory
     ds.export_archive(filename=ds.path, archivetype='zip')
-    default_name = 'datalad_{}.zip'.format(ds.id)
+    default_name = f'datalad_{ds.id}.zip'
     assert_true(os.path.exists(os.path.join(ds.path, default_name)))

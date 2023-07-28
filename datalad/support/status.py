@@ -16,7 +16,7 @@ from ..utils import auto_repr
 
 
 @auto_repr
-class FileStatus(object):
+class FileStatus:
     """Description of the file status to e.g. check if newer version is available
 
     """
@@ -68,4 +68,4 @@ class FileStatus(object):
         elif out is NotImplemented:
             return out
         else:
-            raise RuntimeError("Unknown return %r" % (out,))
+            raise RuntimeError("Unknown return {!r}".format(out))

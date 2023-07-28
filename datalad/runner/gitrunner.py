@@ -32,7 +32,7 @@ lgr = logging.getLogger('datalad.runner.gitrunner')
 GIT_SSH_COMMAND = "datalad sshrun"
 
 
-class GitRunnerBase(object):
+class GitRunnerBase:
     """
     Mix-in class for Runners to be used to run git and git annex commands
 

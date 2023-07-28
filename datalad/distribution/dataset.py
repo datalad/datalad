@@ -61,7 +61,7 @@ lgr.log(5, "Importing dataset")
 
 
 @path_based_str_repr
-class Dataset(object, metaclass=PathBasedFlyweight):
+class Dataset(metaclass=PathBasedFlyweight):
     """Representation of a DataLad dataset/repository
 
     This is the core data type of DataLad: a representation of a dataset.
@@ -190,7 +190,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             import datalad.api
             # which would bind all known interfaces as well.
             # Although adds overhead, good for UX
-        return super(Dataset, self).__getattribute__(attr)
+        return super().__getattribute__(attr)
 
     def close(self):
         """Perform operations which would close any possible process using this Dataset
@@ -586,14 +586,14 @@ def require_dataset(dataset, check_installed=True, purpose=None):
                 "or change the current working directory to be in a "
                 "dataset.".format(
                     getpwd(),
-                    " for the purpose {!r}".format(purpose) if purpose else ''
+                    f" for the purpose {purpose!r}" if purpose else ''
                 )
             )
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
-    lgr.debug(u"Resolved dataset%s: %s",
-              u' to {}'.format(purpose) if purpose else '',
+    lgr.debug("Resolved dataset%s: %s",
+              f' to {purpose}' if purpose else '',
               dataset.path)
 
     if check_installed and not dataset.is_installed():

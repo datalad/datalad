@@ -213,7 +213,7 @@ class Clean(Interface):
             path = res['path'] if refds is None \
                 else str(Path(res['path']).relative_to(refds))
 
-            ui.message(u"{path}: {message}".format(
+            ui.message("{path}: {message}".format(
                 path=ac.color_word(path, ac.BOLD),
                 message=(res['message'][0] % res['message'][1:]
                          if isinstance(res['message'], tuple)

@@ -1,5 +1,4 @@
 # ex: set sts=4 ts=4 sw=4 et:
-# -*- coding: utf-8 -*-
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -109,7 +108,7 @@ def test_parse_gitconfig_dump():
     assert_equal(
         files,
         # the 'command line:' origin is ignored
-        set((Path('ROOT/.git/config'), Path('/home/me/.gitconfig'))))
+        {Path('ROOT/.git/config'), Path('/home/me/.gitconfig')})
     assert_equal(gitcfg_parsetarget, parsed)
 
     # now contaminate the output with a prepended error message
@@ -138,16 +137,16 @@ def test_something(path=None, new_home=None):
     assert_true(cfg.has_section('something'))
     assert_false(cfg.has_section('somethingelse'))
     assert_equal(sorted(cfg.sections()),
-                 [u'onemore.complicated の beast with.dot', 'something'])
+                 ['onemore.complicated の beast with.dot', 'something'])
     assert_true(cfg.has_option('something', 'user'))
     assert_false(cfg.has_option('something', 'us?er'))
     assert_false(cfg.has_option('some?thing', 'user'))
     assert_equal(sorted(cfg.options('something')), ['empty', 'myint', 'novalue', 'user'])
-    assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
+    assert_equal(cfg.options('onemore.complicated の beast with.dot'), ['findme'])
 
     assert_equal(
         sorted(cfg.items()),
-        [(u'onemore.complicated の beast with.dot.findme', '5.0'),
+        [('onemore.complicated の beast with.dot.findme', '5.0'),
          ('something.empty', ''),
          ('something.myint', '3'),
          ('something.novalue', None),
@@ -167,7 +166,7 @@ def test_something(path=None, new_home=None):
         cfg.get('something.user', get_all=True),
         ('name=Jane Doe', 'email=jd@example.com'))
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
-    assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
+    assert_equal(cfg.getfloat('onemore.complicated の beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
     assert_equal(cfg.getbool('something', 'myint'), True)
     # git demands a key without value at all to be used as a flag, thus True
@@ -187,7 +186,7 @@ def test_something(path=None, new_home=None):
 
     # modification follows
     cfg.add('something.new', 'の')
-    assert_equal(cfg.get('something.new'), u'の')
+    assert_equal(cfg.get('something.new'), 'の')
     # sections are added on demand
     cfg.add('unheard.of', 'fame')
     assert_true(cfg.has_section('unheard.of'))
@@ -555,7 +554,7 @@ def test_rewrite_url():
         'http://host4': ('someokish', 'conflict2'),
     }
     cfg = {
-        'url.{}.insteadof'.format(k): v
+        f'url.{k}.insteadof': v
         for k, v in cfg_in.items()
     }
     for input, output in test_cases:

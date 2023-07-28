@@ -26,7 +26,7 @@ test_lines = [
 
 
 def _check_splitting_endings_separator(endings: list[str],
-                                       separator: Optional[str] = None,
+                                       separator: str | None = None,
                                        keep_ends: bool = False,
                                        check_continuation: bool = False
                                        ) -> None:
@@ -132,7 +132,7 @@ def test_assembling_decoder_mix_in_basic() -> None:
 def _decode_multiple(adm: AssemblingDecoderMixIn,
                      encoded_strings: list[bytes],
                      encoding: str,
-                     fixed_index: Optional[int] = None) -> list[str]:
+                     fixed_index: int | None = None) -> list[str]:
 
     # Interleave decoding of multiple strings
     decoded_chars: list[list] = [list() for _ in range(len(encoded_strings))]

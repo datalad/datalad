@@ -28,7 +28,7 @@ class LineSplitter:
     on python's built-in splitlines().
     """
     def __init__(self,
-                 separator: Optional[str] = None,
+                 separator: str | None = None,
                  keep_ends: bool = False
                  ) -> None:
         """
@@ -109,7 +109,7 @@ class LineSplitter:
                 return [line + self.separator for line in detected_lines]
             return detected_lines
 
-    def finish_processing(self) -> Optional[str]:
+    def finish_processing(self) -> str | None:
         return self.remaining_data
 
 

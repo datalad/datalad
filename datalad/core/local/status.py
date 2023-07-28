@@ -147,7 +147,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
             DeprecationWarning)
 
     if reporting_order not in ('depth-first', 'breadth-first'):
-        raise ValueError('Unknown reporting order: {}'.format(reporting_order))
+        raise ValueError(f'Unknown reporting order: {reporting_order}')
 
     if ds.pathobj in queried:
         # do not report on a single dataset twice
@@ -447,7 +447,7 @@ class Status(Interface):
         type_ = res.get('type', res.get('type_src', ''))
         max_len = len('untracked')
         state = res.get('state', 'unknown')
-        ui.message(u'{fill}{state}: {path}{type_}'.format(
+        ui.message('{fill}{state}: {path}{type_}'.format(
             fill=' ' * max(0, max_len - len(state)),
             state=ac.color_word(
                 state,

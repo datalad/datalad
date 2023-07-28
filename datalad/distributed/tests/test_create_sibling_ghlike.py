@@ -181,7 +181,7 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint,
     finally:
         token = os.environ[token_var]
         requests.delete(
-            '{}/{}'.format(api, delete_endpoint.format(reponame=reponame)),
+            f'{api}/{delete_endpoint.format(reponame=reponame)}',
             headers={
                 'user-agent': DEFAULT_USER_AGENT,
                 'authorization':

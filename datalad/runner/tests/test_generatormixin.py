@@ -32,7 +32,7 @@ class TestProtocol(GeneratorMixIn, StdOutErrCapture):
 
     def __init__(self,
                  done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
+                 encoding: str | None = None) -> None:
 
         StdOutErrCapture.__init__(
             self,
@@ -46,7 +46,7 @@ class TestProtocol(GeneratorMixIn, StdOutErrCapture):
 
 def test_generator_mixin_basic() -> None:
 
-    stdin_queue: Queue[Optional[bytes]] = Queue()
+    stdin_queue: Queue[bytes | None] = Queue()
 
     i = 0
     for fd, data in run_command([sys.executable, "-i", "-"], TestProtocol, stdin_queue):
@@ -60,7 +60,7 @@ def test_generator_mixin_basic() -> None:
 
 def test_generator_mixin_runner() -> None:
 
-    stdin_queue: Queue[Optional[bytes]] = Queue()
+    stdin_queue: Queue[bytes | None] = Queue()
 
     runner = WitlessRunner()
     i = 0
@@ -85,7 +85,7 @@ def test_post_pipe_callbacks() -> None:
             self.send_result(1)
             self.send_result(2)
 
-        def connection_lost(self, exc: Optional[BaseException]) -> None:
+        def connection_lost(self, exc: BaseException | None) -> None:
             self.send_result(3)
             self.send_result(4)
 
@@ -107,7 +107,7 @@ def test_file_number_activity_detection() -> None:
         def process_exited(self) -> None:
             self.send_result(3)
 
-        def connection_lost(self, exc: Optional[BaseException]) -> None:
+        def connection_lost(self, exc: BaseException | None) -> None:
             self.send_result(4)
 
     wl_runner = WitlessRunner()

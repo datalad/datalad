@@ -31,7 +31,7 @@ from .protocol import GeneratorMixIn
 lgr = logging.getLogger('datalad.runner.runner')
 
 
-class WitlessRunner(object):
+class WitlessRunner:
     """Minimal Runner with support for online command output processing
 
     It aims to be as simple as possible, providing only essential

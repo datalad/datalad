@@ -68,6 +68,6 @@ def repo_from_path(path):
                 "%s", exc)
 
     if repo is None:
-        raise ValueError('No repository at {}'.format(path))
+        raise ValueError(f'No repository at {path}')
 
     return repo

@@ -138,7 +138,7 @@ def test_copy_file_datalad_specialremote(workdir=None, webdir=None, weburl=None)
     src_ds.repo.init_remote(
         DATALAD_SPECIAL_REMOTE,
         ['encryption=none', 'type=external',
-         'externaltype={}'.format(DATALAD_SPECIAL_REMOTE),
+         f'externaltype={DATALAD_SPECIAL_REMOTE}',
          'autoenable=true'])
     # put files into the dataset by URL
     src_ds.download_url('/'.join((weburl, 'webfile1')),
@@ -150,7 +150,7 @@ def test_copy_file_datalad_specialremote(workdir=None, webdir=None, weburl=None)
     assert_in_results(
         src_ds.repo.whereis('myfile1.txt', output='full').values(),
         here=False,
-        description='[{}]'.format(DATALAD_SPECIAL_REMOTE),
+        description=f'[{DATALAD_SPECIAL_REMOTE}]',
     )
     # now a new dataset
     dest_ds = Dataset(workdir / 'dest').create()

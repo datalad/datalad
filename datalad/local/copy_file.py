@@ -49,7 +49,7 @@ from functools import lru_cache
 lgr = logging.getLogger('datalad.local.copy_file')
 
 
-class _CachedRepo(object):
+class _CachedRepo:
     """Custom wrapper around a Repo instance
 
     It provides a few customized methods that also cache their return
@@ -719,7 +719,7 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
             repo.init_remote(
                 # TODO what about a naming conflict across all dataset sources?
                 sri['name'],
-                ['{}={}'.format(k, v) for k, v in sri.items() if k != 'name'],
+                [f'{k}={v}' for k, v in sri.items() if k != 'name'],
             )
             # must update special remote info for later matching
             repo.get_special_remotes_wo_timestamp.cache_clear()

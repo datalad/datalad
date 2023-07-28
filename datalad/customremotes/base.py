@@ -8,7 +8,6 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Base classes to custom git-annex remotes (e.g. extraction from archives)"""
 
-from __future__ import absolute_import
 
 __docformat__ = 'restructuredtext'
 
@@ -52,7 +51,7 @@ class AnnexCustomRemote(SpecialRemote):
         # some hierarchical structure.  But actually since we might encode
         # additional information (such as size) into the URL, it will not be
         # strictly conforming it. Thus we will not use //
-        return "%s+%s" % (URI_PREFIX, prefix)  # if .PREFIX else '')
+        return "{}+{}".format(URI_PREFIX, prefix)  # if .PREFIX else '')
 
     # Helper methods
     def gen_URLS(self, key):

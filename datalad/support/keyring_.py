@@ -14,7 +14,7 @@ import logging
 lgr = logging.getLogger('datalad.support.keyring')
 
 
-class Keyring(object):
+class Keyring:
     """Adapter to keyring module
 
     It also delays import of keyring which takes 300ms I guess due to all plugins etc
@@ -71,7 +71,7 @@ class Keyring(object):
         # anymmore, but needs to be supported. For example, it is used with and
         # was advertised for
         # https://github.com/datalad-datasets/human-connectome-project-openaccess
-        env_var = ('DATALAD_%s_%s' % (name, field)).replace('-', '_')
+        env_var = ('DATALAD_{}_{}'.format(name, field)).replace('-', '_')
         lgr.log(5, 'Credentials lookup attempt via env var %s', env_var)
         if env_var in os.environ:
             return os.environ[env_var]
@@ -92,7 +92,7 @@ class Keyring(object):
             raise
 
 
-class MemoryKeyring(object):
+class MemoryKeyring:
     """A simple keyring which just stores provided info in memory
 
     Primarily for testing

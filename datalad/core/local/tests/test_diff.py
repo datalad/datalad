@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -392,7 +391,7 @@ def test_path_diff(_path=None, linkpath=None):
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
-                    u'{}_directory_untracked'.format(OBSCURE_FILENAME))
+                    f'{OBSCURE_FILENAME}_directory_untracked')
     apathobj = ds.pathobj / rpath
     apath = str(apathobj)
     for p in (rpath, apath, None):
@@ -499,7 +498,7 @@ def test_diff_rsync_syntax(path=None):
 def test_diff_nonexistent_ref_unicode(path=None):
     ds = Dataset(path).create()
     assert_result_count(
-        ds.diff(fr="HEAD", to=u"β", on_failure="ignore", result_renderer='disabled'),
+        ds.diff(fr="HEAD", to="β", on_failure="ignore", result_renderer='disabled'),
         1,
         path=ds.path,
         status="impossible")

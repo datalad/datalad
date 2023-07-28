@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -241,7 +240,7 @@ def test_configs(path=None):
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        u'%s {script} {ds} {{mysub}} {args}' % quote_cmdlinearg(sys.executable),
+        '%s {script} {ds} {{mysub}} {args}' % quote_cmdlinearg(sys.executable),
         scope='branch'
     )
     ds.config.add(
@@ -261,7 +260,7 @@ def test_configs(path=None):
     # config on dataset level:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        u'%s {script} {ds} local {args}' % quote_cmdlinearg(sys.executable),
+        '%s {script} {ds} local {args}' % quote_cmdlinearg(sys.executable),
         scope='local'
     )
     ds.unlock("fromproc.txt")

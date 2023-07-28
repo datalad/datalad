@@ -1,5 +1,4 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -477,7 +476,7 @@ def test_auto_repr():
             return "some"
 
     @auto_repr(short=False)
-    class buga_long(object):
+    class buga_long:
         def __init__(self):
             self.a = 1
             self.b = list(range(20))
@@ -769,8 +768,7 @@ def test_memoized_generator():
     def g1(n):
         """a generator"""
         called[0] += 1
-        for i in range(n):
-            yield i
+        yield from range(n)
 
     from ..utils import saved_generator
     ok_generator(g1(3))
@@ -790,19 +788,19 @@ def test_memoized_generator():
 def test_assure_unicode():
     ok_(isinstance(ensure_unicode("m"), str))
     ok_(isinstance(ensure_unicode('grandchild_äöü東'), str))
-    ok_(isinstance(ensure_unicode(u'grandchild_äöü東'), str))
-    eq_(ensure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+    ok_(isinstance(ensure_unicode('grandchild_äöü東'), str))
+    eq_(ensure_unicode('grandchild_äöü東'), 'grandchild_äöü東')
     # now, non-utf8
     # Decoding could be deduced with high confidence when the string is
     # really encoded in that codepage
-    mom_koi8r = u"мама".encode('koi8-r')
-    eq_(ensure_unicode(mom_koi8r), u"мама")
-    eq_(ensure_unicode(mom_koi8r, confidence=0.9), u"мама")
-    mom_iso8859 = u'mamá'.encode('iso-8859-1')
-    eq_(ensure_unicode(mom_iso8859), u'mamá')
-    eq_(ensure_unicode(mom_iso8859, confidence=0.5), u'mamá')
+    mom_koi8r = "мама".encode('koi8-r')
+    eq_(ensure_unicode(mom_koi8r), "мама")
+    eq_(ensure_unicode(mom_koi8r, confidence=0.9), "мама")
+    mom_iso8859 = 'mamá'.encode('iso-8859-1')
+    eq_(ensure_unicode(mom_iso8859), 'mamá')
+    eq_(ensure_unicode(mom_iso8859, confidence=0.5), 'mamá')
     # but when we mix, it does still guess something allowing to decode:
-    mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
+    mixedin = mom_koi8r + '東'.encode('iso2022_jp') + '東'.encode()
     ok_(isinstance(ensure_unicode(mixedin), str))
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
@@ -813,8 +811,8 @@ def test_assure_unicode():
 
 
 def test_pathlib_unicode():
-    eq_(str(Path("a")), u"a")
-    eq_(str(Path(u"β")), u"β")
+    eq_(str(Path("a")), "a")
+    eq_(str(Path("β")), "β")
 
 
 @with_tempfile(mkdir=True)
@@ -1042,13 +1040,13 @@ def test_read_csv_lines_basic(infile=None):
     eq_(
         list(gen),
         [
-            {u'h1': u'v1', u'h2': u'2'},
-            {u'h1': u'v2', u'h2': u'3'},
+            {'h1': 'v1', 'h2': '2'},
+            {'h1': 'v2', 'h2': '3'},
         ]
     )
 
 
-@with_tempfile(content=u"h1\th2\nv1\tдата".encode('utf-8'))
+@with_tempfile(content="h1\th2\nv1\tдата".encode())
 def test_read_csv_lines_tsv_unicode(infile=None):
     # Just a basic test, next one with unicode
     gen = read_csv_lines(infile)
@@ -1056,19 +1054,19 @@ def test_read_csv_lines_tsv_unicode(infile=None):
     eq_(
         list(gen),
         [
-            {u'h1': u'v1', u'h2': u'дата'},
+            {'h1': 'v1', 'h2': 'дата'},
         ]
     )
 
 
-@with_tempfile(content=u"h1\nv1\nv2")
+@with_tempfile(content="h1\nv1\nv2")
 def test_read_csv_lines_one_column(infile=None):
     # Just a basic test, next one with unicode
     eq_(
         list(read_csv_lines(infile)),
         [
-            {u'h1': u'v1'},
-            {u'h1': u'v2'},
+            {'h1': 'v1'},
+            {'h1': 'v2'},
         ]
     )
 
@@ -1200,7 +1198,7 @@ def test_get_open_files(p=None):
                  stdout=PIPE,
                  cwd=str(subd))
     # Assure that it started and we read the OK
-    eq_(ensure_unicode(proc.stdout.readline().strip()), u"OK")
+    eq_(ensure_unicode(proc.stdout.readline().strip()), "OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
     eq_(get_open_files(p)[str(subd.resolve())].pid, proc.pid)
     eq_(get_open_files(subd)[str(subd.resolve())].pid, proc.pid)
@@ -1213,7 +1211,7 @@ def test_map_items():
         return x + 10
     eq_(map_items(add10, {2: 3}), {12: 13})
 
-    class Custom(object):
+    class Custom:
         """For testing with custom items possibly of varying length etc"""
         def __init__(self, items):
             self._items = list(items)
@@ -1236,7 +1234,7 @@ def test_CMD_MAX_ARG():
 
 @with_tempfile(mkdir=True)
 def test_create_tree(path=None):
-    content = u"мама мыла раму"
+    content = "мама мыла раму"
     create_tree(path, dict([
         ('1', content),
         ('sd', dict(
@@ -1337,7 +1335,7 @@ def test_is_interactive(fout=None):
                                (AnnexJsonProtocol, False)):
         eq_(get_interactive(protocol=proto),
             interactive,
-            msg='{} -> {}'.format(str(proto), interactive))
+            msg=f'{str(proto)} -> {interactive}')
     # and it must not crash if smth is closed
     for o in ('stderr', 'stdin', 'stdout'):
         eq_(get_interactive("import sys; sys.%s.close(); " % o), False)

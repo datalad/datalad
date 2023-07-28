@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8  -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -170,7 +169,7 @@ def get_bucket(conn, bucket_name):
             _handle_exception(e, bucket_name)
 
 
-class VersionedFilesPool(object):
+class VersionedFilesPool:
     """Just a helper which would help to create versioned files in the bucket"""
     def __init__(self, bucket):
         self._versions = {}
@@ -403,7 +402,7 @@ def add_version_to_url(url, version, replace=False):
     -------
     A versioned URL (str)
     """
-    version_id = "versionId={}".format(version)
+    version_id = f"versionId={version}"
     if not url.query:
         query = version_id
     else:
@@ -511,7 +510,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             all_keys = bucket.list_versions(fpath)
             # Filter and sort them so the newest one on top
             all_keys = [x for x in sorted(all_keys, key=lambda x: (x.last_modified, x.is_latest))
-                        if ((x.name == fpath)  # match exact name, not just prefix
+                        if (x.name == fpath  # match exact name, not just prefix
                             )
                         ][::-1]
             # our current assumptions

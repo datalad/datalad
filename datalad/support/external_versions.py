@@ -177,7 +177,7 @@ def get_rsync_version():
     return LooseVersion(out['stdout'].splitlines()[0].split()[2])
 
 
-class ExternalVersions(object):
+class ExternalVersions:
     """Helper to figure out/use versions of the externals (modules, cmdline tools, etc).
 
     To avoid collision between names of python modules and command line tools,
@@ -384,7 +384,7 @@ class ExternalVersions(object):
         """
         if indent and (indent is True):
             indent = ' '
-        items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self.keys(query=query))]
+        items = ["{}={}".format(k, self._versions[k]) for k in sorted(self.keys(query=query))]
         out = "%s" % preamble if preamble else ''
         if indent is not None:
             if preamble:

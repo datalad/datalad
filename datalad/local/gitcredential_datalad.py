@@ -181,10 +181,10 @@ def _action_get(attrs, providers):
         if isinstance(provider.credential, GitCredential):
             # Just return the unchanged description we got from Git
             for k, v in attrs.items():
-                print('{}={}'.format(k, v))
+                print(f'{k}={v}')
             return
 
     for dlk, gitk in (('user', 'username'), ('password', 'password')):
         val = dlcred.get(dlk)
         if val is not None:
-            print('{}={}'.format(gitk, val))
+            print(f'{gitk}={val}')

@@ -66,7 +66,7 @@ def _get_gitcfg(gitdir, key, cfgargs=None, regex=False):
         return subprocess.check_output(
             cmd,
             # yield text
-            universal_newlines=True).strip()
+            text=True).strip()
     except Exception:
         lgr.debug(
             "Failed to obtain config '%s' at %s",
@@ -106,7 +106,7 @@ class RIARemoteError(RemoteError):
     pass
 
 
-class IOBase(object):
+class IOBase:
     """Abstract class with the desired API for local/remote operations"""
 
     def get_7z(self):
@@ -274,7 +274,7 @@ class LocalIO(IOBase):
 
     def read_file(self, file_path):
 
-        with open(str(file_path), 'r') as f:
+        with open(str(file_path)) as f:
             content = f.read()
         return content
 
@@ -425,7 +425,7 @@ class SSHRemoteIO(IOBase):
             else:
                 return s % S
         else:
-            raise RIARemoteError("invalid key: {}".format(key))
+            raise RIARemoteError(f"invalid key: {key}")
 
     def _run(self, cmd, no_output=True, check=False):
 
@@ -508,10 +508,10 @@ class SSHRemoteIO(IOBase):
                                         # anymore
 
     def mkdir(self, path):
-        self._run('mkdir -p {}'.format(sh_quote(str(path))))
+        self._run(f'mkdir -p {sh_quote(str(path))}')
 
     def symlink(self, target, link_name):
-        self._run('ln -s {} {}'.format(sh_quote(str(target)), sh_quote(str(link_name))))
+        self._run(f'ln -s {sh_quote(str(target))} {sh_quote(str(link_name))}')
 
     def put(self, src, dst, progress_cb):
         self.ssh.put(str(src), str(dst))
@@ -547,7 +547,7 @@ class SSHRemoteIO(IOBase):
         #       earlier calls. This is a problem with blocking reading, since we
         #       need to make sure there's actually something to read in any
         #       case.
-        cmd = 'cat {}'.format(sh_quote(str(src)))
+        cmd = f'cat {sh_quote(str(src))}'
         self.shell.stdin.write(cmd.encode())
         self.shell.stdin.write(b"\n")
         self.shell.stdin.flush()
@@ -568,23 +568,23 @@ class SSHRemoteIO(IOBase):
 
     def rename(self, src, dst):
         with self.ensure_writeable(dst.parent):
-            self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
+            self._run(f'mv {sh_quote(str(src))} {sh_quote(str(dst))}')
 
     def remove(self, path):
         try:
             with self.ensure_writeable(path.parent):
-                self._run('rm {}'.format(sh_quote(str(path))), check=True)
+                self._run(f'rm {sh_quote(str(path))}', check=True)
         except RemoteCommandFailedError as e:
             raise RIARemoteError(f"Unable to remove {path} "
                                  "or to obtain write permission in parent directory.") from e
 
     def remove_dir(self, path):
         with self.ensure_writeable(path.parent):
-            self._run('rmdir {}'.format(sh_quote(str(path))))
+            self._run(f'rmdir {sh_quote(str(path))}')
 
     def exists(self, path):
         try:
-            self._run('test -e {}'.format(sh_quote(str(path))), check=True)
+            self._run(f'test -e {sh_quote(str(path))}', check=True)
             return True
         except RemoteCommandFailedError:
             return False
@@ -646,7 +646,7 @@ class SSHRemoteIO(IOBase):
 
     def read_file(self, file_path):
 
-        cmd = "cat  {}".format(sh_quote(str(file_path)))
+        cmd = f"cat  {sh_quote(str(file_path))}"
         try:
             out = self._run(cmd, no_output=False, check=True)
         except RemoteCommandFailedError as e:
@@ -666,7 +666,7 @@ class SSHRemoteIO(IOBase):
         elif mode == 'a':
             mode = ">>"
         else:
-            raise ValueError("Unknown mode '{}'".format(mode))
+            raise ValueError(f"Unknown mode '{mode}'")
         if not content.endswith('\n'):
             content += '\n'
 
@@ -701,7 +701,7 @@ class SSHRemoteIO(IOBase):
         #     return None
 
 
-class HTTPRemoteIO(object):
+class HTTPRemoteIO:
     # !!!!
     # This is not actually an IO class like SSHRemoteIO and LocalIO and needs
     # respective RF'ing of special remote implementation eventually.
@@ -718,7 +718,7 @@ class HTTPRemoteIO(object):
     def __init__(self, url, buffer_size=DEFAULT_BUFFER_SIZE):
         from datalad.downloaders.providers import Providers
         if not url.startswith("http"):
-            raise RIARemoteError("Expected HTTP URL, but got {}".format(url))
+            raise RIARemoteError(f"Expected HTTP URL, but got {url}")
 
         self.store_url = url.rstrip('/')
 
@@ -876,7 +876,7 @@ class ORARemote(SpecialRemote):
 
     @handle_errors
     def __init__(self, annex):
-        super(ORARemote, self).__init__(annex)
+        super().__init__(annex)
         if hasattr(self, 'configs'):
             # introduced in annexremote 1.4.2 to support LISTCONFIGS
             self.configs['url'] = "RIA store to use"
@@ -1223,7 +1223,7 @@ class ORARemote(SpecialRemote):
                 + path.relative_to(local_store_base_path).as_posix()
             )
         elif self.storage_host:
-            target_ri = "ssh://{}{}".format(self.storage_host, path.as_posix())
+            target_ri = f"ssh://{self.storage_host}{path.as_posix()}"
         else:
             target_ri = path.as_uri()
 
@@ -1247,7 +1247,7 @@ class ORARemote(SpecialRemote):
             raise RuntimeError(f"Failed to access {target_ri}") from exc
 
         if not (1 <= len(file_content) <= 2):
-            self.message("invalid version file {}".format(path),
+            self.message(f"invalid version file {path}",
                          type='info')
             return None
 
@@ -1505,7 +1505,7 @@ class ORARemote(SpecialRemote):
         # In addition include uuid, to not interfere with parallel uploads from
         # different clones.
         transfer_dir = \
-            self.remote_git_dir / "ora-remote-{}".format(self._repo.uuid) / "transfer"
+            self.remote_git_dir / f"ora-remote-{self._repo.uuid}" / "transfer"
         self.push_io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 

@@ -63,7 +63,7 @@ from datalad.support.exceptions import CapturedException
 
 
 @auto_repr
-class ConsoleLog(object):
+class ConsoleLog:
 
     progressbars = None
 
@@ -138,7 +138,7 @@ class SilentConsoleLog(ConsoleLog):
             msg += ' Title: %s.' % title
         if not kwargs.get('hidden'):
             kwargs_str = ', '.join(
-                ('%s=%r' % (k, v)
+                ('{}={!r}'.format(k, v)
                 for k, v in kwargs.items()
                 if v is not None))
             if kwargs_str:
@@ -187,7 +187,7 @@ def _get_value(value, hidden):
 class DialogUI(ConsoleLog, InteractiveUI):
 
     def __init__(self, *args, **kwargs):
-        super(DialogUI, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # ATM doesn't make sense to print the same title for subsequent questions
         # so we will store previous one and not show it if was the previous one shown
         # within 5 seconds from prev question
@@ -237,9 +237,9 @@ class DialogUI(ConsoleLog, InteractiveUI):
                 else x
 
         if choices is not None:
-            msg += "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
+            msg += "{} (choices: {})".format(text, ', '.join(map(mark_default, choices)))
         elif default is not None:
-            msg += '{} [{}]'.format(text, default)
+            msg += f'{text} [{default}]'
         else:
             msg += text
         # Like this:
@@ -253,7 +253,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
             if attempt >= 100:
                 raise RuntimeError("This is 100th attempt. Something really went wrong")
 
-            response = self.input("{}: ".format(msg), hidden=hidden)
+            response = self.input(f"{msg}: ", hidden=hidden)
             # TODO: dedicated option?  got annoyed by this one
             # multiple times already, typically we are not defining
             # new credentials where repetition would be needed.
@@ -261,7 +261,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
                 repeat = hidden and choices is None
 
             if repeat:
-                response_r = self.input('{} (repeat): '.format(msg), hidden=hidden)
+                response_r = self.input(f'{msg} (repeat): ', hidden=hidden)
                 if response != response_r:
                     self.error("input mismatch, please start over")
                     continue
@@ -328,7 +328,7 @@ class IPythonUI(DialogUI):
                 self.__class__._tqdm_frontend = None
         if self._tqdm_frontend:
             kwargs.update()
-        return super(IPythonUI, self).get_progressbar(
+        return super().get_progressbar(
                 *args, frontend=self._tqdm_frontend, **kwargs)
 
 
@@ -342,7 +342,7 @@ class UnderAnnexUI(DialogUI):
             #kwargs['out'] = os.fdopen(sys.stderr.fileno(), 'w', 0)
             # but wasn't effective! sp kist straogjt for now
             kwargs['out'] = sys.stderr
-        super(UnderAnnexUI, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.specialremote = specialremote
 
     def set_specialremote(self, specialremote):
@@ -354,7 +354,7 @@ class UnderAnnexUI(DialogUI):
             kwargs = kwargs.copy()
             kwargs['backend'] = 'annex-remote'
             kwargs['remote'] = self.specialremote
-        return super(UnderAnnexUI, self).get_progressbar(
+        return super().get_progressbar(
                 *args, **kwargs)
 
 
@@ -367,7 +367,7 @@ class UnderTestsUI(DialogUI):
     """
 
     def __init__(self, **kwargs):
-        super(UnderTestsUI, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._responses = deque()
 
     # TODO: possibly allow to provide expected messages etc, so we could

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -46,7 +45,7 @@ _dataset_hierarchy_template = {
         'file1': '',
         # Add prefix to prevent DATALAD_TESTS_OBSCURE_PREFIX=- from working as
         # intended. 'git submodule add' cannot handle paths starting with -.
-        u'ds-' + OBSCURE_FILENAME: {
+        'ds-' + OBSCURE_FILENAME: {
             'file2': 'file2',
             'subsub': {
                 'file3': 'file3'}}}}
@@ -77,7 +76,7 @@ def test_create_raises(path=None, outside_path=None):
         message=(
             'dataset containing given paths is not underneath the reference '
             'dataset %s: %s', ds, outside_path))
-    obscure_ds = u"ds-" + OBSCURE_FILENAME
+    obscure_ds = "ds-" + OBSCURE_FILENAME
     # create a sub:
     ds.create(obscure_ds)
     # fail when doing it again
@@ -283,7 +282,7 @@ def test_create_subdataset_hierarchy_from_top(path=None):
     ok_(ds.is_installed())
     # ... but it has untracked content
     ok_(ds.repo.dirty)
-    subds = ds.create(u"ds-" + OBSCURE_FILENAME, force=True)
+    subds = ds.create("ds-" + OBSCURE_FILENAME, force=True)
     ok_(subds.is_installed())
     ok_(subds.repo.dirty)
     subsubds = subds.create('subsub', force=True)

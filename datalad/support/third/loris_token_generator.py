@@ -21,7 +21,7 @@ from datalad.support.exceptions import (
 from datalad.utils import ensure_unicode
 
 
-class LORISTokenGenerator(object):
+class LORISTokenGenerator:
     """
     Generate a LORIS API token by making a request to the
     LORIS login API endpoint with the given username

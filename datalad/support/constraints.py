@@ -44,7 +44,7 @@ class _NoneDeprecated:
 NoneDeprecated = _NoneDeprecated()
 
 
-class Constraint(object):
+class Constraint:
     """Base class for input value conversion/validation.
 
     These classes are also meant to be able to generate appropriate
@@ -132,7 +132,7 @@ class EnsureListOf(Constraint):
         dtype : functor
         """
         self._dtype = dtype
-        super(EnsureListOf, self).__init__()
+        super().__init__()
 
     def __call__(self, value):
         return list(map(self._dtype, ([value] if isinstance(value, str) else value)))
@@ -154,7 +154,7 @@ class EnsureTupleOf(Constraint):
         dtype : functor
         """
         self._dtype = dtype
-        super(EnsureTupleOf, self).__init__()
+        super().__init__()
 
     def __call__(self, value):
         return tuple(map(self._dtype, ([value] if isinstance(value, str) else value)))
@@ -207,7 +207,7 @@ class EnsureStr(Constraint):
         """
         assert(min_len >= 0)
         self._min_len = min_len
-        super(EnsureStr, self).__init__()
+        super().__init__()
 
     def __call__(self, value):
         if not isinstance(value, (bytes, str)):
@@ -248,10 +248,10 @@ class EnsureStrPrefix(EnsureStr):
         return value
 
     def long_description(self):
-        return "value must start with '{}'".format(self._prefix)
+        return f"value must start with '{self._prefix}'"
 
     def short_description(self):
-        return '{}...'.format(self._prefix)
+        return f'{self._prefix}...'
 
 
 class EnsureNone(Constraint):
@@ -295,7 +295,7 @@ class EnsureChoice(Constraint):
            Possible accepted values.
         """
         self._allowed = values
-        super(EnsureChoice, self).__init__()
+        super().__init__()
 
     def __call__(self, value):
         if value not in self._allowed:
@@ -303,7 +303,7 @@ class EnsureChoice(Constraint):
         return value
 
     def long_description(self):
-        return 'value must be one of [CMD: %s CMD][PY: %s PY]' % (
+        return 'value must be one of [CMD: {} CMD][PY: {} PY]'.format(
             str(tuple(i for i in self._allowed if i is not None)),
             str(self._allowed)
         )
@@ -326,19 +326,19 @@ class EnsureKeyChoice(EnsureChoice):
            Possible accepted values.
         """
         self._key = key
-        super(EnsureKeyChoice, self).__init__(*values)
+        super().__init__(*values)
 
     def __call__(self, value):
         if self._key not in value:
             raise ValueError("value not dict-like")
-        super(EnsureKeyChoice, self).__call__(value[self._key])
+        super().__call__(value[self._key])
         return value
 
     def long_description(self):
-        return "value in '%s' must be one of %s" % (self._key, str(self._allowed),)
+        return "value in '{}' must be one of {}".format(self._key, str(self._allowed))
 
     def short_description(self):
-        return '%s:{%s}' % (self._key, ', '.join([str(c) for c in self._allowed]))
+        return '{}:{{{}}}'.format(self._key, ', '.join([str(c) for c in self._allowed]))
 
 
 class EnsureRange(Constraint):
@@ -357,21 +357,21 @@ class EnsureRange(Constraint):
         """
         self._min = min
         self._max = max
-        super(EnsureRange, self).__init__()
+        super().__init__()
 
     def __call__(self, value):
         if self._min is not None:
             if value < self._min:
-                raise ValueError("value must be at least %s" % (self._min,))
+                raise ValueError("value must be at least {}".format(self._min))
         if self._max is not None:
             if value > self._max:
-                raise ValueError("value must be at most %s" % (self._max,))
+                raise ValueError("value must be at most {}".format(self._max))
         return value
 
     def long_description(self):
         min_str = '-inf' if self._min is None else str(self._min)
         max_str = 'inf' if self._max is None else str(self._max)
-        return 'value must be in range [%s, %s]' % (min_str, max_str)
+        return 'value must be in range [{}, {}]'.format(min_str, max_str)
 
     def short_description(self):
         return None
@@ -417,7 +417,7 @@ class AltConstraints(_MultiConstraint):
         *constraints
            Alternative constraints
         """
-        super(AltConstraints, self).__init__()
+        super().__init__()
         self.constraints = [EnsureNone() if c is None else c for c in constraints]
 
     def __or__(self, other):
@@ -455,7 +455,7 @@ class Constraints(_MultiConstraint):
         *constraints
            Constraints all of which must be satisfied
         """
-        super(Constraints, self).__init__()
+        super().__init__()
         self.constraints = [EnsureNone() if c is None else c for c in constraints]
 
     def __and__(self, other):
@@ -490,4 +490,4 @@ def expand_constraint_spec(spec):
         try:
             return constraint_spec_map[spec]
         except KeyError:
-            raise ValueError("unsupported constraint specification '%r'" % (spec,))
+            raise ValueError("unsupported constraint specification '{!r}'".format(spec))

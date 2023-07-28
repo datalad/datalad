@@ -1,5 +1,4 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -68,8 +67,8 @@ from datalad.utils import (
 
 
 def test_formatter():
-    idx_to_name = {i: "col{}".format(i) for i in range(4)}
-    values = {"col{}".format(i): "value{}".format(i) for i in range(4)}
+    idx_to_name = {i: f"col{i}" for i in range(4)}
+    values = {f"col{i}": f"value{i}" for i in range(4)}
 
     fmt = au.Formatter(idx_to_name)
 
@@ -133,10 +132,10 @@ def test_repformatter():
     fmt = au.RepFormatter({})
 
     for i in range(3):
-        eq_(fmt.format("{c}{_repindex}", {"c": "x"}), "x{}".format(i))
+        eq_(fmt.format("{c}{_repindex}", {"c": "x"}), f"x{i}")
     # A new result gets a fresh index.
     for i in range(2):
-        eq_(fmt.format("{c}{_repindex}", {"c": "y"}), "y{}".format(i))
+        eq_(fmt.format("{c}{_repindex}", {"c": "y"}), f"y{i}")
     # We count even if _repindex isn't there.
     eq_(fmt.format("{c}", {"c": "z0"}), "z0")
     eq_(fmt.format("{c}{_repindex}", {"c": "z"}), "z1")
@@ -421,14 +420,14 @@ def test_addurls_dry_run(path=None):
                    dry_run=True, result_renderer='disabled')
 
         for dir_ in ["foo", "bar"]:
-            assert_in("Would create a subdataset at {}".format(dir_),
+            assert_in(f"Would create a subdataset at {dir_}",
                       cml.out)
         assert_in(
             "Would download URL/a.dat to {}".format(
                 os.path.join(path, "foo", "BASE")),
             cml.out)
 
-        assert_in("Metadata: {}".format([u"name=a", u"subdir=foo"]),
+        assert_in("Metadata: {}".format(["name=a", "subdir=foo"]),
                   cml.out)
 
 
@@ -438,7 +437,7 @@ skip_key_tests = skip_if(
     "git-annex version does not support `examinekey --migrate-to-backend`")
 
 
-class TestAddurls(object):
+class TestAddurls:
 
     @classmethod
     def setup_class(cls):
@@ -523,7 +522,7 @@ class TestAddurls(object):
             ds.addurls(self.json_file, "{url}", "{name}",
                        ifexists="overwrite", result_renderer='disabled')
             for fname in filenames:
-                assert_in("Removing {}".format(os.path.join(path, fname)),
+                assert_in(f"Removing {os.path.join(path, fname)}",
                           cml.out)
 
         # Add to already existing links, skipping.
@@ -605,12 +604,12 @@ class TestAddurls(object):
                 # The custom result renderer transforms the subdataset
                 # action=create results into something more informative than
                 # "create(ok): . (dataset)"...
-                assert_in("create(ok): foo-{} (dataset)".format(label),
+                assert_in(f"create(ok): foo-{label} (dataset)",
                           cmo.out)
                 # ... and that doesn't lose the standard summary.
                 assert_in("create (ok: 2)", cmo.out)
 
-            subdirs = [op.join(ds.path, "{}-{}".format(d, label))
+            subdirs = [op.join(ds.path, f"{d}-{label}")
                        for d in ["foo", "bar"]]
             subdir_files = dict(zip(subdirs, [["a", "c"], ["b"]]))
 
@@ -766,8 +765,7 @@ class TestAddurls(object):
         fn = ds.repo.set_metadata_
 
         def set_meta(_, **kwargs):
-            for i in fn("wreaking-havoc-and-such", **kwargs):
-                yield i
+            yield from fn("wreaking-havoc-and-such", **kwargs)
 
         with patch.object(ds.repo, 'set_metadata_', set_meta):
             with assert_raises(IncompleteResultsError):
@@ -805,7 +803,7 @@ class TestAddurls(object):
         whereis = ds.repo.whereis(names, output="full")
         for fname, info in whereis.items():
             eq_(info[WEB_SPECIAL_REMOTE_UUID]['urls'],
-                ["{}udir/{}.dat.v1".format(self.url, fname)])
+                [f"{self.url}udir/{fname}.dat.v1"])
 
     @with_tempfile(mkdir=True)
     def test_addurls_deeper(self=None, path=None):

@@ -315,7 +315,7 @@ def _amend_param_parser_kwargs_for_help(parser_kwargs, param, default=None):
         # if it is a flag, in commandline it makes little sense to show
         # showing the Default: (likely boolean).
         # See https://github.com/datalad/datalad/issues/3203
-        help += " [Default: %r]" % (default,)
+        help += " [Default: {!r}]".format(default)
     return help
 
 
@@ -489,7 +489,7 @@ class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
         if option_string[0] in chars and option_string[1] in chars:
             # option_string is a long flag. Disable abbreviation.
             return []
-        return super(ArgumentParserDisableAbbrev, self)._get_option_tuples(
+        return super()._get_option_tuples(
             option_string)
 
 
@@ -546,7 +546,7 @@ def parser_add_version_opt(parser, mod_name, include_name=False, delay=False):
             except Exception:
                 version = "unknown"
         if include_name:
-            print("%s %s" % (mod_name, version))
+            print("{} {}".format(mod_name, version))
         else:
             print(version)
         sys.exit(0)

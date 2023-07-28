@@ -101,7 +101,7 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
 
 
 @auto_repr
-class BaseSSHConnection(object):
+class BaseSSHConnection:
     """Representation of an SSH connection.
     """
     def __init__(self, sshri, identity_file=None,
@@ -148,9 +148,9 @@ class BaseSSHConnection(object):
         # arguments for annex ssh invocation
         self._ssh_args = []
         self._ssh_open_args.extend(
-            ['-p', '{}'.format(self.sshri.port)] if self.sshri.port else [])
+            ['-p', f'{self.sshri.port}'] if self.sshri.port else [])
         if force_ip:
-            self._ssh_open_args.append("-{}".format(force_ip))
+            self._ssh_open_args.append(f"-{force_ip}")
         if identity_file:
             self._ssh_open_args.extend(["-i", identity_file])
 
@@ -233,7 +233,7 @@ class BaseSSHConnection(object):
             if remote_annex_installdir:
                 # make sure to use the bundled git version if any exists
                 cmd = '{}; {}'.format(
-                    'export "PATH={}:$PATH"'.format(remote_annex_installdir),
+                    f'export "PATH={remote_annex_installdir}:$PATH"',
                     cmd)
         return cmd
 
@@ -307,7 +307,7 @@ class BaseSSHConnection(object):
         # add source filepath(s) to scp command
         scp_cmd += ensure_list(source)
         # add destination path
-        scp_cmd += ['%s:%s' % (
+        scp_cmd += ['{}:{}'.format(
             self.sshri.hostname,
             self._quote_filename(destination),
         )]
@@ -344,7 +344,7 @@ class BaseSSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
-        scp_cmd += ["%s:%s" % (self.sshri.hostname, self._quote_filename(s))
+        scp_cmd += ["{}:{}".format(self.sshri.hostname, self._quote_filename(s))
                     for s in ensure_list(source)]
         # add destination path
         scp_cmd += [destination]
@@ -461,7 +461,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         # on windows cmd args lists are always converted into a string using appropriate
         # quoting rules, on other platforms args lists are passed directly and we need
         # to take care of quoting ourselves
-        ctrlpath_arg = "ControlPath={}".format(ctrl_path if on_windows else sh_quote(str(ctrl_path)))
+        ctrlpath_arg = f"ControlPath={ctrl_path if on_windows else sh_quote(str(ctrl_path))}"
         self._ssh_args += ["-o", ctrlpath_arg]
         self._ssh_open_args += [
             "-fN",
@@ -613,7 +613,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
 
 
 @auto_repr
-class BaseSSHManager(object):
+class BaseSSHManager:
     """Interface for an SSHManager
     """
     def ensure_initialized(self):
@@ -664,7 +664,7 @@ class BaseSSHManager(object):
             sshri = RI(url)
 
         if not is_ssh(sshri):
-            raise ValueError("Unsupported SSH URL: '{0}', use "
+            raise ValueError("Unsupported SSH URL: '{}', use "
                              "ssh://host/path or host:path syntax".format(url))
 
         from datalad import cfg

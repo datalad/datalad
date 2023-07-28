@@ -56,7 +56,7 @@ class YieldDatasetAndRevision(YieldDatasets):
     """Like YieldDatasets, but also provide "gitshasum" value, if any.
     """
     def __call__(self, res):
-        ds = super(YieldDatasetAndRevision, self).__call__(res)
+        ds = super().__call__(res)
         return ds, res.get("gitshasum")
 
 
@@ -441,13 +441,12 @@ def _save_after_update(refds, tosave, update_failures, path_arg, saw_subds):
         lgr.debug(
             'Subdatasets where updated state may need to be '
             'saved in the parent dataset: %s', save_paths)
-        for r in refds.save(
+        yield from refds.save(
                 path=save_paths,
                 recursive=False,
                 message='[DATALAD] Save updated subdatasets',
                 return_type='generator',
-                result_renderer='disabled'):
-            yield r
+                result_renderer='disabled')
 
 
 def _choose_update_target(repo, branch, remote, cfg_remote):
@@ -484,7 +483,7 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
              "@{upstream}"],
             read_only=True)
     elif branch:
-        remote_branch = "{}/{}".format(remote, branch)
+        remote_branch = f"{remote}/{branch}"
         if repo.commit_exists(remote_branch):
             target = remote_branch
     return target

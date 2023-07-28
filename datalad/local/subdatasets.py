@@ -363,7 +363,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                         logger=lgr,
                         **sm)
                 # also kick from the info we just read above
-                sm.pop('gitmodule_{}'.format(dprop), None)
+                sm.pop(f'gitmodule_{dprop}', None)
             # and now setting values
             for sprop in ensure_list(set_property):
                 prop, val = sprop
@@ -402,7 +402,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     # after this
 
                 # also add to the info we just read above
-                sm['gitmodule_{}'.format(prop)] = val
+                sm[f'gitmodule_{prop}'] = val
             yield from ds.save(
                 '.gitmodules', to_git=True,
                 message='[DATALAD] modified subdataset properties',
@@ -433,7 +433,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 (recursion_limit in (None, 'existing') or
                  (isinstance(recursion_limit, int) and
                   recursion_limit > 1)):
-            for r in _get_submodules(
+            yield from _get_submodules(
                     Dataset(sm_path),
                     paths,
                     fulfilled, recursive,
@@ -444,8 +444,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     bottomup,
                     set_property,
                     delete_property,
-                    refds_path):
-                yield r
+                    refds_path)
         if to_report and (bottomup and \
                 (fulfilled is None or
                  GitRepo.is_valid_repo(sm_path) == fulfilled)):

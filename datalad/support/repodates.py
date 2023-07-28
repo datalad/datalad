@@ -270,7 +270,7 @@ def check_dates(repo, timestamp=None, which="newer", revs=None,
     elif which == "older":
         cmp_fn = operator.lt
     else:
-        raise ValueError("unrecognized value for `which`: {}".format(which))
+        raise ValueError(f"unrecognized value for `which`: {which}")
 
     results = {}
 

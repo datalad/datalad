@@ -39,12 +39,12 @@ def test_ephemeral(ds_path=None, store_path=None, clone_path=None):
     ds.save()
 
     # put into store:
-    ds.create_sibling_ria("ria+{}".format(store.as_uri()), "riastore",
+    ds.create_sibling_ria(f"ria+{store.as_uri()}", "riastore",
                           new_store_ok=True)
     ds.push(to="riastore", data="anything")
 
     # now, get an ephemeral clone from the RIA store:
-    eph_clone = clone('ria+{}#{}'.format(store.as_uri(), ds.id), clone_path,
+    eph_clone = clone(f'ria+{store.as_uri()}#{ds.id}', clone_path,
                       reckless="ephemeral")
 
     # ephemeral clone was properly linked (store has bare repos!):

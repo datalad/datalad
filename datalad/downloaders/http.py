@@ -161,7 +161,7 @@ class HTTPBaseAuthenticator(Authenticator):
         session_cookies : str or list of str, optional
           Session cookies to store (besides auth response cookies)
         """
-        super(HTTPBaseAuthenticator, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.url = url
         self.failure_re = ensure_list_from_str(failure_re)
         self.success_re = ensure_list_from_str(success_re)
@@ -288,7 +288,7 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
         **kwargs : dict, optional
           Passed to super class HTTPBaseAuthenticator
         """
-        super(HTMLFormAuthenticator, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.fields = ensure_dict_from_str(fields)
         self.tagid = tagid
 
@@ -319,7 +319,7 @@ class HTTPRequestsAuthenticator(HTTPBaseAuthenticator):
 
     def __init__(self, **kwargs):
         # so we have __init__ solely for a custom docstring
-        super(HTTPRequestsAuthenticator, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _post_credential(self, credentials, post_url, session):
         authenticator = self.REQUESTS_AUTHENTICATOR(
@@ -394,7 +394,7 @@ class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
 
     def __init__(self, **kwargs):
         # so we have __init__ solely for a custom docstring
-        super(HTTPBearerTokenAuthenticator, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _post_credential(self, credentials, post_url, session):
         # we do not need to post anything, just inject token into the session
@@ -446,7 +446,7 @@ class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
 class HTTPDownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None,  url=None, headers=None,
                  response=None, chunk_size=1024 ** 2):
-        super(HTTPDownloaderSession, self).__init__(
+        super().__init__(
             size=size, filename=filename, url=url, headers=headers,
         )
         self.chunk_size = chunk_size
@@ -537,7 +537,7 @@ class HTTPDownloader(BaseDownloader):
           Header fields to be provided to the session. Unless User-Agent provided, a custom
           one, available in `DEFAULT_USER_AGENT` constant of this module will be used.
         """
-        super(HTTPDownloader, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._session = None
         headers = headers.copy() if headers else {}
         if 'user-agent' not in map(str.lower, headers):

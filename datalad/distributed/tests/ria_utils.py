@@ -49,7 +49,7 @@ def get_all_files(path):
 def initremote(repo, name, encryption=None, config=None):
     cfg = dict(config) if config else {}
     cfg['encryption'] = encryption if encryption else 'none'
-    args = ['{}={}'.format(k, v) for k, v in cfg.items()]
+    args = [f'{k}={v}' for k, v in cfg.items()]
     repo.init_remote(name, args)
 
 
@@ -71,7 +71,7 @@ def setup_archive_remote(repo, archive_path):
         cfg = {'url': 'ria+ssh://datalad-test{}'
                       ''.format(archive_path.as_posix())}
     else:
-        cfg = {'url': 'ria+{}'.format(archive_path.as_uri())}
+        cfg = {'url': f'ria+{archive_path.as_uri()}'}
     initexternalremote(repo, 'archive', 'ora', config=cfg)
 
 

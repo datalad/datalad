@@ -155,10 +155,10 @@ class HelpAction(argparse.Action):
             import subprocess
             # get the datalad manpage to use
             manfile = os.environ.get('MANPATH', '/usr/share/man') \
-                + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
+                + '/man1/{}.1.gz'.format(parser.prog.replace(' ', '-'))
             # extract version field from the manpage
             if not os.path.exists(manfile):
-                raise IOError("manfile is not found")
+                raise OSError("manfile is not found")
             with gzip.open(manfile) as f:
                 man_th = [line for line in f if line.startswith(b".TH")][0]
             man_version = man_th.split(b' ')[-1].strip(b" '\"\t\n").decode('utf-8')
@@ -170,7 +170,7 @@ class HelpAction(argparse.Action):
                 'man %s 2> /dev/null' % manfile,
                 shell=True)
             sys.exit(0)
-        except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
+        except (subprocess.CalledProcessError, OSError, IndexError, ValueError) as e:
             ce = CapturedException(e)
             lgr.debug("Did not use manpage since %s", ce)
 

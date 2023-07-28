@@ -54,7 +54,7 @@ class SpecialRemote(_SpecialRemote):
     """Common base class for all of DataLad's special remote implementations"""
 
     def __init__(self, annex):
-        super(SpecialRemote, self).__init__(annex=annex)
+        super().__init__(annex=annex)
         # instruct annex backend UI to use this remote
         if ui.backend == 'annex':
             ui.set_specialremote(self)

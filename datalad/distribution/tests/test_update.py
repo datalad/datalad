@@ -82,7 +82,7 @@ def test_update_simple(origin=None, src_path=None, dst_path=None):
     # also forget the declared absolute location of the submodules, and turn them
     # relative to this/a clone
     for sub in source.subdatasets(result_xfm=lambda x: x['gitmodule_name']):
-        source.subdatasets(path=sub, set_property=[('url', './{}'.format(sub))])
+        source.subdatasets(path=sub, set_property=[('url', f'./{sub}')])
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())

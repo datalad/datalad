@@ -303,7 +303,7 @@ class Push(Interface):
         render_action_summary(action_summary)
         # report on any hints at the end
         # get all unique hints
-        hints = set([r.get('hints', None) for r in results])
+        hints = {r.get('hints', None) for r in results}
         hints = [hint for hint in hints if hint is not None]
         if hints:
             from datalad.ui import ui
@@ -350,7 +350,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         if res.get('status', None) != 'ok':
             # we cannot handle this situation, report it in panic
             raise RuntimeError(
-                'Cannot handle non-OK diff result: {}'.format(res))
+                f'Cannot handle non-OK diff result: {res}')
         parentds = res.get('parentds', None)
         if not parentds:
             raise RuntimeError(
@@ -428,7 +428,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     res_kwargs.update(type='dataset', path=dspath)
 
     # content will be unique for every push (even on the same dataset)
-    pbar_id = 'push-{}-{}'.format(target, id(content))
+    pbar_id = f'push-{target}-{id(content)}'
     # register for final orderly take down
     pbars[pbar_id] = ds
     log_progress(
@@ -449,7 +449,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 # we will reuse the result further down again, so nothing is wasted
                 wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
                 # we did not get an explicit push target, get it from Git
-                target = set(p.get('remote', None) for p in wannabe_gitpush)
+                target = {p.get('remote', None) for p in wannabe_gitpush}
                 # handle case where a pushinfo record did not have a 'remote'
                 # property -- should not happen, but be robust
                 target.discard(None)
@@ -507,10 +507,10 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     log_progress(
         lgr.info, pbar_id, "Push refspecs",
-        label="Push to '{}'".format(target), update=1, total=4)
+        label=f"Push to '{target}'", update=1, total=4)
 
     # define config var name for potential publication dependencies
-    depvar = 'remote.{}.datalad-publish-depends'.format(target)
+    depvar = f'remote.{target}.datalad-publish-depends'
     # list of remotes that are publication dependencies for the
     # target remote
     publish_depends = ensure_list(ds.config.get(depvar, [], get_all=True))
@@ -613,7 +613,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     # and lastly the primary push target
     target_is_git_remote = repo.config.get(
-        'remote.{}.url'.format(target), None) is not None
+        f'remote.{target}.url', None) is not None
 
     # git-annex data copy
     #
@@ -621,7 +621,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         if data != "nothing":
             log_progress(
                 lgr.info, pbar_id, "Transfer data",
-                label="Transfer data to '{}'".format(target), update=2, total=4)
+                label=f"Transfer data to '{target}'", update=2, total=4)
             yield from _transfer_data(
                 repo,
                 ds,
@@ -645,7 +645,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     log_progress(
         lgr.info, pbar_id, "Update availability information",
-        label="Update availability for '{}'".format(target), update=3, total=4)
+        label=f"Update availability for '{target}'", update=3, total=4)
 
     # TODO fetch is only needed if anything was actually transferred. Collect this
     # info and make the following conditional on it
@@ -666,7 +666,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         lgr.debug("Fetching 'git-annex' branch updates from '%s'", target)
         fetch_cmd = ['fetch', target, 'git-annex']
         pushurl = repo.config.get(
-            'remote.{}.pushurl'.format(target), None)
+            f'remote.{target}.pushurl', None)
         if pushurl:
             # for some reason overwriting remote.{target}.url
             # does not have any effect...
@@ -675,7 +675,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 'url.{}.insteadof={}'.format(
                     pushurl,
                     repo.config.get(
-                        'remote.{}.url'.format(target), None)
+                        f'remote.{target}.url', None)
                 )
             ] + fetch_cmd
             lgr.debug(
@@ -714,11 +714,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
     # try to anticipate any flavor of an idea of a branch ending up in a refspec
     looks_like_that_branch = re.compile(
-        r'((^|.*:)refs/heads/|.*:|^){}$'.format(branch))
+        fr'((^|.*:)refs/heads/|.*:|^){branch}$')
     if all(not looks_like_that_branch.match(r) for r in refspecs):
         refspecs.append(
             branch
-            if ds.config.get('branch.{}.merge'.format(branch), None)
+            if ds.config.get(f'branch.{branch}.merge', None)
             else '{branch}:{branch}'.format(branch=branch)
         )
 
@@ -770,7 +770,7 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
 
 def _push_data(ds, target, content, data, force, jobs, res_kwargs,
                got_path_arg=False):
-    if ds.config.getbool('remote.{}'.format(target), 'annex-ignore', False):
+    if ds.config.getbool(f'remote.{target}', 'annex-ignore', False):
         lgr.debug(
             "Target '%s' is set to annex-ignore, exclude from data-push.",
             target,
@@ -928,7 +928,7 @@ def _get_corresponding_remote_state(repo, to):
     if to:
         # XXX here we assume one to one mapping of names from local branches
         # to the remote
-        since = '%s/%s' % (to, active_branch)
+        since = '{}/{}'.format(to, active_branch)
     else:
         # take tracking remote for the active branch
         tracked_remote, tracked_refspec = repo.get_tracking_branch()
@@ -936,5 +936,5 @@ def _get_corresponding_remote_state(repo, to):
             if tracked_refspec.startswith('refs/heads/'):
                 tracked_refspec = tracked_refspec[len('refs/heads/'):]
             #to = tracked_remote
-            since = '%s/%s' % (tracked_remote, tracked_refspec)
+            since = '{}/{}'.format(tracked_remote, tracked_refspec)
     return since

@@ -60,7 +60,7 @@ def test_check_dates(path=None):
     skip_if_no_module("dateutil")
 
     ref_ts = 1218182889  # Fri, 08 Aug 2008 04:08:09 -0400
-    refdate = "@{}".format(ref_ts)
+    refdate = f"@{ref_ts}"
 
     repo = os.path.join(path, "repo")
     with set_date(ref_ts + 5000):

@@ -107,7 +107,7 @@ def test_manpage_formatter():
         mp = fmt.ManPageFormatter(
             p, ext_sections=addonsections).format_man_page(parsers[p])
         for section in ('SYNOPSIS', 'NAME', 'OPTIONS', 'MYTEST'):
-            assert_in('.SH {0}'.format(section), mp)
+            assert_in(f'.SH {section}', mp)
         assert_in('uniquedummystring', mp)
 
 
@@ -116,5 +116,5 @@ def test_rstmanpage_formatter():
     for p in parsers:
         mp = fmt.RSTManPageFormatter(p).format_man_page(parsers[p])
         for section in ('Synopsis', 'Description', 'Options'):
-            assert_in('\n{0}'.format(section), mp)
-        assert_in('{0}\n{1}'.format(p, '=' * len(p)), mp)
+            assert_in(f'\n{section}', mp)
+        assert_in('{}\n{}'.format(p, '=' * len(p)), mp)

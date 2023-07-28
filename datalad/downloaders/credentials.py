@@ -41,7 +41,7 @@ lgr = getLogger('datalad.downloaders.credentials')
 
 
 @auto_repr
-class Credential(object):
+class Credential:
     """Base class for different types of credentials
 
     Note: While subclasses can define their own `_FIELDS`, they are actually
@@ -340,7 +340,7 @@ class CompositeCredential(Credential):
             )
         self._credentials = credentials
 
-        super(CompositeCredential, self)._prepare()
+        super()._prepare()
 
     # Here it becomes tricky, since theoretically it is the "tail"
     # ones which might expire etc, so we wouldn't exactly know what

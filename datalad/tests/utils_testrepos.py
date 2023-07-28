@@ -38,7 +38,7 @@ from .utils_pytest import get_tempfile_kwargs
 remote_file_url = None
 
 
-class TestRepo(object, metaclass=ABCMeta):
+class TestRepo(metaclass=ABCMeta):
 
     REPO_CLASS = None  # Assign to the class to be used in the subclass
 
@@ -110,7 +110,7 @@ class BasicAnnexTestRepo(TestRepo):
             remote_file_name = 'testrepo-annex.dat'
             with open(opj(test_http_server.path, remote_file_name), "w") as f:
                 f.write("content to be annex-addurl'd")
-            remote_file_url = '{}/{}'.format(test_http_server.url, remote_file_name)
+            remote_file_url = f'{test_http_server.url}/{remote_file_name}'
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
         self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
@@ -155,7 +155,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
 
     def populate(self):
 
-        super(SubmoduleDataset, self).populate()
+        super().populate()
         # add submodules
         annex = BasicAnnexTestRepo()
         annex.create()
@@ -175,7 +175,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
 class NestedDataset(BasicAnnexTestRepo):
 
     def populate(self):
-        super(NestedDataset, self).populate()
+        super().populate()
         ds = SubmoduleDataset()
         ds.create()
         kw = dict(expect_stderr=True)
@@ -195,7 +195,7 @@ class NestedDataset(BasicAnnexTestRepo):
             AnnexRepo(opj(self.path, s), init=True)
 
 
-class InnerSubmodule(object):
+class InnerSubmodule:
 
     def __init__(self):
         self._ds = NestedDataset()

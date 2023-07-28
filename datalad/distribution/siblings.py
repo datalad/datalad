@@ -452,13 +452,13 @@ def _configure_remote(
             repo.set_remote_url(name, url)
 
         # make sure we have a configured fetch expression at this point
-        fetchvar = 'remote.{}.fetch'.format(name)
+        fetchvar = f'remote.{name}.fetch'
         if fetchvar not in repo.config:
             # place default fetch refspec in config
             # same as `git remote add` would have added
             repo.config.add(
                 fetchvar,
-                '+refs/heads/*:refs/remotes/{}/*'.format(name),
+                f'+refs/heads/*:refs/remotes/{name}/*',
                 scope='local')
 
         if pushurl:
@@ -477,9 +477,9 @@ def _configure_remote(
                 return
 
         # define config var name for potential publication dependencies
-        depvar = 'remote.{}.datalad-publish-depends'.format(name)
+        depvar = f'remote.{name}.datalad-publish-depends'
         # and default pushes
-        dfltvar = "remote.{}.push".format(name)
+        dfltvar = f"remote.{name}.push"
 
         if fetch:
             # fetch the remote so we are up to date
@@ -556,7 +556,7 @@ def _configure_remote(
             try:
                 exc = None
                 if not ds.config.obtain(
-                        'remote.{}.annex-ignore'.format(name),
+                        f'remote.{name}.annex-ignore',
                         default=False,
                         valtype=EnsureBool(),
                         store=False):
@@ -593,7 +593,7 @@ def _configure_remote(
                         'initremote',
                         as_common_datasrc,
                         'type=git',
-                        'location={}'.format(remote_url),
+                        f'location={remote_url}',
                         'autoenable=true'])
                 else:
                     yield dict(
@@ -642,7 +642,7 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
             raw_info = {}
         available_space = raw_info.get('available local disk space', None)
         for trust in ('trusted', 'semitrusted', 'untrusted'):
-            ri = raw_info.get('{} repositories'.format(trust), [])
+            ri = raw_info.get(f'{trust} repositories', [])
             for r in ri:
                 uuid = r.get('uuid', '00000000-0000-0000-0000-00000000000')
                 if uuid.startswith('00000000-0000-0000-0000-00000000000'):
@@ -688,7 +688,7 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
         else:
             # common case: actual remotes
             for remotecfg in [k for k in ds.config.keys()
-                              if k.startswith('remote.{}.'.format(remote))]:
+                              if k.startswith(f'remote.{remote}.')]:
                 info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
         if get_annex_info and info.get('annex-uuid', None):
             ainfo = annex_info.get(info['annex-uuid'], {})
@@ -702,7 +702,7 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
                         var = repo.get_preferred_content(
                             prop, '.' if remote == 'here' else remote)
                         if var:
-                            info['annex-{}'.format(prop)] = var
+                            info[f'annex-{prop}'] = var
                     groupwanted = repo.get_groupwanted(remote)
                     if groupwanted:
                         info['annex-groupwanted'] = groupwanted
@@ -804,11 +804,11 @@ def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
                     result_props,
                     status='impossible',
                     message="cannot determine remote host, credential lookup for webdav access is not possible, and not credentials were supplied")
-            cred = UserPassword('webdav:{}'.format(hostname))
+            cred = UserPassword(f'webdav:{hostname}')
             if not cred.is_known:
                 try:
                     cred.enter_new(
-                        instructions="Enter credentials for authentication with WEBDAV server at {}".format(hostname),
+                        instructions=f"Enter credentials for authentication with WEBDAV server at {hostname}",
                         user=os.environ.get('WEBDAV_USERNAME', None),
                         password=os.environ.get('WEBDAV_PASSWORD', None))
                 except KeyboardInterrupt:
@@ -867,7 +867,7 @@ def _inherit_config_var(ds, cfgvar, var):
     return var
 
 
-class _DelayedSuper(object):
+class _DelayedSuper:
     """A helper to delay deduction on super dataset until needed
 
     But if asked and not found -- would return None for everything

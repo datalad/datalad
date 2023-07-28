@@ -61,7 +61,7 @@ lgr = logging.getLogger('datalad.distribution.install')
 
 @build_doc
 class Install(Interface):
-    """Install one or many datasets from remote URL(s) or local PATH source(s).
+    r"""Install one or many datasets from remote URL(s) or local PATH source(s).
 
     This command creates local :term:`sibling`\(s) of existing dataset(s) from
     (remote) locations specified as URL(s) or path(s). Optional recursion into
@@ -355,7 +355,7 @@ class Install(Interface):
             except Exception as e:
                 ce = CapturedException(e)
                 raise ValueError(
-                    "invalid path argument {}: ({})".format(path, ce))
+                    f"invalid path argument {path}: ({ce})")
             try:
                 # Wouldn't work for SSHRI ATM, see TODO within SSHRI
                 # yoh: path should be a local path, and mapping note within
@@ -373,7 +373,7 @@ class Install(Interface):
                 # between path and name of a submodule, we need to consider
                 # this.
                 # For now: Just raise
-                raise ValueError("Invalid path argument {0}".format(path))
+                raise ValueError(f"Invalid path argument {path}")
         # `path` resolved, if there was any.
 
         # clone dataset, will also take care of adding to superdataset, if one

@@ -43,7 +43,7 @@ def test_ui_switcher():
     ui.set_backend('annex')
 
     # Let's pretend we are under IPython
-    class ZMQInteractiveShell(object):
+    class ZMQInteractiveShell:
         pass
 
     with patch('datalad.utils.get_ipython',

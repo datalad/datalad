@@ -145,7 +145,7 @@ def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
-                dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
+                dict(cost=700, name='bang', url=f'pre-{sub.id}-post',
                      from_config=True),
         ])
     # template using the "regular" property `path` (`id` above is shortened from
@@ -326,14 +326,14 @@ def test_get_multiple_files(path=None, url=None, ds_dir=None):
     assert_status(['ok', 'notneeded'], result[1:])
     # explicitly given not existing file was skipped:
     # (see test_get_invalid_call)
-    eq_(set([basename(item.get('path')) for item in result[1:]]),
+    eq_({basename(item.get('path')) for item in result[1:]},
         {'file1.txt', 'file2.txt'})
     ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
 
     # get all of them:
     result = ds.get(curdir)
     # there were two files left to get:
-    eq_(set([basename(item.get('path')) for item in result if item['type'] == 'file']),
+    eq_({basename(item.get('path')) for item in result if item['type'] == 'file'},
         {'file3.txt', 'file4.txt'})
     ok_(all(ds.repo.file_has_content(file_list)))
 
@@ -367,8 +367,8 @@ def test_get_recurse_dirs(o_path=None, c_path=None):
     result = ds.get('subdir')
     # check result:
     assert_status('ok', result)
-    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
-             if item['type'] == 'file']),
+    eq_({item.get('path')[len(ds.path) + 1:] for item in result
+             if item['type'] == 'file'},
         set(files_in_sub))
     # we also get one report on the subdir
     eq_(len(result) - 1, len(files_in_sub))
@@ -441,8 +441,8 @@ def test_get_recurse_subdatasets(src=None, path=None):
     result = ds.get(recursive=True, result_filter=lambda x: x.get('type') != 'dataset')
     assert_status('ok', result)
 
-    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
-             if item['type'] == 'file']),
+    eq_({item.get('path')[len(ds.path) + 1:] for item in result
+             if item['type'] == 'file'},
         annexed_files)
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)

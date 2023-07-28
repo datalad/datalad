@@ -75,7 +75,7 @@ lgr = logging.getLogger('datalad.core.local.run')
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
     cmd_shorty = (join_cmdline(cmd) if isinstance(cmd, list) else cmd)
-    cmd_shorty = u'{}{}'.format(
+    cmd_shorty = '{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
     return cmd_shorty
@@ -304,7 +304,7 @@ class Run(Interface):
             sidecar=None,
             dry_run=None,
             jobs=None):
-        for r in run_command(cmd, dataset=dataset,
+        yield from run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
                              assume_ready=assume_ready,
@@ -312,8 +312,7 @@ class Run(Interface):
                              message=message,
                              sidecar=sidecar,
                              dry_run=dry_run,
-                             jobs=jobs):
-            yield r
+                             jobs=jobs)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
@@ -485,8 +484,7 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None, jobs=None):
 
     get = Get()
     for gp in gps:
-        for res in _install_and_reglob(dset_path, gp):
-            yield res
+        yield from _install_and_reglob(dset_path, gp)
         if gp.misses:
             ds = Dataset(dset_path)
             for miss in gp.misses:
@@ -723,22 +721,20 @@ def _prep_worktree(ds_path, pwd, globbed,
     # unbound. They should (1) receive a string dataset argument, (2) receive
     # relative paths, and (3) happen within a chpwd(pwd) context.
     with chpwd(pwd):
-        for res in prepare_inputs(
+        yield from prepare_inputs(
                 ds_path,
                 [] if assume_ready in ["inputs", "both"]
                 else globbed['inputs'],
                 # Ignore --assume-ready for extra_inputs. It's an unexposed
                 # implementation detail that lets wrappers sneak in inputs.
                 extra_inputs=globbed['extra_inputs'],
-                jobs=jobs):
-            yield res
+                jobs=jobs)
 
         if assume_ready not in ["outputs", "both"]:
             if globbed['outputs']:
-                for res in _install_and_reglob(
-                        ds_path, globbed['outputs']):
-                    yield res
-                for res in _unlock_or_remove(
+                yield from _install_and_reglob(
+                        ds_path, globbed['outputs'])
+                yield from _unlock_or_remove(
                         ds_path,
                         globbed['outputs'].expand_strict()
                         if not remove_outputs
@@ -746,12 +742,10 @@ def _prep_worktree(ds_path, pwd, globbed,
                         else set(
                             globbed['outputs'].expand_strict()).difference(
                                 globbed['inputs'].expand_strict()),
-                        remove=remove_outputs):
-                    yield res
+                        remove=remove_outputs)
 
             if rerun_outputs is not None:
-                for res in _unlock_or_remove(ds_path, rerun_outputs):
-                    yield res
+                yield from _unlock_or_remove(ds_path, rerun_outputs)
 
 
 def _create_record(run_info, sidecar_flag, ds):
@@ -1033,7 +1027,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     cmd_shorty = _format_cmd_shorty(cmd_expanded)
 
     # compose commit message
-    msg = u"""\
+    msg = """\
 [DATALAD RUNCMD] {}
 
 === Do not change lines below ===
@@ -1042,7 +1036,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 """
     msg = msg.format(
         message if message is not None else cmd_shorty,
-        '"{}"'.format(record) if record_path else record)
+        f'"{record}"' if record_path else record)
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
     if outputs_to_save is not None and record_path:
@@ -1098,7 +1092,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     if do_save:
         with chpwd(pwd):
-            for r in Save.__call__(
+            yield from Save.__call__(
                     dataset=ds_path,
                     path=outputs_to_save,
                     recursive=True,
@@ -1109,5 +1103,4 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     # control about the rendering of results, hence we must turn
                     # off internal rendering
                     result_renderer='disabled',
-                    on_failure='ignore'):
-                yield r
+                    on_failure='ignore')

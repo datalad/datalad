@@ -55,8 +55,8 @@ STDERR_FILENO = 2
 # A helper to type-safe retrieval of a Popen-fileno, if data exchange was
 # requested.
 def _get_fileno(active: bool,
-                popen_std_x: Optional[IO]
-                ) -> Optional[int]:
+                popen_std_x: IO | None
+                ) -> int | None:
     if active:
         assert popen_std_x is not None
         return popen_std_x.fileno()
@@ -170,9 +170,9 @@ class ThreadedRunner:
     def __init__(self,
                  cmd: str | list,
                  protocol_class: type[WitlessProtocol],
-                 stdin: int | IO | bytes | Queue[Optional[bytes]] | None,
-                 protocol_kwargs: Optional[dict] = None,
-                 timeout: Optional[float] = None,
+                 stdin: int | IO | bytes | Queue[bytes | None] | None,
+                 protocol_kwargs: dict | None = None,
+                 timeout: float | None = None,
                  exception_on_error: bool = True,
                  **popen_kwargs
                  ):
@@ -250,34 +250,34 @@ class ThreadedRunner:
         self.catch_stderr = self.protocol_class.proc_err
 
         self.write_stdin: bool = False
-        self.stdin_queue: Optional[Queue] = None
-        self.process_stdin_fileno: Optional[int] = None
-        self.process_stdout_fileno: Optional[int] = None
-        self.process_stderr_fileno: Optional[int] = None
-        self.stderr_enqueueing_thread: Optional[ReadThread] = None
-        self.stdout_enqueueing_thread: Optional[ReadThread] = None
-        self.stdin_enqueueing_thread: Optional[WriteThread] = None
-        self.process_waiting_thread: Optional[WaitThread] = None
+        self.stdin_queue: Queue | None = None
+        self.process_stdin_fileno: int | None = None
+        self.process_stdout_fileno: int | None = None
+        self.process_stderr_fileno: int | None = None
+        self.stderr_enqueueing_thread: ReadThread | None = None
+        self.stdout_enqueueing_thread: ReadThread | None = None
+        self.stdin_enqueueing_thread: WriteThread | None = None
+        self.process_waiting_thread: WaitThread | None = None
 
         self.process_running: bool = False
         self.output_queue: Queue = Queue()
         self.process_removed: bool = False
-        self.generator: Optional[_ResultGenerator] = None
-        self.process: Optional[Popen[Any]] = None
-        self.return_code: Optional[int] = None
+        self.generator: _ResultGenerator | None = None
+        self.process: Popen[Any] | None = None
+        self.return_code: int | None = None
 
-        self.last_touched: dict[Optional[int], float] = dict()
-        self.active_file_numbers: set[Optional[int]] = set()
+        self.last_touched: dict[int | None, float] = dict()
+        self.active_file_numbers: set[int | None] = set()
         self.stall_check_interval = 10
 
         self.initialization_lock = threading.Lock()
         self.generator_condition = threading.Condition()
-        self.owning_thread: Optional[int] = None
+        self.owning_thread: int | None = None
 
         # Pure declarations
         self.protocol: WitlessProtocol
-        self.fileno_mapping: dict[Optional[int], int]
-        self.fileno_to_file: dict[Optional[int], Optional[IO]]
+        self.fileno_mapping: dict[int | None, int]
+        self.fileno_to_file: dict[int | None, IO | None]
         self.file_to_fileno: dict[IO, int]
         self.result: dict
 
@@ -744,9 +744,9 @@ class ThreadedRunner:
 
 def run_command(cmd: str | list,
                 protocol: type[WitlessProtocol],
-                stdin: int | IO | bytes | Queue[Optional[bytes]] | None,
-                protocol_kwargs: Optional[dict] = None,
-                timeout: Optional[float] = None,
+                stdin: int | IO | bytes | Queue[bytes | None] | None,
+                protocol_kwargs: dict | None = None,
+                timeout: float | None = None,
                 exception_on_error: bool = True,
                 **popen_kwargs) -> dict | _ResultGenerator:
     """

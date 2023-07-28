@@ -51,7 +51,7 @@ def _test_save_all(path, repocls):
     res = ds.repo.save()
     # make sure we get a 'delete' result for each deleted file
     eq_(
-        set(r['path'] for r in res if r['action'] == 'delete'),
+        {r['path'] for r in res if r['action'] == 'delete'},
         {str(k) for k, v in orig_status.items()
          if k.name in ('file_deleted', 'file_staged_deleted')}
     )

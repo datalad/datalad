@@ -46,12 +46,12 @@ def get_jsonhooks_from_config(cfg):
         # remote code execution by a 3rd-party
         call = cfg.get_from_source(
             'local',
-            '{}.call-json'.format(hook_basevar),
+            f'{hook_basevar}.call-json',
             None
         )
         if not call:
             lgr.warning(
-                'Incomplete result hook configuration %s in %s' % (
+                'Incomplete result hook configuration {} in {}'.format(
                     hook_basevar, cfg))
             continue
         # split command from any args
@@ -207,5 +207,4 @@ def run_jsonhook(hook, spec, res, dsarg=None):
     # only debug level, the hook can issue its own results and communicate
     # through them
     lgr.debug('Running hook %s: %s%s', hook, cmd_name, args)
-    for r in cmd(**args):
-        yield r
+    yield from cmd(**args)

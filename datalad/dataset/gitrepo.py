@@ -266,7 +266,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         else:
             seconds = self.cfg.obtain("datalad.fake-dates-start")
         seconds_new = seconds + 1
-        date = "@{} +0000".format(seconds_new)
+        date = f"@{seconds_new} +0000"
 
         lgr.debug("Setting date to %s",
                   time.strftime("%a %d %b %Y %H:%M:%S +0000",
@@ -691,19 +691,19 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             "for-each-ref",
             "--format={}".format(
                 '%00'.join(
-                    '%({})'.format(f) for f in fields)),
+                    f'%({f})' for f in fields)),
         ]
         if points_at:
-            cmd.append('--points-at={}'.format(points_at))
+            cmd.append(f'--points-at={points_at}')
         if contains:
-            cmd.append('--contains={}'.format(contains))
+            cmd.append(f'--contains={contains}')
         if sort:
             for k in ensure_list(sort):
-                cmd.append('--sort={}'.format(k))
+                cmd.append(f'--sort={k}')
         if pattern:
             cmd += ensure_list(pattern)
         if count:
-            cmd.append('--count={:d}'.format(count))
+            cmd.append(f'--count={count:d}')
 
         for line in self.call_git_items_(cmd, read_only=True):
             props = line.split('\0')

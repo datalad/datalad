@@ -794,8 +794,8 @@ def test_decode_source_spec():
         spec = 'ria+{}://{}{}{}'.format(
             proto,
             loc,
-            '#{}'.format(dsid),
-            '@{}'.format(version) if version else '')
+            f'#{dsid}',
+            f'@{version}' if version else '')
         eq_(decode_source_spec(spec),
             dict(
                 source=spec,
@@ -862,7 +862,7 @@ def test_ria_http(lcl=None, storepath=None, url=None):
     # now we should be able to clone from a ria+http url
     # the super
     riaclone = clone(
-        'ria+{}#{}'.format(url, ds.id),
+        f'ria+{url}#{ds.id}',
         lcl / 'clone',
     )
 
@@ -892,7 +892,7 @@ def test_ria_http(lcl=None, storepath=None, url=None):
     Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
     # re-clone as before
     riaclone2 = clone(
-        'ria+{}#{}'.format(url, ds.id),
+        f'ria+{url}#{ds.id}',
         lcl / 'clone2',
     )
     # and now clone a specific version, here given be the tag name
@@ -911,7 +911,7 @@ def test_ria_http(lcl=None, storepath=None, url=None):
     # attempt to clone a version that doesn't exist
     with swallow_logs():
         with assert_raises(IncompleteResultsError) as cme:
-            clone('ria+{}#{}@impossible'.format(url, ds.id),
+            clone(f'ria+{url}#{ds.id}@impossible',
                   lcl / 'clone_failed')
         assert_in("not found in upstream", str(cme.value))
 
@@ -920,9 +920,9 @@ def test_ria_http(lcl=None, storepath=None, url=None):
     # label, no full URL, but URL rewriting setup maps it back to the
     # HTTP URL used above
     with patch_config({
-            'url.ria+{}#.insteadof'.format(url): 'ria+ssh://somelabel#'}):
+            f'url.ria+{url}#.insteadof': 'ria+ssh://somelabel#'}):
         cloned_by_label = clone(
-            'ria+ssh://somelabel#{}'.format(origds.id),
+            f'ria+ssh://somelabel#{origds.id}',
             lcl / 'cloned_by_label',
         )
     # so we get the same setup as above, but....
@@ -965,7 +965,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     # on INFO level. Only postclone routine would deal with it.
     with swallow_logs(new_level=logging.INFO) as cml:
         # First, the super ds:
-        riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
+        riaclone = clone(f'ria+{url}#{dsid}', clone_path)
         cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
                               "auto-enabled",
                           level="INFO",
@@ -988,7 +988,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     untouched_url = riaclone.repo.get_special_remotes()[
         untouched_remote['annex-uuid']]['url']
     ok_(untouched_url.startswith("ria+file://"))
-    ok_(not untouched_url.startswith("ria+{}".format(url)))
+    ok_(not untouched_url.startswith(f"ria+{url}"))
 
     # publication dependency was set for store-storage but not for
     # anotherstore-storage:
@@ -1038,7 +1038,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     # post-clone configuration is triggered again, when we remove the subds and
     # retrieve it again via `get`:
     ds = Dataset(superds).create()
-    ria_url = 'ria+{}#{}'.format(url, dsid)
+    ria_url = f'ria+{url}#{dsid}'
     ds.clone(ria_url, 'sub')
     sds = ds.subdatasets('sub')
     eq_(len(sds), 1)
@@ -1119,7 +1119,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
     # later on.
     # Doing this first, so datasets in "first"/primary store know about this.
     create_store(io, storepath2, '1')
-    url2 = "ria+{}".format(get_local_file_url(str(storepath2)))
+    url2 = f"ria+{get_local_file_url(str(storepath2))}"
     for d in (ds, subds, subgit):
         create_ds_in_store(io, storepath2, d.id, '2', '1')
         d.create_sibling_ria(url2, "anotherstore", new_store_ok=True)
@@ -1133,7 +1133,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
     # URL to use for upload. Point is, that this should be invalid for the clone
     # so that autoenable would fail. Therefore let it be based on a to be
     # deleted symlink
-    upl_url = "ria+{}".format(get_local_file_url(str(link)))
+    upl_url = f"ria+{get_local_file_url(str(link))}"
 
     for d in (ds, subds, subgit):
 
@@ -1196,7 +1196,7 @@ def test_ria_postclonecfg():
 
         # test cloning via ria+ssh://
         skip_ssh(_test_ria_postclonecfg)(
-            "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+            f"ssh://datalad-test:{Path(store).as_posix()}", id
         )
 
 
@@ -1223,8 +1223,8 @@ def test_no_ria_postclonecfg(dspath=None, storepath=None, clonepath=None):
 
     io = LocalIO()
     create_store(io, storepath, '1')
-    file_url = "ria+{}".format(get_local_file_url(str(storepath)))
-    ssh_url = "ria+ssh://datalad-test:{}".format(storepath.as_posix())
+    file_url = f"ria+{get_local_file_url(str(storepath))}"
+    ssh_url = f"ria+ssh://datalad-test:{storepath.as_posix()}"
     ds.create_sibling_ria(file_url, "teststore",
                           push_url=ssh_url, alias="testds",
                           new_store_ok=True)
@@ -1232,7 +1232,7 @@ def test_no_ria_postclonecfg(dspath=None, storepath=None, clonepath=None):
 
     # Now clone via SSH. Should not reconfigure although `url` doesn't match the
     # URL we cloned from. However, `push-url` does.
-    riaclone = clone('{}#{}'.format(ssh_url, ds.id), clonepath)
+    riaclone = clone(f'{ssh_url}#{ds.id}', clonepath)
 
     # ORA remote is enabled (since URL still valid) but not reconfigured:
     untouched_remote = riaclone.siblings(name='teststore-storage',
@@ -1280,7 +1280,7 @@ def test_ria_postclone_noannex(dspath=None, storepath=None, clonepath=None):
 
     io = LocalIO()
     create_store(io, storepath, '1')
-    lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
+    lcl_url = f"ria+{get_local_file_url(str(storepath))}"
     create_ds_in_store(io, storepath, ds.id, '2', '1')
     ds.create_sibling_ria(lcl_url, "store", new_store_ok=True)
     ds.push('.', to='store')
@@ -1294,8 +1294,8 @@ def test_ria_postclone_noannex(dspath=None, storepath=None, clonepath=None):
     assert_false(annex.exists())
 
     clone_url = get_local_file_url(str(storepath), compatibility='git') + \
-                '#{}'.format(ds.id)
-    clone("ria+{}".format(clone_url), clonepath)
+                f'#{ds.id}'
+    clone(f"ria+{clone_url}", clonepath)
 
     # no need to test the cloning itself - we do that over and over in here
 
@@ -1347,7 +1347,7 @@ def test_inherit_src_candidates(lcl=None, storepath=None, url=None):
 @with_tempfile()
 def test_ria_http_storedataladorg(path=None):
     # can we clone from the store w/o any dedicated config
-    ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
+    ds = clone(f'ria+http://store.datalad.org#{datalad_store_testds_id}', path)
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)
 
@@ -1660,7 +1660,7 @@ def test_clone_git_clone_opts(path=None):
                                  "--single-branch", "--no-tags"])
     repo_b = ds_b.repo
     eq_(repo_b.get_active_branch(), DEFAULT_BRANCH)
-    eq_(set(x["refname"] for x in repo_b.for_each_ref_(fields="refname")),
+    eq_({x["refname"] for x in repo_b.for_each_ref_(fields="refname")},
         {f"refs/heads/{DEFAULT_BRANCH}",
          f"refs/remotes/{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"})
 

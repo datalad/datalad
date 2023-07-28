@@ -38,7 +38,7 @@ _FORMATTERS = {
 
 
 # @auto_repr
-class ActivityStats(object):
+class ActivityStats:
     """Helper to collect/pass statistics on carried out actions
 
     It also keeps track of total counts, which do not get reset by
@@ -57,7 +57,7 @@ class ActivityStats(object):
         # since auto_repr doesn't support "non-0" values atm
         return "%s(%s)" \
             % (self.__class__.__name__,
-               ", ".join(["%s=%s" % (k, v) for k, v in self._current.items() if v]))
+               ", ".join(["{}={}".format(k, v) for k, v in self._current.items() if v]))
 
     # Comparisons operate solely on _current
     def __eq__(self, other):
@@ -86,13 +86,13 @@ class ActivityStats(object):
         if key in self.__metrics__:
             self._current[key] = value
         else:
-            return super(ActivityStats, self).__setattr__(key, value)
+            return super().__setattr__(key, value)
 
     def __getattribute__(self, key):
         if (not key.startswith('_')) and key in self.__metrics__:
             return self._current[key]
         else:
-            return super(ActivityStats, self).__getattribute__(key)
+            return super().__getattribute__(key)
 
     def _get_updated_total(self):
         """Return _total updated with _current

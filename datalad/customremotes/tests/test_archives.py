@@ -251,7 +251,7 @@ def test_link_file_load(tempfile=None):
 
     ok_(os.path.exists(tempfile2))
 
-    with open(tempfile2, 'r') as f:
+    with open(tempfile2) as f:
         assert_equal(f.read(), "LOAD")
 
     def inode(fname):
@@ -290,7 +290,7 @@ def test_link_file_load(tempfile=None):
 
         # should be a copy (after mocked call)
         assert_not_equal(inode(tempfile), inode(tempfile2))
-    with open(tempfile2, 'r') as f:
+    with open(tempfile2) as f:
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
     unlink(tempfile2)  # TODO: next two with_tempfile

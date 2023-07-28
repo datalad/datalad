@@ -188,7 +188,7 @@ def test_download_multiple_NDA(outdir=None):
     ('datalad-test0-versioned', '3versions-allversioned.txt', 'pNsV5jJrnGATkmNrP8.i_xNH6CY4Mo5s'),
 ])
 def test_get_key(b, key, version_id):
-    url = "s3://%s/%s" % (b, key)
+    url = "s3://{}/{}".format(b, key)
     if version_id:
         url += '?versionId=' + version_id
     providers = get_test_providers(url, reload=True)  # to verify having credentials to access
@@ -201,7 +201,7 @@ def test_get_key(b, key, version_id):
     # key1 != key2 probably due to some reasons, so we will just compare fields we care about
     for f in ['name', 'version_id', 'size', 'content_type', 'last_modified']:
         vals = [getattr(k, f) for k in keys]
-        assert_equal(*vals, msg="%s differs between two keys: %s" % (f, vals))
+        assert_equal(*vals, msg="{} differs between two keys: {}".format(f, vals))
 
 
 # not really to be ran as part of the tests since it does

@@ -202,7 +202,7 @@ def diff_dataset(
       DataLad result records.
     """
     if reporting_order not in ('depth-first', 'breadth-first', 'bottom-up'):
-        raise ValueError('Unknown reporting order: {}'.format(reporting_order))
+        raise ValueError(f'Unknown reporting order: {reporting_order}')
 
     ds = require_dataset(
         dataset, check_installed=True, purpose='report difference')
@@ -308,15 +308,15 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
     repo_path = repo.pathobj
     if datasets_only:
         assert not origpaths  # protected above with NotImplementedError
-        paths = dict(
-            (sds.pathobj.relative_to(ds.pathobj), False)
+        paths = {
+            sds.pathobj.relative_to(ds.pathobj): False
             for sds in ds.subdatasets(
                 recursive=False,
                 state='present',
                 result_renderer='disabled',
                 result_xfm='datasets',
             )
-        )
+        }
         if not paths:
             # no subdatasets, nothing todo???
             return
@@ -324,11 +324,11 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         # filter and normalize paths that match this dataset before passing them
         # onto the low-level query method
         paths = None if origpaths is None \
-            else dict(
-                (repo_path / p.relative_to(ds.pathobj), goinside)
+            else {
+                repo_path / p.relative_to(ds.pathobj): goinside
                 for p, goinside in origpaths.items()
                 if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
-            )
+            }
     paths_arg = list(paths) if paths else None
     try:
         lgr.debug("Diff %s from '%s' to '%s'", ds, fr, to)
@@ -441,8 +441,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     "Unexpected subdataset state '{}'. That sucks!".format(
                         subds_state))
     # deal with staged ds diffs (for bottom-up)
-    for rec in ds_diffs:
-        yield rec
+    yield from ds_diffs
     # deal with staged subdataset diffs (for breadth-first)
     for call_args, call_kwargs in subds_diffcalls:
         yield from _diff_ds(*call_args, **call_kwargs)

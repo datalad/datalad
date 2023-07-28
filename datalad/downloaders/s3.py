@@ -69,7 +69,7 @@ class S3Authenticator(Authenticator):
           In some cases it is necessary to provide host to connect to. Passed
           to boto.connect_s3
         """
-        super(S3Authenticator, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.connection = None
         self.bucket = None
         self._conn_kwargs = {}
@@ -126,7 +126,7 @@ class S3Authenticator(Authenticator):
 class S3DownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None, url=None, headers=None,
                  key=None):
-        super(S3DownloaderSession, self).__init__(
+        super().__init__(
             size=size, filename=filename, headers=headers, url=url
         )
         self.key = key
@@ -164,7 +164,7 @@ class S3Downloader(BaseDownloader):
 
     @borrowkwargs(BaseDownloader)
     def __init__(self, **kwargs):
-        super(S3Downloader, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._bucket = None
 
     @property
@@ -354,7 +354,7 @@ class S3Downloader(BaseDownloader):
             raise TargetFileAbsent("S3 refused to provide the key for %s from url %s"
                                 % (url_filepath, url)) from e
         if key is None:
-            raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
+            raise TargetFileAbsent("No key returned for {} from url {}".format(url_filepath, url))
 
         target_size = key.size  # S3 specific
         headers = {

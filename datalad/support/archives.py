@@ -118,7 +118,7 @@ def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-class ArchivesCache(object):
+class ArchivesCache:
     """Cache to maintain extracted archives
 
     Parameters
@@ -248,7 +248,7 @@ class ArchivesCache(object):
             pass
 
 
-class ExtractedArchive(object):
+class ExtractedArchive:
     """Container for the extracted archive
     """
 
@@ -268,7 +268,7 @@ class ExtractedArchive(object):
         self._path = path
 
     def __repr__(self):
-        return "%s(%r, path=%r)" % (self.__class__.__name__, self._archive, self.path)
+        return "{}({!r}, path={!r})".format(self.__class__.__name__, self._archive, self.path)
 
     def clean(self, force=False):
         # would interfere with tests

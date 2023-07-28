@@ -66,7 +66,7 @@ class WitlessProtocol:
     proc_out = False
     proc_err = False
 
-    def __init__(self, done_future: Any = None, encoding: Optional[str] = None) -> None:
+    def __init__(self, done_future: Any = None, encoding: str | None = None) -> None:
         """
         Parameters
         ----------
@@ -82,9 +82,9 @@ class WitlessProtocol:
                           "and will be removed in a future release",
                           DeprecationWarning)
 
-        self.fd_infos: dict[int, tuple[str, Optional[bytearray]]] = {}
+        self.fd_infos: dict[int, tuple[str, bytearray | None]] = {}
 
-        self.process: Optional[subprocess.Popen] = None
+        self.process: subprocess.Popen | None = None
         self.stdout_fileno = 1
         self.stderr_fileno = 2
 
@@ -121,7 +121,7 @@ class WitlessProtocol:
             # fd_name prefix
             lgr.log(5, "%s| %s ", fd_name, log_data)
 
-    def connection_lost(self, exc: Optional[BaseException]) -> None:
+    def connection_lost(self, exc: BaseException | None) -> None:
         """Called when the connection is lost or closed.
 
         The argument is an exception object or None (the latter
@@ -133,7 +133,7 @@ class WitlessProtocol:
         self.process = process
         lgr.log(8, 'Process %i started', self.process.pid)
 
-    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]) -> None:
+    def pipe_connection_lost(self, fd: int, exc: BaseException | None) -> None:
         """Called when a file descriptor associated with the child process is
         closed.
 
@@ -147,7 +147,7 @@ class WitlessProtocol:
         if buffer is not None:
             buffer.extend(data)
 
-    def timeout(self, fd: Optional[int]) -> bool:
+    def timeout(self, fd: int | None) -> bool:
         """
         Called if the timeout parameter to WitlessRunner.run()
         is not `None` and a process file descriptor could not

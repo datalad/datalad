@@ -374,7 +374,7 @@ def test_install_recursive(src=None, path_nr=None, path_r=None):
     ok_(ds.is_installed())
     for sub in ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(not sub.is_installed(),
-            "Unintentionally installed: %s" % (sub,))
+            "Unintentionally installed: {}".format(sub))
     # this also means, subdatasets to be listed as absent:
     eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
         {'sub1'})
@@ -407,7 +407,7 @@ def test_install_recursive(src=None, path_nr=None, path_r=None):
 
     for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subds.is_installed(),
-            "Not installed: %s" % (subds,))
+            "Not installed: {}".format(subds))
         # no content was installed:
         ainfo = subds.repo.get_content_annexinfo(init=None,
                                                  eval_availability=True)
@@ -455,7 +455,7 @@ def test_install_recursive_with_data(src=None, path=None):
         ok_(all_have_content(top_ds.repo))
 
     for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
-        ok_(subds.is_installed(), "Not installed: %s" % (subds,))
+        ok_(subds.is_installed(), "Not installed: {}".format(subds))
         if isinstance(subds.repo, AnnexRepo):
             ok_(all_have_content(subds.repo))
 
@@ -528,7 +528,7 @@ def test_failed_install_multiple(top_path=None):
     # those which succeeded should be saved now
     eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed
-    eq_(set(r.get('source_url', r['path']) for r in cme.value.failed),
+    eq_({r.get('source_url', r['path']) for r in cme.value.failed},
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
@@ -938,7 +938,7 @@ def test_install_subds_from_another_remote(topdir=None):
         origin = create(origin_, annex=False)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
-        clone1.create_sibling('ssh://datalad-test%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
+        clone1.create_sibling('ssh://datalad-test{}/{}'.format(PathRI(getpwd()).posixpath, clone2_), name=clone2_)
 
         # print("Creating clone2")
         clone1.push(to=clone2_)

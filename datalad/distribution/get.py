@@ -207,7 +207,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
         # Directly on parent's ds url
         if remote_url:
             # make remotes and their URLs available to template rendering
-            sm_candidate_props['remoteurl-{}'.format(remote)] = remote_url
+            sm_candidate_props[f'remoteurl-{remote}'] = remote_url
             # attempt: submodule checkout at parent remote URL
             # We might need to quote sm_path portion, e.g. for spaces etc
             if isinstance(RI(remote_url), URL):
@@ -350,12 +350,12 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             section_name = 'submodule.{}'.format(sm['gitmodule_name'])
             # register the submodule as "active" in the superdataset
             ds.config.set(
-                '{}.active'.format(section_name),
+                f'{section_name}.active',
                 'true',
                 reload=False, force=True, scope='local',
             )
             ds.config.set(
-                '{}.url'.format(section_name),
+                f'{section_name}.url',
                 # record the actual source URL of the successful clone
                 # and not a funky prediction based on the parent ds
                 # like ds.repo.update_submodule() would do (does not
@@ -660,14 +660,13 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
     ds_repo = ds.repo
     # needs to be an annex to get content
     if not isinstance(ds_repo, AnnexRepo):
-        for r in results_from_paths(
+        yield from results_from_paths(
                 content, status='notneeded',
                 message="no dataset annex, content already present",
                 action='get',
                 type='file',
                 logger=lgr,
-                refds=refds_path):
-            yield r
+                refds=refds_path)
         return
     respath_by_status = {}
     try:
@@ -694,7 +693,7 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
                 respath_by_status.get(success, []) + [res['path']]
         yield res
 
-    for r in results_from_annex_noinfo(
+    yield from results_from_annex_noinfo(
             ds,
             content,
             respath_by_status,
@@ -703,8 +702,7 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             noinfo_file_msg='already present',
             action='get',
             logger=lgr,
-            refds=refds_path):
-        yield r
+            refds=refds_path)
 
 
 def _check_error_reported_before(res: dict, error_dict: dict):

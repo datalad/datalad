@@ -55,7 +55,7 @@ def decompress_file(archive, dir_):
     if len(suffixes) > 1 and suffixes[-2] == '.tar':
         # we have a compressed tar file that needs to be fed through the
         # decompressor first
-        cmd = '7z x {} -so | 7z x -si -ttar'.format(quote_cmdlinearg(archive))
+        cmd = f'7z x {quote_cmdlinearg(archive)} -so | 7z x -si -ttar'
     else:
         # fire and forget
         cmd = ['7z', 'x', archive]

@@ -71,7 +71,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             return [props]
         except Exception as exc:
             ce = CapturedException(exc)
-            self.message("Failed to check url %s: %s" % (url, ce))
+            self.message("Failed to check url {}: {}".format(url, ce))
             return False
 
     def checkpresent(self, key):
@@ -88,7 +88,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             except TargetFileAbsent as exc:
                 ce = CapturedException(exc)
                 self.message(
-                    "Target url %s file seems to be missing: %s" % (url, ce))
+                    "Target url {} file seems to be missing: {}".format(url, ce))
                 if not resp:
                     # if it is already marked as UNKNOWN -- let it stay that
                     # way but if not -- we might as well say that we can no
@@ -97,7 +97,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             except Exception as exc:
                 ce = CapturedException(exc)
                 self.message(
-                    "Failed to check status of url %s: %s" % (url, ce))
+                    "Failed to check status of url {}: {}".format(url, ce))
         if resp is None:
             raise RemoteError(f'Could not determine presence of key {key}')
         else:

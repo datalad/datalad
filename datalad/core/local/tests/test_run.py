@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -182,31 +181,31 @@ def test_py2_unicode_command(path=None):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
     ds = Dataset(path).create()
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
-    cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
+    cmd_str = "{} -c \"{}\" {}".format(sys.executable,
                                         touch_cmd,
-                                        u"bβ0.dat")
+                                        "bβ0.dat")
     ds.run(cmd_str)
     assert_repo_status(ds.path)
-    ok_exists(op.join(path, u"bβ0.dat"))
+    ok_exists(op.join(path, "bβ0.dat"))
 
     # somewhat desperate attempt to detect our own Github CI tests on a
     # crippled filesystem (VFAT) that is so crippled that it doesn't handle
     # what is needed here. It just goes mad with encoded bytestrings:
     # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
     if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
-        ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
+        ds.run([sys.executable, "-c", touch_cmd, "bβ1.dat"])
         assert_repo_status(ds.path)
-        ok_exists(op.join(path, u"bβ1.dat"))
+        ok_exists(op.join(path, "bβ1.dat"))
 
         # Send in a list of byte-strings to mimic a py2 command-line
         # invocation.
         ds.run([s.encode("utf-8")
-                for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
+                for s in [sys.executable, "-c", touch_cmd, " β1 "]])
         assert_repo_status(ds.path)
-        ok_exists(op.join(path, u" β1 "))
+        ok_exists(op.join(path, " β1 "))
 
     assert_in_results(
-        ds.run(u"bβ2.dat", result_renderer=None, on_failure="ignore"),
+        ds.run("bβ2.dat", result_renderer=None, on_failure="ignore"),
         status="error", action="run")
 
 
@@ -427,7 +426,7 @@ def test_run_explicit(origpath=None, path=None):
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 
-@with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
+@with_tree(tree={OBSCURE_FILENAME + ".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
 def test_inputs_quotes_needed(path=None):
@@ -439,8 +438,8 @@ def test_inputs_quotes_needed(path=None):
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
     ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"], expand="inputs")
-    expected = u"!".join(
-        list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
+    expected = "!".join(
+        list(sorted([OBSCURE_FILENAME + ".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
     with open(op.join(path, "out0")) as ifh:
         eq_(ensure_unicode(ifh.read()), expected)
@@ -548,7 +547,7 @@ def test_run_path_semantics(path=None):
     # relative to current directory
     with chpwd(ds1_subdir):
         out = op.join(ds0.path, "three")
-        run("cd .> {}".format(out), dataset=ds0.path, explicit=True,
+        run(f"cd .> {out}", dataset=ds0.path, explicit=True,
             outputs=[op.relpath(out, ds1_subdir)])
     ok_exists(op.join(ds0.path, "three"))
     assert_repo_status(ds0.path)
@@ -582,7 +581,7 @@ def test_run_remove_keeps_leading_directory(path=None):
     repo.drop(output_rel, options=["--force"])
 
     assert_in_results(
-        ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
+        ds.run(f"cd .> {output_rel}", outputs=[output_rel],
                result_renderer='disabled'),
         action="run.remove", status="ok")
 
@@ -732,7 +731,7 @@ def test_io_substitution(path=None):
     ds.save()
     # prefix the content of any given file with 'mod::'
     cmd = "import sys; from pathlib import Path; t = [(Path(p), 'mod::' + Path(p).read_text()) for p in sys.argv[1:]]; [k.write_text(v) for k, v in t]"
-    cmd_str = "{} -c \"{}\" {{inputs}}".format(sys.executable, cmd)
+    cmd_str = f"{sys.executable} -c \"{cmd}\" {{inputs}}"
     # this should run and not crash with permission denied
     ds.run(cmd_str, inputs=["{outputs}"], outputs=["*.t*"],
            result_renderer='disabled')

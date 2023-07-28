@@ -44,7 +44,7 @@ from datalad.utils import todo_interface_for_extensions
 lgr = logging.getLogger('datalad.distributed.create_sibling_ghlike')
 
 
-class _GitHubLike(object):
+class _GitHubLike:
     """Helper class with a platform abstraction for GitHub-like services
     """
     # (short) lower-case name of the target platform
@@ -162,7 +162,7 @@ class _GitHubLike(object):
 
     def _set_extra_remote_settings(self):
         target_name = urlparse(self.api_url).netloc
-        config_section = "datalad.create-sibling-ghlike.extra-remote-settings.{}".format(target_name)
+        config_section = f"datalad.create-sibling-ghlike.extra-remote-settings.{target_name}"
         target_specific_settings = {
             option: dlcfg.get_value(config_section, option)
             for option in dlcfg.options(config_section)
@@ -440,7 +440,7 @@ class _GitHubLike(object):
             # lastly configure the local datasets
             for var_name, var_value in \
                     self.extra_remote_settings.items():
-                var = 'remote.{}.{}'.format(siblingname, var_name)
+                var = f'remote.{siblingname}.{var_name}'
                 if existing in ('reconfigure', 'replace'):
                     d.config.set(var, var_value, scope='local')
                 elif var not in d.config:

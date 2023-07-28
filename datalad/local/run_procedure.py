@@ -62,7 +62,7 @@ def _get_file_match(dir, name='*'):
                                            m_bn.endswith('.sh') \
                                         else m_bn
                 yield m, report_name
-            elif m_bn == name or m_bn.startswith('{}.'.format(name)):
+            elif m_bn == name or m_bn.startswith(f'{name}.'):
                 yield m, name
 
 
@@ -97,8 +97,8 @@ def _get_proc_config(name, ds=None):
     # case we should actually issue a warning, since we then have no idea
     # of a priority. But ConfigManager isn't able yet to tell us or to
     # restrict the possibility to define multiple values to particular items
-    v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
-    h = cm.get('datalad.procedures.{}.help'.format(name), None)
+    v = cm.get(f'datalad.procedures.{name}.call-format', None)
+    h = cm.get(f'datalad.procedures.{name}.help', None)
     return v, h
 
 
@@ -184,17 +184,17 @@ def _guess_exec(script_file):
     # go by extension with "known" interpreters first, and only then
     # try to execute something that looks executable
     if script_file.endswith('.sh'):
-        return {'type': u'bash_script',
-                'template': u'bash {script} {ds} {args}',
+        return {'type': 'bash_script',
+                'template': 'bash {script} {ds} {args}',
                 'state': 'executable'}
     elif script_file.endswith('.py'):
         ex = quote_cmdlinearg(sys.executable)
-        return {'type': u'python_script',
-                'template': u'%s {script} {ds} {args}' % ex,
+        return {'type': 'python_script',
+                'template': '%s {script} {ds} {args}' % ex,
                 'state': 'executable'}
     elif is_exec and not os.path.isdir(script_file):
-        return {'type': u'executable',
-                'template': u'{script} {ds} {args}',
+        return {'type': 'executable',
+                'template': '{script} {ds} {args}',
                 'state': 'executable'}
     else:
         return {'type': None, 'template': None, 'state': None}
@@ -362,7 +362,7 @@ class RunProcedure(Interface):
                     continue
                 state = 'overridden' if cmd_name in active else ex['state']
                 message = ex['type'] if ex['type'] else 'unknown type'
-                message += ' ({})'.format(state) if state != 'executable' else ''
+                message += f' ({state})' if state != 'executable' else ''
                 res = get_status_dict(
                     action='discover_procedure',
                     path=m,
@@ -453,9 +453,9 @@ class RunProcedure(Interface):
             script=guard_for_format(quote_cmdlinearg(procedure_file)),
             ds=guard_for_format(quote_cmdlinearg(ds.path)) if ds else '',
             args=join_cmdline(args) if args else '')
-        lgr.info(u"Running procedure %s", name)
-        lgr.debug(u'Full procedure command: %r', cmd)
-        for r in Run.__call__(
+        lgr.info("Running procedure %s", name)
+        lgr.debug('Full procedure command: %r', cmd)
+        yield from Run.__call__(
                 cmd=cmd,
                 dataset=ds,
                 explicit=True,
@@ -465,8 +465,7 @@ class RunProcedure(Interface):
                 on_failure='ignore',
                 return_type='generator',
                 result_renderer='disabled'
-        ):
-            yield r
+        )
 
         if ds:
             # the procedure ran and we have to anticipate that it might have

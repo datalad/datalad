@@ -48,7 +48,7 @@ try:
 except (ImportError, AttributeError):
     # Attribute Error happens with newer httpretty and older ssl module
     # https://github.com/datalad/datalad/pull/2623
-    class NoHTTPPretty(object):
+    class NoHTTPPretty:
        __bool__ = lambda s: False
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
@@ -98,7 +98,7 @@ _builtins_open = builtins.open
 
 
 def fake_open(write_=None, skip_regex=None):
-    class myfile(object):
+    class myfile:
         """file which does nothing"""
         if write_:
             def write(self, *args, **kwargs):
@@ -115,7 +115,7 @@ def fake_open(write_=None, skip_regex=None):
 
 
 def _raise_IOError(*args, **kwargs):
-    raise IOError("Testing here")
+    raise OSError("Testing here")
 
 
 def test_process_www_authenticate():
@@ -417,7 +417,7 @@ def test_mtime(path=None, url=None, tempfile=None):
     os.utime(file_to_download, (time.time(), 1000))
     assert_equal(os.stat(file_to_download).st_mtime, 1000)
 
-    file_url = "%s/%s" % (url, 'file.dat')
+    file_url = "{}/{}".format(url, 'file.dat')
     with swallow_outputs():
         get_test_providers().download(file_url, path=tempfile)
     assert_equal(os.stat(tempfile).st_mtime, 1000)
@@ -463,7 +463,7 @@ class FakeCredential1(UserPassword):
     # to be reusable, and not leak across tests,
     # we should get _fixed_credentials per instance
     def __init__(self, *args, **kwargs):
-        super(FakeCredential1, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._fixed_credentials = [
             {'user': 'testlogin', 'password': 'testpassword'},
             {'user': 'testlogin2', 'password': 'testpassword2'},
@@ -498,7 +498,7 @@ def test_HTMLFormAuthenticator_httpretty(d=None):
         assert_equal(credentials['password'], post_params['password'][0])
         assert_equal(credentials['user'], post_params['username'][0])
         assert_not_in('Cookie', request.headers)
-        return (200, headers, "Got {} response from {}".format(request.method, uri))
+        return (200, headers, f"Got {request.method} response from {uri}")
 
     def request_get_callback(request, uri, headers):
         assert_equal(request.body, b'')
@@ -661,7 +661,7 @@ def test_scenario_2(d=None):
         assert_equal(credentials['password'], post_params['password'][0])
         assert_equal(credentials['user'], post_params['username'][0])
         assert_not_in('Cookie', request.headers)
-        return (200, headers, "Got {} response from {}".format(request.method, uri))
+        return (200, headers, f"Got {request.method} response from {uri}")
 
     def request_get_callback(request, uri, headers):
         assert_equal(request.body, b'')

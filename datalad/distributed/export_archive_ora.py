@@ -192,16 +192,16 @@ class ExportArchiveORA(Interface):
         #
         # TODO: use --json which was already added, checked with 10.20230407+git131-gb90c2156a6
         if froms:
-            keypaths = set([
+            keypaths = {
                 annex_objs.joinpath(k) for treeish in froms for k in ds_repo.call_annex_items_([
                 'find', *find_filters, f"--branch={treeish}",
                 "--format=${hashdirmixed}${key}/${key}\\n"])
-                ])
+                }
         else:
-            keypaths = set(annex_objs.joinpath(k) for k in ds_repo.call_annex_items_([
+            keypaths = {annex_objs.joinpath(k) for k in ds_repo.call_annex_items_([
                 'find', *find_filters,
                 "--format=${hashdirmixed}${key}/${key}\\n"
-            ]))
+            ])}
 
         log_progress(
             lgr.info,
@@ -233,7 +233,7 @@ class ExportArchiveORA(Interface):
                 link_fx(str(keypath), str(keydir / key))
             except FileNotFoundError as e:
                 if missing_content == 'error':
-                    raise IOError('Key %s has no content available' % keypath)
+                    raise OSError('Key %s has no content available' % keypath)
                 missing_file_lgr_func(
                     'Key %s has no content available',
                     str(keypath))

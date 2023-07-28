@@ -34,7 +34,7 @@ class Digester:
 
     DEFAULT_DIGESTS = ['md5', 'sha1', 'sha256', 'sha512']
 
-    def __init__(self, digests: Optional[list[str]] = None, blocksize: int = 1 << 16) -> None:
+    def __init__(self, digests: list[str] | None = None, blocksize: int = 1 << 16) -> None:
         """
         Parameters
         ----------

@@ -1,4 +1,3 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -57,7 +56,7 @@ def test_batched_close_abandon():
     # Send at least one instruction to start the subprocess
     response = bc("import time; print('a')")
     assert_equal(response, "a")
-    bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
+    bc.stdin_queue.put(b"time.sleep(2); exit(1)\n")
 
     with unittest.mock.patch("datalad.cmd._cfg_val", "abandon"):
         bc.close(return_stderr=False)
@@ -85,7 +84,7 @@ def test_batched_close_timeout_exception():
 
             # Send process to sleep for two seconds to trigger a timeout in
             # bc.close().
-            bc.stdin_queue.put("time.sleep(2); exit(1)\n".encode())
+            bc.stdin_queue.put(b"time.sleep(2); exit(1)\n")
             with unittest.mock.patch("datalad.cfg") as cfg_mock:
                 cfg_mock.obtain.return_value = "abandon"
                 try:
@@ -108,7 +107,7 @@ def test_batched_close_wait():
     # Send at least one instruction to start the subprocess
     response = bc("import time; print('a')")
     assert_equal(response, "a")
-    bc.stdin_queue.put("time.sleep(2); exit(2)\n".encode())
+    bc.stdin_queue.put(b"time.sleep(2); exit(2)\n")
     bc.close(return_stderr=False)
     assert_true(bc.wait_timed_out is False)
     assert_equal(bc.return_code, 2)
@@ -124,7 +123,7 @@ def test_batched_close_ok():
     # Send at least one instruction to start the subprocess
     response = bc("import time; print('a')")
     assert_equal(response, "a")
-    bc.stdin_queue.put("time.sleep(.5); exit(3)\n".encode())
+    bc.stdin_queue.put(b"time.sleep(.5); exit(3)\n")
     bc.close(return_stderr=False)
     assert_true(bc.wait_timed_out is False)
     assert_equal(bc.return_code, 3)
@@ -158,7 +157,7 @@ def test_batched_restart():
     # Send four lines
     lines = [f"line-{i}" for i in range(4)]
     responses = [bc(lines[i]).split() for i in range(4)]
-    pid_set = set([int(r[0]) for r in responses])
+    pid_set = {int(r[0]) for r in responses}
     assert_equal(len(pid_set), 4)
     response_lines = [r[1] for r in responses]
     assert_equal(lines, response_lines)

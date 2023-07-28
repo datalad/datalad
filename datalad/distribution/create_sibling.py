@@ -210,7 +210,7 @@ def _create_dataset_sibling(
                     remoteds_path
                 )
                 # should be safe since should not remove anything unless an empty dir
-                shell("rmdir {}".format(sh_quote(remoteds_path)))
+                shell(f"rmdir {sh_quote(remoteds_path)}")
                 path_exists = False
             except CommandError as e:
                 # If fails to rmdir -- either contains stuff no permissions
@@ -224,7 +224,7 @@ def _create_dataset_sibling(
                     err_str = str(e.stderr)
                 except UnicodeDecodeError:
                     err_str = e.stderr.decode(errors='replace')
-                _msg += " And it fails to rmdir (%s)." % (err_str.strip(),)
+                _msg += " And it fails to rmdir ({}).".format(err_str.strip())
 
         if path_exists:
             if existing == 'error':
@@ -257,9 +257,9 @@ def _create_dataset_sibling(
                 # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
-                shell("chmod -R +r+w {}".format(sh_quote(remoteds_path)))
+                shell(f"chmod -R +r+w {sh_quote(remoteds_path)}")
                 # remove target at path
-                shell("rm -rf {}".format(sh_quote(remoteds_path)))
+                shell(f"rm -rf {sh_quote(remoteds_path)}")
                 # if we succeeded in removing it
                 path_exists = False
                 # Since it is gone now, git-annex also should forget about it
@@ -284,7 +284,7 @@ def _create_dataset_sibling(
                     "Do not know how to handle existing={}".format(
                         repr(existing)))
         if not path_exists:
-            shell("{} {}".format(mkdir_cmd, sh_quote(remoteds_path)))
+            shell(f"{mkdir_cmd} {sh_quote(remoteds_path)}")
 
     delayed_super = _DelayedSuper(ds)
     if inherit and delayed_super.super:
@@ -318,7 +318,7 @@ def _create_dataset_sibling(
         if target_url and not is_ssh(target_url):
             # we are not coming in via SSH, hence cannot assume proper
             # setup for webserver access -> fix
-            shell('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
+            shell(f'git -C {sh_quote(remoteds_path)} update-server-info')
     else:
         # TODO -- we might still want to reconfigure 'shared' setting!
         pass
@@ -396,10 +396,10 @@ def _ls_remote_path(ssh, path):
         # sh_quote could decide to quote Windows-style
         # C.UTF-8 locale as opposed to C locale handles special characters (umlauts etc.)
         # ls falls back to C locale if LC_ALL is set to unknown locale, so this should be safe.
-        ls_cmd = "LC_ALL=C.UTF-8; export LC_ALL; /bin/ls -A1 {}".format(shlex.quote(path))
+        ls_cmd = f"LC_ALL=C.UTF-8; export LC_ALL; /bin/ls -A1 {shlex.quote(path)}"
         # TODO: Using sh_quote here is also flawed as it checks whether the
         # *local* machine is Windows. Doesn't help if the remote we're ssh'ing in is Windows.
-        ssh_cmd = "sh -c {}".format(sh_quote(ls_cmd))
+        ssh_cmd = f"sh -c {sh_quote(ls_cmd)}"
         out, err = ssh(ssh_cmd)
 
         if err:
@@ -668,7 +668,7 @@ class CreateSibling(Interface):
         ssh_sibling = is_ssh(sibling_ri)
         if not (ssh_sibling or isinstance(sibling_ri, PathRI)):
             raise ValueError(
-                "Unsupported SSH URL or path: '{0}', "
+                "Unsupported SSH URL or path: '{}', "
                 "use ssh://host/path, host:path or path syntax".format(sshurl))
 
         if not name:
@@ -683,7 +683,7 @@ class CreateSibling(Interface):
             # XXX here we assume one to one mapping of names from local branches
             # to the remote
             active_branch = ds.repo.get_active_branch()
-            since = '%s/%s' % (name, active_branch)
+            since = '{}/{}'.format(name, active_branch)
 
         to_process = []
         if recursive:
@@ -960,7 +960,7 @@ class CreateSibling(Interface):
             ds.config.get('remote.%s.url' % name)
         if not url:
             raise ValueError(
-                "%s had neither pushurl or url defined for %s" % (ds, name)
+                "{} had neither pushurl or url defined for {}".format(ds, name)
             )
         return url
 
@@ -968,7 +968,7 @@ class CreateSibling(Interface):
     def init_remote_repo(path, ssh, shared, dataset, description=None):
         cmd = "git -C {} init{}".format(
             sh_quote(path),
-            " --shared='{}'".format(sh_quote(shared)) if shared else '')
+            f" --shared='{sh_quote(shared)}'" if shared else '')
         try:
             ssh(cmd)
         except CommandError as e:
@@ -998,7 +998,7 @@ class CreateSibling(Interface):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
         # make sure hooks directory exists (see #1251)
-        ssh('{} {}'.format(mkdir_cmd, sh_quote(hooks_remote_dir)))
+        ssh(f'{mkdir_cmd} {sh_quote(hooks_remote_dir)}')
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
 
         # create json command for current dataset
@@ -1040,4 +1040,4 @@ done
             # upload hook to dataset
             ssh.put(tempf, hook_remote_target)
         # and make it executable
-        ssh('chmod +x {}'.format(sh_quote(hook_remote_target)))
+        ssh(f'chmod +x {sh_quote(hook_remote_target)}')

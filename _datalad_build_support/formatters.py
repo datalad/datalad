@@ -28,7 +28,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                  version=None
                  ):
         from datalad import cfg
-        super(ManPageFormatter, self).__init__(
+        super().__init__(
             prog,
             indent_increment=indent_increment,
             max_help_position=max_help_position,
@@ -69,13 +69,13 @@ class ManPageFormatter(argparse.HelpFormatter):
         usage = re.sub(r'\[([-a-zA-Z0-9]*)\s([a-zA-Z0-9{}|_]*)\]', r'[\1\~\2]', usage)
 
         usage = usage.replace('%s ' % self._prog, '')
-        usage = '.SH SYNOPSIS\n.nh\n.HP\n\\fB%s\\fR %s\n.hy\n' % (self._markup(self._prog),
+        usage = '.SH SYNOPSIS\n.nh\n.HP\n\\fB{}\\fR {}\n.hy\n'.format(self._markup(self._prog),
                                                     usage)
         return usage
 
     def _mk_title(self, prog):
-        name_version = "{0} {1}".format(prog, self._version)
-        return '.TH "{0}" "{1}" "{2}" "{3}"\n'.format(
+        name_version = f"{prog} {self._version}"
+        return '.TH "{}" "{}" "{}" "{}"\n'.format(
             prog, self._section, self._today, name_version)
 
     def _mk_name(self, prog, desc):
@@ -86,7 +86,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         desc = desc.splitlines()[0] if desc else 'it is in the name'
         # ensure starting lower case
         desc = desc[0].lower() + desc[1:]
-        return '.SH NAME\n%s \\- %s\n' % (self._bold(prog), desc)
+        return '.SH NAME\n{} \\- {}\n'.format(self._bold(prog), desc)
 
     def _mk_description(self, parser):
         desc = parser.description
@@ -113,7 +113,7 @@ class ManPageFormatter(argparse.HelpFormatter):
 
         footer = []
         for section, value in sections.items():
-            part = ".SH {}\n {}".format(section.upper(), value)
+            part = f".SH {section.upper()}\n {value}"
             footer.append(part)
 
         return '\n'.join(footer)
@@ -173,7 +173,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                 default = self._underline(action.dest.upper())
                 args_string = self._format_args(action, default)
                 for option_string in action.option_strings:
-                    parts.append('%s %s' % (self._bold(option_string),
+                    parts.append('{} {}'.format(self._bold(option_string),
                                             args_string))
 
             return ', '.join(p.replace('--', doubledash) for p in parts)
@@ -188,10 +188,10 @@ class RSTManPageFormatter(ManPageFormatter):
         return txt
 
     def _underline(self, string):
-        return "*{0}*".format(string)
+        return f"*{string}*"
 
     def _bold(self, string):
-        return "**{0}**".format(string)
+        return f"**{string}**"
 
     def _mk_synopsis(self, parser):
         self.add_usage(parser.usage, parser._actions,
@@ -209,8 +209,8 @@ class RSTManPageFormatter(ManPageFormatter):
     def _mk_title(self, prog):
         # and an easy to use reference point
         title = ".. _man_%s:\n\n" % prog.replace(' ', '-')
-        title += "{0}".format(prog)
-        title += '\n{0}\n\n'.format('=' * len(prog))
+        title += f"{prog}"
+        title += '\n{}\n\n'.format('=' * len(prog))
         return title
 
     def _mk_name(self, prog, desc):
@@ -228,7 +228,7 @@ class RSTManPageFormatter(ManPageFormatter):
 
         footer = []
         for section, value in sections.items():
-            part = "\n{0}\n{1}\n{2}\n".format(
+            part = "\n{}\n{}\n{}\n".format(
                 section,
                 '-' * len(section),
                 value)
@@ -254,7 +254,7 @@ class RSTManPageFormatter(ManPageFormatter):
         # determine help from format above
         option_sec = formatter.format_help()
 
-        return '\n\nOptions\n-------\n{0}'.format(option_sec)
+        return f'\n\nOptions\n-------\n{option_sec}'
 
     def _format_action(self, action):
         # determine the required width and the entry label
@@ -268,7 +268,7 @@ class RSTManPageFormatter(ManPageFormatter):
             help = ''
 
         # return a single string
-        return '{0}\n{1}\n{2}\n\n'.format(
+        return '{}\n{}\n{}\n\n'.format(
             action_header,
 
             '~' * len(action_header),
@@ -284,7 +284,7 @@ def cmdline_example_to_rst(src, out=None, ref=None):
     out.write('.. AUTO-GENERATED FILE -- DO NOT EDIT!\n\n')
     if ref:
         # place cross-ref target
-        out.write('.. {0}:\n\n'.format(ref))
+        out.write(f'.. {ref}:\n\n')
 
     # parser status vars
     inexample = False

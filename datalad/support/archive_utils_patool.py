@@ -114,7 +114,7 @@ def unixify_path(path):
         if drive:
             # last one must be :
             assert(drive[-1] == ":")
-            return '/%s%s' % (drive[:-1], path_)
+            return '/{}{}'.format(drive[:-1], path_)
         else:
             return path_
     else:

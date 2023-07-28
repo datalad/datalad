@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -406,11 +405,11 @@ def test_bf2043p2(path=None):
 
 
 @with_tree({
-    OBSCURE_FILENAME + u'_staged': 'staged',
-    OBSCURE_FILENAME + u'_untracked': 'untracked'})
+    OBSCURE_FILENAME + '_staged': 'staged',
+    OBSCURE_FILENAME + '_untracked': 'untracked'})
 def test_encoding(path=None):
-    staged = OBSCURE_FILENAME + u'_staged'
-    untracked = OBSCURE_FILENAME + u'_untracked'
+    staged = OBSCURE_FILENAME + '_staged'
+    untracked = OBSCURE_FILENAME + '_untracked'
     ds = Dataset(path).create(force=True)
     ds.repo.add(staged)
     assert_repo_status(ds.path, added=[staged], untracked=[untracked])
@@ -665,16 +664,16 @@ def test_remove_subds(path=None):
 def test_partial_unlocked(path=None):
     # https://github.com/datalad/datalad/issues/1651
     ds = create(path)
-    (ds.pathobj / 'normal.txt').write_text(u'123')
+    (ds.pathobj / 'normal.txt').write_text('123')
     ds.save()
     assert_repo_status(ds.path)
     ds.unlock('normal.txt')
     ds.save()
     # mixed git and git-annex'ed files
-    (ds.pathobj / 'ingit.txt').write_text(u'234')
+    (ds.pathobj / 'ingit.txt').write_text('234')
     ds.save(to_git=True)
-    (ds.pathobj / 'culprit.txt').write_text(u'345')
-    (ds.pathobj / 'ingit.txt').write_text(u'modified')
+    (ds.pathobj / 'culprit.txt').write_text('345')
+    (ds.pathobj / 'ingit.txt').write_text('modified')
     ds.save()
     assert_repo_status(ds.path)
     # but now a change in the attributes
@@ -712,7 +711,7 @@ def test_path_arg_call(path=None):
     for testfile in (
             ds.pathobj / 'abs.txt',
             ds.pathobj / 'rel.txt'):
-        testfile.write_text(u'123')
+        testfile.write_text('123')
         # we used to resolve relative paths against a dataset just given by
         # a path, but we no longer do that
         #save(dataset=ds.path, path=[testfile.name], to_git=True)

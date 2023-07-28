@@ -37,13 +37,13 @@ class CookiesDB:
 
     TODO: this is not multiprocess or multi-thread safe implementation due to shelve auto saving etc
     """
-    def __init__(self, filename: Optional[str | Path] = None) -> None:
+    def __init__(self, filename: str | Path | None = None) -> None:
         self._filename = filename
-        self._cookies_db: Optional[shelve.Shelf[Any]] = None
+        self._cookies_db: shelve.Shelf[Any] | None = None
         atexit.register(self.close)
 
     @property
-    def cookies_db(self) -> Optional[shelve.Shelf[Any]]:
+    def cookies_db(self) -> shelve.Shelf[Any] | None:
         if self._cookies_db is None:
             self._load()
         return self._cookies_db
@@ -109,7 +109,7 @@ class CookiesDB:
             lgr.warning("Failed to set a cookie for %s: %s",
                         url, CapturedException(exc))
 
-    def __contains__(self, url: str) -> Optional[bool]:
+    def __contains__(self, url: str) -> bool | None:
         try:
             return self._get_provider(url) in self.cookies_db  # type: ignore[operator]
         except Exception as exc:

@@ -114,8 +114,7 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
                                + ['r%i' % irepo]))
             subds_fpath = opj(path, subds_path)
             # yield all under
-            for d in _makeds(subds_fpath, levels_, ds=ds_):
-                yield d
+            yield from _makeds(subds_fpath, levels_, ds=ds_)
 
     if ds:
         assert ds.is_installed()

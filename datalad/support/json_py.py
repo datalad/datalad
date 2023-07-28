@@ -126,7 +126,7 @@ def dump2xzstream(obj, fname):
 def load_stream(fname, compressed=None):
     with _suitable_open(fname, compressed)(fname, mode='rb') as f:
         jreader = codecs.getreader('utf-8')(f)
-        cont_line = u''
+        cont_line = ''
         for line in jreader:
             if not line.endswith('\n'):
                 cont_line += line
@@ -136,7 +136,7 @@ def load_stream(fname, compressed=None):
             else:
                 cont_line = line
             yield loads(cont_line)
-            cont_line = u''
+            cont_line = ''
         if cont_line:  # The last line didn't end with a new line.
             yield loads(cont_line)
 
@@ -187,7 +187,7 @@ def load(fname, fixup=True, compressed=None, **kw):
                 s_orig = s = codecs.getreader('utf-8')(f).read()
 
             for o, r in {
-                u"\xa0": " ",  # non-breaking space
+                "\xa0": " ",  # non-breaking space
             }.items():
                 s = s.replace(o, r)
 

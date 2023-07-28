@@ -31,7 +31,7 @@ from datalad.utils import (
 lgr = logging.getLogger('datalad.support.globbedpaths')
 
 
-class GlobbedPaths(object):
+class GlobbedPaths:
     """Helper for globbing paths.
 
     Parameters
@@ -47,7 +47,7 @@ class GlobbedPaths(object):
        Whether the `paths` property returns unexpanded or expanded paths.
     """
 
-    def __init__(self, patterns: Optional[Iterable[str | bytes]], pwd: Optional[str] = None, expand: bool = False) -> None:
+    def __init__(self, patterns: Iterable[str | bytes] | None, pwd: str | None = None, expand: bool = False) -> None:
         self.pwd = pwd or getpwd()
         self._expand = expand
 

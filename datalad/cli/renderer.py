@@ -9,7 +9,7 @@ from datalad.ui import ui
 NA_STRING = 'N/A'  # we might want to make it configurable via config
 
 
-class nagen(object):
+class nagen:
     """A helper to provide a desired missing value if no value is known
 
     Usecases
@@ -24,7 +24,7 @@ class nagen(object):
     def __repr__(self):
         cls = self.__class__.__name__
         args = str(self.missing) if self.missing != NA_STRING else ''
-        return '%s(%s)' % (cls, args)
+        return '{}({})'.format(cls, args)
 
     def __str__(self):
         return self.missing
@@ -54,7 +54,7 @@ class DefaultOutputFormatter(string.Formatter):
         missing: string, optional
           What to output for the missing values
         """
-        super(DefaultOutputFormatter, self).__init__()
+        super().__init__()
         self.missing = missing
 
     def _d(self, msg, *args):
@@ -76,7 +76,7 @@ class DefaultOutputFormatter(string.Formatter):
     #         return "!ERR %s" % exc
 
 
-class DefaultOutputRenderer(object):
+class DefaultOutputRenderer:
     """A default renderer for .format'ed output line
     """
     def __init__(self, format):

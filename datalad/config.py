@@ -183,10 +183,10 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
             else:
                 dct[k] = (present_v, v)
     # take blobs with verbatim markup
-    origin_blobs = set(f for f in fileset if f.startswith('blob:'))
+    origin_blobs = {f for f in fileset if f.startswith('blob:')}
     # convert file specifications to Path objects with absolute paths
-    origin_paths = set(Path(f[5:]) for f in fileset if f.startswith('file:'))
-    origin_paths = set(f if f.is_absolute() else cwd / f for f in origin_paths)
+    origin_paths = {Path(f[5:]) for f in fileset if f.startswith('file:')}
+    origin_paths = {f if f.is_absolute() else cwd / f for f in origin_paths}
     return dct, origin_paths.union(origin_blobs)
 
 
@@ -253,7 +253,7 @@ def anything2bool(val):
             % repr(val))
 
 
-class ConfigManager(object):
+class ConfigManager:
     """Thin wrapper around `git-config` with support for a dataset configuration.
 
     The general idea is to have an object that is primarily used to read/query
@@ -323,7 +323,7 @@ class ConfigManager(object):
 
         if source not in ('any', 'local', 'branch', 'branch-local'):
             raise ValueError(
-                'Unknown ConfigManager(source=) setting: {}'.format(source))
+                f'Unknown ConfigManager(source=) setting: {source}')
         store = dict(
             # store in a simple dict
             # no subclassing, because we want to be largely read-only, and implement
@@ -655,7 +655,7 @@ class ConfigManager(object):
             # anyway
             # needs string conversion nevertheless, because default could come
             # in as something else
-            self.add(var, '{}'.format(_value), scope=scope, reload=reload)
+            self.add(var, f'{_value}', scope=scope, reload=reload)
         return value
 
     def __repr__(self):
@@ -663,7 +663,7 @@ class ConfigManager(object):
         return "ConfigManager({}{})".format(
             [str(p) for p in self._stores['branch']['files'].union(
                 self._stores['git']['files'])],
-            ', overrides={!r}'.format(self.overrides) if self.overrides else '',
+            f', overrides={self.overrides!r}' if self.overrides else '',
         )
 
     def __str__(self):
@@ -757,7 +757,7 @@ class ConfigManager(object):
     #
     def sections(self):
         """Returns a list of the sections available"""
-        return list(set([cfg_section_regex.match(k).group(1) for k in self._merged_store]))
+        return list({cfg_section_regex.match(k).group(1) for k in self._merged_store})
 
     def options(self, section):
         """Returns a list of options available in the specified section."""
@@ -1083,12 +1083,12 @@ def rewrite_url(cfg, url):
                 "Ignoring URL rewrite configuration for '%s', "
                 "multiple conflicting definitions exists: %s",
                 match,
-                ['url.{}.insteadof'.format(k)
+                [f'url.{k}.insteadof'
                  for k, v in matches.items()
                  if v == match]
             )
         else:
-            url = '{}{}'.format(rewrite_base, url[len(match):])
+            url = f'{rewrite_base}{url[len(match):]}'
     return url
 
 
@@ -1119,7 +1119,7 @@ def quote_config(v):
     if v[0] in white or v[-1] in white or any(c in v for c in comment):
         # quoting the value due to leading/trailing whitespace
         # or occurrence of comment char
-        v = '"{}"'.format(v)
+        v = f'"{v}"'
     return v
 
 

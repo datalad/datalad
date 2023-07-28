@@ -41,7 +41,7 @@ class ReadOnlyDict(Mapping):
         return len(self._dict)
 
     def __repr__(self):
-        return '<%s %r>' % (self.__class__.__name__, self._dict)
+        return '<{} {!r}>'.format(self.__class__.__name__, self._dict)
 
     def __hash__(self):
         if self._hash is None:

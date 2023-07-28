@@ -92,7 +92,7 @@ class Formatter(string.Formatter):
     def format(self, format_string, *args, **kwargs):
         if not isinstance(args[0], Mapping):
             raise ValueError(f"First positional argument should be mapping, got {args[0]!r}")
-        return super(Formatter, self).format(format_string, *args, **kwargs)
+        return super().format(format_string, *args, **kwargs)
 
     def get_value(self, key, args, kwargs):
         """Look for key's value in `args[0]` mapping first.
@@ -112,7 +112,7 @@ class Formatter(string.Formatter):
         try:
             value = data[name]
         except KeyError:
-            return super(Formatter, self).get_value(
+            return super().get_value(
                 key, args, kwargs)
 
         if self.missing is not None and isinstance(value, str):
@@ -122,7 +122,7 @@ class Formatter(string.Formatter):
     def convert_field(self, value, conversion):
         if conversion == 'l':
             return str(value).lower()
-        return super(Formatter, self).convert_field(value, conversion)
+        return super().convert_field(value, conversion)
 
 
 class RepFormatter(Formatter):
@@ -130,24 +130,24 @@ class RepFormatter(Formatter):
     """
 
     def __init__(self, *args, **kwargs):
-        super(RepFormatter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.repeats = {}
         self.repindex = 0
 
     def format(self, *args, **kwargs):
         self.repindex = 0
-        result = super(RepFormatter, self).format(*args, **kwargs)
+        result = super().format(*args, **kwargs)
         if result in self.repeats:
             self.repindex = self.repeats[result] + 1
             self.repeats[result] = self.repindex
-            result = super(RepFormatter, self).format(*args, **kwargs)
+            result = super().format(*args, **kwargs)
         else:
             self.repeats[result] = 0
         return result
 
     def get_value(self, key, args, kwargs):
         args[0]["_repindex"] = self.repindex
-        return super(RepFormatter, self).get_value(key, args, kwargs)
+        return super().get_value(key, args, kwargs)
 
 
 def clean_meta_args(args):
@@ -235,7 +235,7 @@ def filter_legal_metafield(fields):
     return legal
 
 
-class AnnexKeyParser(object):
+class AnnexKeyParser:
     """Parse a full annex key into subparts.
 
     The key may have an "et:" prefix appended, which signals that the backend's
@@ -543,7 +543,7 @@ def get_url_parts(url):
 
     url_parts = path.split("/")
     for pidx, part in enumerate(url_parts):
-        names["_url{}".format(pidx)] = part
+        names[f"_url{pidx}"] = part
     basename = url_parts[-1]
     names["_url_basename"] = basename
     names.update(get_file_parts(basename, prefix="_url_basename"))
@@ -580,7 +580,7 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                     row.update(get_file_parts(filename, "_url_filename"))
                 else:
                     raise ValueError(
-                        "{} does not contain a filename".format(url))
+                        f"{url} does not contain a filename")
                 log_progress(lgr.info, "addurls_requestnames",
                              "%s returned for %s", url, filename,
                              update=1, increment=True)
@@ -874,7 +874,7 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
                               **st_kwargs)
 
 
-class RegisterUrl(object):
+class RegisterUrl:
     """Create files (without content) from user-supplied keys and register URLs.
     """
 
@@ -1393,7 +1393,7 @@ class Addurls(Interface):
                                       message=str(ce),
                                       exception=ce)
                 return
-            displayed_source = "'{}'".format(urlfile)
+            displayed_source = f"'{urlfile}'"
         else:
             displayed_source = "<records>"
             records = ensure_list(url_file)
@@ -1437,7 +1437,7 @@ class Addurls(Interface):
                              os.path.join(ds.path, row["filename"]))
                 if "meta_args" in row:
                     lgr.info("Metadata: %s",
-                             sorted(u"{}={}".format(k, v)
+                             sorted(f"{k}={v}"
                                     for k, v in row["meta_args"].items()))
             yield dict(st_dict, status="ok", message="dry-run finished")
             return

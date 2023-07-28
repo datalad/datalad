@@ -148,7 +148,7 @@ class BuildManPage(Command):
         appname = 'datalad'
 
         sections = {
-            'Authors': """{0} is developed by {1} <{2}>.""".format(
+            'Authors': """{} is developed by {} <{}>.""".format(
                 appname, dist.get_author(), dist.get_author_email()),
         }
 
@@ -158,7 +158,7 @@ class BuildManPage(Command):
                 os.makedirs(opath)
             for cmdname in getattr(self, 'cmdline_names', list(self._parser)):
                 p = self._parser[cmdname]
-                cmdname = "{0}{1}".format(
+                cmdname = "{}{}".format(
                     'datalad ' if cmdname != 'datalad' else '',
                     cmdname)
                 format = cls(
@@ -166,7 +166,7 @@ class BuildManPage(Command):
                     ext_sections=sections,
                     version=get_version(getattr(self, 'mod_name', appname)))
                 formatted = format.format_man_page(p)
-                with open(opj(opath, '{0}.{1}'.format(
+                with open(opj(opath, '{}.{}'.format(
                         cmdname.replace(' ', '-'),
                         ext)),
                         'w') as f:
@@ -202,11 +202,11 @@ class BuildRSTExamplesFromScripts(Command):
         from glob import glob
         for example in glob(opj(self.expath, '*.sh')):
             exname = os.path.basename(example)[:-3]
-            with open(opj(opath, '{0}.rst'.format(exname)), 'w') as out:
+            with open(opj(opath, f'{exname}.rst'), 'w') as out:
                 fmt.cmdline_example_to_rst(
                     open(example),
                     out=out,
-                    ref='_example_{0}'.format(exname))
+                    ref=f'_example_{exname}')
 
 
 class BuildConfigInfo(Command):
@@ -243,7 +243,7 @@ class BuildConfigInfo(Command):
             categories[v.get('destination', 'misc')][term] = v
 
         for cat in categories:
-            with open(opj(opath, '{}.rst.in'.format(cat)), 'w') as rst:
+            with open(opj(opath, f'{cat}.rst.in'), 'w') as rst:
                 rst.write('.. glossary::\n')
                 for term, v in sorted(categories[cat].items(), key=lambda x: x[0]):
                     rst.write(_indent(term, '\n  '))

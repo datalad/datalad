@@ -148,10 +148,10 @@ def _readline_rstripped(stdout):
 
 class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
     def __init__(self,
-                 batched_command: "BatchedCommand",
+                 batched_command: BatchedCommand,
                  done_future: Any = None,
-                 encoding: Optional[str] = None,
-                 output_proc: Optional[Callable] = None,
+                 encoding: str | None = None,
+                 output_proc: Callable | None = None,
                  ):
         GeneratorMixIn.__init__(self)
         StdOutErrCapture.__init__(self, done_future, encoding)
@@ -168,14 +168,14 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
         else:
             raise ValueError(f"unknown file descriptor: {fd}")
 
-    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]):
+    def pipe_connection_lost(self, fd: int, exc: BaseException | None):
         if fd == STDOUT_FILENO:
             remaining_line = self.line_splitter.finish_processing()
             if remaining_line is not None:
                 lgr.debug("unterminated line: %s", remaining_line)
                 self.send_result((fd, remaining_line))
 
-    def timeout(self, fd: Optional[int]) -> bool:
+    def timeout(self, fd: int | None) -> bool:
         timeout_error = self.batched_command.get_timeout_exception(fd)
         if timeout_error:
             raise timeout_error
@@ -192,7 +192,7 @@ class ReadlineEmulator:
     threaded runner.
     """
     def __init__(self,
-                 batched_command: "BatchedCommand"):
+                 batched_command: BatchedCommand):
         self.batched_command = batched_command
 
     def readline(self):
@@ -203,7 +203,7 @@ class ReadlineEmulator:
         return self.batched_command.get_one_line()
 
 
-class SafeDelCloseMixin(object):
+class SafeDelCloseMixin:
     """A helper class to use where __del__ would call .close() which might
     fail if "too late in GC game"
     """
@@ -231,27 +231,27 @@ class BatchedCommand(SafeDelCloseMixin):
     _active_instances: WeakValueDictionary[int, BatchedCommand] = WeakValueDictionary()
 
     def __init__(self,
-                 cmd: Union[str, Tuple, List],
-                 path: Optional[str] = None,
-                 output_proc: Optional[Callable] = None,
-                 timeout: Optional[float] = None,
+                 cmd: str | tuple | list,
+                 path: str | None = None,
+                 output_proc: Callable | None = None,
+                 timeout: float | None = None,
                  exception_on_timeout: bool = False,
                  ):
 
         command = cmd
         self.command: list = [command] if not isinstance(command, List) else command
-        self.path: Optional[str] = path
-        self.output_proc: Optional[Callable] = output_proc
-        self.timeout: Optional[float] = timeout
+        self.path: str | None = path
+        self.output_proc: Callable | None = output_proc
+        self.timeout: float | None = timeout
         self.exception_on_timeout: bool = exception_on_timeout
 
         self.stderr_output = b""
-        self.runner: Optional[WitlessRunner] = None
+        self.runner: WitlessRunner | None = None
         self.encoding = None
         self.wait_timed_out = None
-        self.return_code: Optional[int] = None
+        self.return_code: int | None = None
         self._abandon_cache = None
-        self.last_request: Optional[str] = None
+        self.last_request: str | None = None
 
         self._active = 0
         self._active_last = _now()
@@ -353,7 +353,7 @@ class BatchedCommand(SafeDelCloseMixin):
         return False
 
     def __call__(self,
-                 cmds: Union[str, Tuple, List]):
+                 cmds: str | tuple | list):
         """
         Send requests to the subprocess and return the responses. We expect one
         response per request. How the response is structured is determined by
@@ -427,7 +427,7 @@ class BatchedCommand(SafeDelCloseMixin):
         return responses if input_multiple else responses[0] if responses else None
 
     def process_request(self,
-                        request: Union[Tuple, str]) -> Any | None:
+                        request: tuple | str) -> Any | None:
 
         self._active += 1
         try:
@@ -470,7 +470,7 @@ class BatchedCommand(SafeDelCloseMixin):
         finally:
             self._active -= 1
 
-    def get_one_line(self) -> Optional[str]:
+    def get_one_line(self) -> str | None:
         """
         Get a single stdout line from the generator.
 
@@ -601,8 +601,8 @@ class BatchedCommand(SafeDelCloseMixin):
         return None
 
     def get_timeout_exception(self,
-                              fd: Optional[int]
-                              ) -> Optional[TimeoutExpired]:
+                              fd: int | None
+                              ) -> TimeoutExpired | None:
         """
         Get a process timeout exception if timeout exceptions should
         be generated for a process that continues longer than timeout

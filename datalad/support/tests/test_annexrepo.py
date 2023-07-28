@@ -429,7 +429,7 @@ def test_AnnexRepo_web_remote(sitepath=None, siteurl=None, dst=None):
 
     # output='descriptions'
     ldesc = ar.whereis(testfile, output='descriptions')
-    eq_(set(ldesc), set([v['description'] for v in lfull.values()]))
+    eq_(set(ldesc), {v['description'] for v in lfull.values()})
 
     # info w/ and w/o fast mode
     for fast in [True, False]:
@@ -2029,7 +2029,7 @@ def test_AnnexRepo_metadata(path=None):
     # matching timestamp entries for all keys
     md_ts = dict(ar.get_metadata('up.dat', timestamps=True))
     for k in md['up.dat']:
-        assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
+        assert_in(f'{k}-lastchanged', md_ts['up.dat'])
     assert_in('lastchanged', md_ts['up.dat'])
     # recursive needs a flag
     assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
@@ -2110,7 +2110,7 @@ def test_AnnexRepo_get_corresponding_branch(src_path=None, path=None):
     ar.adjust()
     # as above, we still want to get the default branch, while being on
     # 'adjusted/<default branch>(unlocked)'
-    eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
+    eq_(f'adjusted/{DEFAULT_BRANCH}(unlocked)',
         ar.get_active_branch())
     eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
@@ -2178,7 +2178,7 @@ def test_fake_dates(path=None):
     # Commits from the "git annex init" call are one second ahead.
     for commit in ar.get_branch_commits_("git-annex"):
         eq_(timestamp, int(ar.format_commit('%ct', commit)))
-    assert_in("timestamp={}s".format(timestamp),
+    assert_in(f"timestamp={timestamp}s",
               ar.call_git(["cat-file", "blob", "git-annex:uuid.log"], read_only=True))
 
 
@@ -2309,7 +2309,7 @@ def test_annexjson_protocol_incorrect(path=None, *, print_opt, caplog):
     # Test that we still log some incorrectly formed JSON record
     bad_json = '{"I": "am wrong,}'
     with open(path, 'w') as f:
-        print("print(%r%s);" % (bad_json, print_opt), file=f)
+        print("print({!r}{});".format(bad_json, print_opt), file=f)
     runner = GitWitlessRunner()
     # caplog only to not cause memory error in case of heavy debugging
     # Unfortunately it lacks similar .assert_logged with a regex matching

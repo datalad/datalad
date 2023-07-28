@@ -64,7 +64,7 @@ from datalad.downloaders import CREDENTIAL_TYPES
 
 
 @auto_repr
-class Provider(object):
+class Provider:
     """Class to bring together url_res, credential, and authenticator
     """
     # TODO: we might need a lazy loading of the submodules which would provide
@@ -146,7 +146,7 @@ class Provider(object):
         return self._downloader
 
 
-class Providers(object):
+class Providers:
     """
 
     So we could provide handling for URLs with corresponding credentials
@@ -184,7 +184,7 @@ type = {credential_type}
         self._default_providers = {}
 
     def __repr__(self):
-        return "%s(%s)" % (
+        return "{}({})".format(
             self.__class__.__name__,
             "" if not self._providers else repr(self._providers)
         )
@@ -275,7 +275,7 @@ type = {credential_type}
                 locals().get(type_ + "s")[name] = getattr(
                     cls, '_process_' + type_)(name, items)
                 if len(items):
-                    raise ValueError("Unprocessed fields left for %s: %s" % (name, str(items)))
+                    raise ValueError("Unprocessed fields left for {}: {}".format(name, str(items)))
             else:
                 lgr.warning("Do not know how to treat section %s here" % section)
 

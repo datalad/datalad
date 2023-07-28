@@ -88,7 +88,7 @@ def test_siblings(origin=None, repo_path=None, local_clone_path=None):
     assert_status('error', res)
     eq_(res[0]['message'],
         ('unknown sibling(s) specified as publication dependency: %s',
-         set(('r1', 'r2'))))
+         {'r1', 'r2'}))
     # prior config was not changed by failed call above
     eq_(source.config.get(depvar, None), 'stupid')
 

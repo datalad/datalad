@@ -67,7 +67,7 @@ def test_param():
     assert_equal(pname, p.get_autodoc('testname'))
     doc = 'somedoc'
     p = Parameter(doc=doc)
-    assert_equal('%s\n  %s.' % (pname, doc), p.get_autodoc('testname'))
+    assert_equal('{}\n  {}.'.format(pname, doc), p.get_autodoc('testname'))
     # constraints
     p = Parameter(doc=doc, constraints=cnstr.EnsureInt() | cnstr.EnsureStr())
     autodoc = p.get_autodoc('testname')

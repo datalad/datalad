@@ -1,5 +1,4 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -33,10 +32,10 @@ def test_get_default_title(path=None):
 
     # Initialize and get UUID
     ds.create(force=True)
-    eq_(_get_default_title(ds), '{dirname}#{ds.id}'.format(**locals()))
+    eq_(_get_default_title(ds), f'{dirname}#{ds.id}')
 
     # Tag and get @version
     # cannot use ds.save since our tags are not annotated,
     # see https://github.com/datalad/datalad/issues/4139
     ds.repo.tag("0.1", message="important version")
-    eq_(_get_default_title(ds), '{dirname}#{ds.id}@0.1'.format(**locals()))
+    eq_(_get_default_title(ds), f'{dirname}#{ds.id}@0.1')

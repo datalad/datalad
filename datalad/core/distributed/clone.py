@@ -640,7 +640,7 @@ def _post_git_init_processing_(
         lgr.debug(
             'Reinitializing %s to enable shared access permissions',
             destds)
-        destds.repo.call_git(['init', '--shared={}'.format(reckless[7:])])
+        destds.repo.call_git(['init', f'--shared={reckless[7:]}'])
 
     # trick to have the function behave like a generator, even if it
     # (currently) doesn't actually yield anything.
@@ -886,17 +886,17 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
     # no need to reconfigure original/direct remote again
     if cfgds != probeds:
         # prevent duplicates
-        known_remote_urls = set(
+        known_remote_urls = {
             cfgds.config.get(r + '.url', None)
             for r in cfgds.config.sections()
             if r.startswith('remote.')
-        )
+        }
         if origin_url not in known_remote_urls:
             yield from cfgds.siblings(
                 'configure',
                 # no chance for conflict, can only be the second configured
                 # remote
-                name='{}-{}'.format(remote, label),
+                name=f'{remote}-{label}',
                 url=origin_url,
                 # fetch to get all annex info
                 fetch=True,

@@ -163,7 +163,7 @@ class Unlock(Interface):
                     status=status,
                     path=res["path"],
                     type="file",
-                    message="{}; cannot unlock".format(msg),
+                    message=f"{msg}; cannot unlock",
                     **res_kwargs)
 
         # Do the actual unlocking.

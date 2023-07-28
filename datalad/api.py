@@ -37,7 +37,7 @@ def _command_summary():
 
 
 if not datalad.in_librarymode():
-    __doc__ += "\n\n{}".format(_command_summary())
+    __doc__ += f"\n\n{_command_summary()}"
 
 
 def _generate_extension_api():

@@ -19,7 +19,7 @@ import logging
 lgr = logging.getLogger('datalad.distributed.export_to_figshare')
 
 
-class FigshareRESTLaison(object):
+class FigshareRESTLaison:
     """A little helper to provide minimal interface to interact with Figshare
     """
     API_URL = 'https://api.figshare.com/v2'
@@ -149,10 +149,10 @@ def _get_default_title(dataset):
     from ..support.path import basename
     title = basename(dataset.path)
     if dataset.id:
-        title += "#{dataset.id}".format(**locals())
+        title += f"#{dataset.id}"
     version = dataset.repo.describe()
     if version:
-        title += "@{version}".format(**locals())
+        title += f"@{version}"
     # 3 is minimal length. Just in case there is no UUID or version and dir
     # is short
     if len(title) < 3:

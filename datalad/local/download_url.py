@@ -229,7 +229,7 @@ class DownloadURL(Interface):
 URLs:
   {}""".format("\n  ".join(urls))
 
-            for r in Save()(downloaded_paths, message=msg,
+            yield from Save()(downloaded_paths, message=msg,
                             # ATTN: Pass the original dataset argument to
                             # preserve relative path handling semantics.
                             dataset=dataset,
@@ -237,8 +237,7 @@ URLs:
                             result_renderer='disabled',
                             result_xfm=None,
                             result_filter=None,
-                            on_failure="ignore"):
-                yield r
+                            on_failure="ignore")
 
             ds_repo = ds.repo
             if isinstance(ds_repo, AnnexRepo):

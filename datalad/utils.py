@@ -199,9 +199,9 @@ lgr.debug(
 # `getargspec` has been deprecated in Python 3.
 class ArgSpecFake(NamedTuple):
     args: list[str]
-    varargs: Optional[str]
-    keywords: Optional[str]
-    defaults: Optional[tuple[Any, ...]]
+    varargs: str | None
+    keywords: str | None
+    defaults: tuple[Any, ...] | None
 
 
 # adding cache here somehow does break it -- even 'datalad wtf' does not run
@@ -225,8 +225,8 @@ def getargspec(func: Callable[..., Any], *, include_kwonlyargs: bool=False) -> A
     f_sign = inspect.signature(func)
     # Loop through parameters and compose argspec
     args: list[str] = []
-    varargs: Optional[str] = None
-    keywords: Optional[str] = None
+    varargs: str | None = None
+    keywords: str | None = None
     defaults: dict[str, Any] = {}
     # Collect all kwonlyargs into a dedicated dict - name: default
     kwonlyargs: dict[str, Any] = {}
@@ -324,7 +324,7 @@ def any_re_search(regexes: str | list[str], value: str) -> bool:
     return False
 
 
-def not_supported_on_windows(msg: Optional[str]=None) -> None:
+def not_supported_on_windows(msg: str | None=None) -> None:
     """A little helper to be invoked to consistently fail whenever functionality is
     not supported (yet) on Windows
     """
@@ -355,7 +355,7 @@ def get_home_envvars(new_home: str | Path) -> dict[str, str]:
     return {v: val for v, val in out.items() if v in os.environ}
 
 
-def _is_stream_tty(stream: Optional[IO]) -> bool:
+def _is_stream_tty(stream: IO | None) -> bool:
     try:
         # TODO: check on windows if hasattr check would work correctly and
         # add value:
@@ -379,7 +379,7 @@ def is_interactive() -> bool:
     return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
-def get_ipython_shell() -> Optional[Any]:
+def get_ipython_shell() -> Any | None:
     """Detect if running within IPython and returns its `ip` (shell) object
 
     Returns None if not under ipython (no `get_ipython` function)
@@ -398,13 +398,13 @@ def md5sum(filename: str | Path) -> str:
 
 
 _encoded_dirsep = r'\\'  if on_windows else r'/'
-_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (
+_VCS_REGEX = r'{}\.(?:git|gitattributes|svn|bzr|hg)(?:{}|$)'.format(
     _encoded_dirsep, _encoded_dirsep)
-_DATALAD_REGEX = r'%s\.(?:datalad)(?:%s|$)' % (
+_DATALAD_REGEX = r'{}\.(?:datalad)(?:{}|$)'.format(
     _encoded_dirsep, _encoded_dirsep)
 
 
-def find_files(regex: str, topdir: str | Path = curdir, exclude: Optional[str]=None, exclude_vcs: bool =True, exclude_datalad: bool =False, dirs: bool =False) -> Iterator[str]:
+def find_files(regex: str, topdir: str | Path = curdir, exclude: str | None=None, exclude_vcs: bool =True, exclude_datalad: bool =False, dirs: bool =False) -> Iterator[str]:
     """Generator to find files matching regex
 
     Parameters
@@ -450,7 +450,7 @@ def expandpath(path: str | Path, force_absolute: bool =True) -> str:
     return path
 
 
-def posix_relpath(path: str | Path, start: Optional[str | Path]=None) -> str:
+def posix_relpath(path: str | Path, start: str | Path | None=None) -> str:
     """Behave like os.path.relpath, but always return POSIX paths...
 
     on any platform."""
@@ -812,14 +812,14 @@ def ensure_result_list(r: Any) -> list:
     return [r] if isinstance(r, dict) else ensure_list(r)
 
 @overload
-def ensure_list_from_str(s: str, sep: str='\n') -> Optional[list[str]]:
+def ensure_list_from_str(s: str, sep: str='\n') -> list[str] | None:
     ...
 
 @overload
-def ensure_list_from_str(s: list[T], sep: str='\n') -> Optional[list[T]]:
+def ensure_list_from_str(s: list[T], sep: str='\n') -> list[T] | None:
     ...
 
-def ensure_list_from_str(s: str | list[T], sep: str='\n') -> Optional[list[str]] | Optional[list[T]]:
+def ensure_list_from_str(s: str | list[T], sep: str='\n') -> list[str] | None | list[T] | None:
     """Given a multiline string convert it to a list of return None if empty
 
     Parameters
@@ -835,14 +835,14 @@ def ensure_list_from_str(s: str | list[T], sep: str='\n') -> Optional[list[str]]
     return s.split(sep)
 
 @overload
-def ensure_dict_from_str(s: str, sep: str = '\n') -> Optional[dict[str, str]]:
+def ensure_dict_from_str(s: str, sep: str = '\n') -> dict[str, str] | None:
     ...
 
 @overload
-def ensure_dict_from_str(s: dict[K, V], sep: str = '\n') -> Optional[dict[K, V]]:
+def ensure_dict_from_str(s: dict[K, V], sep: str = '\n') -> dict[K, V] | None:
     ...
 
-def ensure_dict_from_str(s: str | dict[K, V], sep: str = '\n') -> Optional[dict[str, str]] | Optional[dict[K, V]]:
+def ensure_dict_from_str(s: str | dict[K, V], sep: str = '\n') -> dict[str, str] | None | dict[K, V] | None:
     """Given a multiline string with key=value items convert it to a dictionary
 
     Parameters
@@ -863,10 +863,10 @@ def ensure_dict_from_str(s: str | dict[K, V], sep: str = '\n') -> Optional[dict[
     assert values is not None
     for value_str in values:
         if '=' not in value_str:
-            raise ValueError("{} is not in key=value format".format(repr(value_str)))
+            raise ValueError(f"{repr(value_str)} is not in key=value format")
         k, v = value_str.split('=', 1)
         if k in out:
-            err = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            err = f"key {k} was already defined in {out}, but new value {v} was provided"
             raise ValueError(err)
         out[k] = v
     return out
@@ -887,7 +887,7 @@ def ensure_bytes(s: str | bytes, encoding: str='utf-8') -> bytes:
     return s.encode(encoding)
 
 
-def ensure_unicode(s: str | bytes, encoding: Optional[str]=None, confidence: Optional[float]=None) -> str:
+def ensure_unicode(s: str | bytes, encoding: str | None=None, confidence: float | None=None) -> str:
     """Convert/decode bytestring to unicode.
 
     If `s` isn't a bytestring, return it as is.
@@ -952,7 +952,7 @@ def ensure_bool(s: Any) -> bool:
     return bool(s)
 
 
-def unique(seq: Sequence[T], key: Optional[Callable[[T], Any]]=None, reverse: bool=False) -> list[T]:
+def unique(seq: Sequence[T], key: Callable[[T], Any] | None=None, reverse: bool=False) -> list[T]:
     """Given a sequence return a list only with unique elements while maintaining order
 
     This is the fastest solution.  See
@@ -1094,8 +1094,7 @@ def saved_generator(gen: Iterable[T]) -> tuple[Iterator[T], Iterator[T]]:
             yield x
 
     def gen2() -> Iterator[T]:
-        for x in saved:  # yielding saved entries
-            yield x
+        yield from saved
 
     return gen1(), gen2()
 
@@ -1142,7 +1141,7 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs: Optional[dict[str, Any]]=None, prefix: str="", wrapped: Optional[Callable]=None) -> dict[str, Any]:
+def get_tempfile_kwargs(tkwargs: dict[str, Any] | None=None, prefix: str="", wrapped: Callable | None=None) -> dict[str, Any]:
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
     if tkwargs is None:
@@ -1228,7 +1227,7 @@ def collect_method_callstats(func: Callable[P, T]) -> Callable[P, T]:
             pass
 
     def print_stats() -> None:
-        print("The cost of property {}:".format(func.__name__))
+        print(f"The cost of property {func.__name__}:")
         if not memo:
             print("None since no calls")
             return
@@ -1251,13 +1250,13 @@ def collect_method_callstats(func: Callable[P, T]) -> Callable[P, T]:
 
 
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
-def never_fail(f: Callable[P, T]) -> Callable[P, Optional[T]]:
+def never_fail(f: Callable[P, T]) -> Callable[P, T | None]:
     """Assure that function never fails -- all exceptions are caught
 
     Returns `None` if function fails internally.
     """
     @wraps(f)
-    def wrapped_func(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+    def wrapped_func(*args: P.args, **kwargs: P.kwargs) -> T | None:
         try:
             return f(*args, **kwargs)
         except Exception as e:
@@ -1309,9 +1308,9 @@ def __auto_repr__(obj: Any, short: bool =True) -> str:
         # such as of URL?
         #if value is None:
         #    continue
-        items.append("%s=%s" % (attr, shortened_repr(value) if short else value))
+        items.append("{}={}".format(attr, shortened_repr(value) if short else value))
 
-    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+    return "{}({})".format(obj.__class__.__name__, ', '.join(items))
 
 
 @optional_args
@@ -1407,7 +1406,7 @@ def swallow_outputs() -> Iterator[SwallowOutputsAdapter]:
     print function had desired effect
     """
 
-    def fake_print(*args: str, sep: str = ' ', end: str = "\n", file: Optional[IO[str]] = None) -> None:
+    def fake_print(*args: str, sep: str = ' ', end: str = "\n", file: IO[str] | None = None) -> None:
         if file is None:
             file = sys.stdout
 
@@ -1460,7 +1459,7 @@ class SwallowLogsAdapter:
             # PY3 requires clearly one or another.  race condition possible
             self._out = open(out_file, 'a')
         self.file = file_
-        self._final_out: Optional[str] = None
+        self._final_out: str | None = None
 
     def _read(self, h: IO[str]) -> str:
         with open(h.name) as f:
@@ -1493,7 +1492,7 @@ class SwallowLogsAdapter:
         if not self.file:
             rmtemp(out_name)
 
-    def assert_logged(self, msg: Optional[str]=None, level: Optional[str]=None, regex: bool =True, **kwargs: Any) -> None:
+    def assert_logged(self, msg: str | None=None, level: str | None=None, regex: bool =True, **kwargs: Any) -> None:
         """Provide assertion on whether a msg was logged at a given level
 
         If neither `msg` nor `level` provided, checks if anything was logged
@@ -1572,7 +1571,7 @@ def swallow_logs(new_level: str | int | None = None, file_ : str | Path | None =
 
 # TODO: May be melt in with swallow_logs at some point:
 @contextmanager
-def disable_logger(logger: Optional[logging.Logger]=None) -> Iterator[logging.Logger]:
+def disable_logger(logger: logging.Logger | None=None) -> Iterator[logging.Logger]:
     """context manager to temporarily disable logging
 
     This is to provide one of swallow_logs' purposes without unnecessarily
@@ -1643,7 +1642,7 @@ def updated(d: dict[K, V], update: dict[K, V]) -> dict[K, V]:
     return d
 
 
-_pwd_mode: Optional[str] = None
+_pwd_mode: str | None = None
 
 
 def _switch_to_getcwd(msg: str, *args: Any) -> None:
@@ -1752,7 +1751,7 @@ class chpwd:
     """
     def __init__(self, path: str | Path | None, mkdir: bool=False, logsuffix: str='') -> None:
 
-        self._prev_pwd: Optional[str]
+        self._prev_pwd: str | None
         if path:
             pwd = getpwd()
             self._prev_pwd = pwd
@@ -1775,7 +1774,7 @@ class chpwd:
         # nothing more to do really, chdir was in the constructor
         pass
 
-    def __exit__(self, exc_type: Optional[type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
         if self._prev_pwd:
             # Need to use self.__class__ so this instance, if the entire
             # thing mocked during the test, still would use correct chpwd
@@ -1802,7 +1801,7 @@ def with_pathsep(path: str) -> str:
     return path + sep if not path.endswith(sep) else path
 
 
-def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
+def get_path_prefix(path: str | Path, pwd: str | None=None) -> str:
     """Get path prefix (for current directory)
 
     Returns relative path to the topdir, if we are under topdir, and if not
@@ -1879,7 +1878,7 @@ def knows_annex(path: str | Path) -> bool:
 
 
 @contextmanager
-def make_tempfile(content: str | bytes | None = None, wrapped: Optional[Callable[..., Any]] = None, **tkwargs: Any) -> Iterator[str]:
+def make_tempfile(content: str | bytes | None = None, wrapped: Callable[..., Any] | None = None, **tkwargs: Any) -> Iterator[str]:
     """Helper class to provide a temporary file name and remove it at the end (context manager)
 
     Parameters
@@ -2001,7 +2000,7 @@ def get_logfilename(dspath: str | Path, cmd: str='datalad') -> str:
     return op.join(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
-def get_trace(edges: Sequence[tuple[T, T]], start: T, end: T, trace: Optional[list[T]]=None) -> Optional[list[T]]:
+def get_trace(edges: Sequence[tuple[T, T]], start: T, end: T, trace: list[T] | None=None) -> list[T] | None:
     """Return the trace/path to reach a node in a tree.
 
     Parameters
@@ -2057,7 +2056,7 @@ def get_trace(edges: Sequence[tuple[T, T]], start: T, end: T, trace: Optional[li
     return None
 
 
-def get_dataset_root(path: str | Path) -> Optional[str]:
+def get_dataset_root(path: str | Path) -> str | None:
     """Return the root of an existent dataset containing a given path
 
     The root path is returned in the same absolute or relative form
@@ -2123,12 +2122,12 @@ def try_multiple(ntrials: int, exception: type[BaseException], base: float, f: C
 @optional_args
 def try_multiple_dec(
         f: Callable[P, T],
-        ntrials: Optional[int] = None,
+        ntrials: int | None = None,
         duration: float = 0.1,
         exceptions: type[BaseException] | tuple[type[BaseException], ...] | None = None,
         increment_type: Literal["exponential"] | None = None,
-        exceptions_filter: Optional[Callable[[BaseException], Any]] = None,
-        logger: Optional[Callable] = None,
+        exceptions_filter: Callable[[BaseException], Any] | None = None,
+        logger: Callable | None = None,
 ) -> Callable[P, T]:
     """Decorator to try function multiple times.
 
@@ -2223,7 +2222,7 @@ def _rmtree(*args: Any, **kwargs: Any) -> None:
     shutil.rmtree(*args, **kwargs)
 
 
-def slash_join(base: Optional[str], extension: Optional[str]) -> Optional[str]:
+def slash_join(base: str | None, extension: str | None) -> str | None:
     """Join two strings with a '/', avoiding duplicate slashes
 
     If any of the strings is None the other is returned as is.
@@ -2266,7 +2265,7 @@ def open_r_encdetect(fname: str | Path, readahead: int=1000) -> IO[str]:
               denc,
               fname,
               enc.get('confidence', 'unknown'))
-    return io.open(fname, encoding=denc)
+    return open(fname, encoding=denc)
 
 
 @overload
@@ -2290,7 +2289,7 @@ def read_file(fname: str | Path, decode: Literal[True, False] =True) -> str | by
     return ensure_unicode(content) if decode else content
 
 
-def read_csv_lines(fname: str | Path, dialect: Optional[str] = None, readahead: int=16384, **kwargs: Any) -> Iterator[dict[str, str]]:
+def read_csv_lines(fname: str | Path, dialect: str | None = None, readahead: int=16384, **kwargs: Any) -> Iterator[dict[str, str]]:
     """A generator of dict records from a CSV/TSV
 
     Automatically guesses the encoding for each record to convert to UTF-8
@@ -2323,13 +2322,13 @@ def read_csv_lines(fname: str | Path, dialect: Optional[str] = None, readahead: 
     else:
         csv_dialect = dialect
 
-    with open(fname, 'r', encoding="utf-8") as tsvfile:
+    with open(fname, encoding="utf-8") as tsvfile:
         csv_reader = csv.reader(
             tsvfile,
             dialect=csv_dialect,
             **kwargs
         )
-        header: Optional[list[str]] = None
+        header: list[str] | None = None
         for row in csv_reader:
             if header is None:
                 header = row
@@ -2363,7 +2362,7 @@ def import_modules(modnames: Iterable[str], pkg: str, msg: str="Failed to import
     for modname in modnames:
         try:
             _globals[modname] = mod = import_module(
-                '.{}'.format(modname),
+                f'.{modname}',
                 pkg)
             mods_loaded.append(mod)
         except Exception as exc:
@@ -2374,7 +2373,7 @@ def import_modules(modnames: Iterable[str], pkg: str, msg: str="Failed to import
     return mods_loaded
 
 
-def import_module_from_file(modpath: str, pkg: Optional[ModuleType]=None, log: Callable[[str], Any]=lgr.debug) -> ModuleType:
+def import_module_from_file(modpath: str, pkg: ModuleType | None=None, log: Callable[[str], Any]=lgr.debug) -> ModuleType:
     """Import provided module given a path
 
     TODO:
@@ -2584,7 +2583,7 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool =True, rem
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 
-def get_suggestions_msg(values: Optional[str | Iterable[str]], known: str, sep: str="\n        ") -> str:
+def get_suggestions_msg(values: str | Iterable[str] | None, known: str, sep: str="\n        ") -> str:
     """Return a formatted string with suggestions for values given the known ones
     """
     import difflib
@@ -2789,7 +2788,7 @@ def check_symlink_capability(path: Path, target: Path) -> bool:
             target.unlink()
 
 
-def obtain_write_permission(path: Path) -> Optional[int]:
+def obtain_write_permission(path: Path) -> int | None:
     """Obtains write permission for `path` and returns previous mode if a
     change was actually made.
 

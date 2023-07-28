@@ -54,7 +54,7 @@ lgr = getLogger('datalad.downloaders')
 
 # TODO: remove headers, HTTP specific
 @auto_repr
-class DownloaderSession(object):
+class DownloaderSession:
     """Base class to encapsulate information and possibly a session to download the content
 
     The idea is that corresponding downloader provides all necessary
@@ -75,7 +75,7 @@ class DownloaderSession(object):
 
 
 @auto_repr
-class BaseDownloader(object, metaclass=ABCMeta):
+class BaseDownloader(metaclass=ABCMeta):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
@@ -447,7 +447,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 filename = downloader_session.filename
                 if not filename:
                     raise DownloadError(
-                        "File name could not be determined from {}".format(url))
+                        f"File name could not be determined from {url}")
                 filepath = opj(path, filename)
             else:
                 filepath = path
@@ -715,7 +715,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
 # Authenticators    XXX might go into authenticators.py
 #
 
-class Authenticator(object):
+class Authenticator:
     """Abstract common class for different types of authentication
 
     Derived classes should get parameterized with options from the config files

@@ -110,7 +110,7 @@ class ExportArchive(Interface):
                 '.' if compression else '',
                 compression) if archivetype == 'tar' else '')
 
-        default_filename = "datalad_{.id}".format(dataset)
+        default_filename = f"datalad_{dataset.id}"
         if filename is not None:
             filename = Path(filename)
         if filename is None:
@@ -128,7 +128,7 @@ class ExportArchive(Interface):
 
         # workaround for inability to pass down the time stamp
         with patch('time.time', return_value=committed_date), \
-                tarfile.open(filename, "w:{}".format(compression)) \
+                tarfile.open(filename, f"w:{compression}") \
                 if archivetype == 'tar' \
                 else zipfile.ZipFile(
                     filename, 'w',
@@ -150,7 +150,7 @@ class ExportArchive(Interface):
                             'File %s has no content available, skipped', p)
                         continue
                     else:
-                        raise IOError('File %s has no content available' % p)
+                        raise OSError('File %s has no content available' % p)
                 # name in the archive
                 aname = Path(leading_dir) / p.relative_to(repo.pathobj)
                 add_method(

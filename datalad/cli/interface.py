@@ -114,7 +114,7 @@ def alter_interface_docs_for_cmdline(docs):
     # clean up sphinx API refs
     docs = re.sub(
         r'\~datalad\.api\.\S*',
-        lambda match: "`{0}`".format(match.group(0)[13:]),
+        lambda match: f"`{match.group(0)[13:]}`",
         docs)
     # dedicated support for version markup
     docs = docs.replace('.. versionadded::', 'New in version')

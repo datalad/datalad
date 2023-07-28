@@ -164,7 +164,7 @@ def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_un
             was_locked = lock.acquire(blocking=True, timeout=timeout)
             if not was_locked:
                 if trial < len(timeouts) - 1:
-                    msg = " Will try again and wait for up to %4g seconds." % (timeouts[trial+1],)
+                    msg = " Will try again and wait for up to {:4g} seconds.".format(timeouts[trial+1])
                 else:  # It was the last attempt
                     if proceed_unlocked:
                         msg = " Will proceed without locking."

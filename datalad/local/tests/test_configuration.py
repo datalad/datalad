@@ -1,5 +1,4 @@
 # ex: set sts=4 ts=4 sw=4 noet:
-# -*- coding: utf-8 -*-
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -76,7 +75,7 @@ def test_something(path=None, new_home=None):
     # UTF handling
     assert_in_results(
         res,
-        name=u'onemore.{}.findme'.format(complicated_str),
+        name=f'onemore.{complicated_str}.findme',
         value='5.0')
 
     res = ds.configuration(

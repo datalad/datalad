@@ -21,7 +21,7 @@ from datalad.runner.exception import CommandError
 lgr = logging.getLogger('datalad.support.exceptions')
 
 
-class CapturedException(object):
+class CapturedException:
     """This class represents information about an occurred exception (including
     its traceback), while not holding any references to the actual exception
     object or its traceback, frame references, etc.
@@ -156,7 +156,7 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
     if include_str:
         # try exc message else exception type
         leading = exc.message or exc.name
-        out = "{} ".format(leading)
+        out = f"{leading} "
     else:
         out = ""
 
@@ -186,7 +186,7 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
                 frame_summary.lineno)
             for frame_summary in entries[-limit:])
         )
-        out += "{}".format(tb_str)
+        out += f"{tb_str}"
 
     return out
 
@@ -217,13 +217,13 @@ class MissingExternalDependency(RuntimeError):
     """External dependency is missing error"""
 
     def __init__(self, name, ver=None, msg=""):
-        super(MissingExternalDependency, self).__init__()
+        super().__init__()
         self.name = name
         self.ver = ver
         self.msg = msg
 
     def __str__(self):
-        to_str = 'No working {} installation'.format(self.name)
+        to_str = f'No working {self.name} installation'
         if self.ver:
             to_str += " of version >= %s" % self.ver
         to_str += "."
@@ -249,7 +249,7 @@ class DeprecatedError(RuntimeError):
           Since which version is deprecated
         kwargs
         """
-        super(DeprecatedError, self).__init__()
+        super().__init__()
         self.version = version
         self.new = new
         self.msg = msg
@@ -267,11 +267,11 @@ class OutdatedExternalDependency(MissingExternalDependency):
     """External dependency is present but outdated"""
 
     def __init__(self, name, ver=None, ver_present=None, msg=""):
-        super(OutdatedExternalDependency, self).__init__(name, ver=ver, msg=msg)
+        super().__init__(name, ver=ver, msg=msg)
         self.ver_present = ver_present
 
     def __str__(self):
-        to_str = super(OutdatedExternalDependency, self).__str__()
+        to_str = super().__str__()
         # MissingExternalDependency ends with a period unless msg is
         # given, in which case it's up to the msg and no callers in
         # our code base currently give a msg ending with a period.
@@ -300,10 +300,10 @@ class FileNotInAnnexError(IOError, CommandError):
     """
     def __init__(self, cmd="", msg="", code=None, filename=""):
         CommandError.__init__(self, cmd=cmd, msg=msg, code=code)
-        IOError.__init__(self, code, "%s: %s" % (cmd, msg), filename)
+        IOError.__init__(self, code, "{}: {}".format(cmd, msg), filename)
 
     def to_str(self, include_output=True):
-        return "%s\n%s" % (
+        return "{}\n{}".format(
             CommandError.to_str(self, include_output=include_output),
             IOError.__str__(self))
 
@@ -324,11 +324,11 @@ class InvalidGitReferenceError(ValueError):
     """Thrown if provided git reference is invalid
     """
     def __init__(self, ref, *args, **kwargs):
-        super(InvalidGitReferenceError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.ref = ref
 
     def __str__(self):
-        return u"Git reference '{}' invalid".format(self.ref)
+        return f"Git reference '{self.ref}' invalid"
 
 
 class GitIgnoreError(CommandError):
@@ -351,7 +351,7 @@ class GitIgnoreError(CommandError):
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
                  paths=None):
-        super(GitIgnoreError, self).__init__(
+        super().__init__(
             cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
         self.paths = paths
 
@@ -370,7 +370,7 @@ class PathOutsideRepositoryError(Exception):
         self.repo = repo
 
     def __str__(self):
-        return "path {0} not within repository {1}".format(self.file_, self.repo)
+        return f"path {self.file_} not within repository {self.repo}"
 
 
 class PathKnownToRepositoryError(Exception):
@@ -395,10 +395,10 @@ class MissingBranchError(Exception):
         self.branch = branch
         self.branches = available_branches
         if msg is None:
-            self.msg = "branch '{0}' missing in {1}." \
+            self.msg = "branch '{}' missing in {}." \
                        "".format(self.branch, self.repo)
             if self.branches:
-                self.msg += " Available branches: {0}".format(self.branches)
+                self.msg += f" Available branches: {self.branches}"
         else:
             self.msg = msg
 
@@ -428,13 +428,13 @@ class OutOfSpaceError(CommandError):
     """
 
     def __init__(self, sizemore_msg=None, **kwargs):
-        super(OutOfSpaceError, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sizemore_msg = sizemore_msg
 
     def to_str(self, include_output=True):
         super_str = super().to_str(
             include_output=include_output).rstrip(linesep + '.')
-        return "%s needs %s more" % (super_str, self.sizemore_msg)
+        return "{} needs {} more".format(super_str, self.sizemore_msg)
 
 
 class RemoteNotAvailableError(CommandError):
@@ -454,12 +454,12 @@ class RemoteNotAvailableError(CommandError):
         kwargs:
           arguments from CommandError
         """
-        super(RemoteNotAvailableError, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.remote = remote
 
     def to_str(self, include_output=True):
         super_str = super().to_str(include_output=include_output)
-        return "Remote '{0}' is not available. Command failed:{1}{2}" \
+        return "Remote '{}' is not available. Command failed:{}{}" \
                "".format(self.remote, linesep, super_str)
 
 
@@ -467,7 +467,7 @@ class InvalidInstanceRequestError(RuntimeError):
     """Thrown if a request to create a (flyweight) instance is invalid"""
 
     def __init__(self, id_, msg=None):
-        super(InvalidInstanceRequestError, self).__init__(msg)
+        super().__init__(msg)
         self.id = id_
         self.msg = msg
 
@@ -485,7 +485,7 @@ class DirectModeNoLongerSupportedError(NotImplementedError):
     """direct mode is no longer supported"""
 
     def __init__(self, repo, msg=None):
-        super(DirectModeNoLongerSupportedError, self).__init__(
+        super().__init__(
             ((" " + msg + ", but ") if msg else '')
             +
              "direct mode of operation is being deprecated in git-annex and "
@@ -511,15 +511,15 @@ class IncompleteResultsError(RuntimeError):
     # General use (as in AnnexRepo) of it discouraged but use in @eval_results
     # is warranted
     def __init__(self, results=None, failed=None, msg=None):
-        super(IncompleteResultsError, self).__init__(msg)
+        super().__init__(msg)
         self.results = results
         self.failed = failed
 
     def __str__(self):
-        super_str = super(IncompleteResultsError, self).__str__()
+        super_str = super().__str__()
         return "{}{}{}".format(
             super_str,
-            ". {} result(s)".format(len(self.results)) if self.results else "",
+            f". {len(self.results)} result(s)" if self.results else "",
             ". {} failed:{}{}".format(
                 len(self.failed),
                 linesep,
@@ -542,7 +542,7 @@ class ConnectionOpenFailedError(CommandError):
 class DownloadError(Exception):
 
     def __init__(self, msg=None, status=None, **kwargs):
-        super(DownloadError, self).__init__(msg, **kwargs)
+        super().__init__(msg, **kwargs)
         # store response status code
         self.status = status
 
@@ -561,7 +561,7 @@ class TargetFileAbsent(DownloadError):
 
 class AccessDeniedError(DownloadError):
     def __init__(self, msg=None, supported_types=None, **kwargs):
-        super(AccessDeniedError, self).__init__(msg, **kwargs)
+        super().__init__(msg, **kwargs)
         self.supported_types = supported_types
 
 
@@ -583,7 +583,7 @@ class AccessFailedError(DownloadError):
 
 class UnhandledRedirectError(DownloadError):
     def __init__(self, msg=None, url=None, **kwargs):
-        super(UnhandledRedirectError, self).__init__(msg, **kwargs)
+        super().__init__(msg, **kwargs)
         self.url = url
 
 #

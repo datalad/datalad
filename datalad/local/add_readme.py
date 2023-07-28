@@ -117,17 +117,17 @@ class AddReadme(Interface):
         for label, content in (
                 ('', meta.get('description', meta.get('shortdescription', ''))),
                 ('Author{}'.format('s' if isinstance(meta.get('author', None), list) else ''),
-                    u'\n'.join([u'- {}'.format(a) for a in ensure_list(meta.get('author', []))])),
+                    '\n'.join([f'- {a}' for a in ensure_list(meta.get('author', []))])),
                 ('Homepage', meta.get('homepage', '')),
                 ('Reference', meta.get('citation', '')),
                 ('License', meta.get('license', '')),
-                ('Keywords', u', '.join([u'`{}`'.format(k) for k in ensure_list(meta.get('tag', []))])),
+                ('Keywords', ', '.join([f'`{k}`' for k in ensure_list(meta.get('tag', []))])),
                 ('Funding', meta.get('fundedby', '')),
                 ):
             if label and content:
-                metainfo += u'\n\n### {}\n\n{}'.format(label, content)
+                metainfo += f'\n\n### {label}\n\n{content}'
             elif content:
-                metainfo += u'\n\n{}'.format(content)
+                metainfo += f'\n\n{content}'
 
         for key in 'title', 'name', 'shortdescription':
             if 'title' in meta:
@@ -135,7 +135,7 @@ class AddReadme(Interface):
             if key in meta:
                 meta['title'] = meta[key]
 
-        default_content=u"""\
+        default_content="""\
 # {title}{metainfo}
 
 ## General information
@@ -214,7 +214,7 @@ files by whom, and when.
 """.format(
             title='Dataset "{}"'.format(meta['title']) if 'title' in meta else 'About this dataset',
             metainfo=metainfo,
-            id=u' (id: {})'.format(dataset.id) if dataset.id else '',
+            id=f' (id: {dataset.id})' if dataset.id else '',
             )
 
         with open(fpath, 'a' if existing == 'append' else 'w', encoding='utf-8') as fp:

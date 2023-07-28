@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -394,7 +393,7 @@ def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no
                 req.add_header(
                     "Authorization",
                     b"Basic " + base64.standard_b64encode(
-                        '{0}:{1}'.format(*auth).encode('utf-8')))
+                        '{}:{}'.format(*auth).encode('utf-8')))
             return urlopen(req)
 
         # @serve_ should remove http_proxy from the os.environ if was present
@@ -432,7 +431,7 @@ def _test_serve_path_via_http(test_fpath, use_ssl, auth, tmp_dir):  # pragma: no
     Path('test_dir', 'test2.txt'),
     Path('test_dir', 'd2', 'd3', 'test3.txt'),
     'file with space test4',
-    u'Джэйсон',
+    'Джэйсон',
     get_most_obscure_supported_name(),
 ])
 @pytest.mark.parametrize("use_ssl,auth", [

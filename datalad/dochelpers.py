@@ -52,7 +52,7 @@ elif __rst_conventions == 'numpy':
 
     def _rst_section(section_name):
         """Provide section heading"""
-        return "%s\n%s" % (section_name, '-' * len(section_name))
+        return "{}\n{}".format(section_name, '-' * len(section_name))
 else:
     raise ValueError("Unknown convention %s for RST" % __rst_conventions)
 
@@ -289,7 +289,7 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
         opreamble, oparams, osuffix = _split_out_parameters(odoc)
         mplist = _parse_parameters(mparams)
         oplist = _parse_parameters(oparams)
-        known_params = set([i[0] for i in mplist])
+        known_params = {i[0] for i in mplist}
 
         # !!! has to not rebind exclude variable
         skip_params = exclude or []         # handle None

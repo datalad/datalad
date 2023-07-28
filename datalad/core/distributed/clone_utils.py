@@ -297,7 +297,7 @@ def _get_url_mappings(cfg):
     cfg_prefix = 'datalad.clone.url-substitute.'
     # figure out which keys we should be looking for
     # in the active config
-    subst_keys = set(k for k in cfg.keys() if k.startswith(cfg_prefix))
+    subst_keys = {k for k in cfg.keys() if k.startswith(cfg_prefix)}
     # and in the common config specs
     from datalad.interface.common_cfg import definitions
     subst_keys.update(k for k in definitions if k.startswith(cfg_prefix))
@@ -395,10 +395,10 @@ def decode_source_spec(spec, cfg=None):
             if '@' in source_ri.fragment else (source_ri.fragment, None)
         uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
         if re.match(uuid_regex, dsid):
-            trace = '{}/{}'.format(dsid[:3], dsid[3:])
+            trace = f'{dsid[:3]}/{dsid[3:]}'
             default_destpath = dsid
         elif dsid.startswith('~'):
-            trace = 'alias/{}'.format(dsid[1:])
+            trace = f'alias/{dsid[1:]}'
             default_destpath = dsid[1:]
         else:
             raise ValueError(
@@ -783,7 +783,7 @@ def _format_clone_errors(
             error_msg = "Failed to clone from any candidate source URL. " \
                         "Encountered errors per each url were:\n- %s"
             error_args = '\n- '.join(
-                '{}\n  {}'.format(url, exc.to_str())
+                f'{url}\n  {exc.to_str()}'
                 for url, exc in error_msgs.items()
             )
     else:
@@ -852,7 +852,7 @@ def _check_autoenable_special_remotes(repo: AnnexRepo):
         # If it looks like a type=git special remote, make sure we have up to
         # date information. See gh-2897.
         if sr_autoenable and repo_config.get(
-                "remote.{}.fetch".format(sr_name)):
+                f"remote.{sr_name}.fetch"):
             try:
                 repo.fetch(remote=sr_name)
             except CommandError as exc:

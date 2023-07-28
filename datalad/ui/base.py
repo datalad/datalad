@@ -18,7 +18,7 @@ from ..utils import auto_repr
 
 
 @auto_repr
-class InteractiveUI(object, metaclass=ABCMeta):
+class InteractiveUI(metaclass=ABCMeta):
     """Semi-abstract class for interfaces to implement interactive UI"""
 
     @abstractmethod

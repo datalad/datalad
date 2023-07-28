@@ -16,7 +16,7 @@ if sys.version_info[0] == 2:
 else:
     from urllib import request as urllib_request
 
-class NDATokenGenerator(object):
+class NDATokenGenerator:
     __schemas = {
         'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
         'data': 'http://gov/nih/ndar/ws/datamanager/server/bean/jaxb'

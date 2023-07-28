@@ -67,7 +67,7 @@ def test_external_versions_basic():
     # all are LooseVersions now
     assert_true(isinstance(ev[our_module], LooseVersion))
     version_str = __version__
-    assert_equal(ev.dumps(), "Versions: %s=%s" % (our_module, version_str))
+    assert_equal(ev.dumps(), "Versions: {}={}".format(our_module, version_str))
 
     # For non-existing one we get None
     assert_equal(ev['custom__nonexisting'], None)
@@ -168,7 +168,7 @@ def test_custom_versions():
 
 def test_ancient_annex():
 
-    class _runner(object):
+    class _runner:
         def run(self, cmd, *args, **kwargs):
             if '--raw' in cmd:
                 raise CommandError
@@ -180,7 +180,7 @@ def test_ancient_annex():
 
 
 def _test_annex_version_comparison(v, cmp_):
-    class _runner(object):
+    class _runner:
         def run(self, cmd, *args, **kwargs):
             return dict(stdout=v, stderr="")
 
@@ -249,7 +249,7 @@ def test_ssh_versions():
     ]:
         ev = ExternalVersions()
         # TODO: figure out leaner way
-        class _runner(object):
+        class _runner:
             def run(self, cmd, *args, **kwargs):
                 return dict(stdout="", stderr=s)
         with patch('datalad.support.external_versions._runner', _runner()):

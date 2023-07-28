@@ -78,7 +78,7 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
             # additionally try to consider .git:
             if not src.rstrip('/').endswith('/.git'):
                 candidates.append(
-                    '{0}/.git'.format(src.rstrip('/')))
+                    '{}/.git'.format(src.rstrip('/')))
 
     return candidates
 
@@ -133,7 +133,7 @@ def _yield_ds_w_matching_siblings(
     # in recursive mode this check could take a substantial amount of
     # time: employ a progress bar (or rather a counter, because we don't
     # know the total in advance
-    pbar_id = 'check-siblings-{}'.format(id(ds))
+    pbar_id = f'check-siblings-{id(ds)}'
     log_progress(
         lgr.info, pbar_id,
         'Start checking pre-existing sibling configuration %s', ds,

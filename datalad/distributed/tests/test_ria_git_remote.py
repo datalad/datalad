@@ -74,8 +74,8 @@ def _test_bare_git_version_1(host, dspath, store):
         url = "ria+ssh://{host}{path}".format(host=host,
                                               path=store)
     else:
-        url = "ria+{}".format(store.as_uri())
-    init_opts = common_init_opts + ['url={}'.format(url)]
+        url = f"ria+{store.as_uri()}"
+    init_opts = common_init_opts + [f'url={url}']
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
     create_store(io, store, '1')
@@ -84,7 +84,7 @@ def _test_bare_git_version_1(host, dspath, store):
     create_ds_in_store(io, store, ds.id, '1', '1', init_obj_tree=False)
 
     # Now, let's have the bare repo as a git remote and use it with annex
-    git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
+    git_url = f"ssh://{host}{bare_repo_path}" \
         if host else bare_repo_path.as_uri()
     ds.repo.add_remote('bare-git', git_url)
     ds.repo.enable_remote('bare-git')
@@ -177,8 +177,8 @@ def _test_bare_git_version_2(host, dspath, store):
         url = "ria+ssh://{host}{path}".format(host=host,
                                               path=store)
     else:
-        url = "ria+{}".format(store.as_uri())
-    init_opts = common_init_opts + ['url={}'.format(url)]
+        url = f"ria+{store.as_uri()}"
+    init_opts = common_init_opts + [f'url={url}']
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
     create_store(io, store, '1')
@@ -190,7 +190,7 @@ def _test_bare_git_version_2(host, dspath, store):
     io.remove_dir(objdir)
 
     # Now, let's have the bare repo as a git remote
-    git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
+    git_url = f"ssh://{host}{bare_repo_path}" \
         if host else bare_repo_path.as_uri()
     ds.repo.add_remote('bare-git', git_url)
     ds.repo.enable_remote('bare-git')

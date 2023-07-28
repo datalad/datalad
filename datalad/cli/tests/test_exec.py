@@ -136,7 +136,7 @@ def test_get_result_filter_arg_vs_config():
             ccfg = f(_new_args())
             ccfg_none = f(_new_args(common_report_status="all"))
         # cannot compare directly but at least could verify based on repr
-        print("%s -> %s" % (v, repr(cargs)))
+        print("{} -> {}".format(v, repr(cargs)))
         eq_(repr(cargs), repr(ccfg))
         # and if 'all' - none filter
         eq_(None, ccfg_none)
@@ -158,7 +158,7 @@ def test_call_from_parser_pos_arg_underscore(how):
     elif how == "args":
         kwds["args"] = ("pos_arg",)
     elif how != "bare":
-        raise AssertionError("Unrecognized how: {}".format(how))
+        raise AssertionError(f"Unrecognized how: {how}")
 
     class Cmd(Interface):
 

@@ -74,7 +74,7 @@ def _test_initremote_basic(url, io, store, ds_path, link):
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
 
-    init_opts = common_init_opts + ['url={}'.format(url)]
+    init_opts = common_init_opts + [f'url={url}']
 
     # fails on non-existing storage location
     assert_raises(CommandError,
@@ -87,7 +87,7 @@ def _test_initremote_basic(url, io, store, ds_path, link):
 
     # fails on non-RIA URL
     assert_raises(CommandError, ds.repo.init_remote, 'ria-remote',
-                  options=common_init_opts + ['url={}'.format(store.as_uri())]
+                  options=common_init_opts + [f'url={store.as_uri()}']
                   )
     # Doesn't actually create a remote if it fails
     assert_not_in('ria-remote',
@@ -120,9 +120,9 @@ def _test_initremote_basic(url, io, store, ds_path, link):
     #   - archive_id (which equals ds id)
     remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
                                   read_only=True)
-    assert_in("url={}".format(url), remote_log)
+    assert_in(f"url={url}", remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
-    assert_in("archive-id={}".format(ds.id), remote_log)
+    assert_in(f"archive-id={ds.id}", remote_log)
 
     # re-configure with invalid URL should fail:
     assert_raises(
@@ -133,10 +133,10 @@ def _test_initremote_basic(url, io, store, ds_path, link):
     # but re-configure with valid URL should work
     if has_symlink_capability():
         link.symlink_to(store)
-        new_url = 'ria+{}'.format(link.as_uri())
+        new_url = f'ria+{link.as_uri()}'
         ds.repo.call_annex(
             ['enableremote', 'ria-remote'] + common_init_opts + [
-                'url={}'.format(new_url)])
+                f'url={new_url}'])
         # git-annex:remote.log should have:
         #   - url
         #   - common_init_opts
@@ -144,9 +144,9 @@ def _test_initremote_basic(url, io, store, ds_path, link):
         remote_log = ds.repo.call_git(['cat-file', 'blob',
                                        'git-annex:remote.log'],
                                       read_only=True)
-        assert_in("url={}".format(new_url), remote_log)
+        assert_in(f"url={new_url}", remote_log)
         [assert_in(c, remote_log) for c in common_init_opts]
-        assert_in("archive-id={}".format(ds.id), remote_log)
+        assert_in(f"archive-id={ds.id}", remote_log)
 
     # we can deal with --sameas, which leads to a special remote not having a
     # 'name' property, but only a 'sameas-name'. See gh-4259
@@ -169,7 +169,7 @@ def _test_initremote_basic(url, io, store, ds_path, link):
 @with_tempfile
 def test_initremote_basic_sshurl(storepath=None):
     _test_initremote_basic(
-        'ria+ssh://datalad-test{}'.format(Path(storepath).as_posix()), \
+        f'ria+ssh://datalad-test{Path(storepath).as_posix()}', \
         SSHRemoteIO('datalad-test'), \
         storepath,
     )
@@ -180,7 +180,7 @@ def test_initremote_basic_sshurl(storepath=None):
 @with_tempfile
 def test_initremote_basic_fileurl(storepath=None):
     _test_initremote_basic(
-        "ria+{}".format(Path(storepath).as_uri()),
+        f"ria+{Path(storepath).as_uri()}",
         LocalIO(),
         storepath,
     )
@@ -223,8 +223,8 @@ def _test_initremote_alias(host, ds_path, store):
         url = "ria+ssh://{host}{path}".format(host=host,
                                               path=store)
     else:
-        url = "ria+{}".format(store.as_uri())
-    init_opts = common_init_opts + ['url={}'.format(url)]
+        url = f"ria+{store.as_uri()}"
+    init_opts = common_init_opts + [f'url={url}']
 
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
@@ -265,15 +265,15 @@ def _test_initremote_rewrite(host, ds_path, store):
     assert_repo_status(ds.path)
 
     url = "mystore:"
-    init_opts = common_init_opts + ['url={}'.format(url)]
+    init_opts = common_init_opts + [f'url={url}']
 
     if host:
         replacement = "ria+ssh://{host}{path}".format(host=host,
                                                       path=store)
     else:
-        replacement = "ria+{}".format(store.as_uri())
+        replacement = f"ria+{store.as_uri()}"
 
-    ds.config.set("url.{}.insteadOf".format(replacement), url, scope='local')
+    ds.config.set(f"url.{replacement}.insteadOf", url, scope='local')
 
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
@@ -292,9 +292,9 @@ def _test_initremote_rewrite(host, ds_path, store):
     #   - archive_id (which equals ds id)
     remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
                                   read_only=True)
-    assert_in("url={}".format(replacement), remote_log)
+    assert_in(f"url={replacement}", remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
-    assert_in("archive-id={}".format(ds.id), remote_log)
+    assert_in(f"archive-id={ds.id}", remote_log)
 
 
 def test_initremote_rewrite():
@@ -324,8 +324,8 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         arch_url = "ria+ssh://{host}{path}".format(host=host,
                                                    path=archiv_store)
     else:
-        store_url = "ria+{}".format(store.as_uri())
-        arch_url = "ria+{}".format(archiv_store.as_uri())
+        store_url = f"ria+{store.as_uri()}"
+        arch_url = f"ria+{archiv_store.as_uri()}"
 
     create_store(io, store, '1')
 
@@ -334,7 +334,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
     create_ds_in_store(io, store, ds.id, '2', '1')
 
     # add special remote
-    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    init_opts = common_init_opts + [f'url={store_url}']
     ds.repo.init_remote('store', options=init_opts)
 
     # copy files into the RIA store
@@ -371,7 +371,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         dsgit_dir, archive_dir, dsobj_dir = \
             get_layout_locations(1, archiv_store, ds.id)
         ds.export_archive_ora(archive_dir / 'archive.7z')
-        init_opts = common_init_opts + ['url={}'.format(arch_url)]
+        init_opts = common_init_opts + [f'url={arch_url}']
         ds.repo.init_remote('archive', options=init_opts)
         # now fsck the new remote to get the new special remote indexed
         ds.repo.fsck(remote='archive', fast=True)
@@ -417,7 +417,7 @@ def _test_version_check(host, dspath, store):
         store_url = "ria+ssh://{host}{path}".format(host=host,
                                                     path=store)
     else:
-        store_url = "ria+{}".format(store.as_uri())
+        store_url = f"ria+{store.as_uri()}"
 
     create_store(io, store, '1')
 
@@ -426,7 +426,7 @@ def _test_version_check(host, dspath, store):
     create_ds_in_store(io, store, ds.id, '2', '1')
 
     # add special remote
-    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    init_opts = common_init_opts + [f'url={store_url}']
     ds.repo.init_remote('store', options=init_opts)
     ds.push('.', to='store')
 
@@ -439,9 +439,9 @@ def _test_version_check(host, dspath, store):
     assert_true(remote_ds_tree_version_file.exists())
     assert_true(remote_obj_tree_version_file.exists())
 
-    with open(str(remote_ds_tree_version_file), 'r') as f:
+    with open(str(remote_ds_tree_version_file)) as f:
         assert_equal(f.read().strip(), '1')
-    with open(str(remote_obj_tree_version_file), 'r') as f:
+    with open(str(remote_obj_tree_version_file)) as f:
         assert_equal(f.read().strip(), '2')
 
     # Accessing the remote should not yield any output regarding versioning,
@@ -517,7 +517,7 @@ def _test_gitannex(host, store, dspath):
         store_url = "ria+ssh://{host}{path}".format(host=host,
                                                     path=store)
     else:
-        store_url = "ria+{}".format(store.as_uri())
+        store_url = f"ria+{store.as_uri()}"
 
     create_store(io, store, '1')
 
@@ -526,7 +526,7 @@ def _test_gitannex(host, store, dspath):
     create_ds_in_store(io, store, ds.id, '2', '1')
 
     # add special remote
-    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    init_opts = common_init_opts + [f'url={store_url}']
     ds.repo.init_remote('store', options=init_opts)
 
     from datalad.support.external_versions import external_versions
@@ -576,13 +576,13 @@ def _test_binary_data(host, store, dspath):
         store_url = "ria+ssh://{host}{path}".format(host=host,
                                                     path=store)
     else:
-        store_url = "ria+{}".format(store.as_uri())
+        store_url = f"ria+{store.as_uri()}"
 
     create_store(io, store, '1')
     create_ds_in_store(io, store, ds.id, '2', '1')
 
     # add special remote
-    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    init_opts = common_init_opts + [f'url={store_url}']
     ds.repo.init_remote('store', options=init_opts)
 
     # actual data transfer (both directions)
@@ -631,21 +631,21 @@ def test_push_url(storepath=None, dspath=None, blockfile=None):
 
     # set up store:
     io = LocalIO()
-    store_url = "ria+{}".format(store.as_uri())
+    store_url = f"ria+{store.as_uri()}"
     create_store(io, store, '1')
     create_ds_in_store(io, store, ds.id, '2', '1')
 
     # initremote fails with invalid url (not a ria+ URL):
     invalid_url = (store.parent / "non-existent").as_uri()
-    init_opts = common_init_opts + ['url={}'.format(store_url),
-                                    'push-url={}'.format(invalid_url)]
+    init_opts = common_init_opts + [f'url={store_url}',
+                                    f'push-url={invalid_url}']
     assert_raises(CommandError, ds.repo.init_remote, 'store', options=init_opts)
 
     # initremote succeeds with valid but inaccessible URL (pointing to a file
     # instead of a store):
     block_url = "ria+" + blockfile.as_uri()
-    init_opts = common_init_opts + ['url={}'.format(store_url),
-                                    'push-url={}'.format(block_url)]
+    init_opts = common_init_opts + [f'url={store_url}',
+                                    f'push-url={block_url}']
     repo.init_remote('store', options=init_opts)
 
     store_uuid = ds.siblings(name='store',
@@ -671,8 +671,8 @@ def test_push_url(storepath=None, dspath=None, blockfile=None):
     assert_not_in(store_uuid, known_sources)
 
     # reconfigure (this time committed)
-    init_opts = common_init_opts + ['url={}'.format(store_url),
-                                    'push-url={}'.format(store_url)]
+    init_opts = common_init_opts + [f'url={store_url}',
+                                    f'push-url={store_url}']
     repo.enable_remote('store', options=init_opts)
 
     # push works now:
@@ -700,7 +700,7 @@ def test_url_keys(dspath=None, storepath=None, httppath=None, httpurl=None):
     # copy target
     ds.create_sibling_ria(
         name='ria',
-        url='ria+file://{}'.format(storepath),
+        url=f'ria+file://{storepath}',
         storage_sibling='only',
         new_store_ok=True
     )
@@ -765,7 +765,7 @@ def _test_permission(host, storepath, dspath):
         store_url = "ria+ssh://{host}{path}".format(host=host,
                                                     path=storepath)
     else:
-        store_url = "ria+{}".format(storepath.as_uri())
+        store_url = f"ria+{storepath.as_uri()}"
 
     create_store(io, storepath, '1')
     create_ds_in_store(io, storepath, ds.id, '2', '1')
@@ -773,7 +773,7 @@ def _test_permission(host, storepath, dspath):
     assert_true(obj_tree.is_dir())
     file_key_in_store = obj_tree / 'X9' / '6J' / 'MD5E-s8--7e55db001d319a94b0b713529a756623.txt' / 'MD5E-s8--7e55db001d319a94b0b713529a756623.txt'
 
-    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    init_opts = common_init_opts + [f'url={store_url}']
     ds.repo.init_remote('store', options=init_opts)
 
     store_uuid = ds.siblings(name='store',

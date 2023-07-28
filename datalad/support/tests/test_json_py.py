@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -36,15 +35,15 @@ def test_load_screwy_unicode(fname=None):
         assert_in('Failed to decode content', cml.out)
 
 
-@with_tempfile(content=u"""\
+@with_tempfile(content="""\
 {"key0": "a b"}
-{"key1": "plain"}""".encode("utf-8"))
+{"key1": "plain"}""".encode())
 def test_load_unicode_line_separator(fname=None):
     # See gh-3523.
     result = list(load_stream(fname))
     eq_(len(result), 2)
-    eq_(result[0]["key0"], u"a b")
-    eq_(result[1]["key1"], u"plain")
+    eq_(result[0]["key0"], "a b")
+    eq_(result[1]["key1"], "plain")
 
 
 def test_loads():

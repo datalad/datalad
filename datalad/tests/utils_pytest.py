@@ -1,4 +1,3 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -202,7 +201,7 @@ def skip_if_url_is_not_available(url, regex=None):
     try:
         content = providers.fetch(url)
         if regex and re.search(regex, content):
-            pytest.skip("%s matched %r -- skipping the test" % (url, regex))
+            pytest.skip("{} matched {!r} -- skipping the test".format(url, regex))
     except DownloadError:
         pytest.skip("%s failed to download" % url)
 
@@ -479,7 +478,7 @@ def ok_symlink(path):
     """Checks whether path is either a working or broken symlink"""
     link_path = os.path.islink(path)
     if not link_path:
-        raise AssertionError("Path {} seems not to be a symlink".format(path))
+        raise AssertionError(f"Path {path} seems not to be a symlink")
 
 
 def ok_good_symlink(path):
@@ -500,17 +499,17 @@ def ok_broken_symlink(path):
 
 def ok_startswith(s, prefix):
     ok_(s.startswith(prefix),
-        msg="String %r doesn't start with %r" % (s, prefix))
+        msg="String {!r} doesn't start with {!r}".format(s, prefix))
 
 
 def ok_endswith(s, suffix):
     ok_(s.endswith(suffix),
-        msg="String %r doesn't end with %r" % (s, suffix))
+        msg="String {!r} doesn't end with {!r}".format(s, suffix))
 
 
 def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
-        msg="String %r starts with %r" % (s, prefix))
+        msg="String {!r} starts with {!r}".format(s, prefix))
 
 
 def ok_git_config_not_empty(ar):
@@ -698,7 +697,7 @@ def _multiproc_serve_path_via_http(
     httpd.serve_forever()
 
 
-class HTTPPath(object):
+class HTTPPath:
     """Serve the content of a path via an HTTP URL.
 
     This class can be used as a context manager, in which case it returns the
@@ -807,7 +806,7 @@ class HTTPPath(object):
                     req.add_header(
                         "Authorization",
                         b"Basic " + base64.standard_b64encode(
-                            '{0}:{1}'.format(*self.auth).encode('utf-8')))
+                            '{}:{}'.format(*self.auth).encode('utf-8')))
                 urlopen(req)
             # be robust and skip if anything goes wrong, rather than just a
             # particular SSL issue
@@ -1216,7 +1215,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                 # here with our assertion
                 if exc_info is None:
                     assert_equal(cwd_before, cwd_after,
-                                 "CWD changed from %s to %s" % (cwd_before, cwd_after))
+                                 "CWD changed from {} to {}".format(cwd_before, cwd_after))
 
         if exc_info is not None:
             raise exc_info[1]
@@ -1262,7 +1261,7 @@ def assert_re_in(regex, c, flags=0, match=True, msg=None):
         if (re.match if match else re.search)(regex, e, flags=flags):
             return
     raise AssertionError(
-        msg or "Not a single entry matched %r in %r" % (regex, c)
+        msg or "Not a single entry matched {!r} in {!r}".format(regex, c)
     )
 
 
@@ -1288,7 +1287,7 @@ def assert_dict_equal(d1, d2):
             same = False
 
         if not same:
-            msgs.append(" [%r] differs: %r != %r" % (k, d1[k], d2[k]))
+            msgs.append(" [{!r}] differs: {!r} != {!r}".format(k, d1[k], d2[k]))
 
         if len(msgs) > 10:
             msgs.append("and more")
@@ -1422,7 +1421,7 @@ def assert_result_values_cond(results, prop, cond):
     results = ensure_result_list(results)
     for r in results:
         ok_(cond(r[prop]),
-            msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
+            msg=f"r[{prop}]: {r[prop]}")
 
 
 def ignore_nose_capturing_stdout(func):
@@ -1453,7 +1452,7 @@ with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
 OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']
-UNICODE_FILENAME = u"ΔЙקم๗あ"
+UNICODE_FILENAME = "ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
@@ -1461,7 +1460,7 @@ UNICODE_FILENAME = u"ΔЙקم๗あ"
 if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_osx:
         # TODO: figure it really out
-        UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+        UNICODE_FILENAME = UNICODE_FILENAME.replace("Й", "")
     if on_windows:
         # TODO: really figure out unicode handling on windows
         UNICODE_FILENAME = ''
@@ -1840,9 +1839,9 @@ def get_deeply_nested_structure(path):
     """
     ds = Dataset(path).create()
     (ds.pathobj / 'subdir').mkdir()
-    (ds.pathobj / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
+    (ds.pathobj / 'subdir' / 'annexed_file.txt').write_text('dummy')
     ds.save()
-    (ds.pathobj / 'subdir' / 'git_file.txt').write_text(u'dummy')
+    (ds.pathobj / 'subdir' / 'git_file.txt').write_text('dummy')
     ds.save(to_git=True)
     # a subtree of datasets
     subds = ds.create('subds_modified')
@@ -1854,15 +1853,15 @@ def get_deeply_nested_structure(path):
             'subdir': {
                 'file_modified': 'file_modified',
             },
-            OBSCURE_FILENAME + u'file_modified_': 'file_modified',
+            OBSCURE_FILENAME + 'file_modified_': 'file_modified',
         }
     )
     create_tree(
         str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
-        {OBSCURE_FILENAME + u'_directory_untracked': {"untracked_file": ""}}
+        {OBSCURE_FILENAME + '_directory_untracked': {"untracked_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
-    (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
+    (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text('dummy')
     subds.save()
     (ds.pathobj / 'directory_untracked').mkdir()
 
@@ -2013,7 +2012,7 @@ def set_date(timestamp):
     timestamp : int
         Unix timestamp.
     """
-    git_ts = "@{} +0000".format(timestamp)
+    git_ts = f"@{timestamp} +0000"
     with patch.dict("os.environ",
                     {"GIT_COMMITTER_DATE": git_ts,
                      "GIT_AUTHOR_DATE": git_ts,

@@ -52,7 +52,7 @@ def test_paths_with_forward_slashes(path=None):
 def test_not_under_git(path=None):
     from datalad.distribution.dataset import require_dataset
     dsroot = get_dataset_root(path)
-    assert dsroot is None, "There must be no dataset above tmp %s. Got: %s" % (path, dsroot)
+    assert dsroot is None, "There must be no dataset above tmp {}. Got: {}".format(path, dsroot)
     with chpwd(path):
         # And require_dataset must puke also
         assert_raises(

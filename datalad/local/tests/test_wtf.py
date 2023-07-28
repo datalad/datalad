@@ -1,5 +1,4 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -61,7 +60,7 @@ def test_wtf(topdir=None):
         wtf(dataset=ds.path)
         assert_in('## configuration', cmo.out)
         assert_in('## dataset', cmo.out)
-        assert_in(u'path: {}'.format(ds.path),
+        assert_in(f'path: {ds.path}',
                   ensure_unicode(cmo.out))
         assert_in('branches', cmo.out)
         assert_in(DEFAULT_BRANCH+'@', cmo.out)

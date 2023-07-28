@@ -118,7 +118,7 @@ def test_ssh_open_close(tmp_path=None, tfile1=None):
     # Note: Use realpath() below because we know that the resolved temporary
     # test directory exists on the target (many tests rely on that), but it
     # doesn't necessarily have the unresolved variant.
-    out, err = c1('ls -a {}'.format(sh_quote(op.realpath(tmp_path))))
+    out, err = c1(f'ls -a {sh_quote(op.realpath(tmp_path))}')
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
     eq_(set(remote_ls), {"f0", "f1"})
@@ -126,7 +126,7 @@ def test_ssh_open_close(tmp_path=None, tfile1=None):
         ok_(exists(socket_path))
 
     # now test for arguments containing spaces and other pleasant symbols
-    out, err = c1('ls -l {}'.format(sh_quote(tfile1)))
+    out, err = c1(f'ls -l {sh_quote(tfile1)}')
     assert_in(tfile1, out)
     # on a crippled FS it will actually say something like
     # Control socket connect(...6258b3a7): Connection refused\r\n'
@@ -208,7 +208,7 @@ def test_ssh_manager_close_no_throw(bogus_socket=None):
 @with_tempfile(content='two')
 def test_ssh_copy(sourcedir=None, sourcefile1=None, sourcefile2=None):
     port = get_ssh_port('datalad-test')
-    remote_url = 'ssh://datalad-test:{}'.format(port)
+    remote_url = f'ssh://datalad-test:{port}'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
 
@@ -251,13 +251,13 @@ def test_ssh_copy(sourcedir=None, sourcefile1=None, sourcefile2=None):
                                    ['one', 'two', 'three']):
         targetpath = opj(targetdir, targetfile)
         ok_(exists(targetpath))
-        with open(targetpath, 'r') as fp:
+        with open(targetpath) as fp:
             eq_(content, fp.read())
 
     # and now a quick smoke test for get
     # but simplify the most obscure filename slightly to not trip `scp` itself
     togetfile = Path(targetdir) / (obscure_file.replace('`', '') + '2')
-    togetfile.write_text(str('something'))
+    togetfile.write_text('something')
     ssh.get(opj(remote_url, str(togetfile)), sourcedir)
     ok_((Path(sourcedir) / togetfile.name).exists())
 
@@ -323,6 +323,6 @@ def test_bundle_invariance(path=None):
     for flag in (True, False):
         assert_false(testfile.exists())
         ssh = manager.get_connection(remote_url, use_remote_annex_bundle=flag)
-        ssh('cd .>{}'.format(str(testfile)))
+        ssh(f'cd .>{str(testfile)}')
         ok_(testfile.exists())
         testfile.unlink()

@@ -131,7 +131,7 @@ def get_cmd_summaries(descriptions, groups, width=79):
         grp_descr = grp[1]
         grp_cmds = descriptions[grp[0]]
 
-        cmd_summary.append('\n*%s*\n' % (grp_descr,))
+        cmd_summary.append('\n*{}*\n'.format(grp_descr))
         for cd in grp_cmds:
             cmd_summary.append('  %s\n%s'
                                % ((cd[0],
@@ -281,7 +281,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
         defaults = defaults + tuple(add_args[k] for k in add_argnames)
     ndefaults = len(defaults)
     # start documentation with what the callable brings with it
-    doc = prefix if prefix else u''
+    doc = prefix if prefix else ''
     if len(args) > 1:
         if len(doc):
             if not doc.endswith('\n'):
@@ -309,7 +309,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
                 has_default=defaults_idx >= 0)
             param._doc = orig_docs
             doc += '\n'
-    doc += suffix if suffix else u""
+    doc += suffix if suffix else ""
     # assign the amended docs
     func.__doc__ = doc
     return func
@@ -342,7 +342,7 @@ def build_example(example, api='python'):
         code_field='code_cmd'
         indicator='%'
     else:
-        raise ValueError("unknown API selection: {}".format(api))
+        raise ValueError(f"unknown API selection: {api}")
     if code_field not in example:
         # only show an example if it exist for the API
         return ''
@@ -360,7 +360,7 @@ def build_example(example, api='python'):
         # disable automatic prefixing, if the example already has one
         # this enables providing more complex examples without having
         # to infer its inner structure
-        '{} '.format(indicator)
+        f'{indicator} '
         if needs_indicator
         # maintain spacing to avoid undesired relative indentation
         else '',

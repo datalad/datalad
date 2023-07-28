@@ -23,7 +23,7 @@ from .. import lgr
 #
 
 
-class ProgressBarBase(object):
+class ProgressBarBase:
     """Base class for any progress bar"""
 
     def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B'):
@@ -84,7 +84,7 @@ class ProgressBarBase(object):
 
 class SilentProgressBar(ProgressBarBase):
     def __init__(self, label='', fill_text=None, total=None, unit='B', out=sys.stdout):
-        super(SilentProgressBar, self).__init__(total=total)
+        super().__init__(total=total)
 
 
 class LogProgressBar(ProgressBarBase):
@@ -97,7 +97,7 @@ class LogProgressBar(ProgressBarBase):
     """
 
     def __init__(self, *args, **kwargs):
-        super(LogProgressBar, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # I think we never generate progress bars unless we are at the beginning
         # of reporting something lengthy.  .start is not always invoked so
         # we cannot reliably set it there instead of the constructor (here)
@@ -116,7 +116,7 @@ class LogProgressBar(ProgressBarBase):
         if self.unit == 'B':
             return humanize.naturalsize(x)
         else:
-            return '%s%s' % (self._naturalfloat(x), self.unit or '')
+            return '{}{}'.format(self._naturalfloat(x), self.unit or '')
 
     @staticmethod
     def _naturaldelta(x):
@@ -222,7 +222,7 @@ try:
             frontend: (None, 'ipython'), optional
               tqdm module to use.  Could be tqdm_notebook if under IPython
             """
-            super(tqdmProgressBar, self).__init__(label=label,
+            super().__init__(label=label,
                                                   total=total,
                                                   unit=unit)
 
@@ -288,16 +288,16 @@ try:
                 # progressbar update
                 # TODO: issue a warning?
                 pass
-            super(tqdmProgressBar, self).update(size,
+            super().update(size,
                                                 increment=increment,
                                                 total=total)
 
         def start(self, initial=0):
-            super(tqdmProgressBar, self).start(initial=initial)
+            super().start(initial=initial)
             self._create(initial=initial)
 
         def refresh(self):
-            super(tqdmProgressBar, self).refresh()
+            super().refresh()
             # older tqdms might not have refresh yet but I think we can live
             # without it for a bit there
             if hasattr(self._tqdm, 'refresh'):
@@ -326,7 +326,7 @@ try:
             finally:
                 self._pbar = None
             try:
-                super(tqdmProgressBar, self).finish()
+                super().finish()
             except Exception as exc:  # pragma: no cover
                 #lgr.debug("Finishing tqdmProgresBar thrown %s", str_exc(exc))
                 pass
@@ -356,11 +356,11 @@ class AnnexSpecialRemoteProgressBar(ProgressBarBase):
     def __init__(self, *args, **kwargs):
         # not worth passing anything since we don't care about anything
         remote = kwargs.get('remote')
-        super(AnnexSpecialRemoteProgressBar, self).__init__()
+        super().__init__()
         self.remote = remote
 
     def update(self, *args, **kwargs):
-        super(AnnexSpecialRemoteProgressBar, self).update(*args, **kwargs)
+        super().update(*args, **kwargs)
         # now use stored value
         if self.remote:
             self.remote.send_progress(self.current)

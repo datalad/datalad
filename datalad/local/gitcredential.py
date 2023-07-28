@@ -49,7 +49,7 @@ def _credspec2dict(spec):
     return attrs
 
 
-class GitCredentialInterface(object):
+class GitCredentialInterface:
     """Frontend to `git credential`
     """
 
@@ -113,7 +113,7 @@ class GitCredentialInterface(object):
             val = self._credential_props.get(p)
             if self._credential_props.get(p) is None:
                 continue
-            props += '{}={}\n'.format(p, val)
+            props += f'{p}={val}\n'
 
         props = props.encode('utf-8')
         if not props:

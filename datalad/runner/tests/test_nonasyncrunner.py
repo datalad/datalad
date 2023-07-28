@@ -1,4 +1,3 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 et:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -72,7 +71,7 @@ from .utils import py2cmd
 class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
     def __init__(self,
                  done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
+                 encoding: str | None = None) -> None:
 
         StdOutErrCapture.__init__(
             self,
@@ -80,14 +79,14 @@ class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
             encoding=encoding)
         GeneratorMixIn.__init__(self)
 
-    def timeout(self, fd: Optional[int]) -> bool:
+    def timeout(self, fd: int | None) -> bool:
         return True
 
 
 class GenNothing(GeneratorMixIn, NoCapture):
     def __init__(self,
                  done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
+                 encoding: str | None = None) -> None:
 
         NoCapture.__init__(
             self,
@@ -105,7 +104,7 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
     """
     def __init__(self,
                  done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
+                 encoding: str | None = None) -> None:
 
         StdOutCapture.__init__(
             self,
@@ -114,14 +113,14 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
         GeneratorMixIn.__init__(self)
         self.line_splitter = LineSplitter()
 
-    def timeout(self, fd: Optional[int]) -> bool:
+    def timeout(self, fd: int | None) -> bool:
         return True
 
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         for line in self.line_splitter.process(data.decode(self.encoding)):
             self.send_result(line)
 
-    def pipe_connection_lost(self, fd: int, exc: Optional[BaseException]) -> None:
+    def pipe_connection_lost(self, fd: int, exc: BaseException | None) -> None:
         remaining_line = self.line_splitter.finish_processing()
         if remaining_line is not None:
             self.send_result(remaining_line)
@@ -143,7 +142,7 @@ def test_subprocess_return_code_capture() -> None:
             super().connection_made(process)
             process.send_signal(self.signal_to_send)
 
-        def connection_lost(self, exc: Optional[BaseException]) -> None:
+        def connection_lost(self, exc: BaseException | None) -> None:
             self.result_pool["connection_lost_called"] = (True, exc)
 
         def process_exited(self) -> None:
@@ -189,7 +188,7 @@ def test_interactive_communication() -> None:
             assert self.process.stdin is not None
             os.write(self.process.stdin.fileno(), b"1 + 1\n")
 
-        def connection_lost(self, exc: Optional[BaseException]) -> None:
+        def connection_lost(self, exc: BaseException | None) -> None:
             self.result_pool["connection_lost_called"] = True
 
         def process_exited(self) -> None:
@@ -287,7 +286,7 @@ def test_blocking_read_closing() -> None:
     def fake_read(*args: Any) -> None:
         raise ValueError("test exception")
 
-    read_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue()
+    read_queue: Queue[tuple[Any, IOState, bytes | None]] = queue.Queue()
     destination_queue: Queue[tuple[Any, IOState, bytes]] = queue.Queue()
     with patch("datalad.runner.runnerthreads.os.read") as read:
         read.side_effect = fake_read
@@ -309,8 +308,8 @@ def test_blocking_read_closing() -> None:
 def test_blocking_write_exception_catching() -> None:
     # Expect that a blocking writer catches exceptions and exits gracefully.
 
-    write_queue: Queue[Optional[bytes]] = queue.Queue()
-    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue()
+    write_queue: Queue[bytes | None] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, bytes | None]] = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
@@ -337,8 +336,8 @@ def test_blocking_write_exception_catching() -> None:
 
 def test_blocking_writer_closing() -> None:
     # Expect that a blocking writer closes its file when `None` is sent to it.
-    write_queue: Queue[Optional[bytes]] = queue.Queue()
-    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue()
+    write_queue: Queue[bytes | None] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, bytes | None]] = queue.Queue()
 
     (read_descriptor, write_descriptor) = os.pipe()
     write_file = os.fdopen(write_descriptor, "rb")
@@ -363,8 +362,8 @@ def test_blocking_writer_closing() -> None:
 def test_blocking_writer_closing_timeout_signal() -> None:
     # Expect that writer or reader do not block forever on a full signal queue
 
-    write_queue: Queue[Optional[bytes]] = queue.Queue()
-    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue(1)
+    write_queue: Queue[bytes | None] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, bytes | None]] = queue.Queue(1)
     signal_queue.put(("This is data", IOState.ok, None))
 
     (read_descriptor, write_descriptor) = os.pipe()
@@ -390,8 +389,8 @@ def test_blocking_writer_closing_timeout_signal() -> None:
 def test_blocking_writer_closing_no_signal() -> None:
     # Expect that writer or reader do not block forever on a full signal queue
 
-    write_queue: Queue[Optional[bytes]] = queue.Queue()
-    signal_queue: Queue[tuple[Any, IOState, Optional[bytes]]] = queue.Queue(1)
+    write_queue: Queue[bytes | None] = queue.Queue()
+    signal_queue: Queue[tuple[Any, IOState, bytes | None]] = queue.Queue(1)
     signal_queue.put(("This is data", IOState.ok, None))
 
     (read_descriptor, write_descriptor) = os.pipe()
@@ -455,13 +454,13 @@ def test_timeout() -> None:
     # if the specified timeout is short enough
     class TestProtocol(StdOutErrCapture):
 
-        received_timeouts: list[tuple[int, Optional[int]]] = []
+        received_timeouts: list[tuple[int, int | None]] = []
 
         def __init__(self) -> None:
             StdOutErrCapture.__init__(self)
             self.counter = count()
 
-        def timeout(self, fd: Optional[int]) -> bool:
+        def timeout(self, fd: int | None) -> bool:
             TestProtocol.received_timeouts.append((next(self.counter), fd))
             return False
 
@@ -482,21 +481,21 @@ def test_timeout_nothing() -> None:
     # if the specified timeout is short enough.
     class TestProtocol(NoCapture):
         def __init__(self,
-                     timeout_queue: list[Optional[int]]) -> None:
+                     timeout_queue: list[int | None]) -> None:
             NoCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
 
-        def timeout(self, fd: Optional[int]) -> bool:
+        def timeout(self, fd: int | None) -> bool:
             self.timeout_queue.append(fd)
             return False
 
-    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
+    stdin_queue: Queue[bytes | None] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    timeout_queue: list[Optional[int]] = []
+    timeout_queue: list[int | None] = []
     run_command(
         py2cmd("import time; time.sleep(.4)\n"),
         stdin=stdin_queue,
@@ -513,21 +512,21 @@ def test_timeout_stdout_stderr() -> None:
     # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
-                     timeout_queue: list[tuple[int, Optional[int]]]) -> None:
+                     timeout_queue: list[tuple[int, int | None]]) -> None:
             StdOutErrCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
 
-        def timeout(self, fd: Optional[int]) -> bool:
+        def timeout(self, fd: int | None) -> bool:
             self.timeout_queue.append((next(self.counter), fd))
             return False
 
-    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
+    stdin_queue: Queue[bytes | None] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    timeout_queue: list[tuple[int, Optional[int]]] = []
+    timeout_queue: list[tuple[int, int | None]] = []
     run_command(
         py2cmd("import time;time.sleep(.5)\n"),
         stdin=stdin_queue,
@@ -548,21 +547,21 @@ def test_timeout_process() -> None:
     # Expect timeouts on stdin, stdout, stderr, and the process
     class TestProtocol(StdOutErrCapture):
         def __init__(self,
-                     timeout_queue: list[tuple[int, Optional[int]]]) -> None:
+                     timeout_queue: list[tuple[int, int | None]]) -> None:
             StdOutErrCapture.__init__(self)
             self.timeout_queue = timeout_queue
             self.counter = count()
 
-        def timeout(self, fd: Optional[int]) -> bool:
+        def timeout(self, fd: int | None) -> bool:
             self.timeout_queue.append((next(self.counter), fd))
             return False
 
-    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
+    stdin_queue: Queue[bytes | None] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
     stdin_queue.put(None)
 
-    timeout_queue: list[tuple[int, Optional[int]]] = []
+    timeout_queue: list[tuple[int, int | None]] = []
     run_command(
         py2cmd("import time;time.sleep(.5)\n"),
         stdin=stdin_queue,
@@ -673,7 +672,7 @@ def test_concurrent_waiting_run() -> None:
 def test_concurrent_generator_reading() -> None:
     number_of_lines = 40
     number_of_threads = 100
-    output_queue: Queue[tuple[int, Optional[str]]] = Queue()
+    output_queue: Queue[tuple[int, str | None]] = Queue()
 
     threaded_runner = ThreadedRunner(
         py2cmd(f"for i in range({number_of_lines}): print(f'result#{{i}}')"),
@@ -682,7 +681,7 @@ def test_concurrent_generator_reading() -> None:
     )
     result_generator = threaded_runner.run()
 
-    def thread_main(thread_number: int, result_generator: Iterator[str], output_queue: Queue[tuple[int, Optional[str]]]) -> None:
+    def thread_main(thread_number: int, result_generator: Iterator[str], output_queue: Queue[tuple[int, str | None]]) -> None:
         while True:
             try:
                 output = next(result_generator)

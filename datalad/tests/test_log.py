@@ -103,7 +103,7 @@ def test_mutliple_targets(dst1=None, dst2=None):
     ok_(not exists(dst1))
     ok_(not exists(dst2))
     lgr = LoggerHelper("dataladtest-3").get_initialized_logger(
-        logtarget="%s,%s" % (dst1, dst2))
+        logtarget="{},{}".format(dst1, dst2))
     ok_(exists(dst1))
     ok_(exists(dst2))
 

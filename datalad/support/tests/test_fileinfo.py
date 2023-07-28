@@ -109,7 +109,7 @@ def test_get_content_info(path=None):
                 if t == 'subds' and s == 'deleted':
                     # same as subds_unavailable -> clean
                     continue
-                p = repopath.joinpath(l, '{}_{}'.format(t, s))
+                p = repopath.joinpath(l, f'{t}_{s}')
                 assert p.match('*_{}'.format(status[p]['state'])), p
                 if t == 'subds':
                     assert_in(status[p]['type'], ('dataset', 'directory'), p)
@@ -123,7 +123,7 @@ def test_get_content_info(path=None):
                   'ingit_clean', 'dropped_clean', 'modified',
                   'ingit_modified'):
             for l in ('', ut.PurePosixPath('subdir', '')):
-                p = repopath.joinpath(l, '{}_{}'.format(t, s))
+                p = repopath.joinpath(l, f'{t}_{s}')
                 if s in ('untracked', 'ingit_clean', 'ingit_modified'):
                     # annex knows nothing about these things
                     assert_not_in('key', annexstatus[p])
@@ -179,7 +179,7 @@ def test_subds_path(path=None):
     subds = ds.create('sub')
     assert_repo_status(path)
     with (subds.pathobj / 'some.txt').open('w') as f:
-        f.write(u'test')
+        f.write('test')
     ds.save(recursive=True)
     assert_repo_status(path)
 
@@ -199,7 +199,7 @@ def test_report_absent_keys(path=None):
     ds = Dataset(path).create()
     # create an annexed file
     testfile = ds.pathobj / 'dummy'
-    testfile.write_text(u'nothing')
+    testfile.write_text('nothing')
     ds.save()
     # present in a full report and in a partial report
     # based on worktree of HEAD ref
@@ -260,7 +260,7 @@ def test_annexinfo_init(path=None):
     foo_cont = b"foo content"
     foo.write_bytes(foo_cont)
     bar = ds.pathobj / "bar"
-    bar.write_text(u"bar content")
+    bar.write_text("bar content")
     ds.save()
 
     # Custom init limits report, with original dict getting updated.
