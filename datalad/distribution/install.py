@@ -269,6 +269,7 @@ class Install(Interface):
                         result_renderer='disabled',
                         result_xfm=None,
                         result_filter=None,
+                        branch=branch,
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
