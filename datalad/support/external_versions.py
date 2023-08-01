@@ -8,18 +8,19 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Module to help maintain a registry of versions for external modules etc
 """
+import os.path as op
 import re
 import sys
-import os.path as op
+from itertools import chain
 from os import linesep
 
-from itertools import chain
 from looseversion import LooseVersion
 
-from datalad.log import lgr
 # import version helper from config to have only one implementation
 # config needs this to avoid circular imports
 from datalad.config import get_git_version as __get_git_version
+from datalad.log import lgr
+
 from .exceptions import (
     CapturedException,
     CommandError,
@@ -46,14 +47,15 @@ class UnknownVersion:
 # Custom handlers
 #
 from datalad.cmd import (
-    WitlessRunner,
     GitWitlessRunner,
     StdOutErrCapture,
+    WitlessRunner,
 )
 from datalad.support.exceptions import (
     MissingExternalDependency,
     OutdatedExternalDependency,
 )
+
 _runner = WitlessRunner()
 _git_runner = GitWitlessRunner()
 
@@ -156,7 +158,10 @@ def get_rsync_version():
     # that of the debian package it's installed with. Reason is in gh-7320,
     # which results in the need to detect a patched-by-ubuntu version of rsync
     # and therefore the package version, not the result of `rsync --version`.
-    from datalad.utils import on_linux, get_linux_distribution
+    from datalad.utils import (
+        get_linux_distribution,
+        on_linux,
+    )
     if on_linux:
         dist = get_linux_distribution()[0]
         if dist in ['debian', 'ubuntu']:
@@ -239,12 +244,16 @@ class ExternalVersions(object):
                 version = getattr(value, attr)
                 break
 
-        # try pkg_resources
+        # try importlib.metadata
         if version is None and hasattr(value, '__name__'):
             pkg_name = klass._PYTHON_PACKAGES.get(value.__name__, value.__name__)
             try:
-                import pkg_resources
-                version = pkg_resources.get_distribution(pkg_name).version
+                if sys.version_info < (3, 10):
+                    import importlib_metadata as im
+                else:
+                    import importlib.metadata as im
+
+                version = im.version(pkg_name)
             except Exception:
                 pass
 
