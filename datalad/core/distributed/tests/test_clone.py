@@ -1365,8 +1365,10 @@ def test_ria_http_storedataladorg(path=None):
 @with_tempfile
 @with_tempfile
 @with_tempfile
+@with_tempfile
 def test_ephemeral(origin_path=None, bare_path=None,
-                   clone1_path=None, clone2_path=None, clone3_path=None):
+                   clone1_path=None, clone2_path=None,
+                   clone3_path=None, clone4_path=None):
     can_symlink = has_symlink_capability()
 
     file_test = Path('ds') / 'test.txt'
@@ -1449,6 +1451,12 @@ def test_ephemeral(origin_path=None, bare_path=None,
         eph_annex = eph_from_bare.repo.dot_git / 'annex'
         ok_(eph_annex.is_symlink())
         ok_(eph_annex.resolve().samefile(Path(bare_path) / 'annex'))
+
+    # 5. ephemeral clone using relative path
+    # https://github.com/datalad/datalad/issues/7469
+    with chpwd(op.dirname(origin_path)):
+        clone4 = clone(op.basename(origin_path), op.basename(clone4_path), reckless='ephemeral')
+    check_clone(clone4)
 
 
 @with_tempfile(mkdir=True)
