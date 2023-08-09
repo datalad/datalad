@@ -1367,40 +1367,34 @@ def test_ria_http_storedataladorg(path=None):
 @with_tempfile
 def test_ephemeral(origin_path=None, bare_path=None,
                    clone1_path=None, clone2_path=None, clone3_path=None):
+    can_symlink = has_symlink_capability()
 
     file_test = Path('ds') / 'test.txt'
     file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
 
     origin = Dataset(origin_path).create(force=True)
     origin.save()
+
+    def check_clone(clone_):
+        # common checks to do on a clone
+        eq_(clone_.config.get("annex.private"), "true")
+        if can_symlink:
+            clone_annex = (clone_.repo.dot_git / 'annex')
+            ok_(clone_annex.is_symlink())
+            ok_(clone_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+            if not clone_.repo.is_managed_branch():
+                # TODO: We can't properly handle adjusted branch yet
+                eq_((clone_.pathobj / file_test).read_text(), 'some')
+                eq_((clone_.pathobj / file_testsub).read_text(), 'somemore')
+
     # 1. clone via path
     clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
-    eq_(clone1.config.get("annex.private"), "true")
-
-    can_symlink = has_symlink_capability()
-
-    if can_symlink:
-        clone1_annex = (clone1.repo.dot_git / 'annex')
-        ok_(clone1_annex.is_symlink())
-        ok_(clone1_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
-        if not clone1.repo.is_managed_branch():
-            # TODO: We can't properly handle adjusted branch yet
-            eq_((clone1.pathobj / file_test).read_text(), 'some')
-            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
+    check_clone(clone1)
 
     # 2. clone via file-scheme URL
     clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
                    reckless='ephemeral')
-    eq_(clone2.config.get("annex.private"), "true")
-
-    if can_symlink:
-        clone2_annex = (clone2.repo.dot_git / 'annex')
-        ok_(clone2_annex.is_symlink())
-        ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
-        if not clone2.repo.is_managed_branch():
-            # TODO: We can't properly handle adjusted branch yet
-            eq_((clone2.pathobj / file_test).read_text(), 'some')
-            eq_((clone2.pathobj / file_testsub).read_text(), 'somemore')
+    check_clone(clone2)
 
     # 3. add something to clone1 and push back to origin availability from
     # clone1 should not be propagated (we declared 'here' dead to that end)
