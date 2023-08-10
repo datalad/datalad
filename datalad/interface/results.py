@@ -10,31 +10,41 @@
 
 """
 
+from __future__ import annotations
+
 __docformat__ = 'restructuredtext'
 
 import logging
-
+from collections.abc import (
+    Iterable,
+    Iterator,
+)
 from os.path import (
     isabs,
     isdir,
-    join as opj,
+)
+from os.path import join as opj
+from os.path import (
     normpath,
     relpath,
 )
+from typing import (
+    Any,
+    Optional,
+)
 
+from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+    format_oneline_tb,
+)
+from datalad.support.path import robust_abspath
 from datalad.utils import (
+    PurePosixPath,
     ensure_list,
     path_is_subpath,
-    PurePosixPath,
 )
-from datalad.support.exceptions import CommandError
-from datalad.support.path import robust_abspath
-from datalad.support.exceptions import (
-    format_oneline_tb,
-    CapturedException,
-)
-from datalad.distribution.dataset import Dataset
-
 
 lgr = logging.getLogger('datalad.interface.results')
 lgr.log(5, "Importing datalad.interface.results")
@@ -48,9 +58,19 @@ success_status_map = {
 }
 
 
-def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
-                    refds=None, status=None, message=None, exception=None,
-                    error_message=None, **kwargs):
+def get_status_dict(
+    action: Optional[str] = None,
+    ds: Optional[Dataset] = None,
+    path: Optional[str] = None,
+    type: Optional[str] = None,
+    logger: Optional[logging.Logger] = None,
+    refds: Optional[str] = None,
+    status: Optional[str] = None,
+    message: str | tuple | None = None,
+    exception: Exception | CapturedException | None = None,
+    error_message: str | tuple | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
     # just for not shadowing the builtin `type` in this function
@@ -62,11 +82,11 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
 
     Parameters
     ----------
-    ds : Dataset instance
+    ds
       If given, the `path` and `type` values are populated with the path of the
       datasets and 'dataset' as the type. Giving additional values for both
       keys will overwrite these pre-populated values.
-    exception : Exception
+    exception
       Exceptions that occurred while generating a result should be captured
       by immediately instantiating a CapturedException. This instance can
       be passed here to yield more comprehensive error reporting, including
@@ -78,7 +98,7 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
     dict
     """
 
-    d = {}
+    d: dict[str, Any] = {}
     if action is not None:
         d['action'] = action
     if ds:
@@ -116,8 +136,16 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
     return d
 
 
-def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
-                       status=None, message=None, exception=None):
+def results_from_paths(
+    paths: str | list[str],
+    action: Optional[str] = None,
+    type: Optional[str] = None,
+    logger: Optional[logging.Logger] = None,
+    refds: Optional[str]=None,
+    status: Optional[str] = None,
+    message: Optional[str] = None,
+    exception: Exception | CapturedException | None = None,
+) -> Iterator[dict[str, Any]]:
     """
     Helper to yield analog result dicts for each path in a sequence.
 
@@ -135,19 +163,20 @@ def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
     for p in ensure_list(paths):
         yield get_status_dict(
             action, path=p, type=type, logger=logger, refds=refds,
-            status=status, message=(message, p) if '%s' in message else message,
+            status=status, message=(message, p) if message is not None and '%s' in message else message,
             exception=exception
         )
 
 
-def is_ok_dataset(r):
+def is_ok_dataset(r: dict) -> bool:
     """Convenience test for a non-failure dataset-related result dict"""
     return r.get('status', None) == 'ok' and r.get('type', None) == 'dataset'
 
 
-class ResultXFM(object):
+class ResultXFM:
     """Abstract definition of the result transformer API"""
-    def __call__(self, res):
+
+    def __call__(self, res: dict[str, Any]) -> Any:
         """This is called with one result dict at a time"""
         raise NotImplementedError
 
@@ -160,16 +189,19 @@ class YieldDatasets(ResultXFM):
 
     `None` is returned for any other result.
     """
-    def __init__(self, success_only=False):
+    def __init__(self, success_only: bool = False) -> None:
         self.success_only = success_only
 
-    def __call__(self, res):
+    def __call__(self, res: dict[str, Any]) -> Optional[Dataset]:
         if res.get('type', None) == 'dataset':
             if not self.success_only or \
                     res.get('status', None) in ('ok', 'notneeded'):
                 return Dataset(res['path'])
+            else:
+                return None
         else:
             lgr.debug('rejected by return value configuration: %s', res)
+            return None
 
 
 class YieldRelativePaths(ResultXFM):
@@ -178,15 +210,17 @@ class YieldRelativePaths(ResultXFM):
     Relative paths are determined from the 'refds' value in the result. If
     no such value is found, `None` is returned.
     """
-    def __call__(self, res):
+    def __call__(self, res: dict[str, Any]) -> Optional[str]:
         refpath = res.get('refds', None)
         if refpath:
             return relpath(res['path'], start=refpath)
+        else:
+            return None
 
 
 class YieldField(ResultXFM):
     """Result transformer to return an arbitrary value from a result dict"""
-    def __init__(self, field):
+    def __init__(self, field: str) -> None:
         """
         Parameters
         ----------
@@ -195,11 +229,12 @@ class YieldField(ResultXFM):
         """
         self.field = field
 
-    def __call__(self, res):
+    def __call__(self, res: dict[str, Any]) -> Any:
         if self.field in res:
             return res[self.field]
         else:
             lgr.debug('rejected by return value configuration: %s', res)
+            return None
 
 
 # a bunch of convenience labels for common result transformers
@@ -219,7 +254,7 @@ translate_annex_notes = {
 }
 
 
-def annexjson2result(d, ds, **kwargs):
+def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> dict[str, Any]:
     """Helper to convert an annex JSON result to a datalad result dict
 
     Info from annex is rather heterogeneous, partly because some of it
@@ -271,13 +306,13 @@ def annexjson2result(d, ds, **kwargs):
     return res
 
 
-def count_results(res, **kwargs):
-    """Return number if results that match all property values in kwargs"""
+def count_results(res: Iterable[dict[str, Any]], **kwargs: Any) -> int:
+    """Return number of results that match all property values in kwargs"""
     return sum(
         all(k in r and r[k] == v for k, v in kwargs.items()) for r in res)
 
 
-def only_matching_paths(res, **kwargs):
+def only_matching_paths(res: dict[str, Any], **kwargs: Any) -> bool:
     # TODO handle relative paths by using a contained 'refds' value
     paths = ensure_list(kwargs.get('path', []))
     respath = res.get('path', None)
@@ -285,8 +320,8 @@ def only_matching_paths(res, **kwargs):
 
 
 # needs decorator, as it will otherwise bind to the command classes that use it
-@staticmethod
-def is_result_matching_pathsource_argument(res, **kwargs):
+@staticmethod  # type: ignore[misc]
+def is_result_matching_pathsource_argument(res: dict[str, Any], **kwargs: Any) -> bool:
     # we either have any non-zero number of "paths" (that could be anything), or
     # we have one path and one source
     # we don't do any error checking here, done by the command itself
@@ -331,9 +366,16 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         return False
 
 
-def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg,
-                              noinfo_dir_msg, noinfo_file_msg, noinfo_status='notneeded',
-                              **kwargs):
+def results_from_annex_noinfo(
+    ds: Dataset,
+    requested_paths: list[str],
+    respath_by_status: dict[str, list[str]],
+    dir_fail_msg: str,
+    noinfo_dir_msg: str,
+    noinfo_file_msg: str,
+    noinfo_status: str = 'notneeded',
+    **kwargs: Any
+) -> Iterator[dict[str, Any]]:
     """Helper to yield results based on what information git annex did no give us.
 
     The helper assumes that the annex command returned without an error code,
