@@ -24,6 +24,9 @@ importlib-metadata>=3.6
 [:python_version < "3.11"]
 typing_extensions>=4.0.0
 
+[:python_version < "3.9"]
+importlib-resources>=3.0
+
 [:python_version >= "3.8"]
 distro
 
@@ -47,6 +50,9 @@ importlib-metadata>=3.6
 
 [core:python_version < "3.11"]
 typing_extensions>=4.0.0
+
+[core:python_version < "3.9"]
+importlib-resources>=3.0
 
 [core:python_version >= "3.8"]
 distro
@@ -116,6 +122,9 @@ importlib-metadata>=3.6
 [devel:python_version < "3.11"]
 typing_extensions>=4.0.0
 
+[devel:python_version < "3.9"]
+importlib-resources>=3.0
+
 [devel:python_version >= "3.8"]
 distro
 
@@ -172,6 +181,9 @@ importlib-metadata>=3.6
 
 [full:python_version < "3.11"]
 typing_extensions>=4.0.0
+
+[full:python_version < "3.9"]
+importlib-resources>=3.0
 
 [full:python_version >= "3.8"]
 distro

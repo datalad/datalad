@@ -92,6 +92,10 @@ def _setup_ephemeral_annex(ds: Dataset, remote: str):
                 # If origin isn't local, we have nothing to do.
                 origin_git_path = Path(RI(origin_annex_url).localpath)
 
+                if not origin_git_path.is_absolute():
+                    # relative path would be relative to the ds, not pwd!
+                    origin_git_path = ds.pathobj / origin_git_path
+
                 # we are local; check for a bare repo first to not mess w/
                 # the path
                 if GitRepo(origin_git_path, create=False).bare:
