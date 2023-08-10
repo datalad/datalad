@@ -59,7 +59,7 @@
      EnsureBool,
 --- a/datalad/local/run_procedure.py
 +++ b/datalad/local/run_procedure.py
-@@ -220,10 +220,10 @@ class RunProcedure(Interface):
+@@ -225,10 +225,10 @@ class RunProcedure(Interface):
      Directories identified by the configuration settings
  
      - 'datalad.locations.user-procedures' (determined by
@@ -94,7 +94,7 @@
          # TODO: guarantee restricted permissions
 --- a/datalad/support/external_versions.py
 +++ b/datalad/support/external_versions.py
-@@ -209,7 +209,7 @@ class ExternalVersions(object):
+@@ -214,7 +214,7 @@ class ExternalVersions(object):
      }
      _INTERESTING = (
          'annexremote',
