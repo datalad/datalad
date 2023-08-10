@@ -3,6 +3,8 @@ datalad (0.19.3-1) unstable; urgency=medium
   * Fresh upstream bugfix release
   * Declare minimal version for typing-extensions to be 3.10.0.2~.
     Note: for the 0.18.4 it needs to be >= 4.0.0~
+  * Added dependency on python3-importlib-resources for older (before 3.9)
+    python3s (valuable only for backports).
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 10 Aug 2023 15:44:13 -0400
 
