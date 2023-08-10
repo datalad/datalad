@@ -298,16 +298,21 @@ class CreateSiblingGitlab(Interface):
                     return_type='list')
             if not subds:
                 # we didn't find anything to operate on, let the user know
-                for p in path:
+                res_kwargs = {'status': 'impossible', 'refds': ds.path,
+                              'type':'dataset', 'logger': lgr,
+                              'action': 'create_sibling_gitlab'}
+                if path is not None:
+                    for p in path:
+                        yield dict(
+                              path=p,
+                              message=('No installed dataset found under %s, forgot to "get" it?' % p),
+                              **res_kwargs
+                        )
+                else:
                     yield dict(
-                          action='create_sibling_gitlab',
-                          status='impossible',
-                          refds=ds.path,
-                          path=p,
-                          message=('No dataset found under %s' % p),
-                          type='dataset',
-                          logger=lgr,
-                    )
+                        path=ds.path,
+                        message=('No installed subdatasets found underneath %s, forgot to "get" any?' % ds.path),
+                        **res_kwargs)
             else:
                 for sub in subds:
                     for r in _proc_dataset(

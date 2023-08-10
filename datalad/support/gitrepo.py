@@ -3513,7 +3513,7 @@ class GitRepo(CoreGitRepo):
                     action='delete',
                     refds=self.pathobj,
                     type=props.get('type'),
-                    path=p,
+                    path=str(p),
                     status='ok',
                     logger=lgr)
 
@@ -3716,7 +3716,7 @@ class GitRepo(CoreGitRepo):
             # get all the entries
             for r in self._process_git_get_output(*add_out):
                 yield get_status_dict(
-                    action=r.get('command', 'add'),
+                    action=str(r.get('command', 'add')),
                     refds=self.pathobj,
                     type='file',
                     path=(self.pathobj / ut.PurePosixPath(r['file']))
@@ -3772,7 +3772,7 @@ class GitRepo(CoreGitRepo):
                 yield get_status_dict(
                     action='add_submodule',
                     ds=self,
-                    path=path,
+                    path=str(path),
                     status='error',
                     message=('cannot add subdataset %s with no commits', subm),
                     logger=lgr)

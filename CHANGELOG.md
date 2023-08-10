@@ -1,4 +1,47 @@
 
+<a id='changelog-0.19.3'></a>
+# 0.19.3 (2023-08-10)
+
+## 🐛 Bug Fixes
+
+- Type annotate get_status_dict and note that we can pass Exception or CapturedException which is not subclass.  [PR #7403](https://github.com/datalad/datalad/pull/7403) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: create-sibling-gitlab used to raise a TypeError when attempting a recursive operation in a dataset with uninstalled subdatasets. It now raises an impossible result instead.  [PR #7430](https://github.com/datalad/datalad/pull/7430) (by [@adswa](https://github.com/adswa))
+
+- Pass branch option into recursive call within Install - for the cases whenever install is invoked with URL(s).  Fixes [#7461](https://github.com/datalad/datalad/issues/7461) via [PR #7463](https://github.com/datalad/datalad/pull/7463) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Allow for reckless=ephemeral clone using relative path for the original location.  Fixes [#7469](https://github.com/datalad/datalad/issues/7469) via [PR #7472](https://github.com/datalad/datalad/pull/7472) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Fix a property name and default costs described in "getting subdatasets" section of `get` documentation.
+  Fixes [#7458](https://github.com/datalad/datalad/issues/7458) via
+  [PR #7460](https://github.com/datalad/datalad/pull/7460)
+  (by [@mslw](https://github.com/mslw))
+
+## 🏠 Internal
+
+- Copy an adjusted environment only if requested to do so.
+  [PR #7399](https://github.com/datalad/datalad/pull/7399)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Eliminate uses of `pkg_resources`.  Fixes [#7435](https://github.com/datalad/datalad/issues/7435) via [PR #7439](https://github.com/datalad/datalad/pull/7439) (by [@jwodder](https://github.com/jwodder))
+
+## 🧪 Tests
+
+- Disable some S3 tests of their VCR taping where they fail for known issues.  [PR #7467](https://github.com/datalad/datalad/pull/7467) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.19.2'></a>
+# 0.19.2 (2023-07-03)
+
+## 🐛 Bug Fixes
+
+- Remove surrounding quotes in output filenames even for newer version of annex.  Fixes [#7440](https://github.com/datalad/datalad/issues/7440) via [PR #7443](https://github.com/datalad/datalad/pull/7443) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- DOC: clarify description of the "install" interface to reflect its convoluted behavior.  [PR #7445](https://github.com/datalad/datalad/pull/7445) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.1'></a>
 # 0.19.1 (2023-06-26)
 

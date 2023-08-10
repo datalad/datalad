@@ -11,29 +11,29 @@ It is unconditionally imported by the main() entrypoint.
 # like error handling, must be done conditionally in-line.
 
 import argparse
+import logging
+import sys
 from collections import defaultdict
 from functools import partial
-import sys
-
 
 from datalad import __version__
-
-from .common_args import common_args
 from datalad.interface.base import (
-    is_api_arg,
     get_cmd_doc,
     get_interface_groups,
+    is_api_arg,
     load_interface,
 )
+from datalad.support.constraints import EnsureChoice
 from datalad.utils import getargspec
+
+from .common_args import common_args
+from .exec import call_from_parser
+from .helpers import get_commands_from_groups
 from .interface import (
     alter_interface_docs_for_cmdline,
     get_cmd_ex,
     get_cmdline_command_name,
 )
-from datalad.support.constraints import EnsureChoice
-from .helpers import get_commands_from_groups
-from .exec import call_from_parser
 
 # special case imports
 #  .helpers import add_entrypoints_to_interface_groups
@@ -43,7 +43,6 @@ from .exec import call_from_parser
 #  .interface._known_extension_commands
 #  .interface._deprecated_commands
 
-import logging
 lgr = logging.getLogger('datalad.cli.parser')
 
 
@@ -138,6 +137,7 @@ def setup_parser(
         # we need the full help, or we have a potential command that
         # lives in an extension, must load all extension, expensive
         from .helpers import add_entrypoints_to_interface_groups
+
         # need to load all the extensions and try again
         # TODO load extensions one-by-one and stop when a command was found
         add_entrypoints_to_interface_groups(interface_groups)
@@ -404,8 +404,8 @@ def try_suggest_extension_with_command(parser, cmd, completing, known_cmds):
     """If completing=False, this function will trigger sys.exit()"""
     # check if might be coming from known extensions
     from .interface import (
-        _known_extension_commands,
         _deprecated_commands,
+        _known_extension_commands,
     )
     extension_commands = {
         c: e
@@ -541,8 +541,13 @@ def parser_add_version_opt(parser, mod_name, include_name=False, delay=False):
             # Let's use the standard Python mechanism if underlying module
             # did not provide __version__
             try:
-                import pkg_resources
-                version = pkg_resources.get_distribution(mod_name).version
+                if sys.version_info < (3, 10):
+                    import importlib_metadata as im
+                else:
+                    import importlib.metadata as im
+
+                pkg = im.packages_distributions()[mod_name][0]
+                version = im.version(pkg)
             except Exception:
                 version = "unknown"
         if include_name:
