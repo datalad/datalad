@@ -87,17 +87,17 @@ def check_decompress_file(leading_directories, path=None):
 
     path_archive_obscure = op.join(outdir, fn_archive_obscure)
     if leading_directories == 'strip':
-        assert_false(op.exists(path_archive_obscure))
+        assert not op.exists(path_archive_obscure)
         testpath = outdir
     elif leading_directories is None:
-        assert_true(op.exists(path_archive_obscure))
+        assert op.exists(path_archive_obscure)
         testpath = path_archive_obscure
     else:
         raise NotImplementedError("Dunno about this strategy: %s"
                                   % leading_directories)
 
-    assert_true(op.exists(op.join(testpath, '3.txt')))
-    assert_true(op.exists(op.join(testpath, fn_in_archive_obscure)))
+    assert op.exists(op.join(testpath, '3.txt'))
+    assert op.exists(op.join(testpath, fn_in_archive_obscure))
     with open(op.join(testpath, '3.txt')) as f:
         eq_(f.read(), '3 load')
 
