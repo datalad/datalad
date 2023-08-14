@@ -26,7 +26,7 @@ export DATALAD_SOURCE_EPOCH=$(SOURCE_DATE_EPOCH)
 
 clean::
 	dh_clean
-	-rm -rf bin build .pybuild datalad.egg-info
+	-rm -rf bin build .pybuild datalad.egg-info .pytest_cache docs/source/generated/man
 	-find . -name '*.pyc' -delete
 
 override_dh_auto_configure:
