@@ -48,6 +48,7 @@ from datalad.tests.utils_pytest import (
     known_failure_githubci_win,
     known_failure_windows,
     ok_,
+    nok_,
     serve_path_via_http,
     skip_if_adjusted_branch,
     skip_if_on_windows,
@@ -823,3 +824,45 @@ def test_get_non_existing(origin_path=None, clone_path=None):
 
     assert_result_count(res, 1, status="impossible",
                         message="path does not exist")
+
+
+@with_tree(tree={'file1.txt': 'whatever 1',
+                 'file2.txt': 'whatever 2',
+                 'file3.txt': 'whatever 3',
+                 'file4.txt': 'whatever 4'})
+@with_tempfile(mkdir=True)
+def test_get_data_auto_wanted_anything(path=None, ds_dir=None):
+    from os import listdir
+    file_list = [f for f in listdir(path) if not f.startswith('.')]
+    # prepare origin
+    origin = Dataset(path).create(force=True)
+    origin.save(file_list, message="initial")
+
+    ds = install(
+        ds_dir, source=path,
+        result_xfm='datasets', return_type='item-or-list')
+
+    # no content present:
+    ok_(not any(ds.repo.file_has_content(file_list)))
+
+    ds.repo.set_preferred_content('wanted', 'exclude=file[3-4].txt', 'here')
+    result = ds.get('.', data='auto')
+
+    eq_(set([basename(item.get('path')) for item in result]),
+        {'file1.txt', 'file2.txt'})
+    ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
+    nok_(any(ds.repo.file_has_content(['file3.txt', 'file4.txt'])))
+
+    ds.drop('.')
+
+    result = ds.get('.', data='auto-if-wanted')
+
+    eq_(set([basename(item.get('path')) for item in result]),
+        {'file1.txt', 'file2.txt'})
+    ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
+    nok_(any(ds.repo.file_has_content(['file3.txt', 'file4.txt'])))
+
+    result = ds.get('.', data='anything')
+    eq_(set([basename(item.get('path')) for item in result]),
+        {'file3.txt', 'file4.txt'})
+    ok_(all(ds.repo.file_has_content(file_list)))
