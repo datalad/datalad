@@ -674,8 +674,8 @@ def _get_targetpaths(ds, content, refds_path, source, jobs, data):
             (data == 'auto-if-wanted') and
             ds_repo.get_preferred_content('wanted', 'here')
         ):
-        lgr.debug("Invoking get --want-get")
-        get_opts.append('--want-get')
+        lgr.debug("Invoking get --auto")
+        get_opts.append('--auto')
 
     try:
         results = ds_repo.get(
@@ -872,12 +872,12 @@ class Get(Interface):
         data=Parameter(
             args=("--data",),
             doc="""what to do with (annex'ed) data. 'anything' would cause
-            transfer of all annexed content, 'nothing' would avoid call to
-            `git annex copy` altogether. 'auto' would use 'git annex copy' with
-            '--auto' thus transferring only data which would satisfy "wanted"
-            or "numcopies" settings for the remote (thus "nothing" otherwise).
+            fetching of all annexed content, 'nothing' would avoid call to
+            `git annex get` altogether. 'auto' would use 'git annex get' with
+            '--auto' thus fetching only data which would satisfy "wanted"
+            or "numcopies" settings for the local copy (thus "nothing" otherwise).
             'auto-if-wanted' would enable '--auto' mode only if there is a
-            "wanted" setting for the remote, and transfer 'anything' otherwise.
+            "wanted" setting for the remote, and fetching 'anything' otherwise.
             """,
             constraints=EnsureChoice(
                 'anything', 'nothing', 'auto', 'auto-if-wanted')),
