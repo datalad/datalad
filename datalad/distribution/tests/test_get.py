@@ -876,3 +876,14 @@ def test_get_non_existing(origin_path=None, clone_path=None):
 
     assert_result_count(res, 1, status="impossible",
                         message="path does not exist")
+
+
+@with_tempfile(mkdir=True)
+def test_get_recursive_relpath(local_path=None):
+    with chpwd(local_path):
+        ds = create(opj(local_path, 'src'))
+        ds.create('sub_ds')
+        dest_path = opj(local_path, 'dest')
+        ds_dest = install(dest_path, source='src/', recursive=False)
+        ds_dest.get('sub_ds')
+        assert Dataset(opj(dest_path, 'sub_ds')).is_installed()
