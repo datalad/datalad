@@ -54,6 +54,7 @@ _TEMP_PATHS_CLONES = set()
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
 on_appveyor = bool(os.environ.get('APPVEYOR', False))
+on_github = bool(os.environ.get('GITHUB_ACTION', False))
 on_nfs = 'nfs' in os.getenv('TMPDIR', '')
 
 if external_versions["cmd:git"] >= "2.28":
