@@ -64,6 +64,8 @@ from datalad.tests.utils_pytest import (
     ok_,
     ok_file_has_content,
     ok_startswith,
+    on_github,
+    on_osx,
     on_travis,
     patch_config,
     serve_path_via_http,
@@ -147,6 +149,7 @@ def test_clone_crcns(tdir=None, ds_path=None):
 
 @integration
 @skip_if_no_network
+@pytest.mark.xfail(on_osx and on_github, reason="spurious https://github.com/datalad/datalad/issues/7485")
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir=None):
     tdir = Path(tdir)
