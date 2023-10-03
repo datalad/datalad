@@ -42,11 +42,24 @@ class GeneratorMixIn:
             # do something, for example write to stdin of the subprocess
 
     """
-    def __init__(self):
-        self.result_queue = deque()
-
     def send_result(self, result):
+        """ This method sends a result that will be yielded by the generator
+
+        If ThreadedRunner.run() is called with a protocol that is derived from
+        this mixin-class, it will return a generator. The elements that the
+        generator yields have to be sent to the generator. This is done via this
+        method. Any `result` that is given to `GeneratorMixIn.send_result()`
+        will eventually be yielded by the generator. The order in which they
+        are yielded is the order in which they are "given" to
+        `GeneratorMixIn.send_result()`.
+        """
         self.result_queue.append(result)
+
+    @property
+    def result_queue(self) -> deque:
+        if not hasattr(self, '_result_queue'):
+            self._result_queue = deque()
+        return self._result_queue
 
 
 class WitlessProtocol:
