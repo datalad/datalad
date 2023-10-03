@@ -58,7 +58,7 @@ class GeneratorMixIn:
     @property
     def result_queue(self) -> deque:
         if not hasattr(self, '_result_queue'):
-            self._result_queue = deque()
+            self._result_queue: deque = deque()
         return self._result_queue
 
 
