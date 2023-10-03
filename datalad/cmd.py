@@ -153,7 +153,6 @@ class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
                  encoding: Optional[str] = None,
                  output_proc: Optional[Callable] = None,
                  ):
-        GeneratorMixIn.__init__(self)
         StdOutErrCapture.__init__(self, done_future, encoding)
         self.batched_command = batched_command
         self.output_proc = output_proc
