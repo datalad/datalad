@@ -20,6 +20,7 @@ from datalad.tests.utils_pytest import (
     assert_equal,
     assert_raises,
 )
+from datalad.utils import on_windows
 
 from ..exception import CommandError
 from ..runner import WitlessRunner
@@ -29,16 +30,6 @@ from .utils import py2cmd
 class TestProtocol(GeneratorMixIn, StdOutErrCapture):
 
     __test__ = False  # class is not a class of tests
-
-    def __init__(self,
-                 done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
-
-        StdOutErrCapture.__init__(
-            self,
-            done_future=done_future,
-            encoding=encoding)
-        GeneratorMixIn.__init__(self)
 
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         self.send_result((fd, data.decode()))
@@ -77,10 +68,6 @@ def test_post_pipe_callbacks() -> None:
     # Expect that the process_exited and connection_lost callbacks
     # are also called in a GeneratorMixIn protocol
     class TestPostPipeProtocol(GeneratorMixIn, StdOutErrCapture):
-        def __init__(self) -> None:
-            GeneratorMixIn.__init__(self)
-            StdOutErrCapture.__init__(self)
-
         def process_exited(self) -> None:
             self.send_result(1)
             self.send_result(2)
@@ -90,7 +77,9 @@ def test_post_pipe_callbacks() -> None:
             self.send_result(4)
 
     runner = WitlessRunner()
-    results = list(runner.run(cmd=["echo", "a"], protocol=TestPostPipeProtocol))
+    results = list(runner.run(
+        cmd=(["cmd.exe", "/c"] if on_windows else []) + ["echo", "a"],
+        protocol=TestPostPipeProtocol))
     assert_equal(results, [1, 2, 3, 4])
 
 
@@ -100,10 +89,6 @@ def test_file_number_activity_detection() -> None:
     # waits for the process and progresses the generator state
     # to `_ResultGenerator.GeneratorState.process_exited`.
     class TestFNADProtocol(GeneratorMixIn, NoCapture):
-        def __init__(self) -> None:
-            GeneratorMixIn.__init__(self)
-            NoCapture.__init__(self)
-
         def process_exited(self) -> None:
             self.send_result(3)
 
@@ -111,7 +96,9 @@ def test_file_number_activity_detection() -> None:
             self.send_result(4)
 
     wl_runner = WitlessRunner()
-    result_generator = wl_runner.run(cmd=["echo", "a"], protocol=TestFNADProtocol)
+    result_generator = wl_runner.run(
+        cmd=(["cmd.exe", "/c"] if on_windows else []) + ["echo", "a"],
+        protocol=TestFNADProtocol)
     assert isinstance(result_generator, _ResultGenerator)
 
     runner = result_generator.runner
@@ -128,9 +115,7 @@ def test_file_number_activity_detection() -> None:
 
 def test_failing_process():
     class TestProtocol(GeneratorMixIn, NoCapture):
-        def __init__(self) -> None:
-            GeneratorMixIn.__init__(self)
-            NoCapture.__init__(self)
+        pass
 
     try:
         for _ in run_command(py2cmd("exit(1)"),

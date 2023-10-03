@@ -70,30 +70,12 @@ from .utils import py2cmd
 
 # Protocol classes used for a set of generator tests later
 class GenStdoutStderr(GeneratorMixIn, StdOutErrCapture):
-    def __init__(self,
-                 done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
-
-        StdOutErrCapture.__init__(
-            self,
-            done_future=done_future,
-            encoding=encoding)
-        GeneratorMixIn.__init__(self)
-
     def timeout(self, fd: Optional[int]) -> bool:
         return True
 
 
 class GenNothing(GeneratorMixIn, NoCapture):
-    def __init__(self,
-                 done_future: Any = None,
-                 encoding: Optional[str] = None) -> None:
-
-        NoCapture.__init__(
-            self,
-            done_future=done_future,
-            encoding=encoding)
-        GeneratorMixIn.__init__(self)
+    pass
 
 
 class GenStdoutLines(GeneratorMixIn, StdOutCapture):
@@ -111,7 +93,6 @@ class GenStdoutLines(GeneratorMixIn, StdOutCapture):
             self,
             done_future=done_future,
             encoding=encoding)
-        GeneratorMixIn.__init__(self)
         self.line_splitter = LineSplitter()
 
     def timeout(self, fd: Optional[int]) -> bool:
@@ -582,7 +563,9 @@ def test_timeout_process() -> None:
 def test_exit_3() -> None:
     # Expect the process to be closed after
     # the generator exits.
-    rt = ThreadedRunner(cmd=["sleep", "4"],
+    rt = ThreadedRunner(cmd=["waitfor", "/T", "4", "TheComputerTurnsIntoATulip"]
+                        if on_windows
+                        else ["sleep", "4"],
                         stdin=None,
                         protocol_class=GenStdoutStderr,
                         timeout=.5,
@@ -592,16 +575,21 @@ def test_exit_3() -> None:
 
 
 def test_exit_4() -> None:
-    rt = ThreadedRunner(cmd=["sleep", "4"],
+    rt = ThreadedRunner(cmd=["waitfor", "/T", "4", "TheComputerTurnsIntoATulip"]
+                        if on_windows
+                        else ["sleep", "4"],
                         stdin=None,
                         protocol_class=GenNothing,
-                        timeout=.5)
+                        timeout=.5,
+                        exception_on_error=False)
     tuple(rt.run())
     assert_true(rt.return_code is not None)
 
 
 def test_generator_throw() -> None:
-    rt = ThreadedRunner(cmd=["sleep", "4"],
+    rt = ThreadedRunner(cmd=["waitfor", "/T", "4", "TheComputerTurnsIntoATulip"]
+                        if on_windows
+                        else ["sleep", "4"],
                         stdin=None,
                         protocol_class=GenNothing,
                         timeout=.5)

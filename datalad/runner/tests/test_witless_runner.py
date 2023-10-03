@@ -66,7 +66,7 @@ result_counter = 0
 def test_runner(tempfile: str = "") -> None:
     runner = Runner()
     content = 'Testing real run' if on_windows else 'Testing äöü東 real run'
-    cmd = 'echo %s > %s' % (content, tempfile)
+    cmd = ('cmd.exe /c' if on_windows else '') + 'echo %s > %s' % (content, tempfile)
     res = runner.run(cmd)
     assert isinstance(res, dict)
     # no capture of any kind, by default
