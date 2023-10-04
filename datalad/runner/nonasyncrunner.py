@@ -319,7 +319,7 @@ class ThreadedRunner:
         Generator
             If the protocol is a subclass of `GeneratorMixIn`, a Generator
             will be returned. This allows to use this method in constructs
-            like:
+            like::
 
                 for protocol_output in runner.run():
                     ...
@@ -330,7 +330,7 @@ class ThreadedRunner:
             generator will raise StopIteration(return_code), where
             return_code is the return code of the process. The return code
             of the process will also be stored in the "return_code"-attribute
-            of the runner. So you could write:
+            of the runner. So you could write::
 
                gen = runner.run()
                for file_descriptor, data in gen:
