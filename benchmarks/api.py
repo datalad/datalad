@@ -104,13 +104,13 @@ class supers(SampleSuperDatasetBenchmarks):
                          reckless='kill')
 
     def time_remove(self):
-        drop(self.ds.path, what='all', reckless='kill', recursive=True)
+        self.ds.drop(what='all', reckless='kill', recursive=True)
 
     def time_diff(self):
-        diff(self.ds.path, revision="HEAD^")
+        self.ds.diff(fr="HEAD^")
 
     def time_diff_recursive(self):
-        diff(self.ds.path, revision="HEAD^", recursive=True)
+        self.ds.diff(fr="HEAD^", recursive=True)
 
     # Status must be called with the dataset, unlike diff
     def time_status(self):
