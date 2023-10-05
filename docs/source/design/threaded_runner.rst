@@ -56,13 +56,7 @@ The main thread waits on the ``output_queue`` for data or signals and handles th
 Protocols
 =========
 
-Due to its history datalad uses the protocol defined in ``asyncio.protocols.SubprocessProtocol`` and in ``asyncio.protocols.BaseProtocol``.
-To keep compatibility with the code base, the threaded-runner implementation uses
-the same interface. Please note, although we use the same interface and
-although the interface is defined in the asyncio
-libraries, the threaded-runner implementation does not make any use of ``asyncio``.
-The description of the interface nevertheless applies in the context of the threaded-runner.
-The following methods of the ``SubprocessProtocol`` are supported.
+Due to its history datalad uses the protocol defined in ``asyncio.protocols.SubprocessProtocol`` and in ``asyncio.protocols.BaseProtocol``. To keep compatibility with the code base, the threaded-runner implementation uses the same interface. Please note, although we use the same interface and although the interface is defined in the asyncio libraries, the threaded-runner implementation does not make any use of ``asyncio``. The description of the interface nevertheless applies in the context of the threaded-runner. The following methods of the ``SubprocessProtocol`` are supported.
 
     - ``SubprocessProtocol.pipe_data_received(fd, data)``
     - ``SubprocessProtocol.pipe_connection_lost(fd, exc)``
@@ -74,23 +68,13 @@ In addition the following methods of ``BaseProtocol`` are supported:
     - ``BaseProtocol.connection_lost(exc)``
 
 
-The datalad-provided protocol ``datalad.runners.protocol.WitlessProtocol``
-provides an additional callback:
+The datalad-provided protocol ``datalad.runners.protocol.WitlessProtocol`` provides an additional callback:
 
     - ``WitlessProtocol.timeout(fd)``
 
-The method ``timeout()`` will be called when the parameter ``timeout`` in
-``WitlessRunner.run``, ``ThreadedRunner.run``, or ``run_command`` is set to a
-number specifying the desired timeout in seconds. If no data is received from
-``stdin``, or ``stderr`` (if those are supposed to be captured), the method
-``WitlessProtocol.timeout(fd)`` is called with ``fd`` set to the respective
-file number, e.g. 1, or 2. If ``WitlessProtocol.timeout(fd)`` returns ``True``,
-only the corresponding file descriptor will be closed and the associated threads will exit.
+The method ``timeout()`` will be called when the parameter ``timeout`` in ``WitlessRunner.run``, ``ThreadedRunner.run``, or ``run_command`` is set to a number specifying the desired timeout in seconds. If no data is received from ``stdin``, or ``stderr`` (if those are supposed to be captured), the method ``WitlessProtocol.timeout(fd)`` is called with ``fd`` set to the respective file number, e.g. 1, or 2. If ``WitlessProtocol.timeout(fd)`` returns ``True``, only the corresponding file descriptor will be closed and the associated threads will exit.
 
-The method ``WitlessProtocol.timeout(fd)`` is also called if stdout, stderr
-and stdin are closed and the process does not exit within the given interval.
-In this case ``fd`` is set to ``None``. If ``WitlessProtocol.timeout(fd)``
-returns ``True`` the process is terminated.
+The method ``WitlessProtocol.timeout(fd)`` is also called if stdout, stderr and stdin are closed and the process does not exit within the given interval. In this case ``fd`` is set to ``None``. If ``WitlessProtocol.timeout(fd)`` returns ``True`` the process is terminated.
 
 
 Object and Generator Results
