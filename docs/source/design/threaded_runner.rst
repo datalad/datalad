@@ -85,7 +85,7 @@ number specifying the desired timeout in seconds. If no data is received from
 ``stdin``, or ``stderr`` (if those are supposed to be captured), the method
 ``WitlessProtocol.timeout(fd)`` is called with ``fd`` set to the respective
 file number, e.g. 1, or 2. If ``WitlessProtocol.timeout(fd)`` returns ``True``,
-the file descriptor will be closed and the associated threads will exit.
+only the corresponding file descriptor will be closed and the associated threads will exit.
 
 The method ``WitlessProtocol.timeout(fd)`` is also called if stdout, stderr
 and stdin are closed and the process does not exit within the given interval.
