@@ -1,4 +1,152 @@
 
+<a id='changelog-0.19.3'></a>
+# 0.19.3 (2023-08-10)
+
+## 🐛 Bug Fixes
+
+- Type annotate get_status_dict and note that we can pass Exception or CapturedException which is not subclass.  [PR #7403](https://github.com/datalad/datalad/pull/7403) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: create-sibling-gitlab used to raise a TypeError when attempting a recursive operation in a dataset with uninstalled subdatasets. It now raises an impossible result instead.  [PR #7430](https://github.com/datalad/datalad/pull/7430) (by [@adswa](https://github.com/adswa))
+
+- Pass branch option into recursive call within Install - for the cases whenever install is invoked with URL(s).  Fixes [#7461](https://github.com/datalad/datalad/issues/7461) via [PR #7463](https://github.com/datalad/datalad/pull/7463) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Allow for reckless=ephemeral clone using relative path for the original location.  Fixes [#7469](https://github.com/datalad/datalad/issues/7469) via [PR #7472](https://github.com/datalad/datalad/pull/7472) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Fix a property name and default costs described in "getting subdatasets" section of `get` documentation.
+  Fixes [#7458](https://github.com/datalad/datalad/issues/7458) via
+  [PR #7460](https://github.com/datalad/datalad/pull/7460)
+  (by [@mslw](https://github.com/mslw))
+
+## 🏠 Internal
+
+- Copy an adjusted environment only if requested to do so.
+  [PR #7399](https://github.com/datalad/datalad/pull/7399)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Eliminate uses of `pkg_resources`.  Fixes [#7435](https://github.com/datalad/datalad/issues/7435) via [PR #7439](https://github.com/datalad/datalad/pull/7439) (by [@jwodder](https://github.com/jwodder))
+
+## 🧪 Tests
+
+- Disable some S3 tests of their VCR taping where they fail for known issues.  [PR #7467](https://github.com/datalad/datalad/pull/7467) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.19.2'></a>
+# 0.19.2 (2023-07-03)
+
+## 🐛 Bug Fixes
+
+- Remove surrounding quotes in output filenames even for newer version of annex.  Fixes [#7440](https://github.com/datalad/datalad/issues/7440) via [PR #7443](https://github.com/datalad/datalad/pull/7443) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- DOC: clarify description of the "install" interface to reflect its convoluted behavior.  [PR #7445](https://github.com/datalad/datalad/pull/7445) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.19.1'></a>
+# 0.19.1 (2023-06-26)
+
+## 🏠 Internal
+
+- Make compatible with upcoming release of git-annex (next after 10.20230407) and pass explicit core.quotepath=false to all git calls. Also added `tools/find-hanged-tests` helper.
+  [PR #7372](https://github.com/datalad/datalad/pull/7372)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Adjust tests for upcoming release of git-annex (next after 10.20230407) and ignore DeprecationWarning for pkg_resources for now.
+  [PR #7372](https://github.com/datalad/datalad/pull/7372)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.19.0'></a>
+# 0.19.0 (2023-06-14)
+
+## 🚀 Enhancements and New Features
+
+- Address gitlab API special character restrictions.  [PR #7407](https://github.com/datalad/datalad/pull/7407) (by [@jsheunis](https://github.com/jsheunis))
+
+- BF: The default layout of create-sibling-gitlab is now ``collection``. The previous default, ``hierarchy`` has been removed as it failed in --recursive mode in different edgecases. For single-level datasets, the outcome of ``collection`` and ``hierarchy`` is identical.  [PR #7410](https://github.com/datalad/datalad/pull/7410) (by [@jsheunis](https://github.com/jsheunis)  and [@adswa](https://github.com/adswa))
+
+## 🐛 Bug Fixes
+
+- WTF - bring back and extend information on metadata extractors etc, and allow for sections to have subsections and be selected at both levels  [PR #7309](https://github.com/datalad/datalad/pull/7309) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Run an actual git invocation with interactive commit config.  [PR #7398](https://github.com/datalad/datalad/pull/7398) (by [@adswa](https://github.com/adswa))
+
+## 🔩 Dependencies
+
+- Raise minimal version of tqdm (progress bars) to v.4.32.0
+  [PR #7330](https://github.com/datalad/datalad/pull/7330)
+  (by [@mslw](https://github.com/mslw))
+
+## 📝 Documentation
+
+- DOC: Add a "User messaging" design doc.  [PR #7310](https://github.com/datalad/datalad/pull/7310) (by [@jsheunis](https://github.com/jsheunis))
+
+## 🧪 Tests
+
+- Remove nose-based testing utils and possibility to test extensions using nose.  [PR #7261](https://github.com/datalad/datalad/pull/7261) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.18.5'></a>
+# 0.18.5 (2023-06-13)
+
+## 🐛 Bug Fixes
+
+- More correct summary reporting for relaxed (no size) --annex.  [PR #7050](https://github.com/datalad/datalad/pull/7050) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- ENH: minor tune up of addurls to be more tolerant and "informative".  [PR #7388](https://github.com/datalad/datalad/pull/7388) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Ensure that data generated by timeout handlers in the asynchronous
+  runner are accessible via the result generator, even if no other
+  other events occur.
+  [PR #7390](https://github.com/datalad/datalad/pull/7390)
+  (by [@christian-monch](https://github.com/christian-monch))
+
+- Do not map (leave as is) trailing / or \ in github URLs.  [PR #7418](https://github.com/datalad/datalad/pull/7418) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Use `sphinx_autodoc_typehints`.  Fixes [#7404](https://github.com/datalad/datalad/issues/7404) via [PR #7412](https://github.com/datalad/datalad/pull/7412) (by [@jwodder](https://github.com/jwodder))
+
+## 🏠 Internal
+
+- Discontinue ConfigManager abuse for Git identity warning.  [PR #7378](https://github.com/datalad/datalad/pull/7378) (by [@mih](https://github.com/mih)) and [PR #7392](https://github.com/datalad/datalad/pull/7392) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Boost python to 3.8 during extensions testing.  [PR #7413](https://github.com/datalad/datalad/pull/7413) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Skip test_system_ssh_version if no ssh found + split parsing into separate test.  [PR #7422](https://github.com/datalad/datalad/pull/7422) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.18.4'></a>
+# 0.18.4 (2023-05-16)
+
+## 🐛 Bug Fixes
+
+- Provider config files were ignored, when CWD changed between different datasets during runtime.
+  Fixes [#7347](https://github.com/datalad/datalad/issues/7347) via
+  [PR #7357](https://github.com/datalad/datalad/pull/7357)
+  (by [@bpoldrack](https://github.com/bpoldrack))
+
+## 📝 Documentation
+
+- Added a workaround for an issue with documentation theme (search
+  function not working on Read the Docs).
+  Fixes [#7374](https://github.com/datalad/datalad/issues/7374) via
+  [PR #7385](https://github.com/datalad/datalad/pull/7385)
+  (by [@mslw](https://github.com/mslw))
+
+## 🏠 Internal
+
+- Type-annotate `datalad/support/gitrepo.py`.  [PR #7341](https://github.com/datalad/datalad/pull/7341) (by [@jwodder](https://github.com/jwodder))
+
+## 🧪 Tests
+
+- Fix failing testing on CI
+  [PR #7379](https://github.com/datalad/datalad/pull/7379) (by [@yarikoptic](https://github.com/yarikoptic))
+  - use sample S3 url DANDI archive,
+  - use our copy of old .deb from datasets.datalad.org instead of snapshots.d.o
+  - use specific miniconda installer for py 3.7.
+
 <a id='changelog-0.18.3'></a>
 # 0.18.3 (2023-03-25)
 

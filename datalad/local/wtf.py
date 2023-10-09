@@ -15,9 +15,12 @@ import os
 import os.path as op
 import sys
 import tempfile
+import textwrap
+
+from collections import defaultdict
 from functools import partial
 
-
+from datalad.dochelpers import get_docstring_split
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -217,7 +220,6 @@ def _describe_extensions():
         infos[ename] = info
         try:
             ext = eload()
-            info['load_error'] = None
             info['description'] = ext[0]
             info['module'] = emod
             mod = import_module(emod, package='datalad')
@@ -236,7 +238,6 @@ def _describe_extensions():
             entry_points['{}.{}'.format(*ep[:2])] = ep_info
             try:
                 import_module(ep[0], package='datalad')
-                ep_info['load_error'] = None
             except Exception as e:
                 ce = CapturedException(e)
                 ep_info['load_error'] = ce.format_short()
@@ -267,8 +268,23 @@ def _describe_metadata_elements(group):
             if version:
                 # no not clutter the report with no version
                 info['version'] = version
-            eload()
-            info['load_error'] = None
+            elem = eload()
+
+            doc, *_ = get_docstring_split(elem)
+            if doc:
+                info['doc'] = textwrap.fill(doc, 1000).strip()  # fill into a long line
+
+            generation = getattr(elem, '__generation__', None)
+            if generation:
+                info['generation'] = generation
+
+            try:
+                info['version'] = elem.get_version(elem)
+            except (AttributeError, NotImplementedError):
+                pass
+
+            # TODO?: levels - file, dataset.
+            # Too specific to each generation and might not be deducable
         except Exception as e:
             ce = CapturedException(e)
             info['load_error'] = ce.format_short()
@@ -346,10 +362,25 @@ SECTION_CALLABLES = {
     'configuration': None,
     'location': None,
     'extensions': _describe_extensions,
+    'metadata.extractors': lambda: _describe_metadata_elements('datalad.metadata.extractors'),
+    'metadata.indexers': lambda: _describe_metadata_elements('datalad.metadata.indexers'),
+    'metadata.filters': lambda: _describe_metadata_elements('datalad.metadata.filters'),
     'dependencies': _describe_dependencies,
     'dataset': None,
     'credentials': _describe_credentials,
 }
+
+# look for top level sections and replace with all SECTION_CALLABLES_GROUPPED
+# Helper to look up SECTION_CALLABLES_GROUPPED when needed
+SECTION_CALLABLES_GROUPPED = defaultdict(list)
+for s in SECTION_CALLABLES:
+    section = s.split('.', 1)[0]
+    SECTION_CALLABLES_GROUPPED[section].append(s)
+    if section != s:
+        # add also subsection by itself
+        SECTION_CALLABLES_GROUPPED[s].append(s)
+# un-defaultdict it so we gain KeyError
+SECTION_CALLABLES_GROUPPED = dict(SECTION_CALLABLES_GROUPPED.items())
 
 
 @build_doc
@@ -387,9 +418,11 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES) + ['*']),
+            constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES_GROUPPED) + ['*']),
             doc="""section to include.  If not set - depends on flavor.
-            '*' could be used to force all sections.
+            '*' could be used to force all sections. If there are subsections 
+            like section.subsection available, then specifying just 'section'
+            would select all subsections for that section.
             [CMD: This option can be given multiple times. CMD]"""),
         flavor=Parameter(
             args=("--flavor",),
@@ -482,19 +515,22 @@ class WTF(Interface):
             else:
                 raise ValueError(flavor)
 
-        for s in sections:
+        # flatten and handle (skip with a record non-matching ones) section groups
+        for sg in sections:
             try:
-                infos[s] = section_callables[s]()
-            except KeyError:
+                for s in SECTION_CALLABLES_GROUPPED[sg]:
+                    infos[s] = section_callables[s]()
+            except KeyError as exc:
                 yield get_status_dict(
                     action='wtf',
                     path=Path.cwd(),
                     status='impossible',
                     message=(
                       'Requested section <%s> was not found among the '
-                      'available infos. Skipping report.', s),
+                      'available infos. Skipping report.', exc.args[0]),
                     logger=lgr
-                    )
+                )
+
         if clipboard:
             external_versions.check(
                 'pyperclip', msg="It is needed to be able to use clipboard")

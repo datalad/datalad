@@ -67,15 +67,21 @@ def setup_package():
                 }
             )
         )
-        m.enter_context(
-            patch.dict(
-                os.environ,
-                {
-                    'PYTHON_KEYRING_BACKEND':
-                        'keyrings.alt.file.PlaintextKeyring'
-                }
+        cred_cfg = cfg.obtain('datalad.tests.credentials')
+        if cred_cfg == 'plaintext':
+            m.enter_context(
+                patch.dict(
+                    os.environ,
+                    {
+                        'PYTHON_KEYRING_BACKEND':
+                            'keyrings.alt.file.PlaintextKeyring'
+                    }
+                )
             )
-        )
+        elif cred_cfg == 'system':
+            pass
+        else:
+            raise ValueError(cred_cfg)
 
         def prep_tmphome():
             # re core.askPass:

@@ -48,6 +48,17 @@ from datalad.utils import (
     split_cmdline,
 )
 
+if sys.version_info < (3, 9):
+    from importlib_resources import (
+        as_file,
+        files,
+    )
+else:
+    from importlib.resources import (
+        as_file,
+        files,
+    )
+
 lgr = logging.getLogger('datalad.local.run_procedures')
 
 
@@ -148,23 +159,17 @@ def _get_procedure_implementation(name='*', ds=None):
 
     # 3. check extensions for procedure
     from datalad.support.entrypoints import iter_entrypoints
-    # delay heavy import until here
-    from pkg_resources import (
-        resource_filename,
-        resource_isdir,
-    )
+
     for epname, epmodule, _ in iter_entrypoints('datalad.extensions'):
-        # use of '/' here is OK wrt to platform compatibility
-        if resource_isdir(epmodule, 'resources/procedures'):
-            for m, n in _get_file_match(
-                    resource_filename(epmodule, 'resources/procedures'),
-                    name):
-                yield (m, n,) + _get_proc_config(n)
+        res = files(epmodule) / "resources" / "procedures"
+        if res.is_dir():
+            with as_file(res) as p:
+                for m, n in _get_file_match(p, name):
+                    yield (m, n,) + _get_proc_config(n)
     # 4. at last check datalad itself for procedure
-    for m, n in _get_file_match(
-            resource_filename('datalad', 'resources/procedures'),
-            name):
-        yield (m, n,) + _get_proc_config(n)
+    with as_file(files("datalad") / "resources" / "procedures") as p:
+        for m, n in _get_file_match(p, name):
+            yield (m, n,) + _get_proc_config(n)
 
 
 def _guess_exec(script_file):

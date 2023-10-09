@@ -581,6 +581,8 @@ Refer datalad/config.py for information on how to add these environment variable
   decorator may be removed/reconsidered).
 - *DATALAD_TESTS_GITCONFIG*:
   Additional content to add to `~/.gitconfig` in the tests `HOME` environment. `\n` is replaced with `os.linesep`.
+- *DATALAD_TESTS_CREDENTIALS*:
+  Set to `system` to allow for credentials possibly present in the user/system wide environment to be used.
 - *DATALAD_CMD_PROTOCOL*:
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.

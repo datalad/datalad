@@ -96,7 +96,7 @@ def test_get_versioned_url():
 def test_get_versioned_url_anon():
     # The one without any authenticator, was crashing.
     # Also it triggered another bug about having . in the bucket name
-    url_on = "http://openneuro.org.s3.amazonaws.com/ds000001/dataset_description.json"
+    url_on = "http://dandiarchive.s3.amazonaws.com/ros3test.nwb"
     url_on_versioned = get_versioned_url(url_on)
     ok_startswith(url_on_versioned, url_on + "?versionId=")
 

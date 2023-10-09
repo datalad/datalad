@@ -60,6 +60,7 @@ be downloaded), to ``path`` value should be determined with respect to the
 potential impact of the result on any local entity (e.g., a URL downloaded
 to a local file path, a local dataset modified based on remote information).
 
+.. _target-result-status:
 
 ``status``
 ----------
@@ -176,8 +177,10 @@ A string label categorizing the state of an entity. Common values are:
 ``error_message``
 -----------------
 
-List of any error messages that were captured or produced while achieving a
-result.
+An error message that was captured or produced while achieving a result.
+
+An error message can be a string or a tuple.  In the case of a tuple, the
+second item can contain values for ``%``-expansion of the message string.
 
 
 ``exception``

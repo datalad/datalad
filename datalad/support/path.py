@@ -17,7 +17,10 @@ import os
 import os.path as op
 # to not pollute API importing as _
 from collections import defaultdict as _defaultdict
-from collections.abc import Iterator
+from collections.abc import (
+    Iterable,
+    Iterator,
+)
 from functools import wraps
 from itertools import dropwhile
 from pathlib import (
@@ -210,7 +213,7 @@ def get_parent_paths(paths: list[str], parents: list[str], only_with_parents: bo
     return res
 
 
-def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
+def get_filtered_paths_(paths: Iterable[str|Path], filter_paths: Iterable[str | Path],
                         *, include_within_path: bool = False) \
         -> Iterator[str]:
     """Among paths (or Path objects) select the ones within filter_paths.
@@ -230,7 +233,7 @@ def get_filtered_paths_(paths: list[str|Path], filter_paths: list[str | Path],
     path within 'filter_paths' is under that path.
     """
     # do conversion and sanity checks, O(N)
-    def _harmonize_paths(l: list[str | Path]) -> list[tuple[str, ...]]:
+    def _harmonize_paths(l: Iterable[str | Path]) -> list[tuple[str, ...]]:
         ps = []
         for p in l:
             pp = PurePosixPath(p)

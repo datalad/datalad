@@ -621,7 +621,7 @@ def _create_sibling_ria(
                 options=special_remote_options)
         except CommandError as e:
             if existing == 'reconfigure' \
-                    and 'git-annex: There is already a special remote' \
+                    and 'There is already a special remote' \
                     in e.stderr:
                 # run enableremote instead
                 lgr.debug(

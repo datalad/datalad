@@ -105,9 +105,12 @@ except ImportError as e:
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
 
-from .config import ConfigManager
-
+from .config import (
+    ConfigManager,
+    warn_on_undefined_git_identity,
+)
 cfg = ConfigManager()
+warn_on_undefined_git_identity(cfg)
 
 
 # must come after config manager

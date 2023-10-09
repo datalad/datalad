@@ -32,7 +32,10 @@ from datalad.runner import (
     KillOutput,
     StdOutErrCapture,
 )
-from datalad.utils import on_windows
+from datalad.utils import (
+    getpwd,
+    on_windows,
+)
 
 lgr = logging.getLogger('datalad.config')
 
@@ -144,6 +147,7 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
       For actual files a Path object is included in the set, for a git-blob
       a Git blob ID prefixed with 'blob:' is reported.
     """
+    cwd = Path(getpwd() if cwd is None else cwd)
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
@@ -152,19 +156,11 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
         # in anticipation of output contamination, process within a loop
         # where we can reject non syntax compliant pieces
         while line:
-            if line.startswith('file:'):
-                # origin line
-                fname = Path(line[5:])
-                if not fname.is_absolute():
-                    fname = Path(cwd) / fname if cwd else Path.cwd() / fname
-                fileset.add(fname)
+            if line.startswith('file:') or line.startswith('blob:'):
+                fileset.add(line)
                 break
             if line.startswith('command line:'):
                 # no origin that we could as a pathobj
-                break
-            if line.startswith('blob:'):
-                # take verbatim to allow distinguishing files from blobs
-                fileset.add(line)
                 break
             # try getting key/value pair from the present chunk
             k, v = _gitcfg_rec_to_keyvalue(line)
@@ -186,7 +182,12 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
                 dct[k] = present_v + (v,)
             else:
                 dct[k] = (present_v, v)
-    return dct, fileset
+    # take blobs with verbatim markup
+    origin_blobs = set(f for f in fileset if f.startswith('blob:'))
+    # convert file specifications to Path objects with absolute paths
+    origin_paths = set(Path(f[5:]) for f in fileset if f.startswith('file:'))
+    origin_paths = set(f if f.is_absolute() else cwd / f for f in origin_paths)
+    return dct, origin_paths.union(origin_blobs)
 
 
 # keep alias with previous name for now
@@ -205,7 +206,7 @@ def _gitcfg_rec_to_keyvalue(rec):
     -------
     str, str
       Parsed key and value. Key and/or value could be None
-      if not snytax-compliant (former) or absent (latter).
+      if not syntax-compliant (former) or absent (latter).
     """
     kv_match = cfg_kv_regex.match(rec)
     if kv_match:
@@ -304,9 +305,6 @@ class ConfigManager(object):
       Note: 'dataset' and 'dataset-local' are deprecated in favor of 'branch'
       and 'branch-local'.
     """
-
-    _checked_git_identity = False
-
     # Lock for running changing operation across multiple threads.
     # Since config itself to the same path could
     # potentially be created independently in multiple threads, and we might be
@@ -399,20 +397,6 @@ class ConfigManager(object):
             self._runner = GitRunner(**run_kwargs)
 
         self.reload(force=True)
-
-        if not ConfigManager._checked_git_identity:
-            for cfg, envs in (
-                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
-                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
-                if cfg not in self \
-                        and not any(e in os.environ for e in envs):
-                    lgr.warning(
-                        "It is highly recommended to configure Git before using "
-                        "DataLad. Set both 'user.name' and 'user.email' "
-                        "configuration variables."
-                    )
-                    break  # one warning enough
-            ConfigManager._checked_git_identity = True
 
     def reload(self, force=False):
         """Reload all configuration items from the configured sources
@@ -1166,3 +1150,18 @@ def write_config_section(fobj, suite, name, props):
             _q_='' if quoted_name.startswith('"') else '"',
             _name_=quoted_name,
             **{k: quote_config(v) for k, v in props.items()}))
+
+
+def warn_on_undefined_git_identity(cfg: ConfigManager):
+    """Check whether a Git identity is defined, and warn if not"""
+    for cfgkey, envs in (
+            ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
+            ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
+        if cfgkey not in cfg \
+                and not any(e in os.environ for e in envs):
+            lgr.warning(
+                "It is highly recommended to configure Git before using "
+                "DataLad. Set both 'user.name' and 'user.email' "
+                "configuration variables."
+            )
+            break  # one warning enough

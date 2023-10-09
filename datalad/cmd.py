@@ -496,7 +496,10 @@ class BatchedCommand(SafeDelCloseMixin):
                 #  when handling multiple instructions at once. Until this is
                 #  done properly, communication timeouts are ignored in order
                 #  to avoid errors.
-                pass
+                if data is None:
+                    lgr.debug('BatchedCommand: timeout on process')
+                else:
+                    lgr.debug('BatchedCommand: timeout on file descriptor %d', data)
             else:
                 raise ValueError(f"{self}: unknown source: {source}")
 

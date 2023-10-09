@@ -49,7 +49,8 @@ url_1version_bucketwithdot = 's3://datalad.test1/version1.txt'
 url_dandi1 = 's3://dandiarchive/dandiarchive/dandiarchive/data/d8dd3e2b-8f74-494b-9370-9e3a6c69e2b0.csv.gz?versionId=9P7aMTvTT5wynPBOtiQqkV.wvV8zcpLf'
 
 
-@use_cassette('test_s3_download_basic')
+# disabled due to https://github.com/datalad/datalad/issues/7465
+# @use_cassette('test_s3_download_basic')
 @pytest.mark.parametrize("url,success_str,failed_str", [
     (url_2versions_nonversioned1, 'version2', 'version1'),
     (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
@@ -156,7 +157,8 @@ def test_boto_host_specification(tempfile=None):
     assert_equal(md5sum(tempfile), '97f4290b2d369816c052607923e372d4')
 
 
-def test_restricted_bucket_on_NDA():
+# disabled due to https://github.com/datalad/datalad/issues/7464
+def disabled_test_restricted_bucket_on_NDA():
     get_test_providers('s3://NDAR_Central_4/', reload=True)  # to verify having credentials to access
     for url, success_str, failed_str in [
         ("s3://NDAR_Central_4/submission_23075/README", 'BIDS', 'error'),
@@ -165,9 +167,10 @@ def test_restricted_bucket_on_NDA():
         check_download_external_url(url, failed_str, success_str)
 
 
+# disabled due to https://github.com/datalad/datalad/issues/7464
 @use_cassette('test_download_multiple_NDA')
 @with_tempfile(mkdir=True)
-def test_download_multiple_NDA(outdir=None):
+def disabled_test_download_multiple_NDA(outdir=None):
     # This would smoke/integration test logic for composite credential testing expiration
     # of the token while reusing session from first url on the 2nd one
     urls = [
@@ -180,9 +183,11 @@ def test_download_multiple_NDA(outdir=None):
         ret = providers.download(url, outdir)
 
 
-@use_cassette('test_get_key')
+# disabled due to https://github.com/datalad/datalad/issues/7465
+# @use_cassette('test_get_key')
 @pytest.mark.parametrize("b,key,version_id", [
-    ('NDAR_Central_4', 'submission_23075/README', None),
+    # disabled due to https://github.com/datalad/datalad/issues/7464
+    # ('NDAR_Central_4', 'submission_23075/README', None),
     ('datalad-test0-versioned', '1version-nonversioned1.txt', None),
     ('datalad-test0-versioned', '3versions-allversioned.txt', None),
     ('datalad-test0-versioned', '3versions-allversioned.txt', 'pNsV5jJrnGATkmNrP8.i_xNH6CY4Mo5s'),

@@ -271,6 +271,10 @@ class Push(Interface):
                     p for p in ensure_list(path) if p in sr
                 ]
             if potential_remote:
+                if len(potential_remote) == 1:
+                    # present as a single value to make hint even more human
+                    # friendly
+                    potential_remote = potential_remote[0]
                 hint = "{} matches a sibling name and not a path. " \
                       "Forgot --to?".format(potential_remote)
                 yield dict(

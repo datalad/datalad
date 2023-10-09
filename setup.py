@@ -29,13 +29,14 @@ requires = {
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
+        'importlib-resources >= 3.0; python_version < "3.9"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
         'packaging',
         'patool>=1.7',
         'tqdm>=4.32.0',
-        'typing_extensions>=3.10.0.0; python_version < "3.10"',
+        'typing_extensions>=4.0.0; python_version < "3.11"',
         'annexremote',
         'looseversion',
     ],
@@ -82,6 +83,7 @@ requires.update({
         'pypandoc',
         # Documentation
         'sphinx>=4.3.0',
+        'sphinx-autodoc-typehints',
         'sphinx-rtd-theme>=0.5.1',
     ],
     'devel-utils': [

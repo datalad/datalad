@@ -180,7 +180,7 @@ _definitions = {
             # take any github project URL apart into <org>###<identifier>
             r',https?://github.com/([^/]+)/(.*)$,\1###\2',
             # replace any (back)slashes with a single dash
-            r',[/\\]+,-',
+            r',[/\\]+(?!$),-',
             # replace any whitespace (include urlquoted variant)
             # with a single underscore
             r',\s+|(%2520)+|(%20)+,_',
@@ -416,6 +416,18 @@ _definitions = {
             'text': 'Where should datalad cache test files?'}),
         'destination': 'global',
         'default_fn': lambda: opj(dirs.user_cache_dir, 'tests')
+    },
+    'datalad.tests.credentials': {
+        'ui': ('question', {
+            'title': 'Credentials to use during tests',
+            'text': 'Which credentials should be available while running tests? If "plaintext" (default), '
+                    'a new plaintext keyring would be created in tests temporary HOME. If "system", '
+                    'no custom configuration would be passed to keyring and known to system credentials '
+                    'could be used.'
+                    }),
+        'destination': 'global',
+        'type': EnsureChoice('plaintext', 'system'),
+        'default': "plaintext"
     },
     'datalad.log.level': {
         'ui': ('question', {
