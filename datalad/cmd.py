@@ -146,7 +146,7 @@ def _readline_rstripped(stdout):
     return stdout.readline().rstrip()
 
 
-class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
+class BatchedCommandProtocol(StdOutErrCapture, GeneratorMixIn):
     def __init__(self,
                  batched_command: "BatchedCommand",
                  done_future: Any = None,

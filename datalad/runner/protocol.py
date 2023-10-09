@@ -31,7 +31,7 @@ lgr = logging.getLogger('datalad.runner.protocol')
 class GeneratorMixIn:
     """ Protocol mix in that will instruct runner.run to return a generator
 
-    When this class is in the parent of a protocol given to runner.run (and
+    When this class is a parent of a protocol given to runner.run (and
     some other functions/methods) the run-method will return a `Generator`,
     which yields whatever the protocol callbacks send to the `Generator`,
     via the `send_result`-method of this class.
@@ -40,6 +40,14 @@ class GeneratorMixIn:
 
         for result in runner.run(...):
             # do something, for example write to stdin of the subprocess
+
+
+    Example for creating a generator-version of the StdOutCapture protocol, that
+    will yield tuples of (fd, data):
+
+        class GeneratorStdOutCapture(StdOutCapture, GeneratorMixIn):
+            def pipe_data_received(self, fd, data):
+                self.send_result((fd, data))
 
     """
     def send_result(self, result):

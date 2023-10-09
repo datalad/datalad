@@ -313,9 +313,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         CommandError if the call exits with a non-zero status.
         """
 
-        class GeneratorStdOutErrCapture(GeneratorMixIn,
-                                        AssemblingDecoderMixIn,
-                                        StdOutErrCapture):
+        class GeneratorStdOutErrCapture(StdOutErrCapture,
+                                        GeneratorMixIn,
+                                        AssemblingDecoderMixIn):
             """
             Generator-runner protocol that captures and yields stdout and stderr.
             """

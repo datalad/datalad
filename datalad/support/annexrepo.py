@@ -3950,6 +3950,9 @@ class AnnexInitOutput(WitlessProtocol, AssemblingDecoderMixIn):
     proc_out = True
     proc_err = True
 
+    def __init__(self, done_future=None, encoding=None):
+        WitlessProtocol.__init__(self, done_future, encoding)
+
     def pipe_data_received(self, fd, byts):
         line = self.decode(fd, byts, self.encoding)
         if fd == 1:

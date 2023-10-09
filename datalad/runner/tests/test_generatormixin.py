@@ -27,7 +27,7 @@ from ..runner import WitlessRunner
 from .utils import py2cmd
 
 
-class TestProtocol(GeneratorMixIn, StdOutErrCapture):
+class TestProtocol(StdOutErrCapture, GeneratorMixIn):
 
     __test__ = False  # class is not a class of tests
 
