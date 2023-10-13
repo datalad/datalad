@@ -38,6 +38,7 @@ from datalad.interface.base import (
     build_doc,
     eval_results,
 )
+from datalad.interface.common_cfg import definitions as cfg_defs
 from datalad.interface.common_opts import (
     jobs_opt,
     save_message_opt,
@@ -623,7 +624,12 @@ def format_command(dset, command, **kwds):
     command = normalize_command(command)
     sfmt = SequenceFormatter()
 
-    for k, v in dset.config.items("datalad.run.substitutions"):
+    for k in set(cfg_defs.keys()).union(dset.config.keys()):
+        v = dset.config.get(
+            k,
+            # pull a default from the config definitions
+            # if we have no value, but a key
+            cfg_defs.get(k, {}).get('default', None))
         sub_key = k.replace("datalad.run.substitutions.", "")
         if sub_key not in kwds:
             kwds[sub_key] = v
