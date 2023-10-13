@@ -70,7 +70,7 @@ def link_file_load(src, dst, dry_run=False):
         # (e.g. Windows) will not cover scenarios where a particular
         # filesystem simply does not implement it on an otherwise
         # sane platform (e.g. exfat on Linux)
-        lgr.warning("Linking of %s failed (%s), copying file" % (src, e))
+        lgr.warning("Linking of %s failed (%s), copying file", src, e)
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
     else:
