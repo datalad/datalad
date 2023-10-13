@@ -548,6 +548,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/9308656?v=4"
             ]
+        },
+        {
+            "login": "Aksoo",
+            "name": "Aksoo",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/Aksoo",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/141905668?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
