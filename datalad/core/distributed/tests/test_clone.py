@@ -1442,7 +1442,6 @@ def test_ephemeral(origin_path=None, bare_path=None,
     runner.run(['git', 'annex', 'init'], cwd=bare_path)
 
     eph_from_bare = clone(bare_path, clone3_path, reckless='ephemeral')
-    can_symlink = has_symlink_capability()
 
     if can_symlink:
         # Bare repo uses dirhashlower by default, while a standard repo uses
