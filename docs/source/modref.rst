@@ -110,6 +110,8 @@ Support functionality
    support.extensions
    customremotes.base
    customremotes.archives
+   runner.nonasyncrunner
+   runner.protocol
 
 Configuration management
 ========================
