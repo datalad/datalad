@@ -63,14 +63,33 @@ class WitlessRunner(object):
     def _get_adjusted_env(self,
                           env: dict | None = None,
                           cwd: str | PathLike | None = None,
-                          copy: bool = True):
-        """Return an adjusted copy of an execution environment
+                          copy: bool = True
+                          ) -> dict | None:
+        """Return an adjusted execution environment
 
-        Or return an unaltered copy of the environment, if no adjustments
-        need to be made.
+        This method adjusts the environment provided in `env` to
+        reflect the configuration of the runner. It returns
+        an altered copy or an altered original, if `copy` is
+        `False`.
+
+        Parameters
+        ----------
+        env
+          The environment that should be adjusted
+
+        cwd: str | PathLike | None (default: None)
+          If not None, the content of this variable will be
+          put into the environment variable 'PWD'.
+
+        copy: bool (default: True)
+          if True, the returned environment will be a
+          copy of `env`. Else the passed in environment
+          is modified. Note: if `env` is not `None` and
+          `cwd` is `None` and `copy` is `True`, the
+          returned dictionary is still a copy
         """
-        env = env.copy() if env else None
-        if cwd and env is not None:
+        env = env.copy() if env is not None and copy is True else env
+        if cwd is not None and env is not None:
             # If an environment and 'cwd' is provided, ensure the 'PWD' in the
             # environment is set to the value of 'cwd'.
             env['PWD'] = str(cwd)
@@ -125,13 +144,14 @@ class WitlessRunner(object):
           `ThreadedRunner` descriptions for a more detailed discussion
           on timeouts.
         exception_on_error : bool, optional
-          This argument is only interpreted if the protocol is a subclass
+          This argument is first interpreted if the protocol is a subclass
           of `GeneratorMixIn`. If it is `True` (default), a
           `CommandErrorException` is raised by the generator if the
           sub process exited with a return code not equal to zero. If the
           parameter is `False`, no exception is raised. In both cases the
           return code can be read from the attribute `return_code` of
-          the generator.
+          the generator. Then this argument interpreted within this function
+          to not raise `CommandError` if value is False in case of non-0 exit.
         kwargs :
           Passed to the Protocol class constructor.
 
@@ -211,8 +231,10 @@ class WitlessRunner(object):
         lgr.debug("Finished %r with status %s", cmd, results['code'])
 
         # make it such that we always blow if a protocol did not report
-        # a return code at all
-        if results.get('code', True) not in [0, None]:
+        # a return code at all or it was non-0 and we were not asked ignore
+        # errors
+        return_code = results.get('code', None)
+        if return_code is None or (return_code and exception_on_error):
             # the runner has a better idea, doc string warns Protocol
             # implementations not to return these
             results.pop('cmd', None)

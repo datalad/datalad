@@ -400,7 +400,7 @@ commits and then provide stats:
 - `asv continuous maint master` - would run and compare `maint` and `master` branches
 - `asv continuous HEAD` - would compare `HEAD` against `HEAD^`
 - `asv continuous master HEAD` - would compare `HEAD` against state of master
-- [TODO: contineous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
+- [TODO: continuous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
 
 Notes:
 - only significant changes will be reported
@@ -444,7 +444,7 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
-## Maintenace teams coordination
+## Maintenance teams coordination
 
 We distinguish particular aspects of DataLad's functionality, each corresponding
 to parts of the code base in this repository, and loosely maintain teams assigned
@@ -581,6 +581,8 @@ Refer datalad/config.py for information on how to add these environment variable
   decorator may be removed/reconsidered).
 - *DATALAD_TESTS_GITCONFIG*:
   Additional content to add to `~/.gitconfig` in the tests `HOME` environment. `\n` is replaced with `os.linesep`.
+- *DATALAD_TESTS_CREDENTIALS*:
+  Set to `system` to allow for credentials possibly present in the user/system wide environment to be used.
 - *DATALAD_CMD_PROTOCOL*:
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.

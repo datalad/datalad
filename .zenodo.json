@@ -129,7 +129,18 @@
         },
         {
             "affiliation": "Institute of Energy and Climate Research - Stratosphere (IEK-7), Research Centre Jülich, Jülich, Germany",
-            "name": "Riße, Matthias"
+            "name": "Riße, Matthias",
+            "orcid": "0009-0006-6081-9327"
+        },
+        {
+            "affiliation": "Eberhard Karls Universität Tübingen",
+            "name": "Büchau, Yann Georg",
+            "orcid": "0000-0003-2472-2051"
+        },
+        {
+            "affiliation": "Institute of Neuroscience and Medicine, Brain & Behavior (INM-7), Research Center Juelich, Germany",
+            "name": "Stephan Heunis",
+            "orcid": "0000-0003-3503-9872"
         }
     ],
     "grants": [

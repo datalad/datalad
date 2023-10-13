@@ -13,8 +13,8 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from distutils.version import LooseVersion
 from os.path import curdir
+import shlex
 from os.path import join as opj
 from os.path import (
     normpath,
@@ -392,7 +392,16 @@ def _create_dataset_sibling(
 def _ls_remote_path(ssh, path):
     try:
         # yoh tried ls on mac
-        out, err = ssh("ls -A1 {}".format(sh_quote(path)))
+        # escape path explicitly with shlex.quote as 'sh' is a POSIX shell and
+        # sh_quote could decide to quote Windows-style
+        # C.UTF-8 locale as opposed to C locale handles special characters (umlauts etc.)
+        # ls falls back to C locale if LC_ALL is set to unknown locale, so this should be safe.
+        ls_cmd = "LC_ALL=C.UTF-8; export LC_ALL; /bin/ls -A1 {}".format(shlex.quote(path))
+        # TODO: Using sh_quote here is also flawed as it checks whether the
+        # *local* machine is Windows. Doesn't help if the remote we're ssh'ing in is Windows.
+        ssh_cmd = "sh -c {}".format(sh_quote(ls_cmd))
+        out, err = ssh(ssh_cmd)
+
         if err:
             # we might even want to raise an exception, but since it was
             # not raised, let's just log a warning

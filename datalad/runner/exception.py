@@ -11,7 +11,12 @@
 from __future__ import annotations
 
 import logging
-
+import os
+from collections import Counter
+from typing import (
+    Any,
+    Optional,
+)
 
 lgr = logging.getLogger('datalad.runner.exception')
 
@@ -23,8 +28,16 @@ class CommandError(RuntimeError):
     `to_str` is called directly in datalad.cli.main.
     """
 
-    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
-                 **kwargs):
+    def __init__(
+        self,
+        cmd: str | list[str] = "",
+        msg: str = "",
+        code: Optional[int] = None,
+        stdout: str | bytes = "",
+        stderr: str | bytes = "",
+        cwd: str | os.PathLike | None = None,
+        **kwargs: Any,
+    ) -> None:
         RuntimeError.__init__(self, msg)
         self.cmd = cmd
         self.msg = msg
@@ -34,7 +47,7 @@ class CommandError(RuntimeError):
         self.cwd = cwd
         self.kwargs = kwargs
 
-    def to_str(self, include_output=True):
+    def to_str(self, include_output: bool = True) -> str:
         from datalad.utils import (
             ensure_unicode,
             join_cmdline,
@@ -74,13 +87,13 @@ class CommandError(RuntimeError):
 
         return to_str
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_str()
 
 
 def _format_json_error_messages(recs: list[dict]) -> str:
     # there could be many, condense
-    msgs: dict[str, str | int] = {}
+    msgs: Counter[str] = Counter()
     for r in recs:
         if r.get('success'):
             continue
@@ -89,10 +102,7 @@ def _format_json_error_messages(recs: list[dict]) -> str:
             '\n'.join(r.get('error-messages', [])),
         )
         if 'file' in r or 'key' in r:
-            occur = msgs.get(msg, 0)
-            assert isinstance(occur, int)
-            occur += 1
-            msgs[msg] = occur
+            msgs[msg] += 1
 
     if not msgs:
         return ''
@@ -102,8 +112,7 @@ def _format_json_error_messages(recs: list[dict]) -> str:
             '{}{}'.format(
                 m,
                 ' [{} times]'.format(n) if n > 1 else '',
-            ) if isinstance(n, int) else
-            '{}'.format(m)
+            )
             for m, n in msgs.items()
         )
     )

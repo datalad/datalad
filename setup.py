@@ -25,16 +25,18 @@ from _datalad_build_support.setup import (
 requires = {
     'core': [
         'platformdirs',
-        'chardet>=3.0.4, <5.0.0',      # rarely used but small/omnipresent
+        'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
+        'importlib-resources >= 3.0; python_version < "3.9"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
         'packaging',
         'patool>=1.7',
-        'tqdm',
+        'tqdm>=4.32.0',
+        'typing_extensions>=4.0.0; python_version < "3.11"',
         'annexremote',
         'looseversion',
     ],
@@ -59,7 +61,7 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
-        'mypy~=0.900',
+        'mypy',
         'pytest',
         'pytest-cov',
         'pytest-fail-slow~=0.2',
@@ -81,6 +83,7 @@ requires.update({
         'pypandoc',
         # Documentation
         'sphinx>=4.3.0',
+        'sphinx-autodoc-typehints',
         'sphinx-rtd-theme>=0.5.1',
     ],
     'devel-utils': [
@@ -96,6 +99,7 @@ requires.update({
         # to the dbus whenever installed or smth like that, thus disabled here
         # but you might need it
         # 'dbus-python',
+        'scriv',  # changelog
     ],
 })
 requires['devel'] = sum(list(requires.values()), [])

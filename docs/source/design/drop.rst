@@ -32,7 +32,7 @@ preferred content (``--what preferred-content``, `#3122
 §4 :command:`drop` prevents data loss by default (`#4750
 <https://github.com/datalad/datalad/issues/4750>`__). Like :command:`get` it
 features a ``--reckless`` "mode-switch" to disable some or all potentially slow
-safety mechnism, i.e. 'key available in sufficient number of other remotes',
+safety mechanism, i.e. 'key available in sufficient number of other remotes',
 'main or all branches pushed to remote(s)' (`#1142
 <https://github.com/datalad/datalad/issues/1142>`__), 'only check availability
 of keys associated with the worktree, but not other branches'. "Reckless
@@ -43,7 +43,7 @@ operation" can be automatic, when following a reckless :command:`get` (`#4744
 an annex as ``dead`` on removal of a repository (`#3887
 <https://github.com/datalad/datalad/issues/3887>`__).
 
-§6 Like :command:`get`, drop supports parallization `#1953
+§6 Like :command:`get`, drop supports parallelization `#1953
 <https://github.com/datalad/datalad/issues/1953>`__ 
 
 §7 `datalad drop` is not intended to be a comprehensive frontend to `git annex

@@ -190,7 +190,6 @@ progressbars = {
 
 try:
     from tqdm import tqdm
-    from datalad.support.external_versions import external_versions
     from datalad.utils import updated
 
     class tqdmProgressBar(ProgressBarBase):
@@ -202,22 +201,10 @@ try:
             'ipython': None  # to be loaded
         }
 
-        # TQDM behaved a bit suboptimally with older versions -- either was
-        # completely resetting time/size in global pbar, or not updating
-        # "slave" pbars, so we had to
-        # set miniters to 1, and mininterval to 0, so it always updates
-        # amd smoothing to 0 so it produces at least consistent average.
-        # But even then it is somewhat flawed.
-        # Newer versions seems to behave more consistently so do not require
-        # those settings
-        _default_pbar_params = \
-            dict(smoothing=0, miniters=1, mininterval=0.1) \
-            if external_versions['tqdm'] < '4.10.0' \
-            else dict(mininterval=0.1)
-
-        # react to changes in the terminal width
-        if external_versions['tqdm'] >= '2.1':
-            _default_pbar_params['dynamic_ncols'] = True
+        _default_pbar_params = {
+            'mininterval': 0.1,
+            'dynamic_ncols': True,  # react to changes in the terminal width
+        }
 
         def __init__(self, label='', fill_text=None,
                      total=None, unit='B', out=sys.stdout, leave=False,
@@ -273,29 +260,11 @@ try:
             if self._pbar is None:
                 self._pbar = self._tqdm(initial=initial, **self._pbar_params)
 
-        @staticmethod
-        def _reset_kludge(pbar, total=None):
-            # tqdm didn't have reset() until v4.32.0 (c7015f4,
-            # 2019-05-10).  This code below is copied from
-            # tqdm.reset() in v4.46.1, replacing "self" with "pbar".
-            # It hasn't changed since added in c7015f4.
-            #
-            # TODO: Drop this and set a minimum tqdm version once
-            # Debian stable has v4.32.0.
-            pbar.last_print_n = pbar.n = 0
-            pbar.last_print_t = pbar.start_t = pbar._time()
-            if total is not None:
-                pbar.total = total
-            pbar.refresh()
-
         def update(self, size, increment=False, total=None):
             self._create()
             if total is not None:
                 # only a reset can change the total of an existing pbar
-                try:
-                    self._pbar.reset(total)
-                except AttributeError:
-                    self._reset_kludge(self._pbar, total)
+                self._pbar.reset(total)
                 # we need to (re-)advance the pbar back to the old state
                 self._pbar.update(self.current)
                 # an update() does not (reliably) trigger a refresh, hence

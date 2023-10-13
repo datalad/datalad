@@ -45,14 +45,14 @@ def test_save_basics(path=None):
 
 
 def _test_save_all(path, repocls):
-    ds = get_convoluted_situation(path, GitRepo)
+    ds = get_convoluted_situation(path, repocls)
     orig_status = ds.repo.status(untracked='all')
     # TODO test the results when the are crafted
     res = ds.repo.save()
     # make sure we get a 'delete' result for each deleted file
     eq_(
         set(r['path'] for r in res if r['action'] == 'delete'),
-        {k for k, v in orig_status.items()
+        {str(k) for k, v in orig_status.items()
          if k.name in ('file_deleted', 'file_staged_deleted')}
     )
     saved_status = ds.repo.status(untracked='all')
@@ -68,6 +68,20 @@ def _test_save_all(path, repocls):
     for f, p in saved_status.items():
         if p.get('state', None) != 'clean':
             assert f.match('subds_modified'), f
+
+    # Since we already have rich filetree, now save at dataset level
+    # recursively and introspect some known gotchas
+    resr = ds.save(recursive=True)
+
+    # File within subdataset got committed to git-annex, which was not the
+    # case for GitRepo parent https://github.com/datalad/datalad/issues/7351
+    assert_in_results(
+        resr,
+        status='ok',
+        path=str(ds.pathobj / 'subds_modified' / 'someds' / 'dirtyds' / 'file_untracked'),
+        # if key is None -- was committed to git which should have not happened!
+        key="MD5E-s14--2c320e0c56ed653384a926292647f226")
+
     return ds
 
 

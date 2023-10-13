@@ -8,7 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Definitions for ansi colors etc"""
 
+from __future__ import annotations
+
 import os
+from typing import Optional
+
 from .. import cfg
 from ..ui import ui
 
@@ -41,7 +45,7 @@ DATASET = UNDERLINE
 FIELD = BOLD
 
 
-def color_enabled():
+def color_enabled() -> bool:
     """Check for whether color output is enabled
 
     If the configuration value ``datalad.ui.color`` is ``'on'`` or ``'off'``,
@@ -59,7 +63,7 @@ def color_enabled():
             ui_color == 'auto' and os.getenv('NO_COLOR') is None and ui.is_interactive)
 
 
-def format_msg(fmt, use_color=False):
+def format_msg(fmt: str, use_color: bool = False) -> str:
     """Replace $RESET and $BOLD with corresponding ANSI entries"""
     if color_enabled() and use_color:
         return fmt.replace("$RESET", RESET_SEQ).replace("$BOLD", BOLD_SEQ)
@@ -67,7 +71,7 @@ def format_msg(fmt, use_color=False):
         return fmt.replace("$RESET", "").replace("$BOLD", "")
 
 
-def color_word(s, color, force=False):
+def color_word(s: str, color: Optional[int], force: bool = False) -> str:
     """Color `s` with `color`.
 
     Parameters
@@ -88,5 +92,5 @@ def color_word(s, color, force=False):
     return s
 
 
-def color_status(status):
+def color_status(status: str) -> str:
     return color_word(status, RESULT_STATUS_COLORS.get(status))

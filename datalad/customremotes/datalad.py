@@ -52,12 +52,10 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 return
             except Exception as exc:
                 ce = CapturedException(exc)
-                cause = getattr(exc, '__cause__', None)
-                debug_msg = f"Failed to download {url} for key {key}: {ce}"
-                if cause:
-                    debug_msg += f' [{cause}]'
+                debug_msg = f"Failed to download {url} for key {key}: " \
+                            f"{ce.format_with_cause()}"
                 self.message(debug_msg)
-                error_causes.append(cause)
+                error_causes.append(ce.format_with_cause())
 
         error_msg = f"Failed to download from any of {len(urls)} locations"
         if error_causes:

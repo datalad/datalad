@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest.mock import patch
 
 from datalad.runner.coreprotocols import StdOutErrCapture
@@ -12,7 +14,7 @@ class TestGeneratorProtocol(GeneratorMixIn, StdOutErrCapture):
     __test__ = False  # class is not a class of tests
 
 
-def test_gitrunner_generator():
+def test_gitrunner_generator() -> None:
     # Expect GitRunner._get_chunked_results() to return generators,
     # if the protocol is a subclass of GeneratorMixIn, and expect
     # run_on_filelist_chunks_items_ to yield elements from
@@ -27,7 +29,7 @@ def test_gitrunner_generator():
         assert_equal(tuple(generator), (0, 1, 0, 1, 2))
 
 
-def test_gitrunner_list():
+def test_gitrunner_list() -> None:
     # Expect GitRunner._get_chunked_results() to return generators,
     # if the protocol is a subclass of GeneratorMixIn, and expect
     # run_on_filelist_chunks_items_ to yield elements from

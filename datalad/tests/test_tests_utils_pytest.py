@@ -665,3 +665,27 @@ def test_ok_file_under_git_symlinks(path=None):
         ok_file_under_git(op.join(lpath, 'notingit'))
     with assert_raises(AssertionError):
         ok_file_under_git(op.join(lpath, 'nonexisting'))
+
+
+def test_assert_raises():
+    # rudimentary test of assert_raises shim prompted by suspicion in
+    # https://github.com/datalad/datalad/issues/6846#issuecomment-1363878497
+    def raise_ValueError():
+        raise ValueError("exc ValueError")
+
+    def raise_TypeError():
+        raise TypeError("exc TypeError")
+
+    # Test both forms of use
+    with assert_raises(ValueError):
+        raise_ValueError()
+    assert_raises(ValueError, raise_ValueError)
+
+    # can we specify multiple in a tuple?
+    with assert_raises((ValueError, TypeError)):
+        raise_ValueError()
+    with assert_raises((ValueError, TypeError)):
+        raise_TypeError()
+
+    assert_raises((ValueError, TypeError), raise_TypeError)
+    assert_raises((ValueError, TypeError), raise_ValueError)

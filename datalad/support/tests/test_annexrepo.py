@@ -108,6 +108,7 @@ from datalad.tests.utils_pytest import (
     ok_file_has_content,
     ok_file_under_git,
     ok_git_config_not_empty,
+    on_nfs,
     on_travis,
     serve_path_via_http,
     set_annex_version,
@@ -123,6 +124,7 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
+    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -349,6 +351,7 @@ def test_AnnexRepo_file_has_content(src=None, annex_path=None, *, batch):
 
 
 # 1 is enough to test
+@xfail_buggy_annex_info
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
@@ -386,6 +389,7 @@ def test_AnnexRepo_is_under_annex(src=None, annex_path=None, *, batch):
         [False])
 
 
+@xfail_buggy_annex_info
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -746,7 +750,18 @@ def test_AnnexRepo_always_commit(path=None):
     # Now git-annex log should show the addition:
     out_list = list(repo.call_annex_items_(['log']))
     eq_(len(out_list), 1)
-    assert_in(file1, out_list[0])
+
+    quote = lambda s: s.replace('"', r'\"')
+    def assert_in_out(filename, out):
+        filename_quoted = quote(filename)
+        if repo._check_version_kludges('quotepath-respected') == "no":
+            assert_in(filename, out)
+        elif repo._check_version_kludges('quotepath-respected') == "maybe":
+            assert filename in out or filename_quoted in out
+        else:
+            assert_in(filename_quoted, out)
+    assert_in_out(file1, out_list[0])
+
     # check git log of git-annex branch:
     # expected: initial creation, update (by annex add) and another
     # update (by annex log)
@@ -761,16 +776,17 @@ def test_AnnexRepo_always_commit(path=None):
         out = repo.call_annex(['log'])
 
         # And we see only the file before always_commit was set to false:
-        assert_in(file1, out)
+        assert_in_out(file1, out)
         assert_not_in(file2, out)
+        assert_not_in(quote(file2), out)
 
     # With always_commit back to True, do something that will trigger a commit
     # on the annex branches.
     repo.call_annex(['sync'])
 
     out = repo.call_annex(['log'])
-    assert_in(file1, out)
-    assert_in(file2, out)
+    assert_in_out(file1, out)
+    assert_in_out(file2, out)
 
     # Now git knows as well:
     eq_(get_annex_commit_counts(), n_annex_commits_initial + 2)
@@ -1614,6 +1630,7 @@ def test_get_urls_none(path=None):
     eq_(ar.get_urls("afile"), [])
 
 
+@xfail_buggy_annex_info
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path=None):
     ar = AnnexRepo(path, create=True)
@@ -2192,16 +2209,23 @@ def _test_add_under_subdir(path):
 def test_error_reporting(path=None):
     ar = AnnexRepo(path, create=True)
     res = ar.call_annex_records(['add'], files='gl\\orious BS')
-    eq_(
-        res,
-        [{
-            'command': 'add',
-            # whole thing, despite space, properly quotes backslash
-            'file': 'gl\\orious BS',
-            'note': 'not found',
-            'error-messages': ['File unknown to git'],
-            'success': False}]
-    )
+    target = {
+        'command': 'add',
+        # whole thing, despite space, properly quotes backslash
+        'file': 'gl\\orious BS',
+        'note': 'not found',
+        'success': False
+    }
+    assert len(res) >= 1
+    if 'message-id' in res[0]:
+        # new since ~ 10.20230407-99-gbe36e208c2
+        target['message-id'] = 'FileNotFound'
+        target['input'] = ['gl\\orious BS']
+        target['error-messages'] = ['git-annex: gl\\orious BS not found']
+    else:
+        # our own produced record
+        target['error-messages'] = ['File unknown to git']
+    eq_(res, [target])
 
 
 @with_tree(tree={
@@ -2308,7 +2332,7 @@ def test_annexjson_protocol_incorrect(path=None, *, print_opt, caplog):
 # see https://github.com/datalad/datalad/pull/5400 for troubleshooting
 # for stalling with unlock=False, and then with unlock=True it took >= 300 sec
 # https://github.com/datalad/datalad/pull/5433#issuecomment-784470028
-@skip_if(on_travis and 'nfs' in os.getenv('TMPDIR', ''))  # TODO. stalls
+@skip_if(on_travis and on_nfs)  # TODO. stalls
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
 @known_failure_githubci_win
@@ -2373,6 +2397,31 @@ def test_commit_annex_commit_changed(path=None, *, unlock):
     )
     ok_file_under_git(path, 'tobechanged-git', annexed=False)
     ok_file_under_git(path, 'tobechanged-annex', annexed=True)
+
+
+_test_unannex_tree = {
+    OBSCURE_FILENAME: 'content1',
+    OBSCURE_FILENAME + ".dat": 'content2',
+}
+if not on_windows and (
+        external_versions['cmd:annex'] <= '10.20230407' or external_versions['cmd:annex'] >= '10.20230408'
+):
+    # Only whenever we are not within the development versions of the 10.20230407
+    # where we cannot do version comparison relibalye,
+    # the case where we have entire filename within ""
+    _test_unannex_tree[f'"{OBSCURE_FILENAME}"'] = 'content3'
+
+
+@with_tree(tree=_test_unannex_tree)
+def test_unannex_etc(path=None):
+    # Primarily to test if quote/unquote/not-quote'ing work for tricky
+    # filenames. Ref: https://github.com/datalad/datalad/pull/7372
+    repo = AnnexRepo(path)
+    files = list(_test_unannex_tree)
+    # here it is through json so kinda guaranteed to work but let's check too
+    assert files == [x['file'] for x in repo.add(files)]
+    assert sorted(files) == sorted(repo.get_annexed_files())
+    assert files == repo.unannex(files)
 
 
 @slow  # 15 + 17sec on travis

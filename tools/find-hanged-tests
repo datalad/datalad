@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""
+Given a log from running tests using pytest -n 2 (or more) see which tests actually
+never completed
+"""
+
+import sys
+import re
+from pathlib import Path
+
+logfile = Path(sys.argv[-1])
+print(f"Working on {logfile}")
+
+lines = logfile.read_text().splitlines()
+lines = [l.strip() for l in lines]
+test_line = re.compile('datalad/.*tests/')
+
+tests_started = {l for l in lines if re.match('\S*datalad/.*tests/test_', l)}
+tests_completed = set()
+for l in lines:
+    res = re.match(r'\[gw[0-9]+\].* (\S*datalad/.*tests/test_.*)', l)
+    if res:
+        tests_completed.add(res.groups()[0])
+tests_didnot_complete = tests_started - tests_completed
+
+# print(tests_completed)
+print(f"{len(tests_started)} started, {len(tests_completed)} completed")
+if tests_didnot_complete:
+    print("Never completed:")
+    for t in sorted(tests_didnot_complete):
+        print(t)

@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import sys
 
 
-def py2cmd(code: str,
-           *additional_arguments):
+def py2cmd(code: str, *additional_arguments: str) -> list[str]:
     """Helper to invoke some Python code through a cmdline invocation of
     the Python interpreter.
 

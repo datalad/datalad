@@ -108,6 +108,16 @@ class Run(Interface):
     input or output preparation. This default ``stop`` behavior can be
     overridden via [CMD: --on-failure ... CMD][PY: `on_failure=...` PY].
 
+    In the presence of subdatasets, the full dataset hierarchy will be checked
+    for unsaved changes prior command execution, and changes in any dataset
+    will be saved after execution. Any modification of subdatasets is also
+    saved in their respective superdatasets to capture a comprehensive record
+    of the entire dataset hierarchy state. The associated provenance record is
+    duplicated in each modified (sub)dataset, although only being fully
+    interpretable and re-executable in the actual top-level superdataset. For
+    this reason the provenance record contains the dataset ID of that
+    superdataset.
+
     *Command format*
 
     || REFLOW >>

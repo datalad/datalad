@@ -50,7 +50,7 @@ a part of this provider -- only download from the web::
     mode = (download|fast|relaxed)            # fast/relaxed/download
     filename = (url|request)                  # of cause also could be _e'valuated given the bs4 link get_video_filename(link, filename)
     recurse_(a|href) =                        # regexes to recurse
-    # mimicing scrapy
+    # mimicking scrapy
     start_urls = http://...                   #
     certificates =                            # if there are https -- we need to allow specifying those
     allowed_domains = example.com/buga/duga   # to limit recursion

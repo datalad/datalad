@@ -79,7 +79,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -119,7 +119,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
     - ID: WinP39a1
       # ~40min
       DTS: >
@@ -182,7 +182,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
     - ID: Ubu20P37b
       # ~25min
       PY: 3.7
@@ -198,7 +198,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20210906T204127Z/pool/main/g/git-annex/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
 
 matrix:
   allow_failures:

@@ -8,20 +8,31 @@
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
 [![Travis tests status](https://app.travis-ci.com/datalad/datalad.svg?branch=master)](https://app.travis-ci.com/datalad/datalad)
 [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
+[![Extensions](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml)
+[![Linters](https://github.com/datalad/datalad/actions/workflows/lint.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/lint.yml)
 [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
 [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/)
-[![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
+[![RRID](https://img.shields.io/badge/RRID-SCR__003931-blue)](https://identifiers.org/RRID:SCR_003931)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-47-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-49-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
+## Distribution
+
+[![Anaconda](https://anaconda.org/conda-forge/datalad/badges/version.svg)](https://anaconda.org/conda-forge/datalad)
+[![Arch (AUR)](https://repology.org/badge/version-for-repo/aur/datalad.svg?header=Arch%20%28%41%55%52%29)](https://repology.org/project/datalad/versions)
+[![Debian Stable](https://badges.debian.net/badges/debian/stable/datalad/version.svg)](https://packages.debian.org/stable/datalad)
+[![Debian Unstable](https://badges.debian.net/badges/debian/unstable/datalad/version.svg)](https://packages.debian.org/unstable/datalad)
+[![Fedora Rawhide package](https://repology.org/badge/version-for-repo/fedora_rawhide/datalad.svg?header=Fedora%20%28rawhide%29)](https://repology.org/project/datalad/versions)
+[![Gentoo (::science)](https://repology.org/badge/version-for-repo/gentoo_ovl_science/datalad.svg?header=Gentoo%20%28%3A%3Ascience%29)](https://repology.org/project/datalad/versions)
+[![PyPI package](https://repology.org/badge/version-for-repo/pypi/datalad.svg?header=PyPI)](https://repology.org/project/datalad/versions)
 
 # 10000-ft. overview
 
@@ -129,16 +140,39 @@ contributing to the project.
 
 ## Acknowledgements
 
-DataLad development is supported by a US-German collaboration in computational
-neuroscience (CRCNS) project "DataGit: converging catalogues, warehouses, and
-deployment logistics into a federated 'data distribution'" (Halchenko/Hanke),
-co-funded by the US National Science Foundation (NSF 1429999) and the German
-Federal Ministry of Education and Research (BMBF 01GQ1411). Additional support
-is provided by the German federal state of Saxony-Anhalt and the European
-Regional Development Fund (ERDF), Project: Center for Behavioral Brain
-Sciences, Imaging Platform.  This work is further facilitated by the ReproNim
-project (NIH 1P41EB019936-01A1). Mac mini instance for development is provided
-by [MacStadium](https://www.macstadium.com/).
+The DataLad project received support through the following grants:
+
+- US-German collaboration in computational neuroscience (CRCNS) project
+  "DataGit: converging catalogues, warehouses, and deployment logistics into a
+  federated 'data distribution'" (Halchenko/Hanke), co-funded by the US National
+  Science Foundation (NSF 1429999) and the German Federal Ministry of
+  Education and Research (BMBF 01GQ1411).
+
+- CRCNS US-German Data Sharing "DataLad - a decentralized system for integrated
+  discovery, management, and publication of digital objects of science"
+  (Halchenko/Pestilli/Hanke), co-funded by the US National Science Foundation
+  (NSF 1912266) and the German Federal Ministry of Education and Research
+  (BMBF 01GQ1905).
+
+- Helmholtz Research Center Jülich, FDM challenge 2022
+
+- German federal state of Saxony-Anhalt and the European Regional Development
+  Fund (ERDF), Project: Center for Behavioral Brain Sciences, Imaging Platform
+
+- ReproNim project (NIH 1P41EB019936-01A1).
+
+- Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grant
+  SFB 1451 ([431549029](https://gepris.dfg.de/gepris/projekt/431549029),
+  INF project)
+
+- European Union’s Horizon 2020 research and innovation programme under grant
+  agreements:
+  - [Human Brain Project SGA3 (H2020-EU.3.1.5.3, grant no. 945539)](https://cordis.europa.eu/project/id/945539)
+  - [VirtualBrainCloud (H2020-EU.3.1.5.3, grant no. 826421)](https://cordis.europa.eu/project/id/826421)
+
+Mac mini instance for development is provided by
+[MacStadium](https://www.macstadium.com/).
+
 
 ### Contributors ✨
 
@@ -209,6 +243,8 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/vickychenglau"><img src="https://avatars.githubusercontent.com/u/22065437?v=4?s=100" width="100px;" alt="Vicky C Lau"/><br /><sub><b>Vicky C Lau</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=vickychenglau" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://chris-lamb.co.uk"><img src="https://avatars.githubusercontent.com/u/133209?v=4?s=100" width="100px;" alt="Chris Lamb"/><br /><sub><b>Chris Lamb</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=lamby" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/asmacdo"><img src="https://avatars.githubusercontent.com/u/1028657?v=4?s=100" width="100px;" alt="Austin Macdonald"/><br /><sub><b>Austin Macdonald</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=asmacdo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://nobodyinperson.de"><img src="https://avatars.githubusercontent.com/u/19148271?v=4?s=100" width="100px;" alt="Yann Büchau"/><br /><sub><b>Yann Büchau</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=nobodyinperson" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/matrss"><img src="https://avatars.githubusercontent.com/u/9308656?v=4?s=100" width="100px;" alt="Matthias Riße"/><br /><sub><b>Matthias Riße</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=matrss" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

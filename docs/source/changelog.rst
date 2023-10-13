@@ -2,19 +2,526 @@
 
 Change log
 **********
+0.19.3 (2023-08-10)
+===================
+
+Bug Fixes
+---------
+
+-  Type annotate get_status_dict and note that we can pass Exception or
+   CapturedException which is not subclass. `PR
+   #7403 <https://github.com/datalad/datalad/pull/7403>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  BF: create-sibling-gitlab used to raise a TypeError when attempting a
+   recursive operation in a dataset with uninstalled subdatasets. It now
+   raises an impossible result instead. `PR
+   #7430 <https://github.com/datalad/datalad/pull/7430>`__ (by
+   `@adswa <https://github.com/adswa>`__)
+
+-  Pass branch option into recursive call within Install - for the cases
+   whenever install is invoked with URL(s). Fixes
+   `#7461 <https://github.com/datalad/datalad/issues/7461>`__ via `PR
+   #7463 <https://github.com/datalad/datalad/pull/7463>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Allow for reckless=ephemeral clone using relative path for the
+   original location. Fixes
+   `#7469 <https://github.com/datalad/datalad/issues/7469>`__ via `PR
+   #7472 <https://github.com/datalad/datalad/pull/7472>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+Documentation
+-------------
+
+-  Fix a property name and default costs described in “getting
+   subdatasets” section of ``get`` documentation. Fixes
+   `#7458 <https://github.com/datalad/datalad/issues/7458>`__ via `PR
+   #7460 <https://github.com/datalad/datalad/pull/7460>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+Internal
+--------
+
+-  Copy an adjusted environment only if requested to do so. `PR
+   #7399 <https://github.com/datalad/datalad/pull/7399>`__ (by
+   `@christian-monch <https://github.com/christian-monch>`__)
+
+-  Eliminate uses of ``pkg_resources``. Fixes
+   `#7435 <https://github.com/datalad/datalad/issues/7435>`__ via `PR
+   #7439 <https://github.com/datalad/datalad/pull/7439>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+Tests
+-----
+
+-  Disable some S3 tests of their VCR taping where they fail for known
+   issues. `PR #7467 <https://github.com/datalad/datalad/pull/7467>`__
+   (by `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-1:
+
+0.19.2 (2023-07-03)
+===================
+
+.. _bug-fixes-1:
+
+Bug Fixes
+---------
+
+-  Remove surrounding quotes in output filenames even for newer version
+   of annex. Fixes
+   `#7440 <https://github.com/datalad/datalad/issues/7440>`__ via `PR
+   #7443 <https://github.com/datalad/datalad/pull/7443>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _documentation-1:
+
+Documentation
+-------------
+
+-  DOC: clarify description of the “install” interface to reflect its
+   convoluted behavior. `PR
+   #7445 <https://github.com/datalad/datalad/pull/7445>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-2:
+
+0.19.1 (2023-06-26)
+===================
+
+.. _internal-1:
+
+Internal
+--------
+
+-  Make compatible with upcoming release of git-annex (next after
+   10.20230407) and pass explicit core.quotepath=false to all git calls.
+   Also added ``tools/find-hanged-tests`` helper. `PR
+   #7372 <https://github.com/datalad/datalad/pull/7372>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _tests-1:
+
+Tests
+-----
+
+-  Adjust tests for upcoming release of git-annex (next after
+   10.20230407) and ignore DeprecationWarning for pkg_resources for now.
+   `PR #7372 <https://github.com/datalad/datalad/pull/7372>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-3:
+
+0.19.0 (2023-06-14)
+===================
+
+Enhancements and New Features
+-----------------------------
+
+-  Address gitlab API special character restrictions. `PR
+   #7407 <https://github.com/datalad/datalad/pull/7407>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__)
+
+-  BF: The default layout of create-sibling-gitlab is now
+   ``collection``. The previous default, ``hierarchy`` has been removed
+   as it failed in –recursive mode in different edgecases. For
+   single-level datasets, the outcome of ``collection`` and
+   ``hierarchy`` is identical. `PR
+   #7410 <https://github.com/datalad/datalad/pull/7410>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__ and
+   `@adswa <https://github.com/adswa>`__)
+
+.. _bug-fixes-2:
+
+Bug Fixes
+---------
+
+-  WTF - bring back and extend information on metadata extractors etc,
+   and allow for sections to have subsections and be selected at both
+   levels `PR #7309 <https://github.com/datalad/datalad/pull/7309>`__
+   (by `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  BF: Run an actual git invocation with interactive commit config. `PR
+   #7398 <https://github.com/datalad/datalad/pull/7398>`__ (by
+   `@adswa <https://github.com/adswa>`__)
+
+Dependencies
+------------
+
+-  Raise minimal version of tqdm (progress bars) to v.4.32.0 `PR
+   #7330 <https://github.com/datalad/datalad/pull/7330>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+.. _documentation-2:
+
+Documentation
+-------------
+
+-  DOC: Add a “User messaging” design doc. `PR
+   #7310 <https://github.com/datalad/datalad/pull/7310>`__ (by
+   `@jsheunis <https://github.com/jsheunis>`__)
+
+.. _tests-2:
+
+Tests
+-----
+
+-  Remove nose-based testing utils and possibility to test extensions
+   using nose. `PR
+   #7261 <https://github.com/datalad/datalad/pull/7261>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-4:
+
+0.18.5 (2023-06-13)
+===================
+
+.. _bug-fixes-3:
+
+Bug Fixes
+---------
+
+-  More correct summary reporting for relaxed (no size) –annex. `PR
+   #7050 <https://github.com/datalad/datalad/pull/7050>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  ENH: minor tune up of addurls to be more tolerant and “informative”.
+   `PR #7388 <https://github.com/datalad/datalad/pull/7388>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Ensure that data generated by timeout handlers in the asynchronous
+   runner are accessible via the result generator, even if no other
+   other events occur. `PR
+   #7390 <https://github.com/datalad/datalad/pull/7390>`__ (by
+   `@christian-monch <https://github.com/christian-monch>`__)
+
+-  Do not map (leave as is) trailing / or  in github URLs. `PR
+   #7418 <https://github.com/datalad/datalad/pull/7418>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _documentation-3:
+
+Documentation
+-------------
+
+-  Use ``sphinx_autodoc_typehints``. Fixes
+   `#7404 <https://github.com/datalad/datalad/issues/7404>`__ via `PR
+   #7412 <https://github.com/datalad/datalad/pull/7412>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+.. _internal-2:
+
+Internal
+--------
+
+-  Discontinue ConfigManager abuse for Git identity warning. `PR
+   #7378 <https://github.com/datalad/datalad/pull/7378>`__ (by
+   `@mih <https://github.com/mih>`__) and `PR
+   #7392 <https://github.com/datalad/datalad/pull/7392>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _tests-3:
+
+Tests
+-----
+
+-  Boost python to 3.8 during extensions testing. `PR
+   #7413 <https://github.com/datalad/datalad/pull/7413>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Skip test_system_ssh_version if no ssh found + split parsing into
+   separate test. `PR
+   #7422 <https://github.com/datalad/datalad/pull/7422>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-5:
+
+0.18.4 (2023-05-16)
+===================
+
+.. _bug-fixes-4:
+
+Bug Fixes
+---------
+
+-  Provider config files were ignored, when CWD changed between
+   different datasets during runtime. Fixes
+   `#7347 <https://github.com/datalad/datalad/issues/7347>`__ via `PR
+   #7357 <https://github.com/datalad/datalad/pull/7357>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+.. _documentation-4:
+
+Documentation
+-------------
+
+-  Added a workaround for an issue with documentation theme (search
+   function not working on Read the Docs). Fixes
+   `#7374 <https://github.com/datalad/datalad/issues/7374>`__ via `PR
+   #7385 <https://github.com/datalad/datalad/pull/7385>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+.. _internal-3:
+
+Internal
+--------
+
+-  Type-annotate ``datalad/support/gitrepo.py``. `PR
+   #7341 <https://github.com/datalad/datalad/pull/7341>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+.. _tests-4:
+
+Tests
+-----
+
+-  Fix failing testing on CI `PR
+   #7379 <https://github.com/datalad/datalad/pull/7379>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+   -  use sample S3 url DANDI archive,
+   -  use our copy of old .deb from datasets.datalad.org instead of
+      snapshots.d.o
+   -  use specific miniconda installer for py 3.7.
+
+.. _section-6:
+
+0.18.3 (2023-03-25)
+===================
+
+.. _bug-fixes-5:
+
+Bug Fixes
+---------
+
+-  Fixed that the ``get`` command would fail, when subdataset
+   source-candidate-templates where using the ``path`` property from
+   ``.gitmodules``. Also enhance the respective documentation for the
+   ``get`` command. Fixes
+   `#7274 <https://github.com/datalad/datalad/issues/7274>`__ via `PR
+   #7280 <https://github.com/datalad/datalad/pull/7280>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+-  Improve up-to-dateness of config reports across manager instances.
+   Fixes `#7299 <https://github.com/datalad/datalad/issues/7299>`__ via
+   `PR #7301 <https://github.com/datalad/datalad/pull/7301>`__ (by
+   `@mih <https://github.com/mih>`__)
+
+-  BF: GitRepo.merge do not allow merging unrelated unconditionally. `PR
+   #7312 <https://github.com/datalad/datalad/pull/7312>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Do not render (empty) WTF report on other records. `PR
+   #7322 <https://github.com/datalad/datalad/pull/7322>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Fixed a bug where changing DataLad’s log level could lead to failing
+   git-annex calls. Fixes
+   `#7328 <https://github.com/datalad/datalad/issues/7328>`__ via `PR
+   #7329 <https://github.com/datalad/datalad/pull/7329>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+-  Fix an issue with uninformative error reporting by the datalad
+   special remote. Fixes
+   `#7332 <https://github.com/datalad/datalad/issues/7332>`__ via `PR
+   #7333 <https://github.com/datalad/datalad/pull/7333>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+-  Fix save to not force committing into git if reference dataset is
+   pure git (not git-annex). Fixes
+   `#7351 <https://github.com/datalad/datalad/issues/7351>`__ via `PR
+   #7355 <https://github.com/datalad/datalad/pull/7355>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _documentation-5:
+
+Documentation
+-------------
+
+-  Include a few previously missing commands in html API docs. Fixes
+   `#7288 <https://github.com/datalad/datalad/issues/7288>`__ via `PR
+   #7289 <https://github.com/datalad/datalad/pull/7289>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+.. _internal-4:
+
+Internal
+--------
+
+-  Type-annotate almost all of ``datalad/utils.py``; add
+   ``datalad/typing.py``. `PR
+   #7317 <https://github.com/datalad/datalad/pull/7317>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+-  Type-annotate and fix ``datalad/support/strings.py``. `PR
+   #7318 <https://github.com/datalad/datalad/pull/7318>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+-  Type-annotate ``datalad/support/globbedpaths.py``. `PR
+   #7327 <https://github.com/datalad/datalad/pull/7327>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+-  Extend type-annotations for ``datalad/support/path.py``. `PR
+   #7336 <https://github.com/datalad/datalad/pull/7336>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+-  Type-annotate various things in ``datalad/runner/``. `PR
+   #7337 <https://github.com/datalad/datalad/pull/7337>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+-  Type-annotate some more files in ``datalad/support/``. `PR
+   #7339 <https://github.com/datalad/datalad/pull/7339>`__ (by
+   `@jwodder <https://github.com/jwodder>`__)
+
+.. _tests-5:
+
+Tests
+-----
+
+-  Skip or xfail some currently failing or stalling tests. `PR
+   #7331 <https://github.com/datalad/datalad/pull/7331>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+-  Skip with_sameas_remote when rsync and annex are incompatible. Fixes
+   `#7320 <https://github.com/datalad/datalad/issues/7320>`__ via `PR
+   #7342 <https://github.com/datalad/datalad/pull/7342>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+-  Fix testing assumption - do create pure GitRepo superdataset and test
+   against it. `PR
+   #7353 <https://github.com/datalad/datalad/pull/7353>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-7:
+
+0.18.2 (2023-02-27)
+===================
+
+.. _bug-fixes-6:
+
+Bug Fixes
+---------
+
+-  Fix ``create-sibling`` for non-English SSH remotes by providing
+   ``LC_ALL=C`` for the ``ls`` call. `PR
+   #7265 <https://github.com/datalad/datalad/pull/7265>`__ (by
+   `@nobodyinperson <https://github.com/nobodyinperson>`__)
+
+-  Fix EnsureListOf() and EnsureTupleOf() for string inputs. `PR
+   #7267 <https://github.com/datalad/datalad/pull/7267>`__ (by
+   `@nobodyinperson <https://github.com/nobodyinperson>`__)
+
+-  create-sibling: Use C.UTF-8 locale instead of C on the remote end.
+   `PR #7273 <https://github.com/datalad/datalad/pull/7273>`__ (by
+   `@nobodyinperson <https://github.com/nobodyinperson>`__)
+
+-  Address compatibility with most recent git-annex where info would
+   exit with non-0. `PR
+   #7292 <https://github.com/datalad/datalad/pull/7292>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _dependencies-1:
+
+Dependencies
+------------
+
+-  Revert “Revert”Remove chardet version upper limit"". `PR
+   #7263 <https://github.com/datalad/datalad/pull/7263>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _internal-5:
+
+Internal
+--------
+
+-  Codespell more (CHANGELOGs etc) and remove custom CLI options from
+   tox.ini. `PR #7271 <https://github.com/datalad/datalad/pull/7271>`__
+   (by `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _tests-6:
+
+Tests
+-----
+
+-  Use older python 3.8 in testing nose utils in github-action
+   test-nose. Fixes
+   `#7259 <https://github.com/datalad/datalad/issues/7259>`__ via `PR
+   #7260 <https://github.com/datalad/datalad/pull/7260>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-8:
+
+0.18.1 (2023-01-16)
+===================
+
+.. _bug-fixes-7:
+
+Bug Fixes
+---------
+
+-  Fixes crashes on windows where DataLad was mistaking git-annex
+   10.20221212 for a not yet released git-annex version and trying to
+   use a new feature. Fixes
+   `#7248 <https://github.com/datalad/datalad/issues/7248>`__ via `PR
+   #7249 <https://github.com/datalad/datalad/pull/7249>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+.. _documentation-6:
+
+Documentation
+-------------
+
+-  DOC: fix EnsureCallable docstring. `PR
+   #7245 <https://github.com/datalad/datalad/pull/7245>`__ (by
+   `@matrss <https://github.com/matrss>`__)
+
+Performance
+-----------
+
+-  Integrate buffer size optimization from datalad-next, leading to
+   significant performance improvement for status and diff. Fixes
+   `#7190 <https://github.com/datalad/datalad/issues/7190>`__ via `PR
+   #7250 <https://github.com/datalad/datalad/pull/7250>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
+
+.. _section-9:
+
 0.18.0 (2022-12-31)
 ===================
 
 Breaking Changes
 ----------------
 
+-  Move all old-style metadata commands ``aggregate_metadata``,
+   ``search``, ``metadata`` and ``extract-metadata``, as well as the
+   ``cfg_metadatatypes`` procedure and the old metadata extractors into
+   the datalad-deprecated extension. Now recommended way of handling
+   metadata is to install the datalad-metalad extension instead. Fixes
+   `#7012 <https://github.com/datalad/datalad/issues/7012>`__ via `PR
+   #7014 <https://github.com/datalad/datalad/pull/7014>`__
+
 -  Automatic reconfiguration of the ORA special remote when cloning from
    RIA stores now only applies locally rather than being committed. `PR
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
+.. _enhancements-and-new-features-1:
+
 Enhancements and New Features
 -----------------------------
+
+-  A repository description can be specified with a new
+   ``--description`` option when creating siblings using
+   ``create-sibling-[gin|gitea|github|gogs]``. Fixes
+   `#6816 <https://github.com/datalad/datalad/issues/6816>`__ via `PR
+   #7109 <https://github.com/datalad/datalad/pull/7109>`__ (by
+   `@mslw <https://github.com/mslw>`__)
+
+-  Make validation failure of alternative constraints more informative.
+   Fixes `#7092 <https://github.com/datalad/datalad/issues/7092>`__ via
+   `PR #7132 <https://github.com/datalad/datalad/pull/7132>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
 
 -  Saving removed dataset content was sped-up, and reporting of types of
    removed content now accurately states ``dataset`` for added and
@@ -53,6 +560,8 @@ Enhancements and New Features
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
+.. _bug-fixes-8:
+
 Bug Fixes
 ---------
 
@@ -62,6 +571,8 @@ Bug Fixes
    `#6950 <https://github.com/datalad/datalad/issues/6950>`__ via `PR
    #6952 <https://github.com/datalad/datalad/pull/6952>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
+
+.. _documentation-7:
 
 Documentation
 -------------
@@ -96,8 +607,15 @@ Documentation
    #7204 <https://github.com/datalad/datalad/pull/7204>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _internal-6:
+
 Internal
 --------
+
+-  Allow EnsureDataset constraint to handle Path instances. Fixes
+   `#7069 <https://github.com/datalad/datalad/issues/7069>`__ via `PR
+   #7133 <https://github.com/datalad/datalad/pull/7133>`__ (by
+   `@bpoldrack <https://github.com/bpoldrack>`__)
 
 -  Use ``looseversion.LooseVersion`` as drop-in replacement for
    ``distutils.version.LooseVersion`` Fixes
@@ -132,6 +650,8 @@ Internal
    #7170 <https://github.com/datalad/datalad/pull/7170>`__ (by
    `@adswa <https://github.com/adswa>`__)
 
+.. _performance-1:
+
 Performance
 -----------
 
@@ -157,10 +677,12 @@ Performance
    #7230 <https://github.com/datalad/datalad/pull/7230>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
+.. _tests-7:
+
 Tests
 -----
 
--  Reenable two now-passing core test on Windows CI. `PR
+-  Re-enable two now-passing core test on Windows CI. `PR
    #7152 <https://github.com/datalad/datalad/pull/7152>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
@@ -169,47 +691,7 @@ Tests
    `PR #7176 <https://github.com/datalad/datalad/pull/7176>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _breaking-changes-1:
-
-Breaking Changes
-----------------
-
--  Move all old-style metadata commands ``aggregate_metadata``,
-   ``search``, ``metadata`` and ``extract-metadata``, as well as the
-   ``cfg_metadatatypes`` procedure and the old metadata extractors into
-   the datalad-deprecated extension. Now recommended way of handling
-   metadata is to install the datalad-metalad extension instead. Fixes
-   `#7012 <https://github.com/datalad/datalad/issues/7012>`__ via `PR
-   #7014 <https://github.com/datalad/datalad/pull/7014>`__
-
-.. _internal-1:
-
-Internal
---------
-
--  Allow EnsureDataset constraint to handle Path instances. Fixes
-   `#7069 <https://github.com/datalad/datalad/issues/7069>`__ via `PR
-   #7133 <https://github.com/datalad/datalad/pull/7133>`__ (by
-   `@bpoldrack <https://github.com/bpoldrack>`__)
-
-.. _enhancements-and-new-features-1:
-
-Enhancements and New Features
------------------------------
-
--  A repository description can be specified with a new
-   ``--description`` option when creating siblings using
-   ``create-sibling-[gin|gitea|github|gogs]``. Fixes
-   `#6816 <https://github.com/datalad/datalad/issues/6816>`__ via `PR
-   #7109 <https://github.com/datalad/datalad/pull/7109>`__ (by
-   `@mslw <https://github.com/mslw>`__)
-
--  Make validation failure of alternative constraints more informative.
-   Fixes `#7092 <https://github.com/datalad/datalad/issues/7092>`__ via
-   `PR #7132 <https://github.com/datalad/datalad/pull/7132>`__ (by
-   `@bpoldrack <https://github.com/bpoldrack>`__)
-
-.. _section-1:
+.. _section-10:
 
 0.17.10 (2022-12-14)
 ====================
@@ -233,7 +715,7 @@ Enhancements and New Features
    #7210 <https://github.com/datalad/datalad/pull/7210>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-1:
+.. _bug-fixes-9:
 
 Bug Fixes
 ---------
@@ -291,7 +773,7 @@ Bug Fixes
    #7226 <https://github.com/datalad/datalad/pull/7226>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _documentation-1:
+.. _documentation-8:
 
 Documentation
 -------------
@@ -302,7 +784,7 @@ Documentation
    #7155 <https://github.com/datalad/datalad/pull/7155>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _internal-2:
+.. _internal-7:
 
 Internal
 --------
@@ -318,7 +800,7 @@ Internal
    #7161 <https://github.com/datalad/datalad/pull/7161>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-1:
+.. _tests-8:
 
 Tests
 -----
@@ -328,7 +810,7 @@ Tests
    #7159 <https://github.com/datalad/datalad/pull/7159>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
--  Reenable now passing test_path_diff test on Windows. Fixes
+-  Re-enable now passing test_path_diff test on Windows. Fixes
    `#3725 <https://github.com/datalad/datalad/issues/3725>`__ via `PR
    #7194 <https://github.com/datalad/datalad/pull/7194>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
@@ -340,12 +822,12 @@ Tests
    #7209 <https://github.com/datalad/datalad/pull/7209>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-2:
+.. _section-11:
 
 0.17.9 (2022-11-07)
 ===================
 
-.. _bug-fixes-2:
+.. _bug-fixes-10:
 
 Bug Fixes
 ---------
@@ -370,6 +852,8 @@ Bug Fixes
    #7129 <https://github.com/datalad/datalad/pull/7129>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
+.. _dependencies-2:
+
 Dependencies
 ------------
 
@@ -383,7 +867,7 @@ Dependencies
    #7136 <https://github.com/datalad/datalad/pull/7136>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _internal-3:
+.. _internal-8:
 
 Internal
 --------
@@ -399,7 +883,7 @@ Internal
    #7118 <https://github.com/datalad/datalad/pull/7118>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-2:
+.. _tests-9:
 
 Tests
 -----
@@ -419,12 +903,12 @@ Tests
    #7130 <https://github.com/datalad/datalad/pull/7130>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-3:
+.. _section-12:
 
 0.17.8 (2022-10-24)
 ===================
 
-.. _bug-fixes-3:
+.. _bug-fixes-11:
 
 Bug Fixes
 ---------
@@ -466,12 +950,12 @@ Bug Fixes
    #7103 <https://github.com/datalad/datalad/pull/7103>`__ (by
    `@mslw <https://github.com/mslw>`__)
 
-.. _section-4:
+.. _section-13:
 
 0.17.7 (2022-10-14)
 ===================
 
-.. _bug-fixes-4:
+.. _bug-fixes-12:
 
 Bug Fixes
 ---------
@@ -490,7 +974,7 @@ Bug Fixes
    `PR #7075 <https://github.com/datalad/datalad/pull/7075>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-4:
+.. _internal-9:
 
 Internal
 --------
@@ -518,7 +1002,7 @@ Internal
    #7082 <https://github.com/datalad/datalad/pull/7082>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-3:
+.. _tests-10:
 
 Tests
 -----
@@ -527,12 +1011,12 @@ Tests
    pass. `PR #7002 <https://github.com/datalad/datalad/pull/7002>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-5:
+.. _section-14:
 
 0.17.6 (2022-09-21)
 ===================
 
-.. _bug-fixes-5:
+.. _bug-fixes-13:
 
 Bug Fixes
 ---------
@@ -564,7 +1048,7 @@ Bug Fixes
    `PR #7049 <https://github.com/datalad/datalad/pull/7049>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-5:
+.. _internal-10:
 
 Internal
 --------
@@ -577,7 +1061,7 @@ Internal
    #7024 <https://github.com/datalad/datalad/pull/7024>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _tests-4:
+.. _tests-11:
 
 Tests
 -----
@@ -651,7 +1135,7 @@ Bug Fix
    `#6978 <https://github.com/datalad/datalad/pull/6978>`__
    (`@christian-monch <https://github.com/christian-monch>`__)
 
-.. _tests-5:
+.. _tests-12:
 
 Tests
 -----
@@ -816,7 +1300,7 @@ Pushed to ``maint``
 -  DOC: fix capitalization of service names
    (`@aqw <https://github.com/aqw>`__)
 
-.. _tests-6:
+.. _tests-13:
 
 Tests
 -----
@@ -975,7 +1459,7 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
-.. _bug-fixes-6:
+.. _bug-fixes-14:
 
 Bug Fixes
 ---------
@@ -995,7 +1479,7 @@ Bug Fixes
    prior recording a new dataset state. Fixes #4967
    `#6795 <https://github.com/datalad/datalad/pull/6795>`__ (by @mih)
 
-.. _documentation-2:
+.. _documentation-9:
 
 Documentation
 -------------
@@ -1009,7 +1493,7 @@ Documentation
    ``addurls``. `#6684 <https://github.com/datalad/datalad/pull/6684>`__
    (by @jdkent)
 
-.. _internal-6:
+.. _internal-11:
 
 Internal
 --------
@@ -1623,7 +2107,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-7:
+.. _bug-fixes-15:
 
 Bug Fixes
 ---------
@@ -1746,7 +2230,7 @@ Bug Fixes
    `#6603 <https://github.com/datalad/datalad/pull/6603>`__ (by
    @yarikoptic)
 
-.. _documentation-3:
+.. _documentation-10:
 
 Documentation
 -------------
@@ -1807,7 +2291,7 @@ Documentation
    now `#6436 <https://github.com/datalad/datalad/pull/6436>`__ (by
    @yarikoptic)
 
-.. _internal-7:
+.. _internal-12:
 
 Internal
 --------
@@ -1816,7 +2300,7 @@ Internal
    promotes “breadth-first” reporting with a new parameter
    ``reporting_order``
    `#6006 <https://github.com/datalad/datalad/pull/6006>`__ (by @mih)
--  ``AnnexRepo.get_file_annexinfo()`` is introduced for more convinient
+-  ``AnnexRepo.get_file_annexinfo()`` is introduced for more convenient
    queries for single files and replaces a now deprecated
    ``AnnexRepo.get_file_key()`` to receive information with fewer calls
    to Git `#6104 <https://github.com/datalad/datalad/pull/6104>`__ (by
@@ -1919,7 +2403,7 @@ Internal
    previous implementations.
    `#6591 <https://github.com/datalad/datalad/pull/6591>`__ (by @mih)
 
-.. _tests-7:
+.. _tests-14:
 
 Tests
 -----
@@ -1994,7 +2478,7 @@ Infra
    configuration
    `#6228 <https://github.com/datalad/datalad/pull/6228>`__ (by @adswa)
 -  The ``readthedocs-theme`` and ``Sphinx`` versions were pinned to
-   reenable rendering of bullet points in the documentation
+   re-enable rendering of bullet points in the documentation
    `#6346 <https://github.com/datalad/datalad/pull/6346>`__ (by @adswa)
 -  The PR template was updated with a CHANGELOG template. Future PRs
    should use it to include a summary for the CHANGELOG
@@ -2165,7 +2649,7 @@ Bug Fix
    `#6140 <https://github.com/datalad/datalad/pull/6140>`__
    (`@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _tests-8:
+.. _tests-15:
 
 Tests
 -----
@@ -2237,7 +2721,7 @@ Pushed to ``maint``
 -  CI: Enable new codecov uploader in Appveyor CI
    (`@adswa <https://github.com/adswa>`__)
 
-.. _internal-8:
+.. _internal-13:
 
 Internal
 --------
@@ -2253,7 +2737,7 @@ Internal
    `#6072 <https://github.com/datalad/datalad/pull/6072>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-4:
+.. _documentation-11:
 
 Documentation
 -------------
@@ -2262,7 +2746,7 @@ Documentation
    `#6065 <https://github.com/datalad/datalad/pull/6065>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-9:
+.. _tests-16:
 
 Tests
 -----
@@ -2331,7 +2815,7 @@ Bug Fix
    `#6007 <https://github.com/datalad/datalad/pull/6007>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-10:
+.. _tests-17:
 
 Tests
 -----
@@ -2393,7 +2877,7 @@ Pushed to ``maint``
 -  Discontinue testing of hirni extension
    (`@mih <https://github.com/mih>`__)
 
-.. _internal-9:
+.. _internal-14:
 
 Internal
 --------
@@ -2402,7 +2886,7 @@ Internal
    `#5980 <https://github.com/datalad/datalad/pull/5980>`__
    (`@jwodder <https://github.com/jwodder>`__)
 
-.. _documentation-5:
+.. _documentation-12:
 
 Documentation
 -------------
@@ -2411,7 +2895,7 @@ Documentation
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
 
-.. _tests-11:
+.. _tests-18:
 
 Tests
 -----
@@ -2767,7 +3251,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-12:
+.. _tests-19:
 
 Tests
 -----
@@ -2838,7 +3322,7 @@ Pushed to ``maint``
 -  RF(BF?)+DOC: provide User-Agent to entire session headers + use those
    if provided (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _internal-10:
+.. _internal-15:
 
 Internal
 --------
@@ -2859,7 +3343,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-13:
+.. _tests-20:
 
 Tests
 -----
@@ -2928,7 +3412,7 @@ Bug Fix
    `#5776 <https://github.com/datalad/datalad/pull/5776>`__
    (s.heunis@fz-juelich.de)
 
-.. _internal-11:
+.. _internal-16:
 
 Internal
 --------
@@ -2940,7 +3424,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-14:
+.. _tests-21:
 
 Tests
 -----
@@ -2968,7 +3452,7 @@ Authors: 4
 0.14.6 (Sun Jun 27 2021)
 ========================
 
-.. _internal-12:
+.. _internal-17:
 
 Internal
 --------
@@ -3079,7 +3563,7 @@ Pushed to ``maint``
 
 -  MNT: Post-release dance (`@kyleam <https://github.com/kyleam>`__)
 
-.. _internal-13:
+.. _internal-18:
 
 Internal
 --------
@@ -3092,7 +3576,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-15:
+.. _tests-22:
 
 Tests
 -----
@@ -3675,7 +4159,7 @@ Fixes
    (`#5218 <https://github.com/datalad/datalad/issues/5218>`__)
 
 -  The internal command runner’s handling of the event loop has been
-   tweaked to hopefully fix issues with runnning DataLad from IPython.
+   tweaked to hopefully fix issues with running DataLad from IPython.
    (`#5106 <https://github.com/datalad/datalad/issues/5106>`__)
 
 -  SSH cleanup wasn’t reliably triggered by the ORA special remote on
@@ -4817,7 +5301,7 @@ Major refactoring and deprecations since 0.12.0rc6
    ``--alternative-source`` parameter has been removed, and a
    ``clone_dataset`` function with multi-source capabilities is provided
    instead. The ``--reckless`` parameter can now take literal mode
-   labels instead of just beeing a binary flag, but backwards
+   labels instead of just being a binary flag, but backwards
    compatibility is maintained.
 
 -  The ``get_file_content`` method of ``GitRepo`` was no longer used
@@ -5138,7 +5622,7 @@ Fixes
    (`#3799 <https://github.com/datalad/datalad/issues/3799>`__)
    (`#3102 <https://github.com/datalad/datalad/issues/3102>`__)
 
--  Do not errorneously discover directory as a procedure.
+-  Do not erroneously discover directory as a procedure.
    (`#3793 <https://github.com/datalad/datalad/issues/3793>`__)
 
 -  Correctly extract version from manpage to trigger use of manpages for
@@ -5456,7 +5940,7 @@ Fixes
 Enhancements and new features
 -----------------------------
 
--  ``SSHConnection`` now offers methods for file upload and dowload
+-  ``SSHConnection`` now offers methods for file upload and download
    (``get()``, ``put()``. The previous ``copy()`` method only supported
    upload and was discontinued
    (`#3401 <https://github.com/datalad/datalad/issues/3401>`__)
@@ -6239,7 +6723,7 @@ Fixes
 
 -  ``annex`` commands are now chunked assuming 50% “safety margin” on
    the maximal command line length. Should resolve crashes while
-   operating ot too many files at ones
+   operating of too many files at ones
    (`#3001 <https://github.com/datalad/datalad/issues/3001>`__)
 -  ``run`` sidecar config processing
    (`#2991 <https://github.com/datalad/datalad/issues/2991>`__)
@@ -6450,7 +6934,7 @@ Fixes
    ``BadName`` issue.
    (`#2712 <https://github.com/datalad/datalad/issues/2712>`__),
    (`#2794 <https://github.com/datalad/datalad/issues/2794>`__)
--  The progess bar for annex file transferring was unable to handle an
+-  The progress bar for annex file transferring was unable to handle an
    empty file.
    (`#2717 <https://github.com/datalad/datalad/issues/2717>`__)
 -  ``datalad add-readme`` halted when no aggregated metadata was found
@@ -6919,8 +7403,8 @@ Enhancements and new features
    potential changes, instead of performing a complete traversal of a
    dataset tree
 -  `add <http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html>`__
-   looks for changes relative to the last commited state of a dataset to
-   discover files to add more efficiently
+   looks for changes relative to the last committed state of a dataset
+   to discover files to add more efficiently
 -  `diff <http://datalad.readthedocs.io/en/latest/generated/man/datalad-diff.html>`__
    can now report untracked files in addition to modified files
 -  [uninstall][] will check itself whether a subdataset is properly

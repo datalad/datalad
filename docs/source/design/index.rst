@@ -34,3 +34,4 @@ subsystems in DataLad.
    progress_reporting
    github_actions
    testing
+   user_messaging

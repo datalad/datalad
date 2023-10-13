@@ -8,7 +8,7 @@ from ..exception import (
 )
 
 
-def get_json_objects(object_count, message_count) -> list[dict]:
+def get_json_objects(object_count: int, message_count: int) -> list[dict]:
     return [
         {
             "success": index % 2 == 0,
@@ -23,7 +23,7 @@ def get_json_objects(object_count, message_count) -> list[dict]:
     ]
 
 
-def test_format_error_with_duplicates():
+def test_format_error_with_duplicates() -> None:
 
     object_count = 10
     message_count = 3
@@ -74,7 +74,7 @@ def test_format_error_with_duplicates():
             f"error-message-{failed_index}-{j} [2 times]")
 
 
-def test_format_no_errors():
+def test_format_no_errors() -> None:
     json_objects = get_json_objects(1, 3)
 
     result = _format_json_error_messages(json_objects)
@@ -84,7 +84,7 @@ def test_format_no_errors():
     assert_equal(result, "")
 
 
-def test_command_error_rendering():
+def test_command_error_rendering() -> None:
     command_error = CommandError(
         cmd="<cmd>",
         msg="<msg>",

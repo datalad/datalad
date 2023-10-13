@@ -30,7 +30,7 @@ class LineSplitter:
     def __init__(self,
                  separator: Optional[str] = None,
                  keep_ends: bool = False
-                 ):
+                 ) -> None:
         """
         Create a line splitter that will split lines either on a given
         separator, if 'separator' is not None, or on one of the known line
@@ -123,8 +123,8 @@ class AssemblingDecoderMixIn:
 
     Any un-decoded data is stored in the 'remaining_data'-attribute.
     """
-    def __init__(self):
-        self.remaining_data = defaultdict(bytes)
+    def __init__(self) -> None:
+        self.remaining_data: dict[int, bytes] = defaultdict(bytes)
 
     def decode(self,
                fd: int,
@@ -140,12 +140,12 @@ class AssemblingDecoderMixIn:
             self.remaining_data[fd] = assembled_data[e.start:]
         return unicode_str
 
-    def __del__(self):
+    def __del__(self) -> None:
         if any(self.remaining_data.values()):
             logger.debug(
                 "unprocessed data in AssemblingDecoderMixIn:\n"
                 +"\n".join(
-                    f"fd: {key}, data: {value}"
+                    f"fd: {key}, data: {value!r}"
                     for key, value in self.remaining_data.items())
                 + "\n")
             logger.warning("unprocessed data in AssemblingDecoderMixIn")

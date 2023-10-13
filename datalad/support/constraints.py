@@ -135,7 +135,7 @@ class EnsureListOf(Constraint):
         super(EnsureListOf, self).__init__()
 
     def __call__(self, value):
-        return list(map(self._dtype, value))
+        return list(map(self._dtype, ([value] if isinstance(value, str) else value)))
 
     def short_description(self):
         return 'list(%s)' % _type_str(self._dtype)
@@ -157,7 +157,7 @@ class EnsureTupleOf(Constraint):
         super(EnsureTupleOf, self).__init__()
 
     def __call__(self, value):
-        return tuple(map(self._dtype, value))
+        return tuple(map(self._dtype, ([value] if isinstance(value, str) else value)))
 
     def short_description(self):
         return 'tuple(%s)' % _type_str(self._dtype)
@@ -270,7 +270,7 @@ class EnsureNone(Constraint):
 
 
 class EnsureCallable(Constraint):
-    """Ensure an input is of value `None`"""
+    """Ensure an input is a callable object"""
     def __call__(self, value):
         if hasattr(value, '__call__'):
             return value

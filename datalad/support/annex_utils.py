@@ -7,10 +7,12 @@
 """Internal helper functions for interfacing git-annex
 """
 
+from __future__ import annotations
+
 from datalad.utils import ensure_list
 
 
-def _fake_json_for_non_existing(paths, cmd):
+def _fake_json_for_non_existing(paths: str | list[str], cmd: str) -> list[dict]:
     """Create faked JSON records for nonexisting paths provided by `paths`
     after running `cmd`.
 
@@ -36,7 +38,7 @@ def _fake_json_for_non_existing(paths, cmd):
              } for f in ensure_list(paths)]
 
 
-def _get_non_existing_from_annex_output(output):
+def _get_non_existing_from_annex_output(output: str) -> list[str]:
     """This parses annex' output for messages about non-existing paths
     and returns a list of such paths (as strings).
 
@@ -67,7 +69,7 @@ def _get_non_existing_from_annex_output(output):
     return unknown_paths
 
 
-def _sanitize_key(key):
+def _sanitize_key(key: str) -> str:
     """Returns a sanitized key that is a suitable directory/file name
 
     Documentation from the analog implementation in git-annex

@@ -9,16 +9,20 @@
 """Provides helper to compute digests (md5 etc) on files
 """
 
+from __future__ import annotations
+
 import hashlib
+import logging
+from pathlib import Path
+from typing import Optional
 
 from ..utils import auto_repr
 
-import logging
 lgr = logging.getLogger('datalad.support.digests')
 
 
 @auto_repr
-class Digester(object):
+class Digester:
     """Helper to compute multiple digests in one pass for a file
     """
 
@@ -30,7 +34,7 @@ class Digester(object):
 
     DEFAULT_DIGESTS = ['md5', 'sha1', 'sha256', 'sha512']
 
-    def __init__(self, digests=None, blocksize=1 << 16):
+    def __init__(self, digests: Optional[list[str]] = None, blocksize: int = 1 << 16) -> None:
         """
         Parameters
         ----------
@@ -46,10 +50,10 @@ class Digester(object):
         self.blocksize = blocksize
 
     @property
-    def digests(self):
+    def digests(self) -> list[str]:
         return self._digests
 
-    def __call__(self, fpath):
+    def __call__(self, fpath: str | Path) -> dict[str, str]:
         """
         fpath : str
           File path for which a checksum shall be computed.
