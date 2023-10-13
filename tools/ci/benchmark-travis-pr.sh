@@ -23,7 +23,7 @@ run_asv () {
     pip install -e .
     git show --no-patch --format="%H (%s)"
     configure_asv
-    asv run -E existing --set-commit-hash $(git rev-parse HEAD)
+    asv run -E existing --show-stderr --set-commit-hash $(git rev-parse HEAD)
 }
 
 pip install asv

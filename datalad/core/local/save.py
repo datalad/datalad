@@ -13,9 +13,16 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-
 from functools import partial
+from pathlib import Path
 
+import datalad.utils as ut
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -23,38 +30,27 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import (
     jobs_opt,
-    recursion_limit,
     recursion_flag,
+    recursion_limit,
     save_message_opt,
 )
 from datalad.interface.utils import (
-    get_tree_roots,
     discover_dataset_trace_to_targets,
+    get_tree_roots,
 )
-from datalad.support.param import Parameter
 from datalad.support.constraints import (
-    EnsureStr,
     EnsureNone,
+    EnsureStr,
 )
 from datalad.support.exceptions import CommandError
 from datalad.support.parallel import (
-    no_subds_in_futures,
     ProducerConsumerProgressLog,
+    no_subds_in_futures,
 )
-from datalad.utils import (
-    ensure_list,
-)
-import datalad.utils as ut
+from datalad.support.param import Parameter
+from datalad.utils import ensure_list
 
-from datalad.distribution.dataset import (
-    Dataset,
-    EnsureDataset,
-    datasetmethod,
-    require_dataset,
-)
-from .status import (
-    Status,
-)
+from .status import Status
 
 lgr = logging.getLogger('datalad.core.local.save')
 
@@ -328,7 +324,7 @@ class Save(Interface):
                         if k in res:
                             res[k] = str(
                                 # recode path back to dataset path anchor
-                                pds.pathobj / res[k].relative_to(
+                                pds.pathobj / Path(res[k]).relative_to(
                                     pds_repo.pathobj)
                             )
                     yield res

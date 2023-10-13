@@ -146,7 +146,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     under the shortened name `id`.
 
     Additionally, the URL of any configured remote that contains the respective
-    submodule commit is available as `remote-<name>` properties, where `name`
+    submodule commit is available as `remoteurl-<name>` property, where `name`
     is the configured remote name.
 
     Lastly, all candidates are sorted according to their cost (lower values
@@ -752,16 +752,20 @@ class Get(Interface):
     cost is given in parenthesis, higher values indicate higher cost, and thus
     lower priority:
 
+    - A datalad URL recorded in `.gitmodules` (cost 590). This allows for
+      datalad URLs that require additional handling/resolution by datalad, like
+      ria-schemes (ria+http, ria+ssh, etc.)
+
+    - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
+
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
-      There can be more than one candidate (cost 500).
+      There can be more than one candidate (cost 650).
 
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
       desired submodule commit, with this relative path appended to it.
-      There can be more than one candidate (cost 500).
-
-    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+      There can be more than one candidate (cost 650).
 
     - In case `.gitmodules` contains a relative path as a URL, the absolute
       path of the superdataset, appended with this relative path (cost 900).
@@ -784,7 +788,7 @@ class Get(Interface):
     under the shortened name `id`.
 
     Additionally, the URL of any configured remote that contains the respective
-    submodule commit is available as `remote-<name>` properties, where `name`
+    submodule commit is available as `remoteurl-<name>` property, where `name`
     is the configured remote name.
 
     Hence, such a template could be `http://example.org/datasets/{id}` or
