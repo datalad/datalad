@@ -103,10 +103,8 @@ class supers(SampleSuperDatasetBenchmarks):
             self.ds.drop(subm["path"], recursive=True, what='all',
                          reckless='kill')
 
-    # disabled since apparently setup is not running for each execution!
-    # TODO: fix up after hearing on https://github.com/airspeed-velocity/asv/issues/1347
-    #def time_remove(self):
-    #    self.ds.drop(what='all', reckless='kill', recursive=True)
+    def time_remove(self):
+       self.ds.drop(what='all', reckless='kill', recursive=True)
 
     def time_diff(self):
         self.ds.diff(fr="HEAD^")
@@ -120,3 +118,6 @@ class supers(SampleSuperDatasetBenchmarks):
 
     def time_status_recursive(self):
         self.ds.status(recursive=True)
+
+
+supers.time_remove.warmup_time = 0
