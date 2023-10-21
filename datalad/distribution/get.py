@@ -42,6 +42,7 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.collections import ReadOnlyDict
+from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import (
@@ -675,11 +676,26 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             content,
             options=['--from=%s' % source] if source else [],
             jobs=jobs)
+    except RemoteNotAvailableError as exc:
+        if source:
+            yield get_status_dict(
+                'get',
+                # ds=ds_repo,  # nothing gets reported
+                # path=ds_repo.path, # nothing gets reported
+                # path=ds_repo, # reported but as AnnexRepo
+                # exception=CapturedException(exc),
+                message="Remote %r is not available in %r" % (source, ds_repo.path),
+                status='impossible',
+                type='dataset',
+                logger=lgr,
+            )
+            return
+        else:
+            raise
     except CommandError as exc:
         results = exc.kwargs.get("stdout_json")
         if not results:
             raise
-
     for res in results:
         res = annexjson2result(res, ds, type='file', logger=lgr,
                                refds=refds_path)
