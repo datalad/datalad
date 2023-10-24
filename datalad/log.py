@@ -622,7 +622,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         import datalad
-        if 'datalad.runtime.librarymode' in datalad.cfg:
+        if datalad.cfg.getbool('datalad.runtime', 'librarymode', False):
             return self.lgr
 
         if not logtarget:
