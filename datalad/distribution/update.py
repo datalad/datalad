@@ -481,7 +481,7 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
         # branch.*.merge value, but that assumes a value for remote.*.fetch.
         target = repo.call_git_oneline(
             ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
-             "@{upstream}"],
+             f"{repo.get_corresponding_branch(branch) or ''}" "@{upstream}"],
             read_only=True)
     elif branch:
         remote_branch = "{}/{}".format(remote, branch)
