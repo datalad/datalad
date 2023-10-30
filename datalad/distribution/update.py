@@ -119,7 +119,7 @@ class Update(Interface):
                   "the revision isn't already present",
              code_py="update(how='merge', how_subds='reset', "
                      "follow='parentds-lazy', recursive=True)",
-             code_cmd="datalad update --how=merge --how-subds=reset"
+             code_cmd="datalad update --how=merge --how-subds=reset "
                       "--follow=parentds-lazy -r"),
     ]
 
