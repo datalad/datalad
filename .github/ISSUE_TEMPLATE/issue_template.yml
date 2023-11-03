@@ -1,9 +1,9 @@
-name: Generic issue
+name: Report a Bug
 
 # For documentation concerning the Github form schema see
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
 
-description: Generic issue
+description: Report a Bug
 
 body:
   - type: textarea
