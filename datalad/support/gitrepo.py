@@ -1470,7 +1470,7 @@ class GitRepo(CoreGitRepo):
             if '--amend' in options:
                 if '--no-edit' not in options:
                     # don't overwrite old commit message with our default
-                    # message by default, but re-use old one. In other words:
+                    # message by default, but reuse old one. In other words:
                     # Make --no-edit the default:
                     options += ["--no-edit"]
             else:

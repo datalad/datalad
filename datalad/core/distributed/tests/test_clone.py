@@ -1727,7 +1727,7 @@ def test_url_mapping_specs():
             (_windows_map,
              r'C:\Users\datalad\from',
              r'D:\to'),
-            # test standard github mapping, no pathc needed
+            # test standard github mapping, no patch needed
             ({},
              'https://github.com/datalad/testrepo_gh/sub _1',
              'https://github.com/datalad/testrepo_gh-sub__1'),

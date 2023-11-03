@@ -367,7 +367,7 @@ class Create(Interface):
 
         # Note for the code below:
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
-        # Re-use tbrepo instance, do not use tbds.repo
+        # Reuse tbrepo instance, do not use tbds.repo
 
         # create and configure desired repository
         # also provides initial set of content to be tracked with git (not annex)
