@@ -158,7 +158,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
         set() if includeds is None else set(includeds)
     # this beast walks the directory tree from a given `basepath` until
     # it discovers any of the given `targetpaths`
-    # if it finds one, it commits any accummulated trace of visited
+    # if it finds one, it commits any accumulated trace of visited
     # datasets on this edge to the spec
     valid_repo = GitRepo.is_valid_repo(basepath)
     if valid_repo:
