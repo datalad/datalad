@@ -1,8 +1,0 @@
-name: Report a Generic Issue
-
-description: Report a generic issue which is not necessarily a bug
-
-body:
-  - type: textarea
-    attributes:
-      label: Description
