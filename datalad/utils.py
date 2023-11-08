@@ -1922,8 +1922,11 @@ def make_tempfile(content: str | bytes | None = None, wrapped: Optional[Callable
     # dir=... will override this.
     mkdir = bool(tkwargs_.pop('mkdir', False))
 
-    filename = {False: tempfile.mktemp,
-                True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    if mkdir:
+        filename = tempfile.mkdtemp(**tkwargs_)
+    else:
+        fd, filename = tempfile.mkstemp(**tkwargs_)
+        os.close(fd)
     # MIH: not clear to me why we need to perform this (possibly expensive)
     # resolve. It was already part of the original implementation
     # 008d9ab8cc3e0170c0a9b8479e80dee9ffe6eb7f

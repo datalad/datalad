@@ -259,7 +259,8 @@ class ExtractedArchive(object):
         self._archive = archive
         # TODO: bad location for extracted archive -- use tempfile
         if not path:
-            path = tempfile.mktemp(**get_tempfile_kwargs(prefix=_get_cached_filename(archive)))
+            fd, path = tempfile.mkstemp(**get_tempfile_kwargs(prefix=_get_cached_filename(archive)))
+            os.close(fd)
 
         if exists(path) and not persistent:
             raise RuntimeError("Directory %s already exists whenever it should not "
