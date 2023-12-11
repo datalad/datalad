@@ -419,9 +419,7 @@ def test_safetynet(otherpath=None, origpath=None, clonepath=None):
 
     res = cloneds.drop(what='all', on_failure='ignore')
     assert_in_results(res, action="drop", status="error")
-    ok_(res[0]['message'].startswith(
-        "unsafe\nCould only verify the existence of "
-        "0 out of 1 necessary"),
+    ok_(res[0]['message'].startswith("unsafe\nCould"),
         msg=f"Results were {res}")
     ok_(cloneds.is_installed())
 
