@@ -665,7 +665,7 @@ def _format_iospecs(specs, **kwargs):
     a kwargs-key (minus the brace chars), whose value is a list.
     In this case the entire specification list is substituted for
     the list in kwargs, which is returned as such. This enables
-    the replace/re-use sequences, e.g. --inputs '{outputs}'
+    the replace/reuse sequences, e.g. --inputs '{outputs}'
 
     Parameters
     ----------
@@ -844,7 +844,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         can be used by callers that already performed analog verififcations
         to avoid duplicate processing.
     yield_expanded : {'inputs', 'outputs', 'both'}, optional
-        Include a 'expanded_%s' item into the run result with the exanded list
+        Include a 'expanded_%s' item into the run result with the expanded list
         of paths matching the inputs and/or outputs specification,
         respectively.
 

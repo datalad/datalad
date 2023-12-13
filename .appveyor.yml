@@ -47,7 +47,7 @@
 #   - Workers have vim installed for convenient text editing in the command shell
 
 
-# do not make repository clone cheap: interfers with versioneer
+# do not make repository clone cheap: interferes with versioneer
 shallow_clone: false
 
 

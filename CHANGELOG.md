@@ -1,4 +1,38 @@
 
+<a id='changelog-0.19.4'></a>
+# 0.19.4 (2023-12-13)
+
+## 🐛 Bug Fixes
+
+- Update target detection for adjusted mode datasets has been improved.
+  Fixes [#7507](https://github.com/datalad/datalad/issues/7507) via
+  [PR #7522](https://github.com/datalad/datalad/pull/7522)
+  (by [@mih](https://github.com/mih))
+
+- Fix typos found by new codespell 2.2.6 and also add checking/fixing "hidden files".  [PR #7530](https://github.com/datalad/datalad/pull/7530) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Improve threaded-runner documentation.  Fixes [#7498](https://github.com/datalad/datalad/issues/7498) via [PR #7500](https://github.com/datalad/datalad/pull/7500) (by [@christian-monch](https://github.com/christian-monch))
+
+## 🏠 Internal
+
+- add RRID to package metadata.  [PR #7495](https://github.com/datalad/datalad/pull/7495) (by [@adswa](https://github.com/adswa))
+
+- Fix time_diff* and time_remove benchmarks to account for long RFed interfaces.  [PR #7502](https://github.com/datalad/datalad/pull/7502) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Cache value of the has_symlink_capability to spare some cycles.  [PR #7471](https://github.com/datalad/datalad/pull/7471) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- RF(TST): use setup_method and teardown_method in TestAddArchiveOptions.  [PR #7488](https://github.com/datalad/datalad/pull/7488) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Announce test_clone_datasets_root xfail on github osx.  [PR #7489](https://github.com/datalad/datalad/pull/7489) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Inform asv that there should be no warmup runs for time_remove benchmark.  [PR #7505](https://github.com/datalad/datalad/pull/7505) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF(TST): Relax matching of git-annex error message about unsafe drop, which was changed in 10.20231129-18-gfd0b510573.  [PR #7541](https://github.com/datalad/datalad/pull/7541) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.3'></a>
 # 0.19.3 (2023-08-10)
 

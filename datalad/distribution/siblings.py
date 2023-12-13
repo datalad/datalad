@@ -515,7 +515,7 @@ def _configure_remote(
                     annex_required = _inherit_annex_var(
                         delayed_super, name, 'required')
                 if annex_group is None:
-                    # I think it might be worth inheritting group regardless what
+                    # I think it might be worth inheriting group regardless what
                     # value is
                     #if annex_wanted in {'groupwanted', 'standard'}:
                     annex_group = _inherit_annex_var(
@@ -577,7 +577,7 @@ def _configure_remote(
 
             if as_common_datasrc:
                 # we need a fully configured remote here
-                # do not re-use `url`, but ask for the remote config
+                # do not reuse `url`, but ask for the remote config
                 # that git-annex will use too
                 remote_url = repo.config.get(f'remote.{name}.url')
                 ri = RI(remote_url)
