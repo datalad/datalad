@@ -1,4 +1,13 @@
 
+<a id='changelog-0.19.5'></a>
+# 0.19.5 (2023-12-28)
+
+## 🧪 Tests
+
+- Fix text to account for a recent change in git-annex dropping sub-second clock precision.
+  As a result we might not report push of git-annex branch since there would be none.
+  [PR #7544](https://github.com/datalad/datalad/pull/7544) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.4'></a>
 # 0.19.4 (2023-12-13)
 
