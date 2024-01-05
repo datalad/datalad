@@ -31,7 +31,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetFound
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
-    OBSCURE_FILENAME,
+    OBSCURE_DIRNAME,
     SkipTest,
     assert_in,
     assert_raises,
@@ -392,7 +392,7 @@ def test_path_diff(_path=None, linkpath=None):
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
-                    u'{}_directory_untracked'.format(OBSCURE_FILENAME))
+                    u'{}_directory_untracked'.format(OBSCURE_DIRNAME))
     apathobj = ds.pathobj / rpath
     apath = str(apathobj)
     for p in (rpath, apath, None):
