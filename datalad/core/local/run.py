@@ -625,6 +625,8 @@ def format_command(dset, command, **kwds):
     sfmt = SequenceFormatter()
 
     for k in set(cfg_defs.keys()).union(dset.config.keys()):
+        if not k.startswith("datalad.run.substitutions."):
+            continue
         v = dset.config.get(
             k,
             # pull a default from the config definitions
