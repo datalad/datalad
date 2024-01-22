@@ -51,8 +51,8 @@ def get_jsonhooks_from_config(cfg):
         )
         if not call:
             lgr.warning(
-                'Incomplete result hook configuration %s in %s' % (
-                    hook_basevar, cfg))
+                'Incomplete result hook configuration %s in %s',
+                hook_basevar, cfg)
             continue
         # split command from any args
         call = call.split(maxsplit=1)

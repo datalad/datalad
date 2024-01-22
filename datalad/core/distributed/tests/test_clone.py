@@ -64,6 +64,8 @@ from datalad.tests.utils_pytest import (
     ok_,
     ok_file_has_content,
     ok_startswith,
+    on_github,
+    on_osx,
     on_travis,
     patch_config,
     serve_path_via_http,
@@ -147,6 +149,7 @@ def test_clone_crcns(tdir=None, ds_path=None):
 
 @integration
 @skip_if_no_network
+@pytest.mark.xfail(on_osx and on_github, reason="spurious https://github.com/datalad/datalad/issues/7485")
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir=None):
     tdir = Path(tdir)
@@ -1439,7 +1442,6 @@ def test_ephemeral(origin_path=None, bare_path=None,
     runner.run(['git', 'annex', 'init'], cwd=bare_path)
 
     eph_from_bare = clone(bare_path, clone3_path, reckless='ephemeral')
-    can_symlink = has_symlink_capability()
 
     if can_symlink:
         # Bare repo uses dirhashlower by default, while a standard repo uses
@@ -1725,7 +1727,7 @@ def test_url_mapping_specs():
             (_windows_map,
              r'C:\Users\datalad\from',
              r'D:\to'),
-            # test standard github mapping, no pathc needed
+            # test standard github mapping, no patch needed
             ({},
              'https://github.com/datalad/testrepo_gh/sub _1',
              'https://github.com/datalad/testrepo_gh-sub__1'),
