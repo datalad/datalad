@@ -49,14 +49,14 @@ def test_bool():
     # this should always work
     assert_equal(c(True), True)
     assert_equal(c(False), False)
-    # all that resuls in True
+    # all that results in True
     assert_equal(c('True'), True)
     assert_equal(c('true'), True)
     assert_equal(c('1'), True)
     assert_equal(c('yes'), True)
     assert_equal(c('on'), True)
     assert_equal(c('enable'), True)
-    # all that resuls in False
+    # all that results in False
     assert_equal(c('false'), False)
     assert_equal(c('False'), False)
     assert_equal(c('0'), False)

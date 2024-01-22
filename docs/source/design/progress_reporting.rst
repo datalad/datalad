@@ -98,7 +98,7 @@ previously known value (if `increment=True`):
 
     log_progress(
         lgr.info,
-        # must match the identier used to start the progress reporting
+        # must match the identifier used to start the progress reporting
         identifier,
         # arbitrary message content, string expansion supported just like
         # regular log messages
