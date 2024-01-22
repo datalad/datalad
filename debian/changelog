@@ -1,3 +1,11 @@
+datalad (0.19.5-1) unstable; urgency=medium
+
+  * Most recent upstream release
+  * debian/rules
+    - remove six and mock dependencies - no longer used
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 22 Jan 2024 10:49:19 -0500
+
 datalad (0.19.3-2) unstable; urgency=medium
 
   * d/control
