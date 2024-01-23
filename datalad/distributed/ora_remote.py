@@ -474,9 +474,12 @@ class SSHRemoteIO(IOBase):
         """
 
         path = sh_quote(str(path))
-        # remember original mode -- better than to prescribe a fixed mode
 
-        if on_osx:
+        # remember original mode -- better than to prescribe a fixed mode
+        # format depends on remote OS, use uname (works on Linux and macOS)
+        uname_out = self._run("uname -s", no_output=False, check=True).rstrip()
+
+        if uname_out == "Darwin":
             format_option = "-f%Dp"
             # on macOS this would return decimal representation of mode (same
             # as python's stat().st_mode
