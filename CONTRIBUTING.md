@@ -630,6 +630,8 @@ changelog based on the pull requests since the last release, commits the
 results, tags the new commit with the next version number, and creates a GitHub
 release for the tag.
 This in turn triggers a job for building an sdist & wheel for the project and uploading them to PyPI.
+The release workflow alternatively could be triggered by visiting [release workflow page](https://github.com/datalad/datalad/actions/workflows/release.yml) and pressing "Run workflow" and choosing corresponding (`maint`) branch to release.
+Note that release workflow would fail if there were no commits since the most recent tagged release.
 
 ### CHANGELOG entries and labelling pull requests
 

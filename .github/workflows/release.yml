@@ -9,12 +9,17 @@ on:
       - maint
     types:
       - closed
+  # Allow manually triggering a release via a "Run workflow" button on the
+  # workflow's page:
+  workflow_dispatch:
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Only run for merged PRs with the "release" label:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    # Only run for manual runs or merged PRs with the "release" label:
+    if: >
+      github.event_name == 'workflow_dispatch'
+         || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release'))
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
