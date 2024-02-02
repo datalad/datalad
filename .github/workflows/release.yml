@@ -39,5 +39,6 @@ jobs:
           pypi-token: ${{ secrets.PYPI_TOKEN }}
           pre-tag: |
             make update-changelog
-            git add docs/source/changelog.rst
-            git commit -m '[skip ci] Update docs/source/changelog.rst'
+            perl -pli -e "s/^version:.*/version: $new_version/" CITATION.cff
+            git add docs/source/changelog.rst CITATION.cff
+            git commit -m '[skip ci] Update docs/source/changelog.rst and CITATION.cff'
