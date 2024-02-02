@@ -26,6 +26,7 @@ from .http import (
     HTTPDigestAuthAuthenticator,
     HTTPBearerTokenAuthenticator,
     HTTPDownloader,
+    HTTPTokenAuthenticator,
 )
 from .s3 import S3Authenticator, S3Downloader
 from .shub import SHubDownloader
@@ -51,6 +52,7 @@ AUTHENTICATION_TYPES = {
     'http_auth': HTTPAuthAuthenticator,
     'http_basic_auth': HTTPBasicAuthAuthenticator,
     'http_digest_auth': HTTPDigestAuthAuthenticator,
+    'http_token': HTTPTokenAuthenticator,
     'bearer_token': HTTPBearerTokenAuthenticator,
     'bearer_token_anon': HTTPAnonBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher

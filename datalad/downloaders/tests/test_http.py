@@ -39,6 +39,7 @@ from ..http import (
     HTTPBaseAuthenticator,
     HTTPBearerTokenAuthenticator,
     HTTPDownloader,
+    HTTPTokenAuthenticator,
     process_www_authenticate,
 )
 
@@ -739,6 +740,11 @@ def test_HTTPBearerTokenAuthenticator(d=None):
 
     content = read_file(fpath)
     assert_equal(content, "correct body")
+
+    # While having this test case setup, test the the odd brother
+    downloader = HTTPDownloader(credential=credential, authenticator=HTTPTokenAuthenticator())
+    downloader.download(url, path=d, overwrite=True)
+    assert_equal(request_get_callback.req.headers['Authorization'], "Token testtoken")
 
 
 class FakeLorisCredential(Token):
