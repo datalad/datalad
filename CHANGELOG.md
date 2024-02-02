@@ -1,4 +1,17 @@
 
+<a id='changelog-0.19.6'></a>
+# 0.19.6 (2024-02-02)
+
+## 🚀 Enhancements and New Features
+
+- Add the "http_token" authentication mechanism which provides 'Authentication: Token {TOKEN}' header.  [PR #7551](https://github.com/datalad/datalad/pull/7551) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Update `pytest_ignore_collect()` for pytest 8.0.  [PR #7546](https://github.com/datalad/datalad/pull/7546) (by [@jwodder](https://github.com/jwodder))
+
+- Add manual triggering support/documentation for release workflow.  [PR #7553](https://github.com/datalad/datalad/pull/7553) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.5'></a>
 # 0.19.5 (2023-12-28)
 
