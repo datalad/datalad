@@ -65,6 +65,7 @@ class GeneratorMixIn:
 
     @property
     def result_queue(self) -> deque:
+        # lazy assignment avoids needing __init__ for the MixIn class
         if not hasattr(self, '_result_queue'):
             self._result_queue: deque = deque()
         return self._result_queue
