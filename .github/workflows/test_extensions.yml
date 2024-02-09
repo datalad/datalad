@@ -109,3 +109,4 @@ jobs:
       with:
         directory: __testhome__
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
