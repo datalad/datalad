@@ -2064,10 +2064,10 @@ def get_dataset_root(path: str | Path) -> Optional[str]:
     as the input argument. If no associated dataset exists, or the
     input path doesn't exist, None is returned.
 
-    If `path` is a symlink or something other than a directory, its
-    the root dataset containing its parent directory will be reported.
-    If none can be found, at a symlink at `path` is pointing to a
-    dataset, `path` itself will be reported as the root.
+    If `path` is a symlink to not a git repository or something other
+    than a directory, its root dataset containing its parent directory
+    will be reported. If none can be found, at a symlink at `path` is
+    pointing to a dataset, `path` itself will be reported as the root.
 
     Parameters
     ----------
@@ -2084,6 +2084,12 @@ def get_dataset_root(path: str | Path) -> Optional[str]:
     suffix = '.git'
     altered = None
     if islink(path) or not isdir(path):
+        # Original motivation described in https://github.com/datalad/datalad/pull/2944
+        # is to handle use case of the symlink pointing to the subdirectory:
+        # https://github.com/datalad/datalad/pull/2944
+        # But if it is already a subdataset -- we should not be altering it
+        if exists(op.join(path, suffix)):
+            return path
         altered = path
         path = dirname(path)
     apath = abspath(path)
