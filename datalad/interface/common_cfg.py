@@ -17,6 +17,7 @@ import logging
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
+import sys
 import time
 
 from platformdirs import AppDirs
@@ -545,6 +546,13 @@ _definitions = {
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
         'default': 8,
+    },
+    'datalad.run.substitutions.python': {
+        'ui': ('question', {
+               'title': 'Substitution for {python} placeholder',
+               'text': 'Path to a Python interpreter executable'}),
+        'type': EnsureStr(),
+        'default': sys.executable,
     },
     'datalad.runtime.max-annex-jobs': {
         'ui': ('question', {

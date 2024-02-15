@@ -21,6 +21,7 @@ from os import (
     mkdir,
     remove,
 )
+import pytest
 from unittest.mock import patch
 
 from datalad.api import (
@@ -43,6 +44,7 @@ from datalad.support.exceptions import (
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     OBSCURE_FILENAME,
+    SkipTest,
     assert_false,
     assert_in,
     assert_in_results,
@@ -781,3 +783,21 @@ def test_substitution_config():
         eq_(_format_iospecs(['{dummy}'],
                             **_get_substitutions(dset)),
             ['a', 'b'])
+
+
+def test_substitution_config_default(tmp_path):
+    ds = Dataset(tmp_path).create(result_renderer='disabled')
+
+    if ds.config.get('datalad.run.substitutions.python') is not None:
+        # we want to test default handling when no config is set
+        raise SkipTest(
+            'Test assumptions conflict with effective configuration')
+
+    # the {python} placeholder is not explicitly defined, but it has
+    # a default, which run() should discover and use
+    res = ds.run('{python} -c "True"', result_renderer='disabled')
+    assert_result_count(res, 1, action='run', status='ok')
+
+    # make sure we could actually detect breakage with the check above
+    with pytest.raises(IncompleteResultsError):
+        ds.run('{python} -c "breakage"', result_renderer='disabled')
