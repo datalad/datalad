@@ -36,12 +36,12 @@
 
 # 10000-ft. overview
 
-DataLad makes data management and data distribution more accessible.
-To do that, it stands on the shoulders of [Git] and [Git-annex] to deliver a
+DataLad's purpose is to make data management and data distribution more accessible. 
+To do so, it stands on the shoulders of [Git] and [Git-annex] to deliver a
 decentralized system for data exchange. This includes automated ingestion of
 data from online portals and exposing it in readily usable form as Git(-annex)
-repositories, so-called datasets. The actual data storage and permission
-management, however, remains with the original data providers.
+repositories - or datasets. However, the actual data storage and permission
+management remains with the original data provider(s).
 
 The full documentation is available at http://docs.datalad.org and
 http://handbook.datalad.org provides a hands-on crash-course on DataLad.
