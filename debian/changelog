@@ -1,7 +1,10 @@
+
 datalad (0.19.6-2) unstable; urgency=medium
 
   * Remove distutils from *Depends - not needed for a while already
     (Closes: #1065841)
+  * Remove python3-exif from Build-Depends - not needed (functionality moved
+    long ago)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 10 Mar 2024 19:12:04 -0400
 
