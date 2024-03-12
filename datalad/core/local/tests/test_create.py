@@ -32,6 +32,7 @@ from datalad.tests.utils_pytest import (
     has_symlink_capability,
     ok_,
     ok_exists,
+    skip_if,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -60,6 +61,11 @@ def test_create_raises(path=None, outside_path=None):
     ds = Dataset(path)
     # incompatible arguments (annex only):
     assert_raises(ValueError, ds.create, annex=False, description='some')
+    assert_raises(ValueError, ds.create, annex=False, private=True)
+
+    # unsupported feature:
+    if not AnnexRepo._check_version_kludges("annex-supports-private"):
+        assert_raises(ValueError, ds.create, private=True)
 
     with open(op.join(path, "somefile.tst"), 'w') as f:
         f.write("some")
@@ -541,3 +547,25 @@ def test_bad_cfg_proc(path=None):
     assert_raises(ValueError, ds.create, path=path, cfg_proc='unknown')
     # verify that no directory got created prior to the error
     assert not op.isdir(path)
+
+
+@skip_if(cond=not AnnexRepo._check_version_kludges("annex-supports-private"),
+         msg="Private mode not supported by git-annex version")
+@with_tempfile
+def test_create_private(path=None):
+    ds = Dataset(path).create(private=True)
+
+    # check that the config options were set
+    ok_(ds.repo.config.get("annex.private"), "true")
+    ok_(ds.repo.config.get("datalad.clone.reckless"), "private")
+
+    # check that config wasn't ignored, and only private uuid.log exists
+    ok_exists(ds.repo.dot_git / "annex" / "journal-private" / "uuid.log")
+    assert_raises(
+        CommandError,
+        ds.repo.call_git, ["cat-file", "-e", "git-annex:uuid.log"]
+    )
+
+    # check that a created subdatset inherits private config
+    subds = ds.create("sub")
+    ok_(subds.repo.config.get("annex.private"), "true")

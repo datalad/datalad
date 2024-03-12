@@ -149,7 +149,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                  create=True, create_sanity_checks=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None,
-                 repo=None, fake_dates=False):
+                 repo=None, fake_dates=False, private=False):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -187,6 +187,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         description: str, optional
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
+        private: bool, optional
+          Set annex.private=True to make a repository without any
+          mention of it ever appearing in the git-annex branch
         """
 
         # BEGIN Repo validity test
@@ -268,7 +271,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 version = None
 
         if do_init:
-            self._init(version=version, description=description)
+            self._init(version=version, description=description,
+                       private=private)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
         self._direct_mode = None
@@ -555,6 +559,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # applies to find, findref to list all known.
         # was added in 10.20221212-17-g0b2dd374d on 20221220.
         kludges["find-supports-anything"] = ver >= "10.20221213"
+        # annex private mode for clone, get & create
+        kludges["annex-supports-private"] = ver >= "8.20210428"
         # applies to log, unannex and may be other commands,
         # was added 10.20230407 release, respecting core.quotepath
         kludges["quotepath-respected"] = \
@@ -1482,7 +1488,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # minimum git-annex version.
             return True
 
-    def _init(self, version=None, description=None):
+    def _init(self, version=None, description=None, private=False):
         """Initializes an annex repository.
 
         Note: This is intended for private use in this class by now.
@@ -1536,6 +1542,19 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 value=new_value,
                                 scope='local',
                                 reload=False)
+
+        # If requested, set annex.private before git annex init
+        if private:
+            if self._check_version_kludges("annex-supports-private"):
+                self.config.add("annex.private", 'true', scope='local')
+            else:
+                raise ValueError("Installed git-annex does not support private "
+                                 "mode repositories. Requires at least "
+                                 "git-annex 8.20210428. Note, that 'git annex "
+                                 "dead here' may serve the purpose if "
+                                 "recording the existence of this location is "
+                                 "not an issue.")
+
         self._call_annex(['init'] + opts, protocol=AnnexInitOutput)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
