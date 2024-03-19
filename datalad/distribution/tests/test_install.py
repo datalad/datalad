@@ -1057,3 +1057,22 @@ def test_install_recursive_github(path=None):
     ]):
         ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
         eq_(len(ds.subdatasets(recursive=True, state='present')), 2)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_install_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    ds = install(dest, src_path, cfg_proc=['yoda'])
+
+    assert (ds.pathobj / 'README.md').exists()
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_recursive_install_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    src.create('subds')
+    ds = install(dest, src_path, recursive=True, cfg_proc=['yoda'])
+
+    assert (ds.pathobj / 'README.md').exists()
+    assert (ds.pathobj / 'subds' / 'README.md').exists()
