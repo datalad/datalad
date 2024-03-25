@@ -369,14 +369,36 @@ def _is_stream_tty(stream: Optional[IO]) -> bool:
 
 
 def is_interactive() -> bool:
-    """Return True if all in/outs are open and tty.
+    from datalad import cfg
+    return cfg.obtain("datalad.ui.interactive")
 
-    Note that in a somewhat abnormal case where e.g. stdin is explicitly
-    closed, and any operation on it would raise a
-    `ValueError("I/O operation on closed file")` exception, this function
-    would just return False, since the session cannot be used interactively.
+
+def is_interactive_failsafe() -> bool:
+    """Detect interactive session
+
+    This catches any exception when assessing whether standard I/O streams are a
+    terminal, in order to not crash when determining the default value of
+    `datalad.ui.interactive`. If something goes wrong, assume non-interactive
+    and proceed.
+
+    This also sets the environment variable for the `datalad.ui.interactive`
+    config, in order to have subprocesses use the outcome the detection of the
+    superprocess rather than running their own detection, which is (sort of)
+    doomed to not be correct. Note, that detection is only supposed to be
+    triggered if the config wasn't set to begin with.
     """
-    return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
+
+    try:
+        interactive = all(_is_stream_tty(s)
+                          for s in (sys.stdin, sys.stdout, sys.stderr))
+    except Exception as e:
+        # Catch any exception and assume non-interactive mode if anything goes
+        # wrong accessing stdin/stdout/stderr.
+        # Raise log level to DEBUG in this case, though.
+        CapturedException(e, level=logging.DEBUG)
+        interactive = False
+    os.environ['DATALAD_UI_INTERACTIVE'] = str(interactive)
+    return interactive
 
 
 def get_ipython_shell() -> Optional[Any]:
