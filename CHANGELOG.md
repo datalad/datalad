@@ -1,4 +1,15 @@
 
+<a id='changelog-1.0.0'></a>
+# 1.0.0 (2024-04-06)
+
+## 💥 Breaking Changes
+
+- Merging maint to make the first major release.  [PR #7577](https://github.com/datalad/datalad/pull/7577) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🚀 Enhancements and New Features
+
+- Increase minimal Git version to 2.25.  Fixes [#7389](https://github.com/datalad/datalad/issues/7389) via [PR #7431](https://github.com/datalad/datalad/pull/7431) (by [@adswa](https://github.com/adswa))
+
 <a id='changelog-0.19.6'></a>
 # 0.19.6 (2024-02-02)
 
