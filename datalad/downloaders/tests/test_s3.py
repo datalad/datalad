@@ -133,6 +133,16 @@ def test_deny_access():
                 downloader.download("doesn't matter")
 
 
+def test_anonymous_s3(tmp_path):
+    downloader = S3Downloader(authenticator=S3Authenticator())
+    downloader.download(
+        "s3://openneuro.org/ds000001/dataset_description.json",
+        path=str(tmp_path / "dataset_description.json"),
+    )
+    assert (tmp_path / "dataset_description.json").exists()
+
+
+
 @with_tempfile
 def test_boto_host_specification(tempfile=None):
     # This test relies on a yoh-specific set of credentials to access
