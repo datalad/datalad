@@ -79,10 +79,11 @@ class S3Authenticator(Authenticator):
     def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
 
-        Sets up a boto3 S3 client. Uses supplied DataLad credentials,
-        reads credentials from boto configuration sources (environmental
-        variables or config files), or connects anonymously - in that order
-        of preference. Tests the credentials for the given bucket.
+        Sets up a boto3 S3 client. Uses supplied DataLad credentials
+        or connects anonymously - in that order of preference.
+
+        No test is done to verify bucket access, to avoid hitting the case
+        where a bucket cannot be listed but its objects can be accessed.
 
         Returns
         -------
@@ -124,46 +125,20 @@ class S3Authenticator(Authenticator):
                 config=conf,
             )
         else:
-            # let boto try and find credentials from config files or variables,
-            # or connect anonymously if it finds none
-            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
+            # Boto3 has mechanisms to read credentials from the environment
+            # or configuration files.
+            # Signed requests for publicly accessible objects may fail, so
+            # for now we will assume that anonymous access is preferred.
             session = boto3.Session()
-            if session.get_credentials() is not None:
-                conn_kind = "with authentication"
-                s3client = session.client("s3", region_name=self.region, config=conf)
-            else:
-                conn_kind = "anonymously"
-                conf = conf.merge(
-                    botocore.config.Config(signature_version=botocore.UNSIGNED)
-                )
-                s3client = session.client("s3", region_name=self.region, config=conf)
+            conn_kind = "anonymously"
+            conf = conf.merge(
+                botocore.config.Config(signature_version=botocore.UNSIGNED)
+            )
+            s3client = session.client("s3", region_name=self.region, config=conf)
 
         lgr.info(
             "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
         )
-
-        # check if the bucket is accessible
-        # (authentication happens only when request is made)
-        #
-        # note: using head_bucket() to test -- although that
-        # effectively tests for List permission, not file access.  We
-        # would ideally use head_object() instead, but the function in
-        # its current shape only knows the bucket, not the object. Old
-        # boto2 code used connect_s3 & get_bucket, which also led to
-        # head_bucket implicitly, so this is not a regression.
-        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/migrations3.html#accessing-a-bucket
-        try:
-            s3client.head_bucket(Bucket=bucket_name)
-        except botocore.exceptions.ClientError as e:
-            error_code = e.response["Error"]["Code"]
-            if error_code == "403":
-                raise AccessDeniedError(e) from e
-            elif error_code == "404":
-                raise TargetFileAbsent(
-                    "Bucket " + bucket_name + " does not exist"
-                ) from e
-            else:
-                raise
 
         self.client = s3client
         return s3client
