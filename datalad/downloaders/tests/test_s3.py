@@ -133,6 +133,7 @@ def test_deny_access():
                 downloader.download("doesn't matter")
 
 
+@use_cassette('test_anonymous_s3')
 def test_anonymous_s3(tmp_path):
     downloader = S3Downloader(authenticator=S3Authenticator())
     downloader.download(
