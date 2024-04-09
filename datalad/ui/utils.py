@@ -74,3 +74,15 @@ def show_hint(msg):
             ansi_colors.color_word(
                 msg,
                 ansi_colors.YELLOW)))
+
+
+def has_terminal():
+    """Return True if the process has a controlling terminal
+
+    This checks for a controlling terminal on Linux
+    """
+    try:
+        open('/dev/tty', 'r').close()
+        return True
+    except IOError as exc:
+        return False
