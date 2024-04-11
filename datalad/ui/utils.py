@@ -84,5 +84,5 @@ def has_terminal():
     try:
         open('/dev/tty', 'r').close()
         return True
-    except IOError as exc:
+    except (IOError, OSError):
         return False
