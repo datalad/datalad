@@ -76,13 +76,17 @@ def show_hint(msg):
                 ansi_colors.YELLOW)))
 
 
-def has_terminal():
-    """Return True if the process has a controlling terminal
+def can_prompt() -> bool:
+    """Return True if the process can prompt for credentials
 
-    This checks for a controlling terminal on Linux
+    On Linux this method checks for a controlling terminal.
+    On Windows it always returns True.
     """
-    try:
-        open('/dev/tty', 'r').close()
+    if on_windows:
         return True
-    except (IOError, OSError):
-        return False
+    else:
+        try:
+            open('/dev/tty', 'r').close()
+            return True
+        except (IOError, OSError):
+            return False

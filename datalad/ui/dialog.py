@@ -31,7 +31,7 @@ from copy import copy
 from ..utils import auto_repr
 from ..utils import on_windows
 from .base import InteractiveUI
-from .utils import has_terminal
+from .utils import can_prompt
 from datalad.support.exceptions import CapturedException
 
 # Example APIs which might be useful to look for "inspiration"
@@ -359,7 +359,7 @@ class UnderAnnexUI(DialogUI):
                 *args, **kwargs)
 
     def input(self, prompt, hidden=False):
-        if not has_terminal():
+        if not can_prompt():
             # we are not interactive
             raise RuntimeError('Interactive input not available for `ui.input()` in annex remotes')
         return super(UnderAnnexUI, self).input(prompt, hidden)
@@ -371,7 +371,7 @@ class UnderAnnexUI(DialogUI):
                  default=None,
                  hidden=False,
                  repeat=None):
-        if not has_terminal():
+        if not can_prompt():
             # we are not interactive
             raise RuntimeError('Interactive input not available for `ui.question()` in annex remotes')
         return super(UnderAnnexUI, self).question(
