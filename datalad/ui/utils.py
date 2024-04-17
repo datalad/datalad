@@ -81,6 +81,8 @@ def can_prompt() -> bool:
 
     On Linux this method checks for a controlling terminal.
     On Windows it always returns True.
+    Unlike :func:`datalad.utils.is_interactive` it does not check all the streams to be a tty,
+    and just tries to open `/dev/tty` directly.
     """
     if on_windows:
         return True
