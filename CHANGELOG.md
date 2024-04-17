@@ -1,4 +1,14 @@
 
+<a id='changelog-1.0.1'></a>
+# 1.0.1 (2024-04-17)
+
+## 🏠 Internal
+
+- The main entrypoint for annex remotes now also runs the standard extension
+  load hook. This enables extensions to alter annex remote implementation
+  behavior in the same way than other DataLad components.
+  (by [@mih](https://github.com/mih))
+
 <a id='changelog-1.0.0'></a>
 # 1.0.0 (2024-04-06)
 
