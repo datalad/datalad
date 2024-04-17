@@ -372,7 +372,8 @@ class UnderAnnexUI(DialogUI):
                  hidden=False,
                  repeat=None):
         if not can_prompt():
-            # we are not interactive
+            # need to do a more specific that `is_interactive` check, since `is_interactive` checks
+            # all streams including stdin/out which are to "talk" to git-annex, and thus not tty.
             raise RuntimeError('A terminal required for interactive input in annex remotes')
         return super(UnderAnnexUI, self).question(
             text,
