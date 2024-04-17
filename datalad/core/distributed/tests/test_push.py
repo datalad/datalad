@@ -499,11 +499,8 @@ def test_force_checkdatapresent(srcpath=None, dstpath=None):
         # before then -- we would report that update was pushed since update had a
         # slightly different git-annex timestamp locally from the remote, and thus commits
         # were different
-        if external_versions['cmd:annex'] < '10.20231212':
-            assert_in_results(res, action='publish', status='ok',
-                              refspec='refs/heads/git-annex:refs/heads/git-annex')
-        else:
-            raise
+        assert_in_results(res, action='publish', status='ok',
+                          refspec='refs/heads/git-annex:refs/heads/git-annex')
 
     assert_in_results(res, status='ok',
                       path=str(src.pathobj / 'test_mod_annex_file'),
