@@ -373,7 +373,7 @@ class UnderAnnexUI(DialogUI):
                  repeat=None):
         if not can_prompt():
             # we are not interactive
-            raise RuntimeError('Interactive input not available for `ui.question()` in annex remotes')
+            raise RuntimeError('A terminal required for interactive input in annex remotes')
         return super(UnderAnnexUI, self).question(
             text,
             title=title,
