@@ -1,4 +1,11 @@
 
+<a id='changelog-1.0.2'></a>
+# 1.0.2 (2024-04-19)
+
+## 🧪 Tests
+
+- Relax condition in `test_force_checkdatapresent` to avoid flaky test failures.  [PR #7581](https://github.com/datalad/datalad/pull/7581) (by [@christian-monch](https://github.com/christian-monch))
+
 <a id='changelog-1.0.1'></a>
 # 1.0.1 (2024-04-17)
 
