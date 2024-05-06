@@ -38,7 +38,7 @@ from ..s3 import (
 from .test_http import check_download_external_url
 from .utils import get_test_providers
 
-skip_if_no_module('boto')
+skip_if_no_module('boto3')
 skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'

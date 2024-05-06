@@ -38,7 +38,7 @@ from ..support.status import FileStatus
 import logging
 from logging import getLogger
 lgr = getLogger('datalad.s3')
-boto_lgr = logging.getLogger('boto')
+boto_lgr = logging.getLogger('boto3')
 # not in effect at all, probably those are setup later
 #boto_lgr.handlers = lgr.handlers  # Use our handlers
 
