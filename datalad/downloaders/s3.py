@@ -147,12 +147,15 @@ class S3Authenticator(Authenticator):
 @auto_repr
 class S3DownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None, url=None, headers=None,
-                 client=None, download_kwargs=None):
+                 client=None,
+                 bucket: str=None, key: str=None, version_kwargs: dict=None):
         super(S3DownloaderSession, self).__init__(
             size=size, filename=filename, headers=headers, url=url
         )
         self.client = client
-        self.download_kwargs = download_kwargs
+        self.bucket = bucket
+        self.key = key
+        self.version_kwargs = version_kwargs
 
     def download(self, f=None, pbar=None, size=None):
         # S3 specific (the rest is common with e.g. http)
@@ -164,21 +167,42 @@ class S3DownloaderSession(DownloaderSession):
                     pass  # do not let pbar spoil our fun
 
         if f:
-            # TODO: May be we could use If-Modified-Since
-            # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-            # note (MSz): in boto3, see client.head_object(IfModifiedSince)
-            self.client.download_fileobj(
-                Fileobj=f,
-                Callback=pbar_callback,
-                **self.download_kwargs,  # Bucket, Key, ExtraArgs
-            )
+            if size is None:
+                # TODO: May be we could use If-Modified-Since
+                # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
+                # note (MSz): in boto3, see client.head_object(IfModifiedSince)
+                self.client.download_fileobj(
+                    Fileobj=f,
+                    Callback=pbar_callback,
+                    Bucket=self.bucket,
+                    Key=self.key,
+                    ExtraArgs=self.version_kwargs,
+                )
+                return
+            # The problem is that there is no Range support in download_fileobj
+            # https://github.com/boto/boto3/issues/1215 ,
+            # so we have to use get_object, and will just save it into a file.
+            # It will not work for large transfers, but hopefully we do not have them
+            # for file downloads
+
+        # return the contents of the file as bytes
+        # ATM no progress indication!
+        kwargs = dict(Bucket=self.bucket, Key=self.key, **self.version_kwargs)
+        if size is not None:
+            # This will work only for relatively small transfers but
+            # in general we do not expect requests with large-ish size.
+            kwargs['Range'] = f'bytes=0-{size - 1}'
+        s3_response = self.client.get_object(
+            **kwargs,
+            # There is no callback for get_object!
+            # Callback=pbar_callback,
+        )
+        content = s3_response.get('Body').read()
+        if f:
+            f.write(content)
         else:
-            # return the contents of the file as bytes
-            s3_response = self.client.get_object(
-                **self.download_kwargs,  # Bucket, Key, ExtraArgs
-                Callback=pbar_callback,
-            )
-            return s3_response.get('Body').read()
+            return content
+
 
 @auto_repr
 class S3Downloader(BaseDownloader):
@@ -286,9 +310,9 @@ class S3Downloader(BaseDownloader):
             if newkeys:
                 raise NotImplementedError("Did not implement support for %s" % newkeys)
             # see: boto3.s3.transfer.S3Transfer.ALLOWED_DOWNLOAD_ARGS
-            extra_args = {"VersionId": params.get("versionId")}
+            version_kwargs = {"VersionId": params.get("versionId")}
         else:
-            extra_args = {}
+            version_kwargs = {}
 
         assert(self._bucket_name == bucket_name)  # must be the same
 
@@ -301,7 +325,7 @@ class S3Downloader(BaseDownloader):
             object_meta = self.client.head_object(
                 Bucket=bucket_name,
                 Key=url_filepath,
-                **extra_args,
+                **version_kwargs,
             )
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
@@ -309,9 +333,17 @@ class S3Downloader(BaseDownloader):
                 raise AccessDeniedError(e) from e
             elif error_code == "404":
                 raise TargetFileAbsent(url + " does not exist") from e
+            elif error_code == '400' and version_kwargs:
+                try:
+                    self.client.head_object(
+                        Bucket=bucket_name,
+                        Key=url_filepath,
+                    )
+                    raise TargetFileAbsent(url + " has unknown version specified") from e
+                except botocore.exceptions.ClientError as e2:
+                    raise e
             else:
                 raise
-
 
         target_size = object_meta.get('ContentLength')  # S3 specific
         headers = self.get_obj_headers(
@@ -335,21 +367,15 @@ class S3Downloader(BaseDownloader):
         # again to get versioned one first.
         # TODO: ask NDA to allow download of specific versionId?
 
-        # download_fileobj has slightly different signature than head_object
-        # we need to pass things below to the S3DownloaderSession
-        s3_download_kwargs = {
-            "Bucket": bucket_name,
-            "Key": url_filepath,
-            "ExtraArgs": extra_args if len(extra_args) > 0 else None,
-        }
-
         return S3DownloaderSession(
             size=target_size,
             filename=url_filename,
             url=url,
             headers=headers,
             client=self.client,
-            download_kwargs=s3_download_kwargs,
+            bucket=bucket_name,
+            key=url_filepath,
+            version_kwargs=version_kwargs,
         )
 
     @classmethod
