@@ -38,6 +38,7 @@ jobs:
   check-sync:
     name: Check that "master" contains everything from "maint" if PR against "master" is marked for a release
     runs-on: ubuntu-latest
+    if: github.repository == 'datalad/datalad'
     steps:
       - name: 'Checkout Code'
         uses: actions/checkout@v4
