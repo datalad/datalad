@@ -170,9 +170,9 @@ environment:
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
 
     # Test alternative Python versions
-    - ID: Ubu22P311a
+    - ID: Ubu22P312a
       # ~35min
-      PY: 3.11
+      PY: 3.12
       DTS: >
           datalad.cli
           datalad.core
@@ -185,9 +185,9 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m datalad/packages
-    - ID: Ubu22P311b
+    - ID: Ubu22P312b
       # ~25min
-      PY: 3.11
+      PY: 3.12
       DTS: >
           datalad.downloaders
           datalad.interface
