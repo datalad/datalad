@@ -212,9 +212,16 @@ def _describe_configuration(cfg, sensitive):
 
 def _describe_extensions():
     infos = {}
+    # Use iter_entrypoints not iter_extensions to be able to
+    # state on either it is enabled or to gather more relevant
+    # information on in case of failed loads etc.
     from datalad.support.entrypoints import iter_entrypoints
     from importlib import import_module
-
+    from datalad import cfg
+    load_extensions_cfg = cfg.get('datalad.extensions.load', get_all=True)
+    if load_extensions_cfg:
+        from datalad.utils import ensure_iter
+        load_extensions_cfg = ensure_iter(load_extensions_cfg, set)
     for ename, emod, eload in iter_entrypoints('datalad.extensions'):
         info = {}
         infos[ename] = info
@@ -222,6 +229,10 @@ def _describe_extensions():
             ext = eload()
             info['description'] = ext[0]
             info['module'] = emod
+            info['enabled'] = (
+                load_extensions_cfg is None
+                or ename in load_extensions_cfg
+            )
             mod = import_module(emod, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
         except Exception as e:

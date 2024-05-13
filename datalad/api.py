@@ -43,7 +43,7 @@ if not datalad.in_librarymode():
 def _generate_extension_api():
     """Auto detect all available extensions and generate an API from them
     """
-    from datalad.support.entrypoints import iter_entrypoints
+    from datalad.support.entrypoints import iter_extensions
     from datalad.interface.base import (
         get_api_name,
         load_interface,
@@ -52,8 +52,7 @@ def _generate_extension_api():
     import logging
     lgr = logging.getLogger('datalad.api')
 
-    for ename, _, (grp_descr, interfaces) in iter_entrypoints(
-            'datalad.extensions', load=True):
+    for ename, _, (grp_descr, interfaces) in iter_extensions(load=True):
         for intfspec in interfaces:
             # turn the interface spec into an instance
             intf = load_interface(intfspec[:2])

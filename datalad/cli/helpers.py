@@ -187,8 +187,8 @@ class LogLevelAction(argparse.Action):
 
 
 def add_entrypoints_to_interface_groups(interface_groups):
-    from datalad.support.entrypoints import iter_entrypoints
-    for name, _, spec in iter_entrypoints('datalad.extensions', load=True):
+    from datalad.support.entrypoints import iter_extensions
+    for name, _, spec in iter_extensions(load=True):
         if len(spec) < 2 or not spec[1]:
             # entrypoint identity was logged by the iterator already
             lgr.debug('Extension does not provide a command suite')
