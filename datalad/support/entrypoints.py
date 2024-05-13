@@ -68,20 +68,27 @@ def iter_entrypoints(group, load=False):
 def load_extensions():
     """Load entrypoint for any configured extension package
 
-    Log a warning in case a requested extension is not available, or if
-    a requested extension fails on load.
+    By default, all extensions are loaded.  'datalad.extensions.load'
+    can be used to configure which specific extensions to load.
+    An explicitly set empty value avoids loading any extension.
 
-    Extensions to load are taken from the 'datalad.extensions.load'
-    configuration item.
+    Logs a warning in case a requested extension is not available, or if
+    an extension fails on load.
     """
     from datalad import cfg
     load_extensions = cfg.get('datalad.extensions.load', get_all=True)
-    if load_extensions:
+    if load_extensions == '':
+        # empty value is an explicit way to disable loading any extension
+        lgr.debug("Not loading any extensions as requested")
+    else:
         from datalad.utils import ensure_list
         exts = {
             ename: eload
             for ename, _, eload in iter_entrypoints('datalad.extensions')
         }
+        if load_extensions is None:
+            # no explicit list of extensions was requested - load all
+            load_extensions = exts
         for el in ensure_list(load_extensions):
             if el not in exts:
                 lgr.warning('Requested extension %r is not available', el)
