@@ -235,7 +235,7 @@ jobs:
         working-directory: __testhome__
 
       - name: Upload coverage to Codecov
-        if: github.event_name == 'schedule'
+        if: github.event_name != 'schedule'
         uses: codecov/codecov-action@v4
         with:
           directory: __testhome__
