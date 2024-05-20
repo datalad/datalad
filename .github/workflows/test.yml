@@ -12,8 +12,8 @@ concurrency:
 
 defaults:
   run:
-    # Use a login shell so that ~/.bashrc is sourced:
-    shell: 'bash -leo pipefail {0}'
+    # Use an interactive shell so that ~/.bashrc is sourced:
+    shell: 'bash -eio pipefail {0}'
 
 env:
    # Note, that there's "turtle" as well, which is always excluded from running.
@@ -129,8 +129,8 @@ jobs:
           eval datalad-installer --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO:-$DEFAULT_ANNEX_INSTALL_SCENARIO}
           # Append new.env to ~/.bashrc instead of $GITHUB_OUTPUT because it
           # can include `source` and `conda activate` commands that are invalid
-          # for the latter; this also necessitates using a login shell for the
-          # workflow.
+          # for the latter; this also necessitates using an interactive shell
+          # for the workflow.
           cat new.env >> ~/.bashrc
 
       - name: Install Python dependencies
