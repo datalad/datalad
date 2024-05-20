@@ -115,13 +115,13 @@ jobs:
         if: matrix.upstream-git
         run: |
           source tools/ci/install-upstream-git.sh
-          echo PATH="$PATH" >> "$GITHUB_ENV"
+          echo "$target_dir/bin-wrappers" >> "$GITHUB_PATH"
 
       - name: Install minimum Git
         if: matrix.minimum-git
         run: |
           tools/ci/install-minimum-git.sh
-          echo PATH="$PWD/git-src/bin-wrappers/:$PATH" >> "$GITHUB_ENV"
+          echo "$PWD/git-src/bin-wrappers" >> "$GITHUB_PATH"
 
       - name: Install git-annex
         run: |
