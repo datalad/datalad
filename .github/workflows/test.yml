@@ -214,7 +214,7 @@ jobs:
 
     env: ${{ matrix.extra-envs }}
     if: "!matrix.cron-only || github.event_name == 'schedule'"
-    continue-on-error: matrix.allow-failure
+    continue-on-error: ${{ matrix.allow-failure }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
