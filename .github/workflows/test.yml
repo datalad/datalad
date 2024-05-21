@@ -89,6 +89,7 @@ jobs:
           # needed for tests of patool compression fall-back solution
           sudo eatmydata apt-get install xz-utils
           sudo eatmydata apt-get install shunit2
+          [ -z "$LC_ALL" ] || sudo eatmydata apt-get install locales-all
 
       - name: Configure _DL_TMPDIR before installing git-annex
         run: |
