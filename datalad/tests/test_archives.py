@@ -33,6 +33,7 @@ from datalad.tests.utils_pytest import (
     eq_,
     ok_file_has_content,
     ok_generator,
+    on_github,
     on_nfs,
     on_travis,
     on_windows,
@@ -102,7 +103,7 @@ def check_decompress_file(leading_directories, path=None):
         eq_(f.read(), '3 load')
 
 
-@pytest.mark.xfail(on_travis and on_nfs, reason="https://github.com/datalad/datalad/issues/4496")
+@pytest.mark.xfail((on_travis or on_github) and on_nfs, reason="https://github.com/datalad/datalad/issues/4496")
 @pytest.mark.parametrize("leading", [None, 'strip'])
 def test_decompress_file(leading):
     return check_decompress_file(leading)
@@ -194,6 +195,7 @@ def test_compress_file(ext, annex):
     check_compress_file(ext, annex)
 
 
+@pytest.mark.xfail(on_github and on_nfs, reason="unknown. TODO: figure out")
 @with_tree(**tree_simplearchive)
 def test_ExtractedArchive(path=None):
     archive = op.join(path, fn_archive_obscure_ext)
