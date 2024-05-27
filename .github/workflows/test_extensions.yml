@@ -65,6 +65,10 @@ jobs:
           datalad-container)
             DL_NEED_SINGULARITY=1;;
         esac
+        case ${{ matrix.extension }} in
+          datalad-next)
+            DATALAD_EXTENSIONS_LOAD=next;;
+        esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
         echo "DL_APT_INSTALLS=$DL_APT_INSTALLS"
@@ -73,7 +77,7 @@ jobs:
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
         echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
         } >> "$GITHUB_ENV"
-        
+
     - name: Clone and install ${{ matrix.extension }} extension
       run: |
         git clone https://github.com/$DL_REPO __extension__
