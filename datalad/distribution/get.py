@@ -22,7 +22,10 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.distribution.utils import _get_flexible_source_candidates
+from datalad.distribution.utils import (
+    _get_flexible_source_candidates,
+    rewrite_match_scheme,
+)
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -109,6 +112,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       ria-schemes (ria+http, ria+ssh, etc.)
 
     - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
+
+    - In case the parent dataset url scheme doesnt match the submodule URL one,
+      attempt a rewrite to match the parent one (cost 610).
 
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
@@ -229,6 +235,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         remote_url,
                         alternate_suffix=False)
                 )
+                rewriten_url = rewrite_match_scheme(remote_url, sm_url)
+                if rewriten_url:
+                    clone_urls.append(dict(cost=610, name=remote, url=rewriten_url))
 
     cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'

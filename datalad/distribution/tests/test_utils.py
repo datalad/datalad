@@ -12,7 +12,10 @@
 import os
 from os.path import join as opj
 
-from datalad.distribution.utils import _get_flexible_source_candidates
+from datalad.distribution.utils import (
+    _get_flexible_source_candidates,
+    rewrite_match_scheme,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
     assert_raises,
@@ -24,6 +27,13 @@ from datalad.utils import (
     on_windows,
     unlink,
 )
+
+
+def test_rewrite_match_scheme():
+    ssh_url = "git@domain.com:user/repo.git"
+    https_url = "https://domain.com/user/repo.git"
+    assert rewrite_match_scheme(ssh_url, https_url) == ssh_url
+    assert rewrite_match_scheme(https_url, ssh_url) == https_url
 
 
 @known_failure_windows
