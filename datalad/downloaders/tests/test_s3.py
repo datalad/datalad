@@ -231,6 +231,7 @@ def _test_expiring_token(outdir):
 
     generated = []
     def _gen_session_token(_, key_id=None, secret_id=None):
+        # TODO: RF for boto3
         from boto.sts.connection import STSConnection
         sts = STSConnection(aws_access_key_id=key_id,
                             aws_secret_access_key=secret_id)
