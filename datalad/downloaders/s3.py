@@ -42,6 +42,9 @@ boto_lgr = logging.getLogger('boto3')
 # not in effect at all, probably those are setup later
 #boto_lgr.handlers = lgr.handlers  # Use our handlers
 
+import warnings
+
+
 __docformat__ = 'restructuredtext'
 
 
@@ -58,23 +61,22 @@ class S3Authenticator(Authenticator):
         Parameters
         ----------
         host: str, optional
-          this argument is deprecated and will be ignored; define region
-          instead (you can also define a default region in your ~/.aws/config
-          file or by setting the AWS_DEFAULT_REGION environment variable)
+          A URL to the endpoint or just a host name (then prepended with https://).
+          Define either `host` or `region`, not both.
         region: str, optional
-          will be passed to s3 client as region_name
+          will be passed to s3 client as region_name.
+          Default region could also be defined in the `~/.aws/config`
+          file or by setting the AWS_DEFAULT_REGION environment variable.
         """
         super(S3Authenticator, self).__init__(*args, **kwargs)
         self.client = None
         self.region = region
         if host:
-            warnings.warn(
-                "Host argument is deprecated and will be ignored. "
-                "Use 'region' argument instead, or define a default region "
-                "in your ~/aws/config file, or set the environment variable "
-                "AWS_DEFAULT_REGION",
-                DeprecationWarning
-            )
+            if region:
+                raise ValueError("Define either 'host' or 'region', not both.")
+            if not (host.startswith('http://') or host.startswith('https://')):
+                host = 'https://' + host
+        self.host = host
 
     def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
@@ -119,6 +121,7 @@ class S3Authenticator(Authenticator):
             s3client = boto3.client(
                 "s3",
                 region_name=self.region,
+                endpoint_url=self.host,
                 aws_access_key_id=credentials["key_id"],
                 aws_secret_access_key=credentials["secret_id"],
                 aws_session_token=credentials.get("session"),
