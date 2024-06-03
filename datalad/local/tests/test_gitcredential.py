@@ -182,7 +182,7 @@ def test_credential_cycle(path=None):
 """)
     ds.save(message="Add provider config")
 
-    gitcred = GitCredentialInterface(url="https://some.data.exampe.com",
+    gitcred = GitCredentialInterface(url="https://some.data.example.com",
                                      repo=ds)
 
     # There's nothing set up yet, helper should return empty.

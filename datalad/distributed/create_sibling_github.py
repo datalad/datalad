@@ -153,7 +153,7 @@ class CreateSiblingGithub(Interface):
        The ``github_login||--github-login`` option will be removed in a future
        release, use the ``credential||--credential`` option instead.
        The ``github_organization||--github-organization`` option will be
-       removed in a future release, prefix the reposity name with ``<org>/``
+       removed in a future release, prefix the repository name with ``<org>/``
        instead.
     """
 
@@ -286,7 +286,7 @@ class CreateSiblingGithub(Interface):
             warnings.warn(
                 "datalad-create-sibling-github's `github_organization` "
                 "option is deprecated and will be removed in a future "
-                "release, prefix the reposity name with `<org>/` instead.",
+                "release, prefix the repository name with `<org>/` instead.",
                 DeprecationWarning)
             reponame = f'{github_organization}/{reponame}'
 
