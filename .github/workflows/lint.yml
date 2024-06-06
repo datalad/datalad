@@ -4,6 +4,11 @@ on:
   - push
   - pull_request
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+
 jobs:
   lint:
     runs-on: ubuntu-latest

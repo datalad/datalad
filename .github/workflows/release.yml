@@ -13,6 +13,11 @@ on:
   # workflow's page:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+
 jobs:
   release:
     runs-on: ubuntu-latest
