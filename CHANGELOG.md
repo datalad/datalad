@@ -1,4 +1,23 @@
 
+<a id='changelog-1.1.0'></a>
+# 1.1.0 (2024-06-06)
+
+## 🔩 Dependencies
+
+- Deprecated `boto` is replaced with `boto3` (used to handle AWS S3
+  downloads). Fixes [#5597](https://github.com/datalad/datalad/issues/5597)
+  via [PR #7340](https://github.com/datalad/datalad/pull/7340)
+  (by [@mslw](https://github.com/mslw), [@effigies](https://github.com/effigies), and [@yarikoptic](https://github.com/yarikoptic)).
+  Remaining issues:
+  - no download progress indication,
+  - no "Range" support (for partial downloads).
+
+## 🏠 Internal
+
+- Retry logic for S3 connections is now handed over to Boto3 and its
+  standard mode, removing our custom method.
+  [PR #7340](https://github.com/datalad/datalad/pull/7340)
+
 <a id='changelog-1.0.3'></a>
 # 1.0.3 (2024-06-06)
 
