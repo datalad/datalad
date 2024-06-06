@@ -4846,7 +4846,7 @@ New features and bugfix release
 
 New feature and bugfix release
 
-- greately improved documentation
+- greatly improved documentation
 - publish command API RFing allows for custom options to annex, and uses
   --to REMOTE for consistent with annex invocation
 - variety of fixes and enhancements throughout

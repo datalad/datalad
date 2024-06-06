@@ -109,7 +109,7 @@ def test_save(path=None):
             f.write(fn)
 
     ds.save([op.join(path, f) for f in files])
-    # superfluous call to save (alll saved it already), should not fail
+    # superfluous call to save (all saved it already), should not fail
     # but report that nothing was saved
     assert_status('notneeded', ds.save(message="set of new files"))
     assert_repo_status(path, annex=isinstance(ds.repo, AnnexRepo))
