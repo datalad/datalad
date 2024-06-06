@@ -21,7 +21,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 [![RRID](https://img.shields.io/badge/RRID-SCR__003931-blue)](https://identifiers.org/RRID:SCR_003931)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-50-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-51-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ## Distribution
@@ -248,6 +248,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Aksoo"><img src="https://avatars.githubusercontent.com/u/141905668?v=4?s=100" width="100px;" alt="Aksoo"/><br /><sub><b>Aksoo</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=Aksoo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dguibert"><img src="https://avatars.githubusercontent.com/u/1178864?v=4?s=100" width="100px;" alt="David Guibert"/><br /><sub><b>David Guibert</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=dguibert" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
