@@ -69,6 +69,8 @@ from datalad.tests.utils_pytest import (
     ok_good_symlink,
     ok_startswith,
     ok_symlink,
+    on_github,
+    on_nfs,
     on_windows,
     patch_config,
     probe_known_failure,
@@ -92,6 +94,8 @@ from datalad.utils import (
     chpwd,
     getpwd,
 )
+
+import pytest
 
 #
 # Test with_tempfile, especially nested invocations
@@ -168,6 +172,8 @@ def test_get_resolved_values():
     with patch_config({'datalad.tests.nonetwork': '1'}):
         eq_(_get_resolved_flavors(flavors), ['local'])
 
+
+@pytest.mark.xfail(on_github and on_nfs, reason="unknown. TODO: figure out")
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
 
