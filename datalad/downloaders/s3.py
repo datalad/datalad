@@ -10,8 +10,10 @@
 """
 
 import re
-
 from urllib.parse import urlsplit, unquote as urlunquote
+
+import boto3
+import botocore
 
 from ..utils import (
     auto_repr,
@@ -22,33 +24,26 @@ from ..dochelpers import (
 )
 from ..support.network import (
     get_url_straight_filename,
-    iso8601_to_epoch,
-    rfc2822_to_epoch,
 )
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
 from ..support.exceptions import (
+    AccessDeniedError,
     AccessPermissionExpiredError,
-    CapturedException,
     TargetFileAbsent,
-)
-from ..support.s3 import (
-    Key,
-    OrdinaryCallingFormat,
-    S3ResponseError,
-    boto,
-    get_bucket,
-    try_multiple_dec_s3,
 )
 from ..support.status import FileStatus
 
 import logging
 from logging import getLogger
 lgr = getLogger('datalad.s3')
-boto_lgr = logging.getLogger('boto')
+boto_lgr = logging.getLogger('boto3')
 # not in effect at all, probably those are setup later
 #boto_lgr.handlers = lgr.handlers  # Use our handlers
+
+import warnings
+
 
 __docformat__ = 'restructuredtext'
 
@@ -60,32 +55,45 @@ class S3Authenticator(Authenticator):
     allows_anonymous = True
     DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
 
-    def __init__(self, *args, host=None, **kwargs):
+    def __init__(self, *args, host=None, region=None, **kwargs):
         """
 
         Parameters
         ----------
         host: str, optional
-          In some cases it is necessary to provide host to connect to. Passed
-          to boto.connect_s3
+          A URL to the endpoint or just a host name (then prepended with https://).
+          Define either `host` or `region`, not both.
+        region: str, optional
+          will be passed to s3 client as region_name.
+          Default region could also be defined in the `~/.aws/config`
+          file or by setting the AWS_DEFAULT_REGION environment variable.
         """
         super(S3Authenticator, self).__init__(*args, **kwargs)
-        self.connection = None
-        self.bucket = None
-        self._conn_kwargs = {}
+        self.client = None
+        self.region = region
         if host:
-            self._conn_kwargs['host'] = host
+            if region:
+                raise ValueError("Define either 'host' or 'region', not both.")
+            if not (host.startswith('http://') or host.startswith('https://')):
+                host = 'https://' + host
+        self.host = host
 
     def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
 
+        Sets up a boto3 S3 client. Uses supplied DataLad credentials
+        or connects anonymously - in that order of preference.
+
+        No test is done to verify bucket access, to avoid hitting the case
+        where a bucket cannot be listed but its objects can be accessed.
+
         Returns
         -------
-        bucket
+        s3client: botocore.client.S3
         """
 
-        if not boto:
-            raise RuntimeError("%s requires boto module which is N/A" % self)
+        if not boto3:
+            raise RuntimeError("%s requires boto3 module which is N/A" % self)
 
         # Shut up boto if we do not care to listen ;)
         boto_lgr.setLevel(
@@ -94,65 +102,109 @@ class S3Authenticator(Authenticator):
             else logging.DEBUG
         )
 
+        # use boto3 standard retry mode, not legacy
+        conf_options = {"retries": {"mode": "standard"}}
+
+        # per http://stackoverflow.com/a/19089045/1265472 & updated for boto3
+        if bucket_name.lower() != bucket_name or "." in bucket_name:
+            conf_options["s3"] = {"addressing_style": "path"}
+
+        conf = botocore.config.Config(**conf_options)
+
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
-        conn_kwargs = self._conn_kwargs.copy()
-        if bucket_name.lower() != bucket_name:
-            # per http://stackoverflow.com/a/19089045/1265472
-            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
 
         if credential is not None:
             credentials = credential()
             conn_kind = "with authentication"
-            conn_args = [credentials['key_id'], credentials['secret_id']]
-            conn_kwargs['security_token'] = credentials.get('session')
+            s3client = boto3.client(
+                "s3",
+                region_name=self.region,
+                endpoint_url=self.host,
+                aws_access_key_id=credentials["key_id"],
+                aws_secret_access_key=credentials["secret_id"],
+                aws_session_token=credentials.get("session"),
+                config=conf,
+            )
         else:
+            # Boto3 has mechanisms to read credentials from the environment
+            # or configuration files.
+            # Signed requests for publicly accessible objects may fail, so
+            # for now we will assume that anonymous access is preferred.
+            session = boto3.Session()
             conn_kind = "anonymously"
-            conn_args = []
-            conn_kwargs['anon'] = True
-        if '.' in bucket_name:
-            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
+            conf = conf.merge(
+                botocore.config.Config(signature_version=botocore.UNSIGNED)
+            )
+            s3client = session.client("s3", region_name=self.region, config=conf)
 
         lgr.info(
             "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
         )
-        self.connection = conn = boto.connect_s3(*conn_args, **conn_kwargs)
-        self.bucket = bucket = get_bucket(conn, bucket_name)
-        return bucket
+
+        self.client = s3client
+        return s3client
 
 
 @auto_repr
 class S3DownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None, url=None, headers=None,
-                 key=None):
+                 client=None,
+                 bucket: str=None, key: str=None, version_kwargs: dict=None):
         super(S3DownloaderSession, self).__init__(
             size=size, filename=filename, headers=headers, url=url
         )
+        self.client = client
+        self.bucket = bucket
         self.key = key
+        self.version_kwargs = version_kwargs
 
     def download(self, f=None, pbar=None, size=None):
         # S3 specific (the rest is common with e.g. http)
-        def pbar_callback(downloaded, totalsize):
-            assert (totalsize == self.key.size)
+        def pbar_callback(downloaded):
             if pbar:
                 try:
-                    pbar.update(downloaded)
+                    pbar.update(downloaded, increment=True)
                 except:  # MIH: what does it do? MemoryError?
                     pass  # do not let pbar spoil our fun
 
-        headers = {}
-        # report for every % for files > 10MB, otherwise every 10%
-        kwargs = dict(headers=headers, cb=pbar_callback,
-                      num_cb=100 if self.key.size > 10*(1024**2) else 10)
-        if size:
-            headers['Range'] = 'bytes=0-%d' % (size - 1)
         if f:
-            # TODO: May be we could use If-Modified-Since
-            # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-            self.key.get_contents_to_file(f, **kwargs)
+            if size is None:
+                # TODO: May be we could use If-Modified-Since
+                # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
+                # note (MSz): in boto3, see client.head_object(IfModifiedSince)
+                self.client.download_fileobj(
+                    Fileobj=f,
+                    Callback=pbar_callback,
+                    Bucket=self.bucket,
+                    Key=self.key,
+                    ExtraArgs=self.version_kwargs,
+                )
+                return
+            # The problem is that there is no Range support in download_fileobj
+            # https://github.com/boto/boto3/issues/1215 ,
+            # so we have to use get_object, and will just save it into a file.
+            # It will not work for large transfers, but hopefully we do not have them
+            # for file downloads
+
+        # return the contents of the file as bytes
+        # ATM no progress indication!
+        kwargs = dict(Bucket=self.bucket, Key=self.key, **self.version_kwargs)
+        if size is not None:
+            # This will work only for relatively small transfers but
+            # in general we do not expect requests with large-ish size.
+            kwargs['Range'] = f'bytes=0-{size - 1}'
+        s3_response = self.client.get_object(
+            **kwargs,
+            # There is no callback for get_object!
+            # Callback=pbar_callback,
+        )
+        content = s3_response.get('Body').read()
+        if f:
+            f.write(content)
         else:
-            return self.key.get_contents_as_string(encoding=None, **kwargs)
+            return content
 
 
 @auto_repr
@@ -165,14 +217,16 @@ class S3Downloader(BaseDownloader):
     @borrowkwargs(BaseDownloader)
     def __init__(self, **kwargs):
         super(S3Downloader, self).__init__(**kwargs)
-        self._bucket = None
+        self._client = None
+        self._bucket_name = None
 
     @property
-    def bucket(self):
-        return self._bucket
+    def client(self):
+        return self._client
 
     def reset(self):
-        self._bucket = None
+        self._client = None
+        self._bucket_name = None
 
     @classmethod
     def _parse_url(cls, url, bucket_only=False):
@@ -210,8 +264,8 @@ class S3Downloader(BaseDownloader):
           To state if old instance of a session/authentication was used
         """
         bucket_name = self._parse_url(url, bucket_only=True)
-        if allow_old and self._bucket:
-            if self._bucket.name == bucket_name:
+        if allow_old and self.client is not None:
+            if self._bucket_name == bucket_name:
                 try:
                     self._check_credential()
                     lgr.debug(
@@ -225,8 +279,9 @@ class S3Downloader(BaseDownloader):
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
 
         lgr.debug("S3 session: Reconnecting to the bucket")
-        self._bucket = try_multiple_dec_s3(self.authenticator.authenticate)(
+        self._client = self.authenticator.authenticate(
             bucket_name, self.credential)
+        self._bucket_name = bucket_name
         return False
 
     def _check_credential(self):
@@ -241,168 +296,110 @@ class S3Downloader(BaseDownloader):
             raise AccessPermissionExpiredError(
                 "Credential %s has expired" % self.credential)
 
-    def _get_key(self, key_name, version_id=None, headers=None):
-        try:
-            return self._bucket.get_key(key_name, version_id=version_id, headers=headers)
-        except S3ResponseError as e:
-            if e.status != 400:
-                raise  # we will not deal with those here
-            # e.g. 400 Bad request could happen due to timed out key.
-            # Since likely things went bad if credential expired, just raise general
-            # AccessDeniedError. Logic upstream should retry
-            self._check_credential()
-            ce1 = CapturedException(e)
-            lgr.debug("bucket.get_key (HEAD) failed with %s, trying GET request now",
-                      ce1)
-            try:
-                return self._get_key_via_get(key_name, version_id=version_id, headers=headers)
-            except S3ResponseError:
-                # propagate S3 exceptions since they actually can provide the reason why we failed!
-                raise
-            except Exception as e2:
-                ce2 = CapturedException(e2)
-                lgr.debug("We failed to get a key via HEAD due to %s and then via partial GET due to %s",
-                          ce1, ce2)
-                # reraise original one
-                raise e
-
-    def _get_key_via_get(self, key_name, version_id=None, headers=None):
-        """Get key information via GET so we can get error_code if any
-
-        The problem with bucket.get_key is that it uses HEAD request.
-        With that request response header has only the status (e.g. 400)
-        but not a specific error_code.  That makes it impossible to properly
-        react on failed requests (wait? re-auth?).
-
-        Yarik found no easy way in boto to reissue the request with GET,
-        so this code is lobotomized version of _get_key_internal but with GET
-        instead of HEAD and thus providing body into error handling.
-        """
-        query_args_l = []
-        if version_id:
-            query_args_l.append('versionId=%s' % version_id)
-        query_args = '&'.join(query_args_l) or None
-        bucket = self._bucket
-        headers = headers or {}
-        headers['Range'] = 'bytes=0-0'
-        response = bucket.connection.make_request(
-            'GET',
-            bucket.name,
-            key_name,
-            headers=headers,
-            query_args=query_args)
-        body = response.read()
-        if response.status // 100 == 2:
-            # it was all good
-            k = bucket.key_class(bucket)
-            provider = bucket.connection.provider
-            k.metadata = boto.utils.get_aws_metadata(response.msg, provider)
-            for field in Key.base_fields:
-                k.__dict__[field.lower().replace('-', '_')] = \
-                    response.getheader(field)
-            crange, crange_size = response.getheader('content-range'), None
-            if crange:
-                # should look like 'bytes 0-0/50993'
-                if not crange.startswith('bytes 0-0/'):
-                    # we will just spit out original exception and be done -- we have tried!
-                    raise ValueError("Got content-range %s which I do not know how to handle to "
-                                     "get the full size" % repr(crange))
-                crange_size = int(crange.split('/', 1)[-1])
-                k.size = crange_size
-            # the following machinations are a workaround to the fact that
-            # apache/fastcgi omits the content-length header on HEAD
-            # requests when the content-length is zero.
-            # See http://goo.gl/0Tdax for more details.
-            if response.status != 206:  # partial content
-                # assume full return of 0 bytes etc
-                clen_size = int(response.getheader('content-length'), 0)
-
-                if crange_size is not None:
-                    if crange_size != clen_size:
-                        raise ValueError(
-                            "We got content-length %d and size from content-range %d - they do "
-                            "not match", clen_size, crange_size)
-                k.size = clen_size
-            k.name = key_name
-            k.handle_version_headers(response)
-            k.handle_encryption_headers(response)
-            k.handle_restore_headers(response)
-            k.handle_storage_class_header(response)
-            k.handle_addl_headers(response.getheaders())
-            return k
-        else:
-            if response.status == 404:
-                return None
-            else:
-                raise bucket.connection.provider.storage_response_error(
-                    response.status, response.reason, body)
-
     def get_downloader_session(self, url, **kwargs):
+        """Create a DownloaderSession for a given URL
+
+        This function sets up a DownloaderSession object and reads the
+        information necessary (e.g. size, headers) by issuing a
+        head_object query.
+
+        Returns
+        -------
+        S3DownloaderSession
+        """
         bucket_name, url_filepath, params = self._parse_url(url)
         if params:
             newkeys = set(params.keys()) - {'versionId'}
             if newkeys:
                 raise NotImplementedError("Did not implement support for %s" % newkeys)
-        assert(self._bucket.name == bucket_name)  # must be the same
+            # see: boto3.s3.transfer.S3Transfer.ALLOWED_DOWNLOAD_ARGS
+            version_kwargs = {"VersionId": params.get("versionId")}
+        else:
+            version_kwargs = {}
+
+        assert(self._bucket_name == bucket_name)  # must be the same
 
         self._check_credential()
+
+        # this is where the *real* access check (for the object) will happen;
+        # may raise botocore.exceptions.ClientError for 404 not found
+        # or 403 forbidden
         try:
-            key = try_multiple_dec_s3(self._get_key)(
-                url_filepath, version_id=params.get('versionId', None)
+            object_meta = self.client.head_object(
+                Bucket=bucket_name,
+                Key=url_filepath,
+                **version_kwargs,
             )
-        except S3ResponseError as e:
-            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s"
-                                % (url_filepath, url)) from e
-        if key is None:
-            raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "403":
+                raise AccessDeniedError(e) from e
+            elif error_code == "404":
+                raise TargetFileAbsent(url + " does not exist") from e
+            elif error_code == '400' and version_kwargs:
+                try:
+                    self.client.head_object(
+                        Bucket=bucket_name,
+                        Key=url_filepath,
+                    )
+                    raise TargetFileAbsent(url + " has unknown version specified") from e
+                except botocore.exceptions.ClientError as e2:
+                    raise e
+            else:
+                raise
 
-        target_size = key.size  # S3 specific
-        headers = {
-            'Content-Length': key.size,
-            'Content-Disposition': key.name
-        }
-
-        if key.last_modified:
-            headers['Last-Modified'] = rfc2822_to_epoch(key.last_modified)
+        target_size = object_meta.get('ContentLength')  # S3 specific
+        headers = self.get_obj_headers(
+            object_meta, other={'Content-Disposition': url_filepath})
 
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        if 'versionId' not in params and key.version_id:
-            # boto adds version_id to the request if it is known present.
-            # It is a good idea in general to avoid race between moment of retrieving
-            # the key information and actual download.
-            # But depending on permissions, we might be unable (like in the case with NDA)
-            # to download a guaranteed version of the key.
-            # So we will just download the latest version (if still there)
-            # if no versionId was specified in URL
-            # Alternative would be to make this a generator and generate sessions
-            # but also remember if the first download succeeded so we do not try
-            # again to get versioned one first.
-            key.version_id = None
-            # TODO: ask NDA to allow download of specific versionId?
+        # head_object also reports VersionId if found, but we don't
+        # take it from there, only from the URL; original comment by
+        # yoh below
+        #
+        # It is a good idea in general to avoid race between moment of retrieving
+        # the key information and actual download.
+        # But depending on permissions, we might be unable (like in the case with NDA)
+        # to download a guaranteed version of the key.
+        # So we will just download the latest version (if still there)
+        # if no versionId was specified in URL
+        # Alternative would be to make this a generator and generate sessions
+        # but also remember if the first download succeeded so we do not try
+        # again to get versioned one first.
+        # TODO: ask NDA to allow download of specific versionId?
 
         return S3DownloaderSession(
             size=target_size,
             filename=url_filename,
             url=url,
             headers=headers,
-            key=key
+            client=self.client,
+            bucket=bucket_name,
+            key=url_filepath,
+            version_kwargs=version_kwargs,
         )
 
     @classmethod
-    def get_key_headers(cls, key, dateformat='rfc2822'):
-        headers = {
-            'Content-Length': key.size,
-            'Content-Disposition': key.name
-        }
+    def get_obj_headers(cls, obj_meta, other=None):
+        """Get a headers dict from head_object output
 
-        if key.last_modified:
-            # boto would return time string the way amazon returns which returns
-            # it in two different ones depending on how key information was obtained:
-            # https://github.com/boto/boto/issues/466
-            headers['Last-Modified'] = {'rfc2822': rfc2822_to_epoch,
-                                        'iso8601': iso8601_to_epoch}[dateformat](key.last_modified)
+        Picks, renames, and converts certain keys from the boto3
+        head_object response. Some (like Content-Disposition) may need
+        to be added via kwargs.
+
+        Note: the head_object output also includes the relevant
+        information under ['ResponseMetadata']['HTTPHeaders']
+        (possibly using different data type), but this function only
+        uses top-level keys.
+        """
+        headers = {"Content-Length": obj_meta.get("ContentLength")}
+        if obj_meta.get("LastModified"):
+            headers["Last-Modified"] = int(
+                obj_meta.get("LastModified").timestamp())
+        if other:
+            headers.update(other)
         return headers
 
     @classmethod
@@ -414,7 +411,3 @@ class S3Downloader(BaseDownloader):
             mtime=headers.get('Last-Modified'),
             filename=headers.get('Content-Disposition')
         )
-
-    @classmethod
-    def get_key_status(cls, key, dateformat='rfc2822'):
-        return cls.get_status_from_headers(cls.get_key_headers(key, dateformat=dateformat))

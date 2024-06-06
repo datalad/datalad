@@ -215,7 +215,7 @@ class ExternalVersions(object):
     _INTERESTING = (
         'annexremote',
         'platformdirs',
-        'boto',
+        'boto3',
         'git',
         'gitdb',
         'humanize',
