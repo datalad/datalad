@@ -4,7 +4,7 @@ Publications
 Further conceptual and technical information on DataLad, and applications built on DataLad,
 are available from the publications listed below.
 
-The best of both worlds: Using semantic web with JSOB-LD. An example with NIDM Results & DataLad [poster]
+The best of both worlds: Using semantic web with JSON-LD. An example with NIDM Results & DataLad [poster]
    - Camille Maumet, Satrajit Ghosh, Yaroslav O. Halchenko, Dorota Jarecka, Nolan Nichols, Jean-Baptist POline, Michael Hanke
 
 One thing to bind them all: A complete raw data structure for auto-generation of BIDS datasets [poster]
