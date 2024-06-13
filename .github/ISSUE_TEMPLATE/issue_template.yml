@@ -1,37 +1,8 @@
-name: Generic issue
+name: Report a Generic Issue
 
-# For documentation concerning the Github form schema see
-# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
-
-description: Generic issue
+description: Report a generic issue which is not necessarily a bug
 
 body:
   - type: textarea
     attributes:
-      label: What is the problem?
-
-  - type: textarea
-    attributes:
-      label: What steps will reproduce the problem?
-
-  - type: textarea
-    attributes:
-      label: DataLad information
-      description: |
-        What version of DataLad and git-annex do you use (run `datalad --version`)? 
-
-        On what operating system (consider running `datalad wtf`)?
-
-  - type: textarea
-    attributes:
-      label: Additional context
-      description:
-        Is there anything else that would be useful to know in this context?
-
-  - type: textarea
-    attributes:
-      label: Have you had any success using DataLad before?
-      description: |
-        This is to assess your expertise/prior luck.
-
-        We would welcome your testimonial additions [here](https://github.com/datalad/datalad/wiki/Testimonials).
+      label: Description
