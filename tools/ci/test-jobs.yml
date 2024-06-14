@@ -170,8 +170,8 @@
   extra-envs:
     DATALAD_TESTS_NONETWORK: "1"
     # must operate nicely with those env variables set
-    http_proxy: ""
-    https_proxy: ""
+    http_proxy: "http://127.0.0.1:9/"
+    https_proxy: "http://127.0.0.1:9/"
 
 # Test under NFS mount  (full, only in master)
 - python-version: '3.9'
