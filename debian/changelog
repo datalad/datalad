@@ -1,10 +1,5 @@
-datalad (0.19.6-3) unstable; urgency=medium
+datalad (0.19.6-3) UNRELEASED; urgency=medium
 
-  * debian/rules: 
-    - remove export of empty http_proxy variables which prevented overloads
-      to prevent network access be done by pbuild (Closes: #1067782)
-    - skip test_download_url_archive_trailing_separator test -
-      now stalls on sid
   * debian/control
     - *depends on 7zip as preferred to p7zip-full. I do not think there
       are any changes to upstream needed (Closes: #1063611)

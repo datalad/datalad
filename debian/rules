@@ -7,9 +7,10 @@ export PYBUILD_NAME = datalad
 # test_test would be removed as 0.17.1
 # test_subprocess_return_code_capture - https://github.com/datalad/datalad/issues/6109
 # test_gracefull_death - too flaky https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1029450
-# test_download_url_archive_trailing_separator - stalls https://github.com/datalad/datalad/issues/7615
-export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture and not test_gracefull_death and not test_download_url_archive_trailing_separator' -c $(CURDIR)/tox.ini
+export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture and not test_gracefull_death' -c $(CURDIR)/tox.ini
 export DATALAD_TESTS_NONETWORK = 1
+export http_proxy=
+export https_proxy=
 
 # We need to copy .egg-info so entry points are discovered. And also need
 # to generate then per-Python version since some module requirements differ
