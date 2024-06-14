@@ -373,12 +373,9 @@ def test_path_diff(_path=None, linkpath=None):
     eq_(plain_recursive, ds.diff(path=['.', '.'], recursive=True, annex='all',
                                  result_renderer='disabled'))
     # neither do nested paths
-    if not "2.24.0" <= ds.repo.git_version < "2.25.0":
-        # Release 2.24.0 contained a regression that was fixed with 072a231016
-        # (2019-12-10).
-        eq_(plain_recursive,
-            ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all',
-                    result_renderer='disabled'))
+    eq_(plain_recursive,
+        ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all',
+                result_renderer='disabled'))
     # when invoked in a subdir of a dataset it still reports on the full thing
     # just like `git status`, as long as there are no paths specified
     with chpwd(op.join(path, 'directory_untracked')):

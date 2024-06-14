@@ -121,7 +121,7 @@ def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_un
     """Try to acquire lock (while blocking) multiple times while logging INFO messages on failure
 
     Primary use case is for operations which are user-visible and thus should not lock
-    indefinetely or for long period of times (so user would just Ctrl-C if no update is provided)
+    indefinitely or for long period of times (so user would just Ctrl-C if no update is provided)
     without "feedback".
 
     Parameters

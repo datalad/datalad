@@ -16,158 +16,46 @@ Use as a script to generate test buckets via e.g.
 __docformat__ = 'restructuredtext'
 
 import mimetypes
-
-from os.path import splitext
+from pathlib import PurePath
 import re
+from urllib.request import urlopen, Request
 
-from datalad.support.network import urlquote, URL
+import boto3
+from botocore.exceptions import ClientError
+
+from datalad.support.network import URL
 
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
-
-from datalad.support.exceptions import (
-    CapturedException,
-    DownloadError,
-    AccessDeniedError,
-    AccessPermissionExpiredError,
-    AnonymousAccessDeniedError,
-)
-from datalad.utils import try_multiple_dec
-
-from urllib.request import urlopen, Request
-
-
-try:
-    import boto
-    from boto.s3.key import Key
-    from boto.exception import S3ResponseError
-    from boto.s3.connection import OrdinaryCallingFormat
-except Exception as e:
-    if not isinstance(e, ImportError):
-        lgr.warning(
-            "boto module failed to import although available: %s",
-            CapturedException(e))
-    boto = Key = S3ResponseError = OrdinaryCallingFormat = None
-
 
 # TODO: should become a config option and managed along with the rest
 S3_ADMIN_CREDENTIAL = "datalad-datalad-admin-s3"
 S3_TEST_CREDENTIAL = "datalad-datalad-test-s3"
 
 
-def _get_bucket_connection(credential):
-    # eventually we should be able to have multiple credentials associated
-    # with different resources. Thus for now just making an option which
-    # one to use
-    # do full shebang with entering credentials
-    from datalad.downloaders.credentials import AWS_S3
-    credential = AWS_S3(credential, None)
-    if not credential.is_known:
-        credential.enter_new()
-    creds = credential()
-    return boto.connect_s3(creds["key_id"], creds["secret_id"])
+def _get_s3_resource(credname=None):
+    """Creates a boto3 s3 resource
 
-
-def _handle_exception(e, bucket_name):
-    """Helper to handle S3 connection exception"""
-    raise (
-        AccessDeniedError
-        if e.error_code == 'AccessDenied'
-        else DownloadError)(
-            "Cannot connect to %s S3 bucket."
-            % (bucket_name)
-        ) from e
-
-
-def _check_S3ResponseError(e):
-    """Returns True if should be retried.
-
-    raises ... if token has expired"""
-    # https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
-    if e.status in (
-                    307,  # MovedTemporarily -- DNS updates etc
-                    503,  # Slow down -- too many requests, so perfect fit to sleep a bit
-                    ):
-        return True
-    if e.status == 400:
-        # Generic Bad Request -- could be many things! generally -- we retry, but
-        # some times provide more directed reaction
-        # ATM, as used, many requests we send with boto might be just HEAD requests
-        # (if I got it right) and we would not receive BODY back with the detailed
-        # error_code.  Then we will allow to retry until we get something we know how to
-        # handle it more specifically
-        if e.error_code == 'ExpiredToken':
-            raise AccessPermissionExpiredError(
-                "Used token to access S3 has expired") from e
-        elif not e.error_code:
-            lgr.log(5, "Empty error_code in %s", e)
-        return True
-    return False
-
-
-def try_multiple_dec_s3(func):
-    """An S3 specific adapter to @try_multiple_dec
-
-    To decorate func to try multiple times after some sleep upon encountering
-    some intermittent error from S3
+    If credential name is given, DataLad credentials are retrieved or
+    entered; otherwise boto3 credential discovery mechanism is used
+    (~/.aws/config or env vars). Resources are a higher-level
+    abstraction than clients, and seem more fitting for use in this
+    module.
     """
-    return try_multiple_dec(
-                ntrials=4,
-                duration=2.,
-                increment_type='exponential',
-                exceptions=S3ResponseError,
-                exceptions_filter=_check_S3ResponseError,
-                logger=lgr.debug,
-    )(func)
-
-
-def get_bucket(conn, bucket_name):
-    """A helper to get a bucket
-
-    Parameters
-    ----------
-    bucket_name: str
-        Name of the bucket to connect to
-    """
-    try:
-        return try_multiple_dec_s3(conn.get_bucket)(bucket_name)
-    except S3ResponseError as e:
-        ce = CapturedException(e)
-        # can initially deny or error to connect to the specific bucket by name,
-        # and we would need to list which buckets are available under following
-        # credentials:
-        lgr.debug("Cannot access bucket %s by name with validation: %s",
-                  bucket_name, ce)
-        if conn.anon:
-            raise AnonymousAccessDeniedError(
-                "Access to the bucket %s did not succeed.  Requesting "
-                "'all buckets' for anonymous S3 connection makes "
-                "little sense and thus not supported." % bucket_name,
-                supported_types=['aws-s3']
-            )
-
-        if e.reason == "Forbidden":
-            # Could be just HEAD call boto issues is not allowed, and we should not
-            # try to verify that bucket is "reachable".  Just carry on
-            try:
-                return try_multiple_dec_s3(conn.get_bucket)(bucket_name, validate=False)
-            except S3ResponseError as e2:
-                lgr.debug("Cannot access bucket %s even without validation: %s",
-                          bucket_name, CapturedException(e2))
-                _handle_exception(e, bucket_name)
-
-        try:
-            all_buckets = try_multiple_dec_s3(conn.get_all_buckets)()
-            all_bucket_names = [b.name for b in all_buckets]
-            lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
-            if bucket_name in all_bucket_names:
-                return all_buckets[all_bucket_names.index(bucket_name)]
-        except S3ResponseError as e2:
-            lgr.debug("Cannot access all buckets: %s", CapturedException(e2))
-            _handle_exception(e, 'any (originally requested %s)' % bucket_name)
-        else:
-            _handle_exception(e, bucket_name)
+    if credname is not None:
+        from datalad.downloaders.credentials import AWS_S3
+        credential = AWS_S3(credname, None)
+        if not credential.is_known:
+            credential.enter_new()
+        creds = credential()
+        session = boto3.session.Session(
+            aws_access_key_id=creds["key_id"],
+            aws_secret_access_key=creds["secret_id"],
+        )
+    else:
+        session = boto3.session.Session()
+    return session.resource("s3")
 
 
 class VersionedFilesPool(object):
@@ -182,50 +70,25 @@ class VersionedFilesPool(object):
 
     def __call__(self, filename, prefix='', load=None):
         self._versions[filename] = version = self._versions.get(filename, 0) + 1
-        version_str = "version%d" % version
-        # if we are to upload fresh content
-        k = Key(self._bucket)
-        k.key = filename
-        #k.set_contents_from_filename('/home/yoh/.emacs')
-        base, ext = splitext(filename)
-        #content_type = None
+        version_str = f"version{version}"
         mtype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-        headers = {'Content-Type': mtype}
 
         if load is None:
             load = prefix
-            if ext == 'html':
-                load += '<html><body>%s</body></html>' % version_str
+            if PurePath(filename).suffix == 'html':
+                load += f'<html><body>{version_str}</body></html>'
             else:
                 load += version_str
 
-        k.set_contents_from_string(load, headers=headers)
-        return k
+        object = self.bucket.Object(key=filename)
+        object.put(
+            Body=load.encode(),
+            ContentType=mtype,
+        )
+        return object
 
     def reset_version(self, filename):
         self._versions[filename] = 0
-
-
-def get_key_url(e, schema='http', versioned=True):
-    """Generate an s3:// or http:// url given a key
-
-    if versioned url is requested but version_id is None, no versionId suffix
-    will be added
-    """
-    # TODO: here we would need to encode the name since urlquote actually
-    # can't do that on its own... but then we should get a copy of the thing
-    # so we could still do the .format....
-    # ... = e.name.encode('utf-8')  # unicode isn't advised in URLs
-    e.name_urlquoted = urlquote(e.name)
-    if schema == 'http':
-        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name_urlquoted}"
-    elif schema == 's3':
-        fmt = "s3://{e.bucket.name}/{e.name_urlquoted}"
-    else:
-        raise ValueError(schema)
-    if versioned and e.version_id is not None:
-        fmt += "?versionId={e.version_id}"
-    return fmt.format(e=e)
 
 
 def prune_and_delete_bucket(bucket):
@@ -233,17 +96,14 @@ def prune_and_delete_bucket(bucket):
 
     Should be used with care -- no confirmation requested
     """
-    bucket.delete_keys(bucket.list_versions(''))
-    # this one doesn't work since it generates DeleteMarkers instead ;)
-    #for key in b.list_versions(''):
-    #    b.delete_key(key)
+    bucket.object_versions.delete()
     bucket.delete()
     lgr.info("Bucket %s was removed", bucket.name)
 
 
 def set_bucket_public_access_policy(bucket):
     # we need to enable permissions for making content available
-    bucket.set_policy("""{
+    bucket.Policy().put(Policy="""{
       "Version":"2012-10-17",
       "Statement":[{
           "Sid":"AddPerm",
@@ -257,19 +117,27 @@ def set_bucket_public_access_policy(bucket):
 
 
 def gen_test_bucket(bucket_name):
-    conn = _get_bucket_connection(S3_ADMIN_CREDENTIAL)
+    s3 = _get_s3_resource(S3_ADMIN_CREDENTIAL)
+    region = s3.meta.client.meta.region_name
+    bucket = s3.Bucket(bucket_name)
     # assure we have none
+    exists = True
     try:
-        bucket = conn.get_bucket(bucket_name)
+        s3.meta.client.head_bucket(Bucket=bucket_name)
+    except ClientError as e:
+        error_code = e.response["Error"]["Code"]
+        if error_code == "404":
+            exists = False
+        else:
+            # likely 403
+            raise e
+    if exists:
         lgr.info("Deleting existing bucket %s", bucket.name)
         prune_and_delete_bucket(bucket)
-    except:  # MIH: MemoryError?
-        # so nothing to worry about
-        pass
-    finally:
-        pass
-
-    return conn.create_bucket(bucket_name)
+    # by default, bucket is created in us-east, leading to constraint exception
+    # if user has different (endpoint) region in config - read & use the latter
+    bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+    return bucket
 
 
 def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
@@ -277,7 +145,9 @@ def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
     bucket = gen_test_bucket(bucket_name)
 
     # Enable web access to that bucket to everyone
-    bucket.configure_website('index.html')
+    bucket.Website().put(
+        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
+    )
     set_bucket_public_access_policy(bucket)
 
     files = VersionedFilesPool(bucket)
@@ -287,7 +157,7 @@ def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
 
     if versioned:
         # make bucket versioned AFTER we uploaded one file already
-        bucket.configure_versioning(True)
+        bucket.Versioning().enable()
 
     files("2versions-nonversioned1.txt")
     files("2versions-nonversioned1.txt_sameprefix")
@@ -296,16 +166,17 @@ def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
     files("3versions-allversioned.txt_sameprefix")  # to test possible problems
 
     # File which was created and then removed
-    bucket.delete_key(files("1version-removed.txt"))
+    #bucket.delete_key(files("1version-removed.txt"))
+    files("1version-removed.txt").delete()
 
     # File which was created/removed/recreated (with new content)
-    bucket.delete_key(files("2versions-removed-recreated.txt"))
+    files("2versions-removed-recreated.txt").delete()
     files("2versions-removed-recreated.txt")
     files("2versions-removed-recreated.txt_sameprefix")
 
     # File which was created/removed/recreated (with new content)
     f = "1version-removed-recreated.txt"
-    bucket.delete_key(files(f))
+    files(f).delete()
     files.reset_version(f)
     files(f)
     lgr.info("Bucket %s was generated and populated", bucket_name)
@@ -324,10 +195,12 @@ def gen_bucket_test0_nonversioned():
 def gen_bucket_test1_dirs():
     bucket_name = 'datalad-test1-dirs-versioned'
     bucket = gen_test_bucket(bucket_name)
-    bucket.configure_versioning(True)
+    bucket.Versioning().enable()
 
     # Enable web access to that bucket to everyone
-    bucket.configure_website('index.html')
+    bucket.Website().put(
+        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
+    )
     set_bucket_public_access_policy(bucket)
 
     files = VersionedFilesPool(bucket)
@@ -344,10 +217,12 @@ def gen_bucket_test2_obscurenames_versioned():
     # well
     bucket_name = 'datalad-test2-obscurenames-versioned'
     bucket = gen_test_bucket(bucket_name)
-    bucket.configure_versioning(True)
+    bucket.Versioning().enable()
 
     # Enable web access to that bucket to everyone
-    bucket.configure_website('index.html')
+    bucket.Website().put(
+        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
+    )
     set_bucket_public_access_policy(bucket)
 
     files = VersionedFilesPool(bucket)
@@ -368,10 +243,12 @@ def gen_bucket_test1_manydirs():
     # to test crawling with flexible subdatasets making decisions
     bucket_name = 'datalad-test1-manydirs-versioned'
     bucket = gen_test_bucket(bucket_name)
-    bucket.configure_versioning(True)
+    bucket.Versioning().enable()
 
     # Enable web access to that bucket to everyone
-    bucket.configure_website('index.html')
+    bucket.Website().put(
+        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
+    )
     set_bucket_public_access_policy(bucket)
 
     files = VersionedFilesPool(bucket)
@@ -424,7 +301,7 @@ def add_version_to_url(url, version, replace=False):
 
 
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
-                      s3conn=None, update=False):
+                      s3client=None, update=False):
     """Given a url return a versioned URL
 
     Originally targeting AWS S3 buckets with versioning enabled
@@ -443,6 +320,9 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     verify: bool, optional
       Verify that URL is accessible. As discovered some versioned keys might
       be denied access to
+    s3client: botocore.client.S3, optional
+      A boto3 client instance that will be used to interact with AWS; if None,
+      a new one will be created.
     update : bool, optional
       If the URL already contains a version ID, update it to the latest version
       ID.  This option has no effect if return_all is true.
@@ -458,12 +338,20 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     was_versioned = False
     all_versions = []
 
-    if url_rec.hostname.endswith('.s3.amazonaws.com'):
-        if url_rec.scheme not in ('http', 'https'):
-            raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
-        # bucket name could have . in it, e.g. openneuro.org
-        s3_bucket = url_rec.hostname[:-len('.s3.amazonaws.com')]
-    elif url_rec.hostname == 's3.amazonaws.com':
+
+    # hostname regex match allowing optional region code
+    # bucket-name.s3.region-code.amazonaws.com
+    match_virtual_hosted_style = re.match(
+        r"^(.+)(\.s3)(?:[.-][a-z0-9-]+){0,1}(\.amazonaws\.com)$", url_rec.hostname
+    )
+    # s3.region-code.amazonaws.com/bucket-name/key-name
+    match_path_style = re.match(
+        r"^s3(?:\.[a-z0-9-]+){0,1}(\.amazonaws\.com)$", url_rec.hostname
+    )
+
+    if match_virtual_hosted_style is not None:
+        s3_bucket = match_virtual_hosted_style.group(1)
+    elif match_path_style is not None:
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # url is s3.amazonaws.com/bucket/PATH
@@ -481,7 +369,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
 
     if s3_bucket:
         # TODO: cache
-        if s3conn is None:
+        if s3client is None:
             # we need to reuse our providers
             from ..downloaders.providers import Providers
             providers = Providers.from_config_files()
@@ -489,40 +377,51 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             s3provider = providers.get_provider(s3url)
             authenticator = s3provider.authenticator
             if not authenticator:
-                # We will use anonymous one
+                # we will use the default one
                 from ..downloaders.s3 import S3Authenticator
                 authenticator = S3Authenticator()
-            if authenticator.bucket is not None and authenticator.bucket.name == s3_bucket:
+            if authenticator.client is not None:
                 # we have established connection before, so let's just reuse
-                bucket = authenticator.bucket
+                s3client = authenticator.client
             else:
-                bucket = authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
-        else:
-            bucket = s3conn.get_bucket(s3_bucket)
+                s3client = authenticator.authenticate(s3_bucket, s3provider.credential)
 
         supports_versioning = True  # assume that it does
         try:
-            supports_versioning = bucket.get_versioning_status()  # TODO cache
-        except S3ResponseError as e:
+            # Status can be "Enabled" | "Suspended", or missing altogether
+            response = s3client.get_bucket_versioning(Bucket=s3_bucket)
+            supports_versioning = response.get("Status") == "Enabled"
+        except ClientError as e:
             # might be forbidden, i.e. "403 Forbidden" so we try then anyways
             supports_versioning = 'maybe'
 
         if supports_versioning:
-            all_keys = bucket.list_versions(fpath)
+            response = s3client.list_object_versions(
+                Bucket=s3_bucket,
+                Prefix=fpath,
+            )
+
+            all_keys = response.get("Versions", [])
             # Filter and sort them so the newest one on top
-            all_keys = [x for x in sorted(all_keys, key=lambda x: (x.last_modified, x.is_latest))
-                        if ((x.name == fpath)  # match exact name, not just prefix
-                            )
-                        ][::-1]
+            all_keys = [
+                x
+                for x in sorted(
+                    all_keys,
+                    key=lambda x: (x["LastModified"], x["IsLatest"]),
+                    reverse=True,
+                )
+                if ((x["Key"] == fpath))  # match exact name, not just prefix
+            ]
+
             # our current assumptions
-            assert(all_keys[0].is_latest)
-            # and now filter out delete markers etc
-            all_keys = [x for x in all_keys if isinstance(x, Key)]  # ignore DeleteMarkers
-            assert(all_keys)
+            assert all_keys[0]["IsLatest"]
+
+            # boto compatibility note: boto3 response should separate
+            # Versions & DeleteMarkers, no action needed
 
             for key in all_keys:
                 url_versioned = add_version_to_url(
-                    url_rec, key.version_id, replace=update and not return_all)
+                    url_rec, key["VersionId"], replace=update and not return_all)
 
                 all_versions.append(url_versioned)
                 if verify:
@@ -554,10 +453,10 @@ if __name__ == '__main__':
             raise ValueError("Say 'all' to regenerate all, or give a generators name")
         name = sys.argv[2]
         if name.lower() == 'all':
-            for f in locals().keys():
-                if f.startswith('gen_bucket_'):
-                    locals()[f]()
+            gb = [k for k in locals().keys() if k.startswith('gen_bucket')]
+            for func_name in gb:
+                locals()[func_name]()
         else:
             locals()['gen_bucket_%s' % name]()
     else:
-        print("nothing todo")
+        print("nothing to do")

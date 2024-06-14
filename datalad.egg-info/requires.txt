@@ -8,7 +8,7 @@ patool>=1.7
 tqdm>=4.32.0
 annexremote
 looseversion
-boto
+boto3
 keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
@@ -68,7 +68,7 @@ patool>=1.7
 tqdm>=4.32.0
 annexremote
 looseversion
-boto
+boto3
 keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
@@ -129,7 +129,7 @@ importlib-resources>=3.0
 distro
 
 [downloaders]
-boto
+boto3
 keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack
@@ -152,7 +152,7 @@ patool>=1.7
 tqdm>=4.32.0
 annexremote
 looseversion
-boto
+boto3
 keyring!=23.9.0,>=20.0
 keyrings.alt
 msgpack

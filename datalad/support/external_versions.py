@@ -163,6 +163,7 @@ def get_rsync_version():
         on_linux,
     )
     if on_linux:
+        ver = None
         dist = get_linux_distribution()[0]
         if dist in ['debian', 'ubuntu']:
             out = _runner.run(['apt-cache', 'policy', 'rsync'],
@@ -215,7 +216,7 @@ class ExternalVersions(object):
     _INTERESTING = (
         'annexremote',
         'platformdirs',
-        'boto',
+        'boto3',
         'git',
         'gitdb',
         'humanize',
