@@ -1,4 +1,76 @@
 
+<a id='changelog-1.1.0'></a>
+# 1.1.0 (2024-06-06)
+
+## 🔩 Dependencies
+
+- Deprecated `boto` is replaced with `boto3` (used to handle AWS S3
+  downloads). Fixes [#5597](https://github.com/datalad/datalad/issues/5597)
+  via [PR #7340](https://github.com/datalad/datalad/pull/7340)
+  (by [@mslw](https://github.com/mslw), [@effigies](https://github.com/effigies), and [@yarikoptic](https://github.com/yarikoptic)).
+  Remaining issues:
+  - no download progress indication,
+  - no "Range" support (for partial downloads).
+
+## 🏠 Internal
+
+- Retry logic for S3 connections is now handed over to Boto3 and its
+  standard mode, removing our custom method.
+  [PR #7340](https://github.com/datalad/datalad/pull/7340)
+
+<a id='changelog-1.0.3'></a>
+# 1.0.3 (2024-06-06)
+
+## 🐛 Bug Fixes
+
+- Raise exception if an annex remote process without console tries to interact with the user, e.g. prompt for a password.  [PR #7578](https://github.com/datalad/datalad/pull/7578) (by [@christian-monch](https://github.com/christian-monch))
+
+- Fix add-archive-content for patool>=2.0.  [PR #7603](https://github.com/datalad/datalad/pull/7603) (by [@dguibert](https://github.com/dguibert))
+
+## 🏠 Internal
+
+- Fixup minor typos in documentation/comments using fresh codespell.  [PR #7610](https://github.com/datalad/datalad/pull/7610) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Stop testing on Python 3.7. Switch MacOS tests to 3.11, include 3.11
+  in Appveyor, and use 3.8 for other tests.
+  Fixes [#7584](https://github.com/datalad/datalad/issues/7584)
+  via [PR #7585](https://github.com/datalad/datalad/pull/7585)
+  (by [@mslw](https://github.com/mslw))
+
+- Convert `.travis.yml` to GitHub Actions workflow.  Fixes [#7574](https://github.com/datalad/datalad/issues/7574) via [PR #7600](https://github.com/datalad/datalad/pull/7600) (by [@jwodder](https://github.com/jwodder))
+
+- Cancel lengthy running workflows if a new commit is pushed.  [PR #7601](https://github.com/datalad/datalad/pull/7601) (by [@jwodder](https://github.com/jwodder))
+
+<a id='changelog-1.0.2'></a>
+# 1.0.2 (2024-04-19)
+
+## 🧪 Tests
+
+- Relax condition in `test_force_checkdatapresent` to avoid flaky test failures.  [PR #7581](https://github.com/datalad/datalad/pull/7581) (by [@christian-monch](https://github.com/christian-monch))
+
+<a id='changelog-1.0.1'></a>
+# 1.0.1 (2024-04-17)
+
+## 🏠 Internal
+
+- The main entrypoint for annex remotes now also runs the standard extension
+  load hook. This enables extensions to alter annex remote implementation
+  behavior in the same way than other DataLad components.
+  (by [@mih](https://github.com/mih))
+
+<a id='changelog-1.0.0'></a>
+# 1.0.0 (2024-04-06)
+
+## 💥 Breaking Changes
+
+- Merging maint to make the first major release.  [PR #7577](https://github.com/datalad/datalad/pull/7577) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🚀 Enhancements and New Features
+
+- Increase minimal Git version to 2.25.  Fixes [#7389](https://github.com/datalad/datalad/issues/7389) via [PR #7431](https://github.com/datalad/datalad/pull/7431) (by [@adswa](https://github.com/adswa))
+
 <a id='changelog-0.19.6'></a>
 # 0.19.6 (2024-02-02)
 
@@ -4818,7 +4890,7 @@ New features and bugfix release
 
 New feature and bugfix release
 
-- greately improved documentation
+- greatly improved documentation
 - publish command API RFing allows for custom options to annex, and uses
   --to REMOTE for consistent with annex invocation
 - variety of fixes and enhancements throughout

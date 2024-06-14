@@ -75,8 +75,8 @@ class Provider(object):
         'http': {'class': HTTPDownloader, 'externals': {'requests'}},
         'https': {'class': HTTPDownloader, 'externals': {'requests'}},
         'shub': {'class': SHubDownloader, 'externals': {'requests'}},
-        'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
-        's3': {'class': S3Downloader, 'externals': {'boto'}}
+        'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto3'}},
+        's3': {'class': S3Downloader, 'externals': {'boto3'}}
         # ... TODO
     }
 

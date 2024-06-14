@@ -125,7 +125,7 @@ def test_rerun(path=None, nodspath=None):
     # Now rerun the buried command.
     ds.rerun(revision=DEFAULT_BRANCH + "~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
-    # Also check that the messasge override worked.
+    # Also check that the message override worked.
     eq_(last_commit_msg(ds.repo).splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.

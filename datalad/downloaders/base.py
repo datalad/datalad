@@ -460,8 +460,8 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
+        temp_filepath = self._get_temp_download_filename(filepath)
         try:
-            temp_filepath = self._get_temp_download_filename(filepath)
             if exists(temp_filepath):
                 # eventually we might want to continue the download
                 lgr.warning(
