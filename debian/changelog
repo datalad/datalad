@@ -1,8 +1,9 @@
-datalad (0.19.6-3) UNRELEASED; urgency=medium
+datalad (1.1.0-1) UNRELEASED; urgency=medium
 
   * debian/control
     - *depends on 7zip as preferred to p7zip-full. I do not think there
       are any changes to upstream needed (Closes: #1063611)
+    - replace python3-boto with python3-boto3 (Closes: #1070186)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 14 Jun 2024 12:48:01 -0400
 
