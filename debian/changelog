@@ -4,6 +4,7 @@ datalad (1.1.0-1) unstable; urgency=medium
     - *depends on 7zip as preferred to p7zip-full. I do not think there
       are any changes to upstream needed (Closes: #1063611)
     - replace python3-boto with python3-boto3 (Closes: #1070186)
+    - add python3-boto3 to build-depends -- testing seems require it
   * debian/patches
     - refreshed
     - deb_setup_no_msgpack_and_duecredit is removed since not needed
