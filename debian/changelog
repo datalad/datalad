@@ -3,6 +3,9 @@ datalad (0.19.6-3) UNRELEASED; urgency=medium
   * debian/rules: 
     - remove export of empty http_proxy variables which prevented overloads
       to prevent network access be done by pbuild (Closes: #1067782)
+  * debian/control
+    - *depends on 7zip as preferred to p7zip-full. I do not think there
+      are any changes to upstream needed (Closes: #1063611)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 14 Jun 2024 10:45:31 -0400
 
