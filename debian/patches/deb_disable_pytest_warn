@@ -17,6 +17,6 @@ Last-Update: 2022-09-23
 -    ignore:pkg_resources is deprecated:DeprecationWarning:
 -    error:.*yield tests:pytest.PytestCollectionWarning
 -    ignore:distutils Version classes are deprecated:DeprecationWarning
-     # comes from boto
-     ignore:the imp module is deprecated
      # workaround for https://github.com/datalad/datalad/issues/6307
+     ignore:The distutils package is deprecated
+ markers =

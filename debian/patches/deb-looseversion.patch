@@ -253,4 +253,4 @@ waiting for an approved package of looseversions (e.g. as in Debian)
 -        'looseversion',
      ],
      'downloaders': [
-         'boto',
+         'boto3',

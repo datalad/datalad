@@ -94,13 +94,13 @@
          # TODO: guarantee restricted permissions
 --- a/datalad/support/external_versions.py
 +++ b/datalad/support/external_versions.py
-@@ -214,7 +214,7 @@ class ExternalVersions(object):
+@@ -215,7 +215,7 @@ class ExternalVersions(object):
      }
      _INTERESTING = (
          'annexremote',
 -        'platformdirs',
 +        'appdirs',
-         'boto',
+         'boto3',
          'git',
          'gitdb',
 --- a/setup.py
