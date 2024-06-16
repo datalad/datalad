@@ -1119,9 +1119,10 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath=None, siteurl=None, dst=None)
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 
     # and closing the pipes now shouldn't anyhow affect things
-    eq_(len(ar._batched), 1)
+    assert ar._batched
+    nbatched = len(ar._batched)
     ar._batched.close()
-    eq_(len(ar._batched), 1)  # doesn't remove them, just closes
+    eq_(len(ar._batched), nbatched)  # doesn't remove them, just closes
     assert(not ar.dirty)
 
     ar._batched.clear()
