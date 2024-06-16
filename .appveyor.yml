@@ -250,6 +250,8 @@ init:
   # enable external SSH access to CI worker on all other systems
   # needs APPVEYOR_SSH_KEY defined in project settings (or environment)
   - sh: curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
+  # Ref: https://github.com/datalad/datalad/issues/5250
+  - sh: sudo sh -c 'echo "MaxSessions 100" >> /etc/ssh/sshd_config' && sudo service sshd restart
   # Identity setup
   - git config --global user.email "test@appveyor.land"
   - git config --global user.name "Appveyor Almighty"
