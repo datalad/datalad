@@ -817,7 +817,7 @@ class GitRepo(CoreGitRepo):
     # should do it once
     _config_checked = False
 
-    GIT_MIN_VERSION = "2.25"
+    GIT_MIN_VERSION = "2.25.0"
     git_version = None
 
     @classmethod
