@@ -73,7 +73,7 @@ jobs:
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
         echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
         } >> "$GITHUB_ENV"
-        
+
     - name: Clone and install ${{ matrix.extension }} extension
       run: |
         git clone https://github.com/$DL_REPO __extension__

@@ -18,7 +18,7 @@ body:
     attributes:
       label: DataLad information
       description: |
-        What version of DataLad and git-annex do you use (run `datalad --version`)? 
+        What version of DataLad and git-annex do you use (run `datalad --version`)?
 
         On what operating system (consider running `datalad wtf`)?
 

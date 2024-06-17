@@ -8,22 +8,21 @@
 """Helpers for benchmarks of DataLad"""
 
 import os
+import os.path as op
 import sys
 import tarfile
 import tempfile
 import timeit
-import os.path as op
 from glob import glob
-
-from datalad.utils import (
-    getpwd,
-    get_tempfile_kwargs,
-    rmtree,
-)
 
 from datalad.api import (
     Dataset,
     create_test_dataset,
+)
+from datalad.utils import (
+    get_tempfile_kwargs,
+    getpwd,
+    rmtree,
 )
 
 ############
@@ -67,6 +66,7 @@ class SuprocBenchmarks(object):
             # which caused our is_interactive to fail.  We need to provide
             # more robust version
             from datalad.support.external_versions import external_versions
+
             # comparing to 0.12.1  since the returned version is "loose"
             # so fails correctly identify rc as pre .0
             if external_versions['datalad'] < '0.12.1':
