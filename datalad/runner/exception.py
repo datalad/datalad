@@ -18,33 +18,51 @@ from typing import (
     Optional,
 )
 
+from datasalad.runners import CommandError as _CommandError
+
 lgr = logging.getLogger('datalad.runner.exception')
 
 
-class CommandError(RuntimeError):
+class CommandError(_CommandError):
     """Thrown if a command call fails.
 
-    Note: Subclasses should override `to_str` rather than `__str__` because
-    `to_str` is called directly in datalad.cli.main.
+    This class is derived from ``datasalad``'s exception, which in turn is the
+    successor of this implementation. The main difference is improved
+    messaging, and alignment with ``subprocess``'s ``CalledProcessError``.
+
+    However, for backward compatibility reasons, the behavior when converting
+    to ``str`` is overwritten here, and held constant with respect to prior
+    DataLad versions.
+
+    In order to ease a future transition, the class supports the ``returncode``
+    attribute and constructor argument (as done by ``subprocess``) in addition
+    to ``code``.
     """
+    # Basic alias idea taken from here:
+    # <https://stackoverflow.com/questions/4017572/how-can-i-make-an-alias-to-a-non-function-member-attribute-in-a-python-class>
+    _aliases = {
+        'returncode': 'code',
+    }
 
     def __init__(
         self,
         cmd: str | list[str] = "",
         msg: str = "",
         code: Optional[int] = None,
+        returncode: Optional[int] = None,
         stdout: str | bytes = "",
         stderr: str | bytes = "",
         cwd: str | os.PathLike | None = None,
         **kwargs: Any,
     ) -> None:
-        RuntimeError.__init__(self, msg)
-        self.cmd = cmd
-        self.msg = msg
-        self.code = code
-        self.stdout = stdout
-        self.stderr = stderr
-        self.cwd = cwd
+        super().__init__(
+            cmd=cmd,
+            msg=msg,
+            returncode=returncode or code,
+            stdout=stdout,
+            stderr=stderr,
+            cwd=cwd,
+        )
         self.kwargs = kwargs
 
     def to_str(self, include_output: bool = True) -> str:
@@ -89,6 +107,18 @@ class CommandError(RuntimeError):
 
     def __str__(self) -> str:
         return self.to_str()
+
+    # override to support alias lookup
+    def __getattr__(self, item):
+        return object.__getattribute__(
+            self, self._aliases.get(item, item))
+
+    # override to support alias lookup
+    def __setattr__(self, key, value):
+        if key == '_aliases':
+            raise AttributeError('Cannot set `_aliases`')
+        return object.__setattr__(
+            self, self._aliases.get(key, key), value)
 
 
 def _format_json_error_messages(recs: list[dict]) -> str:

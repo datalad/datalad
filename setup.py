@@ -24,6 +24,7 @@ from _datalad_build_support.setup import (
 
 requires = {
     'core': [
+        'datasalad>=0.1.0',
         'platformdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
