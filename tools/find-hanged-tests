@@ -18,7 +18,7 @@ test_line = re.compile('datalad/.*tests/')
 test_regex = r'\s+(\.\./)?(?P<test>[a-z].*tests/test_\S+)'
 tests_started = set()
 for l in lines:
-    # Lines might differ between CI backends - some times preprended with extra time stamp
+    # Lines might differ between CI backends - some times prepended with extra time stamp
     if res := re.match('(\[[0-9]{2}:[0-9]{2}:[0-9]{2}\])?' + test_regex, l):
         tests_started.add(res.groupdict()['test'])
 tests_completed = set()
