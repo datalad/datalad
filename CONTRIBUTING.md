@@ -128,7 +128,7 @@ particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
-We support Python 3 only (>= 3.7).
+We support Python 3 only (>= 3.8).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
