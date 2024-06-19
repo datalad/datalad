@@ -80,8 +80,10 @@ def test_wtf(topdir=None):
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
         if external_versions['psutil']:
-            # filesystems detail should be reported
-            assert_in('max_pathlength:', cmo.out)
+            if external_versions['psutil'] < '6.0.0':
+                # filesystems detail should be reported, unless 6.0.0 where
+                # it was removed. See https://github.com/giampaolo/psutil/issues/2109
+                assert_in('max_pathlength:', cmo.out)
         else:
             assert_in("Hint: install psutil", cmo.out)
 
