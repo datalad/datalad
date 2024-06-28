@@ -115,6 +115,7 @@ jobs:
       - name: Install custom Git from upstream
         if: matrix.upstream-git
         run: |
+          sudo apt-get install -y gettext libcurl4-gnutls-dev
           source tools/ci/install-upstream-git.sh
           echo "$target_dir/bin-wrappers" >> "$GITHUB_PATH"
 
