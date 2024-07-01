@@ -83,7 +83,7 @@ def test_wtf(topdir=None):
             if external_versions['psutil'] < '6.0.0':
                 # filesystems detail should be reported, unless 6.0.0 where
                 # it was removed. See https://github.com/giampaolo/psutil/issues/2109
-                assert_in('max_pathlength:', cmo.out)
+                assert_in('max_path_length:', cmo.out)
         else:
             assert_in("Hint: install psutil", cmo.out)
 
