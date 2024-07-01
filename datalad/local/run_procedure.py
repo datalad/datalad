@@ -158,9 +158,9 @@ def _get_procedure_implementation(name='*', ds=None):
                 yield m, n, f, h
 
     # 3. check extensions for procedure
-    from datalad.support.entrypoints import iter_entrypoints
+    from datalad.support.entrypoints import iter_extensions
 
-    for epname, epmodule, _ in iter_entrypoints('datalad.extensions'):
+    for epname, epmodule, _ in iter_extensions():
         res = files(epmodule) / "resources" / "procedures"
         if res.is_dir():
             with as_file(res) as p:

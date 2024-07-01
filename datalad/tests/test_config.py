@@ -176,6 +176,7 @@ def test_something(path=None, new_home=None):
     # empty value is False
     assert_equal(cfg.getbool('something', 'empty'), False)
     assert_equal(cfg.get('something.empty'), '')
+    assert_equal(cfg.get('something.empty', get_all=True), '')
     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
     assert_raises(TypeError, cfg.getbool, 'something', 'user')
 
