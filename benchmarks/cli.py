@@ -8,10 +8,10 @@
 """Benchmarks for DataLad CLI"""
 
 import os
-import sys
 import os.path as osp
-
+import sys
 from subprocess import call
+
 from .common import SuprocBenchmarks
 
 

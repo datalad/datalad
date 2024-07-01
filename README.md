@@ -1,4 +1,4 @@
-     ____            _             _                   _ 
+     ____            _             _                   _
     |  _ \    __ _  | |_    __ _  | |       __ _    __| |
     | | | |  / _` | | __|  / _` | | |      / _` |  / _` |
     | |_| | | (_| | | |_  | (_| | | |___  | (_| | | (_| |
@@ -136,7 +136,7 @@ MIT/Expat
 # Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
-contributing to the project. 
+contributing to the project.
 
 ## Acknowledgements
 

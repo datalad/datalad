@@ -4,15 +4,20 @@
 # without need to discover what benchmark to use etc
 
 import os
-from pathlib import Path, PurePosixPath
+import tempfile
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
+
 import datalad.api as dl
+from datalad import lgr
+from datalad.utils import (
+    get_tempfile_kwargs,
+    rmtree,
+)
 
 from ..common import SuprocBenchmarks
-
-import tempfile
-from datalad.utils import get_tempfile_kwargs, rmtree
-
-from datalad import lgr
 
 
 class addurls1(SuprocBenchmarks):

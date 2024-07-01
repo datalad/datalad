@@ -2,8 +2,8 @@
 
 import os
 import os.path as op
-import sys
 import subprocess
+import sys
 
 if __name__ == '__main__':
     cmd = sys.argv[1]

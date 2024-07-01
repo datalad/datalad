@@ -4,8 +4,8 @@ Given a log from running tests using pytest -n 2 (or more) see which tests actua
 never completed
 """
 
-import sys
 import re
+import sys
 from pathlib import Path
 
 logfile = Path(sys.argv[-1])
