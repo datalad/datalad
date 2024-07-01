@@ -570,6 +570,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/1178864?v=4"
             ]
+        },
+        {
+            "login": "alliesw",
+            "name": "Alex Shields-Weber",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/alliesw",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/72238329?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
