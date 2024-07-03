@@ -241,7 +241,7 @@ class Remove(Interface):
                     if delpath.is_dir():
                         lgr.debug('Remove directory: %s', delpath)
                         rmtree(delpath)
-                    # cannot use .exists() must forsee dead symlinks
+                    # cannot use .exists() must foresee dead symlinks
                     else:
                         lgr.debug('Remove file: %s', delpath)
                         delpath.unlink()

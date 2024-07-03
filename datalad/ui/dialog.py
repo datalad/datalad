@@ -31,6 +31,7 @@ from copy import copy
 from ..utils import auto_repr
 from ..utils import on_windows
 from .base import InteractiveUI
+from .utils import can_prompt
 from datalad.support.exceptions import CapturedException
 
 # Example APIs which might be useful to look for "inspiration"
@@ -356,6 +357,32 @@ class UnderAnnexUI(DialogUI):
             kwargs['remote'] = self.specialremote
         return super(UnderAnnexUI, self).get_progressbar(
                 *args, **kwargs)
+
+    def input(self, prompt, hidden=False):
+        if not can_prompt():
+            # we are not interactive
+            raise RuntimeError('Interactive input not available for `ui.input()` in annex remotes')
+        return super(UnderAnnexUI, self).input(prompt, hidden)
+
+    def question(self,
+                 text,
+                 title=None,
+                 choices=None,
+                 default=None,
+                 hidden=False,
+                 repeat=None):
+        if not can_prompt():
+            # need to do a more specific that `is_interactive` check, since `is_interactive` checks
+            # all streams including stdin/out which are to "talk" to git-annex, and thus not tty.
+            raise RuntimeError('A terminal required for interactive input in annex remotes')
+        return super(UnderAnnexUI, self).question(
+            text,
+            title=title,
+            choices=choices,
+            default=default,
+            hidden=hidden,
+            repeat=repeat
+        )
 
 
 @auto_repr

@@ -63,7 +63,7 @@ lgr = logging.getLogger('datalad.distribution.install')
 class Install(Interface):
     """Install one or many datasets from remote URL(s) or local PATH source(s).
 
-    This command creates local :term:`sibling`\(s) of existing dataset(s) from
+    This command creates local :term:`sibling`\\(s) of existing dataset(s) from
     (remote) locations specified as URL(s) or path(s). Optional recursion into
     potential subdatasets, and download of all referenced data is supported.
     The new dataset(s) can be optionally registered in an existing
@@ -269,6 +269,7 @@ class Install(Interface):
                         result_renderer='disabled',
                         result_xfm=None,
                         result_filter=None,
+                        branch=branch,
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further

@@ -38,7 +38,7 @@ from ..s3 import (
 from .test_http import check_download_external_url
 from .utils import get_test_providers
 
-skip_if_no_module('boto')
+skip_if_no_module('boto3')
 skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
@@ -49,7 +49,8 @@ url_1version_bucketwithdot = 's3://datalad.test1/version1.txt'
 url_dandi1 = 's3://dandiarchive/dandiarchive/dandiarchive/data/d8dd3e2b-8f74-494b-9370-9e3a6c69e2b0.csv.gz?versionId=9P7aMTvTT5wynPBOtiQqkV.wvV8zcpLf'
 
 
-@use_cassette('test_s3_download_basic')
+# disabled due to https://github.com/datalad/datalad/issues/7465
+# @use_cassette('test_s3_download_basic')
 @pytest.mark.parametrize("url,success_str,failed_str", [
     (url_2versions_nonversioned1, 'version2', 'version1'),
     (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
@@ -123,9 +124,24 @@ def test_deny_access():
     def deny_access(*args, **kwargs):
         raise AccessDeniedError
 
+    def return_false(*args, **kwargs):
+        return False
+
     with assert_raises(DownloadError):
-        with patch.object(downloader, '_download', deny_access):
-            downloader.download("doesn't matter")
+        with patch.object(downloader, '_establish_session', return_false):
+            with patch.object(downloader, '_download', deny_access):
+                downloader.download("doesn't matter")
+
+
+@use_cassette('test_anonymous_s3')
+def test_anonymous_s3(tmp_path):
+    downloader = S3Downloader(authenticator=S3Authenticator())
+    downloader.download(
+        "s3://openneuro.org/ds000001/dataset_description.json",
+        path=str(tmp_path / "dataset_description.json"),
+    )
+    assert (tmp_path / "dataset_description.json").exists()
+
 
 
 @with_tempfile
@@ -156,7 +172,8 @@ def test_boto_host_specification(tempfile=None):
     assert_equal(md5sum(tempfile), '97f4290b2d369816c052607923e372d4')
 
 
-def test_restricted_bucket_on_NDA():
+# disabled due to https://github.com/datalad/datalad/issues/7464
+def disabled_test_restricted_bucket_on_NDA():
     get_test_providers('s3://NDAR_Central_4/', reload=True)  # to verify having credentials to access
     for url, success_str, failed_str in [
         ("s3://NDAR_Central_4/submission_23075/README", 'BIDS', 'error'),
@@ -165,9 +182,10 @@ def test_restricted_bucket_on_NDA():
         check_download_external_url(url, failed_str, success_str)
 
 
+# disabled due to https://github.com/datalad/datalad/issues/7464
 @use_cassette('test_download_multiple_NDA')
 @with_tempfile(mkdir=True)
-def test_download_multiple_NDA(outdir=None):
+def disabled_test_download_multiple_NDA(outdir=None):
     # This would smoke/integration test logic for composite credential testing expiration
     # of the token while reusing session from first url on the 2nd one
     urls = [
@@ -178,30 +196,6 @@ def test_download_multiple_NDA(outdir=None):
 
     for url in urls:
         ret = providers.download(url, outdir)
-
-
-@use_cassette('test_get_key')
-@pytest.mark.parametrize("b,key,version_id", [
-    ('NDAR_Central_4', 'submission_23075/README', None),
-    ('datalad-test0-versioned', '1version-nonversioned1.txt', None),
-    ('datalad-test0-versioned', '3versions-allversioned.txt', None),
-    ('datalad-test0-versioned', '3versions-allversioned.txt', 'pNsV5jJrnGATkmNrP8.i_xNH6CY4Mo5s'),
-])
-def test_get_key(b, key, version_id):
-    url = "s3://%s/%s" % (b, key)
-    if version_id:
-        url += '?versionId=' + version_id
-    providers = get_test_providers(url, reload=True)  # to verify having credentials to access
-    downloader = providers.get_provider(url).get_downloader(url)
-    downloader._establish_session(url)
-
-    keys = [f(key, version_id=version_id)
-            for f in (downloader._bucket.get_key,
-                      downloader._get_key_via_get)]
-    # key1 != key2 probably due to some reasons, so we will just compare fields we care about
-    for f in ['name', 'version_id', 'size', 'content_type', 'last_modified']:
-        vals = [getattr(k, f) for k in keys]
-        assert_equal(*vals, msg="%s differs between two keys: %s" % (f, vals))
 
 
 # not really to be ran as part of the tests since it does
@@ -238,6 +232,7 @@ def _test_expiring_token(outdir):
 
     generated = []
     def _gen_session_token(_, key_id=None, secret_id=None):
+        # TODO: RF for boto3
         from boto.sts.connection import STSConnection
         sts = STSConnection(aws_access_key_id=key_id,
                             aws_secret_access_key=secret_id)

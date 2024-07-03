@@ -29,6 +29,7 @@ requires = {
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
         'importlib-metadata >=3.6; python_version < "3.10"',
+        'importlib-resources >= 3.0; python_version < "3.9"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
@@ -40,7 +41,7 @@ requires = {
         'looseversion',
     ],
     'downloaders': [
-        'boto',
+        'boto3',
         'keyring>=20.0,!=23.9.0',
         'keyrings.alt',
         'msgpack',
@@ -168,12 +169,13 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'],
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     project_urls={'Homepage': 'https://www.datalad.org',
                   'Developer docs': 'https://docs.datalad.org/en/stable',
                   'User handbook': 'https://handbook.datalad.org',
                   'Source': 'https://github.com/datalad/datalad',
-                  'Bug Tracker': 'https://github.com/datalad/datalad/issues'},
+                  'Bug Tracker': 'https://github.com/datalad/datalad/issues',
+                  'RRID': 'https://identifiers.org/RRID:SCR_003931'},
     extras_require=requires,
     cmdclass=cmdclass,
     include_package_data=True,

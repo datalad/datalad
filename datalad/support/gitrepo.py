@@ -388,25 +388,8 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
 
     return  _wrap_normalize_paths
 
-
-if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
-    # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
-    # into untracked submodules when multiple pathspecs are given, returning
-    # repositories that are deeper than the first level. This helper filters
-    # these deeper levels out so that save_() doesn't fail trying to add them.
-    #
-    # This regression fixed with upstream's 072a231016 (2019-12-10).
-    def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
-        firstlevel_repos = []
-        prev = None
-        for repo in sorted(repos):
-            if not (prev and str(repo).startswith(prev)):
-                prev = str(repo)
-                firstlevel_repos.append(repo)
-        return firstlevel_repos
-else:
-    def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
-        return repos
+def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
+    return repos
 
 
 class GitProgress(WitlessProtocol):
@@ -834,7 +817,7 @@ class GitRepo(CoreGitRepo):
     # should do it once
     _config_checked = False
 
-    GIT_MIN_VERSION = "2.19.1"
+    GIT_MIN_VERSION = "2.25.0"
     git_version = None
 
     @classmethod
@@ -1470,7 +1453,7 @@ class GitRepo(CoreGitRepo):
             if '--amend' in options:
                 if '--no-edit' not in options:
                     # don't overwrite old commit message with our default
-                    # message by default, but re-use old one. In other words:
+                    # message by default, but reuse old one. In other words:
                     # Make --no-edit the default:
                     options += ["--no-edit"]
             else:
@@ -2949,14 +2932,6 @@ class GitRepo(CoreGitRepo):
             inf: dict[str, str | int | None] = {}
             props = props_re.match(line)
             if not props:
-                # Kludge: Filter out paths starting with .git/ to work around
-                # an `ls-files -o` bug that was fixed in Git 2.25.
-                #
-                # TODO: Drop this condition when GIT_MIN_VERSION is at least
-                # 2.25.
-                if line.startswith(".git/"):
-                    lgr.debug("Filtering out .git/ file: %s", line)
-                    continue
                 # not known to Git, but Git always reports POSIX
                 path = ut.PurePosixPath(line)
                 inf['gitshasum'] = None
@@ -3538,7 +3513,7 @@ class GitRepo(CoreGitRepo):
                     action='delete',
                     refds=self.pathobj,
                     type=props.get('type'),
-                    path=p,
+                    path=str(p),
                     status='ok',
                     logger=lgr)
 
@@ -3741,7 +3716,7 @@ class GitRepo(CoreGitRepo):
             # get all the entries
             for r in self._process_git_get_output(*add_out):
                 yield get_status_dict(
-                    action=r.get('command', 'add'),
+                    action=str(r.get('command', 'add')),
                     refds=self.pathobj,
                     type='file',
                     path=(self.pathobj / ut.PurePosixPath(r['file']))
@@ -3797,7 +3772,7 @@ class GitRepo(CoreGitRepo):
                 yield get_status_dict(
                     action='add_submodule',
                     ds=self,
-                    path=path,
+                    path=str(path),
                     status='error',
                     message=('cannot add subdataset %s with no commits', subm),
                     logger=lgr)

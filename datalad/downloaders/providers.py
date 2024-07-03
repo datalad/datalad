@@ -26,6 +26,7 @@ from .http import (
     HTTPDigestAuthAuthenticator,
     HTTPBearerTokenAuthenticator,
     HTTPDownloader,
+    HTTPTokenAuthenticator,
 )
 from .s3 import S3Authenticator, S3Downloader
 from .shub import SHubDownloader
@@ -51,6 +52,7 @@ AUTHENTICATION_TYPES = {
     'http_auth': HTTPAuthAuthenticator,
     'http_basic_auth': HTTPBasicAuthAuthenticator,
     'http_digest_auth': HTTPDigestAuthAuthenticator,
+    'http_token': HTTPTokenAuthenticator,
     'bearer_token': HTTPBearerTokenAuthenticator,
     'bearer_token_anon': HTTPAnonBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
@@ -73,8 +75,8 @@ class Provider(object):
         'http': {'class': HTTPDownloader, 'externals': {'requests'}},
         'https': {'class': HTTPDownloader, 'externals': {'requests'}},
         'shub': {'class': SHubDownloader, 'externals': {'requests'}},
-        'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
-        's3': {'class': S3Downloader, 'externals': {'boto'}}
+        'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto3'}},
+        's3': {'class': S3Downloader, 'externals': {'boto3'}}
         # ... TODO
     }
 

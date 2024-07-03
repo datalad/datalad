@@ -47,7 +47,7 @@
 #   - Workers have vim installed for convenient text editing in the command shell
 
 
-# do not make repository clone cheap: interfers with versioneer
+# do not make repository clone cheap: interferes with versioneer
 shallow_clone: false
 
 
@@ -168,9 +168,9 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
 
     # Test alternative Python versions
-    - ID: Ubu20P37a
+    - ID: Ubu20P311a
       # ~35min
-      PY: 3.7
+      PY: 3.11
       DTS: >
           datalad.cli
           datalad.core
@@ -183,9 +183,9 @@ environment:
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
-    - ID: Ubu20P37b
+    - ID: Ubu20P311b
       # ~25min
-      PY: 3.7
+      PY: 3.11
       DTS: >
           datalad.downloaders
           datalad.interface
@@ -250,6 +250,8 @@ init:
   # enable external SSH access to CI worker on all other systems
   # needs APPVEYOR_SSH_KEY defined in project settings (or environment)
   - sh: curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
+  # Ref: https://github.com/datalad/datalad/issues/5250
+  - sh: sudo sh -c 'echo "MaxSessions 100" >> /etc/ssh/sshd_config' && if [[ "$(uname)" == "Darwin" ]]; then sudo launchctl kickstart -k system/com.openssh.sshd; else sudo service sshd restart; fi
   # Identity setup
   - git config --global user.email "test@appveyor.land"
   - git config --global user.name "Appveyor Almighty"

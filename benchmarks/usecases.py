@@ -7,16 +7,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Benchmarks for some use cases, typically at datalad.api level"""
 
+import os.path as osp
 import sys
 import tempfile
-from datalad.utils import get_tempfile_kwargs
-import os.path as osp
 from os.path import join as opj
 
 from datalad.api import create
-
 from datalad.utils import (
     create_tree,
+    get_tempfile_kwargs,
     rmtree,
 )
 

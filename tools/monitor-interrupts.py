@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
+#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 #ex: set sts=4 ts=4 sw=4 noet:
 """
 
@@ -30,7 +30,10 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2015 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-import re, numpy as np, time
+import re
+import time
+
+import numpy as np
 
 reline = re.compile('(?P<int>[^:]*):(?P<counts>[\s0-9]*)(?P<desc>.*$)')
 fname = '/proc/interrupts'
@@ -66,4 +69,3 @@ while True:
                 print "%4s %30s: %s %s" % (name[0], name[1], strformat%dt, ' '.join([strformat % x for x in d]))
             print ''.join(totals)
         time.sleep(1)
-

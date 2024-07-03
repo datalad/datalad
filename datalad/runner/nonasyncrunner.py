@@ -45,6 +45,9 @@ from .runnerthreads import (
     _try_close,
 )
 
+
+__docformat__ = 'restructuredtext'
+
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 
 STDIN_FILENO = 0
@@ -304,22 +307,22 @@ class ThreadedRunner:
         Run the command as specified in __init__.
 
         This method is not re-entrant. Furthermore, if the protocol is a
-        subclass of `GeneratorMixIn`, and the generator has not been
+        subclass of ``GeneratorMixIn``, and the generator has not been
         exhausted, i.e. it has not raised `StopIteration`, this method should
         not be called again. If it is called again before the generator is
-        exhausted, a `RuntimeError` is raised. In the non-generator case, a
+        exhausted, a ``RuntimeError`` is raised. In the non-generator case, a
         second caller will be suspended until the first caller has returned.
 
         Returns
         -------
         Any
-            If the protocol is not a subclass of `GeneratorMixIn`, the
+            If the protocol is not a subclass of ``GeneratorMixIn``, the
             result of protocol._prepare_result will be returned.
 
         Generator
-            If the protocol is a subclass of `GeneratorMixIn`, a Generator
+            If the protocol is a subclass of ``GeneratorMixIn``, a Generator
             will be returned. This allows to use this method in constructs
-            like:
+            like::
 
                 for protocol_output in runner.run():
                     ...
@@ -330,14 +333,15 @@ class ThreadedRunner:
             generator will raise StopIteration(return_code), where
             return_code is the return code of the process. The return code
             of the process will also be stored in the "return_code"-attribute
-            of the runner. So you could write:
+            of the runner. So you could write::
 
-               gen = runner.run()
-               for file_descriptor, data in gen:
-                   ...
+                gen = runner.run()
+                for file_descriptor, data in gen:
+                    ...
 
-               # get the return code of the process
-               result = gen.return_code
+                # get the return code of the process
+                result = gen.return_code
+
         """
         with self.initialization_lock:
             return self._locked_run()

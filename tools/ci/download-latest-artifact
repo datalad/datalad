@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Based on https://raw.githubusercontent.com/RedHatInsights/policies-ui-frontend/master/.github/scripts/download-latest-openapi.sh
-# Apache 2.0 license 
+# Apache 2.0 license
 set -eu
 
 : "${TARGET_REPO:=datalad/datalad-extensions}"

@@ -50,29 +50,29 @@ Main Thread
 
 There is a single queue, the ``output_queue``, on which the main thread waits, after all transport threads, and the process waiting thread are started. The ``output_queue`` is the signaling queue and the output queue of the stderr-thread and the stdout-thread. It is also the signaling queue of the stdin-thread, and it is the signaling queue for the process waiting threads.
 
-The main thread waits on the ``output_queue`` for data or signals and handles them accordingly, i.e. calls data callbacks of the protocol if data arrives, and calls connection-related callbacks of the protocol if other signals arrive. If no messages arrive on the  ``output_queue``, the main thread blocks for 100ms. If it is unblocked, either by getting a message or due to elapsing of the 100ms, it will process timeouts. If the ``timeout``-parameter to the constructor was not ``None``, it will check the last time any of the monitored files (stdout and/or stderr) yielded data. If the time is larger than the specified timeout, it will call the ``tiemout`` method of the protocol instance. Due to this implementation, the resolution for timeouts is 100ms. The main thread handles the closing of ``stdin``-, ``stdout``-, and ``stderr``-file descriptors if all other threads have terminated and if ``output_queue`` is empty. These tasks are either performed in the method ``ThreadedRunner.run()`` or in a result generator that is returned by  ``ThreadedRunner.run()`` whenever ``send()`` is called on it.
+The main thread waits on the ``output_queue`` for data or signals and handles them accordingly, i.e. calls data callbacks of the protocol if data arrives, and calls connection-related callbacks of the protocol if other signals arrive. If no messages arrive on the  ``output_queue``, the main thread blocks for 100ms. If it is unblocked, either by getting a message or due to elapsing of the 100ms, it will process timeouts. If the ``timeout``-parameter to the constructor was not ``None``, it will check the last time any of the monitored files (stdout and/or stderr) yielded data. If the time is larger than the specified timeout, it will call the ``timeout`` method of the protocol instance. Due to this implementation, the resolution for timeouts is 100ms. The main thread handles the closing of ``stdin``-, ``stdout``-, and ``stderr``-file descriptors if all other threads have terminated and if ``output_queue`` is empty. These tasks are either performed in the method ``ThreadedRunner.run()`` or in a result generator that is returned by  ``ThreadedRunner.run()`` whenever ``send()`` is called on it.
 
 
 Protocols
 =========
 
-Due to its history the runner implementation uses the interface defined in ``SubprocessProtocol`` (asyncio.protocols.SubprocessProtocol) (although the sub process protocol interface is defined in the asyncio libraries, the current thread-runner implementation does not make use of ``async``).
+Due to its history datalad uses the protocol defined in ``asyncio.protocols.SubprocessProtocol`` and in ``asyncio.protocols.BaseProtocol``. To keep compatibility with the code base, the threaded-runner implementation uses the same interface. Please note, although we use the same interface and although the interface is defined in the asyncio libraries, the threaded-runner implementation does not make any use of ``asyncio``. The description of the interface nevertheless applies in the context of the threaded-runner. The following methods of the ``SubprocessProtocol`` are supported.
 
     - ``SubprocessProtocol.pipe_data_received(fd, data)``
     - ``SubprocessProtocol.pipe_connection_lost(fd, exc)``
     - ``SubprocessProtocol.process_exited()``
 
-In addition the methods of ``BaseProtocol`` are called, i.e.:
+In addition the following methods of ``BaseProtocol`` are supported:
 
     - ``BaseProtocol.connection_made(transport)``
     - ``BaseProtocol.connection_lost(exc)``
 
 
-The datalad-provided protocol ``WitlessProtocol`` provides an additional callback:
+The datalad-provided protocol ``datalad.runners.protocol.WitlessProtocol`` provides an additional callback:
 
     - ``WitlessProtocol.timeout(fd)``
 
-The method ``timeout()`` will be called when the parameter ``timeout`` in ``WitlessRunner.run``, ``ThreadedRunner.run``, or ``run_command`` is set to a number specifying the desired timeout in seconds. If no data is received from ``stdin``, or ``stderr`` (if those are supposed to be captured), the method ``WitlessProtocol.timeout(fd)`` is called with ``fd`` set to the respective file number, e.g. 1, or 2. If ``WitlessProtocol.timeout(fd)`` returns ``True``, the file descriptor will be closed and the associated threads will exit.
+The method ``timeout()`` will be called when the parameter ``timeout`` in ``WitlessRunner.run``, ``ThreadedRunner.run``, or ``run_command`` is set to a number specifying the desired timeout in seconds. If no data is received from ``stdin``, or ``stderr`` (if those are supposed to be captured), the method ``WitlessProtocol.timeout(fd)`` is called with ``fd`` set to the respective file number, e.g. 1, or 2. If ``WitlessProtocol.timeout(fd)`` returns ``True``, only the corresponding file descriptor will be closed and the associated threads will exit.
 
 The method ``WitlessProtocol.timeout(fd)`` is also called if stdout, stderr and stdin are closed and the process does not exit within the given interval. In this case ``fd`` is set to ``None``. If ``WitlessProtocol.timeout(fd)`` returns ``True`` the process is terminated.
 
@@ -84,4 +84,4 @@ If the protocol that is provided to ``run()`` does not inherit ``datalad.runner.
 
 If the protocol that is provided to ``run()`` does inherit ``datalad.runner.protocol.GeneratorMixIn``, ``run()`` will return a ``Generator``. This generator will yield the elements that were sent to it in the protocol-implementation by calling ``GeneratorMixIn.send_result()`` in the order in which the method ``GeneratorMixIn.send_result()`` is called. For example, if ``GeneratorMixIn.send_result(43)`` is called, the generator will yield ``43``, and if ``GeneratorMixIn.send_result({"a": 123, "b": "some data"})`` is called, the generator will yield ``{"a": 123, "b": "some data"}``.
 
-Internally the generator is implemented by keeping track of the process state and waiting in the ``output_queue`` once, when ``send`` is called on it.
+Internally the generator is implemented by keeping track of the process state and waiting in the ``output_queue`` once, when ``send`` (or ``__next__``) is called on it.

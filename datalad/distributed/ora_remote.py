@@ -290,7 +290,7 @@ class LocalIO(IOBase):
 
         runner = WitlessRunner()
         # TODO: To not rely on availability in PATH we might want to use `which`
-        #       (`where` on windows) and get the actual path to 7z to re-use in
+        #       (`where` on windows) and get the actual path to 7z to reuse in
         #       in_archive() and get().
         #       Note: `command -v XXX` or `type` might be cross-platform
         #       solution!
@@ -681,7 +681,7 @@ class SSHRemoteIO(IOBase):
 
     def get_7z(self):
         # TODO: To not rely on availability in PATH we might want to use `which`
-        #       (`where` on windows) and get the actual path to 7z to re-use in
+        #       (`where` on windows) and get the actual path to 7z to reuse in
         #       in_archive() and get().
         #       Note: `command -v XXX` or `type` might be cross-platform
         #       solution!

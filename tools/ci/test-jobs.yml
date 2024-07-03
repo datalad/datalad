@@ -1,0 +1,184 @@
+# Job configurations for `.github/workflows/test.yml`
+#
+# Splitting these out into a separate file seems to be the only sane way to
+# conditionally filter out jobs that should only be run on cron; cf.
+# <https://stackoverflow.com/q/65384420/744178>.
+
+- python-version: '3.8'
+  extra-envs: {}
+
+- python-version: '3.8'
+  # Run all tests in a single whoop here
+  # We cannot have empty -A selector, so the one which always will be fulfilled
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    # To test https://github.com/datalad/datalad/pull/4342 fix.
+    # From our testing in that PR seems to have no effect, but kept around
+    # since should not hurt.
+    LC_ALL: ru_RU.UTF-8
+
+- python-version: '3.9'
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+
+# Two matrix runs for "recent python and git-annex with the recent supported by
+# git annex new version of repo" and various extra options/features enabled for
+# git-annex
+
+- python-version: '3.11'
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    DATALAD_REPO_VERSION: "10"
+    DATALAD_TESTS_GITCONFIG: "\n[annex]\n stalldetection = 1KB/120s\n"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
+
+- python-version: '3.11'
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: ""
+    DATALAD_REPO_VERSION: "10"
+    DATALAD_TESTS_GITCONFIG: "\n[annex]\n stalldetection = 1KB/120s\n"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
+
+- python-version: '3.8'
+  cron-only: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+
+# Split runs for v6 since a single one is too long now
+- python-version: '3.8'
+  extra-envs:
+    DATALAD_SSH_MULTIPLEX__CONNECTIONS: "0"
+    DATALAD_RUNTIME_PATHSPEC__FROM__FILE: always
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=10.20220525 -m conda"
+
+- python-version: '3.8'
+  extra-envs:
+    PYTEST_SELECTION_OP: ""
+    DATALAD_SSH_MULTIPLEX__CONNECTIONS: "0"
+    DATALAD_RUNTIME_PATHSPEC__FROM__FILE: always
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20210310 -m conda"
+    # To test https://github.com/datalad/datalad/pull/4342 fix in case of no
+    # "not" for pytest.  From our testing in that PR seems to have no effect,
+    # but kept around since should not hurt.
+    LANG: bg_BG.UTF-8
+
+# Run slow etc tests under a single tricky scenario
+- python-version: '3.8'
+  extra-envs:
+    PYTEST_SELECTION_OP: ""
+    _DL_TMPDIR: "/var/tmp/sym link"
+    # And the leading - in filenames for the most challenge
+    DATALAD_TESTS_OBSCURE_PREFIX: "-"
+    DATALAD_LOG_TRACEBACK: collide  # just a smoke test for now
+
+# A run loaded with various customizations to smoke test those functionalities
+# Apparently moving symlink outside has different effects on abspath
+# See https://github.com/datalad/datalad/issues/878
+- python-version: '3.8'
+  extra-envs:
+    # eventually: _DL_TMPDIR: "/var/tmp/sym ссылка"
+    _DL_TMPDIR: "/var/tmp/sym link"
+    # and obscure the names more a bit
+    DATALAD_TESTS_OBSCURE_PREFIX: "-"
+    # By default no logs will be output. This one is to test with log
+    # output at INFO level
+    DATALAD_LOG_LEVEL: INFO
+    DATALAD_LOG_TRACEBACK: "1"  # just a smoke test for now
+    DATALAD_LOG_VMEM: "1"
+    DATALAD_RUNTIME_MAX__BATCHED: "2"
+    DATALAD_RUNTIME_MAX__INACTIVE__AGE: "10"
+
+- python-version: '3.8'
+  extra-envs:
+    # By default no logs will be output. This one is to test with low level but
+    # dumped to /dev/null
+    DATALAD_LOG_LEVEL: "2"
+    DATALAD_LOG_TARGET: "/dev/null"
+    DATALAD_TESTS_PROTOCOLREMOTE: "1"
+    DATALAD_TESTS_DATALADREMOTE: "1"
+    DATALAD_LOG_CWD: "1"
+    DATALAD_LOG_OUTPUTS: "1"
+    DATALAD_LOG_ENV: "1"
+    DATALAD_LOG_STDIN: "1"
+    DATALAD_TESTS_UI_BACKEND: console
+    DATALAD_TESTS_OBSCURE_PREFIX: "-"
+    DATALAD_SEED: "1"
+    GIT_AUTHOR_DATE: "Thu, 07 Apr 2005 22:13:13 +0200"
+    GIT_AUTHOR_NAME: blah
+    GIT_AUTHOR_EMAIL: committer@example.com
+    GIT_COMMITTER_DATE: "Thu, 07 Apr 2005 22:13:13 +0200"
+    GIT_COMMITTER_NAME: blah
+    GIT_COMMITTER_EMAIL: committer@example.com
+
+# Test some under NFS mount  (only selected sub-set)
+- python-version: '3.8'
+  extra-envs:
+    # do not run SSH-based tests due to stall(s)
+    # https://github.com/datalad/datalad/pull/4172
+    DATALAD_TESTS_SSH: "0"
+    _DL_TMPDIR: "/tmp/nfsmount"
+    TESTS_TO_PERFORM: "datalad.tests datalad.support"
+
+# The ones to run only on weekends against master.
+# They will not contribute to coverage etc, but might lead to failed status
+#
+# run with minimal supported git-annex version as defined in
+# AnnexRepo.GIT_ANNEX_MIN_VERSION
+# TODO: ATM we do not have that minimal version as a Debian package in
+# snapshots!
+
+- python-version: '3.8'
+  cron-only: true
+  extra-envs:
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20200309 -m conda"
+
+# Run with git's master branch rather the default one on the system.
+- python-version: '3.8'
+  cron-only: true
+  upstream-git: true
+  extra-envs:
+    DATALAD_USE_DEFAULT_GIT: "1"
+
+# Run with our reported minimum Git version.
+- python-version: '3.8'
+  cron-only: true
+  minimum-git: true
+  extra-envs:
+    DATALAD_USE_DEFAULT_GIT: "1"
+
+- python-version: '3.8'
+  cron-only: true
+  extra-envs:
+    # to test operation under root since also would consider FS "crippled" due
+    # to ability to rewrite R/O files
+    PYTEST_WRAPPER: "sudo -E"
+    # no key authentication for root:
+    DATALAD_TESTS_SSH: "0"
+
+- python-version: '3.8'
+  cron-only: true
+  extra-envs:
+    DATALAD_TESTS_NONETWORK: "1"
+    # must operate nicely with those env variables set
+    http_proxy: ""
+    https_proxy: ""
+
+# Test under NFS mount  (full, only in master)
+- python-version: '3.8'
+  cron-only: true
+  allow-failure: true
+  extra-envs:
+    _DL_TMPDIR: "/tmp/nfsmount"
+
+# Causes complete laptop or travis instance crash atm, but survives in a docker
+# need to figure it out (looks like some PID explosion)
+# We would need to migrate to boto3 to test it fully, but SSH should work
+#- python-version: '3.8'
+#  extra-envs:
+#    DATALAD_TESTS_SSH: "1"
+#    UNSET_S3_SECRETS: "1"

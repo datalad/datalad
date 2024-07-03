@@ -2,6 +2,10 @@ name: Extensions
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test:
 
@@ -35,12 +39,12 @@ jobs:
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: 3.8
 
@@ -69,21 +73,14 @@ jobs:
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
         echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
         } >> "$GITHUB_ENV"
-        
+
     - name: Clone and install ${{ matrix.extension }} extension
       run: |
         git clone https://github.com/$DL_REPO __extension__
         pip install ./__extension__[devel]
 
     - name: Install Singularity
-      run: |
-        release="$(curl -fsSL https://api.github.com/repos/sylabs/singularity/releases/latest | jq -r .tag_name)"
-        codename="$(lsb_release -cs)"
-        arch="$(dpkg --print-architecture)"
-        cd /tmp
-        wget -O singularity-ce.deb https://github.com/sylabs/singularity/releases/download/$release/singularity-ce_${release#v}-${codename}_$arch.deb
-        sudo dpkg -i singularity-ce.deb
-        sudo apt-get install -f
+      run: tools/ci/install-singularity.sh
       if: env.DL_NEED_SINGULARITY == '1'
 
     - name: Install additional dependencies and prepare for testing
@@ -112,7 +109,8 @@ jobs:
         python -m coverage xml
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         directory: __testhome__
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}

@@ -335,7 +335,36 @@ def test_path_to_str_conversion() -> None:
         cwd=test_path,
         env=dict(some_key="value")
     )
+    assert adjusted_env is not None
     assert str(test_path) == adjusted_env['PWD']
+
+
+def test_env_copying() -> None:
+    # Regression test to ensure environments are only copied
+    # if `copy=True` is given to `Runner._get_adjusted_env.`
+    # Test also for path adjustments, if not-`None` `pwd`-value
+    # is given to `Runner._get_adjusted_env`.
+    runner = Runner()
+    for original_env in (None, dict(some_key='value')):
+        for cwd in (None, Path('a/b/c')):
+            for do_copy in (True, False):
+                adjusted_env = runner._get_adjusted_env(
+                    cwd=cwd,
+                    env=original_env,
+                    copy=do_copy
+                )
+                if original_env is None:
+                    assert adjusted_env is None
+                else:
+                    assert adjusted_env is not None
+                    if do_copy is True:
+                        assert adjusted_env is not original_env
+                    else:
+                        assert adjusted_env is original_env
+                    if cwd is None:
+                        assert 'PWD' not in adjusted_env
+                    else:
+                        assert 'PWD' in adjusted_env
 
 
 @with_tempfile(mkdir=True)

@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from contextlib import ExitStack
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -27,7 +28,6 @@ test_http_server = None
 @pytest.fixture(autouse=True, scope="session")
 def setup_package():
     import tempfile
-    from pathlib import Path
 
     from datalad import consts
     from datalad.support.annexrepo import AnnexRepo
@@ -238,25 +238,23 @@ def capture_logs(caplog, monkeypatch):
         monkeypatch.setenv('DATALAD_LOG_LEVEL', '100')
 
 
-def pytest_ignore_collect(path):
+def pytest_ignore_collect(collection_path: Path) -> bool:
     # Skip old nose code and the tests for it:
     # Note, that this is not only about executing tests but also importing those
     # files to begin with.
-    if path.basename == "test_tests_utils.py":
+    if collection_path.name == "test_tests_utils.py":
         return True
-    if path.basename == "utils.py" and \
-        path.dirpath().basename == "tests" and \
-            path.dirpath().dirpath().basename == "datalad":
+    if collection_path.parts[:-3] == ("datalad", "tests", "utils.py"):
         return True
     # When pytest is told to run doctests, by default it will import every
     # source file in its search, but a number of datalad source file have
     # undesirable side effects when imported.  This hook should ensure that
     # only `test_*.py` files and `*.py` files containing doctests are imported
     # during test collection.
-    if path.basename.startswith("test_") or path.check(dir=1):
+    if collection_path.name.startswith("test_") or collection_path.is_dir():
         return False
-    if path.ext != ".py":
+    if collection_path.suffix != ".py":
         return True
     return not any(
-        re.match(r"^\s*>>>", ln) for ln in path.read_text("utf-8").splitlines()
+        re.match(r"^\s*>>>", ln) for ln in collection_path.read_text("utf-8").splitlines()
     )

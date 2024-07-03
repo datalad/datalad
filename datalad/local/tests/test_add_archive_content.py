@@ -494,7 +494,7 @@ class TestAddArchiveOptions():
     # few tests bundled with a common setup/teardown to minimize boiler plate
     # nothing here works on windows, no even teardown(), prevent failure at the
     # origin
-    def setup(self):
+    def setup_method(self):
         repo_path = tempfile.mkdtemp(**get_tempfile_kwargs(prefix="tree"))
         create_tree(
             repo_path,
@@ -506,7 +506,7 @@ class TestAddArchiveOptions():
         # Let's add first archive to the annex so we could test
         ds.save('1.tar', message="added 1.tar")
 
-    def teardown(self):
+    def teardown_method(self):
         # so we close any outstanding batch process etc
         self.annex.precommit()
         rmtemp(self.ds.path)

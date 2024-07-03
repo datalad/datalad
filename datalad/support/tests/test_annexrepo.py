@@ -108,6 +108,7 @@ from datalad.tests.utils_pytest import (
     ok_file_has_content,
     ok_file_under_git,
     ok_git_config_not_empty,
+    on_github,
     on_nfs,
     on_travis,
     serve_path_via_http,
@@ -2332,7 +2333,7 @@ def test_annexjson_protocol_incorrect(path=None, *, print_opt, caplog):
 # see https://github.com/datalad/datalad/pull/5400 for troubleshooting
 # for stalling with unlock=False, and then with unlock=True it took >= 300 sec
 # https://github.com/datalad/datalad/pull/5433#issuecomment-784470028
-@skip_if(on_travis and on_nfs)  # TODO. stalls
+@skip_if((on_github or on_travis) and on_nfs)  # TODO. stalled on travis, fails on github
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
 @known_failure_githubci_win

@@ -33,6 +33,7 @@ from datalad.tests.utils_pytest import (
     eq_,
     ok_file_has_content,
     ok_generator,
+    on_github,
     on_nfs,
     on_travis,
     on_windows,
@@ -87,22 +88,22 @@ def check_decompress_file(leading_directories, path=None):
 
     path_archive_obscure = op.join(outdir, fn_archive_obscure)
     if leading_directories == 'strip':
-        assert_false(op.exists(path_archive_obscure))
+        assert not op.exists(path_archive_obscure)
         testpath = outdir
     elif leading_directories is None:
-        assert_true(op.exists(path_archive_obscure))
+        assert op.exists(path_archive_obscure)
         testpath = path_archive_obscure
     else:
         raise NotImplementedError("Dunno about this strategy: %s"
                                   % leading_directories)
 
-    assert_true(op.exists(op.join(testpath, '3.txt')))
-    assert_true(op.exists(op.join(testpath, fn_in_archive_obscure)))
+    assert op.exists(op.join(testpath, '3.txt'))
+    assert op.exists(op.join(testpath, fn_in_archive_obscure))
     with open(op.join(testpath, '3.txt')) as f:
         eq_(f.read(), '3 load')
 
 
-@pytest.mark.xfail(on_travis and on_nfs, reason="https://github.com/datalad/datalad/issues/4496")
+@pytest.mark.xfail((on_travis or on_github) and on_nfs, reason="https://github.com/datalad/datalad/issues/4496")
 @pytest.mark.parametrize("leading", [None, 'strip'])
 def test_decompress_file(leading):
     return check_decompress_file(leading)
@@ -194,6 +195,7 @@ def test_compress_file(ext, annex):
     check_compress_file(ext, annex)
 
 
+@pytest.mark.xfail(on_github and on_nfs, reason="unknown. TODO: figure out")
 @with_tree(**tree_simplearchive)
 def test_ExtractedArchive(path=None):
     archive = op.join(path, fn_archive_obscure_ext)

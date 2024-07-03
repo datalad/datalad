@@ -2,6 +2,10 @@ name: CrippledFS
 
 on: [pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test:
 
@@ -27,13 +31,13 @@ jobs:
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Set up Python 3.7
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.7
+        python-version: 3.8
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip

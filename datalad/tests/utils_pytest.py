@@ -15,6 +15,7 @@ import multiprocessing.queues
 import ssl
 import textwrap
 from difflib import unified_diff
+from functools import lru_cache
 from http.server import (
     HTTPServer,
     SimpleHTTPRequestHandler,
@@ -54,6 +55,7 @@ _TEMP_PATHS_CLONES = set()
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
 on_appveyor = bool(os.environ.get('APPVEYOR', False))
+on_github = bool(os.environ.get('GITHUB_ACTION', False))
 on_nfs = 'nfs' in os.getenv('TMPDIR', '')
 
 if external_versions["cmd:git"] >= "2.28":
@@ -1898,6 +1900,7 @@ def maybe_adjust_repo(repo):
         repo.adjust()
 
 
+@lru_cache()
 @with_tempfile
 @with_tempfile
 def has_symlink_capability(p1, p2):
