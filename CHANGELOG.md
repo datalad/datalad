@@ -1,4 +1,27 @@
 
+<a id='changelog-1.1.1'></a>
+# 1.1.1 (2024-07-03)
+
+## 🐛 Bug Fixes
+
+- Ensure timestamps of files in ZIP archives are within years 1980-2107.  Fixes [#3753](https://github.com/datalad/datalad/issues/3753) via [PR #7450](https://github.com/datalad/datalad/pull/7450) (by [@adswa](https://github.com/adswa))
+
+## 📝 Documentation
+
+- Update README.md: improve wording.  [PR #7550](https://github.com/datalad/datalad/pull/7550) (by [@alliesw](https://github.com/alliesw))
+
+## 🏠 Internal
+
+- Add codespell and minor fixuppers to pre-commit configuration and apply it to non-`datalad/` components.  [PR #7621](https://github.com/datalad/datalad/pull/7621) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- For appveyor ssh setup, setup MaxSessions 100 to avoid 'channel 22: open failed: connect failed: open failed'.  [PR #7617](https://github.com/datalad/datalad/pull/7617) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- test_gracefull_death: raise test_gracefull_death  threshold to 300 from 100.  [PR #7619](https://github.com/datalad/datalad/pull/7619) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Make test for presence of max_path in partitions not run for current psutil 6.0.0.  [PR #7622](https://github.com/datalad/datalad/pull/7622) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.0'></a>
 # 1.1.0 (2024-06-06)
 

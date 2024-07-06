@@ -132,7 +132,9 @@ class ExportArchive(Interface):
                 if archivetype == 'tar' \
                 else zipfile.ZipFile(
                     filename, 'w',
-                    zipfile.ZIP_STORED if not compression else zipfile.ZIP_DEFLATED) \
+                    zipfile.ZIP_STORED if not compression else zipfile.ZIP_DEFLATED,
+                    strict_timestamps=True,
+                ) \
                 as archive:
             add_method = archive.add if archivetype == 'tar' else archive.write
 
