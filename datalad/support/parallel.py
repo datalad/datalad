@@ -91,7 +91,7 @@ class ProducerConsumer:
     - `producer` must produce unique entries. AssertionError might be raised if
       the same entry is to be consumed.
     - `consumer` can add to the queue of items produced by producer via
-      `.add_to_producer_queue`. This allows for continuous re-use of the same
+      `.add_to_producer_queue`. This allows for continuous reuse of the same
       instance in recursive operations (see `get` use of ProducerConsumer).
     - if producer or consumer raise an exception, we will try to "fail gracefully",
       unless subsequent Ctrl-C is pressed, we will let already running jobs to

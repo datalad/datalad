@@ -63,6 +63,16 @@ from ..utils import on_windows
 
 _runner = WitlessRunner()
 
+from datalad.support.external_versions import external_versions
+
+if external_versions["patoolib"]  >= "2.0.0":
+    check_existing_filename = patoolib.fileutil.check_existing_filename
+    check_archive_filelist = patoolib.fileutil.check_archive_filelist
+else:
+    check_existing_filename = patoolib.util.check_existing_filename
+    check_archive_filelist = patoolib.util.check_archive_filelist
+
+
 
 def _patool_run(cmd, verbosity=0, **kwargs):
     """Decorated runner for patool so it doesn't spit out outputs to stdout"""
@@ -132,8 +142,8 @@ def decompress_file(archive, dir_):
     with swallow_outputs() as cmo:
         archive = ensure_bytes(archive)
         dir_ = ensure_bytes(dir_)
-        patoolib.util.check_existing_filename(archive)
-        patoolib.util.check_existing_filename(dir_, onlyfiles=False)
+        check_existing_filename(archive)
+        check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
         outdir = unixify_path(dir_)
         # should be supplied in PY3 to avoid b''
@@ -201,8 +211,8 @@ def compress_files(files, archive, path=None, overwrite=True):
     with swallow_outputs() as cmo:
         with chpwd(path):
             if not overwrite:
-                patoolib.util.check_new_filename(archive)
-            patoolib.util.check_archive_filelist(files)
+                check_new_filename(archive)
+            check_archive_filelist(files)
             # Call protected one to avoid the checks on existence on unixified path
             patoolib._create_archive(unixify_path(archive),
                                      [unixify_path(f) for f in files],

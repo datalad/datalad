@@ -387,10 +387,14 @@ class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
 
 @auto_repr
 class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
-    """Authenticate via HTTP Authorization header
+    """Authenticate via HTTP 'Authorization: Bearer TOKEN' header
+
+    E.g. as defined for OAuth2 in RFC 6750
+    https://datatracker.ietf.org/doc/html/rfc6750
     """
 
     DEFAULT_CREDENTIAL_TYPE = 'token'
+    AUTH_KEYWORD = 'Bearer'
 
     def __init__(self, **kwargs):
         # so we have __init__ solely for a custom docstring
@@ -398,7 +402,18 @@ class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
 
     def _post_credential(self, credentials, post_url, session):
         # we do not need to post anything, just inject token into the session
-        session.headers['Authorization'] = "Bearer %s" % credentials['token']
+        session.headers['Authorization'] = f"{self.AUTH_KEYWORD} {credentials['token']}"
+
+
+class HTTPTokenAuthenticator(HTTPBearerTokenAuthenticator):
+    """Authenticate via HTTP 'Authorization: Token TOKEN' header
+
+    It is pretty much the "Bearer TOKEN" method but which uses different keyword
+    "Token".  It is e.g. the one provided by Django REST Framework.
+    GitHub allows for both 'Bearer' and 'Token' keywords:
+    https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api?apiVersion=2022-11-28
+    """
+    AUTH_KEYWORD = 'Token'
 
 
 @auto_repr

@@ -80,7 +80,7 @@ we outline the workflow used by the developers:
          ghremote git@github.com:YourLogin/datalad.git
 
     to add the above `gh-YourLogin` remote.  Additional handy aliases
-    such as `ghpr` (to fetch existing pr from someone's remote) and 
+    such as `ghpr` (to fetch existing pr from someone's remote) and
     `ghsendpr` could be found at [yarikoptic's bash config file](http://git.onerussian.com/?p=etc/bash.git;a=blob;f=.bash/bashrc/30_aliases_sh;hb=HEAD#l865)
 
 3. Create a branch (generally off the `origin/master`) to hold your changes:
@@ -128,7 +128,7 @@ particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
-We support Python 3 only (>= 3.7).
+We support Python 3 only (>= 3.8).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -177,7 +177,7 @@ It helps to have a GitHub token to increase API limits:
 export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment). 
+Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment).
 Then update zenodo:
 
 ```bash
@@ -493,7 +493,7 @@ You're awesome. :wave::smiley:
 
 - While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
   for quick logging of various health stats in a separate terminal window:
-  
+
         dstat -c --top-cpu -d --top-bio --top-latency --net
 
 - To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
@@ -530,21 +530,21 @@ Refer datalad/config.py for information on how to add these environment variable
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_LOG_VMEM*:
   Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
-- *DATALAD_EXC_STR_TBLIMIT*: 
+- *DATALAD_EXC_STR_TBLIMIT*:
   This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables
   like we do in one of the travis runs
-- *DATALAD_TESTS_TEMP_KEEP*: 
+- *DATALAD_TESTS_TEMP_KEEP*:
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
-- *DATALAD_TESTS_TEMP_DIR*: 
+- *DATALAD_TESTS_TEMP_DIR*:
   Create a temporary directory at location specified by this flag.
   It is used by tests to create a temporary git directory while testing git annex archives etc
-- *DATALAD_TESTS_NONETWORK*: 
+- *DATALAD_TESTS_NONETWORK*:
   Skips network tests completely if this flag is set
   Examples include test for S3, git_repositories, OpenfMRI, etc
-- *DATALAD_TESTS_SSH*: 
+- *DATALAD_TESTS_SSH*:
   Skips SSH tests if this flag is **not** set.  If you enable this,
   you need to set up a "datalad-test" and "datalad-test2" target in
   your SSH configuration.  The second target is used by only a couple
@@ -557,7 +557,7 @@ Refer datalad/config.py for information on how to add these environment variable
   `DATALAD_TESTS_TEMP_DIR`, which restricts the "datalad-test" target
   to being either the localhost or a container that mounts
   `DATALAD_TESTS_TEMP_DIR`.
-- *DATALAD_TESTS_NOTEARDOWN*: 
+- *DATALAD_TESTS_NOTEARDOWN*:
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
 - *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
@@ -630,6 +630,8 @@ changelog based on the pull requests since the last release, commits the
 results, tags the new commit with the next version number, and creates a GitHub
 release for the tag.
 This in turn triggers a job for building an sdist & wheel for the project and uploading them to PyPI.
+The release workflow alternatively could be triggered by visiting [release workflow page](https://github.com/datalad/datalad/actions/workflows/release.yml) and pressing "Run workflow" and choosing corresponding (`maint`) branch to release.
+Note that release workflow would fail if there were no commits since the most recent tagged release.
 
 ### CHANGELOG entries and labelling pull requests
 
@@ -662,7 +664,7 @@ It is not uncommon to discover potential git-annex bugs or git-annex feature req
 In those cases, it is common for developers and contributors to file an issue in git-annex's public bug tracker at [git-annex.branchable.com](https://git-annex.branchable.com/).
 Here are a few hints on how to go about it:
 
-- You can report a new bug or browse through existing bug reports at [git-annex.branchable.com/bugs](https://git-annex.branchable.com/bugs/))
+- You can report a new bug or browse through existing bug reports at [git-annex.branchable.com/bugs](https://git-annex.branchable.com/bugs/)
 - In order to associate a bug report with the DataLad you can add the following mark up into the description: ``[[!tag projects/datalad]]``
 - You can add author metadata with the following mark up: ``[[!meta author=yoh]]``. Some authors will be automatically associated with the DataLad project by git-annex's bug tracker.
 

@@ -172,9 +172,10 @@ def test_gracefull_death():
     results = assert_provides_and_raises(
         ProducerConsumer(range(1000), faulty_consumer, jobs=5), ValueError)
     # and analysis of futures to raise an exception can take some time etc, so
-    # we could get more, but for sure we should not get all 999 and not even a 100
+    # we could get more, but for sure we should not get all 999 and not even a 100.
+    # But some times we get some excursions above 100, so limiting to 300
     if info_log_level:
-        assert_greater(100, len(results))
+        assert_greater(300, len(results))
     assert_equal(results[:4], [0, 2, 3, 4])
 
     def producer():

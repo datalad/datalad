@@ -1,4 +1,4 @@
-     ____            _             _                   _ 
+     ____            _             _                   _
     |  _ \    __ _  | |_    __ _  | |       __ _    __| |
     | | | |  / _` | | __|  / _` | | |      / _` |  / _` |
     | |_| | | (_| | | |_  | (_| | | |___  | (_| | | (_| |
@@ -6,7 +6,7 @@
                                                   Read me
 
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
-[![Travis tests status](https://app.travis-ci.com/datalad/datalad.svg?branch=master)](https://app.travis-ci.com/datalad/datalad)
+[![Test Status](https://github.com/datalad/datalad/actions/workflows/test.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test.yml)
 [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
 [![Extensions](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml)
 [![Linters](https://github.com/datalad/datalad/actions/workflows/lint.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/lint.yml)
@@ -21,7 +21,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 [![RRID](https://img.shields.io/badge/RRID-SCR__003931-blue)](https://identifiers.org/RRID:SCR_003931)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-50-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-52-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ## Distribution
@@ -36,12 +36,12 @@
 
 # 10000-ft. overview
 
-DataLad makes data management and data distribution more accessible.
-To do that, it stands on the shoulders of [Git] and [Git-annex] to deliver a
+DataLad's purpose is to make data management and data distribution more accessible. 
+To do so, it stands on the shoulders of [Git] and [Git-annex] to deliver a
 decentralized system for data exchange. This includes automated ingestion of
 data from online portals and exposing it in readily usable form as Git(-annex)
-repositories, so-called datasets. The actual data storage and permission
-management, however, remains with the original data providers.
+repositories - or datasets. However, the actual data storage and permission
+management remains with the original data provider(s).
 
 The full documentation is available at http://docs.datalad.org and
 http://handbook.datalad.org provides a hands-on crash-course on DataLad.
@@ -136,7 +136,7 @@ MIT/Expat
 # Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
-contributing to the project. 
+contributing to the project.
 
 ## Acknowledgements
 
@@ -248,6 +248,8 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Aksoo"><img src="https://avatars.githubusercontent.com/u/141905668?v=4?s=100" width="100px;" alt="Aksoo"/><br /><sub><b>Aksoo</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=Aksoo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dguibert"><img src="https://avatars.githubusercontent.com/u/1178864?v=4?s=100" width="100px;" alt="David Guibert"/><br /><sub><b>David Guibert</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=dguibert" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/alliesw"><img src="https://avatars.githubusercontent.com/u/72238329?v=4?s=100" width="100px;" alt="Alex Shields-Weber"/><br /><sub><b>Alex Shields-Weber</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=alliesw" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

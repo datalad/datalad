@@ -4,6 +4,10 @@ on:
     - pull_request
     - push
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: macos-latest
@@ -25,10 +29,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set up Python 3.7
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.7
+        python-version: 3.11
 
     - name: Install git-annex
       run: |
@@ -54,6 +58,7 @@ jobs:
         python -m pytest -c ../tox.ini -s -v --cov=datalad --cov-report=xml --pyargs datalad.core datalad.support
 
     - name: Upload coverage report to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: __testhome__/coverage.xml
+        token: ${{ secrets.CODECOV_TOKEN }}

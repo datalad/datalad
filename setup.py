@@ -41,7 +41,7 @@ requires = {
         'looseversion',
     ],
     'downloaders': [
-        'boto',
+        'boto3',
         'keyring>=20.0,!=23.9.0',
         'keyrings.alt',
         'msgpack',
@@ -169,7 +169,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'],
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     project_urls={'Homepage': 'https://www.datalad.org',
                   'Developer docs': 'https://docs.datalad.org/en/stable',
                   'User handbook': 'https://handbook.datalad.org',

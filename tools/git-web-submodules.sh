@@ -89,4 +89,3 @@ git submodule update --init || echo "E: Remains broken, I guess due to sub1/.git
 #cat sub1/f2
 
 kill %1
-

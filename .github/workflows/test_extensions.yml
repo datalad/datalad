@@ -2,6 +2,10 @@ name: Extensions
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test:
 
@@ -40,7 +44,7 @@ jobs:
         fetch-depth: 0
 
     - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: 3.8
 
@@ -69,7 +73,7 @@ jobs:
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
         echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
         } >> "$GITHUB_ENV"
-        
+
     - name: Clone and install ${{ matrix.extension }} extension
       run: |
         git clone https://github.com/$DL_REPO __extension__
@@ -105,7 +109,8 @@ jobs:
         python -m coverage xml
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         directory: __testhome__
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}

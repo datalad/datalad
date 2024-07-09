@@ -23,6 +23,7 @@ from datalad.support.exceptions import (
     IncompleteResultsError,
     InsufficientArgumentsError,
 )
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import get_local_file_url
 from datalad.tests.utils_pytest import (
@@ -475,13 +476,32 @@ def test_force_checkdatapresent(srcpath=None, dstpath=None):
     # now a push without forced no-transfer
     # we do not give since, so the non-transfered file is picked up
     # and transferred
+    annex_branch_state = src.repo.get_hexsha('git-annex')
     res = src.push(to='target', force=None)
     # no branch change, done before
     assert_in_results(res, action='publish', status='notneeded',
                       refspec=DEFAULT_REFSPEC)
     # but availability update
-    assert_in_results(res, action='publish', status='ok',
-                      refspec='refs/heads/git-annex:refs/heads/git-annex')
+    # reflected as a change in git-annex branch
+    assert annex_branch_state != src.repo.get_hexsha('git-annex')
+    # and identical state here and on the remote
+    assert src.repo.get_hexsha('git-annex') == src.repo.get_hexsha('target/git-annex')
+
+    # as a result of [10.20231129-84-geb59da9dd2](https://git.kitenet.net/index.cgi/git-annex.git/commit/?id=HEAD)
+    # which makes git-annex clocks less precise, the git-annex branch change on the remote as a result of
+    # `annex copy` has exactly the same content and timestamp in git-annex branch, so the same commit as local,
+    # so when we fetch updates from the remote, we end up on the same commit instead of merging
+    # updated availability with difference in timestamp within git-annex branch of minuscule difference
+    try:
+        assert_in_results(res, action='publish', status='notneeded',
+                          refspec='refs/heads/git-annex:refs/heads/git-annex')
+    except AssertionError:
+        # before then -- we would report that update was pushed since update had a
+        # slightly different git-annex timestamp locally from the remote, and thus commits
+        # were different
+        assert_in_results(res, action='publish', status='ok',
+                          refspec='refs/heads/git-annex:refs/heads/git-annex')
+
     assert_in_results(res, status='ok',
                       path=str(src.pathobj / 'test_mod_annex_file'),
                       action='copy')

@@ -9,4 +9,3 @@ if grep -q "$err" annex-get-log.txt; then
 	echo "E: $err"
 	exit 1
 fi
-

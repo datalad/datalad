@@ -74,3 +74,21 @@ def show_hint(msg):
             ansi_colors.color_word(
                 msg,
                 ansi_colors.YELLOW)))
+
+
+def can_prompt() -> bool:
+    """Return True if the process can prompt for credentials
+
+    On Linux this method checks for a controlling terminal.
+    On Windows it always returns True.
+    Unlike :func:`datalad.utils.is_interactive` it does not check all the streams to be a tty,
+    and just tries to open `/dev/tty` directly.
+    """
+    if on_windows:
+        return True
+    else:
+        try:
+            open('/dev/tty', 'r').close()
+            return True
+        except (IOError, OSError):
+            return False

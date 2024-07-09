@@ -9,11 +9,13 @@
 
 from os.path import join as opj
 
-from datalad.api import create
-from datalad.api import create_test_dataset
-from datalad.api import install
-from datalad.api import ls
-from datalad.api import drop
+from datalad.api import (
+    create,
+    create_test_dataset,
+    drop,
+    install,
+    ls,
+)
 
 #
 # Following ones could be absent in older versions

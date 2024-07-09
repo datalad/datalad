@@ -1,4 +1,155 @@
 
+<a id='changelog-1.1.1'></a>
+# 1.1.1 (2024-07-03)
+
+## 🐛 Bug Fixes
+
+- Ensure timestamps of files in ZIP archives are within years 1980-2107.  Fixes [#3753](https://github.com/datalad/datalad/issues/3753) via [PR #7450](https://github.com/datalad/datalad/pull/7450) (by [@adswa](https://github.com/adswa))
+
+## 📝 Documentation
+
+- Update README.md: improve wording.  [PR #7550](https://github.com/datalad/datalad/pull/7550) (by [@alliesw](https://github.com/alliesw))
+
+## 🏠 Internal
+
+- Add codespell and minor fixuppers to pre-commit configuration and apply it to non-`datalad/` components.  [PR #7621](https://github.com/datalad/datalad/pull/7621) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- For appveyor ssh setup, setup MaxSessions 100 to avoid 'channel 22: open failed: connect failed: open failed'.  [PR #7617](https://github.com/datalad/datalad/pull/7617) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- test_gracefull_death: raise test_gracefull_death  threshold to 300 from 100.  [PR #7619](https://github.com/datalad/datalad/pull/7619) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Make test for presence of max_path in partitions not run for current psutil 6.0.0.  [PR #7622](https://github.com/datalad/datalad/pull/7622) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.1.0'></a>
+# 1.1.0 (2024-06-06)
+
+## 🔩 Dependencies
+
+- Deprecated `boto` is replaced with `boto3` (used to handle AWS S3
+  downloads). Fixes [#5597](https://github.com/datalad/datalad/issues/5597)
+  via [PR #7340](https://github.com/datalad/datalad/pull/7340)
+  (by [@mslw](https://github.com/mslw), [@effigies](https://github.com/effigies), and [@yarikoptic](https://github.com/yarikoptic)).
+  Remaining issues:
+  - no download progress indication,
+  - no "Range" support (for partial downloads).
+
+## 🏠 Internal
+
+- Retry logic for S3 connections is now handed over to Boto3 and its
+  standard mode, removing our custom method.
+  [PR #7340](https://github.com/datalad/datalad/pull/7340)
+
+<a id='changelog-1.0.3'></a>
+# 1.0.3 (2024-06-06)
+
+## 🐛 Bug Fixes
+
+- Raise exception if an annex remote process without console tries to interact with the user, e.g. prompt for a password.  [PR #7578](https://github.com/datalad/datalad/pull/7578) (by [@christian-monch](https://github.com/christian-monch))
+
+- Fix add-archive-content for patool>=2.0.  [PR #7603](https://github.com/datalad/datalad/pull/7603) (by [@dguibert](https://github.com/dguibert))
+
+## 🏠 Internal
+
+- Fixup minor typos in documentation/comments using fresh codespell.  [PR #7610](https://github.com/datalad/datalad/pull/7610) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Stop testing on Python 3.7. Switch MacOS tests to 3.11, include 3.11
+  in Appveyor, and use 3.8 for other tests.
+  Fixes [#7584](https://github.com/datalad/datalad/issues/7584)
+  via [PR #7585](https://github.com/datalad/datalad/pull/7585)
+  (by [@mslw](https://github.com/mslw))
+
+- Convert `.travis.yml` to GitHub Actions workflow.  Fixes [#7574](https://github.com/datalad/datalad/issues/7574) via [PR #7600](https://github.com/datalad/datalad/pull/7600) (by [@jwodder](https://github.com/jwodder))
+
+- Cancel lengthy running workflows if a new commit is pushed.  [PR #7601](https://github.com/datalad/datalad/pull/7601) (by [@jwodder](https://github.com/jwodder))
+
+<a id='changelog-1.0.2'></a>
+# 1.0.2 (2024-04-19)
+
+## 🧪 Tests
+
+- Relax condition in `test_force_checkdatapresent` to avoid flaky test failures.  [PR #7581](https://github.com/datalad/datalad/pull/7581) (by [@christian-monch](https://github.com/christian-monch))
+
+<a id='changelog-1.0.1'></a>
+# 1.0.1 (2024-04-17)
+
+## 🏠 Internal
+
+- The main entrypoint for annex remotes now also runs the standard extension
+  load hook. This enables extensions to alter annex remote implementation
+  behavior in the same way than other DataLad components.
+  (by [@mih](https://github.com/mih))
+
+<a id='changelog-1.0.0'></a>
+# 1.0.0 (2024-04-06)
+
+## 💥 Breaking Changes
+
+- Merging maint to make the first major release.  [PR #7577](https://github.com/datalad/datalad/pull/7577) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🚀 Enhancements and New Features
+
+- Increase minimal Git version to 2.25.  Fixes [#7389](https://github.com/datalad/datalad/issues/7389) via [PR #7431](https://github.com/datalad/datalad/pull/7431) (by [@adswa](https://github.com/adswa))
+
+<a id='changelog-0.19.6'></a>
+# 0.19.6 (2024-02-02)
+
+## 🚀 Enhancements and New Features
+
+- Add the "http_token" authentication mechanism which provides 'Authentication: Token {TOKEN}' header.  [PR #7551](https://github.com/datalad/datalad/pull/7551) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Update `pytest_ignore_collect()` for pytest 8.0.  [PR #7546](https://github.com/datalad/datalad/pull/7546) (by [@jwodder](https://github.com/jwodder))
+
+- Add manual triggering support/documentation for release workflow.  [PR #7553](https://github.com/datalad/datalad/pull/7553) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.19.5'></a>
+# 0.19.5 (2023-12-28)
+
+## 🧪 Tests
+
+- Fix text to account for a recent change in git-annex dropping sub-second clock precision.
+  As a result we might not report push of git-annex branch since there would be none.
+  [PR #7544](https://github.com/datalad/datalad/pull/7544) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-0.19.4'></a>
+# 0.19.4 (2023-12-13)
+
+## 🐛 Bug Fixes
+
+- Update target detection for adjusted mode datasets has been improved.
+  Fixes [#7507](https://github.com/datalad/datalad/issues/7507) via
+  [PR #7522](https://github.com/datalad/datalad/pull/7522)
+  (by [@mih](https://github.com/mih))
+
+- Fix typos found by new codespell 2.2.6 and also add checking/fixing "hidden files".  [PR #7530](https://github.com/datalad/datalad/pull/7530) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- Improve threaded-runner documentation.  Fixes [#7498](https://github.com/datalad/datalad/issues/7498) via [PR #7500](https://github.com/datalad/datalad/pull/7500) (by [@christian-monch](https://github.com/christian-monch))
+
+## 🏠 Internal
+
+- add RRID to package metadata.  [PR #7495](https://github.com/datalad/datalad/pull/7495) (by [@adswa](https://github.com/adswa))
+
+- Fix time_diff* and time_remove benchmarks to account for long RFed interfaces.  [PR #7502](https://github.com/datalad/datalad/pull/7502) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Cache value of the has_symlink_capability to spare some cycles.  [PR #7471](https://github.com/datalad/datalad/pull/7471) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- RF(TST): use setup_method and teardown_method in TestAddArchiveOptions.  [PR #7488](https://github.com/datalad/datalad/pull/7488) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Announce test_clone_datasets_root xfail on github osx.  [PR #7489](https://github.com/datalad/datalad/pull/7489) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Inform asv that there should be no warmup runs for time_remove benchmark.  [PR #7505](https://github.com/datalad/datalad/pull/7505) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF(TST): Relax matching of git-annex error message about unsafe drop, which was changed in 10.20231129-18-gfd0b510573.  [PR #7541](https://github.com/datalad/datalad/pull/7541) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-0.19.3'></a>
 # 0.19.3 (2023-08-10)
 
@@ -1355,7 +1506,7 @@
   fragile performance in interaction with other `asyncio`-using code, such as
   Jupyter notebooks. The new implementation is based on threads. It also supports
   the specification of "protocols" that were introduced with the switch to the
-  `asyncio` implementation in 0.14.0. ([#5667][]) 
+  `asyncio` implementation in 0.14.0. ([#5667][])
 
 - `clone` now supports arbitrary URL transformations based on regular
   expressions. One or more transformation steps can be defined via
@@ -1550,7 +1701,7 @@
   subdataset record. This was initially done in a second commit, leading to
   inflation of commits and slowdown in superdatasets with many subdatasets. Such
   subdataset record annotation is now collapsed into a single commits.
-  ([#5480][]) 
+  ([#5480][])
 
 - `run` now longer removes leading empty directories as part of the output
   preparation. This was surprising behavior for commands that do not ensure on
@@ -3782,7 +3933,7 @@ Largely a bug fix release with a few enhancements
 
 - [run] learned to replace the `{tmpdir}` placeholder in commands with
   a temporary directory.  ([#3223][])
- 
+
 - [duecredit][] support has been added for citing DataLad itself as
   well as datasets that an analysis uses.  ([#3184][])
 
@@ -4356,7 +4507,7 @@ Minor bugfix release
 
 - Should work correctly with subdatasets named as numbers of bool
   values (requires also GitPython >= 2.1.6)
-- Custom special remotes should work without crashing with 
+- Custom special remotes should work without crashing with
   git-annex >= 6.20170924
 
 
@@ -4380,7 +4531,7 @@ Minor bugfix release
 - [install][] will no longer report nothing when a Dataset instance was
   given as a source argument, but rather perform as expected
 - [remove][] doesn't remove when some files of a dataset could not be dropped
-- [publish][] 
+- [publish][]
   - no longer hides error during a repository push
   - publish behaves "correctly" for `--since=` in considering only the
     differences the last "pushed" state
@@ -4392,14 +4543,14 @@ Minor bugfix release
 - UI credentials interface should now allow to Ctrl-C the entry
 - should not fail while operating on submodules named with
   numerics only or by bool (true/false) names
-- crawl templates should not now override settings for `largefiles` if 
+- crawl templates should not now override settings for `largefiles` if
   specified in `.gitattributes`
 
 
 ## Enhancements and new features
 
-- **Exciting new feature** [run][] command to protocol execution of an external 
-  command and rerun computation if desired. 
+- **Exciting new feature** [run][] command to protocol execution of an external
+  command and rerun computation if desired.
   See [screencast](http://datalad.org/features.html#reproducible-science)
 - [save][] now uses Git for detecting with sundatasets need to be inspected for
   potential changes, instead of performing a complete traversal of a dataset tree
@@ -4414,7 +4565,7 @@ Minor bugfix release
   setting if any was set within `.gitattribues` (e.g. by `datalad create --text-no-annex`)
 - framework for screencasts: `tools/cast*` tools and sample cast scripts under
   `doc/casts` which are published at [datalad.org/features.html](http://datalad.org/features.html)
-- new [project YouTube channel](https://www.youtube.com/channel/UCB8-Zf7D0DSzAsREoIt0Bvw) 
+- new [project YouTube channel](https://www.youtube.com/channel/UCB8-Zf7D0DSzAsREoIt0Bvw)
 - tests failing in direct and/or v6 modes marked explicitly
 
 # 0.8.1 (Aug 13, 2017) -- the best birthday gift
@@ -4447,8 +4598,8 @@ A variety of fixes and enhancements
   were done
 - [publish][] should be able to publish using relative path within SSH URI
   (git hook would use relative paths)
-- [publish][] should better tollerate publishing to pure git and `git-annex` 
-  special remotes 
+- [publish][] should better tollerate publishing to pure git and `git-annex`
+  special remotes
 
 ## Enhancements and new features
 
@@ -4477,7 +4628,7 @@ New features, refactorings, and bug fixes.
 - [siblings][] can now query and set annex preferred content configuration. This
   includes ``wanted`` (as previously supported in other commands), and now
   also ``required``
-- New [metadata][] command to interface with datasets/files [meta-data][] 
+- New [metadata][] command to interface with datasets/files [meta-data][]
 - Documentation for all commands is now built in a uniform fashion
 - Significant parts of the documentation of been updated
 - Instantiate GitPython's Repo instances lazily
@@ -4487,7 +4638,7 @@ New features, refactorings, and bug fixes.
 - API documentation is now rendered properly as HTML, and is easier to browse by
   having more compact pages
 - Closed files left open on various occasions (Popen PIPEs, etc)
-- Restored basic (consumer mode of operation) compatibility with Windows OS 
+- Restored basic (consumer mode of operation) compatibility with Windows OS
 
 
 # 0.6.0 (Jun 14, 2017) -- German perfectionism
@@ -4647,7 +4798,7 @@ Requires now GitPython >= 2.1.0
      - to not save staged files if explicit paths were provided
 - improved (but not yet complete) support for direct mode
 - [update][] to not crash if some sub-datasets are not installed
-- do not log calls to `git config` to avoid leakage of possibly 
+- do not log calls to `git config` to avoid leakage of possibly
   sensitive settings to the logs
 
 ## Enhancements and new features
@@ -4671,11 +4822,11 @@ Requires now GitPython >= 2.1.0
 # 0.4 (Oct 22, 2016) -- Paris is waiting
 
 Primarily it is a bugfix release but because of significant refactoring
-of the [install][] and [get][] implementation, it gets a new minor release. 
+of the [install][] and [get][] implementation, it gets a new minor release.
 
 ## Fixes
 
-- be able to [get][] or [install][] while providing paths while being 
+- be able to [get][] or [install][] while providing paths while being
   outside of a dataset
 - remote annex datasets get properly initialized
 - robust detection of outdated [git-annex][]
@@ -4686,7 +4837,7 @@ of the [install][] and [get][] implementation, it gets a new minor release.
     - [get][] `--recursion-limit=existing` to not recurse into not-installed
        subdatasets
     - [get][] `-n` to possibly install sub-datasets without getting any data
-    - [install][] `--jobs|-J` to specify number of parallel jobs for annex 
+    - [install][] `--jobs|-J` to specify number of parallel jobs for annex
       [get][] call could use (ATM would not work when data comes from archives)
 - more (unit-)testing
 - documentation: see http://docs.datalad.org/en/latest/basics.html
@@ -4748,7 +4899,7 @@ Lots of everything, including but not limited to
 - new and/or improved crawler pipelines for [BALSA][], [CRCNS][], [OpenfMRI][]
 - refactored [install][] command, now with separate [get][]
 - some other commands renaming/refactoring (e.g., [create-sibling][])
-- datalad [search][] would give you an option to install datalad's 
+- datalad [search][] would give you an option to install datalad's
   super-dataset under ~/datalad if ran outside of a dataset
 
 ## 0.2.3 (Jun 28, 2016) -- busy OHBM
@@ -4762,7 +4913,7 @@ New features and bugfix release
 
 New feature and bugfix release
 
-- greately improved documentation
+- greatly improved documentation
 - publish command API RFing allows for custom options to annex, and uses
   --to REMOTE for consistent with annex invocation
 - variety of fixes and enhancements throughout

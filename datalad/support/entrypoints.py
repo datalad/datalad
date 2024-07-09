@@ -32,7 +32,7 @@ def iter_entrypoints(group, load=False):
 
     Yields
     -------
-    (name, module, loade(r|d))
+    (name, module, load(r|d))
       The first item in each yielded tuple is the entry point name (str).
       The second is the name of the module that contains the entry point
       (str). The type of the third items depends on the load parameter.

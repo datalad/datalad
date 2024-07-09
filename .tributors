@@ -281,5 +281,14 @@
     "Aksoo": {
         "name": "Aksoo",
         "blog": "https://github.com/Aksoo"
+    },
+    "dguibert": {
+        "name": "David Guibert",
+        "blog": "https://github.com/dguibert"
+    },
+    "alliesw": {
+        "name": "Alex Shields-Weber",
+        "bio": "CCNA | B.S. in Computer Science \r\n",
+        "blog": "https://github.com/alliesw"
     }
 }

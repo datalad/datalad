@@ -1,0 +1,243 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+  schedule:
+    - cron: '0 6 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # Use an interactive shell so that ~/.bashrc is sourced:
+    shell: 'bash -eio pipefail {0}'
+
+env:
+   # Note, that there's "turtle" as well, which is always excluded from running.
+   PYTEST_SELECTION: "integration or usecase or slow or network"
+   PYTEST_SELECTION_OP: "not "  # so it would be "not (integration or usecase)"
+   DATALAD_TESTS_SSH: "1"
+   DATALAD_LOG_ENV: GIT_SSH_COMMAND
+   # How/which git-annex we install.  conda's build would be the fastest,
+   # but it must not get ahead in PATH to not shadow travis' python
+   _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20201007 -m conda"
+   BOTO_CONFIG: /tmp/nowhere
+   DATALAD_DATASETS_TOPURL: https://datasets-tests.datalad.org
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.jobs.outputs.matrix }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Possibly filter out cron-only jobs
+        id: jobs
+        run: |
+          echo 'matrix<<EOT' >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name == 'schedule' }}" = true ]
+          then
+              yq '{"include": .} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
+          else
+              yq '{"include": [.[] | select(."cron-only" != true)]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
+          fi
+          echo 'EOT' >> "$GITHUB_OUTPUT"
+
+  test:
+    runs-on: ubuntu-latest
+    needs: filter
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.filter.outputs.jobs) }}
+    env: ${{ matrix.extra-envs }}
+    continue-on-error: ${{ matrix.allow-failure || false }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Do full clone (~10 extra seconds) to fetch all tags.
+          # Otherwise we might be missing the tags for maint PRs
+          # whenever those maint releases were not yet merged into master.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Show git describe output to ensure that we did fetch all the tags
+        run: git describe
+
+      # Just in case we need to check if nfs is there etc
+      - run: sudo lsmod
+
+      - name: Install dependencies
+        run: |
+          # The ultimate one-liner setup for NeuroDebian repository
+          bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+          sudo apt-get update -qq
+          sudo apt-get install eatmydata  # to speedup some installations
+          tools/ci/prep-travis-forssh.sh
+          tools/ci/debians_disable_outdated_ssl_cert
+          # Install various basic dependencies
+          sudo eatmydata apt-get install zip pandoc p7zip-full
+          # needed for tests of patool compression fall-back solution
+          sudo eatmydata apt-get install xz-utils
+          sudo eatmydata apt-get install shunit2
+          [ -z "$LC_ALL" ] || sudo eatmydata apt-get install locales-all
+
+      - name: Configure _DL_TMPDIR before installing git-annex
+        run: |
+          if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]
+          then echo "Symlinking $_DL_TMPDIR"
+               ln -s /tmp "$_DL_TMPDIR"
+          fi
+
+          if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]
+          then echo "mkdir $_DL_TMPDIR"
+               mkdir -p "$_DL_TMPDIR"
+          fi
+
+          if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]
+          then echo "mkdir $_DL_TMPDIR"
+               mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"
+               echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'
+               sudo apt-get install -y nfs-kernel-server
+               sudo exportfs -a
+               sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount
+          fi
+
+      - name: Install custom Git from upstream
+        if: matrix.upstream-git
+        run: |
+          sudo apt-get install -y gettext libcurl4-gnutls-dev
+          source tools/ci/install-upstream-git.sh
+          echo "$target_dir/bin-wrappers" >> "$GITHUB_PATH"
+
+      - name: Install minimum Git
+        if: matrix.minimum-git
+        run: |
+          sudo apt-get install -y gettext libcurl4-gnutls-dev
+          tools/ci/install-minimum-git.sh
+          echo "$PWD/git-src/bin-wrappers" >> "$GITHUB_PATH"
+
+      - name: Install git-annex
+        run: |
+          pip install datalad-installer
+          eval datalad-installer --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+          # Append new.env to ~/.bashrc instead of $GITHUB_OUTPUT because it
+          # can include `source` and `conda activate` commands that are invalid
+          # for the latter; this also necessitates using an interactive shell
+          # for the workflow.
+          cat new.env >> ~/.bashrc
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install codecov
+          pip install -r requirements-devel.txt
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "test@github.land"
+          git config --global user.name "GitHub Almighty"
+          # We do `sudo pip install` below, and versioneer needs to run git.
+          # Recent git needs to be made certain it is safe to do
+          sudo git config --global --add safe.directory $PWD
+
+      - name: Configure sudoers
+        # So we could test under sudo -E with PATH pointing to installed
+        # location
+        run: sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
+
+      # TODO: remove - should not be needed
+      - name: Git-annex workaround for NFS mounts
+        run: |
+          if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]
+          then sudo git config --system annex.pidlock true
+          fi
+
+      # Now it should be safe to point TMPDIR to a "tricky" setup just for the
+      # purpose of testing
+      - name: Point TMPDIR to "tricky" setup
+        run: |
+          if [ -n "${_DL_TMPDIR:-}" ]
+          then echo TMPDIR="${_DL_TMPDIR}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Test installation for user
+        run: sudo pip install --user .
+
+      - name: Report WTF information using system-wide installed version
+        run: datalad wtf
+
+      - name: Run tests
+        run: |
+          PYTEST_OPTS=( -v )
+          # If we requested to run only not slow (typically <10sec) tests, fail
+          # if a test takes 3x more than that - it needs to get @slow or
+          # @turtle annotation
+          if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"
+          then
+            PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow 60 )
+            export DATALAD_TESTS_SETUP_TESTREPOS=1
+          fi
+
+          mkdir -p __testhome__
+          cd __testhome__
+          # Note: adding --log-cli-level=INFO would result in
+          # DATALAD_LOG_TARGET=/dev/null being not in effect, dumping too many
+          # logs.
+          set -x
+          http_proxy=
+          PATH=$PWD/../tools/coverage-bin:$PATH
+          $PYTEST_WRAPPER python \
+            -m pytest "${PYTEST_OPTS[@]}" \
+            -c ../tox.ini \
+            -n 2 \
+            -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)" \
+            --doctest-modules \
+            --cov=datalad \
+            --cov-report=xml \
+            --pyargs ${TESTS_TO_PERFORM:-datalad}
+
+      # Makes it only more difficult to comprehend the failing output.  Enable
+      # only when necessary for a particular debugging.
+      - name: Dump debug info
+        #if: "failure()"  # Enabled
+        if: "failure() && false"  # Disabled
+        run: |
+          if [ ! -z "$DATALAD_TESTS_NONETWORK" ]
+          then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo
+          fi
+
+          DATALAD_LOG_LEVEL=DEBUG \
+            $PYTEST_WRAPPER `which pytest` \
+            -s -v --doctest-modules --cov datalad --log-cli-level=DEBUG
+
+          if [ ! -z "$DATALAD_TESTS_NONETWORK" ]
+          then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo
+          fi
+
+      # cron jobs test more and then PRs will be falling behind since they
+      # would not trigger some codepaths.  So submit coverage only from
+      # non-cron jobs, but report for all
+
+      - name: Report coverage
+        run: python -m coverage report
+        working-directory: __testhome__
+
+      - name: Upload coverage to Codecov
+        if: github.event_name != 'schedule'
+        uses: codecov/codecov-action@v4
+        with:
+          directory: __testhome__
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+# vim:set et sts=2:
