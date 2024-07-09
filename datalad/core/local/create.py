@@ -169,6 +169,14 @@ class Create(Interface):
             doc="""if [CMD: set CMD][PY: disabled PY], a plain Git repository
             will be created without any annex""",
             action='store_false'),
+        private=Parameter(
+            args=("--private",),
+            action="store_true",
+            doc="""set annex.private configuration option, so that the
+            created dataset won't record information about itself in
+            the git-annex branch. This can be useful for temporary
+            datasets which will be discarded after being published, or
+            for privacy reasons."""),
         # TODO seems to only cause a config flag to be set, this could be done
         # in a procedure
         fake_dates=Parameter(
@@ -201,7 +209,8 @@ class Create(Interface):
             dataset=None,
             annex=True,
             fake_dates=False,
-            cfg_proc=None
+            cfg_proc=None,
+            private=False,
     ):
         # we only perform negative tests below
         no_annex = not annex
@@ -227,6 +236,15 @@ class Create(Interface):
                 raise ValueError("Incompatible arguments: cannot specify "
                                  "description for annex repo and declaring "
                                  "no annex repo.")
+            if private:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "annex to be private and declare no annex.")
+        if private and not \
+                AnnexRepo._check_version_kludges("annex-supports-private"):
+            raise ValueError("git-annex version does not support private mode. "
+                             "This requires at least git-annex 8.20210428. "
+                             "Note, that 'git annex dead here' may serve the "
+                             "purpose under some circumstances.")
 
         if (isinstance(initopts, (list, tuple)) and '--bare' in initopts) or (
                 isinstance(initopts, dict) and 'bare' in initopts):
@@ -365,6 +383,14 @@ class Create(Interface):
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
+        # Inherit annex.private=true if parent dataset is given explicitly
+        if ds is not None:
+            try:
+                parent_private = ds.config.getbool('annex', 'private')
+            except KeyError:
+                parent_private = False
+            private = private or parent_private
+
         # Note for the code below:
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
         # Reuse tbrepo instance, do not use tbds.repo
@@ -375,7 +401,7 @@ class Create(Interface):
             tbrepo, add_to_git = _setup_git_repo(path, initopts, fake_dates)
         else:
             tbrepo, add_to_git = _setup_annex_repo(
-                path, initopts, fake_dates, description)
+                path, initopts, fake_dates, description, private)
 
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
         # Note, must not happen earlier (before if) since "smart" it would not be
@@ -413,6 +439,12 @@ class Create(Interface):
         # subsequence ds.config.add() call)
         for k, v in tbds_config.overrides.items():
             tbds_config.add(k, v, scope='local', reload=False)
+
+        # tell subdatasets cloned into this to use reckless if private was set
+        if private:
+            tbds_config.set(
+                'datalad.clone.reckless', 'private', scope='local',
+                reload=False)
 
         # all config manipulation is done -> fll reload
         tbds_config.reload()
@@ -500,7 +532,7 @@ def _setup_git_repo(path, initopts=None, fake_dates=False):
 
 
 def _setup_annex_repo(path, initopts=None, fake_dates=False,
-                      description=None):
+                      description=None, private=False):
     """Create and configure a repository at `path`
 
     This includes a default setup of annex.largefiles.
@@ -533,7 +565,8 @@ def _setup_annex_repo(path, initopts=None, fake_dates=False,
         version=None,
         description=description,
         git_opts=initopts,
-        fake_dates=fake_dates
+        fake_dates=fake_dates,
+        private=private,
     )
     # set the annex backend in .gitattributes as a staged change
     tbrepo.set_default_backend(

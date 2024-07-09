@@ -242,6 +242,15 @@ class Clone(Interface):
             # so that we can forget about how things used to be
             reckless = 'auto'
 
+        if reckless == 'private' and not \
+                AnnexRepo._check_version_kludges("annex-supports-private"):
+            raise ValueError("Instructed to make a private clone, but git-annex "
+                             "version does not support private mode. Requires "
+                             "at least git-annex 8.20210428. Note, that 'git "
+                             "annex dead here' may serve the purpose if "
+                             "recording the existence of this location is not "
+                             "an issue.")
+
         if isinstance(source, Dataset):
             source = source.path
 
@@ -416,7 +425,7 @@ def clone_dataset(
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
-    reckless : {None, 'auto', 'ephemeral', 'shared-...'}, optional
+    reckless : {None, 'auto', 'ephemeral', 'private', 'shared-...'}, optional
       Mode switch to put cloned dataset into unsafe/throw-away configurations, i.e.
       sacrifice data safety for performance or resource footprint. When None
       and `cfg` is specified, use the value of `datalad.clone.reckless`.
@@ -586,6 +595,7 @@ def _post_gitclone_processing_(
             gitclonerec=gitclonerec,
             remote=remote,
             description=description,
+            reckless=reckless
         )
         yield from _post_annex_init_processing_(
             destds=destds,
@@ -679,6 +689,7 @@ def _annex_init(
         gitclonerec: Dict,
         remote: str,
         description: None or str,
+        reckless: None or str,
 ):
     """Initializing an annex repository"""
     lgr.debug("Initializing annex repo at %s", destds.path)
@@ -689,9 +700,9 @@ def _annex_init(
     #
     # Additionally, call init if we need to add a description (see #1403),
     # since AnnexRepo.__init__ can only do it with create=True
-    repo = AnnexRepo(destds.path, init=True)
+    repo = AnnexRepo(destds.path, init=True, private=reckless == 'private')
     if not repo.is_initialized() or description:
-        repo._init(description=description)
+        repo._init(description=description, private=reckless == 'private')
     return repo
 
 
@@ -708,7 +719,10 @@ def _post_annex_init_processing_(
     repo = destds.repo
     ds = destds
 
-    if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
+    if (
+        reckless in ('auto', 'private')
+        or (reckless and reckless.startswith('shared-'))
+    ):
         repo.call_annex(['untrust', 'here'])
 
     _check_autoenable_special_remotes(repo)
