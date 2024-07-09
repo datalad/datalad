@@ -1,9 +1,9 @@
-name: Gooey issue
+name: Report a Gooey Issue
 
 # For documentation concerning the Github form schema see
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
 
-description: Gooey issue
+description: Report a Gooey Issue
 
 body:
 
