@@ -11,6 +11,7 @@
 
 import re
 from urllib.parse import urlsplit, unquote as urlunquote
+from threading import Lock
 
 import boto3
 import botocore
@@ -159,15 +160,17 @@ class S3DownloaderSession(DownloaderSession):
         self.bucket = bucket
         self.key = key
         self.version_kwargs = version_kwargs
+        self.pbar_callback_lock = Lock()
 
     def download(self, f=None, pbar=None, size=None):
         # S3 specific (the rest is common with e.g. http)
         def pbar_callback(downloaded):
-            if pbar:
-                try:
-                    pbar.update(downloaded, increment=True)
-                except:  # MIH: what does it do? MemoryError?
-                    pass  # do not let pbar spoil our fun
+            with self.pbar_callback_lock:
+                if pbar:
+                    try:
+                        pbar.update(downloaded, increment=True)
+                    except:  # MIH: what does it do? MemoryError?
+                        pass  # do not let pbar spoil our fun
 
         if f:
             if size is None:
