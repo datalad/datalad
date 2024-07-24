@@ -11,73 +11,71 @@
 """
 
 import logging
+import os.path as op
 import re
 
-import os.path as op
-
 from datalad.config import ConfigManager
-from datalad.interface.base import (
-    Interface,
-    eval_results,
-)
-from datalad.interface.base import build_doc
-from datalad.interface.results import (
-    get_status_dict,
-    results_from_paths,
-    annexjson2result,
-    success_status_map,
-    results_from_annex_noinfo,
-)
-from datalad.interface.common_opts import (
-    recursion_flag,
-    location_description,
-    jobs_opt,
-    reckless_opt,
-)
-from datalad.interface.results import is_ok_dataset
-from datalad.support.constraints import (
-    EnsureInt,
-    EnsureChoice,
-    EnsureStr,
-    EnsureNone,
-)
-from datalad.support.collections import ReadOnlyDict
-from datalad.support.param import Parameter
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import (
-    GitRepo,
-    _fixup_submodule_dotgit_setup,
-)
-from datalad.support.exceptions import (
-    CapturedException,
-    CommandError,
-    InsufficientArgumentsError,
-)
-from datalad.support.network import (
-    URL,
-    RI,
-    urlquote,
-)
-from datalad.support.parallel import (
-    ProducerConsumerProgressLog,
-)
-from datalad.utils import (
-    unique,
-    Path,
-    get_dataset_root,
-    shortened_repr,
-)
-
-from datalad.local.subdatasets import Subdatasets
-
+from datalad.core.distributed.clone import clone_dataset
 from datalad.distribution.dataset import (
     Dataset,
     EnsureDataset,
     datasetmethod,
     require_dataset,
 )
-from datalad.core.distributed.clone import clone_dataset
-from datalad.distribution.utils import _get_flexible_source_candidates
+from datalad.distribution.utils import (
+    _get_flexible_source_candidates,
+    rewrite_match_scheme,
+)
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+    eval_results,
+)
+from datalad.interface.common_opts import (
+    jobs_opt,
+    location_description,
+    reckless_opt,
+    recursion_flag,
+)
+from datalad.interface.results import (
+    annexjson2result,
+    get_status_dict,
+    is_ok_dataset,
+    results_from_annex_noinfo,
+    results_from_paths,
+    success_status_map,
+)
+from datalad.local.subdatasets import Subdatasets
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.collections import ReadOnlyDict
+from datalad.support.constraints import (
+    EnsureChoice,
+    EnsureInt,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+    InsufficientArgumentsError,
+)
+from datalad.support.gitrepo import (
+    GitRepo,
+    _fixup_submodule_dotgit_setup,
+)
+from datalad.support.network import (
+    RI,
+    URL,
+    urlquote,
+)
+from datalad.support.parallel import ProducerConsumerProgressLog
+from datalad.support.param import Parameter
+from datalad.utils import (
+    Path,
+    get_dataset_root,
+    shortened_repr,
+    unique,
+)
 
 __docformat__ = 'restructuredtext'
 
@@ -114,6 +112,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       ria-schemes (ria+http, ria+ssh, etc.)
 
     - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
+
+    - In case the parent dataset url scheme doesnt match the submodule URL one,
+      attempt a rewrite to match the parent one (cost 610).
 
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
@@ -234,6 +235,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         remote_url,
                         alternate_suffix=False)
                 )
+                rewriten_url = rewrite_match_scheme(remote_url, sm_url)
+                if rewriten_url:
+                    clone_urls.append(dict(cost=610, name=remote, url=rewriten_url))
 
     cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
@@ -881,7 +885,7 @@ class Get(Interface):
             reckless=None,
             jobs='auto',
     ):
-        
+
         if not (dataset or path):
             raise InsufficientArgumentsError(
                 "Neither dataset nor target path(s) provided")
