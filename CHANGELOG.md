@@ -1,4 +1,17 @@
 
+<a id='changelog-1.1.2'></a>
+# 1.1.2 (2024-07-25)
+
+## 🐛 Bug Fixes
+
+- Correct remote OS detection when working with RIA (ORA) stores: this
+  should enable RIA operations, including push, from Mac clients to
+  Linux hosts (and likely vice versa).
+  Fixes [#7536](https://github.com/datalad/datalad/issues/7536)
+  via [PR #7549](https://github.com/datalad/datalad/pull/7549) (by [@mslw](https://github.com/mslw))
+
+- Allow only one thread in S3 downloader's progress report callback.  [PR #7636](https://github.com/datalad/datalad/pull/7636) (by [@christian-monch](https://github.com/christian-monch))
+
 <a id='changelog-1.1.1'></a>
 # 1.1.1 (2024-07-03)
 
