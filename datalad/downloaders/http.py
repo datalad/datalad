@@ -9,33 +9,19 @@
 """Provide access to stuff (html, data files) via HTTP and HTTPS
 
 """
+import io
 import re
+from logging import getLogger
+from time import sleep
+
 import requests
 import requests.auth
 from requests.utils import parse_dict_header
 
-# at some point was trying to be too specific about which exceptions to
-# catch for a retry of a download.
-# from urllib3.exceptions import MaxRetryError, NewConnectionError
-
-import io
-from time import sleep
-
 from .. import __version__
-from ..utils import (
-    ensure_list_from_str,
-    ensure_dict_from_str,
-    ensure_bytes,
-)
 from ..dochelpers import borrowkwargs
-
-from ..ui import ui
-from ..utils import auto_repr
-from ..support.network import get_url_filename
-from ..support.network import get_response_disposition_filename
-from ..support.network import rfc2822_to_epoch
+from ..log import LoggerHelper
 from ..support.cookies import cookies_db
-from ..support.status import FileStatus
 from ..support.exceptions import (
     AccessDeniedError,
     AccessFailedError,
@@ -43,12 +29,33 @@ from ..support.exceptions import (
     DownloadError,
     UnhandledRedirectError,
 )
+from ..support.network import (
+    get_response_disposition_filename,
+    get_url_filename,
+    rfc2822_to_epoch,
+)
+from ..support.status import FileStatus
+from ..ui import ui
+from ..utils import (
+    auto_repr,
+    ensure_bytes,
+    ensure_dict_from_str,
+    ensure_list_from_str,
+)
+from .base import (
+    Authenticator,
+    BaseDownloader,
+    DownloaderSession,
+)
 
-from .base import Authenticator
-from .base import BaseDownloader, DownloaderSession
+# at some point was trying to be too specific about which exceptions to
+# catch for a retry of a download.
+# from urllib3.exceptions import MaxRetryError, NewConnectionError
 
-from logging import getLogger
-from ..log import LoggerHelper
+
+
+
+
 lgr = getLogger('datalad.http')
 
 # Following https://meta.wikimedia.org/wiki/User-Agent_policy to provide
@@ -74,6 +81,7 @@ if lgr.getEffectiveLevel() <= 1:
     # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
     # The only thing missing will be the response.body which is not logged.
     import http.client
+
     # TODO: nohow wrapped with logging, plain prints (heh heh), so formatting will not be consistent
     http.client.HTTPConnection.debuglevel = 1
 

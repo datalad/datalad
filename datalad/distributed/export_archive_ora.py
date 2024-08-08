@@ -18,32 +18,30 @@ import shutil
 import subprocess
 from argparse import REMAINDER
 
-from datalad.utils import (
-    ensure_list,
-    rmtree,
-)
-from datalad.interface.base import (
-    Interface,
-    build_doc,
-    eval_results,
-)
-from datalad.interface.results import (
-    get_status_dict,
-)
-from datalad.support.param import Parameter
-from datalad.support.constraints import (
-    EnsureChoice,
-    EnsureNone,
-    EnsureStr,
-)
-from datalad.support.exceptions import CapturedException
 from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     require_dataset,
     resolve_path,
 )
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+    eval_results,
+)
+from datalad.interface.results import get_status_dict
 from datalad.log import log_progress
+from datalad.support.constraints import (
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import CapturedException
+from datalad.support.param import Parameter
+from datalad.utils import (
+    ensure_list,
+    rmtree,
+)
 
 lgr = logging.getLogger('datalad.customremotes.export_archive_ora')
 

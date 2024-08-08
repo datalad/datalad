@@ -14,20 +14,23 @@ __docformat__ = 'restructuredtext'
 
 import concurrent.futures
 import inspect
+import logging
 import sys
 import time
 import uuid
-
 from collections import defaultdict
-from queue import Queue, Empty
+from queue import (
+    Empty,
+    Queue,
+)
 from threading import Thread
 
-from . import ansi_colors as colors
-from ..log import log_progress
-from ..utils import path_is_subpath
 from datalad.support.exceptions import CapturedException
 
-import logging
+from ..log import log_progress
+from ..utils import path_is_subpath
+from . import ansi_colors as colors
+
 lgr = logging.getLogger('datalad.parallel')
 
 
@@ -250,6 +253,7 @@ class ProducerConsumer:
         """
         if jobs in (None, "auto"):
             from datalad import cfg
+
             # ATM there is no "auto" for this operation, so in both auto and None
             # just consult max-jobs which can only be an int ATM.
             # "auto" could be for some auto-scaling based on a single future time

@@ -12,20 +12,20 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections.abc import Mapping
 import logging
+import time
+from collections.abc import Mapping
 from os import environ
 from os.path import expanduser
 from os.path import join as opj
-import time
 
 from platformdirs import AppDirs
 
 from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
-    EnsureInt,
     EnsureFloat,
+    EnsureInt,
     EnsureListOf,
     EnsureNone,
     EnsureStr,
@@ -144,8 +144,9 @@ class _ConfigDefinition(Mapping):
 
 
 def get_default_ssh():
-    from datalad.utils import on_windows
     from pathlib import Path
+
+    from datalad.utils import on_windows
 
     if on_windows:
         windows_openssh_path = \

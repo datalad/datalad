@@ -13,36 +13,36 @@
 __docformat__ = 'restructuredtext'
 
 
+import itertools
 import logging
 from os.path import lexists
-import itertools
 
-from datalad.interface.base import Interface
+from datalad.distribution.dataset import require_dataset
 from datalad.interface.base import (
+    Interface,
     build_doc,
     eval_results,
 )
-from datalad.interface.results import (
-    get_status_dict,
-    YieldDatasets
-)
-from datalad.support.constraints import (
-    EnsureBool,
-    EnsureChoice,
-    EnsureStr,
-    EnsureNone,
-)
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import (
-    CapturedException,
-    CommandError
-)
-from datalad.support.param import Parameter
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
-from datalad.distribution.dataset import require_dataset
+from datalad.interface.results import (
+    YieldDatasets,
+    get_status_dict,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+)
+from datalad.support.param import Parameter
 
 from .dataset import (
     EnsureDataset,

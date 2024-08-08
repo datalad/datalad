@@ -10,6 +10,7 @@
 """
 
 import warnings
+
 warnings.warn(
     "DownloadURL has been moved to datalad.local.download_url. "
     "This module was deprecated in 0.16.0, and will be removed in a future "

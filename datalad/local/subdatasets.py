@@ -12,26 +12,21 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import re
 import os
+import re
 import warnings
 
-from datalad.interface.utils import generic_result_renderer
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+    resolve_path,
+)
 from datalad.interface.base import (
     Interface,
     build_doc,
     eval_results,
-)
-from datalad.interface.results import get_status_dict
-from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
-    NoneDeprecated,
-)
-from datalad.support.param import Parameter
-from datalad.support.exceptions import (
-    CapturedException,
-    CommandError
 )
 from datalad.interface.common_opts import (
     contains,
@@ -40,22 +35,24 @@ from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
-from datalad.distribution.dataset import (
-    Dataset,
-    require_dataset,
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import generic_result_renderer
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+    NoneDeprecated,
+)
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
 )
 from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
 from datalad.utils import (
+    Path,
     ensure_list,
     getpwd,
     partition,
-    Path,
-)
-
-from datalad.distribution.dataset import (
-    EnsureDataset,
-    datasetmethod,
-    resolve_path,
 )
 
 lgr = logging.getLogger('datalad.local.subdatasets')

@@ -45,7 +45,6 @@ from .runnerthreads import (
     _try_close,
 )
 
-
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")

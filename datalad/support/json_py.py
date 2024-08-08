@@ -10,20 +10,19 @@
 """
 
 
-import io
 import codecs
+import io
+import json
+import os
+import os.path as op
+from os import makedirs
 from os.path import (
     dirname,
     exists,
     lexists,
 )
-from os import makedirs
-import os
-import os.path as op
-import json
 
 from datalad.support.exceptions import CapturedException
-
 
 # produce relatively compact, but also diff-friendly format
 json_dump_kwargs = dict(

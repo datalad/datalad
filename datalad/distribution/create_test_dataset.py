@@ -13,20 +13,31 @@
 __docformat__ = 'numpy'
 
 
-import random
 import logging
-import tempfile
-
-from datalad.utils import get_tempfile_kwargs
 import os
-from os.path import join as opj, exists, isabs, abspath
+import random
+import tempfile
+from os.path import (
+    abspath,
+    exists,
+    isabs,
+)
+from os.path import join as opj
+
 from datalad.distribution.dataset import Dataset
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureInt
-from datalad.support.gitrepo import GitRepo
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.support.constraints import (
+    EnsureInt,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
+from datalad.utils import get_tempfile_kwargs
 
 lgr = logging.getLogger('datalad.distribution.tests')
 
@@ -85,6 +96,7 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
     """
     # we apparently can't import api functionality within api
     from datalad.api import save
+
     # To simplify managing all the file paths etc
     if not isabs(path):
         path = abspath(path)

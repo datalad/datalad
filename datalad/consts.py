@@ -10,8 +10,8 @@
 """
 
 import os
-from os.path import join
 import re
+from os.path import join
 
 # directory containing prepared metadata of a dataset repository:
 DATALAD_DOTDIR = ".datalad"

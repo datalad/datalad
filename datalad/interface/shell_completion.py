@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from .base import Interface
+from logging import getLogger
 
 from datalad.interface.base import (
     build_doc,
@@ -21,7 +21,7 @@ from datalad.interface.base import (
 from datalad.interface.results import get_status_dict
 from datalad.support.exceptions import CapturedException
 
-from logging import getLogger
+from .base import Interface
 
 lgr = getLogger("datalad.interface.shell_completion")
 

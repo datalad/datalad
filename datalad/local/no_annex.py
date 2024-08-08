@@ -11,8 +11,10 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 
 
 @build_doc
@@ -36,11 +38,13 @@ class NoAnnex(Interface):
     Note that this command works incrementally, hence any existing configuration
     (e.g. from a previous plugin run) is amended, not replaced.
     """
-    from datalad.support.param import Parameter
-    from datalad.distribution.dataset import datasetmethod
+    from datalad.distribution.dataset import (
+        EnsureDataset,
+        datasetmethod,
+    )
     from datalad.interface.base import eval_results
-    from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import EnsureNone
+    from datalad.support.param import Parameter
 
     _params_ = dict(
         dataset=Parameter(
@@ -76,10 +80,13 @@ class NoAnnex(Interface):
     # TODO*: make dataset, pattern into kwargs after *,?
     def __call__(dataset, pattern, ref_dir='.', makedirs=False):
         # could be extended to accept actual largefile expressions
-        from os.path import join as opj
-        from os.path import isabs
-        from os.path import exists
         from os import makedirs as makedirsfx
+        from os.path import (
+            exists,
+            isabs,
+        )
+        from os.path import join as opj
+
         from datalad.distribution.dataset import require_dataset
         from datalad.support.annexrepo import AnnexRepo
         from datalad.utils import ensure_list

@@ -13,16 +13,16 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from os.path import lexists
 import warnings
+from os.path import lexists
 
 from datalad.core.local.save import Save
 from datalad.core.local.status import get_paths_by_ds
 from datalad.distributed.drop import Drop
 from datalad.distribution.dataset import (
+    EnsureDataset,
     datasetmethod,
     require_dataset,
-    EnsureDataset,
 )
 from datalad.interface.base import (
     Interface,

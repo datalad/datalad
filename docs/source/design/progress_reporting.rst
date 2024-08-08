@@ -156,7 +156,7 @@ level than intermediate updates. It is also possible to single out particular
 intermediate events, and report them at a higher level.
 
 If no `noninteractive_level` is specified, the progress update is unconditionally
-logged at the level implied by the given logger callable. 
+logged at the level implied by the given logger callable.
 
 
 Reporting progress with `with_(result_)progress()`

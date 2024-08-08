@@ -29,8 +29,8 @@ from os import environ
 from os.path import lexists
 from typing import Optional
 from weakref import (
+    WeakValueDictionary,
     finalize,
-    WeakValueDictionary
 )
 
 from datalad.cmd import (
@@ -59,11 +59,10 @@ from datalad.support.exceptions import (
     PathKnownToRepositoryError,
 )
 from datalad.utils import (
+    Path,
     ensure_list,
     lock_if_required,
-    Path,
 )
-
 
 lgr = logging.getLogger('datalad.dataset.gitrepo')
 

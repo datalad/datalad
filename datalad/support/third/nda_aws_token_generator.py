@@ -7,9 +7,8 @@
 import binascii
 import hashlib
 import logging
-import xml.etree.ElementTree as etree
-
 import sys
+import xml.etree.ElementTree as etree
 
 if sys.version_info[0] == 2:
     import urllib2 as urllib_request

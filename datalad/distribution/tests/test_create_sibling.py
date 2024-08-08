@@ -37,7 +37,6 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import urlquote
-from datalad.tests.utils_testdatasets import _mk_submodule_annex
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
@@ -70,6 +69,7 @@ from datalad.tests.utils_pytest import (
     with_tempfile,
     with_testsui,
 )
+from datalad.tests.utils_testdatasets import _mk_submodule_annex
 from datalad.utils import (
     Path,
     _path_,

@@ -13,13 +13,8 @@ a parameterized command call.
 # caused unconditionally by .main, and .parser.
 
 from datalad import cfg
-
-from datalad.interface.base import (
-    is_api_arg,
-)
-from datalad.utils import (
-    getargspec,
-)
+from datalad.interface.base import is_api_arg
+from datalad.utils import getargspec
 
 # only imported during command execution
 # .interface._has_eval_results_call
@@ -50,6 +45,7 @@ def call_from_parser(cls, args):
     """
     # XXX needs safety check for name collisions
     import inspect
+
     from datalad.interface.base import _has_eval_results_call
 
     argspec = getargspec(cls.__call__, include_kwonlyargs=True)
@@ -82,6 +78,7 @@ def call_from_parser(cls, args):
         kwargs['result_xfm'] = None
         if '{' in args.common_result_renderer:
             from .renderer import DefaultOutputRenderer
+
             # stupid hack, could and should become more powerful
             kwargs['result_renderer'] = DefaultOutputRenderer(
                 args.common_result_renderer)

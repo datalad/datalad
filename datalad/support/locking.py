@@ -1,19 +1,20 @@
+import logging
+from contextlib import contextmanager
+
 from fasteners import (
     InterProcessLock,
     try_lock,
 )
-from contextlib import contextmanager
 
-from .path import exists
+from datalad.support.exceptions import CapturedException
+
 from ..utils import (
     ensure_unicode,
     get_open_files,
     unlink,
 )
-from datalad.support.exceptions import CapturedException
+from .path import exists
 
-
-import logging
 lgr = logging.getLogger('datalad.locking')
 
 

@@ -8,7 +8,9 @@
 """Test create publication target on gitlab"""
 
 import os
+
 import pytest
+
 # this must import ok with and without gitlab
 from datalad.api import (
     Dataset,

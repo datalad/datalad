@@ -21,6 +21,7 @@ from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
 )
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     OBSCURE_FILENAME,
@@ -36,8 +37,6 @@ from datalad.tests.utils_pytest import (
     with_tree,
 )
 from datalad.utils import ensure_unicode
-
-from datalad.support.external_versions import external_versions
 
 
 @with_tree({OBSCURE_FILENAME: {}})

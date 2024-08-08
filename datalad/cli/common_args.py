@@ -13,13 +13,13 @@ __docformat__ = 'restructuredtext'
 
 __all__ = ['common_args']
 
+from datalad.interface.base import eval_params
+from datalad.utils import ensure_unicode
+
 from .helpers import (
     HelpAction,
     LogLevelAction,
 )
-from datalad.interface.base import eval_params
-from datalad.utils import ensure_unicode
-
 
 _log_level_names = ['critical', 'error', 'warning', 'info', 'debug']
 

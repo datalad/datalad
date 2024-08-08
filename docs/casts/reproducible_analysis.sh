@@ -35,7 +35,7 @@ for nifti in \\\$@; do
   mkdir -p \\\$subdir
   echo \"Processing \\\$nifti\"
   bet \\\$nifti \\\$subdir/anat -m
-  count=\\\$((count + 1)) 
+  count=\\\$((count + 1))
 done
 EOT"
 
