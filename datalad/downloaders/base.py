@@ -12,27 +12,26 @@
 
 __docformat__ = 'restructuredtext'
 
-import msgpack
 import os
+import os.path as op
 import sys
 import time
+from abc import (
+    ABCMeta,
+    abstractmethod,
+)
+from logging import getLogger
+from os.path import (
+    exists,
+    isdir,
+)
+from os.path import join as opj
 
-from abc import ABCMeta, abstractmethod
-import os.path as op
-from os.path import exists, join as opj, isdir
+import msgpack
 
+from datalad.downloaders import CREDENTIAL_TYPES
 
 from .. import cfg
-from ..ui import ui
-from ..utils import (
-    auto_repr,
-    ensure_unicode,
-    unlink,
-)
-from .credentials import (
-    CompositeCredential,
-)
-from datalad.downloaders import CREDENTIAL_TYPES
 from ..support.exceptions import (
     AccessDeniedError,
     AccessPermissionExpiredError,
@@ -47,8 +46,14 @@ from ..support.locking import (
     try_lock,
     try_lock_informatively,
 )
+from ..ui import ui
+from ..utils import (
+    auto_repr,
+    ensure_unicode,
+    unlink,
+)
+from .credentials import CompositeCredential
 
-from logging import getLogger
 lgr = getLogger('datalad.downloaders')
 
 
@@ -538,6 +543,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             # TODO: move this all logic outside into a dedicated caching beast
             lgr.info("Initializing cache for fetches")
             import dbm
+
             # Initiate cache.
             # Very rudimentary caching for now, might fail many ways
             cache_dir = cfg.obtain('datalad.locations.cache')

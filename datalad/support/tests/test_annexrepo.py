@@ -137,7 +137,6 @@ from datalad.utils import (
     unlink,
 )
 
-
 _GIT_ANNEX_VERSIONS_INFO = AnnexRepo.check_repository_versions()
 
 

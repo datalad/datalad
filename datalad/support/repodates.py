@@ -14,7 +14,6 @@ import operator
 import re
 import time
 
-
 from datalad.log import log_progress
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo

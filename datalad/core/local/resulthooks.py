@@ -12,8 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
 import json
+import logging
 
 from datalad.support.exceptions import CapturedException
 

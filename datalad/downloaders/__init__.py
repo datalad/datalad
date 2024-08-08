@@ -12,15 +12,17 @@
 
 from datalad.downloaders.credentials import (
     AWS_S3,
-    LORIS_Token,
     NDA_S3,
+    GitCredential,
+    LORIS_Token,
     Token,
     UserPassword,
-    GitCredential)
+)
 
 __docformat__ = 'restructuredtext'
 
 from logging import getLogger
+
 lgr = getLogger('datalad.providers')
 
 # TODO: we might not need to instantiate it right here

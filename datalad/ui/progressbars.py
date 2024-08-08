@@ -11,9 +11,10 @@
 Should not be imported until we know that interface needs it
 """
 
-import humanize
 import sys
 import time
+
+import humanize
 
 from .. import lgr
 
@@ -190,6 +191,7 @@ progressbars = {
 
 try:
     from tqdm import tqdm
+
     from datalad.utils import updated
 
     class tqdmProgressBar(ProgressBarBase):

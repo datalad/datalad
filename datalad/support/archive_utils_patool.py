@@ -9,28 +9,46 @@
 """patool based implementation for datalad.support.archives utilities"""
 
 import patoolib
+
 from .external_versions import external_versions
+
 # There were issues, so let's stay consistently with recent version
 assert(external_versions["patoolib"] >= "1.7")
 
+import logging
 import os
-from .exceptions import MissingExternalDependency
-from .path import (
-    basename,
-    join as opj,
-)
 
 from datalad.utils import (
-    ensure_bytes,
     chpwd,
+    ensure_bytes,
 )
 
-import logging
+from .exceptions import MissingExternalDependency
+from .path import basename
+from .path import join as opj
+
 lgr = logging.getLogger('datalad.support.archive_utils_patool')
 
 # Monkey-patch patoolib's logging, so it logs coherently with the rest of
 # datalad
 import patoolib.util
+
+from datalad.cmd import (
+    StdOutErrCapture,
+    WitlessRunner,
+)
+
+# we need to decorate patool.util.run
+# because otherwise it just lets processes to spit out everything to std and we
+# do want to use it at "verbosity>=0" so we could get idea on what is going on.
+# And I don't want to mock for every invocation
+from ..support.exceptions import CommandError
+from ..utils import (
+    ensure_unicode,
+    on_windows,
+    swallow_outputs,
+)
+
 #
 # Seems have managed with swallow_outputs
 #
@@ -47,19 +65,7 @@ import patoolib.util
 # patoolib.util.log_error = _patool_log_error
 # patoolib.util.log_internal_error = _patool_log_error
 
-# we need to decorate patool.util.run
-# because otherwise it just lets processes to spit out everything to std and we
-# do want to use it at "verbosity>=0" so we could get idea on what is going on.
-# And I don't want to mock for every invocation
-from ..support.exceptions import CommandError
-from ..utils import swallow_outputs
-from datalad.cmd import (
-    WitlessRunner,
-    StdOutErrCapture,
-)
-from ..utils import ensure_unicode
 
-from ..utils import on_windows
 
 _runner = WitlessRunner()
 

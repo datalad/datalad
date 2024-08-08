@@ -10,11 +10,14 @@
 
 
 from datalad.support.external_versions import external_versions
+
 external_versions.check(
     "cmd:7z",
     msg='The 7z binary (7-Zip) is required for archive handling, but is missing. '
         "Setting the config flag 'datalad.runtime.use-patool' enables an "
         "alternative implementation that may not need 7z.")
+
+import logging
 
 from datalad.utils import (
     Path,
@@ -22,13 +25,10 @@ from datalad.utils import (
     quote_cmdlinearg,
 )
 
-import logging
 lgr = logging.getLogger('datalad.support.archive_utils_7z')
 
-from datalad.cmd import (
-    WitlessRunner as Runner,
-    KillOutput,
-)
+from datalad.cmd import KillOutput
+from datalad.cmd import WitlessRunner as Runner
 
 
 def _normalize_fname_suffixes(suffixes):

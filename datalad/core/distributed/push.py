@@ -12,40 +12,11 @@
 
 __docformat__ = 'restructuredtext'
 
-from itertools import chain
 import logging
 import re
+from itertools import chain
 
-from datalad.interface.base import (
-    Interface,
-    build_doc,
-    eval_results,
-)
-from datalad.interface.common_opts import (
-    jobs_opt,
-    recursion_limit,
-    recursion_flag,
-)
-from datalad.interface.utils import render_action_summary
-from datalad.interface.results import annexjson2result
-from datalad.log import log_progress
-from datalad.support.annexrepo import (
-    AnnexRepo,
-)
-from datalad.support.gitrepo import GitRepo
-from datalad.support.param import Parameter
-from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
-    EnsureChoice,
-)
-from datalad.support.exceptions import CommandError
-from datalad.utils import (
-    Path,
-    ensure_list,
-    todo_interface_for_extensions,
-)
-
+from datalad.core.local.diff import diff_dataset
 from datalad.distribution.dataset import (
     Dataset,
     EnsureDataset,
@@ -53,8 +24,33 @@ from datalad.distribution.dataset import (
     require_dataset,
     resolve_path,
 )
-from datalad.core.local.diff import diff_dataset
-
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+    eval_results,
+)
+from datalad.interface.common_opts import (
+    jobs_opt,
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.interface.results import annexjson2result
+from datalad.interface.utils import render_action_summary
+from datalad.log import log_progress
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
+from datalad.utils import (
+    Path,
+    ensure_list,
+    todo_interface_for_extensions,
+)
 
 lgr = logging.getLogger('datalad.core.distributed.push')
 
@@ -122,7 +118,7 @@ class Push(Interface):
             `git annex copy` altogether. 'auto' would use 'git annex copy' with
             '--auto' thus transferring only data which would satisfy "wanted"
             or "numcopies" settings for the remote (thus "nothing" otherwise).
-            'auto-if-wanted' would enable '--auto' mode only if there is a 
+            'auto-if-wanted' would enable '--auto' mode only if there is a
             "wanted" setting for the remote, and transfer 'anything' otherwise.
             """,
             constraints=EnsureChoice(
@@ -306,8 +302,8 @@ class Push(Interface):
         hints = set([r.get('hints', None) for r in results])
         hints = [hint for hint in hints if hint is not None]
         if hints:
-            from datalad.ui import ui
             from datalad.support import ansi_colors
+            from datalad.ui import ui
             intro = ansi_colors.color_word(
                 "Hints: ",
                 ansi_colors.YELLOW)

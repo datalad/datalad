@@ -22,7 +22,7 @@ of basic options, and a list of available sub-commands.
                   [--on-failure {ignore,continue,stop}] [--cmd]
                   {create,install,get,publish,uninstall,drop,remove,update,create-sibling,create-sibling-github,unlock,save,search,metadata,aggregate-metadata,test,ls,clean,add-archive-content,download-url,run,rerun,addurls,export-archive,extract-metadata,export-to-figshare,no-annex,wtf,add-readme,annotate-paths,clone,create-test-dataset,diff,siblings,sshrun,subdatasets}
                   ...
-   [[1;31mERROR  [0m] Please specify the command 
+   [[1;31mERROR  [0m] Please specify the command
    [0m[1;36m~[0m % #
 
 More comprehensive information is available via the --help
@@ -32,13 +32,13 @@ long-option (we will truncate the output here)
 
    [1;36m~[0m % datalad --help       | head -n20
    Usage: datalad [global-opts] command [command-opts]
-   
+
    DataLad provides a unified data distribution with the convenience of git-annex
    repositories as a backend.  DataLad command line tools allow to manipulate
    (obtain, create, update, publish, etc.) datasets and their collections.
-   
+
    *Commands for dataset operations*
-   
+
      create
          Create a new dataset from scratch
      install
@@ -65,9 +65,9 @@ again truncated)
                          [--git-opts STRING] [--annex-opts STRING]
                          [--annex-init-opts STRING] [--text-no-annex]
                          [PATH]
-   
+
    Create a new dataset from scratch.
-   
+
    This command initializes a new dataset at a given location, or the
    current directory. The new dataset can optionally be registered in an
    existing superdataset (the new dataset's path needs to be located
@@ -77,7 +77,7 @@ again truncated)
    laptop". This helps humans to identify data locations in distributed
    scenarios.  By default an identifier comprised of user and machine name,
    plus path will be generated.
-   
+
 
 
  ______________________________________

@@ -38,10 +38,6 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import get_local_file_url
-from datalad.tests.utils_testdatasets import (
-    _make_dataset_hierarchy,
-    _mk_submodule_annex,
-)
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
@@ -74,6 +70,10 @@ from datalad.tests.utils_pytest import (
     usecase,
     with_tempfile,
     with_tree,
+)
+from datalad.tests.utils_testdatasets import (
+    _make_dataset_hierarchy,
+    _mk_submodule_annex,
 )
 from datalad.utils import (
     Path,

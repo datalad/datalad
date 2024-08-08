@@ -9,42 +9,40 @@
 """Provide access to Amazon S3 objects.
 """
 
+import logging
 import re
-from urllib.parse import urlsplit, unquote as urlunquote
+from logging import getLogger
 from threading import Lock
+from urllib.parse import unquote as urlunquote
+from urllib.parse import urlsplit
 
 import boto3
 import botocore
 
-from ..utils import (
-    auto_repr,
-    ensure_dict_from_str,
-)
-from ..dochelpers import (
-    borrowkwargs,
-)
-from ..support.network import (
-    get_url_straight_filename,
-)
-
-from .base import Authenticator
-from .base import BaseDownloader, DownloaderSession
+from ..dochelpers import borrowkwargs
 from ..support.exceptions import (
     AccessDeniedError,
     AccessPermissionExpiredError,
     TargetFileAbsent,
 )
+from ..support.network import get_url_straight_filename
 from ..support.status import FileStatus
+from ..utils import (
+    auto_repr,
+    ensure_dict_from_str,
+)
+from .base import (
+    Authenticator,
+    BaseDownloader,
+    DownloaderSession,
+)
 
-import logging
-from logging import getLogger
 lgr = getLogger('datalad.s3')
 boto_lgr = logging.getLogger('boto3')
 # not in effect at all, probably those are setup later
 #boto_lgr.handlers = lgr.handlers  # Use our handlers
 
 import warnings
-
 
 __docformat__ = 'restructuredtext'
 

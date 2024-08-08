@@ -1279,7 +1279,7 @@ class Addurls(Interface):
             WARNING: ONLY USE THIS OPTION IF YOU UNDERSTAND THE CONSEQUENCES.
             If the content of the URLs is not downloaded, then datalad
             will refuse to retrieve the contents with `datalad get <file>` by default
-            because the content of the URLs is not verified.  Add 
+            because the content of the URLs is not verified.  Add
             `annex.security.allow-unverified-downloads = ACKTHPPT` to your git config to bypass
             the safety check.  Underneath, this passes the
             `--fast` flag to `git annex addurl`."""),

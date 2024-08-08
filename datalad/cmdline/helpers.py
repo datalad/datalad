@@ -13,8 +13,8 @@ __docformat__ = 'restructuredtext'
 
 import os
 import warnings
-
 from logging import getLogger
+
 lgr = getLogger('datalad.cmdline')
 
 
@@ -44,10 +44,10 @@ def get_repo_instance(path=os.curdir, class_=None):
                   "It will be removed in a future release.",
                   DeprecationWarning)
 
-    from datalad.utils import get_dataset_root
     from datalad.distribution.dataset import Dataset
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.gitrepo import GitRepo
+    from datalad.utils import get_dataset_root
 
     if class_ is not None:
         if class_ == AnnexRepo:
