@@ -211,6 +211,18 @@ def test_combined_short_option():
     assert_in("too few arguments", stderr)
 
 
+# https://github.com/datalad/datalad/issues/7504
+@with_tempfile(mkdir=True)
+def test_run_exit_code(tempdir=None):
+    # datalad run is just an internal command which can readily be used to trigger
+    # desired situation
+    create(dataset=tempdir, annex=False)
+    with chpwd(tempdir):  # can't just use -C tempdir since we do "in process" run_main
+        stdout, stderr = run_main(['run', '--explicit', 'exit 3'], exit_code=3) #, expect_stderr=True)
+    print(stdout)
+    print(stderr)
+
+
 # https://github.com/datalad/datalad/issues/6814
 @with_tempfile(mkdir=True)
 def test_conflicting_short_option(tempdir=None):

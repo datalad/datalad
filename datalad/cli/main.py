@@ -208,6 +208,21 @@ def _run_with_exception_handler(cmdlineargs):
             # in general we do not want to see the error again, but
             # present in debug output
             lgr.debug('could not perform all requested actions: %s', ce)
+            # fish for an exit code. If any of the "failed" results
+            # is caused by a command error, it will come with an `exit_code`
+            # property.
+            exit_codes = [
+                r['exit_code'] for r in exc.failed if 'exit_code' in r]
+            if exit_codes:
+                # we have exit code(s), take the first non-0 one
+                non0_codes = [e for e in exit_codes if e]
+                if len(non0_codes) != len(exit_codes):
+                    lgr.debug(
+                        "Among %d incomplete results with exit codes %d had exit code 0",
+                        len(exit_codes),
+                        len(exit_codes) - len(non0_codes))
+                if non0_codes:
+                    exit_code = non0_codes[0]
         elif isinstance(exc, CommandError):
             exit_code = _communicate_commanderror(exc) or exit_code
         elif isinstance(exc, KeyboardInterrupt):
