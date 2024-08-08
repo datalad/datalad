@@ -179,7 +179,8 @@ def setup_package():
             _TEMP_PATHS_GENERATED.append(serve_path)
 
         yield
-
+        print("CLEANING up the setup_package")
+        lgr.setLevel(logging.DEBUG)
         lgr.debug("Printing versioning information collected so far")
         # Query for version of datalad, so it is included in ev.dumps below - useful while
         # testing extensions where version of datalad might differ in the environment.
