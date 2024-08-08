@@ -12,7 +12,10 @@ import os.path as op
 import sys
 from unittest.mock import patch
 
-from datalad.cmd import WitlessRunner, StdOutErrCapture
+from datalad.cmd import (
+    StdOutErrCapture,
+    WitlessRunner,
+)
 from datalad.tests.utils_pytest import (
     SkipTest,
     assert_in,

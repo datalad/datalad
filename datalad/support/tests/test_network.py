@@ -34,14 +34,14 @@ from datalad.support.network import (
     is_ssh,
     is_url,
     iso8601_to_epoch,
-    local_path_representation,
     local_path2url_path,
+    local_path_representation,
     local_url_path_representation,
     parse_url_opts,
     quote_path,
     same_website,
-    urlquote,
     url_path2local_path,
+    urlquote,
 )
 from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,

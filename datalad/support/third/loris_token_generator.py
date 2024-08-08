@@ -6,18 +6,15 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### #
-import sys
 import json
-
+import sys
+from urllib.error import HTTPError
 from urllib.request import (
     Request,
     urlopen,
 )
-from urllib.error import HTTPError
 
-from datalad.support.exceptions import (
-    AccessDeniedError,
-)
+from datalad.support.exceptions import AccessDeniedError
 from datalad.utils import ensure_unicode
 
 
@@ -48,4 +45,3 @@ class LORISTokenGenerator(object):
         str_response = ensure_unicode(response.read())
         data = json.loads(str_response)
         return data["token"]
-

@@ -10,6 +10,7 @@
 """
 
 import warnings
+
 warnings.warn(
     "ReRun has been moved to datalad.local.rerun. "
     "This module was deprecated in 0.16.0, and will be removed in a future "

@@ -12,12 +12,14 @@
 __docformat__ = 'restructuredtext'
 
 import argparse
+import gzip
 import os
 import re
 import sys
-import gzip
 import textwrap
 from textwrap import wrap
+
+from platformdirs import AppDirs
 
 from datalad import __version__
 # delay?
@@ -25,12 +27,11 @@ from datalad.support.exceptions import CapturedException
 from datalad.ui.utils import get_console_width
 from datalad.utils import is_interactive
 
-from platformdirs import AppDirs
-
 dirs = AppDirs("datalad", "datalad.org")
 
 
 from logging import getLogger
+
 lgr = getLogger('datalad.cli.helpers')
 
 
@@ -88,9 +89,10 @@ class HelpAction(argparse.Action):
             get_cmd_doc,
             load_interface,
         )
+
         from .interface import (
-            get_cmdline_command_name,
             alter_interface_docs_for_cmdline,
+            get_cmdline_command_name,
         )
         preamble = get_description_with_cmd_summary(
             # produce a mapping of command groups to
@@ -153,6 +155,7 @@ class HelpAction(argparse.Action):
     def _try_manpage(self, parser):
         try:
             import subprocess
+
             # get the datalad manpage to use
             manfile = os.environ.get('MANPATH', '/usr/share/man') \
                 + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
@@ -221,10 +224,9 @@ def _fix_datalad_ri(s):
 
 def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
                                      parser_description):
-    from .interface import (
-        dedent_docstring,
-    )
     from datalad.interface.base import get_cmd_summaries
+
+    from .interface import dedent_docstring
     lgr.debug("Generating detailed description for the parser")
 
     console_width = get_console_width()

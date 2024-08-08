@@ -13,26 +13,28 @@
 __docformat__ = 'restructuredtext'
 
 from logging import getLogger
+
 lgr = getLogger('datalad.ui.dialog')
 
 lgr.log(5, "Starting importing ui.dialog")
 
+import getpass
 import os
 import sys
 import time
-
-import getpass
-
 #!!! OPT adds >100ms to import time!!!
 # from unittest.mock import patch
 from collections import deque
 from copy import copy
 
-from ..utils import auto_repr
-from ..utils import on_windows
+from datalad.support.exceptions import CapturedException
+
+from ..utils import (
+    auto_repr,
+    on_windows,
+)
 from .base import InteractiveUI
 from .utils import can_prompt
-from datalad.support.exceptions import CapturedException
 
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel

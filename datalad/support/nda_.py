@@ -14,10 +14,11 @@ on closed SDK/libraries) module to access miNDAR database.
 
 __docformat__ = 'restructuredtext'
 
+from logging import getLogger
+
 from datalad import cfg
 from datalad.downloaders.providers import Providers
 
-from logging import getLogger
 lgr = getLogger('datalad.support.nda')
 
 DEFAULT_SERVER = 'mindarvpc.cqahbwk3l1mb.us-east-1.rds.amazonaws.com'
@@ -61,7 +62,7 @@ def get_oracle_db(
     if not isinstance(credential, dict):
         credential = credential()
 
-    import cx_Oracle   # you must have the beast if you want to access the dark side
+    import cx_Oracle  # you must have the beast if you want to access the dark side
     dsnStr = cx_Oracle.makedsn(dbserver, port, sid)
     db = cx_Oracle.connect(user=credential['user'],
                            password=credential['password'],

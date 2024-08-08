@@ -1,5 +1,6 @@
 import sys
 
+from datalad import ConfigManager
 from datalad.downloaders import (
     GitCredential,
     UserPassword,
@@ -9,7 +10,6 @@ from datalad.downloaders.providers import (
     Providers,
 )
 from datalad.local.gitcredential import _credspec2dict
-from datalad import ConfigManager
 
 git_credential_datalad_help = """\
 Git credential interface to DataLad's credential management system.

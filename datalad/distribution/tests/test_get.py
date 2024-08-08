@@ -32,33 +32,33 @@ from datalad.support.exceptions import (
     RemoteNotAvailableError,
 )
 from datalad.support.network import get_local_file_url
-from datalad.tests.utils_testdatasets import (
-    _make_dataset_hierarchy,
-    _mk_submodule_annex,
-)
 from datalad.tests.utils_pytest import (
-    create_tree,
+    DEFAULT_REMOTE,
     assert_false,
-    assert_raises,
     assert_in,
-    assert_status,
     assert_in_results,
+    assert_message,
     assert_not_in_results,
+    assert_raises,
     assert_repo_status,
     assert_result_count,
-    assert_message,
-    DEFAULT_REMOTE,
+    assert_status,
+    create_tree,
     eq_,
-    known_failure_windows,
     known_failure_githubci_win,
+    known_failure_windows,
     ok_,
     serve_path_via_http,
     skip_if_adjusted_branch,
-    skip_ssh,
     skip_if_on_windows,
+    skip_ssh,
     slow,
     with_tempfile,
     with_tree,
+)
+from datalad.tests.utils_testdatasets import (
+    _make_dataset_hierarchy,
+    _mk_submodule_annex,
 )
 from datalad.utils import (
     Path,

@@ -18,15 +18,16 @@ from typing import (
     cast,
 )
 
-from .protocol import WitlessProtocol
 from .coreprotocols import NoCapture
 from .exception import CommandError
 from .nonasyncrunner import (
     ThreadedRunner,
     _ResultGenerator,
 )
-from .protocol import GeneratorMixIn
-
+from .protocol import (
+    GeneratorMixIn,
+    WitlessProtocol,
+)
 
 lgr = logging.getLogger('datalad.runner.runner')
 

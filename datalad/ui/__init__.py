@@ -13,22 +13,23 @@
 __docformat__ = 'restructuredtext'
 
 from logging import getLogger
+
 lgr = getLogger('datalad.ui')
 
 lgr.log(5, "Starting importing ui")
 
+from ..utils import (
+    get_ipython_shell,
+    is_interactive,
+)
 from .dialog import (
     ConsoleLog,
     DialogUI,
     IPythonUI,
+    QuietConsoleLog,
+    SilentConsoleLog,
     UnderAnnexUI,
     UnderTestsUI,
-    SilentConsoleLog,
-    QuietConsoleLog,
-)
-from ..utils import (
-    is_interactive,
-    get_ipython_shell,
 )
 
 KNOWN_BACKENDS = {

@@ -12,7 +12,6 @@
 import logging
 import os
 import os.path as op
-
 from typing import Optional
 
 from datalad.dochelpers import borrowdoc
@@ -20,11 +19,11 @@ from datalad.utils import (
     generate_file_chunks,
     make_tempfile,
 )
+
 from .runner import (
     GeneratorMixIn,
     WitlessRunner,
 )
-
 
 lgr = logging.getLogger('datalad.runner.gitrunner')
 

@@ -13,8 +13,8 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from itertools import chain
 import warnings
+from itertools import chain
 
 from datalad.core.local.status import get_paths_by_ds
 from datalad.distribution.dataset import (

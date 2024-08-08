@@ -12,7 +12,7 @@ Let's create a dataset
 .. code-block:: ansi-color
 
    [1;36m~[0m % datalad create demo
-   [[1;37mINFO   [0m] Creating a new annex repo at /demo/demo 
+   [[1;37mINFO   [0m] Creating a new annex repo at /demo/demo
    [1;1mcreate[0m([1;32mok[0m): /demo/demo ([1;35mdataset[0m)
    [0m[1;36m~[0m % cd demo
 
@@ -32,7 +32,7 @@ new dataset in a parent dataset
 .. code-block:: ansi-color
 
    [1;36m~/demo[0m % datalad create -d . sub1
-   [[1;37mINFO   [0m] Creating a new annex repo at /demo/demo/sub1 
+   [[1;37mINFO   [0m] Creating a new annex repo at /demo/demo/sub1
    [1;1madd[0m([1;32mok[0m): sub1 ([1;35mdataset[0m) [added new subdataset]
    [1;1madd[0m([1;32mnotneeded[0m): sub1 ([1;35mdataset[0m) [nothing to add from /demo/demo/sub1]
    [1;1madd[0m([1;32mnotneeded[0m): .gitmodules ([1;35mfile[0m) [already included in the dataset]
@@ -57,7 +57,7 @@ Of course subdatasets can be nested
 .. code-block:: ansi-color
 
    [1;36m~/demo[0m % datalad create -d . sub1/justadir/sub2
-   [[1;37mINFO   [0m] Creating a new annex repo at /demo/demo/sub1/justadir/sub2 
+   [[1;37mINFO   [0m] Creating a new annex repo at /demo/demo/sub1/justadir/sub2
    [1;1madd[0m([1;32mok[0m): sub1/justadir/sub2 ([1;35mdataset[0m) [added new subdataset]
    [1;1madd[0m([1;32mnotneeded[0m): sub1/justadir/sub2 ([1;35mdataset[0m) [nothing to add from /demo/demo/sub1/justadir/sub2]
    [1;1madd[0m([1;32mnotneeded[0m): sub1/.gitmodules ([1;35mfile[0m) [already included in the dataset]
@@ -101,9 +101,9 @@ subdataset was modified
      (use "git add <file>..." to update what will be committed)
      (use "git checkout -- <file>..." to discard changes in working directory)
      (commit or discard the untracked or modified content in submodules)
-   
+
    	[31mmodified:   sub1[m (untracked content)
-   
+
    no changes added to commit (use "git add" and/or "git commit -a")
 
 

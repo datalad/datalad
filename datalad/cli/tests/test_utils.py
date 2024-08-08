@@ -40,6 +40,3 @@ def test_setup_exceptionhook(interactive):
             our_exceptionhook(type_, value_, tb_)
 
     eq_(old_exceptionhook, sys.excepthook)
-
-
-

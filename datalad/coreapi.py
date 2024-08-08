@@ -26,8 +26,10 @@ def _generate_func_api():
         from datalad.support.entrypoints import load_extensions
         load_extensions()
 
-    from .interface.base import get_interface_groups
-    from .interface.base import get_api_name
+    from .interface.base import (
+        get_api_name,
+        get_interface_groups,
+    )
 
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:

@@ -14,11 +14,10 @@ __docformat__ = 'restructuredtext'
 
 __all__ = ['RemoteError', 'SpecialRemote']
 
-from annexremote import (
-    ProtocolError,
-    SpecialRemote as _SpecialRemote,
-    RemoteError as _RemoteError,
-)
+from annexremote import ProtocolError
+from annexremote import RemoteError as _RemoteError
+from annexremote import SpecialRemote as _SpecialRemote
+
 from datalad.support.exceptions import format_exception_with_cause
 from datalad.ui import ui
 

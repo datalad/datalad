@@ -10,6 +10,7 @@
 """
 
 import warnings
+
 warnings.warn(
     "AddArchiveContent has been moved to datalad.local.add_archive_content. "
     "This module was deprecated in 0.16.0, and will be removed in a future "

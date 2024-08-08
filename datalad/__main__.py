@@ -9,6 +9,7 @@
 """Helper to use datalad as a "runnable" module with  -m datalad"""
 
 import sys
+
 from . import __version__
 from .log import lgr
 
@@ -44,8 +45,8 @@ def runctx(cmd, globals=None, locals=None):
 
 
 def main(argv=None):
-    import os
     import getopt
+    import os
 
     if argv is None:
         argv = sys.argv

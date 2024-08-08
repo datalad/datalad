@@ -15,18 +15,21 @@ Use as a script to generate test buckets via e.g.
 
 __docformat__ = 'restructuredtext'
 
+import logging
 import mimetypes
-from pathlib import PurePath
 import re
-from urllib.request import urlopen, Request
+from pathlib import PurePath
+from urllib.request import (
+    Request,
+    urlopen,
+)
 
 import boto3
 from botocore.exceptions import ClientError
 
+import datalad.log  # Just to have lgr setup happen this one used a script
 from datalad.support.network import URL
 
-import logging
-import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
 # TODO: should become a config option and managed along with the rest

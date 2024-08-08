@@ -10,23 +10,29 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
 from pathlib import Path
+
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+
 
 @build_doc
 class ExportArchive(Interface):
     """Export the content of a dataset as a TAR/ZIP archive.
     """
-    from datalad.support.param import Parameter
-    from datalad.distribution.dataset import datasetmethod
+    from datalad.distribution.dataset import (
+        EnsureDataset,
+        datasetmethod,
+    )
     from datalad.interface.base import eval_results
-    from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import (
         EnsureChoice,
         EnsureNone,
         EnsureStr,
     )
+    from datalad.support.param import Parameter
 
     _params_ = dict(
         dataset=Parameter(
@@ -76,15 +82,14 @@ class ExportArchive(Interface):
                  archivetype='tar',
                  compression='gz',
                  missing_content='error'):
+        import logging
         import tarfile
         import zipfile
         from unittest.mock import patch
 
         from datalad.distribution.dataset import require_dataset
-        from datalad.utils import file_basename
         from datalad.support.annexrepo import AnnexRepo
-
-        import logging
+        from datalad.utils import file_basename
         lgr = logging.getLogger('datalad.local.export_archive')
 
         dataset = require_dataset(dataset, check_installed=True,

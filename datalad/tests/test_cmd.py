@@ -16,9 +16,9 @@ import pytest
 
 from datalad.cmd import (
     BatchedCommand,
+    BatchedCommandError,
     readline_rstripped,
 )
-from datalad.cmd import BatchedCommandError
 from datalad.runner.tests.utils import py2cmd
 from datalad.tests.utils_pytest import (
     assert_equal,

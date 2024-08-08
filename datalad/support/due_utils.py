@@ -1,15 +1,24 @@
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
+#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 #ex: set sts=4 ts=4 sw=4 et:
 """
 Support functionality for using DueCredit
 """
 
-# Note Text was added/exposed only since DueCredit 0.6.5
-from .due import due, Doi, Text
-from ..utils import never_fail, swallow_logs
+import logging
+
 from datalad.support.exceptions import CapturedException
 
-import logging
+from ..utils import (
+    never_fail,
+    swallow_logs,
+)
+# Note Text was added/exposed only since DueCredit 0.6.5
+from .due import (
+    Doi,
+    Text,
+    due,
+)
+
 lgr = logging.getLogger('datalad.duecredit')
 
 
@@ -69,7 +78,7 @@ def duecredit_dataset(dataset):
     if not isinstance(res, dict):
         lgr.debug("Got record which is not a dict, no duecredit for now")
         return
-    
+
     metadata = res.get('metadata', {})
 
     # Descend following the dots -- isn't there a helper already - TODO?

@@ -12,6 +12,7 @@
 """
 
 import warnings
+
 warnings.warn("datalad.cmdline.main was replaced by datalad.cli.main in "
               "datalad 0.16. Please update and reinstall extensions.",
               DeprecationWarning)

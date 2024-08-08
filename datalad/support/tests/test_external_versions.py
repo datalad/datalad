@@ -8,11 +8,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-import pytest
 from os import linesep
 
+import pytest
+
 from datalad import __version__
-from datalad.cmd import StdOutErrCapture, WitlessRunner
+from datalad.cmd import (
+    StdOutErrCapture,
+    WitlessRunner,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CommandError,

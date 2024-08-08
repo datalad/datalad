@@ -10,12 +10,15 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.utils import unlink
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-
 import logging
+
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.results import get_status_dict
+from datalad.utils import unlink
+
 lgr = logging.getLogger('datalad.distributed.export_to_figshare')
 
 
@@ -94,8 +97,9 @@ class FigshareRESTLaison(object):
         # TODO: check if the file with the same name already available, and offer
         # to remove/prune it
         import os
-        from datalad.utils import md5sum
+
         from datalad.ui import ui
+        from datalad.utils import md5sum
         file_rec = {'md5': md5sum(fname),
                     'name': os.path.basename(fname),
                     'size': os.stat(fname).st_size
@@ -188,16 +192,18 @@ class ExportToFigshare(Interface):
     navigator.
     """
 
-    from datalad.support.param import Parameter
-    from datalad.distribution.dataset import datasetmethod
+    from datalad.distribution.dataset import (
+        EnsureDataset,
+        datasetmethod,
+    )
     from datalad.interface.base import eval_results
-    from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import (
         EnsureChoice,
         EnsureInt,
         EnsureNone,
         EnsureStr,
     )
+    from datalad.support.param import Parameter
 
     _params_ = dict(
         dataset=Parameter(
@@ -259,11 +265,13 @@ class ExportToFigshare(Interface):
         import logging
         lgr = logging.getLogger('datalad.plugin.export_to_figshare')
 
-        from datalad.ui import ui
-        from datalad.api import add_archive_content
-        from datalad.api import export_archive
+        from datalad.api import (
+            add_archive_content,
+            export_archive,
+        )
         from datalad.distribution.dataset import require_dataset
         from datalad.support.annexrepo import AnnexRepo
+        from datalad.ui import ui
 
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='export to figshare')

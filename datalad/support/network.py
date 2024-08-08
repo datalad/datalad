@@ -29,10 +29,10 @@ from urllib.parse import (
     ParseResult,
     parse_qsl,
 )
+from urllib.parse import quote
 from urllib.parse import quote as urlquote
 from urllib.parse import unquote as urlunquote
 from urllib.parse import (
-    quote,
     urlencode,
     urljoin,
     urlparse,

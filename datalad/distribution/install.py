@@ -13,22 +13,30 @@
 import logging
 from os import curdir
 
-from datalad.interface.base import Interface
-from datalad.interface.common_opts import (
-    recursion_flag,
-    recursion_limit,
-    location_description,
-    jobs_opt,
-    reckless_opt,
+from datalad.core.distributed.clone import Clone
+from datalad.distribution.dataset import (
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+    resolve_path,
 )
-from datalad.interface.results import (
-    get_status_dict,
-    YieldDatasets,
-    is_result_matching_pathsource_argument,
-)
+from datalad.distribution.get import Get
 from datalad.interface.base import (
+    Interface,
     build_doc,
     eval_results,
+)
+from datalad.interface.common_opts import (
+    jobs_opt,
+    location_description,
+    reckless_opt,
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.interface.results import (
+    YieldDatasets,
+    get_status_dict,
+    is_result_matching_pathsource_argument,
 )
 from datalad.support.constraints import (
     EnsureNone,
@@ -38,21 +46,12 @@ from datalad.support.exceptions import (
     CapturedException,
     InsufficientArgumentsError,
 )
-from datalad.support.param import Parameter
 from datalad.support.network import (
     RI,
     PathRI,
 )
+from datalad.support.param import Parameter
 from datalad.utils import ensure_list
-
-from datalad.distribution.dataset import (
-    datasetmethod,
-    resolve_path,
-    require_dataset,
-    EnsureDataset,
-)
-from datalad.distribution.get import Get
-from datalad.core.distributed.clone import Clone
 
 __docformat__ = 'restructuredtext'
 

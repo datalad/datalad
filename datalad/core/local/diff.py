@@ -13,37 +13,33 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from datalad.utils import (
-    ensure_list,
-    ensure_unicode,
-    get_dataset_root,
+
+from datalad.core.local.status import (
+    Status,
+    _common_diffstatus_params,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    path_under_rev_dataset,
+    require_dataset,
+    resolve_path,
 )
 from datalad.interface.base import (
     Interface,
     build_doc,
     eval_results,
 )
-
-from datalad.distribution.dataset import (
-    Dataset,
-    datasetmethod,
-    require_dataset,
-    resolve_path,
-    path_under_rev_dataset,
-)
-
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
+from datalad.support.exceptions import InvalidGitReferenceError
 from datalad.support.param import Parameter
-
-from datalad.core.local.status import (
-    Status,
-    _common_diffstatus_params,
-)
-from datalad.support.exceptions import (
-    InvalidGitReferenceError,
+from datalad.utils import (
+    ensure_list,
+    ensure_unicode,
+    get_dataset_root,
 )
 
 lgr = logging.getLogger('datalad.core.local.diff')

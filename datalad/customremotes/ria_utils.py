@@ -12,7 +12,6 @@
 import logging
 from pathlib import Path
 
-
 lgr = logging.getLogger('datalad.customremotes.ria_utils')
 
 
