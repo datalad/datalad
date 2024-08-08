@@ -1,4 +1,11 @@
 
+<a id='changelog-1.1.3'></a>
+# 1.1.3 (2024-08-08)
+
+## 🧪 Tests
+
+- Account for the fix in git-annex behavior in test_add_delete_after_and_drop_subdir.  [PR #7640](https://github.com/datalad/datalad/pull/7640) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.2'></a>
 # 1.1.2 (2024-07-25)
 
