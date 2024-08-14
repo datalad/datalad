@@ -113,7 +113,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
 
     - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
 
-    - In case the parent dataset url scheme doesnt match the submodule URL one,
+    - In case the parent dataset url scheme doesn't match the submodule URL one,
       attempt a rewrite to match the parent one (cost 610).
 
     - URL of any configured superdataset remote that is known to have the
