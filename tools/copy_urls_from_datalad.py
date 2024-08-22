@@ -14,9 +14,11 @@ May be later could be RFed into some helper function if comes needed again
 """
 
 from collections import defaultdict
-from datalad.support.annexrepo import AnnexRepo
-from datalad import lgr
+
 from tqdm import tqdm
+
+from datalad import lgr
+from datalad.support.annexrepo import AnnexRepo
 
 
 def get_remote_urls(rec, remote):

@@ -7,8 +7,8 @@ It prints time estimated from previous line on the previous line, with 0 always 
 so it becomes possible to sort -n the output to see from what line it took longest to the next
 """
 
-import sys
 import re
+import sys
 from datetime import datetime
 
 reg = re.compile('^\d{4}-\d{2}-\d{1,2} \d{1,2}:\d{1,2}:\d{1,2},\d{1,3}')

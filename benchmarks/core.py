@@ -8,17 +8,17 @@
 """Benchmarks for DataLad"""
 
 import os
-import sys
 import os.path as osp
-
+import sys
 from subprocess import call
 
 from datalad.runner import (
-    Runner,
     GitRunner,
+    Runner,
     StdOutErrCapture,
 )
 
+from .common import SuprocBenchmarks
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
 #import gc
@@ -27,7 +27,6 @@ from datalad.runner import (
 #track_num_objects.unit = "objects"
 
 
-from .common import SuprocBenchmarks
 
 scripts_dir = osp.join(osp.dirname(__file__), 'scripts')
 heavyout_cmd = "{} 1000".format(osp.join(scripts_dir, 'heavyout'))

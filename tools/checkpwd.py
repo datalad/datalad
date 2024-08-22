@@ -7,11 +7,15 @@ Could be used as easy as replacement of `python -m nose ...`, with
 `python checkpwd.py --with-checkpwd ...`
 """
 
+import logging
 import os
 from os import path as op
-import logging
+
 from nose.plugins.base import Plugin
-from nose.util import src, tolist
+from nose.util import (
+    src,
+    tolist,
+)
 
 log = logging.getLogger(__name__)
 

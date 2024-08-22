@@ -604,8 +604,14 @@ class TestAddArchiveOptions():
                 # initiate datalad-archives gh-1258.  If faking dates,
                 # there should be another +1 because annex.alwayscommit
                 # isn't set to false.
+                # Behavior of git-annex changed around 10.20240531+git214 that now
+                # there is now two separate commits in git-annex branch, one for adding
+                # 1/1.dat and then 1/file.txt.  Then it was fixed, see
+                # https://git-annex.branchable.com/bugs/change_in_beh__58___addurls_creates_multiple_commits/
                 assert_equal(len(commits_after),
-                             len(commits_prior) + 2 + self.annex.fake_dates_enabled)
+                             len(commits_prior) + 2
+                             + self.annex.fake_dates_enabled
+                             + ("10.20240531+git214" <= external_versions["cmd:annex"] <= "10.20240731"))
                 assert_equal(len(commits_after_master), len(commits_prior_master))
             # there should be no .datalad temporary files hanging around
             self.assert_no_trash_left_behind()
