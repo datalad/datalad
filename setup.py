@@ -62,7 +62,7 @@ requires = {
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
         'mypy',
-        'pytest',
+        'pytest>=7.0',  # https://github.com/datalad/datalad/issues/7555
         'pytest-cov',
         'pytest-fail-slow~=0.2',
         'types-python-dateutil',
