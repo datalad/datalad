@@ -5,6 +5,9 @@ datalad (1.1.3-1) unstable; urgency=medium
     - remove mentioning of "modularized away" functionality in descriptions
     - remove Recommending or Suggesting datalad-{neuroimaging,crawler} which
       were never packaged for Debian (Closes: #1079316)
+  * remove debian/patches/revert_platformdirs and adjust debian/control
+    to finally use platformdirst in place of appdirs. NeuroDebian has some
+    backports ready already (Closes: #1067962)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 22 Aug 2024 11:35:35 -0400
 

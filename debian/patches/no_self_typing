@@ -9,7 +9,7 @@
      T,
      TypedDict,
  )
-@@ -978,7 +978,7 @@ class GitRepo(CoreGitRepo):
+@@ -961,7 +961,7 @@ class GitRepo(CoreGitRepo):
          return self.pathobj == self.dot_git
  
      @classmethod
