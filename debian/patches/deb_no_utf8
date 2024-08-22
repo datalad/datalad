@@ -114,7 +114,7 @@ Last-Update: 2018-06-05
      assert isinstance(res, dict)
 --- a/datalad/tests/utils_pytest.py
 +++ b/datalad/tests/utils_pytest.py
-@@ -1453,7 +1453,7 @@ with_parametric_batch = pytest.mark.para
+@@ -1455,7 +1455,7 @@ with_parametric_batch = pytest.mark.para
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']
