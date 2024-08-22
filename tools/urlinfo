@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-#emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
+#emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 #ex: set sts=4 ts=4 sw=4 noet:
 #------------------------- =+- Python script -+= -------------------------
 """
@@ -38,9 +38,13 @@ __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
 import argparse
-import re, os, sys, urllib2
+import os
+import re
+import sys
 
+import urllib2
 from urlparse import urlsplit
+
 
 def main(cmdline=None):
     args = make_parser().parse_args(cmdline)
@@ -88,4 +92,3 @@ if __name__ == '__main__':
     # for some reason nose refused to load tests even with --exe
     # test_get_filename()
     sys.exit(main())
-

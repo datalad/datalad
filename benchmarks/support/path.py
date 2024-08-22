@@ -7,6 +7,7 @@ from datalad.support.path import get_parent_paths as get_parent_paths_
 
 from ..common import SuprocBenchmarks
 
+
 class get_parent_paths(SuprocBenchmarks):
 
     def setup(self):

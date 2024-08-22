@@ -356,6 +356,22 @@ class SSHRemoteIO(IOBase):
         # make sure default is used when None was passed, too.
         self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
+        # lazy property to store the remote unix name
+        self._remote_uname = None
+
+    @property
+    def remote_uname(self):
+        """Remote unix system name, lazy resolution
+
+        If accessed for the first time, runs uname -s to find out
+
+        """
+        if self._remote_uname is None:
+            self._remote_uname = self._run(
+                "uname -s", no_output=False, check=True
+            ).rstrip()
+        return self._remote_uname
+
     def close(self):
         # try exiting shell clean first
         self.shell.stdin.write(b"exit\n")
@@ -474,9 +490,9 @@ class SSHRemoteIO(IOBase):
         """
 
         path = sh_quote(str(path))
-        # remember original mode -- better than to prescribe a fixed mode
 
-        if on_osx:
+        # remember original mode -- better than to prescribe a fixed mode
+        if self.remote_uname == "Darwin":
             format_option = "-f%Dp"
             # on macOS this would return decimal representation of mode (same
             # as python's stat().st_mode

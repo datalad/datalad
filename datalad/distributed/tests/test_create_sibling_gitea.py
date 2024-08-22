@@ -24,6 +24,6 @@ def test_gitea(path=None):
         create_sibling_gitea,
         path,
         'gitea',
-        'https://try.gitea.io',
+        'https://demo.gitea.com',
         'api/v1/repos/dataladtester/{reponame}',
     )

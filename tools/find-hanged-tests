@@ -4,8 +4,8 @@ Given a log from running tests using pytest -n 2 (or more) see which tests actua
 never completed
 """
 
-import sys
 import re
+import sys
 from pathlib import Path
 
 logfile = Path(sys.argv[-1])
@@ -15,16 +15,20 @@ lines = logfile.read_text().splitlines()
 lines = [l.strip() for l in lines]
 test_line = re.compile('datalad/.*tests/')
 
-tests_started = {l for l in lines if re.match('\S*datalad/.*tests/test_', l)}
+test_regex = r'\s+(\.\./)?(?P<test>[a-z].*tests/test_\S+)'
+tests_started = set()
+for l in lines:
+    # Lines might differ between CI backends - some times prepended with extra time stamp
+    if res := re.match('(\[[0-9]{2}:[0-9]{2}:[0-9]{2}\])?' + test_regex, l):
+        tests_started.add(res.groupdict()['test'])
 tests_completed = set()
 for l in lines:
-    res = re.match(r'\[gw[0-9]+\].* (\S*datalad/.*tests/test_.*)', l)
-    if res:
-        tests_completed.add(res.groups()[0])
+    if res := re.match('(\[[0-9]{2}:[0-9]{2}:[0-9]{2}\])?\s+\[gw[0-9]+\].*' + test_regex, l):
+        tests_completed.add(res.groupdict()['test'])
 tests_didnot_complete = tests_started - tests_completed
 
 # print(tests_completed)
-print(f"{len(tests_started)} started, {len(tests_completed)} completed")
+print(f"{len(lines)} lines: {len(tests_started)} started, {len(tests_completed)} completed")
 if tests_didnot_complete:
     print("Never completed:")
     for t in sorted(tests_didnot_complete):
