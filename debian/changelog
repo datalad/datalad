@@ -3,6 +3,8 @@ datalad (1.1.3-2) UNRELEASED; urgency=medium
   * debian/control
     - we need pytest over 7.0 for testing
       (see https://github.com/datalad/datalad/issues/7555)
+  * debian/README.md
+    - added to describe some packaging/maintenance procedures
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 22 Aug 2024 12:54:39 -0400
 
