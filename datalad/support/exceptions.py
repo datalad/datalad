@@ -91,7 +91,10 @@ class CapturedException(object):
         -------
         str
         """
-        return self.name + '(' + self.message + ')'
+        s = self.name + '(' + self.message + ')'
+        if exc_cause := getattr(self.tb, '__cause__', None):
+            s += f' -caused by- {format_exception_with_cause(exc_cause)}'
+        return s
 
     def format_with_cause(self):
         """Returns a representation of the original exception including the
