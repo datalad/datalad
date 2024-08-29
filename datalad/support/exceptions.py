@@ -153,13 +153,6 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
     # startup.
     from datalad import cfg
 
-    if include_str:
-        # try exc message else exception type
-        leading = exc.message or exc.name
-        out = "{} ".format(leading)
-    else:
-        out = ""
-
     if tb is None:
         tb = traceback.TracebackException.from_exception(
             exc,
@@ -167,6 +160,15 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
             lookup_lines=True,
             capture_locals=False,
         )
+
+    if include_str:
+        # try exc message else exception type
+        leading = exc.message or exc.name
+        out = "{} ".format(leading)
+        if exc_cause := getattr(tb, '__cause__', None):
+            out += f'-caused by- {format_exception_with_cause(exc_cause)} '
+    else:
+        out = ""
 
     entries = []
     entries.extend(tb.stack)
