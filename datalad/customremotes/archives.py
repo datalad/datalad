@@ -312,7 +312,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         else:
             # TODO: theoretically we should first check if key is available
             # from any remote to know if file is available
-            return False
+            raise RemoteError(f"archive key {akey} is not available locally.")
 
     def checkpresent(self, key):
         # TODO: so we need to maintain mapping from urls to keys.  Then
