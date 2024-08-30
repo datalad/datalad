@@ -50,7 +50,7 @@ from datalad.utils import (
     rmtree,
 )
 
-from .clone_utils import (  # needed because other code imports it from here; RIA imports needed b/c datalad-next imports it from here ATM;; Remove after core was released and next dropped the ria patch.
+from .clone_utils import (  # needed because other code imports it from here
     _check_autoenable_special_remotes,
     _format_clone_errors,
     _generate_candidate_clone_sources,
@@ -60,6 +60,11 @@ from .clone_utils import (  # needed because other code imports it from here; RI
     _test_existing_clone_target,
     _try_clone_candidates,
     decode_source_spec,
+)
+
+from .clone_utils import ( # isort: skip
+    # RIA imports needed b/c datalad-next imports it from here ATM
+    # Remove after core was released and next dropped the ria patch.
     postclone_preannex_cfg_ria,
     postclonecfg_ria,
 )
