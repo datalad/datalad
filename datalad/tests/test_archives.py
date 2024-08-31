@@ -198,7 +198,8 @@ def test_compress_file(ext, annex):
 def test_ExtractedArchive(path=None):
     archive = op.join(path, fn_archive_obscure_ext)
     earchive = ExtractedArchive(archive)
-    assert_false(op.exists(earchive.path))
+    # no longer the case -- we pre-create it now
+    # assert_false(op.exists(earchive.path))
     # no longer the case -- just using hash for now
     # assert_in(os.path.basename(archive), earchive.path)
 
