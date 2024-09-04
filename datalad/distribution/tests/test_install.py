@@ -38,10 +38,6 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import get_local_file_url
-from datalad.tests.utils_testdatasets import (
-    _make_dataset_hierarchy,
-    _mk_submodule_annex,
-)
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
@@ -74,6 +70,10 @@ from datalad.tests.utils_pytest import (
     usecase,
     with_tempfile,
     with_tree,
+)
+from datalad.tests.utils_testdatasets import (
+    _make_dataset_hierarchy,
+    _mk_submodule_annex,
 )
 from datalad.utils import (
     Path,
@@ -140,7 +140,7 @@ def test_invalid_args(path=None):
     # or obscure form for multiple installation "things"
     assert_raises(IncompleteResultsError, install, ['/higherup.', 'Zoidberg'], dataset=ds)
     # and if just given without keyword arg for source -- standard Python exception
-    assert_raises(TypeError, install, '/higherup.', 'Zoidberg', dataset=ds)
+    assert_raises(IncompleteResultsError, install, '/higherup.', 'Zoidberg', dataset=ds)
 
 
 # This test caused a mysterious segvault in gh-1350. I reimplementation of
@@ -1057,3 +1057,22 @@ def test_install_recursive_github(path=None):
     ]):
         ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
         eq_(len(ds.subdatasets(recursive=True, state='present')), 2)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_install_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    ds = install(path=dest, source=src_path, cfg_proc=['yoda'])
+
+    assert (ds.pathobj / 'README.md').exists()
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_recursive_install_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    src.create('subds')
+    ds = install(path=dest, source=src_path, recursive=True, cfg_proc=['yoda'])
+
+    assert (ds.pathobj / 'README.md').exists()
+    assert (ds.pathobj / 'subds' / 'README.md').exists()

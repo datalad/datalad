@@ -823,3 +823,15 @@ def test_get_non_existing(origin_path=None, clone_path=None):
 
     assert_result_count(res, 1, status="impossible",
                         message="path does not exist")
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_recursive_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    subds = src.create('subds')
+    subsubds = src.create('subds/subsubds')
+    ds = clone(src_path, dest)
+    ds.get('subds', recursive=True, cfg_proc=['yoda'])
+    assert (ds.pathobj / 'subds' / 'README.md').exists()
+    assert (ds.pathobj / 'subds' / 'subsubds' / 'README.md').exists()

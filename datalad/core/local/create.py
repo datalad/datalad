@@ -10,53 +10,47 @@
 
 """
 
-import os
 import logging
+import os
+import os.path as op
 import random
 import uuid
 import warnings
-from argparse import (
-    REMAINDER,
-)
-
+from argparse import REMAINDER
 from os import listdir
-import os.path as op
 
-from datalad import cfg
-from datalad import _seed
-from datalad.interface.base import Interface
+from datalad import (
+    _seed,
+    cfg,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    path_under_rev_dataset,
+    require_dataset,
+    resolve_path,
+)
 from datalad.interface.base import (
+    Interface,
     build_doc,
     eval_results,
 )
-from datalad.interface.common_opts import (
-    location_description,
-)
+from datalad.interface.common_opts import location_description
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
     EnsureKeyChoice,
+    EnsureNone,
+    EnsureStr,
 )
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.utils import (
-    getpwd,
+    Path,
     ensure_list,
     get_dataset_root,
-    Path,
+    getpwd,
 )
-
-from datalad.distribution.dataset import (
-    Dataset,
-    datasetmethod,
-    EnsureDataset,
-    resolve_path,
-    path_under_rev_dataset,
-    require_dataset,
-)
-
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-
 
 __docformat__ = 'restructuredtext'
 
@@ -342,25 +336,8 @@ class Create(Interface):
             yield res
             return
 
-        # Check if specified cfg_proc(s) can be discovered, storing
-        # the results so they can be used when the time comes to run
-        # the procedure. If a procedure cannot be found, raise an
-        # error to prevent creating the dataset.
-        cfg_proc_specs = []
-        if cfg_proc:
-            discovered_procs = tbds.run_procedure(
-                discover=True,
-                result_renderer='disabled',
-                return_type='list',
-            )
-            for cfg_proc_ in cfg_proc:
-                for discovered_proc in discovered_procs:
-                    if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
-                        cfg_proc_specs.append(discovered_proc)
-                        break
-                else:
-                    raise ValueError("Cannot find procedure with name "
-                                     "'%s'" % cfg_proc_)
+        from datalad.local.run_procedure import _get_proc_configs
+        cfg_proc_specs = _get_proc_configs(cfg_proc, tbds) if cfg_proc else []
 
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
