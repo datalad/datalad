@@ -298,6 +298,25 @@ def test_run_from_subds_gh3551(path=None):
         # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
         ok_(subds.repo.file_has_content("f"))
 
+# https://github.com/datalad/datalad/issues/7653
+@with_tree(tree={
+    "output_file": "",
+    "output_empty": {},
+    # to ensure that we do unlock etc the other outputs
+    "output_withfile": {"f": "content"},
+})
+def test_run_empty_output(path=None):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    with chpwd(ds.path):
+        assert_in_results(
+            run("cd .> output_empty/f",
+                outputs=["output_file", "output_empty", "output_withfile"],
+                return_type="list", result_filter=None, result_xfm=None),
+            action="save",
+            status="ok")
+    ok_(ds.repo.file_has_content("output_empty/f"))
+
 
 @with_tempfile(mkdir=True)
 def test_run_assume_ready(path=None):
