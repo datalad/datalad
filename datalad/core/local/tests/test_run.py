@@ -308,9 +308,11 @@ def test_run_from_subds_gh3551(path=None):
 def test_run_empty_output(path=None):
     ds = Dataset(path).create(force=True)
     ds.save()
+    # TODO: replace "echo ..." with "cd ." after git-annex fixed to handle empty files
+    # https://git-annex.branchable.com/bugs/git_diff_in_adj_unlock_reports_diff_for_empty_file/
     with chpwd(ds.path):
         assert_in_results(
-            run("cd .> output_empty/f",
+            run("echo content> output_empty/f",
                 outputs=["output_file", "output_empty", "output_withfile"],
                 return_type="list", result_filter=None, result_xfm=None),
             action="save",
