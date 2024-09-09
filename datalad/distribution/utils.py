@@ -11,23 +11,32 @@
 """
 
 import logging
-
-from os.path import (
-    isabs,
-    join as opj,
-    normpath,
-)
 import posixpath
+from os.path import isabs
+from os.path import join as opj
+from os.path import normpath
+
+from giturlparse import parse as parse_git_url
+
 from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import (
-    PathRI,
     RI,
     URL,
+    PathRI,
 )
 
-
 lgr = logging.getLogger('datalad.distribution.utils')
+
+
+def rewrite_match_scheme(target_url, src_url):
+    target_url = parse_git_url(target_url)
+    src_url = parse_git_url(src_url)
+
+    if hasattr(target_url, "protocol") and \
+        hasattr(src_url, "protocol") and \
+        target_url.protocol != src_url.protocol:
+        return src_url.urls[target_url.protocol]
 
 
 def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
