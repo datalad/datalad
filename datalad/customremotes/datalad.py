@@ -13,16 +13,15 @@ __docformat__ = 'restructuredtext'
 import logging
 from urllib.parse import urlparse
 
+from datalad.customremotes import RemoteError
+from datalad.customremotes.base import AnnexCustomRemote
+from datalad.customremotes.main import main as super_main
 from datalad.downloaders.providers import Providers
 from datalad.support.exceptions import (
     CapturedException,
     TargetFileAbsent,
 )
 from datalad.utils import unique
-
-from datalad.customremotes import RemoteError
-from datalad.customremotes.base import AnnexCustomRemote
-from datalad.customremotes.main import main as super_main
 
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
@@ -72,7 +71,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         except Exception as exc:
             ce = CapturedException(exc)
             self.message("Failed to check url %s: %s" % (url, ce))
-            return False
+            raise RemoteError(str(ce))
 
     def checkpresent(self, key):
         resp = None
