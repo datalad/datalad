@@ -65,29 +65,71 @@ def iter_entrypoints(group, load=False):
     lgr.debug("Done processing entrypoints")
 
 
-def load_extensions():
-    """Load entrypoint for any configured extension package
+def iter_extensions(load=False):
+    """Iterate over all entrypoints of the 'datalad.extensions' group
 
-    Log a warning in case a requested extension is not available, or if
-    a requested extension fails on load.
+    By default, iterates over all extensions. 'datalad.extensions.load'
+    configuration item can be used to configure which specific
+    extensions to consider. An explicitly set empty value avoids
+    considering any extension.
 
-    Extensions to load are taken from the 'datalad.extensions.load'
-    configuration item.
+    Logs a warning in case a requested extension is not available, or if
+    an extension fails on load.
+
+    Parameters
+    ----------
+    load: bool, optional
+      Whether to execute the entry point loader internally in a
+      protected manner that only logs a possible exception and emits
+      a warning, but otherwise skips over "broken" entrypoints.
+      If False, the loader callable is returned unexecuted.
+
+    Yields
+    -------
+    (name, module, load(r|d))
+      The first item in each yielded tuple is the entry point name (str).
+      The second is the name of the module that contains the entry point
+      (str). The type of the third items depends on the load parameter.
+      It is either a callable that can be used to load the entrypoint
+      (this is the default behavior), or the outcome of executing the
+      entry point loader.
     """
+
     from datalad import cfg
-    load_extensions = cfg.get('datalad.extensions.load', get_all=True)
-    if load_extensions:
-        from datalad.utils import ensure_list
-        exts = {
-            ename: eload
-            for ename, _, eload in iter_entrypoints('datalad.extensions')
-        }
-        for el in ensure_list(load_extensions):
-            if el not in exts:
-                lgr.warning('Requested extension %r is not available', el)
-                continue
+    load_extensions_cfg = cfg.get('datalad.extensions.load', get_all=True)
+    all_extensions = []
+    if load_extensions_cfg == '':
+        # empty value is an explicit way to disable loading any extension
+        lgr.debug("Not considering any extensions as requested")
+        return
+    elif load_extensions_cfg is not None:
+        from datalad.utils import ensure_iter
+        load_extensions_cfg = ensure_iter(load_extensions_cfg, set)
+
+    # We will do loading here to mimic prior behavior/logging better
+    for ename, mod, eload in iter_entrypoints('datalad.extensions', load=False):
+        all_extensions.append(ename)
+        if not (load_extensions_cfg is None or ename in load_extensions_cfg):
+            continue
+        if load:
             try:
-                exts[el]()
+                yield ename, mod, eload()
             except Exception as e:
                 ce = CapturedException(e)
                 lgr.warning('Could not load extension %r: %s', el, ce)
+        else:
+            yield ename, mod, eload
+
+    if load_extensions_cfg:
+        for ext in load_extensions_cfg.difference(all_extensions):
+            lgr.warning('Requested extension %r is not available', ext)
+
+
+def load_extensions():
+    """Load DataLad extensions entrypoints.
+
+    A convenience and compatibility helper over
+    :py:func:`datalad.support.entrypoints.iter_extensions`.
+    """
+    for _ in iter_extensions(load=True):
+        pass
