@@ -13,44 +13,42 @@ Allows for connecting via ssh and keeping the connection open
 git calls to a ssh remote without the need to reauthenticate.
 """
 
-import fasteners
-import os
 import logging
-from socket import gethostname
-from hashlib import md5
-from subprocess import Popen
+import os
 import tempfile
 import threading
+from hashlib import md5
+from socket import gethostname
+from subprocess import Popen
 
+import fasteners
 
+from datalad.cmd import (
+    NoCapture,
+    StdOutErrCapture,
+    WitlessRunner,
+)
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+    ConnectionOpenFailedError,
+)
+from datalad.support.external_versions import external_versions
 # importing the quote function here so it can always be imported from this
 # module
 # this used to be shlex.quote(), but is now a cross-platform helper
+from datalad.utils import (
+    Path,
+    auto_repr,
+    ensure_list,
+    on_windows,
+)
 from datalad.utils import quote_cmdlinearg as sh_quote
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
 # from datalad.support.network import RI, is_ssh
 
-from datalad.support.exceptions import (
-    CapturedException,
-    CommandError,
-    ConnectionOpenFailedError,
-)
-from datalad.support.external_versions import (
-    external_versions,
-)
-from datalad.utils import (
-    auto_repr,
-    Path,
-    ensure_list,
-    on_windows,
-)
-from datalad.cmd import (
-    NoCapture,
-    StdOutErrCapture,
-    WitlessRunner,
-)
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
@@ -136,7 +134,10 @@ class BaseSSHConnection(object):
         self._ssh_executable = None
         self._ssh_version = None
 
-        from datalad.support.network import SSHRI, is_ssh
+        from datalad.support.network import (
+            SSHRI,
+            is_ssh,
+        )
         if not is_ssh(sshri):
             raise ValueError(
                 "Non-SSH resource identifiers are not supported for SSH "
@@ -226,6 +227,7 @@ class BaseSSHConnection(object):
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
         from datalad import cfg
+
         # locate annex and set the bundled vs. system Git machinery in motion
         if self._use_remote_annex_bundle \
                 or cfg.obtain('datalad.ssh.try-use-annex-bundled-git'):
@@ -652,7 +654,10 @@ class BaseSSHManager(object):
 
     def _prep_connection_args(self, url):
         # parse url:
-        from datalad.support.network import RI, is_ssh
+        from datalad.support.network import (
+            RI,
+            is_ssh,
+        )
         if isinstance(url, RI):
             sshri = url
         else:
@@ -828,6 +833,7 @@ class MultiplexSSHManager(BaseSSHManager):
 # retain backward compat with 0.13.4 and earlier
 # should be ok since cfg already defined by the time this one is imported
 from .. import cfg
+
 if cfg.obtain('datalad.ssh.multiplex-connections'):
     SSHManager = MultiplexSSHManager
     SSHConnection = MultiplexSSHConnection

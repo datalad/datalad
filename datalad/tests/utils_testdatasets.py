@@ -9,7 +9,9 @@
 
 
 from os.path import join as opj
+
 from datalad.distribution.dataset import Dataset
+
 
 def _make_dataset_hierarchy(path):
     origin = Dataset(path).create()

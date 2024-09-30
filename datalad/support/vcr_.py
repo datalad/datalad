@@ -10,13 +10,12 @@
 """
 
 import logging
-
+from contextlib import contextmanager
 from functools import wraps
 from os.path import isabs
-from contextlib import contextmanager
 
-from datalad.utils import Path
 from datalad.support.exceptions import CapturedException
+from datalad.utils import Path
 
 lgr = logging.getLogger("datalad.support.vcr")
 
@@ -30,16 +29,20 @@ def _get_cassette_path(path):
 try:
     # TEMP: Just to overcome problem with testing on jessie with older requests
     # https://github.com/kevin1024/vcrpy/issues/215
-    import vcr.patch as _vcrp
     import requests as _
+    import vcr.patch as _vcrp
     try:
-        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
+        from requests.packages.urllib3.connectionpool import \
+            HTTPConnection as _a
+        from requests.packages.urllib3.connectionpool import \
+            VerifiedHTTPSConnection as _b
     except ImportError:
         def returnnothing(*args, **kwargs):
             return()
         _vcrp.CassettePatcherBuilder._requests = returnnothing
 
-    from vcr import use_cassette as _use_cassette, VCR as _VCR
+    from vcr import VCR as _VCR
+    from vcr import use_cassette as _use_cassette
 
     def use_cassette(path, return_body=None, skip_if_no_vcr=False, **kwargs):
         """Adapter so we could create/use custom use_cassette with custom parameters

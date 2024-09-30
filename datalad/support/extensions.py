@@ -9,11 +9,12 @@
 """Support functionality for extension development"""
 
 import logging
+
 from datalad.interface.common_cfg import (
-    _NotGiven,
     _ConfigDefinition,
-    definitions as _definitions,
+    _NotGiven,
 )
+from datalad.interface.common_cfg import definitions as _definitions
 
 __all__ = ['register_config', 'has_config']
 

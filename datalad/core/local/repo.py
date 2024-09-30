@@ -10,13 +10,14 @@
 
 """
 
+import logging
+
 from datalad.support.exceptions import (
-    InvalidGitRepositoryError,
     InvalidAnnexRepositoryError,
+    InvalidGitRepositoryError,
     NoSuchPathError,
 )
 
-import logging
 lgr = logging.getLogger('datalad.core.local.repo')
 
 __all__ = ["repo_from_path"]
@@ -43,8 +44,8 @@ def repo_from_path(path):
     """
     # keep the imports local for now until it is clearer what the module setup
     # will be
-    from datalad.support.gitrepo import GitRepo
     from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.gitrepo import GitRepo
 
     repo = None
     for cls, ckw, kw in (

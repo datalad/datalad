@@ -29,5 +29,5 @@ cat ca-root.pem certificate-pub.pem > ca_bundle.pem
 # check if certificate is considered valid
 openssl verify -trusted ca_bundle.pem certificate-pub.pem
 
-# potentially 
+# potentially
 #export REQUESTS_CA_BUNDLE=/path/to/ca_bundle.pem

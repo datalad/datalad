@@ -4,7 +4,6 @@ import sys
 
 from datalad.log import is_interactive
 
-
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
 
 

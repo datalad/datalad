@@ -25,15 +25,14 @@ from abc import (
     ABC,
     abstractmethod,
 )
-
 from functools import wraps
 from importlib import import_module
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     Generator,
     TypeVar,
-    TYPE_CHECKING,
 )
 
 import datalad
@@ -50,11 +49,11 @@ from datalad.distribution.dataset import (
 from datalad.interface.common_opts import eval_params
 from datalad.interface.results import known_result_xfms
 from datalad.interface.utils import (
+    _process_results,
     get_result_filter,
     keep_result,
     render_action_summary,
     xfm_result,
-    _process_results
 )
 from datalad.support.exceptions import (
     CapturedException,

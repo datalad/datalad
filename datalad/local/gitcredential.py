@@ -11,13 +11,13 @@
 """
 
 from io import StringIO
+from logging import getLogger
 
 from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
 )
 
-from logging import getLogger
 lgr = getLogger('datalad.local.gitcredentials')
 
 
@@ -154,5 +154,3 @@ class GitCredentialInterface(object):
             ['git', 'credential', 'reject'],
             stdin=self._format_props()
         )
-
-

@@ -14,44 +14,42 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
-from collections import OrderedDict
 import warnings
+from collections import OrderedDict
 
-from datalad.utils import (
-    bytes2human,
-    ensure_list,
-    ensure_unicode,
-    get_dataset_root,
+import datalad.support.ansi_colors as ac
+import datalad.utils as ut
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    path_under_rev_dataset,
+    require_dataset,
+    resolve_path,
 )
+from datalad.dochelpers import single_or_plural
 from datalad.interface.base import (
     Interface,
     build_doc,
     eval_results,
 )
 from datalad.interface.common_opts import (
-    recursion_limit,
     recursion_flag,
+    recursion_limit,
 )
 from datalad.interface.utils import generic_result_renderer
-import datalad.support.ansi_colors as ac
-from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from datalad.distribution.dataset import (
-    Dataset,
-    EnsureDataset,
-    datasetmethod,
-    require_dataset,
-    resolve_path,
-    path_under_rev_dataset,
+from datalad.support.param import Parameter
+from datalad.utils import (
+    bytes2human,
+    ensure_list,
+    ensure_unicode,
+    get_dataset_root,
 )
-
-import datalad.utils as ut
-
-from datalad.dochelpers import single_or_plural
 
 lgr = logging.getLogger('datalad.core.local.status')
 
@@ -436,6 +434,7 @@ class Status(Interface):
             generic_result_renderer(res)
             return
         from datalad.ui import ui
+
         # when to render relative paths:
         #  1) if a dataset arg was given
         #  2) if CWD is the refds

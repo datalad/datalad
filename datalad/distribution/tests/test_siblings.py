@@ -9,6 +9,8 @@
 
 """
 
+import pytest
+
 from datalad.api import (
     Dataset,
     clone,
@@ -47,8 +49,6 @@ from datalad.utils import (
     Path,
     on_windows,
 )
-
-import pytest
 
 
 @with_tempfile(mkdir=True)

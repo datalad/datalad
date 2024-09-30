@@ -16,28 +16,27 @@ import os.path as op
 import sys
 import tempfile
 import textwrap
-
 from collections import defaultdict
 from functools import partial
 
+from datalad import __version__
 from datalad.dochelpers import get_docstring_split
 from datalad.interface.base import (
     Interface,
     build_doc,
 )
-from datalad.utils import (
-    ensure_unicode,
-    getpwd,
-    unlink,
-    Path,
-)
-from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
     CapturedException,
     CommandError,
     InvalidGitRepositoryError,
 )
-from datalad import __version__
+from datalad.support.external_versions import external_versions
+from datalad.utils import (
+    Path,
+    ensure_unicode,
+    getpwd,
+    unlink,
+)
 
 lgr = logging.getLogger('datalad.local.wtf')
 
@@ -65,6 +64,7 @@ def get_max_path_length(top_path=None, maxl=1000):
     if not top_path:
         top_path = getpwd()
     import random
+
     from datalad import lgr
     from datalad.support import path
     prefix = path.join(top_path, "dl%d" % random.randint(1 ,100000))
@@ -124,6 +124,7 @@ def _describe_annex():
 
 def _describe_system():
     import platform as pl
+
     from datalad import get_encoding_info
     from datalad.utils import get_linux_distribution
     try:
@@ -212,8 +213,9 @@ def _describe_configuration(cfg, sensitive):
 
 def _describe_extensions():
     infos = {}
-    from datalad.support.entrypoints import iter_entrypoints
     from importlib import import_module
+
+    from datalad.support.entrypoints import iter_entrypoints
 
     for ename, emod, eload in iter_entrypoints('datalad.extensions'):
         info = {}
@@ -247,8 +249,9 @@ def _describe_extensions():
 
 def _describe_metadata_elements(group):
     infos = {}
-    from datalad.support.entrypoints import iter_entrypoints
     from importlib import import_module
+
+    from datalad.support.entrypoints import iter_entrypoints
     if sys.version_info < (3, 10):
         # 3.10 is when it was no longer provisional
         from importlib_metadata import distribution
@@ -393,11 +396,16 @@ class WTF(Interface):
     """
     result_renderer = 'tailored'
 
-    from datalad.support.param import Parameter
-    from datalad.distribution.dataset import datasetmethod
+    from datalad.distribution.dataset import (
+        EnsureDataset,
+        datasetmethod,
+    )
     from datalad.interface.base import eval_results
-    from datalad.distribution.dataset import EnsureDataset
-    from datalad.support.constraints import EnsureNone, EnsureChoice
+    from datalad.support.constraints import (
+        EnsureChoice,
+        EnsureNone,
+    )
+    from datalad.support.param import Parameter
 
     _params_ = dict(
         dataset=Parameter(
@@ -409,8 +417,8 @@ class WTF(Interface):
         sensitive=Parameter(
             args=("-s", "--sensitive",),
             constraints=EnsureChoice(None, 'some', 'all'),
-            doc="""if set to 'some' or 'all', it will display sections such as 
-            config and metadata which could potentially contain sensitive 
+            doc="""if set to 'some' or 'all', it will display sections such as
+            config and metadata which could potentially contain sensitive
             information (credentials, names, etc.).  If 'some', the fields
             which are known to be sensitive will still be masked out"""),
         sections=Parameter(
@@ -420,7 +428,7 @@ class WTF(Interface):
             metavar="SECTION",
             constraints=EnsureChoice(None, *sorted(SECTION_CALLABLES_GROUPPED) + ['*']),
             doc="""section to include.  If not set - depends on flavor.
-            '*' could be used to force all sections. If there are subsections 
+            '*' could be used to force all sections. If there are subsections
             like section.subsection available, then specifying just 'section'
             would select all subsections for that section.
             [CMD: This option can be given multiple times. CMD]"""),
@@ -448,8 +456,8 @@ class WTF(Interface):
     @eval_results
     def __call__(*, dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
-        from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict
+        from datalad.support.exceptions import NoDatasetFound
 
         ds = None
         try:
@@ -478,8 +486,8 @@ class WTF(Interface):
         else:
             cfg = None
 
-        from datalad.ui import ui
         from datalad.support.external_versions import external_versions
+        from datalad.ui import ui
 
         infos = dict()
         res = get_status_dict(

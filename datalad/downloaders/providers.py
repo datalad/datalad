@@ -9,39 +9,47 @@
 """Data providers - bind downloaders and credentials together
 """
 
+import re
+from configparser import ConfigParser as SafeConfigParserWithIncludes
 from glob import glob
 from logging import getLogger
-
-import re
-from os.path import dirname, abspath, join as pathjoin
+from os.path import (
+    abspath,
+    dirname,
+)
+from os.path import join as pathjoin
 from urllib.parse import urlparse
 
-from .base import NoneAuthenticator, NotImplementedAuthenticator
+from datalad.support import path
+from datalad.support.external_versions import external_versions
+from datalad.support.network import RI
+from datalad.utils import (
+    Path,
+    auto_repr,
+    ensure_list_from_str,
+    get_dataset_root,
+)
 
+from ..interface.common_cfg import dirs
+from .base import (
+    NoneAuthenticator,
+    NotImplementedAuthenticator,
+)
 from .http import (
     HTMLFormAuthenticator,
     HTTPAnonBearerTokenAuthenticator,
     HTTPAuthAuthenticator,
     HTTPBasicAuthAuthenticator,
-    HTTPDigestAuthAuthenticator,
     HTTPBearerTokenAuthenticator,
+    HTTPDigestAuthAuthenticator,
     HTTPDownloader,
     HTTPTokenAuthenticator,
 )
-from .s3 import S3Authenticator, S3Downloader
-from .shub import SHubDownloader
-from configparser import ConfigParser as SafeConfigParserWithIncludes
-from datalad.support.external_versions import external_versions
-from datalad.support.network import RI
-from datalad.support import path
-from datalad.utils import (
-    auto_repr,
-    ensure_list_from_str,
-    get_dataset_root,
-    Path,
+from .s3 import (
+    S3Authenticator,
+    S3Downloader,
 )
-
-from ..interface.common_cfg import dirs
+from .shub import SHubDownloader
 
 lgr = getLogger('datalad.downloaders.providers')
 

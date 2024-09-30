@@ -14,33 +14,30 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from datalad.support.param import Parameter
-from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
-)
+from datalad.core.local.status import get_paths_by_ds
 from datalad.distribution.dataset import (
-    datasetmethod,
-    require_dataset,
     Dataset,
     EnsureDataset,
+    datasetmethod,
+    require_dataset,
 )
-from datalad.interface.base import Interface
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+    eval_results,
+)
 from datalad.interface.common_opts import (
     if_dirty_opt,
     recursion_flag,
 )
-from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.results import get_status_dict
-from datalad.interface.base import (
-    build_doc,
-    eval_results,
+from datalad.interface.utils import handle_dirty_dataset
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
 )
-from datalad.utils import (
-    ensure_list,
-)
-from datalad.core.local.status import get_paths_by_ds
-
+from datalad.support.param import Parameter
+from datalad.utils import ensure_list
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 

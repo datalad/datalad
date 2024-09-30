@@ -28,15 +28,13 @@ import pytest
 
 import datalad.utils as ut
 from datalad import cfg as dl_cfg
+from datalad import utils
 from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
-
-from datalad import utils
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.dochelpers import borrowkwargs
-
 from datalad.support.external_versions import (
     external_versions,
     get_rsync_version,
@@ -46,7 +44,6 @@ from datalad.support.network import RI
 from datalad.support.vcr_ import *
 # TODO this must go
 from datalad.utils import *
-
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -2052,7 +2049,7 @@ def set_annex_version(version):
 
 def integration(f):
     """Mark test as an "integration" test which generally is not needed to be run
-    
+
     Generally tend to be slower.
     Should be used in combination with @slow and @turtle if that is the case.
     """

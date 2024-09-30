@@ -5,8 +5,8 @@ This procedure assumes a clean dataset that was just created by
 `datalad create`.
 """
 
-import sys
 import os.path as op
+import sys
 
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import create_tree

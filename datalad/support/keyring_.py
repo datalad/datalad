@@ -9,8 +9,9 @@
 """Adapters and decorators for keyrings
 """
 
-import os
 import logging
+import os
+
 lgr = logging.getLogger('datalad.support.keyring')
 
 
@@ -36,8 +37,9 @@ class Keyring(object):
         if self.__keyring_mod is None:
             # Setup logging for keyring if we are debugging, although keyring's logging
             # is quite scarce ATM
-            from datalad.log import lgr
             import logging
+
+            from datalad.log import lgr
             lgr_level = lgr.getEffectiveLevel()
             if lgr_level < logging.DEBUG:
                 keyring_lgr = logging.getLogger('keyring')
@@ -49,6 +51,7 @@ class Keyring(object):
 
         if self.__keyring is None:
             from datalad.log import lgr
+
             # we use module bound interfaces whenever we were not provided a dedicated
             # backend
             self.__keyring = self.__keyring_mod

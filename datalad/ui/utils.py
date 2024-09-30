@@ -8,9 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Various utils oriented to UI"""
 
+import struct
+
 from datalad.support import ansi_colors
 from datalad.utils import on_windows
-import struct
 
 
 # origin http://stackoverflow.com/a/3010495/1265472
@@ -18,7 +19,10 @@ def get_terminal_size():
     """Return current terminal size"""
     if on_windows:
         try:
-            from ctypes import windll, create_string_buffer
+            from ctypes import (
+                create_string_buffer,
+                windll,
+            )
 
             # stdin handle is -10
             # stdout handle is -11

@@ -8,8 +8,8 @@ Global portion of the config
 
   [dataset]
   path =
-  description = 
-  exec = 
+  description =
+  exec =
 
 Data providers
 ==============
@@ -612,4 +612,4 @@ https://github.com/scrapy/slybot
   Brings together scrapy + scrapely to provide json-specs for
   spiders/items/etc
   Might be worth at least adopting spiders specs...?
-  Has a neat slybot/validation/schemas.json  which validates the schematic 
+  Has a neat slybot/validation/schemas.json  which validates the schematic

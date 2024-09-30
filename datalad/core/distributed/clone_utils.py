@@ -32,7 +32,7 @@ from datalad.runner.exception import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CapturedException,
-    DownloadError
+    DownloadError,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import (
@@ -53,7 +53,6 @@ from datalad.utils import (
     make_tempfile,
     rmtree,
 )
-
 
 __docformat__ = 'restructuredtext'
 

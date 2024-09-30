@@ -13,8 +13,8 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from os.path import curdir
 import shlex
+from os.path import curdir
 from os.path import join as opj
 from os.path import (
     normpath,

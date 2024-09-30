@@ -17,9 +17,9 @@ import os.path as op
 import sys
 from io import StringIO
 from os import remove
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from datalad.api import (
     install,

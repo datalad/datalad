@@ -15,46 +15,40 @@ from functools import wraps
 from os.path import (
     curdir,
     exists,
-    join as opj,
+)
+from os.path import join as opj
+from os.path import (
     normpath,
     pardir,
 )
 from weakref import WeakValueDictionary
 
+import datalad.utils as ut
 from datalad import cfg
 from datalad.config import ConfigManager
 from datalad.core.local.repo import repo_from_path
+from datalad.dataset.repo import (
+    PathBasedFlyweight,
+    path_based_str_repr,
+)
+from datalad.support import path as op
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 # DueCredit
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
-from datalad.support.exceptions import (
-    NoDatasetFound,
-)
-from datalad.dataset.repo import (
-    path_based_str_repr,
-    PathBasedFlyweight,
-)
-from datalad.support.gitrepo import (
-    GitRepo,
-)
-from datalad.support import path as op
-
-import datalad.utils as ut
+from datalad.support.exceptions import NoDatasetFound
+from datalad.support.gitrepo import GitRepo
+from datalad.utils import \
+    get_dataset_root  # TODO remove after a while, when external consumers have adjusted; to use get_dataset_root()
 from datalad.utils import (
-    getpwd,
-    optional_args,
-    get_dataset_root,
-    get_sig_param_names,
-    # TODO remove after a while, when external consumers have adjusted
-    # to use get_dataset_root()
-    get_dataset_root as rev_get_dataset_root,
     Path,
     PurePath,
     ensure_list,
+    get_sig_param_names,
+    getpwd,
+    optional_args,
 )
-
 
 lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
@@ -188,6 +182,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             # load entire datalad.api which will also bind datasetmethods
             # from extensions.
             import datalad.api
+
             # which would bind all known interfaces as well.
             # Although adds overhead, good for UX
         return super(Dataset, self).__getattribute__(attr)
