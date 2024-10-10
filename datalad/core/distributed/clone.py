@@ -245,6 +245,15 @@ class Clone(Interface):
             # so that we can forget about how things used to be
             reckless = 'auto'
 
+        if reckless == 'private' and not \
+                AnnexRepo._check_version_kludges("annex-supports-private"):
+            raise ValueError("Instructed to make a private clone, but git-annex "
+                             "version does not support private mode. Requires "
+                             "at least git-annex 8.20210428. Note, that 'git "
+                             "annex dead here' may serve the purpose if "
+                             "recording the existence of this location is not "
+                             "an issue.")
+
         if isinstance(source, Dataset):
             source = source.path
 
