@@ -561,6 +561,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             "yes" if ver >= '10.20230408' else \
             "maybe" if ver > '10.20230407' else \
             "no"
+        kludges["annex-supports-private"] = ver >= "8.20210428"
         cls._version_kludges = kludges
         return kludges[key]
 

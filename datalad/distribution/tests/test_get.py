@@ -52,6 +52,7 @@ from datalad.tests.utils_pytest import (
     known_failure_windows,
     known_failure_githubci_win,
     ok_,
+    ok_exists,
     serve_path_via_http,
     skip_if_adjusted_branch,
     skip_ssh,
@@ -823,3 +824,33 @@ def test_get_non_existing(origin_path=None, clone_path=None):
 
     assert_result_count(res, 1, status="impossible",
                         message="path does not exist")
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_private(origin_path=None, dest1=None, dest2=None):
+    """Test whether reckless=private works as expected
+
+    We expect that both get(reckless=private), and get() in a
+    privately cloned parent would produce a subdataset with a private
+    annex journal. The behavior should be implied by clone, since get
+    uses clone_dataset, but here we test it explicitly.
+
+    """
+    ds = Dataset(origin_path).create()
+    subds = ds.create("foo")
+
+    # clone without, then get private
+    regular_clone = clone(ds, dest1)
+    private_subds = regular_clone.get(
+        "foo", reckless="private", result_xfm="datasets", return_type="item-or-list"
+    )
+    ok_exists(private_subds.repo.dot_git / "annex" / "journal-private" / "uuid.log")
+
+    # clone private, then get without (should inherit)
+    private_clone = clone(ds, dest2, reckless="private")
+    private_subds = private_clone.get(
+        "foo", result_xfm="datasets", return_type="item-or-list"
+    )
+    ok_exists(private_subds.repo.dot_git / "annex" / "journal-private" / "uuid.log")
