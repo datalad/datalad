@@ -15,15 +15,21 @@ from unittest.mock import patch
 from ...tests.utils_pytest import (
     assert_equal,
     assert_false,
+    assert_is_instance,
     assert_not_equal,
     assert_raises,
     with_testsui,
 )
-from .. import _UI_Switcher
+from .. import (
+    _UI_Switcher,
+    is_interactive
+)
 from ..dialog import (
     ConsoleLog,
     DialogUI,
     IPythonUI,
+    NoDialogUnderAnnexUI,
+    UnderAnnexUI,
 )
 
 
@@ -41,6 +47,11 @@ def test_ui_switcher():
         ui.yesno
 
     ui.set_backend('annex')
+    if is_interactive():
+        assert_is_instance(ui._ui, UnderAnnexUI)
+    else:
+        assert_is_instance(ui._ui, NoDialogUnderAnnexUI)
+    assert_equal(is_interactive(), ui._ui.is_interactive)
 
     # Let's pretend we are under IPython
     class ZMQInteractiveShell(object):

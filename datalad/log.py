@@ -23,7 +23,8 @@ from os.path import basename, dirname
 
 from collections import defaultdict
 
-from .utils import is_interactive, optional_args
+from .utils import optional_args
+from . import is_interactive
 from .support import ansi_colors as colors
 
 __all__ = [

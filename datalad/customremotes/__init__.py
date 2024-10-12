@@ -56,7 +56,7 @@ class SpecialRemote(_SpecialRemote):
     def __init__(self, annex):
         super(SpecialRemote, self).__init__(annex=annex)
         # instruct annex backend UI to use this remote
-        if ui.backend == 'annex':
+        if ui.backend in ['annex', 'annex-no-dialog']:
             ui.set_specialremote(self)
 
     def message(self, msg, type='debug'):
