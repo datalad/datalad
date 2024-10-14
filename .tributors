@@ -243,7 +243,8 @@
         "name": "Matt McCormick",
         "blog": "https://www.mmmccormick.com",
         "orcid": "0000-0001-9475-3756",
-        "affiliation": "Kitware Inc"
+        "affiliation": "Kitware Inc",
+        "email": "matt@mmmccormick.com"
     },
     "tstoeter": {
         "name": "tstoeter",
