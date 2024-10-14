@@ -13,9 +13,9 @@
 import logging
 import threading
 
+from datalad import utils as ut
 from datalad.support.exceptions import InvalidInstanceRequestError
 from datalad.support.network import RI
-from datalad import utils as ut
 
 lgr = logging.getLogger('datalad.repo')
 
@@ -301,4 +301,3 @@ def path_based_str_repr(cls):
     cls._repr = None
     cls.__repr__ = __repr__
     return cls
-

@@ -28,8 +28,8 @@ from datalad.tests.utils_pytest import (
     known_failure_githubci_win,
     on_nfs,
     on_travis,
-    slow,
     skip_if,
+    slow,
     with_tempfile,
     with_tree,
 )

@@ -13,10 +13,10 @@ the same developers as DataLad
 """
 
 import logging
-import re
-import textwrap
 import os
+import re
 import sys
+import textwrap
 import traceback
 
 from datalad.support.exceptions import CapturedException

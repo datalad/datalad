@@ -12,36 +12,35 @@
 
 __docformat__ = 'restructuredtext'
 
+import json
 import logging
 import sys
-from time import time
 from os import listdir
-from os.path import join as opj
 from os.path import isdir
-from os.path import relpath
-from os.path import sep
+from os.path import join as opj
+from os.path import (
+    relpath,
+    sep,
+)
+from time import time
+from typing import TypeVar
 
-import json
-
-from typing import (
-    TypeVar
-)
-# avoid import from API to not get into circular imports
-from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
-from datalad.utils import (
-    path_startswith,
-    path_is_subpath,
-    ensure_unicode,
-    getargspec,
-)
-from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import (
-    CapturedException,
-)
+import datalad.support.ansi_colors as ac
 from datalad import cfg as dlcfg
 from datalad.dochelpers import single_or_plural
+from datalad.support.exceptions import CapturedException
+from datalad.support.gitrepo import GitRepo
 from datalad.ui import ui
-import datalad.support.ansi_colors as ac
+# avoid import from API to not get into circular imports
+from datalad.utils import (
+    ensure_unicode,
+    getargspec,
+    path_is_subpath,
+    path_startswith,
+)
+from datalad.utils import \
+    with_pathsep as \
+    _with_sep  # TODO: RF whenever merge conflict is not upon us
 
 anInterface = TypeVar('anInterface', bound='Interface')
 
@@ -219,6 +218,7 @@ def get_result_filter(fx):
 
 def eval_results(wrapped):
     import warnings
+
     from datalad.interface.base import eval_results as eval_results_moved
     warnings.warn("datalad.interface.utils.eval_results is obsolete. "
                   "Use datalad.interface.base.eval_results instead",

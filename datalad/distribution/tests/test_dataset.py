@@ -28,9 +28,7 @@ from datalad.api import (
     get,
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import (
-    NoDatasetFound,
-)
+from datalad.support.exceptions import NoDatasetFound
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
     OBSCURE_FILENAME,

@@ -15,15 +15,16 @@ import inspect
 import logging
 import os.path as op
 import sys
-from typing import Union
-
 from argparse import REMAINDER
 from itertools import chain
 from tempfile import mkdtemp
+from typing import Union
 
-from datalad.cmd import NoCapture, StdOutErrCapture
+from datalad.cmd import (
+    NoCapture,
+    StdOutErrCapture,
+)
 from datalad.core.local.run import normalize_command
-
 from datalad.distribution.dataset import (
     Dataset,
     EnsureDataset,
@@ -56,9 +57,9 @@ from datalad.support.parallel import (
     no_subds_in_futures,
 )
 from datalad.support.param import Parameter
+from datalad.utils import SequenceFormatter
+from datalad.utils import chpwd as chpwd_cm
 from datalad.utils import (
-    SequenceFormatter,
-    chpwd as chpwd_cm,
     getpwd,
     nothing_cm,
     shortened_repr,

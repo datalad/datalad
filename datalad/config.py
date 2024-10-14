@@ -16,13 +16,13 @@ import re
 import threading
 import warnings
 from collections import namedtuple
-from fasteners import InterProcessLock
 from functools import (
     lru_cache,
     wraps,
 )
 from pathlib import Path
 
+from fasteners import InterProcessLock
 
 import datalad
 from datalad.consts import DATASET_CONFIG_FILE

@@ -13,8 +13,10 @@ import logging
 import os
 import time
 
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.interface.results import get_status_dict
 from datalad.support.exceptions import (
     CapturedException,
@@ -46,6 +48,7 @@ def _parse_date(date):
                 msg="This package is required to parse non-timestamp dates")
 
         from calendar import timegm
+
         # Note: datetime.timestamp isn't available in Python 2.
         try:
             timestamp = timegm(dateutil.parser.parse(date).utctimetuple())
@@ -66,9 +69,13 @@ class CheckDates(Interface):
     timestamps within files of the "git-annex" branch, and (3) the timestamps
     of annotated tags.
     """
-    from datalad.interface.base import eval_results
     import datalad.support.ansi_colors as ac
-    from datalad.support.constraints import EnsureChoice, EnsureNone, EnsureStr
+    from datalad.interface.base import eval_results
+    from datalad.support.constraints import (
+        EnsureChoice,
+        EnsureNone,
+        EnsureStr,
+    )
     from datalad.support.param import Parameter
 
     result_renderer = "tailored"
