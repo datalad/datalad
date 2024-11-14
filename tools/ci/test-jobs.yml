@@ -18,11 +18,6 @@
     # since should not hurt.
     LC_ALL: ru_RU.UTF-8
 
-- python-version: '3.10'
-  extra-envs:
-    PYTEST_SELECTION: ""
-    PYTEST_SELECTION_OP: "not"
-
 # Two matrix runs for "recent python and git-annex with the recent supported by
 # git annex new version of repo" and various extra options/features enabled for
 # git-annex
