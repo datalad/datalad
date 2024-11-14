@@ -2393,7 +2393,7 @@ class GitRepo(CoreGitRepo):
         # bring into traditional shape
         for name, props in mods.items():
             if 'path' not in props:
-                lgr.warning("Failed to get '%s.path', skipping this submodule", name)
+                lgr.warning("Failed to get '%s', skipping this submodule", name)
                 continue
             modprops = {'gitmodule_{}'.format(k): v
                         for k, v in props.items()
