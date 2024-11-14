@@ -335,6 +335,7 @@ before_test:
   - ssh -v localhost exit
   - ssh datalad-test exit
   - ssh datalad-test2 exit
+  - python -m pip freeze
   - datalad wtf
 
 
@@ -350,6 +351,7 @@ test_script:
 
 after_test:
   - sh: python -m coverage combine -a /tmp/.coverage-entrypoints-*;
+  - python -m coverage debug sys
   - python -m coverage xml
   - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
   - cmd: .\codecov.exe -f "coverage.xml"

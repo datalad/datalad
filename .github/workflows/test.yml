@@ -174,7 +174,9 @@ jobs:
         run: sudo pip install --user .
 
       - name: Report WTF information using system-wide installed version
-        run: datalad wtf
+        run: |
+          datalad wtf
+          python -m pip freeze
 
       - name: Run tests
         run: |
@@ -229,7 +231,9 @@ jobs:
       # non-cron jobs, but report for all
 
       - name: Report coverage
-        run: python -m coverage report
+        run: |
+          python -m coverage debug sys
+          python -m coverage report
         working-directory: __testhome__
 
       - name: Upload coverage to Codecov
