@@ -87,7 +87,8 @@ requires.update({
     ],
     'devel-utils': [
         'asv',        # benchmarks
-        'coverage',
+        # https://github.com/nedbat/coveragepy/issues/1891#issuecomment-2477760029
+        'coverage<=7.6.4',
         'gprof2dot',  # rendering cProfile output as a graph image
         'psutil',
         'pytest-xdist',  # parallelize pytest runs etc
