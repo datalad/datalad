@@ -27,9 +27,8 @@ requires = {
         'platformdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
-        'distro; python_version >= "3.8"',
+        'distro',
         'importlib-metadata >=3.6; python_version < "3.10"',
-        'importlib-resources >= 3.0; python_version < "3.9"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
@@ -169,7 +168,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'],
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     project_urls={'Homepage': 'https://www.datalad.org',
                   'Developer docs': 'https://docs.datalad.org/en/stable',
                   'User handbook': 'https://handbook.datalad.org',
