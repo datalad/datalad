@@ -66,7 +66,7 @@ environment:
     # is a need for debugging
 
     # Ubuntu core tests
-    - ID: Ubu20core
+    - ID: Ubu22core
       # ~30min
       DTS: >
           datalad.cli
@@ -75,7 +75,8 @@ environment:
           datalad.dataset
           datalad.distributed
           datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
+      PY: 3.9
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
@@ -105,7 +106,7 @@ environment:
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
 
     # Additional test runs
-    - ID: Ubu20a1
+    - ID: Ubu22a1
       # ~30min
       DTS: >
           datalad.downloaders
@@ -115,7 +116,8 @@ environment:
           datalad.support
           datalad.tests
           datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
+      PY: 3.9
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
@@ -168,7 +170,7 @@ environment:
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
 
     # Test alternative Python versions
-    - ID: Ubu20P311a
+    - ID: Ubu22P311a
       # ~35min
       PY: 3.11
       DTS: >
@@ -178,12 +180,12 @@ environment:
           datalad.dataset
           datalad.distributed
           datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
-    - ID: Ubu20P311b
+    - ID: Ubu22P311b
       # ~25min
       PY: 3.11
       DTS: >
@@ -194,7 +196,7 @@ environment:
           datalad.support
           datalad.tests
           datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
