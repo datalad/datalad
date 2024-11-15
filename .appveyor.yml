@@ -80,7 +80,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -121,7 +121,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
     - ID: WinP39a1
       # ~40min
       DTS: >
@@ -184,7 +184,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
     - ID: Ubu22P311b
       # ~25min
       PY: 3.11
@@ -200,7 +200,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
 
 matrix:
   allow_failures:
