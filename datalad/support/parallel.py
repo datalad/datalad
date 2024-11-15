@@ -89,8 +89,6 @@ class ProducerConsumer:
     -----
     - with jobs > 1, results are yielded as soon as available, so order
       might not match the one provided by "producer".
-    - jobs > 1, is "effective" only for Python >= 3.8.  For older versions it
-      would log a warning (upon initial encounter) if jobs > 1 is specified.
     - `producer` must produce unique entries. AssertionError might be raised if
       the same entry is to be consumed.
     - `consumer` can add to the queue of items produced by producer via
