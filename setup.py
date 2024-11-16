@@ -39,6 +39,7 @@ requires = {
         'typing_extensions>=4.0.0; python_version < "3.11"',
         'annexremote',
         'looseversion',
+        "giturlparse",
     ],
     'downloaders': [
         'boto3',
