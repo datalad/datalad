@@ -11,7 +11,7 @@ Credential management
 
    This specification describes the current implementation.
 
-Various components of DataLad need to be passed credentials to interact with services that require authentication. 
+Various components of DataLad need to be passed credentials to interact with services that require authentication.
 This includes downloading files, but also things like REST API usage or authenticated cloning.
 Key components of DataLad's credential management are credentials types, providers, authenticators and downloaders.
 

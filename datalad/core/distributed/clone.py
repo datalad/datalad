@@ -25,7 +25,7 @@ from datalad.distribution.dataset import (
 from datalad.interface.base import (
     Interface,
     build_doc,
-    eval_results
+    eval_results,
 )
 from datalad.interface.common_opts import (
     location_description,
@@ -45,8 +45,8 @@ from datalad.support.network import (
 )
 from datalad.support.param import Parameter
 from datalad.utils import (
-    knows_annex,
     PurePath,
+    knows_annex,
     rmtree,
 )
 
@@ -60,7 +60,10 @@ from .clone_utils import (  # needed because other code imports it from here
     _test_existing_clone_target,
     _try_clone_candidates,
     decode_source_spec,
-    # RIA imports needed b/c datalad-next imports it from here ATM;
+)
+
+from .clone_utils import ( # isort: skip
+    # RIA imports needed b/c datalad-next imports it from here ATM
     # Remove after core was released and next dropped the ria patch.
     postclone_preannex_cfg_ria,
     postclonecfg_ria,

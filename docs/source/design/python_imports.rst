@@ -41,9 +41,9 @@ The following rules apply to any ``import`` statement in the code base:
   - DataLad core (absolute imports)
 
   - DataLad extensions
-  
+
   - DataLad core ("local" relative imports)
-  
+
   Sorting imports can be aided by https://github.com/PyCQA/isort (e.g. ``python -m isort -m3 --fgw 2 --tc <filename>``).
 
 
@@ -63,15 +63,14 @@ Examples
         ensure_unicode,
         get_dataset_root as gdr,
     )
-    
+
  In the `datalad/submodule/tests/test_mod.py` test file demonstrating an "exception" to absolute imports
- rule where test files are accompanying corresponding files of the underlying module:: 
- 
+ rule where test files are accompanying corresponding files of the underlying module::
+
     import os
-  
+
     from datalad.utils import ensure_list
-    
+
     from ..mod import func1
 
     from datalad.tests.utils_pytest import assert_true
-    

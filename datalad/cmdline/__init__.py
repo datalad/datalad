@@ -10,6 +10,7 @@
 """
 
 import warnings
+
 warnings.warn(
     "All of datalad.cmdline is deprecated/discontinued as of datalad 0.16. "
     "A new CLI implementation is available at datalad.cli. "

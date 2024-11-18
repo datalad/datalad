@@ -21,6 +21,3 @@ def test_nadict():
     d = nadict({1: 2})
     eq_(d[1], 2)
     eq_(str(d[2]), NA_STRING)
-
-
-

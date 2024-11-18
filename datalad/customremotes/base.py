@@ -22,6 +22,7 @@ from annexremote import (
     RemoteError,
     UnsupportedRequest,
 )
+
 from datalad.customremotes import SpecialRemote
 
 URI_PREFIX = "dl"

@@ -98,11 +98,7 @@ def setup_parser(
         description=help_gist,
         formatter_class=formatter_class,
         add_help=False,
-        # TODO: when dropping support for Python 3.8: uncomment below
-        # and use parse_known_args instead of _parse_known_args:
-        # # set to False so parse_known_args does not add its error handling
-        # # Added while RFing from using _parse_known_args to parse_known_args.
-        # exit_on_error=False,
+        exit_on_error=False,
     )
 
     # common options
@@ -128,9 +124,10 @@ def setup_parser(
 
     # when completing and we have no incomplete option or parameter
     # we still need to offer all commands for completion
-    if (completing and status == 'allknown') or (
+    if ((completing and status == 'allknown') or (
             status == 'subcommand' and parseinfo not in
-            get_commands_from_groups(interface_groups)):
+            get_commands_from_groups(interface_groups))
+            or status == 'error'):
         # we know the command is not in the core package
         # still a chance it could be in an extension
         command_provider = 'extension'
@@ -353,7 +350,7 @@ def single_subparser_possible(cmdlineargs, parser, completing):
     # Before doing anything additional and possibly expensive see may be that
     # we have got the command already
     try:
-        parsed_args, unparsed_args = parser._parse_known_args(
+        parsed_args, unparsed_args = parser.parse_known_args(
             cmdlineargs[1:], argparse.Namespace())
         # before anything handle possible datalad --version
         if not unparsed_args and getattr(parsed_args, 'version', None):

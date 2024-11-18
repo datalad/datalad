@@ -12,8 +12,10 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.support.annexrepo import AnnexRepo
 
 lgr = logging.getLogger('datalad.local.add_readme')
@@ -29,15 +31,17 @@ class AddReadme(Interface):
     .gitattributes file exist.
 
     """
-    from datalad.support.param import Parameter
-    from datalad.distribution.dataset import datasetmethod
+    from datalad.distribution.dataset import (
+        EnsureDataset,
+        datasetmethod,
+    )
     from datalad.interface.base import eval_results
-    from datalad.distribution.dataset import EnsureDataset
     from datalad.support.constraints import (
         EnsureChoice,
         EnsureNone,
         EnsureStr,
     )
+    from datalad.support.param import Parameter
 
     _params_ = dict(
         dataset=Parameter(
@@ -67,9 +71,9 @@ class AddReadme(Interface):
                  *,
                  dataset=None,
                  existing='skip'):
-        from os.path import lexists
-        from os.path import join as opj
         from io import open
+        from os.path import join as opj
+        from os.path import lexists
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import ensure_list

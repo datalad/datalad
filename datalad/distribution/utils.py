@@ -11,21 +11,18 @@
 """
 
 import logging
-
-from os.path import (
-    isabs,
-    join as opj,
-    normpath,
-)
 import posixpath
+from os.path import isabs
+from os.path import join as opj
+from os.path import normpath
+
 from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import (
-    PathRI,
     RI,
     URL,
+    PathRI,
 )
-
 
 lgr = logging.getLogger('datalad.distribution.utils')
 

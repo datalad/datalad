@@ -8,23 +8,27 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Logging setup and utilities, including progress reporting"""
 
-from contextlib import contextmanager
-from functools import partial
 import inspect
 import logging
+import logging.handlers
 import os
-import sys
 import platform
 import random
-import logging.handlers
+import sys
 import warnings
-
-from os.path import basename, dirname
-
 from collections import defaultdict
+from contextlib import contextmanager
+from functools import partial
+from os.path import (
+    basename,
+    dirname,
+)
 
-from .utils import is_interactive, optional_args
 from .support import ansi_colors as colors
+from .utils import (
+    is_interactive,
+    optional_args,
+)
 
 __all__ = [
     'ColorFormatter',
@@ -649,6 +653,7 @@ class LoggerHelper(object):
             names = self._get_config(names_filter, '')
             if names:
                 import re
+
                 # add a filter which would catch those
                 class LogFilter(object):
                     """A log filter to filter based on the log target name(s)"""

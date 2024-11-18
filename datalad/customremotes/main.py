@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import argparse
+import logging
 
 from datalad.cli.parser import (
     parser_add_common_opt,
@@ -20,7 +21,6 @@ from datalad.cli.parser import (
 from datalad.cli.utils import setup_exceptionhook
 from datalad.ui import ui
 
-import logging
 lgr = logging.getLogger('datalad.customremotes')
 
 
@@ -60,7 +60,9 @@ def _main(args, cls):
 
 def main(args=None, cls=None, remote_name=None, description=None):
     import sys
+
     from datalad.support.entrypoints import load_extensions
+
     # load extensions requested by configuration
     # analog to what coreapi is doing for a Python session
     # importantly, load them prior to parser construction, such

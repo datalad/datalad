@@ -95,8 +95,6 @@ from datalad.utils import (
     getpwd,
 )
 
-import pytest
-
 #
 # Test with_tempfile, especially nested invocations
 #
@@ -263,7 +261,7 @@ def test_ok_symlink_helpers(tmpfile=None):
 
     with open(tmpfile, 'w') as tf:
         tf.write('test text')
-    
+
     # tmpfile is still not a symlink here
     assert_raises(AssertionError, ok_symlink, tmpfile)
     assert_raises(AssertionError, ok_good_symlink, tmpfile)

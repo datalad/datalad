@@ -14,8 +14,8 @@ import logging
 from datalad.distributed.create_sibling_ghlike import _create_sibling
 from datalad.distributed.create_sibling_gogs import _GOGS
 from datalad.distribution.dataset import (
-    datasetmethod,
     Dataset,
+    datasetmethod,
 )
 from datalad.interface.base import (
     Interface,
@@ -23,7 +23,6 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.support.annexrepo import AnnexRepo
-
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gin')
 

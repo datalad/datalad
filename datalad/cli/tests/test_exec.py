@@ -174,4 +174,3 @@ def test_call_from_parser_pos_arg_underscore(how):
     args = parser.parse_args(["val"])
     eq_(call_from_parser(Cmd, args),
         "val")
-
