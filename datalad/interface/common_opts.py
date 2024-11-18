@@ -13,7 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 from datalad.interface.results import known_result_xfms
-from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureBool,
     EnsureCallable,
@@ -23,6 +22,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureStrPrefix,
 )
+from datalad.support.param import Parameter
 
 location_description = Parameter(
     args=("-D", "--description",),
@@ -170,8 +170,8 @@ reckless_opt = Parameter(
     EnsureChoice(None, True, False, 'auto', 'ephemeral') | \
     EnsureStrPrefix('shared-'),
     metavar='auto|ephemeral|shared-...',
-    doc="""Obtain a dataset or subdatset and set it up in a potentially 
-    unsafe way for performance, or access reasons. 
+    doc="""Obtain a dataset or subdatset and set it up in a potentially
+    unsafe way for performance, or access reasons.
     Use with care, any dataset is marked as 'untrusted'.
     The reckless mode is stored in a dataset's local configuration under
     'datalad.clone.reckless', and will be inherited to any of its subdatasets.

@@ -1006,13 +1006,13 @@ class GitRepo(CoreGitRepo):
         url_ri = RI(url) if not isinstance(url, RI) else url
         if on_windows:
             # When we're cloning from a local path on Windows, the URL at
-            # this point is platform-specific (e.g., "..\\origin"). According 
+            # this point is platform-specific (e.g., "..\\origin"). According
             # to Git clone's manpage, clone urls can't have backslashes.
-            # While Git does manage to clone a URL with backslashes, 
+            # While Git does manage to clone a URL with backslashes,
             # in the case of subdatasets cloned from relative paths it nevertheless
             # messed up the resulting remote url, resulting in a mix of
-            # front and backslashes (see also gh-7180): 
-            # 'C:/Users/adina/AppData/Local/Temp/datalad_temp_frvczceh/ds/..\\origin' 
+            # front and backslashes (see also gh-7180):
+            # 'C:/Users/adina/AppData/Local/Temp/datalad_temp_frvczceh/ds/..\\origin'
             # Therefore, we're turning it to Posix now.
             if isinstance(url_ri, PathRI):
                 url = Path(url).as_posix()
@@ -2393,7 +2393,7 @@ class GitRepo(CoreGitRepo):
         # bring into traditional shape
         for name, props in mods.items():
             if 'path' not in props:
-                lgr.warning("Failed to get '%s.path', skipping this submodule", name)
+                lgr.warning("Failed to get '%s', skipping this submodule", name)
                 continue
             modprops = {'gitmodule_{}'.format(k): v
                         for k, v in props.items()

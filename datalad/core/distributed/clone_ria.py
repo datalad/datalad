@@ -6,13 +6,13 @@ import logging
 from typing import Dict
 
 from datalad.distribution.dataset import Dataset
+
+from . import clone as mod_clone
 # For now kept in clone_utils, to avoid circular import (see datalad-next)
 from .clone_utils import (
     postclone_preannex_cfg_ria,
     postclonecfg_ria,
 )
-
-from . import clone as mod_clone
 
 # we need to preserve the original functions to be able to call them
 # in the patch

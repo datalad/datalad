@@ -65,5 +65,3 @@ def test_register_config():
     nkeys = len(df)
     df.update(funky='seven')
     eq_(len(df), nkeys + 1)
-
-

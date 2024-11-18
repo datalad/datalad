@@ -13,38 +13,35 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from shutil import copyfile
 import sys
+from functools import lru_cache
+from shutil import copyfile
 
-from datalad.interface.base import Interface
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+    resolve_path,
+)
 from datalad.interface.base import (
+    Interface,
     build_doc,
     eval_results,
 )
-from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
-)
 from datalad.interface.common_opts import save_message_opt
-from datalad.support.param import Parameter
-from datalad.distribution.dataset import (
-    Dataset,
-    require_dataset,
-)
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+)
 from datalad.support.exceptions import CapturedException
+from datalad.support.param import Parameter
 from datalad.utils import (
+    Path,
     ensure_list,
     get_dataset_root,
-    Path,
 )
-
-from datalad.distribution.dataset import (
-    EnsureDataset,
-    datasetmethod,
-    resolve_path,
-)
-from functools import lru_cache
 
 lgr = logging.getLogger('datalad.local.copy_file')
 

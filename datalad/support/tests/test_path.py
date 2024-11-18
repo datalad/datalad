@@ -10,6 +10,8 @@
 import os
 from pathlib import PurePosixPath
 
+import pytest
+
 from ...tests.utils_pytest import (
     SkipTest,
     assert_raises,
@@ -24,13 +26,11 @@ from ...utils import (
 from ..path import (
     abspath,
     curdir,
-    get_parent_paths,
     get_filtered_paths_,
+    get_parent_paths,
     robust_abspath,
     split_ext,
 )
-
-import pytest
 
 
 @with_tempfile(mkdir=True)

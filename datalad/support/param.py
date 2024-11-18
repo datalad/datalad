@@ -10,9 +10,10 @@
 
 __docformat__ = 'restructuredtext'
 
+import argparse
 import re
 import textwrap
-import argparse
+
 from datalad.utils import getargspec
 
 from .constraints import expand_constraint_spec

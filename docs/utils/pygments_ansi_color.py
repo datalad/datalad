@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """Pygments lexer for text containing ANSI color codes."""
-from __future__ import absolute_import
-from __future__ import unicode_literals
+from __future__ import (
+    absolute_import,
+    unicode_literals,
+)
 
 import itertools
 import re
 
 import pygments.lexer
 import pygments.token
-
 
 Color = pygments.token.Token.Color
 

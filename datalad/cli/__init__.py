@@ -8,4 +8,5 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+
 lgr = logging.getLogger('datalad.cli')

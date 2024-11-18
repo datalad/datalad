@@ -21,22 +21,22 @@ https://github.com/omab/python-social-auth
 """
 
 import time
-
-from ..support.exceptions import (
-    AccessDeniedError,
-    CapturedException,
-)
-from ..support.keyring_ import keyring as keyring_
-from ..ui import ui
-from ..utils import auto_repr
-from ..support.network import iso8601_to_epoch
+from logging import getLogger
 
 from datalad import cfg as dlcfg
 from datalad.config import anything2bool
 from datalad.distribution.dataset import Dataset
 from datalad.local.gitcredential import GitCredentialInterface
 
-from logging import getLogger
+from ..support.exceptions import (
+    AccessDeniedError,
+    CapturedException,
+)
+from ..support.keyring_ import keyring as keyring_
+from ..support.network import iso8601_to_epoch
+from ..ui import ui
+from ..utils import auto_repr
+
 lgr = getLogger('datalad.downloaders.credentials')
 
 
@@ -399,6 +399,7 @@ class CompositeCredential(Credential):
 
 def _nda_adapter(composite, user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
+
     from .. import cfg
     nda_auth_url = cfg.obtain('datalad.externals.nda.dbserver')
     gen = NDATokenGenerator(nda_auth_url)

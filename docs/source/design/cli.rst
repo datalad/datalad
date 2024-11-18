@@ -130,4 +130,3 @@ processing of result recorded yielded by a command.
 If an underlying command returns a Python generator it is unwound to trigger
 the respective underlying processing. The handler performs no error handling.
 This is left to the main command line entry point.
-

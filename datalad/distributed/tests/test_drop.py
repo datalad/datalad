@@ -46,7 +46,6 @@ from datalad.tests.utils_pytest import (
 )
 from datalad.utils import chpwd
 
-
 ckwa = dict(result_renderer='disabled')
 
 

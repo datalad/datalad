@@ -44,7 +44,7 @@ an annex as ``dead`` on removal of a repository (`#3887
 <https://github.com/datalad/datalad/issues/3887>`__).
 
 §6 Like :command:`get`, drop supports parallelization `#1953
-<https://github.com/datalad/datalad/issues/1953>`__ 
+<https://github.com/datalad/datalad/issues/1953>`__
 
 §7 `datalad drop` is not intended to be a comprehensive frontend to `git annex
 drop` (e.g. limited support for e.g. `#1482

@@ -9,6 +9,7 @@
 """Import shim to ease the transition after the move under distributed/"""
 
 import warnings
+
 warnings.warn(
     "CreateSiblingGithub has been moved to "
     "datalad.distributed.create_sibling_github. Please adjust the import.",

@@ -10,53 +10,47 @@
 
 """
 
-import os
 import logging
+import os
+import os.path as op
 import random
 import uuid
 import warnings
-from argparse import (
-    REMAINDER,
-)
-
+from argparse import REMAINDER
 from os import listdir
-import os.path as op
 
-from datalad import cfg
-from datalad import _seed
-from datalad.interface.base import Interface
+from datalad import (
+    _seed,
+    cfg,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    path_under_rev_dataset,
+    require_dataset,
+    resolve_path,
+)
 from datalad.interface.base import (
+    Interface,
     build_doc,
     eval_results,
 )
-from datalad.interface.common_opts import (
-    location_description,
-)
+from datalad.interface.common_opts import location_description
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
     EnsureKeyChoice,
+    EnsureNone,
+    EnsureStr,
 )
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.utils import (
-    getpwd,
+    Path,
     ensure_list,
     get_dataset_root,
-    Path,
+    getpwd,
 )
-
-from datalad.distribution.dataset import (
-    Dataset,
-    datasetmethod,
-    EnsureDataset,
-    resolve_path,
-    path_under_rev_dataset,
-    require_dataset,
-)
-
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-
 
 __docformat__ = 'restructuredtext'
 

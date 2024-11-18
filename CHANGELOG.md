@@ -1,4 +1,29 @@
 
+<a id='changelog-1.1.4'></a>
+# 1.1.4 (2024-11-18)
+
+## 🐛 Bug Fixes
+
+- Exit with the original non-0 exit code if underlying functionality, in particular "datalad run", returned incomplete result record with a non-0 exit code.  Fixes [#7504](https://github.com/datalad/datalad/issues/7504) via [PR #7641](https://github.com/datalad/datalad/pull/7641) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Provide detail on why CHECKURL failed for datalad and archive special remotes (would require new AnnexRemote release (above 1.6.5) to take advantage of this PR).  [PR #7648](https://github.com/datalad/datalad/pull/7648) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: allow for empty output directory to be specified to run.  Fixes [#7653](https://github.com/datalad/datalad/issues/7653) via [PR #7654](https://github.com/datalad/datalad/pull/7654) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- fix: do load extension interfaces if early parsing errors out.  Fixes [#7678](https://github.com/datalad/datalad/issues/7678) via [PR #7679](https://github.com/datalad/datalad/pull/7679) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Drop Python 3.8.  Fixes [#7678](https://github.com/datalad/datalad/issues/7678) via [PR #7682](https://github.com/datalad/datalad/pull/7682) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏎 Performance
+
+- OPT: use set O(log(n)) instead of list O(n) for checking if modified in _check_files.  [PR #7655](https://github.com/datalad/datalad/pull/7655) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Declare minimal compat version of pytest to be 7.0.  Fixes [#7555](https://github.com/datalad/datalad/issues/7555) via [PR #7645](https://github.com/datalad/datalad/pull/7645) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: replace url for codecov uploader for macos to versioned one with two archs.  Fixes [#7642](https://github.com/datalad/datalad/issues/7642) via [PR #7649](https://github.com/datalad/datalad/pull/7649) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.3'></a>
 # 1.1.3 (2024-08-08)
 

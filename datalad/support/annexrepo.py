@@ -58,7 +58,6 @@ from datalad.runner.utils import (
     AssemblingDecoderMixIn,
     LineSplitter,
 )
-
 from datalad.support.annex_utils import (
     _fake_json_for_non_existing,
     _get_non_existing_from_annex_output,
@@ -1997,10 +1996,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         # ATTN: test_AnnexRepo_file_has_content has a failure before Git
         # v2.13 (tested back to v2.9) because this diff call unexpectedly
         # reports a type change as modified.
-        modified = [
+        modified = {
             f for f in self.call_git_items_(
                 ['diff', '--name-only', '-z'], sep='\0')
-            if f] if pointers else []
+            if f
+        } if pointers else set()
         annex_res = fn(files, normalize_paths=False, batch=batch)
         return [bool(annex_res.get(f) and
                      not (pointers and normpath(f) in modified))

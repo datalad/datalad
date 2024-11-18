@@ -1,18 +1,19 @@
 import functools
+import logging
 import os
+import shutil
 import stat
+import subprocess
 import sys
+from contextlib import contextmanager
+from functools import wraps
 from pathlib import (
     Path,
-    PurePosixPath
+    PurePosixPath,
 )
-from contextlib import contextmanager
-import requests
-import shutil
 from shlex import quote as sh_quote
-import subprocess
-import logging
-from functools import wraps
+
+import requests
 
 from datalad import ssh_manager
 from datalad.config import anything2bool
@@ -22,25 +23,24 @@ from datalad.customremotes import (
     SpecialRemote,
 )
 from datalad.customremotes.main import main as super_main
+from datalad.customremotes.ria_utils import (
+    UnknownLayoutVersion,
+    get_layout_locations,
+    verify_ria_url,
+)
 from datalad.support.annex_utils import _sanitize_key
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     AccessDeniedError,
     AccessFailedError,
     CapturedException,
-    DownloadError
+    DownloadError,
 )
 from datalad.support.network import url_path2local_path
-from datalad.customremotes.ria_utils import (
-    get_layout_locations,
-    UnknownLayoutVersion,
-    verify_ria_url,
-)
 from datalad.utils import (
     ensure_write_permission,
-    on_osx
+    on_osx,
 )
-
 
 lgr = logging.getLogger('datalad.customremotes.ria_remote')
 
@@ -285,7 +285,12 @@ class LocalIO(IOBase):
             f.write(content)
 
     def get_7z(self):
-        from datalad.cmd import CommandError, StdOutErrCapture, WitlessRunner
+        from datalad.cmd import (
+            CommandError,
+            StdOutErrCapture,
+            WitlessRunner,
+        )
+
         # from datalad.utils import on_windows
 
         runner = WitlessRunner()
@@ -1441,7 +1446,10 @@ class ORARemote(SpecialRemote):
                                                 self.buffer_size)
 
                 # We have a new instance. Kill the existing one and replace.
-                from atexit import register, unregister
+                from atexit import (
+                    register,
+                    unregister,
+                )
                 if hasattr(self.io, 'close'):
                     unregister(self.io.close)
                     self.io.close()

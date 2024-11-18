@@ -40,7 +40,6 @@ from datalad.support.param import Parameter
 from datalad.ui import ui
 from datalad.utils import todo_interface_for_extensions
 
-
 lgr = logging.getLogger('datalad.distributed.create_sibling_ghlike')
 
 

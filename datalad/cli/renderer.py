@@ -1,9 +1,8 @@
 """Render results in a terminal"""
 
-from collections import (
-    defaultdict,
-)
 import string
+from collections import defaultdict
+
 from datalad.ui import ui
 
 NA_STRING = 'N/A'  # we might want to make it configurable via config
