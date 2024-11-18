@@ -39,7 +39,7 @@
      from typing import (
 --- a/setup.py
 +++ b/setup.py
-@@ -36,7 +36,9 @@ requires = {
+@@ -35,7 +35,9 @@ requires = {
          'packaging',
          'patool>=1.7',
          'tqdm>=4.32.0',
