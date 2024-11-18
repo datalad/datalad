@@ -124,9 +124,10 @@ def setup_parser(
 
     # when completing and we have no incomplete option or parameter
     # we still need to offer all commands for completion
-    if (completing and status == 'allknown') or (
+    if ((completing and status == 'allknown') or (
             status == 'subcommand' and parseinfo not in
-            get_commands_from_groups(interface_groups)):
+            get_commands_from_groups(interface_groups))
+            or status == 'error'):
         # we know the command is not in the core package
         # still a chance it could be in an extension
         command_provider = 'extension'
