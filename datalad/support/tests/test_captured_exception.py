@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import patch
 
 from datalad import cfg
@@ -72,15 +73,16 @@ def test_CapturedException():
     assert_equal(full_display[0], "Traceback (most recent call last):")
     # points in f and f2 for first exception with two lines each
     # (where is the line and what reads the line):
-    assert_true(full_display[1].lstrip().startswith("File"))
-    assert_equal(full_display[2].strip(), "f2()")
-    assert_true(full_display[3].lstrip().startswith("File"))
-    assert_equal(full_display[4].strip(), "raise Exception(\"my bad again\")")
-    assert_equal(full_display[5].strip(), "Exception: my bad again")
-    assert_equal(full_display[7].strip(), "The above exception was the direct cause of the following exception:")
-    assert_equal(full_display[9], "Traceback (most recent call last):")
+    assert full_display[1].lstrip().startswith("File")
+    assert full_display[2].strip() == "f2()"
+    inc = int(sys.version_info >= (3, 13))
+    assert full_display[3 + inc].lstrip().startswith("File")
+    assert full_display[4 + inc].strip() == "raise Exception(\"my bad again\")"
+    assert full_display[5 + inc].strip() == "Exception: my bad again"
+    assert full_display[7 + inc].strip() == "The above exception was the direct cause of the following exception:"
+    assert full_display[9 + inc] == "Traceback (most recent call last):"
     # ...
-    assert_equal(full_display[-1].strip(), "RuntimeError: new message")
+    assert full_display[-1].strip() == "RuntimeError: new message"
 
     # CapturedException.__repr__:
     assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",

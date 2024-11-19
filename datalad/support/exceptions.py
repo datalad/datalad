@@ -11,6 +11,7 @@
 
 import logging
 import re
+import sys
 import traceback
 from os import linesep
 from pathlib import Path
@@ -112,15 +113,26 @@ class CapturedException(object):
         """
         return str(self.tb)
 
-    @property
-    def name(self):
-        """Returns the class name of the original exception
+    if sys.version_info < (3, 13):
+        @property
+        def name(self):
+            """Returns the class name of the original exception
 
-        Returns
-        -------
-        str
-        """
-        return self.tb.exc_type.__qualname__
+            Returns
+            -------
+            str
+            """
+            return self.tb.exc_type.__qualname__
+    else:
+        @property
+        def name(self):
+            """Returns the class name of the original exception
+
+            Returns
+            -------
+            str
+            """
+            return self.tb.exc_type_str
 
     def __str__(self):
         return self.format_short()
@@ -210,7 +222,8 @@ def format_exception_with_cause(e):
     messages.
     """
     s = str(e) or \
-        (e.exc_type.__name__ if isinstance(e, traceback.TracebackException)
+        ((e.exc_type.__name__ if sys.version_info < (3, 13) else e.exc_type_str)
+         if isinstance(e, traceback.TracebackException)
          else e.__class__.__name__)
     exc_cause = getattr(e, '__cause__', None)
     if exc_cause:
