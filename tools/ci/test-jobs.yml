@@ -38,6 +38,16 @@
     DATALAD_TESTS_GITCONFIG: "\n[annex]\n stalldetection = 1KB/120s\n"
     _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
+- python-version: '3.13'
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+
+- python-version: '3.13'
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: ""
+
 - python-version: '3.9'
   cron-only: true
   extra-envs:
