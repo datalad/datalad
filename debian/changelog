@@ -2,8 +2,13 @@ datalad (1.1.4-1) unstable; urgency=medium
 
   * New upstream release
     - addresses compatibility with patched in Debian Python 3.12
-	  (Closes: #1087782)
+      (Closes: #1087782)
   * debian/patches - refreshed
+  * debian/rules
+    - disable  "test_completion" test, issue filed upstreams
+      https://github.com/datalad/datalad/issues/7684
+      https://github.com/kislyuk/argcomplete/issues/514 .
+      Debian python 3.12 is to blame.
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 18 Nov 2024 17:30:21 -0500
 
