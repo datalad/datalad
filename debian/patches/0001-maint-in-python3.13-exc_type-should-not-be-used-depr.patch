@@ -1,0 +1,105 @@
+From 3ea0067586bdd61b05e5280e15d9a58f9c14348f Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Mon, 18 Nov 2024 23:10:37 -0500
+Subject: [PATCH] maint: in python3.13 exc_type should not be used -
+ deprecated. Also traceback got a new extra line
+
+---
+ datalad/support/exceptions.py                 | 31 +++++++++++++------
+ .../support/tests/test_captured_exception.py  | 18 ++++++-----
+ 2 files changed, 32 insertions(+), 17 deletions(-)
+
+diff --git a/datalad/support/exceptions.py b/datalad/support/exceptions.py
+index 48a86ce7c..159507275 100644
+--- a/datalad/support/exceptions.py
++++ b/datalad/support/exceptions.py
+@@ -11,6 +11,7 @@
+ 
+ import logging
+ import re
++import sys
+ import traceback
+ from os import linesep
+ from pathlib import Path
+@@ -112,15 +113,26 @@ class CapturedException(object):
+         """
+         return str(self.tb)
+ 
+-    @property
+-    def name(self):
+-        """Returns the class name of the original exception
++    if sys.version_info < (3, 13):
++        @property
++        def name(self):
++            """Returns the class name of the original exception
+ 
+-        Returns
+-        -------
+-        str
+-        """
+-        return self.tb.exc_type.__qualname__
++            Returns
++            -------
++            str
++            """
++            return self.tb.exc_type.__qualname__
++    else:
++        @property
++        def name(self):
++            """Returns the class name of the original exception
++
++            Returns
++            -------
++            str
++            """
++            return self.tb.exc_type_str
+ 
+     def __str__(self):
+         return self.format_short()
+@@ -210,7 +222,8 @@ def format_exception_with_cause(e):
+     messages.
+     """
+     s = str(e) or \
+-        (e.exc_type.__name__ if isinstance(e, traceback.TracebackException)
++        ((e.exc_type.__name__ if sys.version_info < (3, 13) else e.exc_type_str)
++         if isinstance(e, traceback.TracebackException)
+          else e.__class__.__name__)
+     exc_cause = getattr(e, '__cause__', None)
+     if exc_cause:
+diff --git a/datalad/support/tests/test_captured_exception.py b/datalad/support/tests/test_captured_exception.py
+index dd5a9db14..262119441 100644
+--- a/datalad/support/tests/test_captured_exception.py
++++ b/datalad/support/tests/test_captured_exception.py
+@@ -1,3 +1,4 @@
++import sys
+ from unittest.mock import patch
+ 
+ from datalad import cfg
+@@ -72,15 +73,16 @@ def test_CapturedException():
+     assert_equal(full_display[0], "Traceback (most recent call last):")
+     # points in f and f2 for first exception with two lines each
+     # (where is the line and what reads the line):
+-    assert_true(full_display[1].lstrip().startswith("File"))
+-    assert_equal(full_display[2].strip(), "f2()")
+-    assert_true(full_display[3].lstrip().startswith("File"))
+-    assert_equal(full_display[4].strip(), "raise Exception(\"my bad again\")")
+-    assert_equal(full_display[5].strip(), "Exception: my bad again")
+-    assert_equal(full_display[7].strip(), "The above exception was the direct cause of the following exception:")
+-    assert_equal(full_display[9], "Traceback (most recent call last):")
++    assert full_display[1].lstrip().startswith("File")
++    assert full_display[2].strip() == "f2()"
++    inc = int(sys.version_info >= (3, 13))
++    assert full_display[3 + inc].lstrip().startswith("File")
++    assert full_display[4 + inc].strip() == "raise Exception(\"my bad again\")"
++    assert full_display[5 + inc].strip() == "Exception: my bad again"
++    assert full_display[7 + inc].strip() == "The above exception was the direct cause of the following exception:"
++    assert full_display[9 + inc] == "Traceback (most recent call last):"
+     # ...
+-    assert_equal(full_display[-1].strip(), "RuntimeError: new message")
++    assert full_display[-1].strip() == "RuntimeError: new message"
+ 
+     # CapturedException.__repr__:
+     assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",
+-- 
+2.45.2
+
