@@ -24,6 +24,7 @@ from datalad.api import (
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     OBSCURE_FILENAME,
@@ -245,6 +246,8 @@ def test_subdataset_save(path=None):
     assert len(submodules) == 1
 
 
+@pytest.mark.xfail(external_versions['cmd:git'] > '2.45.2',
+                   reason="https://github.com/datalad/datalad/issues/7681")
 @with_tempfile(mkdir=True)
 def test_subsuperdataset_save(path=None):
     # Verify that when invoked without recursion save does not
