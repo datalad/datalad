@@ -29,6 +29,7 @@ env:
 
 jobs:
   filter:
+    if: ${{ github.repository == 'datalad/datalad' || github.event_name != schedule }}
     runs-on: ubuntu-latest
     outputs:
       jobs: ${{ steps.jobs.outputs.matrix }}
@@ -49,6 +50,7 @@ jobs:
           echo 'EOT' >> "$GITHUB_OUTPUT"
 
   test:
+    if: ${{ github.repository == 'datalad/datalad' || github.event_name != schedule }}
     runs-on: ubuntu-latest
     needs: filter
     strategy:
