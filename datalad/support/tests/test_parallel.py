@@ -33,11 +33,7 @@ from datalad.tests.utils_pytest import (
     assert_greater_equal,
     assert_raises,
     assert_repo_status,
-    known_failure_osx,
-    on_osx,
-    on_windows,
     rmtree,
-    skip_if,
     slow,
     with_tempfile,
 )
