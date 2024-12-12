@@ -20,12 +20,13 @@ import os
 import sys
 import tempfile
 
-from datalad.support.param import Parameter
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
-from datalad.utils import split_cmdline
-
 from datalad import ssh_manager
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.support.param import Parameter
+from datalad.utils import split_cmdline
 
 lgr = logging.getLogger('datalad.sshrun')
 

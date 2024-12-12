@@ -12,7 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
-from abc import ABCMeta, abstractmethod
+from abc import (
+    ABCMeta,
+    abstractmethod,
+)
 
 from ..utils import auto_repr
 

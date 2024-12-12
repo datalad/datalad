@@ -8,11 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import sys
-from io import StringIO, UnsupportedOperation
-
-import pytest
+from io import (
+    StringIO,
+    UnsupportedOperation,
+)
 from unittest.mock import patch
 
+import pytest
 
 from datalad.api import sshrun
 from datalad.cli.main import main

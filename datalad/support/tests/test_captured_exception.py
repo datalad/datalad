@@ -59,10 +59,10 @@ def test_CapturedException():
 
     estr_full = captured_exc.format_oneline_tb(10)
 
-    assert_re_in(r"new message \[test_captured_exception.py:test_CapturedException:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr_full)
-    assert_re_in(r"new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
-    assert_re_in(r"new message \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
-    assert_re_in(r"new message \[test_captured_exception.py:f2:[0-9]+\]", estr1)
+    assert_re_in(r"new message -caused by- my bad again \[test_captured_exception.py:test_CapturedException:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr_full)
+    assert_re_in(r"new message -caused by- my bad again \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr3)
+    assert_re_in(r"new message -caused by- my bad again \[test_captured_exception.py:f:[0-9]+,test_captured_exception.py:f2:[0-9]+\]", estr2)
+    assert_re_in(r"new message -caused by- my bad again \[test_captured_exception.py:f2:[0-9]+\]", estr1)
     # default: no limit:
     assert_equal(estr_, estr_full)
 

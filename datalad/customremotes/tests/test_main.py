@@ -10,11 +10,8 @@
 
 import logging
 import os
+
 import pytest
-
-from ..main import main
-
-from ..base import AnnexCustomRemote
 
 from datalad.tests.utils_pytest import (
     patch,
@@ -22,6 +19,9 @@ from datalad.tests.utils_pytest import (
     swallow_outputs,
 )
 from datalad.ui import ui
+
+from ..base import AnnexCustomRemote
+from ..main import main
 
 
 def test_erroring_out():

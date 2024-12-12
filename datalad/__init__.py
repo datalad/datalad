@@ -109,6 +109,7 @@ from .config import (
     ConfigManager,
     warn_on_undefined_git_identity,
 )
+
 cfg = ConfigManager()
 warn_on_undefined_git_identity(cfg)
 

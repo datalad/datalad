@@ -124,7 +124,7 @@ https://datasets.datalad.org provides a super-dataset consisting of datasets
 from various portals and sites.  Many of them were crawled, and periodically
 updated, using `datalad-crawler <https://github.com/datalad/datalad-crawler>`__
 extension.  The argument ``///`` can be used
-as a shortcut that points to the superdataset located at https://datasets.datalad.org/. 
+as a shortcut that points to the superdataset located at https://datasets.datalad.org/.
 Here are three common examples in command line notation:
 
 ``datalad install ///``
@@ -132,7 +132,7 @@ Here are three common examples in command line notation:
     `datasets.datalad.org/` subdirectory under the current directory
 ``datalad install -r ///openfmri``
     installs the openfmri superdataset into an `openfmri/` subdirectory.
-    Additionally, the ``-r`` flag recursively downloads all metadata of datasets 
+    Additionally, the ``-r`` flag recursively downloads all metadata of datasets
     available from http://openfmri.org as subdatasets into the `openfmri/` subdirectory
 ``datalad install -g -J3 -r ///labs/haxby``
     installs the superdataset of datasets released by the lab of Dr. James V. Haxby

@@ -27,9 +27,8 @@ requires = {
         'platformdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
-        'distro; python_version >= "3.8"',
+        'distro',
         'importlib-metadata >=3.6; python_version < "3.10"',
-        'importlib-resources >= 3.0; python_version < "3.9"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
@@ -62,7 +61,7 @@ requires = {
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.9.4',  # Introduced py 3.6 support
         'mypy',
-        'pytest',
+        'pytest>=7.0',  # https://github.com/datalad/datalad/issues/7555
         'pytest-cov',
         'pytest-fail-slow~=0.2',
         'types-python-dateutil',
@@ -88,7 +87,7 @@ requires.update({
     ],
     'devel-utils': [
         'asv',        # benchmarks
-        'coverage',
+        'coverage!=7.6.5',
         'gprof2dot',  # rendering cProfile output as a graph image
         'psutil',
         'pytest-xdist',  # parallelize pytest runs etc
@@ -169,7 +168,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'],
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     project_urls={'Homepage': 'https://www.datalad.org',
                   'Developer docs': 'https://docs.datalad.org/en/stable',
                   'User handbook': 'https://handbook.datalad.org',

@@ -66,7 +66,7 @@ environment:
     # is a need for debugging
 
     # Ubuntu core tests
-    - ID: Ubu20core
+    - ID: Ubu22core
       # ~30min
       DTS: >
           datalad.cli
@@ -75,11 +75,12 @@ environment:
           datalad.dataset
           datalad.distributed
           datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
+      PY: 3.9
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -92,20 +93,20 @@ environment:
       # This one is set in master but kept without change in maint for now
       # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
-    - ID: MacP38core
+    - ID: MacP39core
       # ~40min
       DTS: datalad.core datalad.dataset datalad.runner datalad.support
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.8
+      PY: 3.9
       # does not give a functional installation
       # INSTALL_GITANNEX: git-annex -m snapshot
       #INSTALL_GITANNEX: git-annex=8.20201129
-      INSTALL_GITANNEX: git-annex
+      INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+      CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
 
     # Additional test runs
-    - ID: Ubu20a1
+    - ID: Ubu22a1
       # ~30min
       DTS: >
           datalad.downloaders
@@ -115,11 +116,12 @@ environment:
           datalad.support
           datalad.tests
           datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
+      PY: 3.9
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
     - ID: WinP39a1
       # ~40min
       DTS: >
@@ -141,7 +143,7 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       PY: 39-x64
 
-    - ID: MacP38a1
+    - ID: MacP39a1
       # ~40min
       DTS: >
           datalad.cli
@@ -152,23 +154,23 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
+      PY: 3.9
+      INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
-    - ID: MacP38a2
+      CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
+    - ID: MacP39a2
       # ~40min
       DTS: >
           datalad.local
           datalad.distributed
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
+      PY: 3.9
+      INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-      CODECOV_BINARY: https://uploader.codecov.io/latest/macos/codecov
+      CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
 
     # Test alternative Python versions
-    - ID: Ubu20P311a
+    - ID: Ubu22P311a
       # ~35min
       PY: 3.11
       DTS: >
@@ -178,12 +180,12 @@ environment:
           datalad.dataset
           datalad.distributed
           datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
-    - ID: Ubu20P311b
+      INSTALL_GITANNEX: git-annex -m snapshot
+    - ID: Ubu22P311b
       # ~25min
       PY: 3.11
       DTS: >
@@ -194,11 +196,11 @@ environment:
           datalad.support
           datalad.tests
           datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url https://datasets.datalad.org/datalad/packages/neurodebian/git-annex_8.20210903-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m snapshot
 
 matrix:
   allow_failures:
@@ -227,7 +229,7 @@ cache:
   - /home/appveyor/.cache/pip -> .appveyor.yml
   # TODO: where is the cache on macOS?
   #- /Users/appveyor/.cache/pip -> .appveyor.yml
-  # TODO: Can we cache `brew`?
+  # TODO: Can we cache `rew`?
   #- /usr/local/Cellar
   #- /usr/local/bin
 
@@ -335,6 +337,7 @@ before_test:
   - ssh -v localhost exit
   - ssh datalad-test exit
   - ssh datalad-test2 exit
+  - python -m pip freeze
   - datalad wtf
 
 
@@ -350,6 +353,7 @@ test_script:
 
 after_test:
   - sh: python -m coverage combine -a /tmp/.coverage-entrypoints-*;
+  - python -m coverage debug sys
   - python -m coverage xml
   - cmd: curl -fsSL -o codecov.exe "https://uploader.codecov.io/latest/windows/codecov.exe"
   - cmd: .\codecov.exe -f "coverage.xml"

@@ -15,12 +15,15 @@ from datalad.coreapi import *
 def _command_summary():
     # Import here to avoid polluting the datalad.api namespace.
     from collections import defaultdict
-    from datalad.interface.base import alter_interface_docs_for_api
-    from datalad.interface.base import get_api_name
-    from datalad.interface.base import get_cmd_doc
-    from datalad.interface.base import get_cmd_summaries
-    from datalad.interface.base import get_interface_groups
-    from datalad.interface.base import load_interface
+
+    from datalad.interface.base import (
+        alter_interface_docs_for_api,
+        get_api_name,
+        get_cmd_doc,
+        get_cmd_summaries,
+        get_interface_groups,
+        load_interface,
+    )
 
     groups = get_interface_groups()
     grp_short_descriptions = defaultdict(list)
@@ -43,13 +46,13 @@ if not datalad.in_librarymode():
 def _generate_extension_api():
     """Auto detect all available extensions and generate an API from them
     """
-    from datalad.support.entrypoints import iter_entrypoints
+    import logging
+
     from datalad.interface.base import (
         get_api_name,
         load_interface,
     )
-
-    import logging
+    from datalad.support.entrypoints import iter_entrypoints
     lgr = logging.getLogger('datalad.api')
 
     for ename, _, (grp_descr, interfaces) in iter_entrypoints(
