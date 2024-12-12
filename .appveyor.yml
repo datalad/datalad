@@ -80,7 +80,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -98,7 +98,7 @@ environment:
       DTS: datalad.core datalad.dataset datalad.runner datalad.support
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.9
-      # does not give a functional installation
+      # does not give a functional installation - needs env/PATH adjustment
       # INSTALL_GITANNEX: git-annex -m snapshot
       #INSTALL_GITANNEX: git-annex=8.20201129
       INSTALL_GITANNEX: git-annex -m datalad/packages
@@ -121,7 +121,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     - ID: WinP39a1
       # ~40min
       DTS: >
@@ -184,7 +184,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     - ID: Ubu22P311b
       # ~25min
       PY: 3.11
@@ -200,7 +200,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
 
 matrix:
   allow_failures:
