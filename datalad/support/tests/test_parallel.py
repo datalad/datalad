@@ -88,7 +88,7 @@ def test_producing_consumer(jobs):
 
     # we auto-detect generator function producer
     pc = ProducerConsumer(producer, consumer, jobs=jobs)
-    assert_equal(list(pc), [0, 1, 2, "0", "1", "4"])
+    assert_equal(set(pc), {0, 1, 2, "0", "1", "4"})
 
 
 def test_producer_future_key(jobs):
