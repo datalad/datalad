@@ -315,7 +315,9 @@ install:
   - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && datalad-installer --sudo ok ${INSTALL_GITANNEX}"
   # TODO remove when datalad-installer can handle this
   - cmd: tools\ci\appveyor_install_git-annex.bat
-  - sh: "[ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacos-monterey\" ] && export PATH=/Applications/git-annex.app/Contents/MacOS:$PATH || :"
+  # "package" installation does not place git-annex into the PATH, and for
+  # compatibility etc, we just symlink also git itself
+  - sh: "[ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacos-monterey\" ] && ln -sf /Applications/git-annex.app/Contents/MacOS/git* /usr/local/bin/ || true"
 
 
 #before_build:
