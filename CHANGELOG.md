@@ -1,4 +1,15 @@
 
+<a id='changelog-1.1.5'></a>
+# 1.1.5 (2024-12-15)
+
+## 🧪 Tests
+
+- test: xfail test_subsuperdataset_save on newer gits.  [PR #7687](https://github.com/datalad/datalad/pull/7687) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- test: refactor test_parallel.py to be abit more pytest'y.  [PR #7690](https://github.com/datalad/datalad/pull/7690) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: use datalad/packages method of installing git-annex.  [PR #7692](https://github.com/datalad/datalad/pull/7692) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.4'></a>
 # 1.1.4 (2024-11-18)
 

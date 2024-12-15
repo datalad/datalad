@@ -80,7 +80,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -98,7 +98,7 @@ environment:
       DTS: datalad.core datalad.dataset datalad.runner datalad.support
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
       PY: 3.9
-      # does not give a functional installation
+      # does not give a functional installation - needs env/PATH adjustment
       # INSTALL_GITANNEX: git-annex -m snapshot
       #INSTALL_GITANNEX: git-annex=8.20201129
       INSTALL_GITANNEX: git-annex -m datalad/packages
@@ -121,7 +121,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     - ID: WinP39a1
       # ~40min
       DTS: >
@@ -184,7 +184,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     - ID: Ubu22P311b
       # ~25min
       PY: 3.11
@@ -200,7 +200,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
 
 matrix:
   allow_failures:
@@ -308,13 +308,16 @@ install:
       )
   - sh: python -m pip install datalad-installer${DATALAD_INSTALLER_VERSION:-}
   # Missing system software
-  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
+  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacos-monterey\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
   - cmd: IF DEFINED INSTALL_GITANNEX datalad-installer --sudo ok %INSTALL_GITANNEX%
   - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && datalad-installer --sudo ok ${INSTALL_GITANNEX}"
   # TODO remove when datalad-installer can handle this
   - cmd: tools\ci\appveyor_install_git-annex.bat
+  # "package" installation does not place git-annex into the PATH, and for
+  # compatibility etc, we just symlink also git itself
+  - sh: "[ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacos-monterey\" ] && ln -sf /Applications/git-annex.app/Contents/MacOS/git* /usr/local/bin/ || true"
 
 
 #before_build:

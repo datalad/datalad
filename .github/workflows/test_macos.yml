@@ -58,7 +58,7 @@ jobs:
         python -m pytest -c ../tox.ini -s -v --cov=datalad --cov-report=xml --pyargs datalad.core datalad.support
 
     - name: Upload coverage report to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         file: __testhome__/coverage.xml
         token: ${{ secrets.CODECOV_TOKEN }}
