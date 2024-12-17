@@ -645,8 +645,7 @@ def _create_sibling_ria(
         if trust_level:
             trust_cmd = [trust_level]
             if trust_level == 'trust':
-                # Following git-annex 8.20201129-73-g6a0030a11, using `git
-                # annex trust` requires --force.
+                # using `git annex trust` requires --force.
                 trust_cmd.append('--force')
             ds.repo.call_annex(trust_cmd + [srname])
         # get uuid for use in bare repo's config

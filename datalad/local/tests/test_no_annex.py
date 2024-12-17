@@ -48,20 +48,7 @@ def test_no_annex(path=None):
     ds.save([opj('code', 'notinannex'), 'README'])
 
     repo = ds.repo
-    try:
-        assert_repo_status(ds.path)
-    except AssertionError:
-        # If on an adjusted branch and notinannex's mtime is as recent or newer
-        # than .git/index's, the clean filter runs on it when save() is called.
-        # This leads to a racy failure until after git-annex's 424bef6b6
-        # (smudge: check for known annexed inodes before checking
-        # annex.largefiles, 2021-05-03).
-        #
-        # https://git-annex.branchable.com/forum/one-off_unlocked_annex_files_that_go_against_large/
-        if repo.is_managed_branch() and repo.git_annex_version <= "8.20210428":
-            assert_repo_status(ds.path, modified=[inannex])
-            raise SkipTest("Known bug fixed in git-annex")
-        raise
+    assert_repo_status(ds.path)
 
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed

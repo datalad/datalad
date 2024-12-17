@@ -48,12 +48,7 @@ def check_basic_scenario(url, d=None):
     filenames = glob.glob(op.join(d, '3versions[-_]allversioned.txt'))
     eq_(len(filenames), 1)
     filename = op.basename(filenames[0])
-    # Date after the fix in 8.20200501-53-gcabbc91b1 - must have '-'
-    if external_versions['cmd:annex'] >= '8.20200512':
-        assert_in('-', filename)
-    else:
-        # either one is ok
-        assert '_' in filename or '-' in filename
+    assert_in('-', filename)
 
     whereis1 = annex.whereis(filename, output='full')
     eq_(len(whereis1), 2)  # here and datalad

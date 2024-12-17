@@ -1249,8 +1249,7 @@ class Addurls(Interface):
             content. In this case, the file is not downloaded; instead the key
             is used to create the file without content. The value should be
             structured as "[et:]<input backend>[-s<bytes>]--<hash>". The
-            optional "et:" prefix, which requires git-annex 8.20201116 or
-            later, signals to toggle extension state of the input backend
+            optional "et:" prefix signals to toggle extension state of the input backend
             (i.e., MD5 vs MD5E). As an example, "et:MD5-s{size}--{md5sum}"
             would use the 'md5sum' and 'size' columns to construct the key,
             migrating the key from MD5 to MD5E, with an extension based on the
@@ -1364,20 +1363,6 @@ class Addurls(Interface):
         if repo and not isinstance(repo, AnnexRepo):
             yield dict(st_dict, status="error", message="not an annex repo")
             return
-
-        if key:
-            old_examinekey = external_versions["cmd:annex"] < "8.20201116"
-            if old_examinekey:
-                old_msg = None
-                if key.startswith("et:"):
-                    old_msg = ("et: prefix of `key` option requires "
-                               "git-annex 8.20201116 or later")
-                elif repo.is_managed_branch():
-                    old_msg = ("Using `key` option on adjusted branch "
-                               "requires git-annex 8.20201116 or later")
-                if old_msg:
-                    yield dict(st_dict, status="error", message=old_msg)
-                    return
 
         if isinstance(url_file, str):
             if url_file != "-":
