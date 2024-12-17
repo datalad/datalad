@@ -884,8 +884,6 @@ class RegisterUrl(object):
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
         self.use_pointer = self.repo.is_managed_branch()
-        self._avoid_fromkey = self.use_pointer and \
-            not self.repo._check_version_kludges("fromkey-supports-unlocked")
 
     def examinekey(self, parsed_key, filename, migrate=False):
         opts = []
@@ -923,30 +921,13 @@ class RegisterUrl(object):
         filename = row["ds_filename"]
         try:
             parsed_key = row["key"]
-            migrate = "target_backend" in parsed_key
-            avoid_fromkey = self._avoid_fromkey
-            ek_info = None
-            if avoid_fromkey or migrate:
-                ek_info = self.examinekey(parsed_key, filename,
-                                          migrate=migrate)
-                if not ek_info:
-                    yield dict(self._err_res,
-                               path=row["filename_abs"],
-                               message=("Failed to get information for %s",
-                                        parsed_key))
-                    return
-                key = ek_info["key"]
-            else:
-                key = parsed_key["key"]
+            key = parsed_key["key"]
 
             self.registerurl(key, row["url"])
-            if avoid_fromkey:
-                res = self._write_pointer(row, ek_info)
-            else:
-                res = annexjson2result(self.fromkey(key, filename),
-                                       self.ds, type="file", logger=lgr)
-                if not res.get("message"):
-                    res["message"] = "registered URL"
+            res = annexjson2result(self.fromkey(key, filename),
+                                   self.ds, type="file", logger=lgr)
+            if not res.get("message"):
+                res["message"] = "registered URL"
         except CommandError as exc:
             ce = CapturedException(exc)
             yield dict(self._err_res,

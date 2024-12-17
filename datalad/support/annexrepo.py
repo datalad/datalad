@@ -550,12 +550,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             cls._check_git_annex_version()
 
         ver = cls.git_annex_version
-        kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
-        # applies to get, drop, move, copy, whereis
-        kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
-        # applies to find, findref to list all known.
-        # was added in 10.20221212-17-g0b2dd374d on 20221220.
-        kludges["find-supports-anything"] = ver >= "10.20221213"
         # applies to log, unannex and may be other commands,
         # was added 10.20230407 release, respecting core.quotepath
         kludges["quotepath-respected"] = \
@@ -2482,10 +2476,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ensure_list(options, copy=True)
         if batch:
-            # TODO: --batch-keys was added to 8.20210903
             if key:
-                if not self._check_version_kludges("grp1-supports-batch-keys"):
-                    raise ValueError("batch=True for `key=True` requires git-annex >= 8.20210903")
                 bkw = {'batch_opt': '--batch-keys'}
             else:
                 bkw = {}
@@ -3441,12 +3432,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex.
-        if self._check_version_kludges("find-supports-anything"):
-            cmd = ['--anything']
-        else:
-            # --include=* was recommended by Joey in
-            # https://git-annex.branchable.com/todo/add_--all___40__or_alike__41___to_find_and_findref/
-            cmd = ['--include=*']
+        cmd = ['--anything']
         files = None
         if ref:
             cmd = ['findref'] + cmd
