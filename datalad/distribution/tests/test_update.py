@@ -347,11 +347,6 @@ def test_newthings_coming_down(originpath=None, destpath=None):
 def test_update_volatile_subds(originpath=None, otherpath=None, destpath=None):
     origin = Dataset(originpath).create()
     repo = origin.repo
-    if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
-        # Fails before git-annex's fd161da2c (adjustTree: Consider submodule
-        # deletions, 2021-01-06).
-        raise SkipTest(
-            "On adjusted branch, test requires fix in more recent git-annex")
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -726,12 +721,6 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_detached(path=None, *, on_adjusted):
-    if on_adjusted and DEFAULT_REMOTE != "origin" and \
-       external_versions['cmd:annex'] <= "8.20210330":
-        raise SkipTest(
-            "'git annex init' with adjusted branch currently fails "
-            "due to hard-coded 'origin'")
-
     # Note: For the adjusted case, this is not much more than a smoke test that
     # on an adjusted branch we fail sensibly. The resulting state is not easy
     # to reason about nor desirable.

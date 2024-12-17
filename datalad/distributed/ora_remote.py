@@ -857,8 +857,7 @@ def handle_errors(func):
             try:
                 # We're done using io, so let it perform any needed cleanup. At
                 # the moment, this is only relevant for SSHRemoteIO, in which
-                # case it cleans up the SSH socket and prevents a hang with
-                # git-annex 8.20201103 and later.
+                # case it cleans up the SSH socket and prevents git-annex hang.
                 from atexit import unregister
                 if self._io:
                     self._io.close()
