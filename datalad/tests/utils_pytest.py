@@ -35,10 +35,7 @@ from datalad.cmd import (
 )
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.dochelpers import borrowkwargs
-from datalad.support.external_versions import (
-    external_versions,
-    get_rsync_version,
-)
+from datalad.support.external_versions import external_versions
 from datalad.support.keyring_ import MemoryKeyring
 from datalad.support.network import RI
 from datalad.support.vcr_ import *
@@ -1117,25 +1114,6 @@ def with_sameas_remote(func, autoenabled=False):
     @with_tempfile(mkdir=True)
     @with_tempfile(mkdir=True)
     def  _wrap_with_sameas_remote(*args, **kwargs):
-        # With git-annex's 8.20200522-77-g1f2e2d15e, transferring from an rsync
-        # special remote hangs on Xenial. This is likely due to an interaction
-        # with an older rsync or openssh version. Use openssh as a rough
-        # indicator. See
-        # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
-        if external_versions['cmd:system-ssh'] < '7.4' and \
-           '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
-            pytest.skip("Test known to hang")
-
-        # A fix in rsync 3.2.4 broke compatibility with older annex versions.
-        # To make things a bit more complicated, ubuntu pulled that fix into
-        # their rsync package for 3.1.3-8.
-        # Issue: gh-7320
-        rsync_ver = get_rsync_version()
-        rsync_fixed = rsync_ver >= "3.1.3-8ubuntu" or rsync_ver >= "3.2.4"
-        if rsync_fixed and external_versions['cmd:annex'] < "10.20220504":
-            pytest.skip(f"rsync {rsync_ver} and git-annex "
-                        f"{external_versions['cmd:annex']} incompatible")
-
         sr_path, repo_path = args[-2:]
         fn_args = args[:-2]
         repo = AnnexRepo(repo_path)
