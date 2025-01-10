@@ -1614,3 +1614,16 @@ def test_gitrepo_push_default_first_kludge(path=None):
     eq_(len(res_twoshot), 3)
     # The configuration variable is removed afterward.
     assert_false(repo_b.config.get(cfg_var))
+
+
+@with_tempfile(mkdir=True)
+def test_gitrepo_newline(temp_dir=None):
+    path = Path(temp_dir)
+    repo = GitRepo(str(path))
+    repo.save()
+    file_path = path / "l1\nl2"
+    file_path.write_text("aaa\n")
+    repo.add([str(file_path)])
+    repo.save()
+    files = repo.get_files()
+    assert files == ["l1\nl2"]
