@@ -9,7 +9,9 @@ warehouses, and deployment logistics into a federated 'data distribution'"
 01GQ1411`_). Additional support is provided by the German federal state of
 Saxony-Anhalt and the European Regional Development
 Fund (ERDF), Project: `Center for Behavioral Brain Sciences`_, Imaging Platform.
-DataLad also received support by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grants `SFB 1451 (431549029, INF project)`_ and `CRC 379 (512007073, Q02)`_.
+DataLad also received support by the Deutsche Forschungsgemeinschaft (DFG,
+German Research Foundation) under grants `SFB 1451 (431549029, INF project)`_
+and `CRC 379 (512007073, Q02)`_.
 
 DataLad is built atop the git-annex_ software that is being developed and
 maintained by `Joey Hess`_.
