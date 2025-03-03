@@ -4,4 +4,3 @@ deb_loosenup_setup_requires
 deb_no_utf8
 python3.patch
 deb-looseversion.patch
-0001-maint-in-python3.13-exc_type-should-not-be-used-depr.patch

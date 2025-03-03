@@ -1,3 +1,12 @@
+datalad (1.1.5-1) unstable; urgency=medium
+
+  * Recent upstream release
+    - removing upstreamed
+      0001-maint-in-python3.13-exc_type-should-not-be-used-depr.patch
+      patch
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 03 Mar 2025 17:50:30 -0500
+
 datalad (1.1.4-1) unstable; urgency=medium
 
   * New upstream release
