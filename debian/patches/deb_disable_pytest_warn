@@ -19,4 +19,4 @@ Last-Update: 2022-09-23
 -    ignore:distutils Version classes are deprecated:DeprecationWarning
      # workaround for https://github.com/datalad/datalad/issues/6307
      ignore:The distutils package is deprecated
- markers =
+     # sent fix upstream: https://github.com/HTTPretty/HTTPretty/pull/9
