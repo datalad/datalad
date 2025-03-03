@@ -4,6 +4,10 @@ datalad (1.1.5-1) unstable; urgency=medium
     - removing upstreamed
       0001-maint-in-python3.13-exc_type-should-not-be-used-depr.patch
       patch
+    - announced test_subsuperdataset_save xfailing so should stop
+      causing FTBFS due to a failing test. See more at
+      https://github.com/datalad/datalad/issues/7681
+      (Closes: #1092390)
   * debian/control
     - remove recommending python3-requests-ftp which is not in Debian
       (Closes: #1099382)
