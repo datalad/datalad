@@ -9,7 +9,7 @@ export PYBUILD_NAME = datalad
 # test_gracefull_death - too flaky https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1029450
 # test_completion -- patched in Debian python 3.12 and argcomplete https://github.com/kislyuk/argcomplete/issues/514
 # test_ProducerConsumer  -- needs fixing for py 3.13 https://github.com/datalad/datalad/pull/7686
-export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture and not test_gracefull_death and not test_completion and not test_ProducerConsumer' -c $(CURDIR)/tox.ini
+export PYBUILD_TEST_ARGS = -s -v -k 'not test_test and not test_subprocess_return_code_capture and not test_gracefull_death and not test_completion and not test_ProducerConsumer and not test_producer_future_key' -c $(CURDIR)/tox.ini
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=
 export https_proxy=

@@ -1,3 +1,11 @@
+datalad (1.1.5-2) unstable; urgency=medium
+
+  * Skip test_producer_future_key flaky on Debian test
+    (ref: https://github.com/datalad/datalad/issues/7709)
+    (Closes: #1104394)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 05 May 2025 08:21:34 -0400
+
 datalad (1.1.5-1) unstable; urgency=medium
 
   * Recent upstream release
