@@ -53,7 +53,7 @@ Providers are associating credentials with a context for using them and are defi
 A single provider is represented by :class:`Provider` object and the list of available providers is represented by the :class:`Providers` class.
 A provider is identified by a label and stored in a dedicated config file per provider named `LABEL.cfg`.
 Such a file can reside in a dataset (under `.datalad/providers/`), at the user level (under `{user_config_dir}/providers`), at the system level (under `{site_config_dir}/providers`) or come packaged with the datalad distribution (in directory `configs` next to `providers.py`).
-Such a provider specifies a regular expression to match URLs against and assigns authenticator abd credentials to be used for a match.
+Such a provider specifies a regular expression to match URLs against and assigns authenticator and credentials to be used for a match.
 Credentials are referenced by their label, which in turn is the name of another section in such a file specifying the type of the credential.
 References to credential and authenticator types are strings that are mapped to classes by the following dict definitions:
 
