@@ -59,7 +59,7 @@ class DownloadURL(Interface):
     """Download content
 
     It allows for a uniform download interface to various supported URL
-    schemes (see command help for details), re-using or asking for
+    schemes (see command help for details), reusing or asking for
     authentication details maintained by datalad.
     """
 
