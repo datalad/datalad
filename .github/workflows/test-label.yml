@@ -59,7 +59,7 @@ jobs:
           # Fetch the "maint" branch
           git fetch origin maint:maint
           git fetch origin master:master
- 
+
           # Check if "maint" is already merged into "master"
           if git merge-base --is-ancestor maint master; then
             echo "All commits from 'maint' are already merged into 'master'."
