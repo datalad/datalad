@@ -244,7 +244,8 @@
         "blog": "https://www.mmmccormick.com",
         "orcid": "0000-0001-9475-3756",
         "affiliation": "Kitware Inc",
-        "email": "matt@mmmccormick.com"
+        "email": "matt@mmmccormick.com",
+        "bio": "Empowering innovators to extract insights from scientific images."
     },
     "tstoeter": {
         "name": "tstoeter",
