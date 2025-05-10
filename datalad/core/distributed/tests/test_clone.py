@@ -1753,3 +1753,11 @@ def test_url_mapping_specs():
             ):
         with patch.dict(cfg._merged_store, m):
             eq_(_map_urls(cfg, [i]), [o])
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_clone_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    ds = clone(src_path, dest, cfg_proc=['yoda'])
+    assert (ds.pathobj / 'README.md').exists()
