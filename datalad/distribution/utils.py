@@ -35,7 +35,8 @@ def rewrite_match_scheme(target_url, src_url):
 
     if hasattr(target_url, "protocol") and \
         hasattr(src_url, "protocol") and \
-        target_url.protocol != src_url.protocol:
+        target_url.protocol != src_url.protocol and \
+        target_url.protocol != 'http': # avoid decreasing security
         return src_url.urls[target_url.protocol]
 
 
