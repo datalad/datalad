@@ -113,7 +113,9 @@ class ForEachDataset(Interface):
     - "{pwd}" will be replaced with the full path of the current working directory.
     - "{ds}" and "{refds}" will provide instances of the dataset currently
       operated on and the reference "context" dataset which was provided via ``dataset``
-      argument.
+      argument. Therefore, {ds.path} returns the path to the submodule and {ds.id}
+      produces the submodule's datalad ID. The placeholder "refds" is used in the same
+      way. See the API documentation of "Dataset" for more options.
     - "{tmpdir}" will be replaced with the full path of a temporary directory.
     """
     _examples_ = [
