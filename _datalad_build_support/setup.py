@@ -24,11 +24,11 @@ from genericpath import exists
 from packaging.version import Version
 from setuptools import (
     Command,
-    DistutilsOptionError,
     find_namespace_packages,
     findall,
     setup,
 )
+from setuptools.errors import OptionError
 
 from . import formatters as fmt
 
@@ -75,11 +75,11 @@ class BuildManPage(Command):
 
     def finalize_options(self):
         if self.manpath is None:
-            raise DistutilsOptionError('\'manpath\' option is required')
+            raise OptionError('\'manpath\' option is required')
         if self.rstpath is None:
-            raise DistutilsOptionError('\'rstpath\' option is required')
+            raise OptionError('\'rstpath\' option is required')
         if self.parser is None:
-            raise DistutilsOptionError('\'parser\' option is required')
+            raise OptionError('\'parser\' option is required')
         self.manpath = _path_rel2file(self.manpath)
         self.rstpath = _path_rel2file(self.rstpath)
         mod_name, func_name = self.parser.split(':')
@@ -183,9 +183,9 @@ class BuildRSTExamplesFromScripts(Command):
 
     def finalize_options(self):
         if self.expath is None:
-            raise DistutilsOptionError('\'expath\' option is required')
+            raise OptionError('\'expath\' option is required')
         if self.rstpath is None:
-            raise DistutilsOptionError('\'rstpath\' option is required')
+            raise OptionError('\'rstpath\' option is required')
         self.expath = _path_rel2file(self.expath)
         self.rstpath = _path_rel2file(self.rstpath)
         self.announce('Converting example scripts')
@@ -217,7 +217,7 @@ class BuildConfigInfo(Command):
 
     def finalize_options(self):
         if self.rstpath is None:
-            raise DistutilsOptionError('\'rstpath\' option is required')
+            raise OptionError('\'rstpath\' option is required')
         self.rstpath = _path_rel2file(self.rstpath)
         self.announce('Generating configuration documentation')
 
