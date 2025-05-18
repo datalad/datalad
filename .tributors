@@ -48,11 +48,14 @@
     "loj": {
         "name": "Laura Waite",
         "blog": "https://github.com/loj",
-        "email": "laura@waite.eu"
+        "email": "laura@waite.eu",
+        "orcid": "0000-0003-2213-7465"
     },
     "feilong": {
         "name": "Feilong Ma",
-        "blog": "https://github.com/feilong"
+        "blog": "https://github.com/feilong",
+        "orcid": "0000-0002-6838-3971",
+        "affiliation": "Dartmouth College, Hanover, NH, United States"
     },
     "jhpoelen": {
         "name": "jhpoelen",
@@ -60,11 +63,15 @@
     },
     "andycon": {
         "name": "Andrew Connolly",
-        "blog": "https://github.com/andycon"
+        "blog": "https://github.com/andycon",
+        "orcid": "0000-0003-4366-8230",
+        "affiliation": "Dartmouth College Geisel School of Medicine"
     },
     "nicholsn": {
         "name": "Nolan Nichols",
-        "blog": "https://github.com/nicholsn"
+        "blog": "https://github.com/nicholsn",
+        "orcid": "0000-0003-1099-3328",
+        "affiliation": "Altos Labs"
     },
     "adelavega": {
         "name": "Alejandro de la Vega",
@@ -109,7 +116,9 @@
     "emdupre": {
         "name": "Elizabeth DuPre",
         "blog": "https://github.com/emdupre",
-        "bio": "Neuroscience graduate student at McGill University"
+        "bio": "Neuroscience graduate student at McGill University",
+        "orcid": "0000-0003-1358-196X",
+        "affiliation": "Stanford University"
     },
     "aqw": {
         "name": "Alex Waite",
@@ -182,7 +191,8 @@
     "ypid": {
         "name": "Robin Schneider",
         "bio": "Working on Free Software as in Freedom.                   EDE1 371D 1B87 D28D A5E8  0515 86FD 980B BF1A 40F8",
-        "blog": "https://me.ypid.de/"
+        "blog": "https://me.ypid.de/",
+        "orcid": "0000-0002-2922-488X"
     },
     "kimsin98": {
         "name": "Sin Kim",
@@ -287,7 +297,8 @@
     },
     "dguibert": {
         "name": "David Guibert",
-        "blog": "https://github.com/dguibert"
+        "blog": "https://github.com/dguibert",
+        "orcid": "0000-0001-5533-8867"
     },
     "alliesw": {
         "name": "Alex Shields-Weber",

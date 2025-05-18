@@ -1,4 +1,15 @@
 
+<a id='changelog-1.1.6'></a>
+# 1.1.6 (2025-05-18)
+
+## 📝 Documentation
+
+- enh: update acknowledgments with additional grants.  [PR #7716](https://github.com/datalad/datalad/pull/7716) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- chore: for github tests CI - py 3.13 matrix should also (as for 3.12) use most recent available git-annex.  [PR #7710](https://github.com/datalad/datalad/pull/7710) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.5'></a>
 # 1.1.5 (2024-12-15)
 
