@@ -41,6 +41,7 @@ German Funding
 
   - SFB 1451 (`431549029`_)
   - `Helmholtz Research Center Jülich, FDM challenge 2022`_
+  - CRC 379 (`512007073`_, Q02)
 
 Canadian Funding
 ================
@@ -67,6 +68,7 @@ Software and Infrastructure Acknowledgments
 .. _VirtualBrainCloud (H2020-EU.3.1.5.3, grant no. 826421): https://cordis.europa.eu/project/id/826421
 .. _Center for Behavioral Brain Sciences: http://cbbs.eu/en/
 .. _431549029: https://gepris.dfg.de/gepris/projekt/431549029
+.. _512007073: https://gepris.dfg.de/gepris/projekt/546006540
 .. _Helmholtz Research Center Jülich, FDM challenge 2022: https://www.fz-juelich.de/de
 .. _Healthy Brains, Healthy Lives: https://www.mcgill.ca/hbhl/
 .. _git-annex: https://git-annex.branchable.com/

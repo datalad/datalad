@@ -35,5 +35,37 @@ jobs:
             || contains(github.event.pull_request.labels.*.name, 'semver-performance')
             || contains(github.event.pull_request.labels.*.name, 'semver-tests')
           }}
+  check-sync:
+    name: Check that "master" contains everything from "maint" if PR against "master" is marked for a release
+    runs-on: ubuntu-latest
+    if: github.repository == 'datalad/datalad'
+    steps:
+      - name: 'Checkout Code'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches to perform the comparison
+
+      - name: 'Check for "release" Label'
+        id: check_label
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const prLabels = context.payload.pull_request.labels.map(label => label.name);
+            core.setOutput('has_release_label', prLabels.includes('release'));
+
+      - name: 'Check Branch Sync'
+        if: steps.check_label.outputs.has_release_label == 'true' && github.event.pull_request.base.ref == 'master'
+        run: |
+          # Fetch the "maint" branch
+          git fetch origin maint:maint
+          git fetch origin master:master
+ 
+          # Check if "maint" is already merged into "master"
+          if git merge-base --is-ancestor maint master; then
+            echo "All commits from 'maint' are already merged into 'master'."
+          else
+            echo "The 'master' branch is missing commits from 'maint'. Please merge the branches before proceeding."
+            exit 1
+          fi
 
 # vim:set sts=2:

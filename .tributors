@@ -106,7 +106,8 @@
         "name": "Debanjum Singh Solanky",
         "blog": "https://github.com/debanjum",
         "orcid": "0000-0002-0774-6564",
-        "affiliation": "Dartmouth College, Hanover, NH, United States"
+        "affiliation": "Dartmouth College, Hanover, NH, United States",
+        "bio": "Building open, personal AI"
     },
     "nellh": {
         "name": "nellh",
@@ -252,7 +253,9 @@
         "name": "Matt McCormick",
         "blog": "https://www.mmmccormick.com",
         "orcid": "0000-0001-9475-3756",
-        "affiliation": "Kitware Inc"
+        "affiliation": "Kitware Inc",
+        "email": "matt@mmmccormick.com",
+        "bio": "Empowering innovators to extract insights from scientific images."
     },
     "tstoeter": {
         "name": "tstoeter",
