@@ -1,4 +1,15 @@
 
+<a id='changelog-1.2.0'></a>
+# 1.2.0 (2025-05-21)
+
+## 🚀 Enhancements and New Features
+
+- Remove import of GIT_SSH_COMMAND within .consts (import directly from datalad.runner.gitrunner).  [PR #7656](https://github.com/datalad/datalad/pull/7656) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Make github workflow which would ensure that a "release" PR against `master` would have everything from `maint` merged.  [PR #7590](https://github.com/datalad/datalad/pull/7590) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.6'></a>
 # 1.1.6 (2025-05-18)
 
