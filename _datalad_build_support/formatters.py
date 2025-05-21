@@ -36,8 +36,9 @@ class ManPageFormatter(argparse.HelpFormatter):
 
         self._prog = prog
         self._section = 1
-        self._today = datetime.datetime.utcfromtimestamp(
-            cfg.obtain('datalad.source.epoch')
+        self._today = datetime.datetime.fromtimestamp(
+            cfg.obtain('datalad.source.epoch'),
+            datetime.timezone.utc
         ).strftime('%Y\\-%m\\-%d')
         self._ext_sections = ext_sections
         self._version = version
