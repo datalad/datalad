@@ -195,6 +195,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
         for k, v in sm.items()
         if k.startswith('gitmodule_')
     }
+    sm_candidate_props['basename'] = op.basename(sm_candidate_props["path"])
 
     for remote in unique(candidate_remotes):
         remote_url = ds_repo.get_remote_url(remote, push=False)
