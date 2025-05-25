@@ -907,9 +907,6 @@ class TestAddurls(object):
     def check_addurls_from_key(self, key_arg, expected_backend, fake_dates,
                                path):
         ds = Dataset(path).create(force=True, fake_dates=fake_dates)
-        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
-            raise SkipTest("Adjusted branch functionality requires "
-                           "more recent `git annex examinekey`")
         ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
                    key=key_arg, result_renderer='disabled')
         repo = ds.repo
@@ -937,9 +934,6 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self=None, path=None):
         ds = Dataset(path).create(force=True)
-        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
-            raise SkipTest("Adjusted branch functionality requires "
-                           "more recent `git annex examinekey`")
         data = deepcopy(self.data)
         for row in data:
             if row["name"] == "b":
