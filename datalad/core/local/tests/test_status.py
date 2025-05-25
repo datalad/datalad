@@ -305,10 +305,8 @@ def test_status_symlinked_dir_within_repo(path=None):
     ds.save()
     bar_f = ds.pathobj / "bar" / "f"
 
-    def call():
-        return ds.status(path=[bar_f], annex="availability",
-                         on_failure="ignore", result_renderer='disabled')
-
+    res = ds.status(path=[bar_f], annex="availability",
+        on_failure="ignore", result_renderer='disabled')
     assert_result_count(res, 1, status='error', state='unknown',
                         path=str(bar_f))
 
