@@ -134,10 +134,12 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180913 -- annex fixes all known to us issues for v6
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
     # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
+    # 8.20210428 -- added annex.private and remote.name.annex-private configs
+    # 10.20230126 -- version in Debian bookworm (current stable)
     #
     # When bumping this, check whether datalad.repo.version needs to be
     # adjusted.
-    GIT_ANNEX_MIN_VERSION = '8.20200309'
+    GIT_ANNEX_MIN_VERSION = '10.20230126'
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None
@@ -548,12 +550,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             cls._check_git_annex_version()
 
         ver = cls.git_annex_version
-        kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
-        # applies to get, drop, move, copy, whereis
-        kludges["grp1-supports-batch-keys"] = ver >= "8.20210903"
-        # applies to find, findref to list all known.
-        # was added in 10.20221212-17-g0b2dd374d on 20221220.
-        kludges["find-supports-anything"] = ver >= "10.20221213"
         # applies to log, unannex and may be other commands,
         # was added 10.20230407 release, respecting core.quotepath
         kludges["quotepath-respected"] = \
@@ -2480,10 +2476,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ensure_list(options, copy=True)
         if batch:
-            # TODO: --batch-keys was added to 8.20210903
             if key:
-                if not self._check_version_kludges("grp1-supports-batch-keys"):
-                    raise ValueError("batch=True for `key=True` requires git-annex >= 8.20210903")
                 bkw = {'batch_opt': '--batch-keys'}
             else:
                 bkw = {}
@@ -3439,12 +3432,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex.
-        if self._check_version_kludges("find-supports-anything"):
-            cmd = ['--anything']
-        else:
-            # --include=* was recommended by Joey in
-            # https://git-annex.branchable.com/todo/add_--all___40__or_alike__41___to_find_and_findref/
-            cmd = ['--include=*']
+        cmd = ['--anything']
         files = None
         if ref:
             cmd = ['findref'] + cmd
