@@ -198,6 +198,32 @@ def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
 
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_get_flexible_source_candidates_for_submodule_basename(t=None, t2=None, t3=None):
+    f = _get_flexible_source_candidates_for_submodule
+    # for now without mocking -- let's just really build a dataset
+    ds = create(t)
+    deep_subds_path = 'deep/deeper/sub'
+    sub_deep = ds.create(deep_subds_path)
+    deep_ds_subpath = str(ds.pathobj / deep_subds_path)
+    clone = install(
+        t2, source=t,
+        result_xfm='datasets', return_type='item-or-list')
+
+    # template using property `path_basename`
+    clone.update(merge=True)
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'somewhe.re/{path_basename}'}):
+        eq_(f(clone, clone.subdatasets(deep_subds_path, return_type='item-or-list')),
+            [
+                dict(cost=600, name=DEFAULT_REMOTE, url=deep_ds_subpath),
+                dict(cost=700, name='bang', url='somewhe.re/sub',
+                     from_config=True),
+        ])
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(content="doesntmatter")
