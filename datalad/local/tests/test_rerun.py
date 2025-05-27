@@ -149,7 +149,12 @@ def test_rerun(path=None, nodspath=None):
 
     # Nothing changed.
     eq_('xxxxxxxxxx\n', open(probe_path).read())
-    assert_result_count(report, 1, rerun_action="skip-or-pick")
+    # With fix for issue #4700, we now include all commits, not just those after
+    # the first run commit. We expect 3 skip-or-pick actions:
+    # 1. Initial dataset creation commit
+    # 2. Subdataset creation commit
+    # 3. The non-run "nonrun-file" commit
+    assert_result_count(report, 3, rerun_action="skip-or-pick")
     report[-1]["commit"] == ds.repo.get_hexsha()
 
     # If a file is dropped, we remove it instead of unlocking it.
@@ -954,3 +959,38 @@ def test_rerun_commit_message_check():
     eq_(subject, "fine")
     assert_dict_equal(info,
                       {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
+
+
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
+    """Test for issue #4700: regular commits before first RUNCMD are not cherry-picked"""
+    ds = Dataset(path).create()
+    initial_commit = ds.repo.get_hexsha()
+
+    # Create regular commits before any run commands
+    create_tree(ds.path, {"file1.txt": "content1", "file2.txt": "content2"})
+    ds.save(["file1.txt", "file2.txt"], message="Add files before run")
+
+    # Create a run command
+    ds.run('echo "run output" > run_output.txt')
+
+    # Create another regular commit after the run
+    create_tree(ds.path, {"file3.txt": "content3"})
+    ds.save("file3.txt", message="Add file after run")
+
+    head_commit = ds.repo.get_hexsha()
+
+    # Go back to initial commit and rerun everything
+    ds.repo.checkout(initial_commit, options=["--detach"])
+
+    # Rerun from the saved HEAD (issue #4700: without fix, regular commits before
+    # first RUNCMD would be dropped by dropwhile())
+    ds.rerun(revision=head_commit, since=initial_commit, branch="rerun-branch")
+
+    # Verify all files exist (with fix, regular commits are no longer dropped)
+    ds.repo.checkout("rerun-branch")
+    ok_exists(op.join(path, "file1.txt"))
+    ok_exists(op.join(path, "file2.txt"))
+    ok_exists(op.join(path, "run_output.txt"))
+    ok_exists(op.join(path, "file3.txt"))

@@ -329,17 +329,25 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         return
 
     ds_repo = dset.repo
-    # Drop any leading commits that don't have a run command. These would be
-    # skipped anyways.
-    results = list(dropwhile(lambda r: "run_info" not in r, results))
-    if not results:
+    # Don't drop leading commits that don't have a run command
+    # They should be cherry-picked if needed (fixes issue #4700)
+    results = list(results)
+    # Check if there are any run commits at all
+    has_run_commits = any("run_info" in r for r in results)
+    if not has_run_commits:
         yield get_status_dict(
             "run", status="impossible", ds=dset,
             message=("No run commits found in range %s", revrange))
         return
 
     if onto is not None and onto.strip() == "":
-        onto = results[0]["commit"] + "^"
+        # Find the first commit with run info to determine the onto point
+        first_run_commit = next((r for r in results if "run_info" in r), None)
+        if first_run_commit:
+            onto = first_run_commit["commit"] + "^"
+        else:
+            # This shouldn't happen since we already checked has_run_commits
+            onto = results[0]["commit"] + "^"
 
     if onto and not ds_repo.commit_exists(onto):
         yield get_status_dict(
