@@ -910,8 +910,12 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
     # given the clone source is a local dataset, we can have a
     # cheap look at it, and configure its own `remote` as a remote
     # (if there is any), and benefit from additional annex availability
-    yield from configure_origins(
-        cfgds,
-        Dataset(probeds.pathobj / origin_url),
-        label=label + 1,
-        remote=remote)
+    # But first check if we would recurse into the same dataset
+    # to prevent infinite recursion (see gh-7721)
+    next_dataset_path = probeds.pathobj / origin_url
+    if next_dataset_path.resolve() != probeds.pathobj.resolve():
+        yield from configure_origins(
+            cfgds,
+            Dataset(next_dataset_path),
+            label=label + 1,
+            remote=remote)
