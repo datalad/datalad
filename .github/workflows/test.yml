@@ -29,7 +29,7 @@ env:
 
 jobs:
   filter:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       jobs: ${{ steps.jobs.outputs.matrix }}
     steps:
@@ -49,7 +49,7 @@ jobs:
           echo 'EOT' >> "$GITHUB_OUTPUT"
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: filter
     strategy:
       fail-fast: false
