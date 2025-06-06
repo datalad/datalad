@@ -433,7 +433,7 @@ _definitions = {
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
-                     'stdout while running datalad commands/debugging'}),
+                     'stderr while running datalad commands/debugging'}),
     },
     'datalad.log.result-level': {
         'ui': ('question', {

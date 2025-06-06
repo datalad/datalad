@@ -514,7 +514,7 @@ Refer datalad/config.py for information on how to add these environment variable
   Used to point to an alternative location for `///` dataset. If running
   tests preferred to be set to https://datasets-tests.datalad.org
 - *DATALAD_LOG_LEVEL*:
-  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
+  Used for control the verbosity of logs printed to stderr while running datalad commands/debugging
 - *DATALAD_LOG_NAME*:
   Whether to include logger name (e.g. `datalad.support.sshconnector`) in the log
 - *DATALAD_LOG_OUTPUTS*:
