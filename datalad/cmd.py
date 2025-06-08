@@ -146,14 +146,13 @@ def _readline_rstripped(stdout):
     return stdout.readline().rstrip()
 
 
-class BatchedCommandProtocol(GeneratorMixIn, StdOutErrCapture):
+class BatchedCommandProtocol(StdOutErrCapture, GeneratorMixIn):
     def __init__(self,
                  batched_command: "BatchedCommand",
                  done_future: Any = None,
                  encoding: Optional[str] = None,
                  output_proc: Optional[Callable] = None,
                  ):
-        GeneratorMixIn.__init__(self)
         StdOutErrCapture.__init__(self, done_future, encoding)
         self.batched_command = batched_command
         self.output_proc = output_proc
