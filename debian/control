@@ -89,7 +89,6 @@ Depends: git-annex (>= 8.20200309~) | git-annex-standalone (>= 8.20200309~),
          ${python3:Depends}
 Recommends: python3-html5lib,
             python3-httpretty,
-            python3-lzma,
             python3-pytest (>= 7.0),
             python3-pyperclip,
             python3-vcr,
