@@ -1,3 +1,11 @@
+datalad (1.1.5-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Remove recommenadation of python3-lzma, no longer a separate
+    package in Debian, part of Python 3.3 and later. (Closes: #1099382).
+
+ -- Sven Hoexter <hoexter@debian.org>  Sun, 15 Jun 2025 11:01:44 +0200
+
 datalad (1.1.5-2) unstable; urgency=medium
 
   * Skip test_producer_future_key flaky on Debian test
