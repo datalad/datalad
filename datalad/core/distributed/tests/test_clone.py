@@ -1757,6 +1757,14 @@ def test_url_mapping_specs():
 
 
 @with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_clone_withcfg(src_path=None, dest=None):
+    src = create(src_path)
+    ds = clone(src_path, dest, cfg_proc=['yoda'])
+    assert (ds.pathobj / 'README.md').exists()
+
+
+@with_tempfile(mkdir=True)
 def test_clone_self_referential_remote(path=None):
     """Test that cloning doesn't recurse infinitely when a remote points to itself
 

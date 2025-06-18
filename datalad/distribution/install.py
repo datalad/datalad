@@ -177,6 +177,15 @@ class Install(Interface):
             args=("-g", "--get-data",),
             doc="""if given, obtain all data content too""",
             action="store_true"),
+        cfg_proc=Parameter(
+            args=("-c", "--cfg-proc"),
+            metavar="PROC",
+            action='append',
+            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
+            on the installed dataset. Use
+            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
+            to get a list of available procedures, such as cfg_text2git.
+            """),
         description=location_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -198,6 +207,7 @@ class Install(Interface):
             recursion_limit=None,
             reckless=None,
             jobs="auto",
+            cfg_proc=None,
             branch=None):
 
         # normalize path argument to be equal when called from cmdline and
@@ -222,6 +232,7 @@ class Install(Interface):
             # annex_opts=annex_opts,
             reckless=reckless,
             jobs=jobs,
+            cfg_proc=cfg_proc,
         )
 
         # did we explicitly get a dataset to install into?
@@ -234,6 +245,9 @@ class Install(Interface):
             common_kwargs['dataset'] = dataset
         # pre-compute for results below
         refds_path = ds if ds is None else ds.path
+
+        # assure cfg_proc is a list (relevant if used via Python API)
+        cfg_proc = ensure_list(cfg_proc)
 
         # switch into the two scenarios without --source:
         # 1. list of URLs
@@ -389,7 +403,8 @@ class Install(Interface):
             return_type='generator',
             result_renderer='disabled',
             result_filter=None,
-            on_failure='ignore')
+            on_failure='ignore',
+            cfg_proc=cfg_proc,)
         # helper
         as_ds = YieldDatasets()
         destination_dataset = None
@@ -422,6 +437,7 @@ class Install(Interface):
                     **common_kwargs):
                 r['refds'] = refds_path
                 yield r
+
         # at this point no further post-processing should be necessary,
         # `clone` and `get` must have done that (incl. parent handling)
         # if not, bugs should be fixed in those commands
