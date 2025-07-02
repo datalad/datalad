@@ -378,7 +378,10 @@ class Clone(Interface):
                 # Note, that we didn't allow deviating from git's default
                 # behavior WRT a submodule's name vs its path when we made this
                 # a new subdataset.
-                subds_name = path.relative_to(ds.pathobj)
+                # all pathobjs involved are platform paths, but the
+                # default submodule name equals the relative path
+                # in posix conventions, hence .as_posix()
+                subds_name = path.relative_to(ds.pathobj).as_posix()
                 ds.repo.call_git(
                     ['config',
                      '--file',
