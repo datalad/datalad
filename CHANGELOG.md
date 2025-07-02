@@ -1,4 +1,13 @@
 
+<a id='changelog-1.2.1'></a>
+# 1.2.1 (2025-07-02)
+
+## 🐛 Bug Fixes
+
+- Resolve datetime library warnings.  [PR #7714](https://github.com/datalad/datalad/pull/7714) (by [@emmanuel-ferdman](https://github.com/emmanuel-ferdman))
+
+- BF: Prevent infinite recursion in clone when a remote points to itself.  Fixes [#7721](https://github.com/datalad/datalad/issues/7721) via [PR #7731](https://github.com/datalad/datalad/pull/7731) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.2.0'></a>
 # 1.2.0 (2025-05-21)
 
