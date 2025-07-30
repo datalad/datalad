@@ -130,8 +130,11 @@ requires = [
 ]
 
 [tool.setuptools]
-packages = ["datalad"]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["datalad*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "datalad.__version__" }
