@@ -53,7 +53,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 license = "MIT"
+license-files = ["COPYING"]
 readme = "README.md"
+
 [project.urls]
 Homepage = "https://www.datalad.org"
 "Developer docs" = "https://docs.datalad.org/en/stable"
