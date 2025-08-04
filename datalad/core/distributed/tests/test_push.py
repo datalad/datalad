@@ -256,6 +256,245 @@ def test_push(annex):
     check_push(annex)
 
 
+@pytest.mark.parametrize("annex", [False, True])
+def test_push_all(annex, tmp_path):
+    """Check push with `data="all"`"""
+    src_path = tmp_path / "src"
+    src_path.mkdir()
+    src = Dataset(src_path).create(annex=annex)
+    src_repo = src.repo
+
+    (src.pathobj / "test_mod_file").write_text("Some additional stuff.")
+    src.save(to_git=True, message="Modified.")
+    (src.pathobj / "test_mod_annex_file").write_text("Heavy stuff.")
+    (src.pathobj / "test_mod_annex_file_del").write_text("Heavy stuff to be deleted.")
+    src.save(to_git=not annex, message="Modified again.")
+    if annex:
+        keys = []
+        # not sure whether get_content_annexinfo is guaranteed to preserve the order
+        # of `paths` therefore call for single files in a loop
+        for file in "test_mod_annex_file", "test_mod_annex_file_del":
+            i = src_repo.get_file_annexinfo(file)
+            keys.append(i["key"])
+        file_key, file_del_key = keys
+    else:
+        file_key = None
+        file_del_key = None
+    (src.pathobj / "test_mod_annex_file_del").unlink()
+    src.save(message="Removed one file.")
+    assert_repo_status(src_repo, annex=annex)
+
+    # push without `data` argument
+    dst_path = tmp_path / "dst"
+    dst_path.mkdir()
+    target = mk_push_target(src, "target", str(dst_path), annex=annex)
+    res = src.push(to="target")
+    eq_(
+        list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(src_repo.get_branch_commits_(DEFAULT_BRANCH)),
+    )
+    assert_in_results(
+        res,
+        action="publish",
+        status="ok",
+        target="target",
+        refspec=DEFAULT_REFSPEC,
+    )
+    if annex:
+        assert_in_results(
+            res,
+            action="copy",
+            status="ok",
+            annexkey=file_key,
+        )
+        # the following is not in HEAD and thus not copied
+        assert_not_in_results(
+            res,
+            action="copy",
+            status="ok",
+            annexkey=file_del_key,
+        )
+
+    # push with `data="all"
+    dst_path_all = tmp_path / "dst_all"
+    dst_path_all.mkdir()
+    target_all = mk_push_target(src, "target_all", str(dst_path_all), annex=annex)
+    res_all = src.push(to="target_all", data="all")
+    eq_(
+        list(target_all.get_branch_commits_(DEFAULT_BRANCH)),
+        list(src_repo.get_branch_commits_(DEFAULT_BRANCH)),
+    )
+    assert_in_results(
+        res_all,
+        action="publish",
+        status="ok",
+        target="target_all",
+        refspec=DEFAULT_REFSPEC,
+    )
+    if annex:
+        for i in file_key, file_del_key:
+            assert_in_results(
+                res_all,
+                action="copy",
+                status="ok",
+                # path points to the repo
+                path=src.path,
+                annexkey=i,
+            )
+        f, fd = target_all.call_git_items_(
+            ["annex", "contentlocation"], files=[file_key, file_del_key]
+        )
+        assert (dst_path_all / f).read_text() == "Heavy stuff."
+        assert (dst_path_all / fd).read_text() == "Heavy stuff to be deleted."
+    else:
+        assert (
+            target_all.call_git(["show", "HEAD:test_mod_annex_file"], read_only=True)
+            == "Heavy stuff."
+        )
+    assert (
+        target_all.call_git(["show", "HEAD:test_mod_file"], read_only=True)
+        == "Some additional stuff."
+    )
+    for tgt in target, target_all:
+        head_tree = filter(
+            lambda x: not x.startswith("."),
+            tgt.call_git_items_(["ls-tree", "--name-only", "-r", "HEAD"]),
+        )
+        assert {"test_mod_file", "test_mod_annex_file"} == set(head_tree)
+
+    # modify and push again
+    (src.pathobj / "test_mod_annex_file2").write_text("More heavy stuff.")
+    src.save(to_git=not annex, message="Modification 3.")
+    res2 = src.push(to="target", data="all")
+    res2_copy = [r for r in res2 if r["action"] == "copy"]
+    if annex:
+        file2_key = src_repo.get_file_annexinfo("test_mod_annex_file2")["key"]
+        # now the previously omitted deleted file and the new file should be pushed
+        assert len(res2_copy) == 2
+        for k in file_del_key, file2_key:
+            assert_in_results(
+                res2_copy,
+                action="copy",
+                status="ok",
+                # path is path to the repo
+                path=src.path,
+                annexkey=k,
+            )
+    res_all2 = src.push(to="target_all", data="all")
+    res_all2_copy = [r for r in res_all2 if r["action"] == "copy"]
+    if annex:
+        file2_key = src_repo.get_file_annexinfo("test_mod_annex_file2")["key"]
+        # here only the new file should be pushed
+        assert len(res_all2_copy) == 1
+        assert_in_results(
+            res2_copy,
+            action="copy",
+            status="ok",
+            # path points to the repo
+            path=src.path,
+            annexkey=file2_key,
+        )
+    for tgt in target, target_all:
+        head_tree2 = filter(
+            lambda x: not x.startswith("."),
+            tgt.call_git_items_(["ls-tree", "--name-only", "-r", "HEAD"]),
+        )
+        assert {"test_mod_file", "test_mod_annex_file", "test_mod_annex_file2"} == set(
+            head_tree2
+        )
+
+
+@slow  # 70 seconds on laptop
+def test_push_all_recursive(tmp_path):
+    """Check recursive push with `data="all"`"""
+    src_path = tmp_path / "src"
+    src_path.mkdir()
+    src = {"": Dataset(src_path).create()}
+    for i in range(1, 4):
+        src[f"sub{i}"] = src[""].create(f"sub{i}")
+        for j in range(1, 3):
+            src[f"sub{i}/sub{i}{j}"] = src[f"sub{i}"].create(f"sub{i}{j}")
+
+    for ds in src.values():
+        (ds.pathobj / "file").write_text("Stuff.")
+        (ds.pathobj / "file_del").write_text("Stuff to be deleted.")
+    src[""].save(to_git=False, message="Create files", recursive=True)
+    file_keys = {k: ds.repo.get_file_annexinfo("file")["key"] for k, ds in src.items()}
+    file_del_keys = {
+        k: ds.repo.get_file_annexinfo("file_del")["key"] for k, ds in src.items()
+    }
+    for ds in src.values():
+        (ds.pathobj / "file_del").unlink()
+    src[""].save(message="Remove files", recursive=True)
+
+    dst_path = tmp_path / "dst"
+    dst_path.mkdir()
+    targets = {}
+    for p, ds in src.items():
+        targets[p] = mk_push_target(ds, "target", str(dst_path / p), annex=True)
+
+    with pytest.raises(ValueError):
+        # path `sub1` is in a subdataset, therefore this cannot work without recursion
+        src[""].push("sub1", to="target", data="all", recursive=False)
+    res1 = src[""].push(
+        "sub1", to="target", data="all", recursive=True, recursion_limit=1
+    )
+    res1_copy = [r for r in res1 if r["action"] == "copy"]
+    assert len(res1_copy) == 4
+    for d in "", "sub1":
+        ds = src[d]
+        for k in file_keys[d], file_del_keys[d]:
+            assert_in_results(
+                res1_copy,
+                action="copy",
+                status="ok",
+                # path points to the repo
+                path=ds.path,
+                annexkey=k,
+            )
+    res2 = src[""].push("sub2", to="target", data="all", recursive=True)
+    res2_copy = [r for r in res2 if r["action"] == "copy"]
+    # root dataset has already been pushed, leaving sub2, sub21, sub22
+    assert len(res2_copy) == 6
+    for d in "sub2", "sub2/sub21", "sub2/sub22":
+        ds = src[d]
+        for k in file_keys[d], file_del_keys[d]:
+            assert_in_results(
+                res2_copy,
+                action="copy",
+                status="ok",
+                # path points to the repo
+                path=ds.path,
+                annexkey=k,
+            )
+    # This should push the rest (i.e., subsets of sub1 and all of sub3)
+    res3 = src[""].push(to="target", data="all", recursive=True)
+    res3_copy = [r for r in res3 if r["action"] == "copy"]
+    assert len(res3_copy) == 10
+    for d in "sub1/sub11", "sub1/sub12", "sub3", "sub3/sub31", "sub3/sub32":
+        ds = src[d]
+        for k in file_keys[d], file_del_keys[d]:
+            assert_in_results(
+                res3_copy,
+                action="copy",
+                status="ok",
+                # path points to the repo
+                path=ds.path,
+                annexkey=k,
+            )
+    # check that file_del are really not present, otherwise there would be no
+    # difference to `data="anything"`
+    for tgt in targets.values():
+        tr = set(
+            filter(
+                lambda x: not x.startswith("."),
+                tgt.call_git_items_(["ls-tree", "--name-only", "-r", "HEAD"]),
+            )
+        )
+        assert "file" in tr
+        assert "file_del" not in tr
+
+
 def check_datasets_order(res, order='bottom-up'):
     """Check that all type=dataset records not violating the expected order
 
