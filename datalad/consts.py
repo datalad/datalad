@@ -48,9 +48,6 @@ WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
 
-# in order to avoid breakage, import runner-related const
-from datalad.runner.gitrunner import GIT_SSH_COMMAND
-
 # magic sha is from `git hash-object -t tree /dev/null`, i.e. from nothing
 PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 

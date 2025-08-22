@@ -12,6 +12,7 @@
 import logging
 import os.path as op
 import stat
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -1753,3 +1754,37 @@ def test_url_mapping_specs():
             ):
         with patch.dict(cfg._merged_store, m):
             eq_(_map_urls(cfg, [i]), [o])
+
+
+@with_tempfile(mkdir=True)
+def test_clone_self_referential_remote(path=None):
+    """Test that cloning doesn't recurse infinitely when a remote points to itself
+
+    Regression test for https://github.com/datalad/datalad/issues/7721
+    """
+    path = Path(path)
+
+    # Create datasets a and b
+    ds_a = Dataset(path / 'a').create()
+    ds_b = Dataset(path / 'b').create()
+
+    # Set b's origin remote to point to itself - use absolute path as in the issue
+    ds_b.repo.call_git(['remote', 'add', 'origin', str(ds_b.pathobj.resolve())])
+
+    # This should not cause infinite recursion
+    # Before the fix, this would raise RecursionError
+
+    # Set a lower recursion limit to catch the issue faster
+    old_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(100)
+    try:
+        # Use the same syntax as in the issue report
+        with chpwd(str(ds_a.path)):
+            ds_cloned = clone(source='../b', path='b')
+        # If we get here, the fix is working
+        ok_(ds_cloned.is_installed())
+    except RecursionError:
+        # This is the bug we're trying to fix
+        raise AssertionError("Clone encountered infinite recursion with self-referential remote")
+    finally:
+        sys.setrecursionlimit(old_limit)
