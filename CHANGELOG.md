@@ -1,4 +1,35 @@
 
+<a id='changelog-1.2.1'></a>
+# 1.2.1 (2025-07-02)
+
+## 🐛 Bug Fixes
+
+- Resolve datetime library warnings.  [PR #7714](https://github.com/datalad/datalad/pull/7714) (by [@emmanuel-ferdman](https://github.com/emmanuel-ferdman))
+
+- BF: Prevent infinite recursion in clone when a remote points to itself.  Fixes [#7721](https://github.com/datalad/datalad/issues/7721) via [PR #7731](https://github.com/datalad/datalad/pull/7731) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.2.0'></a>
+# 1.2.0 (2025-05-21)
+
+## 🚀 Enhancements and New Features
+
+- Remove import of GIT_SSH_COMMAND within .consts (import directly from datalad.runner.gitrunner).  [PR #7656](https://github.com/datalad/datalad/pull/7656) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Make github workflow which would ensure that a "release" PR against `master` would have everything from `maint` merged.  [PR #7590](https://github.com/datalad/datalad/pull/7590) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.1.6'></a>
+# 1.1.6 (2025-05-18)
+
+## 📝 Documentation
+
+- enh: update acknowledgments with additional grants.  [PR #7716](https://github.com/datalad/datalad/pull/7716) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- chore: for github tests CI - py 3.13 matrix should also (as for 3.12) use most recent available git-annex.  [PR #7710](https://github.com/datalad/datalad/pull/7710) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.5'></a>
 # 1.1.5 (2024-12-15)
 
