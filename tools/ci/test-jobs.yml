@@ -180,6 +180,8 @@
   cron-only: true
   allow-failure: true
   extra-envs:
+    # give much more time to complete on NFS
+    PYTEST_FAIL_SLOW: "1200"
     _DL_TMPDIR: "/tmp/nfsmount"
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker

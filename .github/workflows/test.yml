@@ -19,6 +19,7 @@ env:
    # Note, that there's "turtle" as well, which is always excluded from running.
    PYTEST_SELECTION: "integration or usecase or slow or network"
    PYTEST_SELECTION_OP: "not "  # so it would be "not (integration or usecase)"
+   PYTEST_FAIL_SLOW: 60  # seconds allowed for tests to take (if not @slow or @turtle)
    DATALAD_TESTS_SSH: "1"
    DATALAD_LOG_ENV: GIT_SSH_COMMAND
    # How/which git-annex we install.  conda's build would be the fastest,
@@ -186,7 +187,7 @@ jobs:
           # @turtle annotation
           if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"
           then
-            PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow 60 )
+            PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow "$PYTEST_FAIL_SLOW" )
             export DATALAD_TESTS_SETUP_TESTREPOS=1
           fi
 
