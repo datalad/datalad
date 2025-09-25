@@ -70,6 +70,7 @@ from datalad.utils import (
 from ..dataset import Dataset
 
 
+@slow   # occasionally takes up to 120sec
 @with_tempfile
 @with_tempfile
 @with_tempfile

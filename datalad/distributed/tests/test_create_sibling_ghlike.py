@@ -26,10 +26,12 @@ from datalad.tests.utils_pytest import (
     assert_result_count,
     assert_status,
     eq_,
+    slow,
     with_tempfile,
 )
 
 
+@slow  # could take 60-120 seconds, we should not time out
 @with_tempfile
 def test_invalid_call(path=None):
     # no dataset
