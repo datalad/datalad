@@ -4,7 +4,7 @@ authors = [
 ]
 
 name = "datalad"
-description = "data distribution geared toward scientific datasets"
+description = "Distributed system for joint management of code, data, and their relationship"
 requires-python = ">= 3.9"
 dependencies = [
     # core
