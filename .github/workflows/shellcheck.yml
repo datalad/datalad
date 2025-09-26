@@ -12,7 +12,7 @@ jobs:
       shell: bash
       run: |
         sudo apt-get update -qq
-        sudo apt-get install shellcheck
+        sudo apt-get install -y shellcheck
     - uses: actions/checkout@v4
     - name: Run shellcheck
       run: |
