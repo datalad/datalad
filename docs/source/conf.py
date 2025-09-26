@@ -19,6 +19,8 @@ from glob import glob
 from os import pardir
 from os.path import exists
 from os.path import join as opj
+from pathlib import Path
+import subprocess
 
 
 def setup(sphinx):
@@ -40,15 +42,14 @@ def setup(sphinx):
 #sys.path.insert(0, os.path.abspath('.'))
 
 # generate missing pieces
-for setup_py_path in (opj(pardir, 'setup.py'),  # travis
-                      opj(pardir, pardir, 'setup.py')):  # RTD
-    if exists(setup_py_path):
-        try:
-            for cmd in 'manpage', 'cfginfo':
-                os.system('{} build_{}'.format(setup_py_path, cmd))
-        except:
-            # shut up and do your best
-            pass
+for setup_py_path in (Path(pardir),  # travis
+                      Path(pardir, pardir)):  # RTD
+    if (setup_py_path / 'setup.py').exists():
+        for cmd in 'manpage', 'cfginfo':
+            # ignore errors and do your best
+            subprocess.run(
+                ['python', 'setup.py', f'build_{cmd}'], cwd=setup_py_path, check=False
+            )
 
 # if docs are build for a development version of datalad installed with
 # `pip install -e`, add its location to the path

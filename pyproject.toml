@@ -1,6 +1,143 @@
+[project]
+authors = [
+    { name = "The DataLad Team and Contributors", email = "team@datalad.org" },
+]
+
+name = "datalad"
+description = "Distributed system for joint management of code, data, and their relationship"
+requires-python = ">= 3.9"
+dependencies = [
+    # core
+    "platformdirs",
+    "chardet>=3.0.4",                                    # rarely used but small/omnipresent
+    "colorama; platform_system=='Windows'",
+    "distro",
+    "importlib-metadata >=3.6; python_version < '3.10'",
+    "iso8601",
+    "humanize",
+    "fasteners>=0.14",
+    "packaging",
+    "patool>=1.7",
+    "tqdm>=4.32.0",
+    "typing_extensions>=4.0.0; python_version < '3.11'",
+    "annexremote",
+    "looseversion",
+    # downloaders
+    "boto3",
+    "keyring>=20.0,!=23.9.0",
+    "keyrings.alt",
+    "msgpack",
+    "requests>=1.2",
+    # publish
+    "python-gitlab", # required for create-sibling-gitlab
+]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Unix Shell",
+    "Topic :: Communications :: File Sharing",
+    "Topic :: Education",
+    "Topic :: Internet",
+    "Topic :: Other/Nonlisted Topic",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Utilities",
+]
+license = "MIT"
+license-files = ["COPYING"]
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://www.datalad.org"
+"Developer docs" = "https://docs.datalad.org/en/stable"
+Documentation = "https://handbook.datalad.org"
+Repository = "https://github.com/datalad/datalad"
+Issues = "https://github.com/datalad/datalad/issues"
+RRID = "https://identifiers.org/RRID:SCR_003931"
+
+[project.optional-dependencies]
+downloaders-extra = ["requests_ftp"]
+misc = [
+    "argcomplete>=1.12.3", # optional CLI completion
+    "pyperclip",           # clipboard manipulations
+    "python-dateutil",     # add support for more date formats to check_dates
+]
+tests = [
+    "BeautifulSoup4",        # VERY weak requirement, still used in one of the tests
+    "httpretty>=0.9.4",      # Introduced py 3.6 support
+    "mypy",
+    "pytest>=7.0",           # https://github.com/datalad/datalad/issues/7555
+    "pytest-cov",
+    "pytest-fail-slow~=0.2",
+    "types-python-dateutil",
+    "types-requests",
+    "vcrpy",
+]
+duecredit = [
+    "duecredit", # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
+]
+full = ["datalad[downloaders-extra,misc,tests,duecredit]"]
+devel-docs = [
+    # used for converting README.md -> .rst for long_description
+    "pypandoc",
+    # Documentation
+    "sphinx>=4.3.0",
+    "sphinx-autodoc-typehints",
+    "sphinx-rtd-theme>=0.5.1",
+]
+devel-utils = [
+    "asv",             # benchmarks
+    "coverage!=7.6.5",
+    "gprof2dot",       # rendering cProfile output as a graph image
+    "psutil",
+    "pytest-xdist",    # parallelize pytest runs etc
+    # disable for now, as it pulls in ipython 6, which is PY3 only
+    #"line-profiler",
+    # necessary for accessing SecretStorage keyring (system wide Gnome
+    # keyring)  but not installable on travis, IIRC since it needs connectivity
+    # to the dbus whenever installed or smth like that, thus disabled here
+    # but you might need it
+    # "dbus-python",
+    "scriv", # changelog
+]
+devel = ["datalad[full,devel-docs,devel-utils]"]
+
+[project.scripts]
+datalad = "datalad.cli.main:main"
+git-annex-remote-datalad-archives = "datalad.customremotes.archives:main"
+git-annex-remote-datalad = "datalad.customremotes.datalad:main"
+git-annex-remote-ria = "datalad.customremotes.ria_remote:main"
+git-annex-remote-ora = "datalad.distributed.ora_remote:main"
+git-credential-datalad = "datalad.local.gitcredential_datalad:git_credential_datalad"
+
 [build-system]
 # wheel to get more lightweight (not EASY-INSTALL) entry-points
-requires = ["packaging", "setuptools>=59.0.0", "wheel"]
+requires = [
+    "packaging",
+    "setuptools>=59.0.0",
+    "wheel",
+    "fasteners",
+    "looseversion",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["datalad*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "datalad.__version__" }
 
 [tool.isort]
 force_grid_wrap = 2
