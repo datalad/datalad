@@ -80,7 +80,7 @@ jobs:
       - name: Install dependencies
         run: |
           # The ultimate one-liner setup for NeuroDebian repository
-          bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+          bash <(wget -q -O- https://neuro.debian.net/_files/neurodebian-ci-setup.sh)
           sudo apt-get update -qq
           sudo apt-get install -y eatmydata  # to speedup some installations
           tools/ci/prep-travis-forssh.sh
