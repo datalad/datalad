@@ -9,7 +9,7 @@ from datalad.tests.utils_pytest import assert_equal
 from ..gitrunner import GitWitlessRunner
 
 
-class TestGeneratorProtocol(GeneratorMixIn, StdOutErrCapture):
+class TestGeneratorProtocol(StdOutErrCapture, GeneratorMixIn):
 
     __test__ = False  # class is not a class of tests
 

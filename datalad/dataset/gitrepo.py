@@ -312,17 +312,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         CommandError if the call exits with a non-zero status.
         """
 
-        class GeneratorStdOutErrCapture(GeneratorMixIn,
-                                        AssemblingDecoderMixIn,
-                                        StdOutErrCapture):
+        class GeneratorStdOutErrCapture(StdOutErrCapture,
+                                        GeneratorMixIn,
+                                        AssemblingDecoderMixIn):
             """
             Generator-runner protocol that captures and yields stdout and stderr.
             """
-            def __init__(self):
-                GeneratorMixIn.__init__(self)
-                AssemblingDecoderMixIn.__init__(self)
-                StdOutErrCapture.__init__(self)
-
             def pipe_data_received(self, fd, data):
                 if fd in (1, 2):
                     self.send_result((fd, self.decode(fd, data, self.encoding)))
