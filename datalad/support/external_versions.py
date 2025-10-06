@@ -239,7 +239,7 @@ class ExternalVersions(object):
     )
 
     def __init__(self):
-        self._versions = {}
+        self._versions: dict[str, LooseVersion] = {}
         self.CUSTOM = self._CUSTOM.copy()
         self.INTERESTING = list(self._INTERESTING)  # make mutable for `add`
 

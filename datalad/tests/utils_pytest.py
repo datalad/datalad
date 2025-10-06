@@ -21,6 +21,7 @@ from http.server import (
     SimpleHTTPRequestHandler,
 )
 from json import dumps
+from typing import Optional
 from unittest import SkipTest
 from unittest.mock import patch
 
@@ -35,7 +36,10 @@ from datalad.cmd import (
 )
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.dochelpers import borrowkwargs
-from datalad.support.external_versions import external_versions
+from datalad.support.external_versions import (
+    LooseVersion,
+    external_versions,
+)
 from datalad.support.keyring_ import MemoryKeyring
 from datalad.support.network import RI
 from datalad.support.vcr_ import *
@@ -2001,7 +2005,7 @@ def set_date(timestamp):
 
 
 @contextmanager
-def set_annex_version(version):
+def set_annex_version(version: Optional[str]):
     """Override the git-annex version.
 
     This temporarily masks the git-annex version present in external_versions
@@ -2011,7 +2015,7 @@ def set_annex_version(version):
     ar_vers = AnnexRepo.git_annex_version
     with patch.dict(
             "datalad.support.annexrepo.external_versions._versions",
-            {"cmd:annex": version}):
+            {"cmd:annex": LooseVersion(version) if version else version}):
         try:
             AnnexRepo.git_annex_version = None
             yield
