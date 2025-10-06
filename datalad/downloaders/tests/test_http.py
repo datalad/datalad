@@ -56,6 +56,8 @@ except (ImportError, AttributeError):
 
 from unittest.mock import patch
 
+import pytest
+
 from ...support.exceptions import (
     AccessDeniedError,
     AnonymousAccessDeniedError,
@@ -391,6 +393,7 @@ test_detect_login_error2.tags = ['external-portal', 'network']
 
 @known_failure_githubci_win
 @skip_if_no_network
+@pytest.mark.flaky(retries=3, only_on=[AccessFailedError])
 def test_download_ftp():
     try:
         import requests_ftp
