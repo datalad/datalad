@@ -27,7 +27,7 @@ jobs:
         # See also the GIT_ASKPASS env var below
         git config --global core.askPass ""
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - name: Set up Python 3.9
