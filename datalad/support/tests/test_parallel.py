@@ -38,6 +38,7 @@ from datalad.tests.utils_pytest import (
     slow,
     with_tempfile,
 )
+from datalad.utils import on_windows
 
 info_log_level = lgr.getEffectiveLevel() >= logging.INFO
 
@@ -95,6 +96,8 @@ def test_producing_consumer(jobs):
 def test_producer_future_key(jobs):
     if sys.version_info >= (3, 13) and jobs == 10:
         pytest.xfail("Known issue with Python 3.13 and jobs=10")
+    if on_windows and jobs == 10:
+        pytest.xfail("Known issue on Windows with jobs=10")
 
     def producer():
         for i in range(3):
