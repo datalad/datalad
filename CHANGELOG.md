@@ -1,4 +1,29 @@
 
+<a id='changelog-1.2.2'></a>
+# 1.2.2 (2025-10-15)
+
+## 🐛 Bug Fixes
+
+- Remove absolute path specification from `/bin/ls` invocation while interrogating remote path.  [PR #7730](https://github.com/datalad/datalad/pull/7730) (by [@malikwirin](https://github.com/malikwirin))
+
+## 📝 Documentation
+
+- DOC: clarify in config documentation that we log to stderr not stdout.  [PR #7734](https://github.com/datalad/datalad/pull/7734) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Move project metadata from setup.py to pyproject.toml.  [PR #7740](https://github.com/datalad/datalad/pull/7740) (by [@lschr](https://github.com/lschr))
+
+## 🧪 Tests
+
+- TST: Allow for tests under NFS (cron run only) for x20 more time.  [PR #7749](https://github.com/datalad/datalad/pull/7749) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- chore: Upgrade/switch back to ubuntu-latest for github CI and use generalized neurodebian-ci-setup script (over https now).  [PR #7751](https://github.com/datalad/datalad/pull/7751) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Add use of pytest-retry and mark test_download_ftp to be retried.  [PR #7754](https://github.com/datalad/datalad/pull/7754) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Mark test_producer_future_key[10] as xfail on Windows.  [PR #7755](https://github.com/datalad/datalad/pull/7755) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.2.1'></a>
 # 1.2.1 (2025-07-02)
 
