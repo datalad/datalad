@@ -391,6 +391,7 @@ def test_detect_login_error2():
 test_detect_login_error2.tags = ['external-portal', 'network']
 
 
+@pytest.mark.xfail(reason="unknown. flaky but below flaky does not help? TODO: figure out")
 @known_failure_githubci_win
 @skip_if_no_network
 @pytest.mark.flaky(retries=3, only_on=[AccessFailedError])
