@@ -245,6 +245,15 @@ class Clone(Interface):
             # so that we can forget about how things used to be
             reckless = 'auto'
 
+        if reckless == 'private' and not \
+                AnnexRepo._check_version_kludges("annex-supports-private"):
+            raise ValueError("Instructed to make a private clone, but git-annex "
+                             "version does not support private mode. Requires "
+                             "at least git-annex 8.20210428. Note, that 'git "
+                             "annex dead here' may serve the purpose if "
+                             "recording the existence of this location is not "
+                             "an issue.")
+
         if isinstance(source, Dataset):
             source = source.path
 
@@ -422,7 +431,7 @@ def clone_dataset(
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
-    reckless : {None, 'auto', 'ephemeral', 'shared-...'}, optional
+    reckless : {None, 'auto', 'ephemeral', 'private', 'shared-...'}, optional
       Mode switch to put cloned dataset into unsafe/throw-away configurations, i.e.
       sacrifice data safety for performance or resource footprint. When None
       and `cfg` is specified, use the value of `datalad.clone.reckless`.
@@ -672,6 +681,9 @@ def _pre_annex_init_processing_(
         destds.config.set(
             'annex.hardlink', 'true', scope='local', reload=True)
 
+    if reckless == 'private':
+        destds.config.set('annex.private', 'true', scope='local')
+
     # trick to have the function behave like a generator, even if it
     # (currently) doesn't actually yield anything.
     if False:
@@ -714,7 +726,10 @@ def _post_annex_init_processing_(
     repo = destds.repo
     ds = destds
 
-    if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
+    if (
+        reckless in ('auto', 'private')
+        or (reckless and reckless.startswith('shared-'))
+    ):
         repo.call_annex(['untrust', 'here'])
 
     _check_autoenable_special_remotes(repo)
