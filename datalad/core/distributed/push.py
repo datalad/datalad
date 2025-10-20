@@ -239,7 +239,7 @@ class Push(Interface):
 
         if data == "all":
             if recursive:
-                subds = ds.subdatasets(
+                dss = ds.subdatasets(
                     path,
                     recursive=recursive,
                     recursion_limit=recursion_limit,
@@ -248,10 +248,10 @@ class Push(Interface):
                     bottomup=True,
                 )
             else:
-                subds = []
-            subds.append(ds.path)
+                dss = []
+            dss.append(ds.path)
 
-            non_ds_paths = sorted(set(paths) - set(map(Path, subds)))
+            non_ds_paths = sorted(set(paths) - set(map(Path, dss)))
             if non_ds_paths:
                 b = "\n".join(map(str, non_ds_paths))
                 raise ValueError(
@@ -261,7 +261,7 @@ class Push(Interface):
 
             # list subdatasets, but no need to list files as `git annex copy --all`
             # will transfer all of them
-            ds_spec = [(d, []) for d in subds]
+            ds_spec = [(d, []) for d in dss]
         else:
             # obtain a generator for information on the datasets to process
             # idea is to turn the `paths` argument into per-dataset
