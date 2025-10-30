@@ -545,7 +545,7 @@ _definitions = {
                'title': 'git-annex repository version',
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
-        'default': 8,
+        'default': 10,
     },
     'datalad.runtime.max-annex-jobs': {
         'ui': ('question', {

@@ -484,22 +484,15 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
     if annex:
-        if ds.repo.git_annex_version < "8.20200908":
-            # TODO: Drop when GIT_ANNEX_MIN_VERSION is at least 8.20200908.
-
-            # the standard setup keeps the annex locks accessible to the user only
-            nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-                 & stat.S_IWGRP)
-        else:
-            # umask might be such (e.g. 002) that group write permissions are inherited, so
-            # for the next test we should check if that is the case on some sample file
-            dltmp_path = ds.pathobj / '.git' / "dltmp"
-            dltmp_path.write_text('')
-            default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
-            dltmp_path.unlink()
-            # the standard setup keeps the annex locks following umask inheritance
-            eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-                 & stat.S_IWGRP, default_grp_write_perms)
+        # umask might be such (e.g. 002) that group write permissions are inherited, so
+        # for the next test we should check if that is the case on some sample file
+        dltmp_path = ds.pathobj / '.git' / "dltmp"
+        dltmp_path.write_text('')
+        default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
+        dltmp_path.unlink()
+        # the standard setup keeps the annex locks following umask inheritance
+        eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+             & stat.S_IWGRP, default_grp_write_perms)
 
         # but we can set it up for group-shared access too
         sharedds = clone(
@@ -1413,13 +1406,12 @@ def test_ephemeral(origin_path=None, bare_path=None,
     # if we couldn't symlink:
     clone1.push(to=DEFAULT_REMOTE, data='nothing' if can_symlink else 'auto')
 
-    if external_versions['cmd:annex'] >= "8.20210428":
-        # ephemeral clones are private (if supported by annex version). Despite
-        # the push, clone1's UUID doesn't show up in origin
-        recorded_locations = origin.repo.call_git(['cat-file', 'blob',
-                                                   'git-annex:uuid.log'],
-                                                  read_only=True)
-        assert_not_in(clone1.config.get("annex.uuid"), recorded_locations)
+    # ephemeral clones are private (if supported by annex version). Despite
+    # the push, clone1's UUID doesn't show up in origin
+    recorded_locations = origin.repo.call_git(['cat-file', 'blob',
+                                               'git-annex:uuid.log'],
+                                              read_only=True)
+    assert_not_in(clone1.config.get("annex.uuid"), recorded_locations)
 
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches

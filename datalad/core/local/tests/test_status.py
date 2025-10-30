@@ -305,34 +305,10 @@ def test_status_symlinked_dir_within_repo(path=None):
     ds.save()
     bar_f = ds.pathobj / "bar" / "f"
 
-    def call():
-        return ds.status(path=[bar_f], annex="availability",
-                         on_failure="ignore", result_renderer='disabled')
-
-    if ds.repo.git_annex_version < "8.20200522" \
-        or (on_windows and ds.repo.git_annex_version < "10.20220525"):
-        # version for windows is an approx guess, but stopped happening
-        # somewhere around 10.20220505-g3b83224e5 may be.
-        # see https://github.com/datalad/datalad/issues/6849
-        assert_result_count(call(), 0)
-    elif ds.repo.git_annex_version < '10.20220222':
-        # As of 2a8fdfc7d (Display a warning message when asked to operate on a
-        # file inside a symlinked directory, 2020-05-11), git-annex will error.
-        with assert_raises(CommandError):
-            call()
-    elif '10.20220222' <= ds.repo.git_annex_version < '10.20220322':
-        # No error on annex' side since 10.20220222;
-        # However, we'd now get something like this:
-        # > git annex find bar/f
-        # error: pathspec 'bar/f' did not match any file(s) known to git
-        # Did you forget to 'git add'?
-        #
-        # But exists zero until 10.20220322!
-        assert_result_count(call(), 0)
-    else:
-        res = call()
-        assert_result_count(res, 1, status='error', state='unknown',
-                            path=str(bar_f))
+    res = ds.status(path=[bar_f], annex="availability",
+        on_failure="ignore", result_renderer='disabled')
+    assert_result_count(res, 1, status='error', state='unknown',
+                        path=str(bar_f))
 
 
 @with_tempfile

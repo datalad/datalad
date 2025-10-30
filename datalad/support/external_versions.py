@@ -60,10 +60,10 @@ _runner = WitlessRunner()
 _git_runner = GitWitlessRunner()
 
 
-def _get_annex_version():
+def _get_annex_version() -> str:
     """Return version of available git-annex"""
     try:
-        return _runner.run(
+        ver = _runner.run(
             'git annex version --raw'.split(),
             protocol=StdOutErrCapture)['stdout']
     except CommandError:
@@ -71,7 +71,15 @@ def _get_annex_version():
         out = _runner.run(
             ['git', 'annex', 'version'],
             protocol=StdOutErrCapture)
-        return out['stdout'].splitlines()[0].split(':')[1].strip()
+        ver = out['stdout'].splitlines()[0].split(':')[1].strip()
+    if ver == '10.20221213-ge5b6b7b5e':
+        # a standalone build corresponding to the 10.20230126 .
+        # Joey described somewhere (yoh failed to find in 2025) the dance
+        # which is done during standalone builds which results in having
+        # standalone tarballs not yet aware of the released version which
+        # comes a few commits later.
+        ver = '10.20230126'
+    return ver
 
 
 def _get_git_version():
@@ -231,7 +239,7 @@ class ExternalVersions(object):
     )
 
     def __init__(self):
-        self._versions = {}
+        self._versions: dict[str, LooseVersion] = {}
         self.CUSTOM = self._CUSTOM.copy()
         self.INTERESTING = list(self._INTERESTING)  # make mutable for `add`
 
