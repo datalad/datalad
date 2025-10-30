@@ -1,4 +1,15 @@
 
+<a id='changelog-1.2.3'></a>
+# 1.2.3 (2025-10-30)
+
+## 🔩 Dependencies
+
+- Boost minimal git-annex version to 10.20230126.  [PR #7693](https://github.com/datalad/datalad/pull/7693) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- BF: altogether xfail the test_download_ftp -- too flaky/unknown reason ATM.  [PR #7758](https://github.com/datalad/datalad/pull/7758) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.2.2'></a>
 # 1.2.2 (2025-10-15)
 
