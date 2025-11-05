@@ -702,6 +702,17 @@ _definitions = {
         'default': time.time(),
 
     },
+    'datalad.run.cmdexec': {
+        'ui': ('question', {
+            'title': 'Command execution wrapper',
+            'text': 'Template for wrapping commands before execution. '
+                    'Supports {python} placeholder for Python executable path '
+                    'and {cmd} placeholder for the actual command to execute. '
+                    'This allows running commands using arbitrary wrappers (like '
+                    '`duct` of `con-duct` or even using a container).'}),
+        'destination': 'dataset',
+        'type': EnsureStr(),
+    },
     'datalad.ssh.executable': {
         'ui': ('question', {
             'title': "Name of ssh executable for 'datalad sshrun'",
