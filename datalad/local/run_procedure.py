@@ -521,3 +521,25 @@ class RunProcedure(Interface):
 
         else:
             generic_result_renderer(res)
+
+
+def _get_proc_configs(names, ds):
+    """Get specifications for discovered procedures.
+
+     If not a single procedure found, raises `ValueError`
+     """
+    cfg_proc_specs = []
+    discovered_procs = ds.run_procedure(
+        discover=True,
+        result_renderer='disabled',
+        return_type='list',
+    )
+    for cfg_proc_ in names:
+        for discovered_proc in discovered_procs:
+            if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
+                cfg_proc_specs.append(discovered_proc)
+                break
+        else:
+            raise ValueError("Cannot find procedure with name "
+                             "'%s'" % cfg_proc_)
+    return cfg_proc_specs

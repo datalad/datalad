@@ -216,6 +216,15 @@ class Clone(Interface):
             because both a regular branch and the git-annex branch are
             required. Note that a version in a RIA URL takes precedence over
             '--branch'."""),
+        cfg_proc=Parameter(
+            args=("-c", "--cfg-proc"),
+            metavar="PROC",
+            action='append',
+            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
+            on the installed dataset. Use
+            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
+            to get a list of available procedures, such as cfg_text2git.
+            """),
         description=location_description,
         reckless=reckless_opt,
     )
@@ -231,6 +240,7 @@ class Clone(Interface):
             dataset=None,
             description=None,
             reckless=None,
+            cfg_proc=None,
         ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -324,6 +334,7 @@ class Clone(Interface):
                 result_props,
                 cfg=None if ds is None else ds.config,
                 clone_opts=git_clone_opts,
+                cfg_proc=cfg_proc,
                 ):
             if r['status'] in ['error', 'impossible']:
                 clone_failure = True
@@ -410,7 +421,8 @@ def clone_dataset(
         result_props=None,
         cfg=None,
         checkout_gitsha=None,
-        clone_opts=None):
+        clone_opts=None,
+        cfg_proc=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -443,6 +455,8 @@ def clone_dataset(
       Options passed to git-clone. Note that for RIA URLs, the version is
       translated to a --branch argument, and that will take precedence over a
       --branch argument included in this value.
+    cfg_proc : list of str, optional
+      List of procedures to be run on the cloned datasets.
 
     Yields
     ------
@@ -540,6 +554,15 @@ def clone_dataset(
         )
         rmtree(destds.path, children_only=dest_path_existed)
         return
+
+    from datalad.local.run_procedure import _get_proc_configs
+    cfg_proc_specs = _get_proc_configs(cfg_proc, destds) if cfg_proc else []
+    for cfg_proc_spec in cfg_proc_specs:
+        yield from destds.run_procedure(
+            cfg_proc_spec,
+            result_renderer='disabled',
+            return_type='generator',
+        )
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
