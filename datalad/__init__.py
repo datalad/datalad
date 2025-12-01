@@ -81,6 +81,13 @@ def enable_librarymode():
     # export into the environment for child processes to inherit
     os.environ['DATALAD_RUNTIME_LIBRARYMODE'] = '1'
 
+    # disable custom datalad logging handler
+    lgr_handlers = lgr.handlers
+    if lgr_handlers:  # were not removed yet!
+        for h in lgr_handlers:
+            lgr.debug("Enabling library mode: removing datalad specific handler %s", h)
+            lgr.removeHandler(h)
+
 
 # For reproducible demos/tests
 _seed = os.environ.get('DATALAD_SEED', None)
