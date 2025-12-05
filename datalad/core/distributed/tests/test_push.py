@@ -103,6 +103,52 @@ def test_invalid_call(origin=None, tdir=None):
         ds.push, to='target', since='')
 
 
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_since_nothing_to_push(src_path=None, target_path=None):
+    """Test that --since=^ does not push when there are no changes.
+
+    When the remote tracking branch (e.g., github/draft) equals HEAD,
+    --since=^ should result in no push operation being attempted,
+    and should return 'notneeded' status with appropriate message.
+    """
+    # Create source dataset (git-only to avoid annex dependency)
+    src = Dataset(src_path).create(annex=False)
+    (src.pathobj / 'test_file.txt').write_text("Initial content")
+    src.save(message="Initial commit")
+
+    # Create target as bare git repo and add as sibling
+    target = GitRepo(path=target_path, bare=True, create=True)
+    src.siblings('add', name='target', url=target_path, **ckwa)
+
+    # Configure tracking branch
+    src.config.set(
+        'branch.{}.remote'.format(DEFAULT_BRANCH),
+        'target', scope='local')
+    src.config.set(
+        'branch.{}.merge'.format(DEFAULT_BRANCH),
+        'refs/heads/{}'.format(DEFAULT_BRANCH), scope='local')
+
+    # First push to sync everything
+    res = src.push(to='target')
+    assert_status('ok', res)
+
+    # Now push again with since='^' - should be notneeded without doing
+    # any actual push work (the key bug fix: before this fix, a push
+    # would still be attempted)
+    res = src.push(to='target', since='^')
+    # Should get notneeded status with appropriate message
+    assert_status('notneeded', res)
+    assert_in_results(
+        res,
+        status='notneeded',
+        message='Given constraints did not match any changes to publish'
+    )
+    # Should be only one result (not multiple 'notneeded' from git push)
+    assert_result_count(res, 1)
+
+
 def mk_push_target(ds, name, path, annex=True, bare=True):
     # life could be simple, but nothing is simple on windows
     #src.create_sibling(dst_path, name='target')
