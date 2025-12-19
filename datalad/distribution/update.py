@@ -369,12 +369,6 @@ class Update(Interface):
 
                 adjusted = is_annex and repo.is_managed_branch(curr_branch)
                 if adjusted:
-                    if follow_parent:
-                        yield dict(
-                            res, status="impossible",
-                            message=("follow='parentds' is incompatible "
-                                     "with adjusted branches"))
-                        continue
                     if how_curr != "merge":
                         yield dict(
                             res, status="impossible",
@@ -387,7 +381,8 @@ class Update(Interface):
                     repo,
                     how_curr,
                     is_annex=is_annex,
-                    adjusted=adjusted)
+                    adjusted=adjusted,
+                    follow_parent=follow_parent)
 
                 fn_opts = ["--ff-only"] if how_curr == "ff-only" else None
                 if update_fn is not _annex_sync:
@@ -493,15 +488,22 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
 #  Update functions
 
 
-def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
+def _choose_update_fn(repo, how, is_annex=False, adjusted=False,
+                      follow_parent=False):
     if adjusted and how != "merge":
         raise RuntimeError(
             "bug: Upstream checks should abort if adjusted is used "
             "with action other than 'merge'")
     elif how in ["merge", "ff-only"]:
         if adjusted and is_annex:
-            # For adjusted repos, blindly sync.
-            fn = _annex_sync
+            if follow_parent:
+                # For adjusted repos with a specific target (from parentds),
+                # use git annex merge <target> to merge into both the
+                # corresponding branch and the adjusted branch.
+                fn = _annex_merge_target
+            else:
+                # For adjusted repos following sibling, blindly sync.
+                fn = _annex_sync
         elif is_annex:
             fn = _annex_plain_merge
         elif adjusted:
@@ -564,6 +566,19 @@ def _annex_sync(repo, remote, _target, opts=None):
         {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
         repo.call_annex,
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
+
+
+def _annex_merge_target(repo, _remote, target, opts=None):
+    """Merge a specific target revision using git-annex merge.
+
+    This is useful for adjusted branches where we need to merge a specific
+    commit (e.g., from follow='parentds') into both the corresponding branch
+    and the adjusted branch.
+    """
+    yield _try_command(
+        {"action": "update.annex_merge", "message": ("Merged %s", target)},
+        repo.call_annex,
+        ['merge', target])
 
 
 def _reset_hard(repo, _, target, opts=None):
