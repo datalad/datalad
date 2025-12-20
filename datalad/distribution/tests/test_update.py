@@ -504,8 +504,8 @@ def test_unrelated_history_merge(tmp_path):
 
 # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
 # adjusted branch, so we don't give an error if TARGET can't be
-# determined.
-@skip_if_adjusted_branch
+# determined. However, on adjusted branches the test still passes because
+# the sync operation correctly reports impossible status.
 @with_tempfile(mkdir=True)
 def test_merge_no_merge_target(path=None):
     path = Path(path)
@@ -518,8 +518,9 @@ def test_merge_no_merge_target(path=None):
     assert_in_results(res, status="impossible", action="update")
 
 
-# `git annex sync REMOTE` is used on an adjusted branch, but this error
-# depends on `git merge TARGET` being used.
+# `git annex sync REMOTE` is used on an adjusted branch. This test
+# relies on specific merge conflict resolution steps that work differently
+# with git-annex-sync, so we skip it on adjusted branches.
 @skip_if_adjusted_branch
 @slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
@@ -572,8 +573,9 @@ def test_merge_conflict(path=None):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
-# `git annex sync REMOTE` is used on an adjusted branch, but this error
-# depends on `git merge TARGET` being used.
+# `git annex sync REMOTE` is used on an adjusted branch. This test
+# relies on specific conflict detection via `git ls-files --unmerged`
+# that works differently with git-annex-sync, so we skip it on adjusted branches.
 @skip_if_adjusted_branch
 @slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)

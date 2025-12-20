@@ -1607,7 +1607,6 @@ def test_fetch_git_special_remote(url_path=None, url=None, path=None):
     ok_(ds_b.repo.file_has_content("f1"))
 
 
-@skip_if_adjusted_branch
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 def test_nonuniform_adjusted_subdataset(path=None):
