@@ -281,6 +281,10 @@ Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in
 be used to establish a clean docker environment (based on any NtesteuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
+The [tools/testing/adhoc](tools/testing/adhoc) folder contains ad-hoc testing
+scripts produced to test specific functionality at some point in time. These
+scripts are not actively maintained but may be useful for reference.
+
 ### CI setup
 
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.
