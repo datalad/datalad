@@ -22,7 +22,7 @@ jobs:
          || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release'))
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
           # Check out all history so that the previous release tag can be
