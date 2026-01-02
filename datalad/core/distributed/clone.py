@@ -579,27 +579,35 @@ def _post_gitclone_processing_(
 
     if knows_annex(destds.path):
         # init annex when traces of a remote annex can be detected
-        yield from _pre_annex_init_processing_(
-            destds=destds,
-            cfg=cfg,
-            gitclonerec=gitclonerec,
-            remote=remote,
-            reckless=reckless,
-        )
-        dest_repo = _annex_init(
-            destds=destds,
-            cfg=cfg,
-            gitclonerec=gitclonerec,
-            remote=remote,
-            description=description,
-        )
-        yield from _post_annex_init_processing_(
-            destds=destds,
-            cfg=cfg,
-            gitclonerec=gitclonerec,
-            remote=remote,
-            reckless=reckless,
-        )
+        noannexf = destds.pathobj / ".noannex"
+        if noannexf.exists() or noannexf.is_symlink():
+            lgr.warning(
+                "%s seems to know about git-annex, but has .noannex file present. "
+                "We skip running 'git annex init'.",
+                destds,
+            )
+        else:
+            yield from _pre_annex_init_processing_(
+                destds=destds,
+                cfg=cfg,
+                gitclonerec=gitclonerec,
+                remote=remote,
+                reckless=reckless,
+            )
+            dest_repo = _annex_init(
+                destds=destds,
+                cfg=cfg,
+                gitclonerec=gitclonerec,
+                remote=remote,
+                description=description,
+            )
+            yield from _post_annex_init_processing_(
+                destds=destds,
+                cfg=cfg,
+                gitclonerec=gitclonerec,
+                remote=remote,
+                reckless=reckless,
+            )
 
     if checkout_gitsha and \
        dest_repo.get_hexsha(
