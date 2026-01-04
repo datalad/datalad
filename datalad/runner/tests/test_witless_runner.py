@@ -225,10 +225,6 @@ def test_runner_parametrized_protocol() -> None:
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_asyncio_loop_noninterference1(path1: str = "", path2: str = "") -> None:
-    if on_windows and sys.version_info < (3, 8):
-        raise SkipTest(
-            "get_event_loop() raises "
-            "RuntimeError: There is no current event loop in thread 'MainThread'.")
     # minimalistic use case provided by Dorota
     import datalad.api as dl
     src = dl.create(path1)  # type: ignore[attr-defined]
@@ -260,10 +256,6 @@ def test_asyncio_forked(temp_: str = "") -> None:
         # so we will just skip if no forking is possible
         raise SkipTest(f"Cannot fork: {exc}")
     # if does not fail (in original or in a fork) -- we are good
-    if sys.version_info < (3, 8) and pid != 0:
-        # for some reason it is crucial to sleep a little (but 0.001 is not enough)
-        # in the master process with older pythons or it takes forever to make the child run
-        sleep(0.1)
     try:
         runner.run([sys.executable, '--version'], protocol=StdOutCapture)
         if pid == 0:

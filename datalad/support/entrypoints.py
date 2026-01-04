@@ -9,7 +9,6 @@
 """Core utilities"""
 
 import logging
-import sys
 
 from datalad.support.exceptions import CapturedException
 
@@ -42,11 +41,8 @@ def iter_entrypoints(group, load=False):
     """
     lgr.debug("Processing entrypoints")
 
-    if sys.version_info < (3, 10):
-        # 3.10 is when it was no longer provisional
-        from importlib_metadata import entry_points
-    else:
-        from importlib.metadata import entry_points
+    from importlib.metadata import entry_points
+
     for ep in entry_points(group=group):
         if not load:
             yield ep.name, ep.module, ep.load

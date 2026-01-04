@@ -250,14 +250,9 @@ def _describe_extensions():
 def _describe_metadata_elements(group):
     infos = {}
     from importlib import import_module
+    from importlib.metadata import distribution
 
     from datalad.support.entrypoints import iter_entrypoints
-    if sys.version_info < (3, 10):
-        # 3.10 is when it was no longer provisional
-        from importlib_metadata import distribution
-    else:
-        from importlib.metadata import distribution
-
 
     for ename, emod, eload in iter_entrypoints(group):
         info = {}

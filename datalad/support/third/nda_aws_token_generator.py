@@ -7,13 +7,8 @@
 import binascii
 import hashlib
 import logging
-import sys
 import xml.etree.ElementTree as etree
-
-if sys.version_info[0] == 2:
-    import urllib2 as urllib_request
-else:
-    from urllib import request as urllib_request
+from urllib import request as urllib_request
 
 class NDATokenGenerator(object):
     __schemas = {

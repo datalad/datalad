@@ -257,10 +257,7 @@ class ExternalVersions(object):
         if version is None and hasattr(value, '__name__'):
             pkg_name = klass._PYTHON_PACKAGES.get(value.__name__, value.__name__)
             try:
-                if sys.version_info < (3, 10):
-                    import importlib_metadata as im
-                else:
-                    import importlib.metadata as im
+                import importlib.metadata as im
 
                 version = im.version(pkg_name)
             except Exception:
