@@ -581,6 +581,50 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/72238329?v=4"
             ]
+        },
+        {
+            "login": "emmanuel-ferdman",
+            "name": "Emmanuel Ferdman",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/emmanuel-ferdman",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/35470921?v=4"
+            ]
+        },
+        {
+            "login": "lschr",
+            "name": "Lukas Schrangl",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/lschr",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/13418822?v=4"
+            ]
+        },
+        {
+            "login": "mlell",
+            "name": "mlell",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mlell",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/16210594?v=4"
+            ]
+        },
+        {
+            "login": "malikwirin",
+            "name": "Malik",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/malikwirin",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/117918464?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7

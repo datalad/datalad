@@ -304,5 +304,25 @@
         "name": "Alex Shields-Weber",
         "bio": "CCNA | B.S. in Computer Science \r\n",
         "blog": "https://github.com/alliesw"
+    },
+    "lschr": {
+        "name": "Lukas Schrangl",
+        "orcid": "0000-0002-0420-7872",
+        "affiliation": "University of Natural Resources and Life Sciences, Vienna",
+        "blog": "https://github.com/lschr"
+    },
+    "mlell": {
+        "name": "mlell",
+        "blog": "https://github.com/mlell"
+    },
+    "malikwirin": {
+        "name": "Malik",
+        "blog": "https://github.com/malikwirin"
+    },
+    "emmanuel-ferdman": {
+        "name": "Emmanuel Ferdman",
+        "bio": "MS Computer Science with a focus on Machine Learning and Computer Vision. Full-time software developer at @Intel.",
+        "orcid": "0009-0004-8953-0151",
+        "blog": "https://github.com/emmanuel-ferdman"
     }
 }
