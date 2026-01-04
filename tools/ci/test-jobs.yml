@@ -4,10 +4,10 @@
 # conditionally filter out jobs that should only be run on cron; cf.
 # <https://stackoverflow.com/q/65384420/744178>.
 
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs: {}
 
-- python-version: '3.9'
+- python-version: '3.10'
   # Run all tests in a single whoop here
   # We cannot have empty -A selector, so the one which always will be fulfilled
   extra-envs:
@@ -50,20 +50,20 @@
     PYTEST_SELECTION_OP: ""
     _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
 
 # Split runs for v6 since a single one is too long now
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs:
     DATALAD_SSH_MULTIPLEX__CONNECTIONS: "0"
     DATALAD_RUNTIME_PATHSPEC__FROM__FILE: always
     _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=10.20230126 -m conda"
 
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs:
     PYTEST_SELECTION_OP: ""
     DATALAD_SSH_MULTIPLEX__CONNECTIONS: "0"
@@ -75,7 +75,7 @@
     LANG: bg_BG.UTF-8
 
 # Run slow etc tests under a single tricky scenario
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs:
     PYTEST_SELECTION_OP: ""
     _DL_TMPDIR: "/var/tmp/sym link"
@@ -86,7 +86,7 @@
 # A run loaded with various customizations to smoke test those functionalities
 # Apparently moving symlink outside has different effects on abspath
 # See https://github.com/datalad/datalad/issues/878
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs:
     # eventually: _DL_TMPDIR: "/var/tmp/sym ссылка"
     _DL_TMPDIR: "/var/tmp/sym link"
@@ -100,7 +100,7 @@
     DATALAD_RUNTIME_MAX__BATCHED: "2"
     DATALAD_RUNTIME_MAX__INACTIVE__AGE: "10"
 
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs:
     # By default no logs will be output. This one is to test with low level but
     # dumped to /dev/null
@@ -123,7 +123,7 @@
     GIT_COMMITTER_EMAIL: committer@example.com
 
 # Test some under NFS mount  (only selected sub-set)
-- python-version: '3.9'
+- python-version: '3.10'
   extra-envs:
     # do not run SSH-based tests due to stall(s)
     # https://github.com/datalad/datalad/pull/4172
@@ -140,26 +140,26 @@
 # TODO: ATM we do not have that minimal version as a Debian package in
 # snapshots!
 
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   extra-envs:
-    _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py39_25.9.1-1 --python-match minor --batch git-annex=10.20230126 -m conda"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py310_25.9.1-1 --python-match minor --batch git-annex=10.20230126 -m conda"
 
 # Run with git's master branch rather the default one on the system.
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   upstream-git: true
   extra-envs:
     DATALAD_USE_DEFAULT_GIT: "1"
 
 # Run with our reported minimum Git version.
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   minimum-git: true
   extra-envs:
     DATALAD_USE_DEFAULT_GIT: "1"
 
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   extra-envs:
     # to test operation under root since also would consider FS "crippled" due
@@ -168,7 +168,7 @@
     # no key authentication for root:
     DATALAD_TESTS_SSH: "0"
 
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   extra-envs:
     DATALAD_TESTS_NONETWORK: "1"
@@ -177,7 +177,7 @@
     https_proxy: ""
 
 # Test under NFS mount  (full, only in master)
-- python-version: '3.9'
+- python-version: '3.10'
   cron-only: true
   allow-failure: true
   extra-envs:
@@ -188,7 +188,7 @@
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
 # We would need to migrate to boto3 to test it fully, but SSH should work
-#- python-version: '3.9'
+#- python-version: '3.10'
 #  extra-envs:
 #    DATALAD_TESTS_SSH: "1"
 #    UNSET_S3_SECRETS: "1"

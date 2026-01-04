@@ -5,14 +5,13 @@ authors = [
 
 name = "datalad"
 description = "Distributed system for joint management of code, data, and their relationship"
-requires-python = ">= 3.9"
+requires-python = ">= 3.10"
 dependencies = [
     # core
     "platformdirs",
     "chardet>=3.0.4",                                    # rarely used but small/omnipresent
     "colorama; platform_system=='Windows'",
     "distro",
-    "importlib-metadata >=3.6; python_version < '3.10'",
     "iso8601",
     "humanize",
     "fasteners>=0.14",

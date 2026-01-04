@@ -40,8 +40,8 @@
 #     Desktop (a required .txt extension will be added automatically). The session
 #     will run until the file is removed (or 60 min have passed)
 #
-#   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
-#     environment to debug in a Python 3.9 session (should generally match the
+#   - in a terminal execute, for example, `C:\datalad_debug.bat 310` to set up the
+#     environment to debug in a Python 3.10 session (should generally match the
 #     respective CI run configuration).
 #
 #   - Workers have vim installed for convenient text editing in the command shell
@@ -76,28 +76,28 @@ environment:
           datalad.distributed
           datalad.distribution
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
-      PY: 3.9
+      PY: 3.10
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m datalad/packages
     # Windows core tests
-    - ID: WinP39core
+    - ID: WinP310core
       # ~35 min
       DTS: datalad.core datalad.dataset datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       # Python version specification is non-standard on windows
-      PY: 39-x64
+      PY: 310-x64
       # TODO: use datalad/git-annex (github release packages) but
       # it would need setup of a GITHUB_TOKEN to access.
       # This one is set in master but kept without change in maint for now
       # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
-    - ID: MacP39core
+    - ID: MacP310core
       # ~40min
       DTS: datalad.core datalad.dataset datalad.runner datalad.support
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.9
+      PY: 3.10
       # does not give a functional installation - needs env/PATH adjustment
       # INSTALL_GITANNEX: git-annex -m snapshot
       #INSTALL_GITANNEX: git-annex=8.20201129
@@ -117,12 +117,12 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
-      PY: 3.9
+      PY: 3.10
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m datalad/packages
-    - ID: WinP39a1
+    - ID: WinP310a1
       # ~40min
       DTS: >
           datalad.cli
@@ -133,17 +133,17 @@ environment:
           datalad.interface
           datalad.tests
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
-    - ID: WinP39a2
+      PY: 310-x64
+    - ID: WinP310a2
       # ~45min
       DTS: >
           datalad.local
           datalad.support
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
+      PY: 310-x64
 
-    - ID: MacP39a1
+    - ID: MacP310a1
       # ~40min
       DTS: >
           datalad.cli
@@ -154,17 +154,17 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.9
+      PY: 3.10
       INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
-    - ID: MacP39a2
+    - ID: MacP310a2
       # ~40min
       DTS: >
           datalad.local
           datalad.distributed
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.9
+      PY: 3.10
       INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
