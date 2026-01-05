@@ -43,10 +43,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set up Python 3.9
+    - name: Set up Python 3.10
       uses: actions/setup-python@v6
       with:
-        python-version: 3.9
+        python-version: '3.10'
 
     - name: Install DataLad and dependencies
       run: |
@@ -64,6 +64,9 @@ jobs:
         case ${{ matrix.extension }} in
           datalad-container)
             DL_NEED_SINGULARITY=1;;
+          datalad-deprecated)
+            # python-xmp-toolkit requires libexempi
+            DL_APT_INSTALLS="$DL_APT_INSTALLS libexempi-dev";;
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"

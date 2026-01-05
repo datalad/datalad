@@ -48,16 +48,10 @@ from datalad.utils import (
     split_cmdline,
 )
 
-if sys.version_info < (3, 9):
-    from importlib_resources import (
-        as_file,
-        files,
-    )
-else:
-    from importlib.resources import (
-        as_file,
-        files,
-    )
+from importlib.resources import (
+    as_file,
+    files,
+)
 
 lgr = logging.getLogger('datalad.local.run_procedures')
 
