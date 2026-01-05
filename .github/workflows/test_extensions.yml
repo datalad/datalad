@@ -64,6 +64,9 @@ jobs:
         case ${{ matrix.extension }} in
           datalad-container)
             DL_NEED_SINGULARITY=1;;
+          datalad-deprecated)
+            # python-xmp-toolkit requires libexempi
+            DL_APT_INSTALLS="$DL_APT_INSTALLS libexempi-dev";;
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
