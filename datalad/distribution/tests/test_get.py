@@ -9,6 +9,7 @@
 
 """
 
+import logging
 from os import curdir
 from os.path import basename
 from os.path import join as opj
@@ -24,7 +25,9 @@ from datalad.api import (
 )
 from datalad.distribution.get import (
     _get_flexible_source_candidates_for_submodule,
+    _parse_source_candidate_name,
 )
+from datalad.distribution.get import lgr as get_lgr
 from datalad.interface.results import only_matching_paths
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
@@ -64,6 +67,7 @@ from datalad.utils import (
     Path,
     chpwd,
     rmtree,
+    swallow_logs,
     with_pathsep,
 )
 
@@ -130,7 +134,7 @@ def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
                 dict(cost=600, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='youredead', from_config=True),
         ])
-    # we can alter the cost by given the name a two-digit prefix
+    # we can alter the cost by giving the name a three-digit prefix
     with patch.dict(
             'os.environ',
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__400BANG': 'youredead'}):
@@ -196,8 +200,56 @@ def test_get_flexible_source_candidates_for_submodule(t=None, t2=None, t3=None):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{not-a-key}-post'}):
         f(clone, clone.subdatasets(return_type='item-or-list'))
 
+    # check that using non-3-digit prefix (instead of required 3) issues a warning
+    # (more extensive testing of _parse_source_candidate_name is done separately)
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__40BANG': 'youredead'}):
+        with swallow_logs(new_level=logging.WARNING) as cml:
+            result = f(clone, clone.subdatasets(return_type='item-or-list'))
+            assert_in("starts with 2 digit(s)", cml.out)
+            assert_in("040bang", cml.out)  # suggested fix
+            # should still work but with default cost 700
+            eq_([r for r in result if r.get('from_config')],
+                [dict(cost=700, name='40bang', url='youredead', from_config=True)])
+
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("name,expected_cost,expected_cand_name,expected_warning", [
+    # Valid 3-digit costs - no warning
+    ('400bang', 400, 'bang', None),
+    ('001foo', 1, 'foo', None),
+    ('999bar', 999, 'bar', None),
+    ('400', 400, '', None),
+    # No digits - no warning, default cost
+    ('bang', 700, 'bang', None),
+    ('myserver', 700, 'myserver', None),
+    # 1 digit - warning with padded suggestion
+    ('4bang', 700, '4bang', '004bang'),
+    ('1a', 700, '1a', '001a'),
+    # 2 digits - warning with padded suggestion
+    ('40bang', 700, '40bang', '040bang'),
+    ('99x', 700, '99x', '099x'),
+    # 4+ digits - warning with truncated suggestion
+    ('4000foo', 700, '4000foo', '400foo'),
+    ('12345bar', 700, '12345bar', '123bar'),
+    ('0040x', 700, '0040x', '004x'),
+])
+def test_parse_source_candidate_name(
+    name, expected_cost, expected_cand_name, expected_warning
+):
+    """Test _parse_source_candidate_name extracts cost and issues warnings."""
+    with swallow_logs(new_level=logging.WARNING, name=get_lgr.name) as cml:
+        cost, cand_name = _parse_source_candidate_name(name)
+        assert cost == expected_cost
+        assert cand_name == expected_cand_name
+        if expected_warning:
+            assert_in(expected_warning, cml.out)
+        else:
+            assert cml.out == '', f"Unexpected warning: {cml.out}"
 
 
 @with_tempfile(mkdir=True)
