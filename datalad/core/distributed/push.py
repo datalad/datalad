@@ -369,6 +369,13 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
                 raise ValueError(
                     'Cannot publish subdataset, not present: {}'.format(res['path']))
 
+        # Skip entries with 'clean' state - nothing changed, nothing to push.
+        # This is essential for --since=^ to work correctly: when the remote
+        # tracking branch equals HEAD, all entries will be 'clean' and we
+        # should not yield any dataset for pushing.
+        if res.get('state') == 'clean':
+            continue
+
         if parentds != cur_ds:
             if ds_res:
                 # we switch to another dataset, yield this one so outside
