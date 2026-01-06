@@ -138,7 +138,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     from the parent dataset's knowledge about the target subdataset. Properties
     include any submodule property specified in the respective `.gitmodules`
     record. For convenience, an existing `datalad-id` record is made available
-    under the shortened name `id`.
+    under the shortened name `id`, and the basename of the path of the submodule
+    in the parent repository is available as `path_basename`.
 
     Additionally, the URL of any configured remote that contains the respective
     submodule commit is available as `remoteurl-<name>` property, where `name`
