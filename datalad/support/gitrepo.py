@@ -3207,10 +3207,21 @@ class GitRepo(CoreGitRepo):
             st['gitshasum'] = subrepo_commit
             # subdataset records must be labeled clean up to this point
             # test if current commit in subdataset deviates from what is
-            # recorded in the dataset
-            st['state'] = 'modified' \
-                if st['prev_gitshasum'] != subrepo_commit \
-                else 'clean'
+            # recorded in the dataset.
+            # On adjusted branches, the recorded commit could be either the
+            # corresponding branch commit (recorded by datalad save) or the
+            # adjusted HEAD commit (recorded by git-annex sync after install).
+            # Accept either as "clean" state.
+            prev_sha = st['prev_gitshasum']
+            if prev_sha != subrepo_commit:
+                # Check if recorded commit matches HEAD on adjusted branch
+                subrepo_head = subrepo.get_hexsha()
+                if prev_sha == subrepo_head:
+                    st['state'] = 'clean'
+                else:
+                    st['state'] = 'modified'
+            else:
+                st['state'] = 'clean'
             if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
             if eval_submodule_state == 'commit':
