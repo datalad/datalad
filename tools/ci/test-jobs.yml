@@ -54,13 +54,13 @@
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
-    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
+    _DL_ANNEX_INSTALL_SCENARIO: "venv git-annex -m datalad/packages"
 
 - python-version: '3.14'
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: ""
-    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
+    _DL_ANNEX_INSTALL_SCENARIO: "venv git-annex -m datalad/packages"
 
 - python-version: '3.9'
   cron-only: true
