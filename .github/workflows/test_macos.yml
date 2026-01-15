@@ -1,8 +1,9 @@
 name: Test on macOS
 
 on:
-    - pull_request
-    - push
+  pull_request:
+  push:
+    branches: ['master', 'maint']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
