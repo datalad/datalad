@@ -1122,8 +1122,9 @@ def test_update_custom_message(path=None):
     Dataset(origin.pathobj / "sub").save("newfile.txt")
     custom_msg = "Update subdataset to latest version"
     clone_ds.update(recursive=True, how="merge", message=custom_msg)
-    # Parent has custom message
-    eq_(clone_ds.repo.format_commit("%B").strip(), custom_msg)
+    # Parent has custom message. Use DEFAULT_BRANCH to handle adjusted branches
+    # where git-annex adds an extra commit on top.
+    eq_(clone_ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
     # Child is unaffected
     subds = Dataset(clone_ds.pathobj / "sub")
-    neq_(subds.repo.format_commit("%B").strip(), custom_msg)
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
