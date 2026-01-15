@@ -320,7 +320,7 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     # Note, we test against the produced history in DEFAULT_BRANCH, not what it
     # turns into in an adjusted branch!
     hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
-    subds = ds.clone(source, "sub",
+    subds = ds.clone(source, "sub", message="custom clone message",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
@@ -340,6 +340,9 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     ))
     assert_not_in(hexsha_before, commits)
     eq_(len(commits), 1)
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom clone message")
+    # child is unaffected
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom clone message")
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -368,26 +371,6 @@ def test_clone_into_dataset(source_path=None, top_path=None):
                                   'dummy.txt'])
     # nothing was committed
     eq_(hexsha_before, ds.repo.get_hexsha(DEFAULT_BRANCH))
-
-
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_clone_custom_message(source_path=None, top_path=None):
-    source = Dataset(source_path).create()
-    ds = create(top_path)
-    # Single line message
-    custom_msg = "Add source dataset for testing"
-    ds.clone(source, "sub", message=custom_msg)
-    # Parent has custom message. Use DEFAULT_BRANCH to handle adjusted branches
-    # where git-annex adds an extra commit on top.
-    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
-    # Child is unaffected (has its own commit history from source)
-    subds = Dataset(ds.pathobj / "sub")
-    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
-    # Multi-line message
-    multi_line_msg = "Add second dataset\n\nThis is the body."
-    ds.clone(source, "sub2", message=multi_line_msg)
-    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), multi_line_msg)
 
 
 @with_tempfile(mkdir=True)
