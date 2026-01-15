@@ -196,7 +196,7 @@ def test_create_sub(path=None):
     ds.create()
 
     # 1. create sub and add to super:
-    subds = ds.create(op.join("some", "what", "deeper"))
+    subds = ds.create(op.join("some", "what", "deeper"), message="custom create message")
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     assert_repo_status(subds.path, annex=True)
@@ -213,6 +213,9 @@ def test_create_sub(path=None):
               ds.subdatasets(result_xfm='relpaths'))
     # and was committed:
     assert_repo_status(ds.path)
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom create message")
+    # child is unaffected
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom create message")
 
     # subds finds superdataset
     ok_(subds.get_superdataset() == ds)
@@ -232,24 +235,6 @@ def test_create_sub(path=None):
     ok_(subds3.is_installed())
     assert_repo_status(subds3.path, annex=False)
     assert_in("third", ds.subdatasets(result_xfm='relpaths'))
-
-
-@with_tempfile
-def test_create_custom_message(path=None):
-    ds = Dataset(path).create()
-    # Single line message
-    custom_msg = "Create raw data subdataset"
-    ds.create("sub", message=custom_msg)
-    # Parent has custom message. Use DEFAULT_BRANCH to handle adjusted branches
-    # where git-annex adds an extra commit on top.
-    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
-    # Child is unaffected (still has default "new dataset" message)
-    subds = Dataset(ds.pathobj / "sub")
-    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
-    # Multi-line message
-    multi_line_msg = "Create processed data\n\nThis is the body."
-    ds.create("sub2", message=multi_line_msg)
-    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), multi_line_msg)
 
 
 @with_tempfile
