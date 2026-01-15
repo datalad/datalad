@@ -15,11 +15,13 @@ import time
 from calendar import timegm
 from os.path import join as opj
 
+from datalad.downloaders.providers import Providers
 from datalad.downloaders.tests.utils import get_test_providers
 from datalad.support.network import (
     download_url,
     get_url_straight_filename,
 )
+from datalad.support.path import Path
 from datalad.utils import ensure_unicode
 
 from ...support.exceptions import AccessFailedError
@@ -260,7 +262,15 @@ def test_access_denied(toppath=None, topurl=None, keyring=None):
 
     # We've forced an AccessDenied error and then set up bogus credentials,
     # leading to a 501 (not implemented) error.
-    assert_raises(AccessFailedError, run_set_up_provider)
+    try:
+        assert_raises(AccessFailedError, run_set_up_provider)
+    finally:
+        # Clean up the provider config file created during the test to avoid
+        # polluting subsequent test runs
+        providers_dir = Providers._get_providers_dirs().get('user')
+        cfg_file = Path(providers_dir) / 'newprovider.cfg'
+        cfg_file.unlink(missing_ok=True)
+        Providers.reset_default_providers()
 
 
 @with_tempfile(mkdir=True)
