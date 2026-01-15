@@ -21,6 +21,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
 from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
     OBSCURE_FILENAME,
     assert_in,
     assert_in_results,
@@ -239,15 +240,16 @@ def test_create_custom_message(path=None):
     # Single line message
     custom_msg = "Create raw data subdataset"
     ds.create("sub", message=custom_msg)
-    # Parent has custom message
-    eq_(ds.repo.format_commit("%B").strip(), custom_msg)
+    # Parent has custom message. Use DEFAULT_BRANCH to handle adjusted branches
+    # where git-annex adds an extra commit on top.
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
     # Child is unaffected (still has default "new dataset" message)
     subds = Dataset(ds.pathobj / "sub")
-    neq_(subds.repo.format_commit("%B").strip(), custom_msg)
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
     # Multi-line message
     multi_line_msg = "Create processed data\n\nThis is the body."
     ds.create("sub2", message=multi_line_msg)
-    eq_(ds.repo.format_commit("%B").strip(), multi_line_msg)
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), multi_line_msg)
 
 
 @with_tempfile
