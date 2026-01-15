@@ -1109,3 +1109,21 @@ def test_update_fetch_failure(path=None):
         status="ok",
         path=ds_b.path,
         action="update")
+
+
+@with_tempfile(mkdir=True)
+def test_update_custom_message(path=None):
+    path = Path(path)
+    origin = Dataset(path / "origin").create()
+    origin.create("sub")
+    clone_ds = install(source=origin.path, path=str(path / "clone"), recursive=True)
+    # Change subdataset without saving in parent - forces save after update
+    (origin.pathobj / "sub" / "newfile.txt").write_text("content")
+    Dataset(origin.pathobj / "sub").save("newfile.txt")
+    custom_msg = "Update subdataset to latest version"
+    clone_ds.update(recursive=True, how="merge", message=custom_msg)
+    # Parent has custom message
+    eq_(clone_ds.repo.format_commit("%B").strip(), custom_msg)
+    # Child is unaffected
+    subds = Dataset(clone_ds.pathobj / "sub")
+    neq_(subds.repo.format_commit("%B").strip(), custom_msg)

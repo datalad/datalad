@@ -372,6 +372,25 @@ def test_clone_into_dataset(source_path=None, top_path=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+def test_clone_custom_message(source_path=None, top_path=None):
+    source = Dataset(source_path).create()
+    ds = create(top_path)
+    # Single line message
+    custom_msg = "Add source dataset for testing"
+    ds.clone(source, "sub", message=custom_msg)
+    # Parent has custom message
+    eq_(ds.repo.format_commit("%B").strip(), custom_msg)
+    # Child is unaffected (has its own commit history from source)
+    subds = Dataset(ds.pathobj / "sub")
+    neq_(subds.repo.format_commit("%B").strip(), custom_msg)
+    # Multi-line message
+    multi_line_msg = "Add second dataset\n\nThis is the body."
+    ds.clone(source, "sub2", message=multi_line_msg)
+    eq_(ds.repo.format_commit("%B").strip(), multi_line_msg)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
 def test_notclone_known_subdataset(src_path=None, path=None):
     src = Dataset(src_path).create()
     sub = src.create('subm 1')

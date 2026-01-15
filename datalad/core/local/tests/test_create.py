@@ -30,6 +30,7 @@ from datalad.tests.utils_pytest import (
     assert_status,
     eq_,
     has_symlink_capability,
+    neq_,
     ok_,
     ok_exists,
     swallow_outputs,
@@ -230,6 +231,23 @@ def test_create_sub(path=None):
     ok_(subds3.is_installed())
     assert_repo_status(subds3.path, annex=False)
     assert_in("third", ds.subdatasets(result_xfm='relpaths'))
+
+
+@with_tempfile
+def test_create_custom_message(path=None):
+    ds = Dataset(path).create()
+    # Single line message
+    custom_msg = "Create raw data subdataset"
+    ds.create("sub", message=custom_msg)
+    # Parent has custom message
+    eq_(ds.repo.format_commit("%B").strip(), custom_msg)
+    # Child is unaffected (still has default "new dataset" message)
+    subds = Dataset(ds.pathobj / "sub")
+    neq_(subds.repo.format_commit("%B").strip(), custom_msg)
+    # Multi-line message
+    multi_line_msg = "Create processed data\n\nThis is the body."
+    ds.create("sub2", message=multi_line_msg)
+    eq_(ds.repo.format_commit("%B").strip(), multi_line_msg)
 
 
 @with_tempfile

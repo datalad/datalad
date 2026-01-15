@@ -36,7 +36,10 @@ from datalad.interface.base import (
     build_doc,
     eval_results,
 )
-from datalad.interface.common_opts import location_description
+from datalad.interface.common_opts import (
+    location_description,
+    save_message_opt,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureKeyChoice,
@@ -180,7 +183,8 @@ class Create(Interface):
             [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
             to get a list of available procedures, such as cfg_text2git.
             """
-        )
+        ),
+        message=save_message_opt,
     )
 
     @staticmethod
@@ -195,7 +199,8 @@ class Create(Interface):
             dataset=None,
             annex=True,
             fake_dates=False,
-            cfg_proc=None
+            cfg_proc=None,
+            message=None,
     ):
         # we only perform negative tests below
         no_annex = not annex
@@ -443,6 +448,9 @@ class Create(Interface):
             # -> make submodule
             yield from refds.save(
                 path=tbds.path,
+                # This save only commits the new subdataset, nothing else.
+                # Use caller's message if provided, otherwise a specific default.
+                message=message or "[DATALAD] Created subdataset",
                 return_type='generator',
                 result_renderer='disabled',
             )
