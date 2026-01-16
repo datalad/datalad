@@ -348,8 +348,17 @@ def test_Dataset_flyweight(path1=None, path2=None):
 
     ds1 = Dataset(path1)
     assert_is_instance(ds1, Dataset)
-    # Don't create circular references or anything similar
-    assert_equal(1, sys.getrefcount(ds1) - 1)
+    # Don't create circular references or anything similar.
+    # Python 3.14+ changed internal reference handling - the interpreter now
+    # "borrows" references when loading objects onto the operand stack instead
+    # of incrementing refcount, leading to different sys.getrefcount() values.
+    # Per Python docs: "do not rely on the returned value to be accurate,
+    # other than a value of 0 or 1". The actual test for circular references
+    # is whether the object gets garbage collected below (lines ~410-425) -
+    # if circular refs existed, the instance wouldn't be removed from
+    # _unique_instances.
+    if sys.version_info < (3, 14):
+        assert_equal(1, sys.getrefcount(ds1) - 1)
 
     ds1.create()
 
@@ -363,8 +372,9 @@ def test_Dataset_flyweight(path1=None, path2=None):
     # introduce new circular references and make the issue worse!
     gc.collect()
 
-    # refcount still fine after repo creation:
-    assert_equal(1, sys.getrefcount(ds1) - 1)
+    # refcount still fine after repo creation (see Python 3.14+ note above):
+    if sys.version_info < (3, 14):
+        assert_equal(1, sys.getrefcount(ds1) - 1)
 
 
     # instantiate again:

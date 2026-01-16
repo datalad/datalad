@@ -235,7 +235,13 @@ def test_asyncio_loop_noninterference1(path1: str = "", path2: str = "") -> None
     reproducer = src.pathobj/ "reproducer.py"
     reproducer.write_text(f"""\
 import asyncio
-asyncio.get_event_loop()
+import sys
+# Python 3.14+ no longer implicitly creates event loops in get_event_loop()
+if sys.version_info >= (3, 14):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+else:
+    asyncio.get_event_loop()
 import datalad.api as datalad
 ds = datalad.clone(path=r'{path2}', source=r"{path1}")
 loop = asyncio.get_event_loop()

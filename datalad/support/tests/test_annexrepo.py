@@ -1746,7 +1746,15 @@ def test_AnnexRepo_flyweight(path1=None, path2=None):
     # should be the only counted reference to this instance.
     # Note, that sys.getrefcount reports its own argument and therefore one
     # reference too much.
-    assert_equal(1, sys.getrefcount(repo1) - 1)
+    # Python 3.14+ changed internal reference handling - the interpreter now
+    # "borrows" references when loading objects onto the operand stack instead
+    # of incrementing refcount, leading to different sys.getrefcount() values.
+    # Per Python docs: "do not rely on the returned value to be accurate,
+    # other than a value of 0 or 1". The actual test for circular references
+    # is whether the object gets garbage collected below (lines ~1805-1825) -
+    # if circular refs existed, the finalizer wouldn't be called.
+    if sys.version_info < (3, 14):
+        assert_equal(1, sys.getrefcount(repo1) - 1)
 
     # instantiate again:
     repo2 = AnnexRepo(path1, create=False)
