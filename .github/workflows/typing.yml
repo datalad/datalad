@@ -6,8 +6,9 @@
 name: Type-check
 
 on:
-  - push
-  - pull_request
+  pull_request:
+  push:
+    branches: ['master', 'maint']
 
 jobs:
   typing:

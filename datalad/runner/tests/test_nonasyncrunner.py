@@ -426,6 +426,13 @@ def test_inside_async() -> None:
     eq_(result["stdout"], "abc" + os.linesep)
 
 
+# Helper function for test_popen_invocation - must be at module level to be picklable
+def _get_file_in_subprocess(ds_path: str, file_path: str) -> None:
+    """Fetch a file in a subprocess by reconstructing the Dataset from path."""
+    from datalad.distribution.dataset import Dataset
+    Dataset(ds_path).get(path=file_path)
+
+
 # Both Windows and OSX suffer from wrapt's object proxy insufficiency
 # NotImplementedError: object proxy must define __reduce_ex__()
 @known_failure_osx
@@ -434,6 +441,11 @@ def test_inside_async() -> None:
 @with_tempfile
 def test_popen_invocation(src_path: str = "", dest_path: str = "") -> None:
     # https://github.com/ReproNim/testkraken/issues/93
+    # Note: Python 3.14+ changed default multiprocessing start method from
+    # 'fork' to 'forkserver' on Linux. 'forkserver' requires pickling arguments,
+    # so we pass the path string instead of a Dataset object/bound method.
+    # This pattern (reconstructing Dataset from path in subprocess) is the
+    # recommended way to use datalad with multiprocessing on all platforms.
     from multiprocessing import Process
 
     from datalad.api import clone  # type: ignore[attr-defined]
@@ -443,8 +455,11 @@ def test_popen_invocation(src_path: str = "", dest_path: str = "") -> None:
     (src.pathobj / "file.dat").write_bytes(b"\000")
     src.save(message="got data")
 
-    dest = clone(source=src_path, path=dest_path)
-    fetching_data = Process(target=dest.get, kwargs={"path": 'file.dat'})
+    clone(source=src_path, path=dest_path)
+    fetching_data = Process(
+        target=_get_file_in_subprocess,
+        args=(dest_path, 'file.dat')
+    )
     fetching_data.start()
     fetching_data.join(5.0)
     assert_false(fetching_data.is_alive(), "Child is stuck!")

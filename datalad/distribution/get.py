@@ -230,7 +230,6 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         alternate_suffix=False)
                 )
 
-    cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
     for name, tmpl in [(c[len(candcfg_prefix):],
                         ds_repo.config[c])
@@ -254,13 +253,12 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
-        # outside. Additional guesswork can only make it slower
-        has_cost = cost_candidate_expr.match(name) is not None
+        # outside. Additional guesswork can only make it slower.
+        cost, cand_name = _parse_source_candidate_name(name)
         clone_urls.append(
-            # assign a default cost, if a config doesn't have one
             dict(
-                cost=int(name[:3]) if has_cost else 700,
-                name=name[3:] if has_cost else name,
+                cost=cost,
+                name=cand_name,
                 url=url,
                 from_config=True,
             ))
@@ -1011,3 +1009,46 @@ class Get(Interface):
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res
+
+
+def _parse_source_candidate_name(name):
+    """Parse subdataset-source-candidate name to extract cost and candidate name.
+
+    If name starts with exactly 3 digits, those are used as the cost and the
+    remainder is the candidate name. Otherwise, default cost 700 is used and
+    the full name is kept. A warning is issued if name starts with digits but
+    not exactly 3.
+
+    Parameters
+    ----------
+    name : str
+        The candidate name (after 'datalad.get.subdataset-source-candidate-' prefix)
+
+    Returns
+    -------
+    tuple : (cost: int, cand_name: str)
+    """
+    cost = 700
+    cand_name = name
+    cost_candidate_expr = re.compile('([0-9]+)(.*)')
+    if (cost_match := cost_candidate_expr.match(name)):
+        cost_str, remainder = cost_match.groups()
+        n_digits = len(cost_str)
+        if n_digits == 3:
+            cost = int(cost_str)
+            cand_name = remainder
+        else:
+            # warn about non-3-digit cost prefix
+            # suggest padding for <3 digits, truncating for >3 digits
+            if n_digits < 3:
+                suggested = cost_str.zfill(3)
+            else:
+                suggested = cost_str[:3].lstrip('0').zfill(3)
+            suggested += remainder
+            lgr.warning(
+                "subdataset-source-candidate '%s' starts with %d digit(s) "
+                "which is not recognized as a cost (must be exactly 3). "
+                "Use e.g. '%s' to specify cost, or start with a non-digit.",
+                name, n_digits, suggested
+            )
+    return cost, cand_name
