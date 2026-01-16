@@ -1,6 +1,9 @@
 name: Shellcheck on scripts
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches: ['master', 'maint']
 
 jobs:
   test:
