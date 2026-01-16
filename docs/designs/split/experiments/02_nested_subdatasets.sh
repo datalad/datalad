@@ -9,10 +9,16 @@ EXPERIMENT_DIR="/tmp/datalad-split-exp02"
 echo "=== Experiment 2: Nested Subdataset Handling ==="
 echo "Working directory: $EXPERIMENT_DIR"
 
-# Clean up from previous runs
+# Clean up from previous runs (with proper permissions)
+chmod -R +w "$EXPERIMENT_DIR" 2>/dev/null || true
 rm -rf "$EXPERIMENT_DIR"
 mkdir -p "$EXPERIMENT_DIR"
 cd "$EXPERIMENT_DIR"
+
+# Allow file:// protocol for submodules (needed for local cloning)
+# Set in a way that works in various environments
+git config --global protocol.file.allow always 2>/dev/null || \
+  GIT_CONFIG_GLOBAL=/dev/null git config --global protocol.file.allow always 2>/dev/null || true
 
 # Step 1: Create parent dataset
 echo -e "\n[Step 1] Creating parent dataset with nested subdatasets..."
@@ -55,7 +61,7 @@ find data code -type f -o -type d | grep -v '.git' | sort
 # Step 3: Clone for filtering (will extract data/subject01)
 echo -e "\n[Step 3] Cloning and preparing to filter data/subject01..."
 cd "$EXPERIMENT_DIR"
-git clone --recursive parent-dataset filtered-with-nested
+git -c protocol.file.allow=always clone --recursive parent-dataset filtered-with-nested
 cd filtered-with-nested
 
 echo "Before filtering - subdatasets:"
@@ -118,7 +124,7 @@ fi
 # Step 7: Test Case - What if we want to preserve the subdataset?
 echo -e "\n[Step 7] Testing subdataset preservation strategy..."
 cd "$EXPERIMENT_DIR"
-git clone --recursive parent-dataset test-preserve-subdataset
+git -c protocol.file.allow=always clone --recursive parent-dataset test-preserve-subdataset
 cd test-preserve-subdataset
 
 echo "Strategy: Keep subdataset reference when filtering parent path"
