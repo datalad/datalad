@@ -27,7 +27,7 @@ echo "Subject 02 - Session 1" > data/subject02/session1.txt
 echo "Analysis script" > code/analyze.py
 
 # Create some annexed content
-mkdir -p data/subject01/large
+mkdir -p data/subject01/large data/subject02/large
 dd if=/dev/urandom of=data/subject01/large/file1.dat bs=1M count=5 2>/dev/null
 dd if=/dev/urandom of=data/subject02/large/file2.dat bs=1M count=5 2>/dev/null
 
