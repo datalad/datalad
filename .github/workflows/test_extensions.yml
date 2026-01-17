@@ -66,6 +66,7 @@ jobs:
         DL_REPO=datalad/${{ matrix.extension }}
         DL_TESTER=pytest
         DL_NEED_SINGULARITY=
+        DL_PYTEST_OPTS=
         # TODO: just reuse information from datalad-extensions!!
         case ${{ matrix.extension }} in
           datalad-container)
@@ -73,6 +74,12 @@ jobs:
           datalad-deprecated)
             # python-xmp-toolkit requires libexempi
             DL_APT_INSTALLS="$DL_APT_INSTALLS libexempi-dev";;
+          datalad-metalad)
+            # metalad's extractors/legacy/tests/test_xmp.py requires libexempi
+            DL_APT_INSTALLS="$DL_APT_INSTALLS libexempi-dev";;
+          datalad-next)
+            # Skip test_existing_switch - see https://github.com/datalad/datalad-next/issues/791
+            DL_PYTEST_OPTS='-k "not test_existing_switch"';;
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
@@ -80,6 +87,7 @@ jobs:
         echo "DL_REPO=$DL_REPO"
         echo "DL_TESTER=$DL_TESTER"
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
+        echo "DL_PYTEST_OPTS=$DL_PYTEST_OPTS"
         echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
         } >> "$GITHUB_ENV"
 
@@ -110,7 +118,7 @@ jobs:
         # configuration.  So far attempts to "fix" by somehow providing full path did not work.
         # That is why just symlink it here.  If no tox.ini -- create an empty one
         [ -e ../__extension__/tox.ini ] && ln -s ../__extension__/tox.ini . || touch tox.ini
-        python -m pytest -c ./tox.ini -s -v --cov=datalad --pyargs ${DL_PACKAGE}
+        python -m pytest -c ./tox.ini -s -v --cov=datalad $DL_PYTEST_OPTS --pyargs ${DL_PACKAGE}
       if: env.DL_TESTER == 'pytest'
 
     - name: Prepare coverage
