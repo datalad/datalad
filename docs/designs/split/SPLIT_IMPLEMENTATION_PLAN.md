@@ -234,7 +234,12 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
 - **--preserve-branch-name**: Ensure branch name in subdataset matches parent (default: `true`)
   - Subdataset will have same branch checked out as parent had for that path
   - Important for workflows that depend on branch names
-  - With worktree mode: Branch exists in namespace but preserves name locally
+  - With worktree mode: Branch created under prefix, then checked out locally
+- **--worktree-branch-prefix**: Prefix for worktree branches (default: `split/`)
+  - Used with `--clone-mode=worktree` to organize split branches
+  - Branch created as `<prefix><target_path>` (e.g., `split/data/subjects/subject01`)
+  - Preserves hierarchical structure in branch names
+  - Can be customized (e.g., `--worktree-branch-prefix=archive/` → `archive/data/subjects/subject01`)
 
 ### Example Usage
 
@@ -279,9 +284,13 @@ datalad split --propagate-annex-config=none data/subject01
 # Default: standard clone (independent repository)
 datalad split data/subject01
 
-# Use git worktree with namespace (most efficient, shares git + annex objects)
+# Use git worktree (most efficient, shares git + annex objects)
 datalad split --clone-mode=worktree data/subjects/subject01
-# Creates: refs/namespaces/split/data/subjects/subject01 (preserves hierarchy)
+# Creates branch: split/data/subjects/subject01 (preserves hierarchy)
+
+# Custom branch prefix
+datalad split --clone-mode=worktree --worktree-branch-prefix=archive/ data/old/study01
+# Creates branch: archive/data/old/study01
 
 # Reckless ephemeral mode (temporary working copy, shares annex via symlink)
 datalad split --clone-mode=reckless-ephemeral data/subject01
@@ -758,9 +767,11 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
        - Use git worktree instead of clone
        - Implementation (REPLACES the clone step in 2.4):
          cd <parent_ds>
-         # Create branch with sanitized path (slashes → double-dash)
-         # Path: data/subjects/subject01 → Branch: split--data--subjects--subject01
-         branch_name="split--$(echo <target_path> | tr '/' '-')"
+         # Create branch with hierarchical name (preserves path structure)
+         # Path: data/subjects/subject01 → Branch: split/data/subjects/subject01
+         # Default prefix: "split/", configurable via --worktree-branch-prefix
+         prefix="${worktree_branch_prefix:-split/}"
+         branch_name="${prefix}${target_path}"
          git branch "$branch_name" HEAD
          # Remove from index (as in corrected workflow)
          git rm -r --cached <target_path>/
@@ -775,9 +786,11 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
          # Result: Worktree shares BOTH git objects AND annex objects
        - Result: **Most efficient approach**
        - Storage: Parent .git (~5.3M), Worktree .git (**4KB**), Annex fully shared
+       - Branch organization: Hierarchical under prefix (e.g., split/data/subjects/...)
        - Benefit: Shares both git history and annex content
        - Why it works:
          * Git worktree shares .git/objects (standard worktree behavior)
+         * Git branch names can contain slashes (feature/x, split/y, etc.)
          * After filtering, annex symlinks (../../../.git/annex/objects/...) still resolve to parent
          * No duplication of git OR annex content
          * Uses git's built-in mechanism - no manual symlink hacks
