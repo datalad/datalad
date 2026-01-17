@@ -240,6 +240,14 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
   - Branch created as `<prefix><target_path>` (e.g., `split/data/subjects/subject01`)
   - Preserves hierarchical structure in branch names
   - Can be customized (e.g., `--worktree-branch-prefix=archive/` → `archive/data/subjects/subject01`)
+- **--worktree-use-namespace**: Use git namespaces instead of branch prefix (default: `false`)
+  - Used with `--clone-mode=worktree` for complete branch isolation
+  - When enabled, creates branches in `refs/namespaces/<namespace>/refs/heads/<path>`
+  - Namespace defaults to value of `--worktree-branch-prefix` (without trailing slash)
+  - Example: With prefix `split/`, creates `refs/namespaces/split/refs/heads/data/subjects/subject01`
+  - Pros: Complete separation from main branch namespace, no pollution
+  - Cons: Branches less visible in standard `git branch` output
+  - Note: Can be combined with custom prefix for organizational flexibility
 
 ### Example Usage
 
@@ -291,6 +299,11 @@ datalad split --clone-mode=worktree data/subjects/subject01
 # Custom branch prefix
 datalad split --clone-mode=worktree --worktree-branch-prefix=archive/ data/old/study01
 # Creates branch: archive/data/old/study01
+
+# Use namespaces for complete separation
+datalad split --clone-mode=worktree --worktree-use-namespace data/subjects/subject01
+# Creates: refs/namespaces/split/refs/heads/data/subjects/subject01
+# Keeps split branches completely separate from main namespace
 
 # Reckless ephemeral mode (temporary working copy, shares annex via symlink)
 datalad split --clone-mode=reckless-ephemeral data/subject01
@@ -767,18 +780,30 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
        - Use git worktree instead of clone
        - Implementation (REPLACES the clone step in 2.4):
          cd <parent_ds>
-         # Create branch with hierarchical name (preserves path structure)
+         # Create branch - two approaches available:
+
+         # Approach A: Simple prefix (DEFAULT, --worktree-use-namespace=false)
          # Path: data/subjects/subject01 → Branch: split/data/subjects/subject01
-         # Default prefix: "split/", configurable via --worktree-branch-prefix
          prefix="${worktree_branch_prefix:-split/}"
          branch_name="${prefix}${target_path}"
          git branch "$branch_name" HEAD
+         worktree_ref="$branch_name"
+
+         # Approach B: Git namespaces (--worktree-use-namespace=true)
+         # Path: data/subjects/subject01 → refs/namespaces/split/refs/heads/data/subjects/subject01
+         namespace="${worktree_branch_prefix:-split/}"  # Remove trailing slash if present
+         namespace="${namespace%/}"
+         branch_path="${target_path}"  # Hierarchical path preserved
+         GIT_NAMESPACE="$namespace" git branch "$branch_path" HEAD
+         worktree_ref="refs/namespaces/$namespace/refs/heads/$branch_path"
+
+         # Common steps for both approaches:
          # Remove from index (as in corrected workflow)
          git rm -r --cached <target_path>/
          # Remove physically
          rm -rf <target_path>
-         # Create worktree
-         git worktree add <target_path> "$branch_name"
+         # Create worktree (using appropriate ref)
+         git worktree add <target_path> "$worktree_ref"
          cd <target_path>
          # Filter as normal - annex symlinks will still work!
          git-annex filter-branch <target_path> --include-all-key-information --include-all-repo-config
@@ -786,11 +811,14 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
          # Result: Worktree shares BOTH git objects AND annex objects
        - Result: **Most efficient approach**
        - Storage: Parent .git (~5.3M), Worktree .git (**4KB**), Annex fully shared
-       - Branch organization: Hierarchical under prefix (e.g., split/data/subjects/...)
+       - Branch organization options:
+         * Prefix-based: `split/data/subjects/...` (default, simpler)
+         * Namespace-based: `refs/namespaces/split/refs/heads/data/subjects/...` (isolated)
        - Benefit: Shares both git history and annex content
        - Why it works:
          * Git worktree shares .git/objects (standard worktree behavior)
          * Git branch names can contain slashes (feature/x, split/y, etc.)
+         * Namespaces provide complete isolation without polluting main branch namespace
          * After filtering, annex symlinks (../../../.git/annex/objects/...) still resolve to parent
          * No duplication of git OR annex content
          * Uses git's built-in mechanism - no manual symlink hacks
