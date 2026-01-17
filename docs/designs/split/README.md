@@ -21,10 +21,32 @@ This directory contains the complete design, experimentation, and implementation
   - Design patterns explained
   - Integration points
 
+### Operational Modes
+- **[SPLIT_MODES.md](SPLIT_MODES.md)** - Complete modes documentation
+  - **split-top** (default): Safe split with preserved history
+  - **truncate-top**: Fresh start with orphan commit
+  - **truncate-top-graft**: Orphan + grafted full history via git replace
+  - **rewrite-parent**: Retroactive split with gitlinks throughout history
+  - Cleanup options (reflog, gc, annex) to reclaim space
+
+### Advanced Features
+- **[RETROACTIVE_HISTORY_REWRITING.md](RETROACTIVE_HISTORY_REWRITING.md)** - rewrite-parent mode design
+  - Rewriting parent history to make splits appear retroactive
+  - Gitlink-based approach for consistent history
+  - Corner cases and failure conditions
+  - Experiments 14-17 for validation
+
 ### For Validation
-- **[experiments/](experiments/)** - Prototype experiments (1-13)
-  - **[EXPERIMENT_RESULTS.md](experiments/EXPERIMENT_RESULTS.md)** - Findings from all experiments
-  - **[13_filter_branch_options_analysis.md](experiments/13_filter_branch_options_analysis.md)** - git-annex filter-branch options analysis
+- **[EXPERIMENT_SUMMARY.md](EXPERIMENT_SUMMARY.md)** - ⭐ Complete validation results
+  - **Experiments 1-13**: ✅ Core functionality validated
+  - **Experiment 16**: ✅ Nested subdatasets proven feasible
+  - **Experiment 17**: ✅ **Rewrite-parent POC successful!**
+  - Confidence assessment and implementation recommendations
+
+- **[experiments/](experiments/)** - Detailed experiment scripts (1-17)
+  - **[EXPERIMENT_RESULTS.md](experiments/EXPERIMENT_RESULTS.md)** - Per-experiment findings
+  - **[13_filter_branch_options_analysis.md](experiments/13_filter_branch_options_analysis.md)** - git-annex options
+  - Scripts 14-17 validate rewrite-parent mode
 
 ## Implementation Status
 
