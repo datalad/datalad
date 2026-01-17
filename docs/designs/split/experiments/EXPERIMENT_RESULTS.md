@@ -528,6 +528,138 @@ git config -f .gitmodules --remove-section submodule.data/raw/subject02
 
 ---
 
+## Experiment 11: ReproNim/containers Split - Real-World Testing
+
+**Status**: ✅ **SUCCESS** (after critical fix)
+
+### Objective
+
+Test complete split workflow on real-world repository (ReproNim/containers) with target structure:
+```
+containers/
+├── images/ (top-level subdataset)
+│   ├── bids/ (should be nested subdataset)
+│   ├── repronim/ (should be nested subdataset)
+│   │   └── .duct/ (should be deeply nested)
+│   └── ...other directories...
+├── binds/ (top-level subdataset)
+└── artwork/ (pre-existing subdataset)
+```
+
+### Results
+
+**Initial Split** (following Experiment 9 workflow):
+- ✅ `binds/` successfully split into subdataset
+- ✅ `images/` successfully split into subdataset
+- ✅ Git status: **clean**
+- ✅ Both registered in `.gitmodules`
+- ⚠️ **CRITICAL ISSUE DISCOVERED**: Parent still tracking individual files!
+
+**Problem Found**:
+```bash
+# Parent repository still tracked individual files inside subdatasets:
+$ git ls-files images/ | head -5
+images/README.md
+images/adswa/Singularity.nilearn--0.9.1
+images/adswa/adswa-nilearn--0.7.1.sing
+...
+
+# Submodule entry was MISSING from index:
+$ git ls-files -s | grep "^160000.*images$"
+(no output - mode 160000 entry missing!)
+```
+
+**Root Cause**:
+The workflow from Experiment 9 did:
+1. `rm -rf images/` - Physical removal
+2. `git clone . images/` - Clone
+3. Filter operations
+4. `git rm -r --cached images/` - **TOO LATE!**
+5. `git submodule add ./images images`
+
+Step 4 tried to remove from index AFTER physical removal, so git had nothing to remove. Parent continued tracking individual files even though `.gitmodules` had the submodule entry.
+
+**Fix Applied** (`/tmp/fix_split.sh`):
+```bash
+# Remove from git index while files still exist
+git rm -r --cached images/
+git rm -r --cached binds/
+
+# Re-register as proper submodules
+git submodule add --force ./images images
+git submodule add --force ./binds binds
+
+# Commit the fix
+git commit -m "Fix: Properly register as submodules"
+```
+
+**After Fix**:
+```bash
+# Submodule entries now have mode 160000:
+$ git ls-files -s images binds
+160000 60fc73369441fa33246efb671160cd710176bec4 0 images
+160000 308c027a1504714bfa9bf66287c5e58e9ce26d50 0 binds
+
+# Parent tracks only submodule entry, not individual files:
+$ git ls-files images/
+images  # Just the submodule entry
+$ git ls-files binds/
+binds   # Just the submodule entry
+```
+
+### Nested Subdatasets
+
+As expected from Experiment 10:
+- ⚠️ `images/.gitmodules` does NOT exist
+- ✗ `bids/`, `repronim/`, `.duct/` are regular directories, not subdatasets
+- Reason: `git filter-branch --subdirectory-filter` strips top-level `.gitmodules`
+
+This confirms Phase 4 implementation is needed for nested subdataset support.
+
+### Conclusions
+
+**CRITICAL FIX IDENTIFIED**:
+- **`git rm -r --cached` MUST be done BEFORE cloning, not after**
+- Correct order: `git rm -r --cached` → `rm -rf` → `git clone` → filter → `git submodule add`
+- Without this, parent tracks individual files AND submodule entry simultaneously (broken state)
+
+**Updated Workflow** (corrected from Experiment 9):
+```bash
+# For each directory to split:
+
+# 1. Remove from git index FIRST (while files still exist)
+git rm -r --cached <path>/
+
+# 2. Physically remove directory
+rm -rf <path>/
+
+# 3. Clone parent into location
+git -c protocol.file.allow=always clone . <path>/
+
+# 4. Filter the clone
+cd <path>/
+git annex filter-branch <path> --include-all-key-information --include-all-repo-config
+git filter-branch --subdirectory-filter <path> HEAD
+git remote set-url origin <parent-absolute-path>
+git annex forget --force --drop-dead
+cd ..
+
+# 5. Register as submodule
+git submodule add ./<path> <path>
+
+# After ALL splits:
+git commit -m "Split into subdatasets"
+```
+
+**Documentation Updates Made**:
+1. ✅ Updated `SPLIT_IMPLEMENTATION_PLAN.md` Command Execution Order
+2. ✅ Added critical insight about git rm ordering
+3. ✅ Created corrected workflow script: `/tmp/finish_split_corrected.sh`
+
+**Result Location**: `/tmp/datalad-split-exp11/containers`
+
+---
+
 ## Overall Assessment
 
 ### What's Ready for Implementation
@@ -599,6 +731,15 @@ git config -f .gitmodules --remove-section submodule.data/raw/subject02
 - No fixes needed - validates the correct git-annex workflow
 - **This is the definitive experiment for content handling**
 
+### Experiment 11: 11_repronim_containers_split.sh
+- **CRITICAL FIX**: Discovered parent repository still tracked individual files inside subdatasets
+- **Root cause**: `git rm -r --cached` was done AFTER cloning instead of BEFORE
+- **Fix applied**: Created `/tmp/fix_split.sh` to properly remove files from index and re-register submodules
+- **Correct order**: `git rm -r --cached` → `rm -rf` → `git clone` → filter → `git submodule add`
+- **Result**: Parent now correctly tracks only submodule commits (mode 160000), not individual files
+- **Updated**: Command Execution Order in SPLIT_IMPLEMENTATION_PLAN.md to reflect correct workflow
+- **Confirmed**: Nested subdatasets (bids/, repronim/, .duct/) were lost as expected (Phase 4 needed)
+
 ---
 
 ## Next Steps
@@ -635,12 +776,14 @@ bash docs/designs/split/experiments/07_correct_location_tracking.sh  # Correct g
 bash docs/designs/split/experiments/08_complete_split_workflow.sh   # Full end-to-end on real dataset
 bash docs/designs/split/experiments/09_in_place_split.sh            # RECOMMENDED: In-place approach
 bash docs/designs/split/experiments/10_nested_split.sh              # Documents nested limitation
+bash docs/designs/split/experiments/11_repronim_containers_split.sh # Real-world nested structure
 ```
 
 **Note**: Experiments create temporary directories under `/tmp/datalad-split-expXX/` which can be examined after running.
 
 **Important**:
 - **Experiment 9 shows the RECOMMENDED workflow**: in-place split with single save at end
+- **Experiment 11 identified CRITICAL fix**: `git rm -r --cached` MUST be done BEFORE cloning
 - Experiment 7 validates correct git-annex location tracking (use `--include-all-key-information`)
 - Experiment 8 confirms end-to-end workflow on real-world dataset
-- Experiment 10 documents nested subdataset limitation (Phase 2 feature)
+- Experiment 10 documents nested subdataset limitation (Phase 4 feature)
