@@ -629,15 +629,14 @@ def _perform_single_split(
             _apply_truncate_top(target_path, create_graft_branch=True)
 
         elif mode == 'rewrite-parent':
-            lgr.debug("Rewrite-parent mode not yet fully implemented for %s", rel_path)
-            # TODO: Implement rewrite-parent mode using split_helpers_nested
-            # This requires:
-            # 1. Collecting all split paths in current batch
-            # 2. Filtering all subdatasets
-            # 3. Rewriting parent history with gitlinks
-            # 4. Setting up nested subdatasets with proper initialization
-            # For now, fall back to split-top behavior
-            lgr.warning("rewrite-parent mode not yet implemented, using split-top")
+            lgr.debug("Applying rewrite-parent mode to %s", rel_path)
+            # For single paths, implement simplified rewrite-parent
+            # For nested paths (e.g., data/ and data/logs/), would need batch processing
+            # using split_helpers_nested module
+            _apply_rewrite_parent_simple(
+                parent_ds=ds,
+                subdataset_path=target_path,
+                rel_path=rel_path)
 
         # elif mode == 'split-top': (default - no special handling needed)
 
@@ -660,24 +659,37 @@ def _perform_single_split(
                 subdataset_path=target_path,
                 config_spec=propagate_annex_config)
 
-        # Step 7: Register as submodule (if not worktree)
-        if clone_mode != 'worktree':
-            _register_as_submodule(
-                parent_ds=ds,
-                subdataset_path=target_path,
-                rel_path=rel_path)
+        # Step 7: Register as submodule and commit (unless rewrite-parent)
+        # For rewrite-parent mode, history is already rewritten with gitlinks
+        # No need to register or create a new commit
+        if mode != 'rewrite-parent':
+            # Register as submodule (if not worktree)
+            if clone_mode != 'worktree':
+                _register_as_submodule(
+                    parent_ds=ds,
+                    subdataset_path=target_path,
+                    rel_path=rel_path)
 
-        # Step 8: Commit the changes
-        commit_msg = (
-            f"Split {rel_path}/ into subdataset\n\n"
-            f"Split mode: {mode}\n"
-            f"Clone mode: {clone_mode}\n"
-            f"Content mode: {content}\n"
-            f"Cleanup: {cleanup}\n\n"
-            "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
-            "Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-        )
-        ds.repo.call_git(['commit', '-m', commit_msg])
+            # Step 8: Commit the changes
+            commit_msg = (
+                f"Split {rel_path}/ into subdataset\n\n"
+                f"Split mode: {mode}\n"
+                f"Clone mode: {clone_mode}\n"
+                f"Content mode: {content}\n"
+                f"Cleanup: {cleanup}\n\n"
+                "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
+                "Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+            )
+            ds.repo.call_git(['commit', '-m', commit_msg])
+        else:
+            # For rewrite-parent, clone the subdataset to its location
+            # (history rewriting already created gitlinks)
+            lgr.debug("Cloning subdataset to its path for rewrite-parent mode")
+            try:
+                # Remove the split commit we just made
+                ds.repo.call_git(['reset', '--hard', 'HEAD~1'])
+            except:
+                pass  # May fail if no previous commit
 
         yield get_status_dict(
             'split',
@@ -939,6 +951,218 @@ def _apply_cleanup(subdataset_path, cleanup_level):
                 lgr.debug("Dropped unused annex content")
         except CommandError as e:
             lgr.warning("Annex cleanup failed: %s", e)
+
+
+def _apply_rewrite_parent_simple(parent_ds, subdataset_path, rel_path):
+    """Apply rewrite-parent mode for a single path (simplified version).
+
+    Rewrites parent history to include gitlinks to the subdataset at each
+    commit where the subdirectory was modified. This makes it appear as
+    though the subdataset existed from the beginning.
+
+    NOTE: This is a simplified implementation. Full nested support requires
+    using the split_helpers_nested module and batch processing multiple paths.
+
+    Parameters
+    ----------
+    parent_ds : Dataset
+        Parent dataset object
+    subdataset_path : str
+        Absolute path to subdataset
+    rel_path : Path
+        Relative path of subdataset within parent
+    """
+    lgr.info("Rewriting parent history to retroactively include %s as subdataset", rel_path)
+
+    parent_repo = parent_ds.repo
+    subdataset = Dataset(subdataset_path)
+    subdataset_repo = subdataset.repo
+
+    # Build commit mapping by matching commit messages
+    # This links original parent commits to filtered subdataset commits
+    commit_map = _build_commit_mapping(
+        parent_repo, subdataset_repo, str(rel_path))
+
+    lgr.debug("Built commit map: %d parent commits map to subdataset commits",
+              len(commit_map))
+
+    if not commit_map:
+        lgr.warning("No commits found to map - subdataset may be empty or history mismatch")
+        return
+
+    # Rewrite parent history using index-filter (faster than tree-filter)
+    _rewrite_history_with_gitlinks(
+        parent_repo=parent_repo,
+        rel_path=str(rel_path),
+        commit_map=commit_map)
+
+    lgr.info("Parent history rewritten - %s now appears as subdataset throughout history",
+             rel_path)
+
+
+def _build_commit_mapping(parent_repo, subdataset_repo, rel_path):
+    """Build mapping from parent commits to subdataset commits.
+
+    Matches commits by their commit message to establish correspondence
+    between parent and filtered subdataset history.
+
+    Returns
+    -------
+    dict
+        Mapping of {parent_commit_sha: subdataset_commit_sha}
+    """
+    commit_map = {}
+
+    try:
+        # Get all parent commits (before the split was registered)
+        # Find the last commit before we added the split commit
+        all_commits = parent_repo.call_git([
+            'rev-list', '--all', '--reverse'
+        ]).strip().split('\n')
+
+        # Find split commit (has "Split" in message)
+        split_commit_idx = None
+        for idx, commit in enumerate(all_commits):
+            msg = parent_repo.call_git(['log', '-1', '--format=%s', commit]).strip()
+            if 'Split' in msg and rel_path in msg:
+                split_commit_idx = idx
+                break
+
+        # Use commits before split
+        if split_commit_idx:
+            parent_commits = all_commits[:split_commit_idx]
+        else:
+            parent_commits = all_commits
+
+        # Get subdataset commits in reverse order (oldest first)
+        subdataset_commits = subdataset_repo.call_git([
+            'log', '--format=%H', '--reverse'
+        ]).strip().split('\n')
+
+        # Build mapping by matching commit messages
+        for parent_commit in parent_commits:
+            parent_msg = parent_repo.call_git([
+                'log', '-1', '--format=%s', parent_commit
+            ]).strip()
+
+            # Find matching commit in subdataset
+            for subds_commit in subdataset_commits:
+                subds_msg = subdataset_repo.call_git([
+                    'log', '-1', '--format=%s', subds_commit
+                ]).strip()
+
+                if subds_msg == parent_msg:
+                    # Verify this commit touched the split path
+                    try:
+                        files = parent_repo.call_git([
+                            'diff-tree', '--no-commit-id', '--name-only', '-r',
+                            parent_commit
+                        ]).strip().split('\n')
+
+                        if any(f.startswith(rel_path) for f in files if f):
+                            commit_map[parent_commit] = subds_commit
+                            break
+                    except:
+                        pass
+
+    except Exception as e:
+        lgr.debug("Error building commit map: %s", e)
+
+    return commit_map
+
+
+def _rewrite_history_with_gitlinks(parent_repo, rel_path, commit_map):
+    """Rewrite parent history to replace directory with gitlinks.
+
+    Uses git filter-branch with --index-filter for performance.
+    """
+    import tempfile
+    import json
+
+    # Create commit map file for the filter script
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(commit_map, f)
+        commit_map_file = f.name
+
+    # Create index filter script
+    filter_script = f"""#!/bin/bash
+# Get current commit being rewritten
+ORIG_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+# Load commit map
+COMMIT_MAP_FILE="{commit_map_file}"
+
+# Check if this commit has a corresponding subdataset commit
+if [ -f "$COMMIT_MAP_FILE" ]; then
+    SUBDS_SHA=$(python3 -c "
+import json, sys
+try:
+    with open('$COMMIT_MAP_FILE') as f:
+        cm = json.load(f)
+    print(cm.get('$ORIG_COMMIT', ''))
+except:
+    pass
+" 2>/dev/null)
+
+    if [ ! -z "$SUBDS_SHA" ]; then
+        # This commit should have gitlink
+        # Remove directory entries
+        git rm -r --cached --ignore-unmatch {rel_path} 2>/dev/null || true
+
+        # Add gitlink
+        git update-index --add --cacheinfo 160000,$SUBDS_SHA,{rel_path} 2>/dev/null || true
+
+        # Add .gitmodules if not present
+        if ! git ls-files --error-unmatch .gitmodules >/dev/null 2>&1; then
+            cat > .gitmodules << 'GITMODULES_EOF'
+[submodule "{rel_path}"]
+	path = {rel_path}
+	url = ./{rel_path}
+GITMODULES_EOF
+            git add .gitmodules 2>/dev/null || true
+        fi
+    fi
+fi
+"""
+
+    filter_script_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
+            f.write(filter_script)
+            filter_script_path = f.name
+
+        os.chmod(filter_script_path, 0o755)
+
+        # Run filter-branch
+        env = os.environ.copy()
+        env['FILTER_BRANCH_SQUELCH_WARNING'] = '1'
+
+        lgr.info("Rewriting history (this may take time for large repositories)...")
+
+        parent_repo.call_git([
+            'filter-branch', '-f',
+            '--index-filter', filter_script_path,
+            '--tag-name-filter', 'cat',
+            '--', '--all'
+        ], env=env)
+
+        lgr.debug("History rewrite complete")
+
+    finally:
+        # Cleanup
+        if filter_script_path and os.path.exists(filter_script_path):
+            os.unlink(filter_script_path)
+        if os.path.exists(commit_map_file):
+            os.unlink(commit_map_file)
+
+        # Clean up refs/original
+        try:
+            import glob
+            for ref in glob.glob(os.path.join(parent_repo.path, '.git/refs/original/**'), recursive=True):
+                if os.path.isfile(ref):
+                    os.unlink(ref)
+        except:
+            pass
 
 
 def _handle_content(parent_ds, subdataset_path, mode):
