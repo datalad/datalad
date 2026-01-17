@@ -4,6 +4,61 @@
 
 This document outlines the implementation plan for a `datalad split` command that splits a DataLad dataset into multiple subdatasets, based on [GitHub Issue #3554](https://github.com/datalad/datalad/issues/3554) and related discussions. The command addresses the common scenario where users retroactively need to reorganize directories into independent subdatasets.
 
+## ⚠️ CRITICAL DISCLAIMER
+
+**IMPORTANT: The split operation is complex and potentially alters repository behavior in subtle ways.**
+
+This command performs destructive operations including:
+- Git history rewriting (`git filter-branch`)
+- Git-annex branch filtering and metadata cleanup
+- Removal of content from parent dataset
+- Reconstruction of `.gitattributes` with path adjustments
+- Modification of git-annex location tracking
+- Potential alteration of content accessibility
+
+**BEFORE RUNNING `datalad split`:**
+
+1. **BACKUP YOUR DATASET**: Create a complete backup of your dataset before proceeding
+   ```bash
+   # Create backup clone with all annexed content
+   datalad clone --reckless availability /path/to/dataset /path/to/backup
+   cd /path/to/backup
+   datalad get -r .  # Get all content if needed
+   ```
+
+2. **Verify backup integrity**: Ensure backup is complete and functional
+   ```bash
+   cd /path/to/backup
+   git status  # Should be clean
+   datalad status  # Should show all content available
+   ```
+
+3. **Test on small dataset first**: Before splitting large/important datasets, test the workflow on a small test dataset
+
+4. **Understand the changes**: Review what will happen:
+   - Original content will be removed from parent
+   - Subdatasets will depend on parent for content retrieval (origin remote)
+   - Parent dataset must remain accessible for content access
+   - Git history will be rewritten (irreversible without backup)
+   - `.gitattributes` rules will be reconstructed (may affect behavior)
+
+5. **Use verification**: Always run with `--check full` (default) to verify integrity
+
+**Recovery**: If something goes wrong, restore from backup:
+```bash
+# Discard failed split attempt
+cd /path/to/dataset
+git reset --hard HEAD~N  # Reset to pre-split state
+# Or completely restore from backup
+rm -rf /path/to/dataset
+datalad clone /path/to/backup /path/to/dataset
+```
+
+**When in doubt**:
+- Use `--dry-run` first to see what would happen
+- Ask for help on DataLad mailing list or GitHub
+- Keep your backup until you've verified the split succeeded
+
 ## Background & Use Cases
 
 ### Primary Use Cases
@@ -211,7 +266,49 @@ datalad split --propagate-annex-config=none data/subject01
 
 **Note**: Phase 2 implements the core split functionality for **leaf directories** only. Nested subdataset support (Phase 4) requires additional `.gitmodules` reconstruction logic.
 
-#### 2.1 Path Discovery & Validation
+#### 2.1 Safety Warning Display
+```python
+def _display_safety_warning(dataset, paths, force=False):
+    """
+    Display critical safety warning before performing split.
+
+    MUST be called before any destructive operations.
+
+    Warning message should include:
+    1. List of destructive operations that will be performed
+    2. Recommendation to create backup first
+    3. Note that operation is irreversible without backup
+    4. Warning about potential behavior changes
+
+    If not in force mode and not dry-run:
+    - Display warning
+    - Prompt user for confirmation: "Continue? [y/N]"
+    - Abort if user doesn't confirm
+
+    If --force flag is set:
+    - Display warning (non-interactive)
+    - Proceed automatically (user accepted responsibility)
+
+    Example warning:
+        WARNING: This operation will:
+        - Rewrite git history (irreversible)
+        - Filter git-annex metadata
+        - Remove content from parent dataset
+        - Reconstruct .gitattributes
+
+        STRONGLY RECOMMENDED: Create a backup first!
+          datalad clone --reckless availability . /path/to/backup
+
+        Continue? [y/N]
+
+    Documentation requirements:
+    - Prominently display backup instructions in command help
+    - Include warning in docstring
+    - Reference full disclaimer in user documentation
+    """
+```
+
+#### 2.2 Path Discovery & Validation
 ```python
 def _validate_paths(dataset, paths):
     """
@@ -258,7 +355,7 @@ def _validate_paths(dataset, paths):
     """
 ```
 
-#### 2.2 Subdataset Discovery
+#### 2.3 Subdataset Discovery
 ```python
 def _discover_subdatasets(dataset, path):
     """
@@ -267,7 +364,7 @@ def _discover_subdatasets(dataset, path):
     """
 ```
 
-#### 2.3 History Filtering Workflow
+#### 2.4 History Filtering Workflow
 ```python
 def _filter_repository_history(source_repo_path, target_path, subdir_path):
     """
@@ -283,7 +380,7 @@ def _filter_repository_history(source_repo_path, target_path, subdir_path):
     """
 ```
 
-#### 2.4 Subdataset Registration
+#### 2.5 Subdataset Registration
 ```python
 def _register_subdataset(parent_ds, subdataset_path):
     """
@@ -294,7 +391,7 @@ def _register_subdataset(parent_ds, subdataset_path):
     """
 ```
 
-#### 2.5 Gitattributes Inheritance (CRITICAL)
+#### 2.6 Gitattributes Inheritance (CRITICAL)
 ```python
 def _reconstruct_gitattributes(parent_ds, target_path, split_dataset_path):
     """
@@ -387,7 +484,7 @@ def _reconstruct_gitattributes(parent_ds, target_path, split_dataset_path):
 - Preserve per-attribute precedence (don't just concatenate files)
 - Consider `--preserve-gitattributes` flag to skip this step if user wants manual control
 
-#### 2.6 Content Removal from Parent
+#### 2.7 Content Removal from Parent
 ```python
 def _remove_content_from_parent(parent_ds, path):
     """
@@ -398,7 +495,7 @@ def _remove_content_from_parent(parent_ds, path):
     """
 ```
 
-#### 2.7 Location Tracking Preservation (CRITICAL)
+#### 2.8 Location Tracking Preservation (CRITICAL)
 ```python
 def _preserve_location_tracking(clone_path, parent_path):
     """
@@ -509,7 +606,7 @@ References:
 - [annex.largefiles configuration](https://git-annex.branchable.com/tips/largefiles/)
 - [unlocked files configuration](https://github.com/RonnyPfannschmidt/git-annex/blob/master/doc/tips/unlocked_files.mdwn)
 
-#### 2.7 Post-Split Verification (--check option)
+#### 2.9 Post-Split Verification (--check option)
 ```python
 def _verify_split(parent_ds, split_paths, check_level='full', original_tree_snapshot=None):
     """
