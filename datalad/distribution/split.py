@@ -365,6 +365,8 @@ class Split(Interface):
                     content=content,
                     worktree_branch_prefix=worktree_branch_prefix,
                     worktree_use_namespace=worktree_use_namespace,
+                    mode=mode,
+                    cleanup=cleanup,
                     propagate_annex_config=propagate_annex_config,
                     preserve_branch_name=preserve_branch_name,
                     dry_run=dry_run,
@@ -548,11 +550,21 @@ def _perform_single_split(
         content,
         worktree_branch_prefix,
         worktree_use_namespace,
+        mode,
+        cleanup,
         propagate_annex_config,
         preserve_branch_name,
         dry_run,
         refds_path):
-    """Perform split operation on a single path."""
+    """Perform split operation on a single path.
+
+    Parameters
+    ----------
+    mode : str
+        Split mode: 'split-top', 'truncate-top', 'truncate-top-graft', or 'rewrite-parent'
+    cleanup : str
+        Cleanup level: 'none', 'reflog', 'gc', 'annex', or 'all'
+    """
 
     path_obj = Path(target_path)
     ds_path = Path(ds.path)
@@ -607,6 +619,33 @@ def _perform_single_split(
             filter_path=str(rel_path),
             parent_path=ds.path)
 
+        # Step 4.5: Apply mode-specific transformations
+        if mode == 'truncate-top':
+            lgr.debug("Applying truncate-top mode to %s", rel_path)
+            _apply_truncate_top(target_path, create_graft_branch=False)
+
+        elif mode == 'truncate-top-graft':
+            lgr.debug("Applying truncate-top-graft mode to %s", rel_path)
+            _apply_truncate_top(target_path, create_graft_branch=True)
+
+        elif mode == 'rewrite-parent':
+            lgr.debug("Rewrite-parent mode not yet fully implemented for %s", rel_path)
+            # TODO: Implement rewrite-parent mode using split_helpers_nested
+            # This requires:
+            # 1. Collecting all split paths in current batch
+            # 2. Filtering all subdatasets
+            # 3. Rewriting parent history with gitlinks
+            # 4. Setting up nested subdatasets with proper initialization
+            # For now, fall back to split-top behavior
+            lgr.warning("rewrite-parent mode not yet implemented, using split-top")
+
+        # elif mode == 'split-top': (default - no special handling needed)
+
+        # Step 4.6: Apply cleanup if requested
+        if cleanup != 'none' and mode in ('truncate-top', 'truncate-top-graft', 'rewrite-parent'):
+            lgr.debug("Applying cleanup level: %s", cleanup)
+            _apply_cleanup(target_path, cleanup)
+
         # Step 5: Handle content based on mode
         if content != 'none' and content != 'auto':
             _handle_content(
@@ -631,8 +670,10 @@ def _perform_single_split(
         # Step 8: Commit the changes
         commit_msg = (
             f"Split {rel_path}/ into subdataset\n\n"
+            f"Split mode: {mode}\n"
             f"Clone mode: {clone_mode}\n"
-            f"Content mode: {content}\n\n"
+            f"Content mode: {content}\n"
+            f"Cleanup: {cleanup}\n\n"
             "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
             "Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
         )
@@ -795,6 +836,109 @@ def _filter_subdataset(subdataset_path, filter_path, parent_path):
     if is_annex:
         lgr.debug("Running git annex forget")
         repo.call_annex(['forget', '--force', '--drop-dead'])
+
+
+def _apply_truncate_top(subdataset_path, create_graft_branch=False):
+    """Truncate history to single commit (truncate-top mode).
+
+    Removes all commit history, keeping only the final tree state.
+    Optionally creates a -split-full branch with git replace for full history.
+
+    Parameters
+    ----------
+    subdataset_path : str
+        Path to subdataset
+    create_graft_branch : bool
+        If True, create {branch}-split-full branch and git replace graft
+    """
+    lgr.debug("Applying truncate-top to %s (graft=%s)",
+              subdataset_path, create_graft_branch)
+
+    subdataset = Dataset(subdataset_path)
+    repo = subdataset.repo
+
+    # Get current branch name
+    current_branch = repo.call_git(['branch', '--show-current']).strip()
+    if not current_branch:
+        current_branch = 'master'  # Detached HEAD, use master
+
+    # If creating graft, save full history branch first
+    if create_graft_branch:
+        full_branch = f"{current_branch}-split-full"
+        lgr.debug("Creating full history branch: %s", full_branch)
+        repo.call_git(['branch', full_branch, current_branch])
+
+    # Get the current tree
+    tree_sha = repo.call_git(['rev-parse', 'HEAD^{tree}']).strip()
+
+    # Create new orphan commit with same tree
+    commit_msg = (
+        "Split subdataset\n\n"
+        "History truncated to single commit.\n"
+        "Original history preserved in branch format.\n\n"
+        "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
+        "Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+    )
+
+    # Create commit-tree with the existing tree
+    new_commit = repo.call_git(
+        ['commit-tree', tree_sha, '-m', commit_msg]
+    ).strip()
+
+    # If creating graft, establish git replace relationship
+    if create_graft_branch:
+        old_commit = repo.call_git(['rev-parse', 'HEAD']).strip()
+        lgr.debug("Creating git replace: %s -> %s", new_commit, old_commit)
+        repo.call_git(['replace', new_commit, old_commit])
+
+    # Force update current branch to new commit
+    repo.call_git(['reset', '--hard', new_commit])
+
+    lgr.debug("Truncated history to single commit: %s", new_commit)
+
+
+def _apply_cleanup(subdataset_path, cleanup_level):
+    """Apply cleanup operations to reclaim storage.
+
+    Parameters
+    ----------
+    subdataset_path : str
+        Path to subdataset
+    cleanup_level : str
+        Cleanup level: 'reflog', 'gc', 'annex', or 'all'
+    """
+    if cleanup_level == 'none':
+        return
+
+    lgr.debug("Applying cleanup level '%s' to %s", cleanup_level, subdataset_path)
+
+    subdataset = Dataset(subdataset_path)
+    repo = subdataset.repo
+    is_annex = hasattr(repo, 'call_annex')
+
+    # Reflog cleanup
+    if cleanup_level in ('reflog', 'all'):
+        lgr.debug("Expiring reflog")
+        repo.call_git(['reflog', 'expire', '--expire=now', '--all'])
+
+    # Git gc
+    if cleanup_level in ('gc', 'all'):
+        lgr.debug("Running git gc --aggressive --prune=now")
+        repo.call_git(['gc', '--aggressive', '--prune=now'])
+
+    # Git-annex cleanup
+    if cleanup_level in ('annex', 'all') and is_annex:
+        lgr.debug("Running git annex unused and drop")
+        try:
+            # Find unused content
+            unused_output = repo.call_annex(['unused'])
+
+            # Drop unused if any found
+            if 'unused data' in unused_output.lower():
+                repo.call_annex(['dropunused', 'all'])
+                lgr.debug("Dropped unused annex content")
+        except CommandError as e:
+            lgr.warning("Annex cleanup failed: %s", e)
 
 
 def _handle_content(parent_ds, subdataset_path, mode):
