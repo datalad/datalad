@@ -627,14 +627,16 @@ def _perform_single_split(
             _apply_truncate_top(target_path, create_graft_branch=True)
 
         elif mode == 'rewrite-parent':
-            lgr.debug("Applying rewrite-parent mode to %s", rel_path)
-            # For single paths, implement simplified rewrite-parent
-            # For nested paths (e.g., data/ and data/logs/), would need batch processing
-            # using split_helpers_nested module
-            _apply_rewrite_parent_simple(
-                parent_ds=ds,
-                subdataset_path=target_path,
-                rel_path=rel_path)
+            # rewrite-parent mode requires split_helpers_nested module integration
+            # Current simplified implementation has critical bugs (history collapse)
+            # See: docs/designs/split/experiments/17_VERIFICATION_RESULTS.md
+            #      docs/designs/split/experiments/18_VERIFICATION_RESULTS.md
+            #      datalad/distribution/split_helpers_nested.py
+            lgr.warning(
+                "rewrite-parent mode not yet fully implemented - "
+                "requires split_helpers_nested integration. "
+                "Using split-top mode instead."
+            )
 
         # elif mode == 'split-top': (default - no special handling needed)
 
@@ -954,6 +956,10 @@ def _apply_cleanup(subdataset_path, cleanup_level):
 def _apply_rewrite_parent_simple(parent_ds, subdataset_path, rel_path):
     """Apply rewrite-parent mode for a single path (simplified version).
 
+    WARNING: This implementation has critical bugs (history collapse).
+    DO NOT USE. Requires rework with split_helpers_nested module integration.
+    See experiments 17-19 for correct approach.
+
     Rewrites parent history to include gitlinks to the subdataset at each
     commit where the subdirectory was modified. This makes it appear as
     though the subdataset existed from the beginning.
@@ -976,17 +982,25 @@ def _apply_rewrite_parent_simple(parent_ds, subdataset_path, rel_path):
     subdataset = Dataset(subdataset_path)
     subdataset_repo = subdataset.repo
 
-    # Build commit mapping by matching commit messages
+    # Build commit mapping BEFORE resetting (needs split commit to find boundary)
     # This links original parent commits to filtered subdataset commits
     commit_map = _build_commit_mapping(
         parent_repo, subdataset_repo, str(rel_path))
 
     lgr.debug("Built commit map: %d parent commits map to subdataset commits",
               len(commit_map))
+    for parent_sha, subds_sha in commit_map.items():
+        lgr.debug("  %s -> %s", parent_sha[:8], subds_sha[:8])
 
     if not commit_map:
         lgr.warning("No commits found to map - subdataset may be empty or history mismatch")
         return
+
+    # Reset to clean state for filter-branch (remove the split commit)
+    # The subdataset registration creates uncommitted changes that conflict with filter-branch
+    # After filter-branch rewrites history, the gitlinks will be added throughout history
+    lgr.debug("Resetting to prepare for history rewrite (removing split commit)")
+    parent_repo.call_git(['reset', '--hard', 'HEAD~1'])
 
     # Rewrite parent history using index-filter (faster than tree-filter)
     _rewrite_history_with_gitlinks(
@@ -1084,8 +1098,8 @@ def _rewrite_history_with_gitlinks(parent_repo, rel_path, commit_map):
 
     # Create index filter script
     filter_script = f"""#!/bin/bash
-# Get current commit being rewritten
-ORIG_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+# Get current commit being rewritten (GIT_COMMIT is set by filter-branch)
+ORIG_COMMIT=$GIT_COMMIT
 
 # Load commit map
 COMMIT_MAP_FILE="{commit_map_file}"
@@ -1137,11 +1151,15 @@ fi
 
         lgr.info("Rewriting history (this may take time for large repositories)...")
 
+        # Get current branch name
+        current_branch = parent_repo.call_git(['rev-parse', '--abbrev-ref', 'HEAD']).strip()
+
+        # Only rewrite current branch, not --all (which can cause issues)
         parent_repo.call_git([
             'filter-branch', '-f',
             '--index-filter', filter_script_path,
             '--tag-name-filter', 'cat',
-            '--', '--all'
+            '--', current_branch
         ], env=env)
 
         lgr.debug("History rewrite complete")
