@@ -96,7 +96,7 @@ devel-docs = [
 ]
 devel-utils = [
     "asv",             # benchmarks
-    "coverage!=7.6.5",
+    "coverage!=7.6.5,!=7.13.1",  # 7.13.1: ConfigError with '..' in config paths on macOS
     "gprof2dot",       # rendering cProfile output as a graph image
     "psutil",
     "pytest-xdist",    # parallelize pytest runs etc
