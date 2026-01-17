@@ -125,6 +125,17 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
 - **--force**: Proceed even if there are uncommitted changes (dangerous)
 - **-r, --recursive**: Recursively handle nested subdatasets (enabled by default for bottom-up)
 - **--jobs N**: Number of parallel operations for multiple splits
+- **--check {full,annex,tree,none}**: Post-split verification level (default: `full`)
+  - `full`: Perform both annex and tree verification (default, recommended)
+  - `annex`: Verify git-annex integrity and content accessibility
+    * Run `git annex fsck` in split subdatasets
+    * Verify all annexed files are accessible (locally or from remotes)
+    * Check that location tracking is preserved correctly
+  - `tree`: Verify directory tree structure matches original
+    * Compare complete file tree across all split subdatasets
+    * Ensure tree union matches original dataset tree
+    * Detect any missing or extra files
+  - `none`: Skip all verification checks (fast but risky)
 
 ### Example Usage
 
@@ -146,6 +157,15 @@ datalad split --dry-run data/subject01
 
 # Incremental mode (no history rewrite, backward compatible)
 datalad split --skip-rewrite all data/subject01
+
+# Skip verification for speed (use with caution)
+datalad split --check none data/subject01
+
+# Only verify annex integrity
+datalad split --check annex data/subject01
+
+# Full verification (default, recommended)
+datalad split --check full data/subject01
 ```
 
 ## Implementation Plan
@@ -309,6 +329,174 @@ def _preserve_location_tracking(clone_path, parent_path):
 - Verify `git annex whereis` shows origin for tracked files
 - Document that parent dataset must remain accessible for content retrieval
 - Consider optional `--copy-content` flag for users who want "offline" split datasets
+
+#### 2.7 Post-Split Verification (--check option)
+```python
+def _verify_split(parent_ds, split_paths, check_level='full', original_tree_snapshot=None):
+    """
+    Verify the split operation completed successfully.
+
+    Parameters:
+    - parent_ds: Parent dataset object
+    - split_paths: List of paths that were split into subdatasets
+    - check_level: Verification level ('full', 'annex', 'tree', 'none')
+    - original_tree_snapshot: Pre-split tree state for comparison
+
+    Returns:
+    - verification_results: Dict with verification status and details
+
+    Raises:
+    - VerificationError: If critical issues found during verification
+    """
+```
+
+**Check Level: 'annex' - Git-Annex Integrity Verification**
+```python
+def _verify_annex_integrity(parent_ds, split_subdatasets):
+    """
+    Verify git-annex integrity and content accessibility.
+
+    For each split subdataset:
+    1. Run 'git annex fsck' to verify repository integrity
+       - Check for corrupted objects
+       - Verify key information consistency
+       - Report any anomalies
+
+    2. Verify content accessibility:
+       - List all annexed files: git annex find
+       - For each file, check locations: git annex whereis <file>
+       - Ensure file is either:
+         a. Present locally (--in=here), OR
+         b. Available from at least one remote (origin or other)
+       - Report files with no known locations (DATA LOSS!)
+
+    3. Verify location tracking preservation:
+       - Check origin remote is configured
+       - Verify git annex whereis shows origin for files not present locally
+       - Test sample retrieval: datalad get <sample-file>
+
+    4. Check parent dataset:
+       - Verify parent no longer tracks content in split paths
+       - Verify parent's git-annex branch cleaned (optional: git annex unused)
+
+    Returns:
+    - annex_status: Dict with:
+        * fsck_passed: Boolean
+        * files_accessible: List of files with known locations
+        * files_missing: List of files with NO known locations (critical!)
+        * location_tracking_ok: Boolean
+        * origin_configured: Boolean
+        * sample_retrieval_test: Boolean
+
+    Raises:
+    - AnnexVerificationError: If files have no known locations (data loss)
+    """
+```
+
+**Check Level: 'tree' - Directory Tree Verification**
+```python
+def _verify_tree_integrity(parent_ds, split_subdatasets, original_tree_snapshot):
+    """
+    Verify directory tree structure matches original dataset.
+
+    Strategy:
+    1. Capture original tree before split:
+       - Use git ls-files to list all tracked files
+       - Store paths and their git object hashes (for verification)
+       - Optionally include annex keys for annexed files
+
+    2. After split, reconstruct tree from:
+       - Parent dataset (remaining files)
+       - All split subdatasets (union of their contents)
+
+    3. Compare original vs reconstructed:
+       - Verify all original files present in union
+       - Check for extra files (should not exist)
+       - Verify file paths match (no renames/moves)
+       - Optional: Verify object hashes match (content unchanged)
+
+    4. Verify subdataset boundaries:
+       - Ensure no file appears in multiple subdatasets
+       - Ensure split paths cleanly partition the tree
+       - Check that parent contains subdataset references, not content
+
+    Parameters:
+    - parent_ds: Parent dataset object
+    - split_subdatasets: List of split subdataset paths
+    - original_tree_snapshot: Pre-split tree state
+        * Structure: {
+            'files': {
+                'path/to/file': {
+                    'hash': 'git-object-hash',
+                    'type': 'file|symlink|submodule',
+                    'annex_key': 'SHA256-s...' (if annexed)
+                }
+            },
+            'total_files': count,
+            'total_annexed': count
+        }
+
+    Returns:
+    - tree_status: Dict with:
+        * files_in_original: count
+        * files_in_union: count
+        * files_missing: List[str] (files lost during split)
+        * files_extra: List[str] (unexpected new files)
+        * files_duplicated: List[str] (appears in multiple subdatasets)
+        * tree_matches: Boolean
+
+    Raises:
+    - TreeVerificationError: If files are missing or duplicated
+    """
+```
+
+**Check Level: 'full' - Combined Verification**
+```python
+def _verify_full(parent_ds, split_paths, original_tree_snapshot):
+    """
+    Run both annex and tree verification.
+
+    Steps:
+    1. Run tree verification first (faster, structural issues)
+    2. If tree verification passes, run annex verification
+    3. Combine results and report comprehensive status
+
+    Returns:
+    - combined_status: Dict with both annex_status and tree_status
+
+    Raises:
+    - VerificationError: If either verification fails
+    """
+```
+
+**Check Level: 'none' - Skip Verification**
+```python
+# Simply return success without checks
+# Log warning: "Skipping verification - data integrity not verified"
+```
+
+**Implementation Notes**:
+- **Capture original tree state BEFORE split** (required for tree verification)
+- Use `git ls-files -s` to get file list with modes and hashes
+- For annexed files, use `git annex whereis --json` for machine-readable output
+- Run fsck with `--fast` option by default (full fsck can be very slow)
+- Provide detailed report on verification failures with remediation suggestions
+- Consider `--check-sample N` option to only verify N random files (faster for large datasets)
+
+**Error Handling**:
+```python
+class VerificationError(Exception):
+    """Base class for verification failures."""
+    pass
+
+class AnnexVerificationError(VerificationError):
+    """Git-annex integrity check failed."""
+    pass
+
+class TreeVerificationError(VerificationError):
+    """Directory tree structure verification failed."""
+    pass
+```
 
 ### Phase 3: Advanced Features
 
@@ -556,12 +744,49 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_skip_rewrite`: Test incremental mode
    - `test_split_output_path`: Split to alternative location
 
-6. **Error Handling**
+6. **Post-Split Verification (--check option)** (CRITICAL)
+   - `test_split_verification_full`: Default verification runs both annex and tree checks
+   - `test_split_verification_annex`: Verify git-annex integrity
+     * Run with `--check annex`
+     * Verify git annex fsck executes in subdatasets
+     * Check all files have known locations (local or remote)
+     * Verify location tracking preserved (origin remote configured)
+     * Test sample content retrieval from origin
+     * Verify parent's annex branch cleaned
+   - `test_split_verification_tree`: Verify tree structure matches
+     * Run with `--check tree`
+     * Capture tree snapshot before split
+     * Compare original tree with union of (parent + subdatasets)
+     * Verify no files missing
+     * Verify no files duplicated across subdatasets
+     * Verify parent contains submodule refs, not content
+   - `test_split_verification_none`: Skip all verification
+     * Run with `--check none`
+     * Should complete quickly without running checks
+     * Log warning about skipped verification
+   - `test_split_verification_fails_on_missing_content`: **CRITICAL**
+     * Simulate scenario where annexed content has no known locations
+     * Verification should fail with AnnexVerificationError
+     * Error message should list affected files
+   - `test_split_verification_fails_on_tree_mismatch`: **CRITICAL**
+     * Simulate scenario where files are lost during split
+     * Verification should fail with TreeVerificationError
+     * Error message should list missing files
+   - `test_split_verification_report_format`: Verify report structure
+     * Check verification results dict has expected keys
+     * Verify status booleans are present
+     * Check file lists are properly formatted
+   - `test_split_verification_partial_failure`: Handle mixed results
+     * Some subdatasets pass verification, others fail
+     * Should report which subdatasets have issues
+     * Provide actionable remediation suggestions
+
+7. **Error Handling**
    - `test_split_missing_dataset`: No dataset found
    - `test_split_permission_error`: Insufficient permissions
    - `test_split_git_annex_unavailable`: Fallback behavior without git-annex
 
-7. **Integration Tests**
+8. **Integration Tests**
    - `test_split_roundtrip`: Split then clone, verify content retrievable
    - `test_split_roundtrip_with_get`: Clone split dataset, run 'datalad get -r'
    - `test_split_with_remotes`: Verify remote operations still work
@@ -569,7 +794,7 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_parent_remains_accessible`: Verify parent dataset can serve content
    - `test_split_chained_retrieval`: Clone of split can retrieve from original via origin chain
 
-8. **Performance Tests** (in `benchmarks/`)
+9. **Performance Tests** (in `benchmarks/`)
    - Benchmark splitting large directories (1000+ files)
    - Benchmark with many subdatasets (100+ nested)
    - Memory usage during filter operations
