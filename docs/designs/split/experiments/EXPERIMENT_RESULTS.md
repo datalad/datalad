@@ -828,12 +828,13 @@ ls -lh data.dat
 
 ### Branch Naming for Worktree
 
-Paths with slashes need sanitization for git branch names:
+Git branch names can contain slashes, so we preserve the hierarchical structure:
 
 ```bash
 # Path: data/subjects/subject01
-# Branch: split--data--subjects--subject01
-BRANCH="split--$(echo "$TARGET_PATH" | tr '/' '-')"
+# Branch: split/data/subjects/subject01 (hierarchical!)
+PREFIX="split/"  # Configurable via --worktree-branch-prefix
+BRANCH="${PREFIX}${TARGET_PATH}"
 git branch "$BRANCH" HEAD
 git worktree add "$TARGET" "$BRANCH"
 ```
@@ -841,8 +842,9 @@ git worktree add "$TARGET" "$BRANCH"
 ### Validated Workflow (Worktree)
 
 ```bash
-# 1. Create branch
-BRANCH="split--$(echo "$TARGET" | tr '/' '-')"
+# 1. Create branch with hierarchical name
+PREFIX="split/"  # Default, configurable via --worktree-branch-prefix
+BRANCH="${PREFIX}${TARGET}"  # e.g., split/data/subjects/subject01
 git branch "$BRANCH" HEAD
 
 # 2. Remove from index
