@@ -199,6 +199,40 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
   - Note: Repository-wide settings (`git annex config`) are handled automatically by git-annex filter-branch
 - **--exclude-annex-config SETTINGS**: Exclude specific annex.* settings from propagation (comma-separated)
 - **--interactive-config**: Interactively prompt for each annex.* setting to propagate
+- **--content-mode {nothing,copy,move,reckless-hardlink,reckless-ephemeral,worktree}**: Control how annexed content is handled (default: `nothing`)
+  - `nothing`: Don't make content available in subdataset (retrieve on-demand from origin) - **default**
+    * Subdataset tracks content location but doesn't have local copies
+    * Use `datalad get` to retrieve content from parent when needed
+    * Most storage-efficient, requires parent accessible
+  - `copy`: Copy present content from parent to subdataset
+    * Run `datalad get` in subdataset to copy content from parent (origin)
+    * Content exists in both parent and subdataset
+    * Doubles storage usage but subdataset is self-contained
+    * Parent remains source of truth
+  - `move`: Move content from parent to subdataset
+    * Use `git annex move --to <subdataset>` to transfer content
+    * Content removed from parent, placed in subdataset
+    * Parent knows content location is now in subdataset
+    * Storage-efficient, subdataset becomes content holder
+  - `reckless-hardlink`: Hardlink content files from parent to subdataset
+    * Create hardlinks in subdataset's `.git/annex/objects` to parent's objects
+    * Similar to `datalad install --reckless=hardlink`
+    * Shares storage via hardlinks, no duplication
+    * **WARNING**: Modifications to content affect both parent and subdataset
+    * Requires same filesystem for parent and subdataset
+    * More independent than ephemeral (separate annex metadata)
+  - `reckless-ephemeral`: Share annex object store via symlink
+    * Symlink subdataset's `.git/annex` to parent's `.git/annex`
+    * Similar to `datalad install --reckless=ephemeral`
+    * Shares storage completely, no duplication
+    * **WARNING**: Subdataset is not independent, relies on parent's annex
+    * Suitable for temporary working copies
+  - `worktree`: Use git worktree instead of clone
+    * Create subdataset as git worktree with branch named after hierarchy
+    * Share git object database with parent
+    * Independent working tree, shared storage
+    * Allows independent development while reusing objects
+    * More efficient than clone, maintains relationship to parent
 
 ### Example Usage
 
@@ -238,6 +272,25 @@ datalad split --interactive-config data/subject01
 
 # Don't propagate any annex config (manual configuration later)
 datalad split --propagate-annex-config=none data/subject01
+
+# Content handling modes
+# Default: content not copied, retrieve on-demand from parent
+datalad split data/subject01
+
+# Copy present content to subdataset (self-contained but doubles storage)
+datalad split --content-mode=copy data/subject01
+
+# Move content from parent to subdataset (storage-efficient)
+datalad split --content-mode=move data/subject01
+
+# Use hardlinks to share content (efficient, same filesystem required)
+datalad split --content-mode=reckless-hardlink data/subject01
+
+# Share annex via symlink (temporary working copy)
+datalad split --content-mode=reckless-ephemeral data/subject01
+
+# Use git worktree (shared objects, independent working tree)
+datalad split --content-mode=worktree data/subject01
 ```
 
 ## Implementation Plan
@@ -606,7 +659,160 @@ References:
 - [annex.largefiles configuration](https://git-annex.branchable.com/tips/largefiles/)
 - [unlocked files configuration](https://github.com/RonnyPfannschmidt/git-annex/blob/master/doc/tips/unlocked_files.mdwn)
 
-#### 2.9 Post-Split Verification (--check option)
+#### 2.9 Content Mode Handling (--content-mode option)
+```python
+def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing'):
+    """
+    Handle annexed content according to specified mode.
+
+    IMPORTANT: This addresses the use case where parent dataset has
+    annexed content present locally (e.g., locked under .git/annex).
+
+    Parameters:
+    - parent_ds: Parent dataset object
+    - split_ds: Split subdataset object (after filtering)
+    - target_path: Path that was split
+    - content_mode: Strategy for handling content
+
+    Modes:
+
+    1. 'nothing' (default):
+       - Do nothing - content not present in subdataset
+       - Subdataset can retrieve on-demand via 'datalad get' from origin
+       - Most storage-efficient
+       - Implementation: Already handled by location tracking (section 2.8)
+
+    2. 'copy':
+       - Copy present content from parent to subdataset
+       - Implementation:
+         cd <split_ds>
+         # Get list of annexed files
+         annexed_files=$(git annex find)
+         # For each file, copy from parent (origin)
+         for file in $annexed_files; do
+             datalad get "$file"
+         done
+       - Result: Content in both parent and subdataset
+       - Storage: Doubles usage
+       - Benefit: Subdataset is self-contained
+
+    3. 'move':
+       - Move content from parent to subdataset
+       - Implementation:
+         cd <parent_ds>
+         # Initialize subdataset as git-annex remote
+         cd <target_path>
+         git annex init
+         cd <parent_ds>
+         git remote add subdataset-temp ./<target_path>
+         # Move content for files under target_path
+         git annex move --to subdataset-temp <target_path>/
+         git remote remove subdataset-temp
+       - Result: Content only in subdataset, parent knows location
+       - Storage: No duplication
+       - Benefit: Parent freed of content, subdataset becomes holder
+
+    4. 'reckless-hardlink':
+       - Hardlink content from parent to subdataset
+       - Implementation:
+         cd <split_ds>
+         # For each annexed file
+         annexed_files=$(git annex find)
+         for file in $annexed_files; do
+             key=$(git annex lookupkey "$file")
+             parent_obj="<parent>/.git/annex/objects/.../SHA256-..."
+             subds_obj=".git/annex/objects/.../SHA256-..."
+             # Create hardlink
+             mkdir -p $(dirname "$subds_obj")
+             ln "$parent_obj" "$subds_obj"
+             git annex fsck "$file"  # Update location tracking
+         done
+       - Result: Shared storage via hardlinks
+       - Storage: No duplication (same inode)
+       - WARNING: Modifications affect both datasets
+       - Requirement: Same filesystem
+
+    5. 'reckless-ephemeral':
+       - Share entire annex object store via symlink
+       - Implementation:
+         cd <split_ds>
+         rm -rf .git/annex/objects
+         ln -s <parent>/.git/annex/objects .git/annex/objects
+         # Keep separate annex metadata
+       - Result: Complete sharing of object store
+       - Storage: No duplication
+       - WARNING: Not independent, relies on parent
+       - Use case: Temporary working copies
+
+    6. 'worktree':
+       - Use git worktree instead of clone
+       - Implementation (REPLACES the clone step in 2.4):
+         cd <parent_ds>
+         # Create branch for subdataset with hierarchical name
+         branch_name="split/<target_path_normalized>"  # e.g., split/data/raw
+         git branch "$branch_name" HEAD
+         # Remove from index (as in corrected workflow)
+         git rm -r --cached <target_path>/
+         # Create worktree
+         git worktree add <target_path> "$branch_name"
+         cd <target_path>
+         # Continue with filter-branch as normal
+         git-annex filter-branch <target_path> --include-all-key-information
+         git filter-branch --subdirectory-filter <target_path> HEAD
+         # Worktree already shares .git/objects with parent
+       - Result: Shared object database, independent working tree
+       - Storage: Efficient (shared git objects)
+       - Benefit: Independent development, maintained relationship
+       - Note: git-annex works with worktrees, content sharing possible
+
+    Returns:
+    - content_handled: Boolean indicating success
+    - content_stats: Dict with storage info, file counts
+    """
+```
+
+**Implementation Considerations**:
+
+1. **Storage Impact Table**:
+   ```
+   Mode               | Parent Storage | Subdataset Storage | Total Impact
+   -------------------|----------------|--------------------|--------------
+   nothing            | Unchanged      | 0                  | No increase
+   copy               | Unchanged      | 100% duplication   | 2x original
+   move               | Freed          | Original size      | No increase
+   reckless-hardlink  | Unchanged      | 0 (hardlinks)      | No increase*
+   reckless-ephemeral | Unchanged      | 0 (symlink)        | No increase
+   worktree           | Shared         | 0 (shared objects) | No increase
+
+   * Requires same filesystem
+   ```
+
+2. **Independence Matrix**:
+   ```
+   Mode               | Dataset Independent? | Content Independent? | Safe for Production?
+   -------------------|----------------------|----------------------|---------------------
+   nothing            | Yes                  | N/A (on-demand)      | Yes
+   copy               | Yes                  | Yes                  | Yes
+   move               | Yes                  | Yes                  | Yes
+   reckless-hardlink  | Yes (metadata)       | No (shared inodes)   | Use with caution
+   reckless-ephemeral | No (shared annex)    | No                   | No (temp only)
+   worktree           | Partial (branch)     | Partial (shared)     | Use with caution
+   ```
+
+3. **Selection Guidance**:
+   - **Production datasets**: Use `nothing` (default), `copy`, or `move`
+   - **Development/testing**: Use `reckless-hardlink` or `worktree`
+   - **Temporary analysis**: Use `reckless-ephemeral`
+   - **Large datasets with limited storage**: Use `nothing` or `move`
+   - **Offline subdatasets needed**: Use `copy`
+
+4. **Validation Requirements**:
+   - For all modes: Verify content accessibility post-split
+   - For reckless modes: Display warning about implications
+   - For worktree: Check git-annex compatibility
+   - For hardlink: Verify same filesystem
+
+#### 2.10 Post-Split Verification (--check option)
 ```python
 def _verify_split(parent_ds, split_paths, check_level='full', original_tree_snapshot=None):
     """
@@ -1021,7 +1227,57 @@ def _split_with_nested_subdatasets(dataset, target_paths):
      * Verify git annex config handled by filter-branch
      * Verify git config handled by propagation logic
 
-4. **Nested Subdatasets** (Phase 4 - .gitmodules reconstruction)
+4. **Content Mode Handling (--content-mode)** (CRITICAL)
+   - `test_split_content_mode_nothing`: **CRITICAL** - Default mode, on-demand retrieval
+     * Split with --content-mode=nothing (default)
+     * Verify content not present in subdataset initially
+     * Verify datalad get retrieves from parent
+     * Check git annex whereis shows origin
+   - `test_split_content_mode_copy`: Copy content to subdataset
+     * Parent has annexed content present locally
+     * Split with --content-mode=copy
+     * Verify content copied to subdataset
+     * Verify content still in parent
+     * Check storage doubled
+   - `test_split_content_mode_move`: Move content to subdataset
+     * Parent has annexed content present locally
+     * Split with --content-mode=move
+     * Verify content moved to subdataset
+     * Verify content removed from parent
+     * Check parent knows subdataset has content
+     * Verify no storage increase
+   - `test_split_content_mode_reckless_hardlink`: Hardlink content
+     * Parent has annexed content present
+     * Split with --content-mode=reckless-hardlink
+     * Verify hardlinks created (same inode)
+     * Verify no storage duplication
+     * Check modifications affect both (WARNING test)
+     * Verify requires same filesystem
+   - `test_split_content_mode_reckless_ephemeral`: Share annex via symlink
+     * Split with --content-mode=reckless-ephemeral
+     * Verify .git/annex/objects is symlink to parent
+     * Check content accessible in subdataset
+     * Verify no independent annex
+   - `test_split_content_mode_worktree`: Use git worktree
+     * Split with --content-mode=worktree
+     * Verify worktree created (not clone)
+     * Check shared .git/objects with parent
+     * Verify independent working tree
+     * Test git-annex compatibility
+   - `test_split_content_mode_storage_impact`: Verify storage calculations
+     * Test each mode's storage impact matches specification
+     * Verify Storage Impact Table accuracy
+   - `test_split_content_mode_warnings`: Verify warnings displayed
+     * reckless modes should display warnings
+     * User should be informed of implications
+   - `test_split_content_mode_validation`: Verify filesystem checks
+     * hardlink mode should check same filesystem
+     * worktree mode should verify git-annex support
+   - `test_split_content_mode_mixed_content`: Handle partially present content
+     * Parent has some content present, some not
+     * Test each mode handles mixed scenario correctly
+
+5. **Nested Subdatasets** (Phase 4 - .gitmodules reconstruction)
    - `test_split_detects_nested_subdatasets`: Detect subdatasets under target path
    - `test_split_error_on_nested_without_support`: Phase 1 should error with clear message
    - `test_split_reconstructs_gitmodules`: Verify .gitmodules recreated with adjusted paths
@@ -1041,7 +1297,7 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_gitmodules_relative_urls_adjusted`: Relative URLs adjusted correctly (./path, ../path)
    - `test_split_gitmodules_config_completeness`: Verify no configuration lost during reconstruction
 
-5. **Edge Cases**
+6. **Edge Cases**
    - `test_split_nonexistent_path`: Should fail gracefully
    - `test_split_already_subdataset`: Should detect and error
    - `test_split_path_in_subdataset`: **CRITICAL** - Verify paths belonging to subdatasets are rejected
@@ -1055,13 +1311,13 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_empty_directory`: Handle empty directories
    - `test_split_with_uncommitted_changes`: Behavior with dirty working tree
 
-6. **Configuration & Options**
+7. **Configuration & Options**
    - `test_split_with_cfg_proc`: Apply configuration processors
    - `test_split_dry_run`: Verify no changes made in dry-run mode
    - `test_split_skip_rewrite`: Test incremental mode
    - `test_split_output_path`: Split to alternative location
 
-7. **Post-Split Verification (--check option)** (CRITICAL)
+8. **Post-Split Verification (--check option)** (CRITICAL)
    - `test_split_verification_full`: Default verification runs both annex and tree checks
    - `test_split_verification_annex`: Verify git-annex integrity
      * Run with `--check annex`
@@ -1098,12 +1354,12 @@ def _split_with_nested_subdatasets(dataset, target_paths):
      * Should report which subdatasets have issues
      * Provide actionable remediation suggestions
 
-8. **Error Handling**
+9. **Error Handling**
    - `test_split_missing_dataset`: No dataset found
    - `test_split_permission_error`: Insufficient permissions
    - `test_split_git_annex_unavailable`: Fallback behavior without git-annex
 
-9. **Integration Tests**
+10. **Integration Tests**
    - `test_split_roundtrip`: Split then clone, verify content retrievable
    - `test_split_roundtrip_with_get`: Clone split dataset, run 'datalad get -r'
    - `test_split_with_remotes`: Verify remote operations still work
@@ -1111,7 +1367,7 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_parent_remains_accessible`: Verify parent dataset can serve content
    - `test_split_chained_retrieval`: Clone of split can retrieve from original via origin chain
 
-10. **Performance Tests** (in `benchmarks/`)
+11. **Performance Tests** (in `benchmarks/`)
    - Benchmark splitting large directories (1000+ files)
    - Benchmark with many subdatasets (100+ nested)
    - Memory usage during filter operations
