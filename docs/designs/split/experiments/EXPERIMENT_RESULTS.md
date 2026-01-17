@@ -341,6 +341,162 @@ The **CORRECT workflow** is:
 
 ---
 
+## Experiment 8: Complete Split Workflow
+
+**Status**: ✅ **SUCCESS** - Full end-to-end workflow validated
+
+### Results
+
+Tested the complete split workflow on real-world dataset (dandizarrs dataset):
+1. Clone and filter subdirectory into separate location
+2. Remove original content from parent
+3. Register filtered dataset as subdataset at original location
+4. Verify clean git status
+5. Test content retrieval with `datalad get -r`
+
+**All checks passed**:
+- ✅ Split subdataset created
+- ✅ Registered in parent at original location (`sorting/`)
+- ✅ Original content removed from parent
+- ✅ Parent git status clean
+- ✅ Content retrievable (30 annexed files from web)
+- ✅ Subdataset git status clean
+
+### Key Workflow Steps
+
+```bash
+# 1. Create split dataset (outside parent)
+cd /tmp
+git clone parent-dataset sorting-split
+cd sorting-split
+git annex filter-branch sorting --include-all-key-information
+git filter-branch --subdirectory-filter sorting --prune-empty HEAD
+git remote set-url origin /path/to/parent
+
+# 2. In parent: remove original, register subdataset
+cd parent-dataset
+git rm -rf sorting/
+datalad save -m "Remove sorting"
+datalad install -d . -s /path/to/sorting-split sorting
+
+# 3. Verify
+git status  # clean
+datalad get -r sorting  # retrieves all content
+```
+
+### Conclusions
+
+The complete workflow is sound and works end-to-end with real datasets!
+
+---
+
+## Experiment 9: In-Place Split
+
+**Status**: ✅ **SUCCESS** - Simplified workflow validated
+
+### Results
+
+Tested **cleaner in-place approach**:
+1. `rm -rf sorting/` (don't commit)
+2. `git clone . sorting/` (clone directly into place)
+3. Filter in place
+4. Register as submodule
+5. Single `datalad save -d . -r` at the end
+
+**Results**:
+- ✅ Single subfolder split: CLEAN git status
+- ✅ Multiple subfolders (sorting, extensions, recording): CLEAN git status
+- ✅ Content retrieval works (417 files retrieved from web)
+- ✅ Much simpler than external clone approach
+
+### Key Advantages
+
+1. **Simpler**: No need to clone outside and move back
+2. **Cleaner**: Direct in-place filtering
+3. **Efficient**: Single save at end for multiple splits
+4. **Batch-friendly**: Easy to split multiple directories in loop
+
+### Recommended Workflow
+
+```bash
+# For each directory to split:
+rm -rf TARGET/
+git clone . TARGET/
+cd TARGET/
+git annex filter-branch TARGET --include-all-key-information
+git filter-branch --subdirectory-filter TARGET HEAD
+git remote set-url origin /path/to/parent
+cd ..
+git submodule add ./TARGET TARGET
+
+# After all splits:
+datalad save -d . -r -m "Split directories into subdatasets"
+```
+
+---
+
+## Experiment 10: Nested Subdataset Split
+
+**Status**: ⚠️ **PARTIAL** - Confirms nested subdataset limitation
+
+### Results
+
+Attempted bottom-up split of nested structure:
+```
+parent/
+  └── data/              # to be subdataset
+      ├── raw/           # to be nested subdataset
+      │   ├── subject01/ # to be deeply nested
+      │   └── subject02/ # to be deeply nested
+      └── processed/     # to be subdataset
+```
+
+**What Happened**:
+- ✅ Deepest directories split first (subject01, subject02, processed)
+- ✅ Parent directories split (raw, data)
+- ⚠️ **Only outermost `data/` became subdataset**
+- ✗ Nested structure lost - all became regular directories inside `data/`
+
+**Verification**:
+```
+data/: IS subdataset
+data/raw/subject01: NOT a subdataset (regular directory)
+data/raw/subject02: NOT a subdataset (regular directory)
+data/processed: NOT a subdataset (regular directory)
+data/raw: NOT a subdataset (regular directory)
+```
+
+### Why This Happens
+
+**Root Cause**: `git filter-branch --subdirectory-filter` **loses `.gitmodules`**
+
+When we:
+1. Split `subject01` and `subject02` first → registered as subdatasets in parent
+2. Then split `data/raw` → clone parent, filter to `data/raw/`
+3. The filtering **loses `.gitmodules`** from the filtered history
+4. So `subject01/` and `subject02/` become regular directories, not subdataset references
+
+This is the **same issue** discovered in Experiment 2.
+
+### Conclusions
+
+**For Phase 1 Implementation**:
+- Detect nested subdatasets before splitting
+- **ERROR** with clear message: "Cannot split directories containing subdatasets"
+- Document this as a known limitation
+
+**For Phase 2 (Future Work)**:
+- Implement special handling to preserve/reconstruct `.gitmodules`
+- Options:
+  - Manually reconstruct `.gitmodules` after filtering
+  - Use different filtering approach that preserves submodule information
+  - Process subdatasets separately from parent filtering
+
+**Current Recommendation**:
+Only split **leaf directories** that don't contain subdatasets.
+
+---
+
 ## Overall Assessment
 
 ### What's Ready for Implementation
@@ -444,12 +600,16 @@ bash docs/designs/split/experiments/02_nested_subdatasets.sh
 bash docs/designs/split/experiments/03_metadata_cleanup.sh
 bash docs/designs/split/experiments/05_real_world_validation.sh
 bash docs/designs/split/experiments/06_content_transfer_fix.sh
-bash docs/designs/split/experiments/07_correct_location_tracking.sh  # DEFINITIVE
+bash docs/designs/split/experiments/07_correct_location_tracking.sh  # Correct git-annex usage
+bash docs/designs/split/experiments/08_complete_split_workflow.sh   # Full end-to-end on real dataset
+bash docs/designs/split/experiments/09_in_place_split.sh            # RECOMMENDED: In-place approach
+bash docs/designs/split/experiments/10_nested_split.sh              # Documents nested limitation
 ```
 
 **Note**: Experiments create temporary directories under `/tmp/datalad-split-expXX/` which can be examined after running.
 
 **Important**:
-- Experiments 5 & 6 initially explored content transfer approaches
-- **Experiment 7 validates the CORRECT approach** using proper git-annex location tracking
-- The correct workflow: use `--include-all-key-information` and keep origin remote configured
+- **Experiment 9 shows the RECOMMENDED workflow**: in-place split with single save at end
+- Experiment 7 validates correct git-annex location tracking (use `--include-all-key-information`)
+- Experiment 8 confirms end-to-end workflow on real-world dataset
+- Experiment 10 documents nested subdataset limitation (Phase 2 feature)
