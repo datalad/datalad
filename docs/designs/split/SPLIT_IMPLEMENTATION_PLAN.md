@@ -136,6 +136,14 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
     * Ensure tree union matches original dataset tree
     * Detect any missing or extra files
   - `none`: Skip all verification checks (fast but risky)
+- **--propagate-annex-config {all,common,none,SETTINGS}**: Control git config annex.* propagation (default: `common`)
+  - `all`: Propagate all annex.* settings from parent to subdatasets
+  - `common`: Propagate safe common settings (annex.addunlocked, annex.largefiles, annex.backend)
+  - `none`: Don't propagate any annex.* settings
+  - `SETTINGS`: Comma-separated list of specific settings (e.g., "annex.addunlocked,annex.backend")
+  - Note: Repository-wide settings (`git annex config`) are handled automatically by git-annex filter-branch
+- **--exclude-annex-config SETTINGS**: Exclude specific annex.* settings from propagation (comma-separated)
+- **--interactive-config**: Interactively prompt for each annex.* setting to propagate
 
 ### Example Usage
 
@@ -166,6 +174,15 @@ datalad split --check annex data/subject01
 
 # Full verification (default, recommended)
 datalad split --check full data/subject01
+
+# Propagate specific annex config settings
+datalad split --propagate-annex-config="annex.addunlocked,annex.backend" data/subject01
+
+# Interactive config propagation
+datalad split --interactive-config data/subject01
+
+# Don't propagate any annex config (manual configuration later)
+datalad split --propagate-annex-config=none data/subject01
 ```
 
 ## Implementation Plan
@@ -277,7 +294,100 @@ def _register_subdataset(parent_ds, subdataset_path):
     """
 ```
 
-#### 2.5 Content Removal from Parent
+#### 2.5 Gitattributes Inheritance (CRITICAL)
+```python
+def _reconstruct_gitattributes(parent_ds, target_path, split_dataset_path):
+    """
+    CRITICAL: Reconstruct .gitattributes in split subdataset to preserve git/git-annex behavior.
+
+    Git's .gitattributes inheritance behavior (validated via testing):
+    - Per-attribute inheritance: Subdirectories inherit attributes from parent .gitattributes
+      unless specifically overridden for that attribute
+    - Proximity precedence: Closer .gitattributes files override more distant ones
+    - Path-specific rules: Patterns like data/raw/** apply to matching paths
+    - Subdirectories inherit from all .gitattributes files in parent directories
+
+    Example from testing:
+        Root .gitattributes:
+            *.txt text eol=lf
+            * annex.largefile=((mimeencoding=binary)and(largerthan=100kb))
+            data/raw/** annex.largefiles=anything
+
+        data/.gitattributes:
+            *.txt text eol=crlf
+            *.csv diff=csv
+
+        Result for data/raw/nested.txt:
+            text: set (from root *.txt)
+            eol: crlf (from data/ *.txt, overrides root)
+            annex.largefile: ((mimeencoding=binary)and(largerthan=100kb)) (from root *)
+            annex.largefiles: anything (from root data/raw/**)
+
+    Strategy for splitting data/raw/ into subdataset:
+
+    1. Collect all .gitattributes from root down to target directory:
+       - Read /.gitattributes
+       - Read /data/.gitattributes
+       - Read /data/raw/.gitattributes (if exists)
+
+    2. Filter and adjust rules for each .gitattributes file:
+       a. Wildcard rules (*, *.txt, etc.): Copy as-is
+       b. Path-specific rules:
+          - If path matches or is under target_path:
+            * Strip target_path prefix
+            * Example: "data/raw/**" → "**" when splitting data/raw/
+            * Example: "data/*.csv" → SKIP (doesn't apply to data/raw/)
+          - If path doesn't match target_path: SKIP
+
+    3. Merge rules respecting precedence:
+       - Start with rules from root
+       - Layer on rules from intermediate directories (data/)
+       - Layer on rules from target directory (data/raw/)
+       - Closer directories override earlier ones (per-attribute)
+
+    4. Write consolidated .gitattributes to split dataset root:
+       - Include all applicable wildcard rules
+       - Include adjusted path-specific rules
+       - Maintain precedence order (later rules override earlier)
+
+    5. Handle special cases:
+       - If only wildcard rules (*), can copy parent .gitattributes as-is
+       - If no .gitattributes in ancestry, no file needed
+       - Preserve comments for documentation
+
+    Parameters:
+    - parent_ds: Parent dataset object
+    - target_path: Path being split (e.g., "data/raw")
+    - split_dataset_path: Path to split subdataset
+
+    Returns:
+    - gitattributes_content: String content of reconstructed .gitattributes
+    - rules_applied: List of rules that apply to split content
+
+    Example:
+        Splitting data/raw/ with parent rules:
+            Root: "*.dat filter=annex"
+            Root: "data/raw/** annex.largefiles=anything"
+            data/: "*.csv diff=csv"
+
+        Result in data/raw/.gitattributes:
+            *.dat filter=annex
+            ** annex.largefiles=anything
+            *.csv diff=csv
+
+    References:
+    - Git docs: https://git-scm.com/docs/gitattributes
+    - Testing validated per-attribute inheritance and precedence behavior
+    """
+```
+
+**Implementation Notes**:
+- Use `git check-attr -a <file>` to verify reconstructed attributes match expected
+- Test with both wildcard patterns and path-specific rules
+- Preserve per-attribute precedence (don't just concatenate files)
+- Consider `--preserve-gitattributes` flag to skip this step if user wants manual control
+
+#### 2.6 Content Removal from Parent
 ```python
 def _remove_content_from_parent(parent_ds, path):
     """
@@ -288,7 +398,7 @@ def _remove_content_from_parent(parent_ds, path):
     """
 ```
 
-#### 2.6 Location Tracking Preservation (CRITICAL)
+#### 2.7 Location Tracking Preservation (CRITICAL)
 ```python
 def _preserve_location_tracking(clone_path, parent_path):
     """
@@ -324,11 +434,80 @@ def _preserve_location_tracking(clone_path, parent_path):
 
 **Implementation Notes**:
 - Use `git-annex filter-branch --include-all-key-information --include-all-repo-config`
+  - `--include-all-repo-config` handles repository-wide settings from `git annex config`
+  - This includes special remote configs, trust settings, preferred content, etc.
 - Update origin remote URL to absolute path of parent dataset
 - **DO NOT** mark origin as dead or remove the remote
 - Verify `git annex whereis` shows origin for tracked files
 - Document that parent dataset must remain accessible for content retrieval
 - Consider optional `--copy-content` flag for users who want "offline" split datasets
+
+**Git-Annex Config Propagation**:
+
+Repository-wide settings (handled by `git-annex filter-branch --include-all-repo-config`):
+- Settings from `git annex config` (stored in git-annex branch)
+- Special remote configurations
+- Trust settings (trusted, semitrusted, untrusted repos)
+- Preferred content expressions
+- Required content settings
+- Numcopies settings
+
+Local git config annex.* settings (require explicit handling):
+- `annex.addunlocked`: Controls whether files are added in unlocked mode
+- `annex.largefiles`: Expression for which files go to annex vs git
+- `annex.dotfiles`: Whether to annex dotfiles
+- `annex.backend`: Default backend for storing file content
+- `annex.thin`: Use hard links for unlocked files
+- `annex.stalldetection`: Network stall detection settings
+- `annex.retry`: Number of retries for failed transfers
+- `annex.web-options`: Options for web special remote
+
+Strategy for local git config propagation:
+1. **Scan parent's git config** for annex.* settings:
+   ```bash
+   git config --local --get-regexp '^annex\.'
+   ```
+
+2. **Interactive mode** (default with `--interactive-config`):
+   - Present user with list of parent's annex.* settings
+   - Ask which to propagate to split subdatasets
+   - Explain each setting's impact
+   - Example: "Parent has annex.addunlocked=true. Apply to split subdataset? [Y/n]"
+
+3. **Automatic propagation** (with `--propagate-annex-config all|common|none`):
+   - `all`: Propagate all annex.* settings
+   - `common`: Propagate common safe settings (addunlocked, largefiles, backend)
+   - `none`: Don't propagate any (user manually configures later)
+   - Default: `common`
+
+4. **Explicit selection** (with `--propagate-annex-config="setting1,setting2"`):
+   - User specifies exact settings to propagate
+   - Example: `--propagate-annex-config="annex.addunlocked,annex.backend"`
+
+5. **Exclusion** option: `--exclude-annex-config="setting1,setting2"`
+
+Implementation:
+```python
+def _propagate_annex_config(parent_ds, split_ds, mode='common', explicit_settings=None):
+    """
+    Propagate annex.* git config settings to split subdataset.
+
+    Note: git annex config settings are handled by git-annex filter-branch
+    --include-all-repo-config. This function handles local git config only.
+    """
+```
+
+**Documentation Requirements**:
+- Explicitly state that `git annex config` (repository-wide) is handled by filter-branch
+- Document which local settings are safe to propagate automatically
+- Warn about settings that may need customization per subdataset
+- Provide examples of common configuration scenarios
+
+References:
+- [git-annex filter-branch](https://git-annex.branchable.com/git-annex-filter-branch/)
+- [git-annex-config](https://git-annex.branchable.com/git-annex-config/)
+- [annex.largefiles configuration](https://git-annex.branchable.com/tips/largefiles/)
+- [unlocked files configuration](https://github.com/RonnyPfannschmidt/git-annex/blob/master/doc/tips/unlocked_files.mdwn)
 
 #### 2.7 Post-Split Verification (--check option)
 ```python
@@ -704,7 +883,48 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_large_annexed_files`: Test with GB-sized files
    - `test_split_partial_content`: Handle case where some content is not available in parent
 
-3. **Nested Subdatasets** (Phase 4 - .gitmodules reconstruction)
+3. **Gitattributes & Git Config Propagation** (CRITICAL)
+   - `test_split_reconstructs_gitattributes`: **CRITICAL** - Verify .gitattributes reconstructed
+     * Parent has root .gitattributes with wildcard rules (*.txt, *)
+     * Parent has path-specific rules (data/raw/** annex.largefiles=anything)
+     * data/ has .gitattributes with overrides (*.txt eol=crlf)
+     * Split data/raw/ into subdataset
+     * Verify split dataset has .gitattributes with:
+       - Wildcard rules from root and data/ (with precedence)
+       - Adjusted path-specific rules (data/raw/** → **)
+     * Use `git check-attr` to verify attributes match expected
+   - `test_split_gitattributes_wildcard_only`: Simple case with only * rules
+     * Should copy parent .gitattributes as-is
+   - `test_split_gitattributes_path_adjustment`: Path-specific rule adjustment
+     * Verify data/raw/** becomes ** in split dataset
+     * Verify data/*.csv is excluded (doesn't apply)
+   - `test_split_gitattributes_no_ancestry`: No .gitattributes in parent
+     * Split dataset should not have .gitattributes
+   - `test_split_gitattributes_precedence`: Per-attribute precedence preserved
+     * Root sets eol=lf, subdirectory overrides to eol=crlf
+     * Verify subdirectory override is preserved in split
+   - `test_split_annex_config_propagation_common`: **CRITICAL** - Test --propagate-annex-config=common
+     * Parent has annex.addunlocked=true, annex.backend=SHA256
+     * Split with default (common) propagation
+     * Verify split dataset has same settings
+     * Verify git annex config settings NOT copied (handled by filter-branch)
+   - `test_split_annex_config_propagation_all`: Test --propagate-annex-config=all
+     * Parent has various annex.* settings
+     * Verify all are copied to split dataset
+   - `test_split_annex_config_propagation_none`: Test --propagate-annex-config=none
+     * Parent has annex.* settings
+     * Verify split dataset has NO annex.* config
+   - `test_split_annex_config_explicit_list`: Test explicit setting list
+     * --propagate-annex-config="annex.addunlocked,annex.backend"
+     * Verify only specified settings are propagated
+   - `test_split_annex_config_exclude`: Test --exclude-annex-config
+     * Propagate common settings but exclude specific one
+   - `test_split_annex_config_vs_annex_config`: Verify distinction
+     * Set both `git config annex.X=Y` and `git annex config annex.X=Z`
+     * Verify git annex config handled by filter-branch
+     * Verify git config handled by propagation logic
+
+4. **Nested Subdatasets** (Phase 4 - .gitmodules reconstruction)
    - `test_split_detects_nested_subdatasets`: Detect subdatasets under target path
    - `test_split_error_on_nested_without_support`: Phase 1 should error with clear message
    - `test_split_reconstructs_gitmodules`: Verify .gitmodules recreated with adjusted paths
@@ -724,7 +944,7 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_gitmodules_relative_urls_adjusted`: Relative URLs adjusted correctly (./path, ../path)
    - `test_split_gitmodules_config_completeness`: Verify no configuration lost during reconstruction
 
-4. **Edge Cases**
+5. **Edge Cases**
    - `test_split_nonexistent_path`: Should fail gracefully
    - `test_split_already_subdataset`: Should detect and error
    - `test_split_path_in_subdataset`: **CRITICAL** - Verify paths belonging to subdatasets are rejected
@@ -738,13 +958,13 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_empty_directory`: Handle empty directories
    - `test_split_with_uncommitted_changes`: Behavior with dirty working tree
 
-5. **Configuration & Options**
+6. **Configuration & Options**
    - `test_split_with_cfg_proc`: Apply configuration processors
    - `test_split_dry_run`: Verify no changes made in dry-run mode
    - `test_split_skip_rewrite`: Test incremental mode
    - `test_split_output_path`: Split to alternative location
 
-6. **Post-Split Verification (--check option)** (CRITICAL)
+7. **Post-Split Verification (--check option)** (CRITICAL)
    - `test_split_verification_full`: Default verification runs both annex and tree checks
    - `test_split_verification_annex`: Verify git-annex integrity
      * Run with `--check annex`
@@ -781,12 +1001,12 @@ def _split_with_nested_subdatasets(dataset, target_paths):
      * Should report which subdatasets have issues
      * Provide actionable remediation suggestions
 
-7. **Error Handling**
+8. **Error Handling**
    - `test_split_missing_dataset`: No dataset found
    - `test_split_permission_error`: Insufficient permissions
    - `test_split_git_annex_unavailable`: Fallback behavior without git-annex
 
-8. **Integration Tests**
+9. **Integration Tests**
    - `test_split_roundtrip`: Split then clone, verify content retrievable
    - `test_split_roundtrip_with_get`: Clone split dataset, run 'datalad get -r'
    - `test_split_with_remotes`: Verify remote operations still work
@@ -794,7 +1014,7 @@ def _split_with_nested_subdatasets(dataset, target_paths):
    - `test_split_parent_remains_accessible`: Verify parent dataset can serve content
    - `test_split_chained_retrieval`: Clone of split can retrieve from original via origin chain
 
-9. **Performance Tests** (in `benchmarks/`)
+10. **Performance Tests** (in `benchmarks/`)
    - Benchmark splitting large directories (1000+ files)
    - Benchmark with many subdatasets (100+ nested)
    - Memory usage during filter operations
