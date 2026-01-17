@@ -849,6 +849,50 @@ def test_lorisadapter(d=None, keyring=None):
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
+def test_server_error_retry(toppath=None, topurl=None):
+    """Test retry logic for 5xx server errors (e.g., 503 Service Unavailable)."""
+    furl = "%sfile.dat" % topurl
+    downloader = HTTPDownloader()
+
+    def _fail_get_downloader_session(try_to_fail):
+        """Return a function that raises AccessFailedError for N tries, then succeeds."""
+        try_ = [0]
+        _orig_get_downloader_session = HTTPDownloader.get_downloader_session
+
+        def _get_downloader_session(self, *args, **kwargs):
+            try_[0] += 1
+            if try_[0] >= try_to_fail:
+                return _orig_get_downloader_session(self, *args, **kwargs)
+            raise AccessFailedError(
+                f"Access to {args[0]} has failed: status code 503",
+                status=503
+            )
+        return _get_downloader_session
+
+    start_time = time.time()
+
+    # Mock time.sleep to avoid actual delays during testing
+    with patch('datalad.downloaders.base.time.sleep'):
+        # Should succeed after 5 failures (on 6th attempt)
+        with patch.object(HTTPDownloader, 'get_downloader_session',
+                          _fail_get_downloader_session(6)), \
+                swallow_logs():
+            assert_equal(downloader.fetch(furl), 'abc')
+
+        # Should fail after 6 failures (exceeds 5 retry limit)
+        with patch.object(HTTPDownloader, 'get_downloader_session',
+                          _fail_get_downloader_session(7)), \
+                swallow_logs():
+            assert_raises(AccessFailedError, downloader.fetch, furl)
+
+    elapsed = time.time() - start_time
+    # Ensure test runs fast (sleep is mocked) - fail if implementation changes
+    # and starts sleeping for real
+    assert elapsed < 1.0, f"Test took {elapsed:.1f}s, expected < 1s (is sleep mocked?)"
+
+
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
 def test_download_url(toppath=None, topurl=None):
     furl = "%sfile.dat" % topurl
     # fails if URL is dysfunctional

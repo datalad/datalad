@@ -138,14 +138,19 @@ class BuildManPage(Command):
 
     def run(self):
 
-        dist = self.distribution
         #homepage = dist.get_url()
         #appname = self._parser.prog
         appname = 'datalad'
 
+        # Get author info from package metadata (works with pyproject.toml)
+        from importlib.metadata import metadata
+        pkg_metadata = metadata(getattr(self, 'mod_name', appname))
+        author = pkg_metadata.get('Author') or 'The DataLad Team and Contributors'
+        author_email = pkg_metadata.get('Author-email') or 'team@datalad.org'
+
         sections = {
             'Authors': """{0} is developed by {1} <{2}>.""".format(
-                appname, dist.get_author(), dist.get_author_email()),
+                appname, author, author_email),
         }
 
         for cls, opath, ext in ((fmt.ManPageFormatter, self.manpath, '1'),
