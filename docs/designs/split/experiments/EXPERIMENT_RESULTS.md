@@ -273,6 +273,74 @@ METHOD 3 (copied before filter):
 
 ---
 
+## Experiment 7: Correct Location Tracking
+
+**Status**: ✅ **SUCCESS** - Validated the proper git-annex workflow!
+
+### Results
+
+**This is the CORRECT approach** - `git-annex filter-branch` with `--include-all-key-information` properly preserves location tracking information!
+
+**What Worked**:
+1. ✅ Clone source dataset
+2. ✅ Run `git-annex filter-branch <path> --include-all-key-information --include-all-repo-config`
+3. ✅ Run `git filter-branch --subdirectory-filter <path>`
+4. ✅ Update origin remote URL (DON'T remove it!)
+5. ✅ Split dataset knows where to get content: `git annex whereis` shows origin
+6. ✅ `datalad get` successfully retrieves content from origin
+7. ✅ Even clones of the split dataset can retrieve content!
+
+**Key Evidence**:
+```
+$ git annex whereis data.dat
+whereis data.dat (1 copy)
+  bd845c82-4768-4773-8e3e-7eac455c7447 -- [...]/parent-dataset [origin]
+ok
+
+$ datalad get data.dat
+get(ok): data.dat (file) [from origin...]
+
+# Roundtrip test - clone the split dataset
+$ git clone split-correct split-correct-clone
+$ cd split-correct-clone
+$ git annex whereis data.dat
+whereis data.dat (2 copies)
+  bd845c82-4768-4773-8e3e-7eac455c7447 -- [...]/parent-dataset
+  fab26add-acf5-4046-bd97-fe9ddfbbbeff -- [...]/split-correct [origin]
+ok
+
+$ datalad get data.dat
+get(ok): data.dat (file) [from origin...]
+✓ SUCCESS: Content retrieved in clone!
+```
+
+### Conclusions
+
+**CRITICAL CORRECTION**: Experiments 5 & 6 were testing the wrong approach!
+
+The **CORRECT workflow** is:
+1. Use `git-annex filter-branch` with `--include-all-key-information` to preserve location tracking
+2. **Keep the origin remote** (don't mark as dead or remove it)
+3. Content remains available on-demand via `datalad get`
+4. **No need to copy all content during split** - this would be wasteful!
+
+**Why This Is the Right Approach**:
+- ✅ Split dataset is smaller (no duplicate content storage)
+- ✅ Content retrievable on-demand via standard `datalad get`
+- ✅ Works with DataLad's existing infrastructure
+- ✅ Supports chained retrieval (clone of split can still get content)
+- ✅ Efficient for large datasets (don't copy everything unnecessarily)
+
+**Implementation Requirements**:
+- Use `git-annex filter-branch --include-all-key-information --include-all-repo-config`
+- Update origin remote URL to point to parent dataset location
+- **DO NOT** mark origin as dead or remove it
+- Document that parent dataset must remain accessible for content retrieval
+
+**Supersedes**: The recommendations from Experiment 6 about copying content first (Method 3) are now obsolete. Method 2 (keep origin) is the correct and only necessary approach.
+
+---
+
 ## Overall Assessment
 
 ### What's Ready for Implementation
@@ -284,9 +352,10 @@ METHOD 3 (copied before filter):
 
 ### Critical Issues to Address
 
-1. ⚠️ **Content Transfer**: Annexed content NOT transferred during split (see Experiments 5 & 6)
-   - **Solution**: Copy content before filtering with `git annex get <path>`
-   - **Alternative**: Keep origin remote for on-demand retrieval
+1. ✅ **Content Retrieval**: SOLVED (see Experiment 7)
+   - Use `git-annex filter-branch --include-all-key-information`
+   - Keep origin remote configured (don't mark as dead)
+   - Content remains available via `datalad get`
 2. ⚠️ **Nested subdatasets**: Require special handling (see Experiment 2)
 3. ⚠️ **Git protocol**: Need to handle protocol.file.allow for local operations
 4. ℹ️ **Metadata references**: Some cross-references may persist (minor issue)
@@ -295,24 +364,27 @@ METHOD 3 (copied before filter):
 
 #### Phase 1: Basic Implementation
 - Implement basic split without nested subdataset support
-- **CRITICAL**: Implement content transfer (Method 3 - copy before filtering)
-- Add `--get-content` flag (default: true) to control content copying
+- **CRITICAL**: Preserve location tracking via `git-annex filter-branch --include-all-key-information`
+- **CRITICAL**: Keep origin remote configured (update URL, don't mark as dead)
 - Add explicit check to ERROR if nested subdatasets detected
+- Document that parent dataset must remain accessible for content retrieval
 - Document limitations clearly
 
 #### Phase 2: Nested Subdataset Support & Advanced Features
 - Implement subdataset detection
 - Add logic to preserve/reconstruct .gitmodules
-- Add Method 2 support (keep origin remote) as alternative to copying
+- Consider option to copy content locally for "offline" split datasets (optional)
 - Test thoroughly with various nesting scenarios
 
 #### Testing Priorities
-1. **Critical**: Test content transfer with various dataset sizes
-2. **High**: Test with nested subdatasets (various depths)
-3. **High**: Test with large datasets (multi-GB)
-4. **High**: Verify content integrity after split (checksums)
-5. **Medium**: Test with special remotes (S3, WebDAV, etc.)
-6. **Medium**: Test performance with many files (1000+)
+1. **Critical**: Test content retrieval via `datalad get` from split datasets
+2. **Critical**: Verify location tracking preserved correctly (git annex whereis)
+3. **High**: Test with nested subdatasets (various depths)
+4. **High**: Test roundtrip (clone split dataset, verify content accessible)
+5. **High**: Verify content integrity after retrieval (checksums)
+6. **Medium**: Test with special remotes (S3, WebDAV, etc.)
+7. **Medium**: Test performance with many files (1000+)
+8. **Low**: Test optional "offline mode" if implemented (copy content during split)
 
 ---
 
@@ -334,6 +406,11 @@ METHOD 3 (copied before filter):
 
 ### Experiment 6: 06_content_transfer_fix.sh
 - No fixes needed - successfully found working solutions
+- **Note**: Method 3 recommendations superseded by Experiment 7
+
+### Experiment 7: 07_correct_location_tracking.sh
+- No fixes needed - validates the correct git-annex workflow
+- **This is the definitive experiment for content handling**
 
 ---
 
@@ -341,12 +418,13 @@ METHOD 3 (copied before filter):
 
 1. ✅ Document these findings
 2. ✅ Update implementation plan based on nested subdataset discovery
-3. ✅ Validate content transfer requirements (Experiments 5 & 6)
-4. ⏭ Update implementation plan to include content transfer requirements
-5. ⏭ Begin implementation with basic split (no nested subdatasets)
-6. ⏭ Implement content transfer (Method 3 - copy before filtering)
-7. ⏭ Add nested subdataset detection and error handling
-8. ⏭ Design and implement nested subdataset preservation strategy
+3. ✅ Validate content transfer requirements (Experiments 5, 6 & 7)
+4. ✅ Identified correct approach: preserve location tracking, keep origin remote
+5. ⏭ Update implementation plan to reflect correct git-annex workflow
+6. ⏭ Begin implementation with basic split (no nested subdatasets)
+7. ⏭ Implement location tracking preservation (keep origin remote)
+8. ⏭ Add nested subdataset detection and error handling
+9. ⏭ Design and implement nested subdataset preservation strategy
 
 ---
 
@@ -366,8 +444,12 @@ bash docs/designs/split/experiments/02_nested_subdatasets.sh
 bash docs/designs/split/experiments/03_metadata_cleanup.sh
 bash docs/designs/split/experiments/05_real_world_validation.sh
 bash docs/designs/split/experiments/06_content_transfer_fix.sh
+bash docs/designs/split/experiments/07_correct_location_tracking.sh  # DEFINITIVE
 ```
 
 **Note**: Experiments create temporary directories under `/tmp/datalad-split-expXX/` which can be examined after running.
 
-**Important**: Experiments 5 and 6 validate the critical content transfer requirement discovered during testing.
+**Important**:
+- Experiments 5 & 6 initially explored content transfer approaches
+- **Experiment 7 validates the CORRECT approach** using proper git-annex location tracking
+- The correct workflow: use `--include-all-key-information` and keep origin remote configured

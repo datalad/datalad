@@ -43,26 +43,20 @@ The implementation will handle nested subdatasets through **bottom-up traversal*
 
 Critical insights from experiments and community discussion:
 
-1. **Content MUST be transferred BEFORE filtering** (Experiments 5 & 6)
+1. **Location tracking is preserved via `git-annex filter-branch --include-all-key-information`** (Experiment 7)
 2. `git-annex filter-branch` should **precede** `git filter-branch` to ensure proper metadata cleanup
+3. **Keep origin remote configured** to allow content retrieval on-demand
 
 ```bash
-# Recommended order (Strategy A - with content transfer):
-git annex get <path>                    # CRITICAL: Transfer content FIRST
-git annex find --in=here <path>         # Verify content present
+# CORRECT workflow (validated by Experiment 7):
 git-annex filter-branch <path> --include-all-key-information --include-all-repo-config
 git filter-branch --subdirectory-filter <path> HEAD
-git annex dead origin                   # Content already local, safe to remove
-git remote rm origin
-git annex forget --force --drop-dead
+git remote set-url origin <absolute-path-to-original>  # Update origin URL
+# CRITICAL: Do NOT run "git annex dead origin" or "git remote rm origin"
+git annex forget --force --drop-dead    # Clean unrelated metadata
 
-# Alternative order (Strategy B - keep origin):
-git-annex filter-branch <path> --include-all-key-information --include-all-repo-config
-git filter-branch --subdirectory-filter <path> HEAD
-git remote set-url origin <absolute-path-to-original>  # Keep origin for content retrieval
-# Skip: git annex dead origin (we want to keep it!)
-# Skip: git remote rm origin
-git annex forget --force --drop-dead    # Clean metadata but keep remote info
+# Result: Split dataset can retrieve content via 'datalad get' from parent
+# git annex whereis shows content available at origin
 ```
 
 ## Proposed Command Interface
@@ -82,9 +76,6 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
 - **--regex-subdatasets REGEX**: Pattern-based approach to identify multiple paths
 - **-c, --cfg-proc PROC**: Configuration processor to apply to new subdatasets
 - **-o, --output-path PATH**: Alternative output location (operate outside source directory)
-- **--get-content / --no-get-content**: Transfer annexed content before split (default: True)
-  - `--get-content`: Copy all annexed content to split dataset (Strategy A - recommended)
-  - `--no-get-content`: Keep origin remote for on-demand retrieval (Strategy B - smaller dataset)
 - **--skip-rewrite {all,parent,subdataset}**: Control which history rewriting steps to skip
   - `all`: No history rewriting, use incremental approach (git rm/mv only)
   - `parent`: Skip parent dataset history rewrite
@@ -114,9 +105,6 @@ datalad split --dry-run data/subject01
 
 # Incremental mode (no history rewrite, backward compatible)
 datalad split --skip-rewrite all data/subject01
-
-# Large dataset - don't copy content, keep origin as source
-datalad split --no-get-content data/large-subject
 ```
 
 ## Implementation Plan
@@ -167,22 +155,17 @@ def _discover_subdatasets(dataset, path):
 
 #### 2.3 History Filtering Workflow
 ```python
-def _filter_repository_history(source_repo_path, target_path, subdir_path, get_content=True):
+def _filter_repository_history(source_repo_path, target_path, subdir_path):
     """
     1. Clone source repository to target
-    2. CRITICAL: Transfer annexed content (see 2.6)
-       - If get_content=True: Run 'git annex get <subdir_path>'
-       - Verify content present with 'git annex find --in=here'
-    3. Run git-annex filter-branch for the subdirectory
-    4. Run git filter-branch --subdirectory-filter
-    5. If get_content=True:
-       - Mark origin as dead
-       - Remove origin remote
-       - Run git annex forget --force --drop-dead
-    6. If get_content=False:
-       - Update origin remote URL to point to original
-       - Keep origin as git-annex remote
-    7. Update git-annex branch
+    2. Run git-annex filter-branch with --include-all-key-information
+       - This preserves location tracking information in git-annex branch
+    3. Run git filter-branch --subdirectory-filter
+    4. Update origin remote URL to point to original dataset location
+       - CRITICAL: Do NOT mark origin as dead or remove it!
+    5. Run git annex forget --force --drop-dead
+       - Cleans unrelated metadata while preserving origin info
+    6. Result: Split dataset can retrieve content via 'datalad get'
     """
 ```
 
@@ -208,49 +191,47 @@ def _remove_content_from_parent(parent_ds, path):
     """
 ```
 
-#### 2.6 Content Transfer (CRITICAL)
+#### 2.6 Location Tracking Preservation (CRITICAL)
 ```python
-def _transfer_annexed_content(clone_path, subdir_path, get_content=True):
+def _preserve_location_tracking(clone_path, parent_path):
     """
-    CRITICAL: Transfer annexed content before filtering history.
+    CRITICAL: Ensure split dataset can retrieve annexed content from parent.
 
-    Two strategies available:
+    The key insight (from Experiment 7):
+    - git-annex filter-branch with --include-all-key-information preserves
+      location tracking information in the git-annex branch
+    - Keeping origin remote configured allows on-demand content retrieval
+    - No need to copy all content during split!
 
-    Strategy A (Recommended - Default): Copy content before filtering
-    1. Before filter-branch: git annex get <subdir_path>
-    2. Verify content present: git annex find --in=here <subdir_path>
-    3. Proceed with filtering - content survives in .git/annex/objects/
-    4. Result: Split dataset is independent, content immediately available
-
-    Strategy B (Alternative): Maintain origin remote
-    1. Skip marking origin as dead
-    2. Configure origin remote with proper URL
-    3. Content retrievable via 'datalad get' from original
-    4. Result: Smaller split dataset, requires access to original
+    Steps:
+    1. After filtering, update origin remote URL to parent's absolute path
+    2. Verify git-annex knows about origin: git annex whereis should show origin
+    3. Test retrieval works: git annex find --not --in=here | head -n1 | xargs datalad get
 
     Parameters:
-    - clone_path: Path to cloned repository
-    - subdir_path: Subdirectory being split
-    - get_content: If True, use Strategy A; if False, use Strategy B
+    - clone_path: Path to filtered clone (split dataset)
+    - parent_path: Absolute path to parent dataset
 
     Returns:
-    - content_transferred: Number of annexed files transferred
-    - content_missing: Number of annexed files not available
+    - location_preserved: Boolean indicating if location tracking is valid
+    - content_available: Number of files that can be retrieved from origin
     """
 ```
 
 **Why This Is Critical**:
-- Experiments 5 & 6 revealed that `git filter-branch` does NOT transfer annexed content
-- Without explicit content handling, split datasets have broken symlinks
-- Users cannot retrieve content from split datasets
-- This is a **blocking issue** that must be solved in Phase 1
+- Experiment 7 validated that `git-annex filter-branch --include-all-key-information`
+  properly preserves location tracking
+- Split datasets can retrieve content on-demand via `datalad get`
+- No wasteful copying of potentially large content during split
+- Works with DataLad's standard content retrieval infrastructure
 
 **Implementation Notes**:
-- Add `--get-content` flag (default: True) to control behavior
-- For large datasets, provide option to use Strategy B (--no-get-content)
-- Progress reporting during content transfer
-- Verify all content transferred successfully before proceeding
-- Handle cases where content is not available in original
+- Use `git-annex filter-branch --include-all-key-information --include-all-repo-config`
+- Update origin remote URL to absolute path of parent dataset
+- **DO NOT** mark origin as dead or remove the remote
+- Verify `git annex whereis` shows origin for tracked files
+- Document that parent dataset must remain accessible for content retrieval
+- Consider optional `--copy-content` flag for users who want "offline" split datasets
 
 ### Phase 3: Advanced Features
 
@@ -306,17 +287,17 @@ def _process_nested_subdatasets(dataset, target_paths):
    - `test_split_with_git_history`: Verify history is properly filtered
    - `test_split_preserves_annex_content`: Verify annexed files are accessible in new subdataset
 
-2. **Git-Annex Integration & Content Transfer** (CRITICAL)
-   - `test_split_transfers_annexed_content`: Verify annexed content is accessible (Strategy A)
-   - `test_split_content_integrity`: Verify checksums after content transfer
-   - `test_split_with_no_get_content`: Test Strategy B (keep origin remote)
+2. **Git-Annex Integration & Location Tracking** (CRITICAL)
+   - `test_split_preserves_location_tracking`: Verify git annex whereis shows origin
    - `test_split_content_retrieval`: Verify 'datalad get' works in split dataset
+   - `test_split_content_integrity`: Verify checksums after retrieval
+   - `test_split_roundtrip_retrieval`: Clone split dataset, verify content accessible
    - `test_split_filters_annex_metadata`: Verify git-annex branch is cleaned
    - `test_split_preserves_key_information`: Ensure key info for split files is retained
    - `test_split_cleans_unrelated_keys`: Verify unrelated keys are removed
    - `test_split_with_special_remotes`: Test with S3, WebDAV, etc.
    - `test_split_large_annexed_files`: Test with GB-sized files
-   - `test_split_partial_content`: Handle case where some content is not available
+   - `test_split_partial_content`: Handle case where some content is not available in parent
 
 3. **Nested Subdatasets**
    - `test_split_with_nested_subdatasets`: Directory containing subdatasets
@@ -344,11 +325,12 @@ def _process_nested_subdatasets(dataset, target_paths):
    - `test_split_git_annex_unavailable`: Fallback behavior without git-annex
 
 7. **Integration Tests**
-   - `test_split_roundtrip`: Split then clone, verify content accessible
-   - `test_split_roundtrip_with_get`: Clone split dataset and retrieve all content
+   - `test_split_roundtrip`: Split then clone, verify content retrievable
+   - `test_split_roundtrip_with_get`: Clone split dataset, run 'datalad get -r'
    - `test_split_with_remotes`: Verify remote operations still work
    - `test_split_workflow_scenario`: Complete realistic workflow
-   - `test_split_content_survives_clone`: Verify content accessible in cloned split dataset
+   - `test_split_parent_remains_accessible`: Verify parent dataset can serve content
+   - `test_split_chained_retrieval`: Clone of split can retrieve from original via origin chain
 
 8. **Performance Tests** (in `benchmarks/`)
    - Benchmark splitting large directories (1000+ files)
