@@ -41,7 +41,11 @@ Based on Kyle Meyer's proposal and community feedback, the implementation will u
    - Example: `data/raw/subject01` → `subject01`
 3. **In parent**: Remove nested subdataset entries from parent's `.gitmodules`
 
-**Phase 1 Limitation**: Detect nested subdatasets and ERROR with clear message
+**Phase 1 Limitations**:
+1. Detect nested subdatasets and ERROR with clear message
+2. **CRITICAL**: Only operate on paths belonging to current dataset, not subdatasets
+   - If path belongs to subdataset, raise NotImplementedError
+   - Recommend using `datalad foreach-dataset` to process subdatasets
 
 **Phase 4 Implementation** will handle nested subdatasets through **bottom-up traversal** with `.gitmodules` reconstruction:
 
@@ -174,12 +178,46 @@ datalad split --skip-rewrite all data/subject01
 ```python
 def _validate_paths(dataset, paths):
     """
-    Validate that paths:
-    - Exist in the dataset
-    - Are not the dataset root
-    - Are not already subdatasets
-    - Are subdirectories (not files)
-    - Don't overlap (one is not parent of another)
+    Validate that paths meet all requirements for splitting.
+
+    Checks performed:
+    1. Exist in the dataset
+    2. Are not the dataset root
+    3. Are not already subdatasets
+    4. Are subdirectories (not files)
+    5. Don't overlap (one is not parent of another)
+    6. CRITICAL: Belong to current dataset, not to subdatasets
+
+    For check #6:
+    - Use dataset.get_containing_subdataset(path) or similar API
+    - If path belongs to a subdataset (not current dataset):
+      - Raise NotImplementedError with helpful message:
+        "Cannot split paths that belong to subdatasets.
+         To split content within subdatasets, use:
+         datalad foreach-dataset --recursive <command>"
+
+    Example error case:
+        parent/
+        ├── subds/         # existing subdataset
+        │   └── data/      # user tries to split this
+
+        $ datalad split subds/data
+        ERROR: Path 'subds/data' belongs to subdataset 'subds', not to current dataset.
+               Cannot split paths within subdatasets.
+
+               To split content within subdatasets, navigate to the subdataset first:
+                 cd subds
+                 datalad split data
+
+               Or use foreach-dataset to process multiple subdatasets:
+                 datalad foreach-dataset --recursive split data
+
+    Returns:
+        validated_paths: List of validated absolute paths
+
+    Raises:
+        ValueError: For invalid paths (non-existent, root, files, overlapping)
+        NotImplementedError: For paths belonging to subdatasets
     """
 ```
 
@@ -501,6 +539,12 @@ def _split_with_nested_subdatasets(dataset, target_paths):
 4. **Edge Cases**
    - `test_split_nonexistent_path`: Should fail gracefully
    - `test_split_already_subdataset`: Should detect and error
+   - `test_split_path_in_subdataset`: **CRITICAL** - Verify paths belonging to subdatasets are rejected
+     * Create parent dataset with subdataset
+     * Try to split path within subdataset (e.g., `subds/data`)
+     * Should raise NotImplementedError with helpful message
+     * Verify message suggests `datalad foreach-dataset`
+     * Test with nested subdataset (multiple levels deep)
    - `test_split_overlapping_paths`: Two paths where one contains the other
    - `test_split_dataset_root`: Should fail (can't split entire dataset)
    - `test_split_empty_directory`: Handle empty directories
@@ -546,7 +590,14 @@ def dataset_with_nested_structure():
       │   │   └── subject02/ (to be split)
       │   └── processed/
       ├── code/ (already a subdataset)
+      │   └── analysis/ (path within subdataset - should reject split)
       └── docs/
+
+    This fixture is used to test:
+    - Splitting leaf directories (subject01, subject02)
+    - Detecting existing subdatasets (code)
+    - CRITICAL: Rejecting paths within subdatasets (code/analysis)
+    - Detecting nested subdatasets (subsub under subject01)
     """
 ```
 
