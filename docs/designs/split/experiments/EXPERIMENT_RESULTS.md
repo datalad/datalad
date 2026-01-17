@@ -756,6 +756,139 @@ git commit -m "Split into subdatasets"
 
 ---
 
+## Experiment 12: Content Mode Strategies
+
+**Status**: ✅ **SUCCESS**
+
+### Purpose
+
+Test different content-handling strategies for locally-present annexed content when splitting nested paths (2 directories deep: `data/subjects/subject01/`).
+
+### Tested Strategies
+
+1. **nothing mode**: Location tracking only, no content transfer
+2. **copy mode**: Duplicate content to subdataset
+3. **reckless-ephemeral mode**: Symlink entire `.git/annex/objects` to parent
+4. **worktree mode**: Use git worktree to share both git objects and annex objects
+
+### Results
+
+#### 1. nothing mode ✅
+```bash
+# After split:
+git annex whereis session1/data.dat
+# (1 copy) at origin (parent dataset)
+
+ls -lh session1/data.dat
+# Broken symlink - target not present locally
+```
+- **Storage**: No duplication
+- **Content retrieval**: Works via `datalad get` from parent
+- **Use case**: Default - on-demand retrieval
+
+#### 2. copy mode ✅
+```bash
+# After split + datalad get:
+du -sh .git/annex/objects
+# Parent: 5.0M, Subdataset: 5.0M
+```
+- **Storage**: ~10M total (may be less on CoW filesystems)
+- **Content retrieval**: Immediate - already present
+- **Use case**: Fully independent subdatasets
+
+#### 3. reckless-ephemeral mode ✅
+```bash
+ls -la .git/annex/objects
+# lrwxrwxrwx -> /path/to/parent/.git/annex/objects
+```
+- **Storage**: Zero duplication
+- **Dependency**: Completely dependent on parent
+- **Use case**: Temporary splits for analysis
+
+#### 4. worktree mode ✅ **MOST EFFICIENT**
+```bash
+# Parent .git: 5.3M
+# Worktree .git: 4K (4 kilobytes!)
+
+ls -lh data.dat
+# Symlink: ../../../.git/annex/objects/.../file.dat
+# Points to parent's annex via relative path!
+```
+
+**Storage comparison**:
+- Parent `.git`: 5.3M
+- Worktree `.git`: **4K** (just worktree metadata)
+- Annex: Fully shared via relative symlinks
+
+**Why it works**:
+1. Git worktree shares git objects (standard worktree behavior)
+2. After filtering, annex symlinks (`../../../.git/annex/objects/...`) still resolve to parent
+3. No duplication of git history OR annex content
+4. Uses git's built-in worktree mechanism - no symlink hacks
+
+### Branch Naming for Worktree
+
+Paths with slashes need sanitization for git branch names:
+
+```bash
+# Path: data/subjects/subject01
+# Branch: split--data--subjects--subject01
+BRANCH="split--$(echo "$TARGET_PATH" | tr '/' '-')"
+git branch "$BRANCH" HEAD
+git worktree add "$TARGET" "$BRANCH"
+```
+
+### Validated Workflow (Worktree)
+
+```bash
+# 1. Create branch
+BRANCH="split--$(echo "$TARGET" | tr '/' '-')"
+git branch "$BRANCH" HEAD
+
+# 2. Remove from index
+git rm -r --cached "$TARGET/"
+
+# 3. Remove physically
+rm -rf "$TARGET"
+
+# 4. Create worktree
+git worktree add "$TARGET" "$BRANCH"
+
+# 5. Filter in worktree
+cd "$TARGET"
+git annex filter-branch "$TARGET" --include-all-key-information --include-all-repo-config
+git filter-branch --subdirectory-filter "$TARGET" --prune-empty HEAD
+```
+
+### Conclusions
+
+1. ✅ **All four content strategies work correctly** on nested paths
+2. ✅ **Worktree is the most efficient approach**:
+   - Only 4KB overhead vs 5.3M for clone
+   - Shares both git objects and annex objects
+   - No manual symlink management required
+3. ✅ **Location tracking preserved** in all modes
+4. ✅ **Content retrieval works** in all modes
+5. ⚠️ **Worktree requires parent and subdataset stay together**
+6. ⚠️ **reckless-ephemeral completely dependent on parent**
+
+### Recommendations
+
+**For `--clone-mode` parameter**:
+- `clone` (default): Standard independent repository
+- `reckless-ephemeral`: Symlink annex (temporary only)
+- `worktree`: Most efficient, shares everything (permanent local reorganization)
+
+**For `--content` parameter**:
+- `auto` (default): Resolves to `none` for all modes
+- `copy`: Only with `clone` mode
+- `move`: Only with `clone` mode
+- `none`: Works with all modes
+
+**Optimal choice for local dataset reorganization**: `--clone-mode=worktree --content=auto`
+
+---
+
 ## Test Command Summary
 
 To reproduce these experiments:
@@ -777,6 +910,7 @@ bash docs/designs/split/experiments/08_complete_split_workflow.sh   # Full end-t
 bash docs/designs/split/experiments/09_in_place_split.sh            # RECOMMENDED: In-place approach
 bash docs/designs/split/experiments/10_nested_split.sh              # Documents nested limitation
 bash docs/designs/split/experiments/11_repronim_containers_split.sh # Real-world nested structure
+bash docs/designs/split/experiments/12_content_mode_strategies.sh   # Content handling strategies
 ```
 
 **Note**: Experiments create temporary directories under `/tmp/datalad-split-expXX/` which can be examined after running.
@@ -784,6 +918,7 @@ bash docs/designs/split/experiments/11_repronim_containers_split.sh # Real-world
 **Important**:
 - **Experiment 9 shows the RECOMMENDED workflow**: in-place split with single save at end
 - **Experiment 11 identified CRITICAL fix**: `git rm -r --cached` MUST be done BEFORE cloning
+- **Experiment 12 validates content strategies**: worktree mode is most efficient (4KB vs 5.3M)
 - Experiment 7 validates correct git-annex location tracking (use `--include-all-key-information`)
 - Experiment 8 confirms end-to-end workflow on real-world dataset
 - Experiment 10 documents nested subdataset limitation (Phase 4 feature)
