@@ -314,9 +314,34 @@ class Split(Interface):
 
         # Display safety warning unless forced
         if not force and not dry_run:
-            _display_safety_warning(ds=ds, paths=resolved_paths)
-            # TODO: In real implementation, prompt for confirmation here
-            # For now, we'll proceed if --force is given
+            # Yield warning as a proper DataLad result instead of printing
+            warning_lines = [
+                "",
+                "=" * 70,
+                "WARNING: DESTRUCTIVE OPERATION",
+                "=" * 70,
+                "This operation will:",
+                "  1. Rewrite git history using filter-branch",
+                "  2. Modify .gitmodules and repository structure",
+                "  3. Cannot be easily undone",
+                "",
+                "Affected paths:",
+            ]
+            warning_lines.extend(f"  - {p}" for p in resolved_paths)
+            warning_lines.extend([
+                "",
+                "STRONGLY RECOMMENDED: Create a backup before proceeding!",
+                "Use --force to proceed without this prompt.",
+                "=" * 70,
+                ""
+            ])
+
+            yield get_status_dict(
+                'split',
+                status='note',
+                message="\n".join(warning_lines),
+                refds=refds_path,
+                logger=lgr)
 
         # Perform path validation and discovery
         validated_paths = []
@@ -374,33 +399,6 @@ def _validate_split_params(clone_mode, content, paths, ds):
     if not paths:
         raise InsufficientArgumentsError(
             "Please provide at least one path to split")
-
-
-def _display_safety_warning(ds, paths):
-    """Display critical safety warning before split."""
-    import sys
-
-    # Build warning message
-    warning_msg = (
-        "\n" + "="*70 + "\n"
-        "WARNING: DESTRUCTIVE OPERATION\n"
-        "="*70 + "\n"
-        "This operation will:\n"
-        "  1. Rewrite git history using filter-branch\n"
-        "  2. Modify .gitmodules and repository structure\n"
-        "  3. Cannot be easily undone\n"
-        "\n"
-        "Affected paths:\n"
-        + "\n".join(f"  - {p}" for p in paths) + "\n"
-        "\n"
-        "STRONGLY RECOMMENDED: Create a backup before proceeding!\n"
-        "Use --force to proceed without this prompt.\n"
-        "="*70 + "\n"
-    )
-
-    # Write directly to stderr to avoid logging system duplication
-    sys.stderr.write(warning_msg)
-    sys.stderr.flush()
 
 
 def _validate_split_path(ds, path, refds_path):
@@ -748,6 +746,15 @@ def _filter_subdataset(subdataset_path, filter_path, parent_path):
     is_annex = hasattr(repo, 'call_annex')
 
     if is_annex:
+        # Step 0: Initialize git-annex to ensure git-annex branch exists locally
+        # Without this, filter-branch might not work correctly
+        lgr.debug("Initializing git-annex in subdataset")
+        try:
+            repo.call_annex(['init', f'split-{Path(filter_path).name}'])
+        except CommandError as e:
+            # Init might fail if already initialized, which is okay
+            lgr.debug("git-annex init returned error (might be already initialized): %s", e)
+
         # Step 1: git-annex filter-branch
         lgr.debug("Running git-annex filter-branch for %s", filter_path)
         repo.call_annex([
