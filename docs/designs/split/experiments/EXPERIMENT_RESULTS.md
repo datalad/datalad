@@ -485,15 +485,46 @@ This is the **same issue** discovered in Experiment 2.
 - **ERROR** with clear message: "Cannot split directories containing subdatasets"
 - Document this as a known limitation
 
-**For Phase 2 (Future Work)**:
-- Implement special handling to preserve/reconstruct `.gitmodules`
-- Options:
-  - Manually reconstruct `.gitmodules` after filtering
-  - Use different filtering approach that preserves submodule information
-  - Process subdatasets separately from parent filtering
+**For Phase 4 (Nested Subdataset Support)**:
+Implement `.gitmodules` reconstruction:
+
+1. **Before filtering**: Parse parent's `.gitmodules`, save entries under target path
+2. **After filtering**: Reconstruct `.gitmodules` with adjusted paths
+   - Example: `data/raw/subject01` → `subject01` (strip prefix)
+3. **In parent**: Remove nested entries from parent's `.gitmodules`
+4. **Update references**: Fix `.git` files in nested subdatasets to point to correct locations
+
+**Algorithm**:
+```bash
+# 1. Parse parent .gitmodules before split
+NESTED_SUBS=$(git config -f .gitmodules --get-regexp '^submodule\.data/raw' | ...)
+
+# 2. Clone and filter (loses .gitmodules)
+git clone . data/raw/
+cd data/raw/
+git filter-branch --subdirectory-filter data/raw HEAD
+
+# 3. Reconstruct .gitmodules with adjusted paths
+cat > .gitmodules <<EOF
+[submodule "subject01"]
+    path = subject01
+    url = ./subject01
+[submodule "subject02"]
+    path = subject02
+    url = ./subject02
+EOF
+git add .gitmodules
+git commit -m "Reconstruct nested subdataset registrations"
+
+# 4. Parent: remove nested entries
+cd ../..
+git config -f .gitmodules --remove-section submodule.data/raw/subject01
+git config -f .gitmodules --remove-section submodule.data/raw/subject02
+```
 
 **Current Recommendation**:
-Only split **leaf directories** that don't contain subdatasets.
+- Phase 1: Only split **leaf directories** without subdatasets
+- Phase 4: Implement full nested support with `.gitmodules` reconstruction
 
 ---
 
