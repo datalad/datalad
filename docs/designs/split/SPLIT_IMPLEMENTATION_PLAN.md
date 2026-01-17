@@ -199,40 +199,42 @@ datalad split [-d|--dataset DATASET] [OPTIONS] PATH [PATH ...]
   - Note: Repository-wide settings (`git annex config`) are handled automatically by git-annex filter-branch
 - **--exclude-annex-config SETTINGS**: Exclude specific annex.* settings from propagation (comma-separated)
 - **--interactive-config**: Interactively prompt for each annex.* setting to propagate
-- **--content-mode {nothing,copy,move,reckless-hardlink,reckless-ephemeral,worktree}**: Control how annexed content is handled (default: `nothing`)
-  - `nothing`: Don't make content available in subdataset (retrieve on-demand from origin) - **default**
-    * Subdataset tracks content location but doesn't have local copies
-    * Use `datalad get` to retrieve content from parent when needed
-    * Most storage-efficient, requires parent accessible
-  - `copy`: Copy present content from parent to subdataset
-    * Run `datalad get` in subdataset to copy content from parent (origin)
-    * Content exists in both parent and subdataset
-    * Doubles storage usage but subdataset is self-contained
-    * Parent remains source of truth
-  - `move`: Move content from parent to subdataset
-    * Use `git annex move --to <subdataset>` to transfer content
-    * Content removed from parent, placed in subdataset
-    * Parent knows content location is now in subdataset
-    * Storage-efficient, subdataset becomes content holder
-  - `reckless-hardlink`: Hardlink content files from parent to subdataset
-    * Create hardlinks in subdataset's `.git/annex/objects` to parent's objects
-    * Similar to `datalad install --reckless=hardlink`
-    * Shares storage via hardlinks, no duplication
-    * **WARNING**: Modifications to content affect both parent and subdataset
-    * Requires same filesystem for parent and subdataset
-    * More independent than ephemeral (separate annex metadata)
+- **--clone-mode {clone,reckless-ephemeral,worktree}**: Control how subdataset repository is created (default: `clone`)
+  - `clone`: Standard git clone approach - **default**
+    * Full independent repository
+    * Separate .git directory with own objects
+    * Safe for production use
   - `reckless-ephemeral`: Share annex object store via symlink
-    * Symlink subdataset's `.git/annex` to parent's `.git/annex`
-    * Similar to `datalad install --reckless=ephemeral`
-    * Shares storage completely, no duplication
-    * **WARNING**: Subdataset is not independent, relies on parent's annex
-    * Suitable for temporary working copies
-  - `worktree`: Use git worktree instead of clone
-    * Create subdataset as git worktree with branch named after hierarchy
-    * Share git object database with parent
-    * Independent working tree, shared storage
-    * Allows independent development while reusing objects
-    * More efficient than clone, maintains relationship to parent
+    * Symlink .git/annex/objects to parent
+    * Minimal overhead, not independent
+    * Temporary working copies only
+  - `worktree`: Use git worktree with namespace
+    * Create as git worktree on branch in namespace
+    * Share git objects and annex objects with parent
+    * Most efficient, uses git namespaces for clean separation
+    * Branch in namespace: `refs/namespaces/split/<hierarchical-path>`
+    * Example: `data/subjects/subject01` → `refs/namespaces/split/data/subjects/subject01`
+    * Preserves hierarchical structure, no path collapsing needed
+- **--content {auto,copy,move,none}**: Control how annexed content is handled (default: `auto`)
+  - `auto`: Automatic based on clone-mode - **default**
+    * For `clone`: Use `none` (on-demand retrieval)
+    * For `reckless-ephemeral`: Use `none` (shares annex via symlink)
+    * For `worktree`: Use `none` (shares annex objects)
+  - `none`: Don't copy content to subdataset
+    * Retrieve on-demand via `datalad get` from origin
+    * Most storage-efficient
+  - `copy`: Copy present content from parent to subdataset
+    * Only valid with `--clone-mode=clone`
+    * Run `datalad get` in subdataset
+    * Doubles storage (unless CoW filesystem)
+  - `move`: Move content from parent to subdataset
+    * Only valid with `--clone-mode=clone`
+    * Use `git annex move --to <subdataset>`
+    * Storage-efficient, subdataset becomes content holder
+- **--preserve-branch-name**: Ensure branch name in subdataset matches parent (default: `true`)
+  - Subdataset will have same branch checked out as parent had for that path
+  - Important for workflows that depend on branch names
+  - With worktree mode: Branch exists in namespace but preserves name locally
 
 ### Example Usage
 
@@ -273,24 +275,32 @@ datalad split --interactive-config data/subject01
 # Don't propagate any annex config (manual configuration later)
 datalad split --propagate-annex-config=none data/subject01
 
-# Content handling modes
-# Default: content not copied, retrieve on-demand from parent
+# Clone mode options (how to create subdataset repository)
+# Default: standard clone (independent repository)
 datalad split data/subject01
 
-# Copy present content to subdataset (self-contained but doubles storage)
-datalad split --content-mode=copy data/subject01
+# Use git worktree with namespace (most efficient, shares git + annex objects)
+datalad split --clone-mode=worktree data/subjects/subject01
+# Creates: refs/namespaces/split/data/subjects/subject01 (preserves hierarchy)
 
-# Move content from parent to subdataset (storage-efficient)
-datalad split --content-mode=move data/subject01
+# Reckless ephemeral mode (temporary working copy, shares annex via symlink)
+datalad split --clone-mode=reckless-ephemeral data/subject01
 
-# Use hardlinks to share content (efficient, same filesystem required)
-datalad split --content-mode=reckless-hardlink data/subject01
+# Content handling options (what to do with annexed content)
+# Default: auto (none for worktree/reckless, none for clone)
+datalad split data/subject01
 
-# Share annex via symlink (temporary working copy)
-datalad split --content-mode=reckless-ephemeral data/subject01
+# Copy present content to subdataset (only with clone mode)
+datalad split --clone-mode=clone --content=copy data/subject01
 
-# Use git worktree (shared objects, independent working tree)
-datalad split --content-mode=worktree data/subject01
+# Move content from parent to subdataset (only with clone mode)
+datalad split --clone-mode=clone --content=move data/subject01
+
+# Explicit none (on-demand retrieval)
+datalad split --clone-mode=clone --content=none data/subject01
+
+# Combined: worktree mode with explicit content setting (content=auto → none)
+datalad split --clone-mode=worktree --content=auto data/subjects/subject01
 ```
 
 ## Implementation Plan
@@ -748,22 +758,31 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
        - Use git worktree instead of clone
        - Implementation (REPLACES the clone step in 2.4):
          cd <parent_ds>
-         # Create branch for subdataset with hierarchical name
-         branch_name="split/<target_path_normalized>"  # e.g., split/data/raw
+         # Create branch with sanitized path (slashes → double-dash)
+         # Path: data/subjects/subject01 → Branch: split--data--subjects--subject01
+         branch_name="split--$(echo <target_path> | tr '/' '-')"
          git branch "$branch_name" HEAD
          # Remove from index (as in corrected workflow)
          git rm -r --cached <target_path>/
+         # Remove physically
+         rm -rf <target_path>
          # Create worktree
          git worktree add <target_path> "$branch_name"
          cd <target_path>
-         # Continue with filter-branch as normal
-         git-annex filter-branch <target_path> --include-all-key-information
-         git filter-branch --subdirectory-filter <target_path> HEAD
-         # Worktree already shares .git/objects with parent
-       - Result: Shared object database, independent working tree
-       - Storage: Efficient (shared git objects)
-       - Benefit: Independent development, maintained relationship
-       - Note: git-annex works with worktrees, content sharing possible
+         # Filter as normal - annex symlinks will still work!
+         git-annex filter-branch <target_path> --include-all-key-information --include-all-repo-config
+         git filter-branch --subdirectory-filter <target_path> --prune-empty HEAD
+         # Result: Worktree shares BOTH git objects AND annex objects
+       - Result: **Most efficient approach**
+       - Storage: Parent .git (~5.3M), Worktree .git (**4KB**), Annex fully shared
+       - Benefit: Shares both git history and annex content
+       - Why it works:
+         * Git worktree shares .git/objects (standard worktree behavior)
+         * After filtering, annex symlinks (../../../.git/annex/objects/...) still resolve to parent
+         * No duplication of git OR annex content
+         * Uses git's built-in mechanism - no manual symlink hacks
+       - Note: **Validated in Experiment 12** - worktree overhead only 4KB vs 5.3M for clone
+       - Constraint: Parent and subdataset must stay together (worktree dependency)
 
     Returns:
     - content_handled: Boolean indicating success
@@ -773,18 +792,19 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
 
 **Implementation Considerations**:
 
-1. **Storage Impact Table**:
+1. **Storage Impact Table** (validated in Experiment 12):
    ```
-   Mode               | Parent Storage | Subdataset Storage | Total Impact
-   -------------------|----------------|--------------------|--------------
-   nothing            | Unchanged      | 0                  | No increase
-   copy               | Unchanged      | 100% duplication   | 2x original
-   move               | Freed          | Original size      | No increase
-   reckless-hardlink  | Unchanged      | 0 (hardlinks)      | No increase*
-   reckless-ephemeral | Unchanged      | 0 (symlink)        | No increase
-   worktree           | Shared         | 0 (shared objects) | No increase
+   Mode               | Parent Storage | Subdataset Storage | Total Impact        | Notes
+   -------------------|----------------|--------------------|--------------------|-------------------
+   nothing            | Unchanged      | 0                  | No increase         | Content on-demand
+   copy               | Unchanged      | ~5.0M (100% dup)   | ~2x original        | CoW may reduce
+   move               | Freed          | Original size      | No increase         | Transfers content
+   reckless-hardlink  | Unchanged      | 0 (hardlinks)      | No increase*        | Same filesystem
+   reckless-ephemeral | Unchanged      | 0 (symlink)        | No increase         | Shares annex
+   worktree           | ~5.3M (shared) | 4KB (metadata)     | 4KB overhead only   | MOST EFFICIENT
 
    * Requires same filesystem
+   ** Experiment 12: Parent 5.3M, Worktree 4KB, Annex fully shared via relative symlinks
    ```
 
 2. **Independence Matrix**:
@@ -800,11 +820,13 @@ def _handle_content_mode(parent_ds, split_ds, target_path, content_mode='nothing
    ```
 
 3. **Selection Guidance**:
-   - **Production datasets**: Use `nothing` (default), `copy`, or `move`
+   - **Local dataset reorganization (RECOMMENDED)**: Use `worktree` - only 4KB overhead, shares everything
+   - **Production datasets (distribution)**: Use `nothing` (default), `copy`, or `move`
    - **Development/testing**: Use `reckless-hardlink` or `worktree`
    - **Temporary analysis**: Use `reckless-ephemeral`
-   - **Large datasets with limited storage**: Use `nothing` or `move`
+   - **Large datasets with limited storage**: Use `nothing` or `move` or `worktree`
    - **Offline subdatasets needed**: Use `copy`
+   - **Subdatasets for distribution/publishing**: Use `clone` mode with appropriate content handling
 
 4. **Validation Requirements**:
    - For all modes: Verify content accessibility post-split
