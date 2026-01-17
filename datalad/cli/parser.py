@@ -538,10 +538,7 @@ def parser_add_version_opt(parser, mod_name, include_name=False, delay=False):
             # Let's use the standard Python mechanism if underlying module
             # did not provide __version__
             try:
-                if sys.version_info < (3, 10):
-                    import importlib_metadata as im
-                else:
-                    import importlib.metadata as im
+                import importlib.metadata as im
 
                 pkg = im.packages_distributions()[mod_name][0]
                 version = im.version(pkg)

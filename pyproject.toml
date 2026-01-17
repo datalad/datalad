@@ -5,14 +5,13 @@ authors = [
 
 name = "datalad"
 description = "Distributed system for joint management of code, data, and their relationship"
-requires-python = ">= 3.9"
+requires-python = ">= 3.10"
 dependencies = [
     # core
     "platformdirs",
     "chardet>=3.0.4",                                    # rarely used but small/omnipresent
     "colorama; platform_system=='Windows'",
     "distro",
-    "importlib-metadata >=3.6; python_version < '3.10'",
     "iso8601",
     "humanize",
     "fasteners>=0.14",
@@ -97,7 +96,7 @@ devel-docs = [
 ]
 devel-utils = [
     "asv",             # benchmarks
-    "coverage!=7.6.5",
+    "coverage!=7.6.5,!=7.13.1",  # 7.13.1: ConfigError with '..' in config paths on macOS
     "gprof2dot",       # rendering cProfile output as a graph image
     "psutil",
     "pytest-xdist",    # parallelize pytest runs etc
