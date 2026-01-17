@@ -55,20 +55,45 @@ Based on Kyle Meyer's proposal and community feedback, the implementation will u
 
 Critical insights from experiments and community discussion:
 
-1. **Location tracking is preserved via `git-annex filter-branch --include-all-key-information`** (Experiment 7)
-2. `git-annex filter-branch` should **precede** `git filter-branch` to ensure proper metadata cleanup
-3. **Keep origin remote configured** to allow content retrieval on-demand
+1. **`git rm -r --cached` MUST be done BEFORE cloning** (Experiment 11 fix) to prevent parent from tracking individual files
+2. **Location tracking is preserved via `git-annex filter-branch --include-all-key-information`** (Experiment 7)
+3. `git-annex filter-branch` should **precede** `git filter-branch` to ensure proper metadata cleanup
+4. **Keep origin remote configured** to allow content retrieval on-demand
 
 ```bash
-# CORRECT workflow (validated by Experiment 7):
+# CORRECT workflow (validated by Experiments 7, 9, 11):
+
+# In parent repository:
+cd <parent-dataset>
+
+# Step 1: Remove from git index FIRST (while files still exist)
+git rm -r --cached <path>/
+
+# Step 2: Physically remove directory
+rm -rf <path>/
+
+# Step 3: Clone parent into the location
+git clone . <path>/
+
+# Step 4: Filter the cloned repository
+cd <path>/
 git-annex filter-branch <path> --include-all-key-information --include-all-repo-config
 git filter-branch --subdirectory-filter <path> HEAD
-git remote set-url origin <absolute-path-to-original>  # Update origin URL
+git remote set-url origin <absolute-path-to-parent>  # Update origin URL
 # CRITICAL: Do NOT run "git annex dead origin" or "git remote rm origin"
 git annex forget --force --drop-dead    # Clean unrelated metadata
 
-# Result: Split dataset can retrieve content via 'datalad get' from parent
-# git annex whereis shows content available at origin
+# Step 5: Return to parent and register as submodule
+cd <parent-dataset>
+git submodule add ./<path> <path>
+
+# Step 6: Commit the changes
+git commit -m "Split <path>/ into subdataset"
+
+# Result:
+# - Parent only tracks submodule commit (mode 160000), not individual files
+# - Split dataset can retrieve content via 'datalad get' from parent
+# - git annex whereis shows content available at origin
 ```
 
 ## Proposed Command Interface
