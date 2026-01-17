@@ -1,4 +1,27 @@
 
+<a id='changelog-1.3.0'></a>
+# 1.3.0 (2026-01-17)
+
+## 🚀 Enhancements and New Features
+
+- maint: drop Python 3.9 - update CI and codebase.  [PR #7777](https://github.com/datalad/datalad/pull/7777) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- fix: clone - do not run  'git annex init'   if there is .noannex file.  Fixes [#7774](https://github.com/datalad/datalad/issues/7774) via [PR #7775](https://github.com/datalad/datalad/pull/7775) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- doc: Use importlib.metadata for author info in manpage generation to avoid None's and double nested <>.  [PR #7788](https://github.com/datalad/datalad/pull/7788) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Add testing and compatibility fixes for Python 3.14 support.  [PR #7784](https://github.com/datalad/datalad/pull/7784) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF(TST): Clean up provider config file in test_access_denied.  [PR #7786](https://github.com/datalad/datalad/pull/7786) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- ci: avoid running various test workflows on BOTH PR and branch (unless master and maint).  [PR #7787](https://github.com/datalad/datalad/pull/7787) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.2.3'></a>
 # 1.2.3 (2025-10-30)
 
