@@ -30,14 +30,26 @@ Based on Kyle Meyer's proposal and community feedback, the implementation will u
 7. **Register subdataset** in parent using git submodule
 8. **Remove original content** from parent dataset
 
-### Bottom-Up Traversal for Nested Subdatasets
+### Nested Subdataset Handling (Phase 4)
 
-The implementation will handle nested subdatasets through **bottom-up traversal**:
+**Challenge**: `git filter-branch --subdirectory-filter` loses `.gitmodules` because it's at the repository root.
+
+**Solution**: Reconstruct `.gitmodules` with adjusted paths:
+
+1. **Before filtering**: Parse parent's `.gitmodules`, extract entries under target path
+2. **After filtering**: Create new `.gitmodules` in split dataset with adjusted paths
+   - Example: `data/raw/subject01` → `subject01`
+3. **In parent**: Remove nested subdataset entries from parent's `.gitmodules`
+
+**Phase 1 Limitation**: Detect nested subdatasets and ERROR with clear message
+
+**Phase 4 Implementation** will handle nested subdatasets through **bottom-up traversal** with `.gitmodules` reconstruction:
 
 1. Discover all subdatasets recursively in the dataset
 2. Process deepest subdatasets first (leaves of the tree)
 3. Move up the hierarchy, handling parent datasets only after children
-4. This ensures nested subdatasets are properly registered and their content is preserved
+4. For each split: parse, reconstruct, and clean up `.gitmodules` at each level
+5. This ensures nested subdatasets are properly registered with correct paths
 
 ### Command Execution Order
 
@@ -129,7 +141,9 @@ datalad split --skip-rewrite all data/subject01
 - Add to `datalad/interface/__init__.py` under appropriate group (likely `_group_2dataset`)
 - Ensure command appears in `datalad --help`
 
-### Phase 2: Core Functionality
+### Phase 2: Core Functionality (Without Nested Subdatasets)
+
+**Note**: Phase 2 implements the core split functionality for **leaf directories** only. Nested subdataset support (Phase 4) requires additional `.gitmodules` reconstruction logic.
 
 #### 2.1 Path Discovery & Validation
 ```python
@@ -256,24 +270,164 @@ def _preserve_location_tracking(clone_path, parent_path):
 
 ### Phase 4: Nested Subdataset Support
 
-#### 4.1 Bottom-Up Traversal Algorithm
+**Critical Insight** (from Experiments 2 & 10): `git filter-branch --subdirectory-filter` **loses `.gitmodules`** because it's at the repository root. The subdatasets become regular directories after filtering.
+
+**Solution**: Manually reconstruct `.gitmodules` with adjusted paths.
+
+#### 4.1 Nested Subdataset Detection
 ```python
-def _process_nested_subdatasets(dataset, target_paths):
+def _detect_nested_subdatasets(dataset, target_path):
     """
-    For each target path:
-    1. Discover all nested subdatasets
-    2. Sort by depth (deepest first)
-    3. Process each subdataset:
-       a. If subdataset is entirely within target path: include in split
-       b. If subdataset crosses boundary: error or warn
-    4. Process leaf subdatasets first, then parents
+    Parse .gitmodules to find subdatasets under target_path.
+
+    Returns:
+    - List of subdataset entries with original paths
+    - e.g., for target "data/raw":
+      [
+        {"path": "data/raw/subject01", "url": "..."},
+        {"path": "data/raw/subject02", "url": "..."}
+      ]
     """
 ```
 
-#### 4.2 Subdataset Boundary Handling
+#### 4.2 .gitmodules Reconstruction
+```python
+def _reconstruct_gitmodules(split_dataset_path, target_path, nested_subdatasets):
+    """
+    CRITICAL: Recreate .gitmodules in the split dataset with ALL configuration.
+
+    Problem: git filter-branch loses .gitmodules at repository root
+    Solution:
+    1. Parse parent's .gitmodules BEFORE filtering
+    2. Extract ALL entries (path, url, and custom configs) under target_path
+    3. AFTER filtering, create new .gitmodules with adjusted paths
+
+    Example - Parent .gitmodules:
+        [submodule "data/raw/subject01"]
+            path = data/raw/subject01
+            url = ./subject01
+            update = checkout
+            branch = main
+            fetchRecurseSubmodules = false
+            datalad-id = 12345-abcde
+            datalad-url = https://example.com/dataset
+
+    After filtering to "data/raw/", create in split dataset:
+        [submodule "subject01"]
+            path = subject01                    # ADJUSTED: stripped prefix
+            url = ./subject01                   # ADJUSTED if relative to dataset root
+            update = checkout                   # PRESERVED
+            branch = main                       # PRESERVED
+            fetchRecurseSubmodules = false      # PRESERVED
+            datalad-id = 12345-abcde           # PRESERVED
+            datalad-url = https://example.com/dataset  # PRESERVED
+
+    Steps:
+    1. Parse ALL settings for each submodule under target_path:
+       - Use: git config -f .gitmodules --get-regexp '^submodule\.<name>\.'
+    2. For each submodule entry:
+       a. Adjust 'path': strip target_path prefix
+       b. Adjust 'url' if it's a relative path referencing dataset internals
+       c. PRESERVE all other settings (update, branch, datalad-*, etc.)
+    3. Write new .gitmodules with all settings
+    4. git add .gitmodules && git commit
+    5. Update each subdataset's .git file to point to correct location
+
+    Important URL handling:
+    - Relative URLs like "./subject01" or "../other": Keep as-is or adjust if needed
+    - Absolute paths within dataset: Strip prefix
+    - External URLs (http://, git://): Preserve unchanged
+    - DataLad URLs (datalad-url config): Preserve unchanged
+
+    Returns:
+    - Number of subdatasets reconstructed
+    - List of any configuration that couldn't be transferred
+    """
+```
+
+#### 4.3 Parent .gitmodules Cleanup
+```python
+def _remove_nested_subdatasets_from_parent(parent_dataset, target_path, nested_subdatasets):
+    """
+    Remove nested subdataset entries from parent's .gitmodules.
+
+    When we split "data/raw/" containing "data/raw/subject01":
+    1. Remove [submodule "data/raw/subject01"] from parent's .gitmodules
+    2. These subdatasets are now registered in the split dataset's .gitmodules
+    3. git add .gitmodules
+    4. Commit will happen during final save
+
+    Important: This is done BEFORE registering the split dataset itself
+    """
+```
+
+#### 4.4 Bottom-Up Processing Algorithm
+```python
+def _split_with_nested_subdatasets(dataset, target_paths):
+    """
+    Process nested subdatasets in bottom-up order.
+
+    Algorithm:
+    1. For each target_path:
+       a. Detect nested subdatasets under target_path
+       b. Parse their .gitmodules entries
+
+    2. Clone parent to target location
+
+    3. Run git filter-branch (loses .gitmodules)
+
+    4. Reconstruct .gitmodules with adjusted paths:
+       - Parse saved entries
+       - Strip target_path prefix
+       - Create new .gitmodules
+
+    5. Update .git files in nested subdatasets to point to correct locations
+
+    6. In parent: Remove nested entries from .gitmodules
+
+    7. In parent: Register split dataset as submodule
+
+    Example workflow for splitting "data/raw/":
+
+    # Before split - Parent .gitmodules:
+    [submodule "data/raw/subject01"]
+        path = data/raw/subject01
+        url = ./data/raw/subject01
+        update = checkout
+        branch = main
+        datalad-id = abc-123
+    [submodule "data/raw/subject02"]
+        path = data/raw/subject02
+        url = https://example.com/subject02.git
+        fetchRecurseSubmodules = false
+
+    # After split - data/raw/ (split dataset) .gitmodules:
+    [submodule "subject01"]
+        path = subject01                    # ADJUSTED: prefix stripped
+        url = ./subject01                   # ADJUSTED: relative to new root
+        update = checkout                   # PRESERVED
+        branch = main                       # PRESERVED
+        datalad-id = abc-123               # PRESERVED
+    [submodule "subject02"]
+        path = subject02                    # ADJUSTED: prefix stripped
+        url = https://example.com/subject02.git  # PRESERVED: external URL
+        fetchRecurseSubmodules = false      # PRESERVED
+
+    # After split - Parent .gitmodules:
+    [submodule "data/raw"]
+        path = data/raw
+        url = ./data/raw
+    # Note: data/raw/subject01 and data/raw/subject02 entries removed
+    """
+```
+
+#### 4.5 Subdataset Boundary Handling
 - Detect when a subdataset straddles the split boundary
 - Provide clear error messages
 - Suggest alternative split paths
+- Examples:
+  - ERROR: "Cannot split 'data/raw' because subdataset 'data/shared' crosses boundary"
+  - SUGGEST: "Consider splitting 'data/' entirely, or split 'data/raw/subject01' individually"
 
 ### Phase 5: Testing Strategy
 
@@ -299,11 +453,25 @@ def _process_nested_subdatasets(dataset, target_paths):
    - `test_split_large_annexed_files`: Test with GB-sized files
    - `test_split_partial_content`: Handle case where some content is not available in parent
 
-3. **Nested Subdatasets**
-   - `test_split_with_nested_subdatasets`: Directory containing subdatasets
-   - `test_split_preserves_nested_subdataset_structure`: Verify hierarchy maintained
-   - `test_split_cross_boundary_subdataset`: Subdataset partially in/out of split path
-   - `test_split_bottom_up_processing`: Verify correct order of operations
+3. **Nested Subdatasets** (Phase 4 - .gitmodules reconstruction)
+   - `test_split_detects_nested_subdatasets`: Detect subdatasets under target path
+   - `test_split_error_on_nested_without_support`: Phase 1 should error with clear message
+   - `test_split_reconstructs_gitmodules`: Verify .gitmodules recreated with adjusted paths
+   - `test_split_removes_nested_from_parent_gitmodules`: Verify parent cleanup
+   - `test_split_nested_subdataset_functionality`: Verify nested subdatasets work after split
+   - `test_split_preserves_nested_hierarchy`: Multi-level nesting (e.g., data/raw/subject01/)
+   - `test_split_cross_boundary_subdataset`: Subdataset partially in/out of split path (should error)
+   - `test_split_gitmodules_path_adjustment`: Verify paths correctly adjusted (data/raw/sub01 → sub01)
+   - `test_split_gitmodules_url_adjustment`: Verify URLs adjusted if relative to dataset root
+   - `test_split_preserves_custom_submodule_config`: **CRITICAL** - Verify ALL config preserved:
+     * `update` setting (merge, checkout, rebase, none)
+     * `branch` setting
+     * `fetchRecurseSubmodules` setting
+     * `datalad-id` and `datalad-url` settings
+     * Any custom configuration keys
+   - `test_split_gitmodules_external_urls_preserved`: External URLs (http://, git://) unchanged
+   - `test_split_gitmodules_relative_urls_adjusted`: Relative URLs adjusted correctly (./path, ../path)
+   - `test_split_gitmodules_config_completeness`: Verify no configuration lost during reconstruction
 
 4. **Edge Cases**
    - `test_split_nonexistent_path`: Should fail gracefully
