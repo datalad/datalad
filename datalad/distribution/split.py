@@ -27,13 +27,11 @@ from datalad.interface.base import (
     build_doc,
     eval_results,
 )
-from datalad.interface.common_opts import (
-    jobs_opt,
-)
+from datalad.interface.common_opts import jobs_opt
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import (
-    EnsureChoice,
     EnsureBool,
+    EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
@@ -1076,8 +1074,8 @@ def _rewrite_history_with_gitlinks(parent_repo, rel_path, commit_map):
 
     Uses git filter-branch with --index-filter for performance.
     """
-    import tempfile
     import json
+    import tempfile
 
     # Create commit map file for the filter script
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -1179,8 +1177,7 @@ def _handle_content(parent_ds, subdataset_path, mode):
         # Get all annexed files in subdataset
         lgr.info("Copying content to subdataset")
         annexed_files = subdataset.repo.call_annex(
-            ['find', '--include', '*'],
-            read_only=True).splitlines()
+            ['find', '--include', '*']).splitlines()
 
         if annexed_files:
             # Get each file from parent
@@ -1194,8 +1191,7 @@ def _handle_content(parent_ds, subdataset_path, mode):
         # Move content from parent to subdataset
         lgr.info("Moving content to subdataset")
         annexed_files = subdataset.repo.call_annex(
-            ['find', '--include', '*'],
-            read_only=True).splitlines()
+            ['find', '--include', '*']).splitlines()
 
         if annexed_files:
             for afile in annexed_files:
