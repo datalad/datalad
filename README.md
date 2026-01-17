@@ -7,7 +7,7 @@
 
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
 [![Test Status](https://github.com/datalad/datalad/actions/workflows/test.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test.yml)
-[![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/pb6v1ka50o0xhl9j/branch/master?svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
 [![Extensions](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml)
 [![Linters](https://github.com/datalad/datalad/actions/workflows/lint.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/lint.yml)
 [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
