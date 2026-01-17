@@ -9,6 +9,15 @@ Results from running the prototype validation experiments for the datalad split 
 - Git: 2.39.5
 - Python: 3.11.2
 
+**⚠️ Note**: Experiments create temporary files/directories and may generate shell history files (`.bash_history`, `.cache/`, `.local/`, etc.) in the current working directory. It is recommended to run experiments in a temporary directory or set `HOME` to a temporary location to avoid polluting your workspace:
+
+```bash
+# Run experiments in a clean temporary environment
+export HOME=$(mktemp -d)
+cd /path/to/datalad/docs/designs/split/experiments
+bash 01_basic_filter.sh
+```
+
 ## Experiment 1: Basic Filter Branch
 
 **Status**: ✅ **SUCCESS**
