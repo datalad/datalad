@@ -924,3 +924,182 @@ bash docs/designs/split/experiments/12_content_mode_strategies.sh   # Content ha
 - Experiment 7 validates correct git-annex location tracking (use `--include-all-key-information`)
 - Experiment 8 confirms end-to-end workflow on real-world dataset
 - Experiment 10 documents nested subdataset limitation (Phase 4 feature)
+
+## Experiment 14: git-filter-repo Stable Commit Mapping
+
+**Status**: 📋 **PLANNED**
+
+### Goal
+
+Verify that `git-filter-repo` can provide stable mappings between original commits and filtered subdataset commits while preserving metadata.
+
+### Key Questions
+
+1. Can we get original_sha → filtered_sha mapping from git-filter-repo?
+2. Does it preserve commit timestamps, authors, messages exactly?
+3. Can we predict or track filtered commit SHAs?
+
+### Expected Findings
+
+- git-filter-repo should preserve:
+  - Author name and email (exactly)
+  - Author timestamp (exactly)
+  - Commit message (exactly)
+
+- Commit mapping methods:
+  1. Parse `.git/filter-repo/commit-map` file
+  2. Use `--commit-callback` to build mapping during filter
+  3. Match by timestamp (author_time is preserved exactly)
+
+### Script
+
+Run: `./14_git_filter_repo_stable_mapping.sh`
+
+### Next Steps
+
+Results will inform how we build the commit mapping for retroactive history rewriting.
+
+---
+
+## Experiment 15: Historical Gitlinks
+
+**Status**: 📋 **PLANNED**
+
+### Goal
+
+Verify that we can manually create commits with gitlinks pointing to subdataset commits, and that git handles historical gitlinks correctly.
+
+### Key Questions
+
+1. Can we create commits with mode 160000 (gitlink) entries?
+2. Does `git checkout` work correctly with historical gitlinks?
+3. What happens with `.gitmodules` in historical commits?
+4. Can we rewrite history to add gitlinks to existing commits?
+
+### Test Approach
+
+1. Create parent repository with normal directory through multiple commits
+2. Create subdataset with filtered history
+3. Manually rewrite parent commits to use gitlinks instead of tree entries
+4. Test checkout of historical commits
+5. Verify `git submodule update` works at each point in history
+
+### Expected Findings
+
+- Gitlinks can be created using git plumbing (mode 160000)
+- `.gitmodules` is required for git to treat gitlink as submodule
+- Historical gitlinks work correctly with `git checkout` and `git submodule update`
+
+### Script
+
+Run: `./15_historical_gitlinks.sh`
+
+### Next Steps
+
+Results will validate the approach for retroactive history rewriting with gitlinks.
+
+
+---
+
+## Experiment 16: Rewrite Parent with Nested Subdatasets
+
+**Status**: 📋 **PLANNED**
+
+### Goal
+
+Test rewrite-parent mode with nested subdataset structures to ensure gitlinks and .gitmodules are correct at all levels.
+
+### Test Scenario
+
+```
+parent/
+  ├── root.txt
+  ├── data/
+  │   ├── file1.txt
+  │   └── subjects/
+  │       ├── sub01/data.txt
+  │       └── sub02/data.txt
+  └── analysis/results.txt
+```
+
+Split plan:
+1. Split `data/subjects/sub01` into subdataset
+2. Split `data/subjects/sub02` into subdataset  
+3. Split `data/subjects` into subdataset (contains sub01 and sub02)
+4. Rewrite parent history with nested gitlinks
+
+### Key Questions
+
+1. Can we maintain nested .gitmodules correctly at each level?
+2. Do gitlinks work at multiple nesting depths?
+3. How to handle commits that span multiple nesting levels?
+4. What processing order is required (bottom-up)?
+
+### Expected Challenges
+
+- **Commit mapping complexity**: Each commit maps to multiple subdataset commits
+- **Tree rewriting**: Must handle gitlinks at multiple levels
+- **Bottom-up processing**: Critical to process deepest subdatasets first
+- **.gitmodules evolution**: Each level needs correct submodule entries
+
+### Script
+
+Run: `./16_rewrite_parent_nested.sh`
+
+### Next Steps
+
+Results will validate the approach for handling nested subdatasets in rewrite-parent mode and identify any edge cases.
+
+---
+
+## Experiment 17: Simple Rewrite Parent (Proof of Concept)
+
+**Status**: 📋 **PLANNED**
+
+### Goal
+
+Implement a working proof-of-concept for rewrite-parent mode with simple linear history (no nesting).
+
+### Test Scenario
+
+```
+Simple linear history:
+  A - B - C - D
+  All commits modify data/file.txt
+
+After rewrite:
+  A' - B' - C' - D'
+  All commits have data/ as gitlink (mode 160000)
+```
+
+### Implementation Approach
+
+1. Create parent with simple history
+2. Filter subdataset history
+3. Build commit mapping (original → filtered)
+4. Manually rewrite parent commits:
+   - Replace tree entries with gitlinks (mode 160000)
+   - Add .gitmodules blob
+   - Preserve all commit metadata
+5. Verify historical checkout works
+
+### Key Techniques
+
+- `git ls-tree` to read tree entries
+- `git mktree` to create new trees
+- `git commit-tree` to create commits with new trees
+- `GIT_AUTHOR_DATE` and `GIT_COMMITTER_DATE` to preserve timestamps
+- Manual gitlink creation: `160000 commit <sha> <path>`
+
+### Script
+
+Run: `./17_simple_rewrite_parent.sh`
+
+### Expected Results
+
+Demonstrates that rewrite-parent mode is feasible:
+- ✓ Gitlinks can be created at arbitrary points in history
+- ✓ Metadata (author, timestamp, message) can be preserved
+- ✓ Historical checkout and submodule update work correctly
+- ✓ Approach can be extended to multiple paths and nested structure
+
