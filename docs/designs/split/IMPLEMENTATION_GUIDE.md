@@ -161,6 +161,16 @@ class Split(Interface):
             PREFIX + path (e.g., 'split/data/subjects/subject01').""",
             constraints=EnsureStr() | EnsureNone()),
 
+        worktree_use_namespace=Parameter(
+            args=("--worktree-use-namespace",),
+            action='store_true',
+            doc="""use git namespaces instead of branch prefix for worktree
+            branches. Only used with --clone-mode=worktree. When enabled,
+            creates branches in refs/namespaces/<namespace>/refs/heads/<path>
+            for complete isolation from main branch namespace. Namespace
+            defaults to the value of --worktree-branch-prefix (without
+            trailing slash)."""),
+
         check=Parameter(
             args=("--check",),
             metavar='LEVEL',
@@ -248,6 +258,7 @@ class Split(Interface):
             clone_mode='clone',
             content='auto',
             worktree_branch_prefix='split/',
+            worktree_use_namespace=False,
             check='full',
             propagate_annex_config=None,
             preserve_branch_name=True,
@@ -574,7 +585,8 @@ def _perform_single_split(
                 ds=ds,
                 target_path=target_path,
                 rel_path=rel_path,
-                prefix=worktree_branch_prefix)
+                prefix=worktree_branch_prefix,
+                use_namespace=worktree_use_namespace)
 
         elif clone_mode == 'reckless-ephemeral':
             _create_via_reckless_ephemeral(
@@ -657,21 +669,48 @@ def _create_via_clone(ds, target_path, rel_path):
 ### Step 5.3: Worktree Mode Implementation
 
 ```python
-def _create_via_worktree(ds, target_path, rel_path, prefix):
-    """Create subdataset via git worktree."""
-    lgr.debug("Creating subdataset via worktree")
+def _create_via_worktree(ds, target_path, rel_path, prefix, use_namespace=False):
+    """Create subdataset via git worktree.
 
-    # Create branch with hierarchical name
-    branch_name = f"{prefix}{rel_path}"
-    lgr.debug("Creating branch: %s", branch_name)
-    ds.repo.call_git(['branch', branch_name, 'HEAD'])
+    Args:
+        ds: Parent dataset
+        target_path: Absolute path to target
+        rel_path: Relative path within dataset
+        prefix: Branch prefix (default: 'split/')
+        use_namespace: If True, use git namespaces for complete isolation
+    """
+    lgr.debug("Creating subdataset via worktree (namespace=%s)", use_namespace)
 
-    # Create worktree
-    lgr.debug("Creating worktree at %s", rel_path)
+    if use_namespace:
+        # Approach B: Use git namespaces for complete isolation
+        namespace = prefix.rstrip('/')  # Remove trailing slash
+        branch_path = str(rel_path)
+
+        lgr.debug("Creating namespaced branch: %s in namespace %s",
+                  branch_path, namespace)
+
+        # Create branch in namespace
+        env = os.environ.copy()
+        env['GIT_NAMESPACE'] = namespace
+        ds.repo.call_git(['branch', branch_path, 'HEAD'], env=env)
+
+        # Worktree ref for namespaced branch
+        worktree_ref = f"refs/namespaces/{namespace}/refs/heads/{branch_path}"
+    else:
+        # Approach A: Simple hierarchical prefix (default)
+        branch_name = f"{prefix}{rel_path}"
+        lgr.debug("Creating prefixed branch: %s", branch_name)
+        ds.repo.call_git(['branch', branch_name, 'HEAD'])
+
+        # Worktree ref is just the branch name
+        worktree_ref = branch_name
+
+    # Create worktree (same for both approaches)
+    lgr.debug("Creating worktree at %s with ref %s", rel_path, worktree_ref)
     ds.repo.call_git([
         'worktree', 'add',
         str(rel_path),
-        branch_name
+        worktree_ref
     ])
 ```
 
