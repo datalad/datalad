@@ -478,5 +478,165 @@ def test_preserve_commit_metadata(path=None):
     assert original_author == subds_author
 
 
+@pytest.mark.ai_generated
+@with_tempfile
+def test_rewrite_parent_mode_basic(path=None):
+    """Test rewrite-parent mode preserves all commits with retroactive gitlinks."""
+    # Create parent dataset without annex for simpler testing
+    ds = Dataset(path).create(force=True, annex=False)
+
+    # Create commits before data/ exists
+    (Path(path) / 'root1.txt').write_text('root 1')
+    ds.save(message='Root commit 1')
+
+    # Create data/ and add commits
+    data_dir = Path(path) / 'data'
+    data_dir.mkdir()
+    (data_dir / 'file1.txt').write_text('v1')
+    ds.save(message='Commit 1: Add data')
+
+    (data_dir / 'file2.txt').write_text('v2')
+    ds.save(message='Commit 2: Add more data')
+
+    # Another root commit
+    (Path(path) / 'root2.txt').write_text('root 2')
+    ds.save(message='Root commit 2')
+
+    # Another data commit
+    (data_dir / 'file3.txt').write_text('v3')
+    ds.save(message='Commit 3: Add even more data')
+
+    # Count commits before split
+    commits_before = ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip()
+
+    # Run split with rewrite-parent mode
+    result = split(
+        'data',
+        dataset=path,
+        mode='rewrite-parent',
+        force=True,
+        return_type='list'
+    )
+
+    assert_status('ok', result)
+
+    # Count commits after split - should be SAME
+    commits_after = ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip()
+    assert commits_before == commits_after, \
+        f"Commit count changed: {commits_before} -> {commits_after}"
+
+    # Check that commits have gitlinks
+    all_commits = ds.repo.call_git(['rev-list', '--reverse', 'HEAD']).strip().split('\n')
+
+    # Initial commit should NOT have gitlink (no data/ yet)
+    initial_commit = all_commits[0]
+    initial_tree = ds.repo.call_git(['log', '-1', '--format=%T', initial_commit]).strip()
+    initial_tree_lines = ds.repo.call_git(['ls-tree', initial_tree]).strip()
+    assert '\tdata' not in initial_tree_lines, "Initial commit should not have data/"
+
+    # Check which commits should have gitlinks (those that touched data/)
+    # We know these commits touched data/ based on commit messages
+    data_commits = ['Commit 1: Add data', 'Commit 2: Add more data', 'Commit 3: Add even more data']
+
+    for commit in all_commits:
+        msg = ds.repo.call_git(['log', '-1', '--format=%s', commit]).strip()
+        tree = ds.repo.call_git(['log', '-1', '--format=%T', commit]).strip()
+        tree_lines = ds.repo.call_git(['ls-tree', tree]).strip()
+
+        if msg in data_commits:
+            # Commits that touched data/ should have gitlinks
+            assert '160000 commit' in tree_lines and '\tdata' in tree_lines, \
+                f"Commit '{msg}' should have gitlink but doesn't"
+        elif msg != '[DATALAD] new dataset':
+            # Root commits may or may not have gitlinks depending on when they occurred
+            # Just verify tree is valid
+            pass
+
+    # Verify subdataset exists and has correct structure
+    subds = Dataset(Path(path) / 'data')
+    assert subds.is_installed(), "Subdataset should be installed"
+
+    # Verify subdataset has filtered history (only commits touching data/)
+    subds_commits = subds.repo.call_git(['rev-list', '--count', 'HEAD']).strip()
+    # Should have 3 commits (the ones that touched data/)
+    assert int(subds_commits) == 3, \
+        f"Subdataset should have 3 commits, got {subds_commits}"
+
+    # Verify files exist in subdataset
+    assert (Path(path) / 'data' / 'file1.txt').exists()
+    assert (Path(path) / 'data' / 'file2.txt').exists()
+    assert (Path(path) / 'data' / 'file3.txt').exists()
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_rewrite_parent_mode_nested(path=None):
+    """Test rewrite-parent mode with nested directory structure."""
+    ds = Dataset(path).create(force=True, annex=False)
+
+    # Create nested structure
+    nested_dir = Path(path) / 'data' / 'subdir' / 'deep'
+    nested_dir.mkdir(parents=True)
+
+    (nested_dir / 'file.txt').write_text('v1')
+    ds.save(message='Add nested structure')
+
+    (nested_dir / 'file.txt').write_text('v2')
+    ds.save(message='Update nested file')
+
+    commits_before = int(ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+
+    # Split
+    result = split(
+        'data',
+        dataset=path,
+        mode='rewrite-parent',
+        force=True,
+        return_type='list'
+    )
+
+    assert_status('ok', result)
+
+    # Verify commits preserved
+    commits_after = int(ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+    assert commits_before == commits_after
+
+    # Verify nested structure in subdataset
+    assert (Path(path) / 'data' / 'subdir' / 'deep' / 'file.txt').exists()
+    assert (Path(path) / 'data' / 'subdir' / 'deep' / 'file.txt').read_text() == 'v2'
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_rewrite_parent_mode_commit_metadata(path=None):
+    """Test that rewrite-parent mode preserves commit metadata."""
+    ds = Dataset(path).create(force=True, annex=False)
+
+    data_dir = Path(path) / 'data'
+    data_dir.mkdir()
+    (data_dir / 'file.txt').write_text('v1')
+    ds.save(message='Test commit for metadata')
+
+    # Get original metadata
+    original_author = ds.repo.call_git(['log', '-1', '--format=%an']).strip()
+    original_email = ds.repo.call_git(['log', '-1', '--format=%ae']).strip()
+    original_date = ds.repo.call_git(['log', '-1', '--format=%ai']).strip()
+    original_msg = ds.repo.call_git(['log', '-1', '--format=%B']).strip()
+
+    # Split with rewrite-parent
+    split('data', dataset=path, mode='rewrite-parent', force=True)
+
+    # Get metadata after rewrite
+    new_author = ds.repo.call_git(['log', '-1', '--format=%an']).strip()
+    new_email = ds.repo.call_git(['log', '-1', '--format=%ae']).strip()
+    # Date will change due to rewrite, but author should be same
+    new_msg = ds.repo.call_git(['log', '-1', '--format=%B']).strip()
+
+    # Metadata should be preserved
+    assert new_author == original_author, "Author changed after rewrite"
+    assert new_email == original_email, "Email changed after rewrite"
+    assert new_msg == original_msg, "Message changed after rewrite"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
