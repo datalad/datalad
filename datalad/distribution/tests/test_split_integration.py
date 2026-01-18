@@ -640,35 +640,72 @@ def test_rewrite_parent_mode_commit_metadata(path=None):
 
 @pytest.mark.ai_generated
 @with_tempfile
-def test_rewrite_parent_mode_nested_path_error(path=None):
-    """Test that rewrite-parent mode fails gracefully on nested paths."""
+def test_rewrite_parent_mode_nested_path_2_levels(path=None):
+    """Test rewrite-parent mode with nested paths (2 levels: images/adswa/)."""
     ds = Dataset(path).create(force=True, annex=False)
 
-    # Create nested structure
+    # Create nested structure (2 levels)
     nested_dir = Path(path) / 'images' / 'adswa'
     nested_dir.mkdir(parents=True)
-    (nested_dir / 'file.txt').write_text('v1')
-    ds.save(message='Add nested structure')
+    (nested_dir / 'file1.txt').write_text('v1')
+    ds.save(message='Add nested file')
 
-    # Attempt to split nested path (should fail with NotImplementedError)
+    # Modify nested file to create history
+    (nested_dir / 'file1.txt').write_text('v2')
+    ds.save(message='Update nested file')
+
+    # Add another file
+    (nested_dir / 'file2.txt').write_text('new file')
+    ds.save(message='Add second file')
+
+    commits_before = int(ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+
+    # Split nested path with rewrite-parent (2 levels deep)
     result = split(
         'images/adswa',
         dataset=path,
         mode='rewrite-parent',
         force=True,
-        return_type='list',
-        on_failure='ignore'
+        return_type='list'
     )
 
-    # Should have failed with error status
-    assert len(result) > 0
-    error_result = [r for r in result if r.get('status') == 'error']
-    assert len(error_result) > 0, "Should have error result for nested path"
+    assert_status('ok', result)
 
-    # Error message should mention nested paths not supported
-    error_msg = str(error_result[0].get('message', ''))
-    assert 'nested path' in error_msg.lower() or 'slash' in error_msg.lower(), \
-        f"Error message should mention nested paths: {error_msg}"
+    # Verify commits preserved
+    commits_after = int(ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+    assert commits_before == commits_after, \
+        f"Commit count should be preserved: {commits_before} != {commits_after}"
+
+    # Verify nested gitlink exists in tree
+    # Check images/ tree contains adswa/ as gitlink
+    tree = ds.repo.call_git(['log', '-1', '--format=%T', 'HEAD']).strip()
+    images_entry = ds.repo.call_git(['ls-tree', tree]).strip()
+    assert 'images' in images_entry, "Should have images/ entry in root tree"
+
+    # Get images/ tree SHA
+    for line in images_entry.split('\n'):
+        if line.endswith('\timages'):
+            images_tree_sha = line.split()[2]
+            break
+
+    # Check adswa/ is gitlink (160000) in images/ tree
+    adswa_entry = ds.repo.call_git(['ls-tree', images_tree_sha]).strip()
+    assert 'adswa' in adswa_entry, "Should have adswa/ entry in images/ tree"
+
+    for line in adswa_entry.split('\n'):
+        if line.endswith('\tadswa'):
+            mode = line.split()[0]
+            assert mode == '160000', \
+                f"adswa/ should be gitlink (mode 160000), got {mode}"
+            break
+
+    # Verify subdataset exists and has history
+    adswa_subds = Dataset(Path(path) / 'images' / 'adswa')
+    assert adswa_subds.is_installed(), "Subdataset should be installed"
+
+    # Verify subdataset has expected commits
+    subds_commits = int(adswa_subds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+    assert subds_commits >= 3, f"Subdataset should have >=3 commits, got {subds_commits}"
 
 
 if __name__ == '__main__':
