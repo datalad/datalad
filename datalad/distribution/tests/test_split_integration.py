@@ -638,5 +638,38 @@ def test_rewrite_parent_mode_commit_metadata(path=None):
     assert new_msg == original_msg, "Message changed after rewrite"
 
 
+@pytest.mark.ai_generated
+@with_tempfile
+def test_rewrite_parent_mode_nested_path_error(path=None):
+    """Test that rewrite-parent mode fails gracefully on nested paths."""
+    ds = Dataset(path).create(force=True, annex=False)
+
+    # Create nested structure
+    nested_dir = Path(path) / 'images' / 'adswa'
+    nested_dir.mkdir(parents=True)
+    (nested_dir / 'file.txt').write_text('v1')
+    ds.save(message='Add nested structure')
+
+    # Attempt to split nested path (should fail with NotImplementedError)
+    result = split(
+        'images/adswa',
+        dataset=path,
+        mode='rewrite-parent',
+        force=True,
+        return_type='list',
+        on_failure='ignore'
+    )
+
+    # Should have failed with error status
+    assert len(result) > 0
+    error_result = [r for r in result if r.get('status') == 'error']
+    assert len(error_result) > 0, "Should have error result for nested path"
+
+    # Error message should mention nested paths not supported
+    error_msg = str(error_result[0].get('message', ''))
+    assert 'nested path' in error_msg.lower() or 'slash' in error_msg.lower(), \
+        f"Error message should mention nested paths: {error_msg}"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

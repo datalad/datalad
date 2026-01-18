@@ -1150,7 +1150,17 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
     original_commits : list
         List of original commit SHAs to rewrite (oldest first)
     """
-    lgr.info("Rewriting history (this may take time for large repositories)...")
+    # Check for nested paths (containing slashes)
+    if '/' in str(rel_path):
+        raise NotImplementedError(
+            f"Rewrite-parent mode does not yet support nested paths like '{rel_path}'. "
+            f"Please split only top-level directories (those directly under the repository root). "
+            f"Nested subdataset support requires the split_helpers_nested module integration. "
+            f"See docs/designs/split/experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md"
+        )
+
+    total_commits = len(original_commits)
+    lgr.info("Rewriting %d commits (this may take time for large repositories)...", total_commits)
 
     # Use the provided list of commits (already in reverse order, oldest first)
     all_commits = original_commits
@@ -1177,7 +1187,12 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
     new_commits = {}
     prev_new_commit = None
 
-    for orig_commit in all_commits:
+    for idx, orig_commit in enumerate(all_commits, 1):
+        # Progress reporting
+        msg_snippet = parent_repo.call_git([
+            'log', '-1', '--format=%s', orig_commit]).strip()[:50]
+        lgr.info("Processing commit %d/%d: %s...", idx, total_commits, msg_snippet)
+
         # Get original commit metadata
         author_name = parent_repo.call_git([
             'log', '-1', '--format=%an', orig_commit]).strip()
@@ -1266,7 +1281,7 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
     parent_repo.call_git(['update-ref', f'refs/heads/{current_branch}', prev_new_commit])
     parent_repo.call_git(['reset', '--hard', current_branch])
 
-    lgr.debug("History rewrite complete: %d commits rewritten", len(new_commits))
+    lgr.info("History rewrite complete: %d commits rewritten successfully", len(new_commits))
 
 
 def _handle_content(parent_ds, subdataset_path, mode):
