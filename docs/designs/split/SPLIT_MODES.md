@@ -337,9 +337,13 @@ The `--mode=rewrite-parent` now supports both **top-level** and **nested paths**
 **All of these work:**
 ```bash
 datalad split --mode=rewrite-parent data/              # ✓ Top-level directory
-datalad split --mode=rewrite-parent images/adswa/      # ✓ Nested path (2 levels)
-datalad split --mode=rewrite-parent data/logs/raw/     # ✓ Nested path (3 levels)
+datalad split --mode=rewrite-parent images/adswa/      # ✓ Nested path (adswa/ becomes subdataset, images/ stays directory)
+datalad split --mode=rewrite-parent data/logs/raw/     # ✓ Deeply nested path
 ```
+
+**Important distinction:**
+- `split images/adswa/` → Creates **1 subdataset** (only adswa/), images/ stays a regular directory
+- `split images/ images/adswa/` → Creates **nested subdatasets** (images/ is subdataset containing adswa/ subdataset)
 
 **How it works:**
 
@@ -348,8 +352,10 @@ The implementation uses bottom-up recursive tree building to handle nested paths
 1. Parse path into components (e.g., `'data/logs/'` → `['data', 'logs']`)
 2. Navigate down tree hierarchy: root → data/ → logs/
 3. Build new data/ tree with logs/ replaced by gitlink (160000 mode)
-4. Build new root tree with data/ replaced by modified data/ tree
+4. Build new root tree with data/ replaced by modified data/ tree (stays regular tree, NOT gitlink)
 5. Create commit with new root tree
+
+Only the specified path becomes a subdataset; parent directories remain regular trees.
 
 Algorithm validated in Experiment 20 and implemented in `_build_tree_with_nested_gitlink()`.
 
@@ -408,16 +414,17 @@ The experiments revealed that proper nested subdataset setup requires THREE step
 Missing step 3 results in uninitialized submodules (shown with '-' prefix in `git submodule status`).
 
 **Testing:**
-- ⏳ Add integration test for 2-level nesting (`data/logs/`)
-- ⏳ Add integration test for 3+ level nesting (`data/logs/subds/`)
-- ⏳ Verify gitlink chains throughout history
-- ⏳ Verify submodule initialization at all levels
+- ✅ Add integration test for nested path (`images/adswa/`) - single subdataset at nested location
+- ⏳ Add integration test for deeply nested path (`data/logs/raw/`) - single subdataset 3+ directories deep
+- ⏳ Add integration test for true nested subdatasets (split both parent and child paths)
+- ⏳ Verify gitlink placement throughout history at correct tree levels
+- ⏳ Verify submodule initialization for nested subdatasets
 
 **See Also:**
 - `datalad/distribution/split_helpers_nested.py` - Implementation ready for integration
-- `docs/designs/split/experiments/18_VERIFICATION_RESULTS.md` - Successful 3-level nesting test
-- `docs/designs/split/experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md` - Complete procedure
-- `docs/designs/split/experiments/20_nested_tree_building_experiment.sh` - Tree building validation
+- `docs/designs/split/experiments/18_VERIFICATION_RESULTS.md` - Validated true nested subdatasets (data/ → logs/ → subds/)
+- `docs/designs/split/experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md` - Complete 3-step procedure
+- `docs/designs/split/experiments/20_nested_tree_building_experiment.sh` - Tree building algorithm validation
 
 ## Cleanup Operations
 
