@@ -1,8 +1,13 @@
 # Retroactive History Rewriting for Split - Design Document
 
+> **IMPLEMENTATION STATUS**: ✅ **IMPLEMENTED**
+> This design has been implemented as the `--mode=rewrite-parent` option in `datalad split`.
+> Implementation uses manual git commit-tree approach (as validated in Experiments 17-19).
+> See `datalad/distribution/split.py:_apply_rewrite_parent_simple()` and `_rewrite_history_with_commit_tree()`.
+
 ## Problem Statement
 
-Currently, `datalad split` rewrites history **independently** in each created subdataset, but does NOT rewrite the parent dataset's history. This means:
+With the default `split-top` mode, `datalad split` rewrites history **independently** in each created subdataset, but does NOT rewrite the parent dataset's history. This means:
 
 - **Subdataset**: Has clean history with only commits affecting its files
 - **Parent**: Retains original commit history + new commit marking the split
