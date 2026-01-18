@@ -326,6 +326,97 @@ See RETROACTIVE_HISTORY_REWRITING.md for detailed implementation using `git-filt
 - Creating reference implementation for others to clone
 - Willing to accept breaking change for historical consistency
 
+### Current Limitations
+
+> **Implementation Status**: ✅ Implemented for **top-level paths only**
+
+**Nested Path Limitation** (v1.0):
+
+Currently, `--mode=rewrite-parent` only supports splitting **top-level directories** (those directly under the repository root). Nested paths like `images/adswa/` are not yet supported.
+
+**Works:**
+```bash
+datalad split --mode=rewrite-parent images/      # ✓ Top-level directory
+datalad split --mode=rewrite-parent data/        # ✓ Top-level directory
+```
+
+**Does not work:**
+```bash
+datalad split --mode=rewrite-parent images/adswa/    # ✗ Nested path (contains slash)
+datalad split --mode=rewrite-parent data/logs/raw/  # ✗ Nested path (contains slashes)
+```
+
+**Error message:**
+```
+NotImplementedError: Rewrite-parent mode does not yet support nested paths like 'images/adswa/'.
+Please split only top-level directories (those directly under the repository root).
+Nested subdataset support requires the split_helpers_nested module integration.
+```
+
+**Why this limitation exists:**
+
+The `git mktree` command (used to build new commit trees) only accepts single-level path entries without slashes. For nested paths like `images/adswa/`, we need to:
+
+1. Parse path into components `['images', 'adswa']`
+2. Get the `images` tree from parent commit
+3. Modify `images` tree to replace `adswa` entry with gitlink
+4. Create new `images` tree with `git mktree`
+5. Add modified `images` tree to root tree
+
+This requires recursive tree manipulation, which is implemented in the `split_helpers_nested` module but not yet integrated into the main rewrite-parent flow.
+
+**Workaround:**
+
+To split nested structures, use the default `split-top` mode (which handles nested paths correctly):
+
+```bash
+# Option 1: Split parent directory as single subdataset
+datalad split images/                    # Creates one subdataset containing all of images/*
+
+# Option 2: Split hierarchically (creates nested subdatasets)
+datalad split images/                    # First create images/ subdataset
+cd images/
+datalad split adswa/ bids/ neuronets/    # Then split subdirectories within it
+```
+
+### Future Work
+
+**TODO: Nested Path Support** (Priority: High, Effort: 8-12 hours)
+
+Enable `--mode=rewrite-parent` for nested paths by integrating the `split_helpers_nested` module:
+
+**Experimental Validation:**
+- ✅ Experiments 16-19 successfully validated nested rewrite-parent with 3+ nesting levels
+- ✅ `split_helpers_nested.py` (349 lines) implements complete nested setup procedure
+- ✅ Production-ready approach documented in `experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md`
+
+**Implementation Plan:**
+1. Extend `_rewrite_history_with_commit_tree()` to handle recursive tree manipulation
+2. For nested paths, build intermediate trees bottom-up before creating commit
+3. Integrate `split_helpers_nested.setup_nested_subdatasets()` for post-rewrite setup
+4. Add 3-step setup: clone → checkout → submodule init (critical!)
+5. Process multiple nested paths in bottom-up order (deepest first)
+
+**Key Technical Requirement:**
+
+The experiments revealed that proper nested subdataset setup requires THREE steps (not two!):
+1. Clone filtered repositories to their paths
+2. Checkout commits matching gitlinks in parent
+3. **Initialize submodules in .git/config** ← Often forgotten but essential!
+
+Missing step 3 results in uninitialized submodules (shown with '-' prefix in `git submodule status`).
+
+**Testing:**
+- Add integration test for 2-level nesting (`data/logs/`)
+- Add integration test for 3+ level nesting (`data/logs/subds/`)
+- Verify gitlink chains throughout history
+- Verify submodule initialization at all levels
+
+**See Also:**
+- `datalad/distribution/split_helpers_nested.py` - Implementation ready for integration
+- `docs/designs/split/experiments/18_VERIFICATION_RESULTS.md` - Successful 3-level nesting test
+- `docs/designs/split/experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md` - Complete procedure
+
 ## Cleanup Operations
 
 The `--cleanup` parameter controls post-split cleanup to reclaim disk space.
