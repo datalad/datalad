@@ -58,32 +58,34 @@ class Split(Interface):
     filter-branch to rewrite history.
 
     .. warning::
-       This operation rewrites git history. It is HIGHLY recommended to create
+       This operation modifies git history. It is HIGHLY recommended to create
        a backup before running this command.
 
     .. note::
-       **IMPORTANT DISCLAIMER ABOUT HISTORY REWRITING:**
+       **IMPORTANT: UNDERSTANDING HISTORY MODES:**
 
-       The current implementation rewrites history INDEPENDENTLY within each
-       created subdataset to isolate its directory's history. However, the
-       parent dataset's history is NOT rewritten. Instead, a new commit is
-       created in the parent to register the split. This means:
+       The `--mode` parameter controls how parent history is affected:
 
-       - The subdataset will have a clean history containing only commits that
-         affected its files
-       - The parent dataset retains its original commit history, with a new
-         commit marking the split operation
-       - There is NO direct linkage between the original parent history and
-         the subdataset's filtered history
+       - **split-top (default)**: SAFEST - subdatasets have filtered history,
+         parent history is NOT rewritten. A new commit is added to parent
+         marking the split. Original commits unchanged, split appears at a
+         single point in time.
 
-       This approach preserves the parent's commit SHAs and branch structure,
-       but means the split is not retroactive through history. The repository
-       structure appears as though the split happened at a single point in time,
-       not as if subdatasets existed from the beginning.
+       - **truncate-top**: Discards ALL parent history, creating orphan commit.
+         Subdatasets have filtered history. Use for fresh start when history
+         is not valuable. DESTRUCTIVE - requires re-cloning.
 
-       A future enhancement may add an option to rewrite parent history to make
-       it appear as though subdatasets existed from the beginning, with commits
-       properly linked through the hierarchy.
+       - **truncate-top-graft**: Like truncate-top but preserves full history
+         in separate branch with git replace for transparent access when needed.
+         Best of both worlds - minimal working tree, full history available.
+
+       - **rewrite-parent**: Rewrites ENTIRE parent history to retroactively
+         include subdatasets with proper gitlinks throughout. Makes it appear
+         as though subdatasets existed from the beginning. CHANGES ALL COMMIT
+         SHAs - requires re-cloning all copies. Most destructive but
+         historically accurate.
+
+       See `--mode` parameter documentation for details on each mode.
 
     The split operation:
 
@@ -254,6 +256,21 @@ class Split(Interface):
             text="Use namespaces for complete branch isolation",
             code_py="split('data/subjects/subject01', clone_mode='worktree', worktree_use_namespace=True)",
             code_cmd="datalad split --clone-mode=worktree --worktree-use-namespace data/subjects/subject01"),
+
+        dict(
+            text="Truncate history for fresh start with minimal storage",
+            code_py="split('data', mode='truncate-top', cleanup='all', force=True)",
+            code_cmd="datalad split --mode=truncate-top --cleanup=all --force data"),
+
+        dict(
+            text="Truncate with grafted full history access",
+            code_py="split('data', mode='truncate-top-graft', cleanup='gc', force=True)",
+            code_cmd="datalad split --mode=truncate-top-graft --cleanup=gc --force data"),
+
+        dict(
+            text="Rewrite entire parent history to retroactively include subdataset (DESTRUCTIVE)",
+            code_py="split('data', mode='rewrite-parent', force=True)",
+            code_cmd="datalad split --mode=rewrite-parent --force data"),
     ]
 
     @staticmethod
@@ -316,15 +333,54 @@ class Split(Interface):
             warning_lines = [
                 "",
                 "=" * 70,
-                "WARNING: DESTRUCTIVE OPERATION",
+                "WARNING: HISTORY-MODIFYING OPERATION",
                 "=" * 70,
-                "This operation will:",
-                "  1. Rewrite git history using filter-branch",
-                "  2. Modify .gitmodules and repository structure",
-                "  3. Cannot be easily undone",
+                f"Mode: {mode}",
+                "",
+            ]
+
+            # Mode-specific warnings
+            if mode == 'split-top':
+                warning_lines.extend([
+                    "This operation will:",
+                    "  1. Create subdataset with filtered history (safe)",
+                    "  2. Add new commit to parent marking the split",
+                    "  3. Parent history remains unchanged",
+                    "",
+                    "Impact: LOW - safest mode, easily reversible"
+                ])
+            elif mode == 'truncate-top':
+                warning_lines.extend([
+                    "This operation will:",
+                    "  1. DELETE ALL PARENT HISTORY (creates orphan commit)",
+                    "  2. Create subdataset with filtered history",
+                    "  3. Requires re-cloning all repository copies",
+                    "",
+                    "Impact: HIGH - destroys history, cannot be undone"
+                ])
+            elif mode == 'truncate-top-graft':
+                warning_lines.extend([
+                    "This operation will:",
+                    "  1. Create orphan commit (working tree only)",
+                    "  2. Preserve full history in separate branch",
+                    "  3. Use git replace for transparent access",
+                    "",
+                    "Impact: MEDIUM - history preserved but requires re-cloning"
+                ])
+            elif mode == 'rewrite-parent':
+                warning_lines.extend([
+                    "This operation will:",
+                    "  1. REWRITE ENTIRE PARENT HISTORY (all commits get new SHAs)",
+                    "  2. Retroactively add subdataset gitlinks throughout history",
+                    "  3. Requires re-cloning ALL repository copies",
+                    "",
+                    "Impact: HIGHEST - changes every commit, cannot be undone"
+                ])
+
+            warning_lines.extend([
                 "",
                 "Affected paths:",
-            ]
+            ])
             warning_lines.extend(f"  - {p}" for p in resolved_paths)
             warning_lines.extend([
                 "",
