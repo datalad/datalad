@@ -29,6 +29,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.results import get_status_dict
+from datalad.log import log_progress
 from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
@@ -1301,10 +1302,19 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
         lgr.info("Processing nested path '%s' using recursive tree building", rel_path)
 
     total_commits = len(original_commits)
-    lgr.info("Rewriting %d commits (this may take time for large repositories)...", total_commits)
 
     # Use the provided list of commits (already in reverse order, oldest first)
     all_commits = original_commits
+
+    # Start progress reporting
+    pbar_id = f'rewrite-history-{id(parent_repo)}-{rel_path}'
+    log_progress(
+        lgr.info, pbar_id,
+        'Start rewriting %d commits to add %s as subdataset', total_commits, rel_path,
+        total=total_commits,
+        label='Rewriting history',
+        unit=' Commits'
+    )
 
     # Create .gitmodules content
     gitmodules_content = f"""[submodule "{rel_path}"]
@@ -1329,10 +1339,15 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
     prev_new_commit = None
 
     for idx, orig_commit in enumerate(all_commits, 1):
-        # Progress reporting
+        # Progress update
         msg_snippet = parent_repo.call_git([
             'log', '-1', '--format=%s', orig_commit]).strip()[:50]
-        lgr.info("Processing commit %d/%d: %s...", idx, total_commits, msg_snippet)
+        log_progress(
+            lgr.info, pbar_id,
+            'Processing commit %d/%d: %s', idx, total_commits, msg_snippet,
+            update=idx,
+            total=total_commits
+        )
 
         # Get original commit metadata
         author_name = parent_repo.call_git([
@@ -1502,7 +1517,11 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
     parent_repo.call_git(['update-ref', f'refs/heads/{current_branch}', prev_new_commit])
     parent_repo.call_git(['reset', '--hard', current_branch])
 
-    lgr.info("History rewrite complete: %d commits rewritten successfully", len(new_commits))
+    # Finish progress reporting
+    log_progress(
+        lgr.info, pbar_id,
+        'Finished rewriting %d commits successfully', len(new_commits)
+    )
 
 
 def _handle_content(parent_ds, subdataset_path, mode):
