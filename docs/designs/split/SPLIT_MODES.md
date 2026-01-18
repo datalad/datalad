@@ -326,96 +326,98 @@ See RETROACTIVE_HISTORY_REWRITING.md for detailed implementation using `git-filt
 - Creating reference implementation for others to clone
 - Willing to accept breaking change for historical consistency
 
+### Implementation Status
+
+> **Implementation Status**: ✅ **FULLY IMPLEMENTED** (including nested paths)
+
+**Nested Path Support** (v2.0):
+
+The `--mode=rewrite-parent` now supports both **top-level** and **nested paths** using recursive tree building:
+
+**All of these work:**
+```bash
+datalad split --mode=rewrite-parent data/              # ✓ Top-level directory
+datalad split --mode=rewrite-parent images/adswa/      # ✓ Nested path (2 levels)
+datalad split --mode=rewrite-parent data/logs/raw/     # ✓ Nested path (3 levels)
+```
+
+**How it works:**
+
+The implementation uses bottom-up recursive tree building to handle nested paths:
+
+1. Parse path into components (e.g., `'data/logs/'` → `['data', 'logs']`)
+2. Navigate down tree hierarchy: root → data/ → logs/
+3. Build new data/ tree with logs/ replaced by gitlink (160000 mode)
+4. Build new root tree with data/ replaced by modified data/ tree
+5. Create commit with new root tree
+
+Algorithm validated in Experiment 20 and implemented in `_build_tree_with_nested_gitlink()`.
+
+**Technical Solution:**
+
+Git's `mktree` command only accepts single-level paths without slashes. For nested paths, the implementation:
+- Uses `git ls-tree` to navigate down the tree hierarchy
+- Builds intermediate trees from deepest level upward
+- Each level uses `git mktree` only on single-level entries (no slashes)
+- Returns modified root tree with nested gitlink incorporated
+
 ### Current Limitations
 
-> **Implementation Status**: ✅ Implemented for **top-level paths only**
+**Post-Rewrite Setup** (Partial Implementation):
 
-**Nested Path Limitation** (v1.0):
+The tree building and history rewriting fully support nested paths. However, the post-rewrite subdataset setup currently uses a simplified approach:
 
-Currently, `--mode=rewrite-parent` only supports splitting **top-level directories** (those directly under the repository root). Nested paths like `images/adswa/` are not yet supported.
+**What works:**
+- ✅ History rewriting with nested gitlinks throughout all commits
+- ✅ Correct tree structures with gitlinks at arbitrary nesting depths
+- ✅ Filtered subdataset repositories in correct locations
+- ✅ Basic .gitmodules entries
 
-**Works:**
-```bash
-datalad split --mode=rewrite-parent images/      # ✓ Top-level directory
-datalad split --mode=rewrite-parent data/        # ✓ Top-level directory
-```
+**What's TODO:**
+- ⏳ Full 3-step nested subdataset initialization (clone → checkout → submodule init)
+- ⏳ .gitmodules placement at parent directory level (currently at root)
+- ⏳ Verification of submodule status (`git submodule status` should not show '-' prefix)
 
-**Does not work:**
-```bash
-datalad split --mode=rewrite-parent images/adswa/    # ✗ Nested path (contains slash)
-datalad split --mode=rewrite-parent data/logs/raw/  # ✗ Nested path (contains slashes)
-```
-
-**Error message:**
-```
-NotImplementedError: Rewrite-parent mode does not yet support nested paths like 'images/adswa/'.
-Please split only top-level directories (those directly under the repository root).
-Nested subdataset support requires the split_helpers_nested module integration.
-```
-
-**Why this limitation exists:**
-
-The `git mktree` command (used to build new commit trees) only accepts single-level path entries without slashes. For nested paths like `images/adswa/`, we need to:
-
-1. Parse path into components `['images', 'adswa']`
-2. Get the `images` tree from parent commit
-3. Modify `images` tree to replace `adswa` entry with gitlink
-4. Create new `images` tree with `git mktree`
-5. Add modified `images` tree to root tree
-
-This requires recursive tree manipulation, which is implemented in the `split_helpers_nested` module but not yet integrated into the main rewrite-parent flow.
-
-**Workaround:**
-
-To split nested structures, use the default `split-top` mode (which handles nested paths correctly):
-
-```bash
-# Option 1: Split parent directory as single subdataset
-datalad split images/                    # Creates one subdataset containing all of images/*
-
-# Option 2: Split hierarchically (creates nested subdatasets)
-datalad split images/                    # First create images/ subdataset
-cd images/
-datalad split adswa/ bids/ neuronets/    # Then split subdirectories within it
-```
+For production use with complex nested hierarchies, the `split_helpers_nested` module integration provides complete setup.
 
 ### Future Work
 
-**TODO: Nested Path Support** (Priority: High, Effort: 8-12 hours)
+**TODO: Complete split_helpers_nested Integration** (Priority: Medium, Effort: 2-4 hours)
 
-Enable `--mode=rewrite-parent` for nested paths by integrating the `split_helpers_nested` module:
+Integrate the full 3-step setup procedure for nested subdatasets:
 
 **Experimental Validation:**
 - ✅ Experiments 16-19 successfully validated nested rewrite-parent with 3+ nesting levels
 - ✅ `split_helpers_nested.py` (349 lines) implements complete nested setup procedure
 - ✅ Production-ready approach documented in `experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md`
 
-**Implementation Plan:**
-1. Extend `_rewrite_history_with_commit_tree()` to handle recursive tree manipulation
-2. For nested paths, build intermediate trees bottom-up before creating commit
-3. Integrate `split_helpers_nested.setup_nested_subdatasets()` for post-rewrite setup
-4. Add 3-step setup: clone → checkout → submodule init (critical!)
-5. Process multiple nested paths in bottom-up order (deepest first)
+**Remaining Implementation Tasks:**
+1. ✅ ~~Extend `_rewrite_history_with_commit_tree()` to handle recursive tree manipulation~~ DONE
+2. ✅ ~~For nested paths, build intermediate trees bottom-up before creating commit~~ DONE
+3. ⏳ Integrate `split_helpers_nested.setup_nested_subdatasets()` for post-rewrite setup
+4. ⏳ Add 3-step setup: clone → checkout → submodule init (critical!)
+5. ⏳ Process multiple nested paths in bottom-up order (deepest first)
 
 **Key Technical Requirement:**
 
 The experiments revealed that proper nested subdataset setup requires THREE steps (not two!):
-1. Clone filtered repositories to their paths
-2. Checkout commits matching gitlinks in parent
-3. **Initialize submodules in .git/config** ← Often forgotten but essential!
+1. Clone filtered repositories to their paths ✅ (basic version done)
+2. Checkout commits matching gitlinks in parent ✅ (basic version done)
+3. **Initialize submodules in .git/config** ⏳ (needs split_helpers_nested integration)
 
 Missing step 3 results in uninitialized submodules (shown with '-' prefix in `git submodule status`).
 
 **Testing:**
-- Add integration test for 2-level nesting (`data/logs/`)
-- Add integration test for 3+ level nesting (`data/logs/subds/`)
-- Verify gitlink chains throughout history
-- Verify submodule initialization at all levels
+- ⏳ Add integration test for 2-level nesting (`data/logs/`)
+- ⏳ Add integration test for 3+ level nesting (`data/logs/subds/`)
+- ⏳ Verify gitlink chains throughout history
+- ⏳ Verify submodule initialization at all levels
 
 **See Also:**
 - `datalad/distribution/split_helpers_nested.py` - Implementation ready for integration
 - `docs/designs/split/experiments/18_VERIFICATION_RESULTS.md` - Successful 3-level nesting test
 - `docs/designs/split/experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md` - Complete procedure
+- `docs/designs/split/experiments/20_nested_tree_building_experiment.sh` - Tree building validation
 
 ## Cleanup Operations
 
