@@ -627,16 +627,13 @@ def _perform_single_split(
             _apply_truncate_top(target_path, create_graft_branch=True)
 
         elif mode == 'rewrite-parent':
-            # rewrite-parent mode requires split_helpers_nested module integration
-            # Current simplified implementation has critical bugs (history collapse)
-            # See: docs/designs/split/experiments/17_VERIFICATION_RESULTS.md
-            #      docs/designs/split/experiments/18_VERIFICATION_RESULTS.md
-            #      datalad/distribution/split_helpers_nested.py
-            lgr.warning(
-                "rewrite-parent mode not yet fully implemented - "
-                "requires split_helpers_nested integration. "
-                "Using split-top mode instead."
-            )
+            lgr.debug("Applying rewrite-parent mode to %s", rel_path)
+            # Rewrite parent history to include gitlinks from the beginning
+            # Uses manual git commit-tree approach (validated in Experiment 17)
+            _apply_rewrite_parent_simple(
+                parent_ds=ds,
+                subdataset_path=target_path,
+                rel_path=rel_path)
 
         # elif mode == 'split-top': (default - no special handling needed)
 
@@ -682,14 +679,9 @@ def _perform_single_split(
             )
             ds.repo.call_git(['commit', '-m', commit_msg])
         else:
-            # For rewrite-parent, clone the subdataset to its location
-            # (history rewriting already created gitlinks)
-            lgr.debug("Cloning subdataset to its path for rewrite-parent mode")
-            try:
-                # Remove the split commit we just made
-                ds.repo.call_git(['reset', '--hard', 'HEAD~1'])
-            except:
-                pass  # May fail if no previous commit
+            # For rewrite-parent mode, history has already been rewritten
+            # The _apply_rewrite_parent_simple() function handles everything
+            pass
 
         yield get_status_dict(
             'split',
@@ -954,15 +946,13 @@ def _apply_cleanup(subdataset_path, cleanup_level):
 
 
 def _apply_rewrite_parent_simple(parent_ds, subdataset_path, rel_path):
-    """Apply rewrite-parent mode for a single path (simplified version).
+    """Apply rewrite-parent mode for a single path.
 
-    WARNING: This implementation has critical bugs (history collapse).
-    DO NOT USE. Requires rework with split_helpers_nested module integration.
-    See experiments 17-19 for correct approach.
+    Rewrites parent history using manual git commit-tree approach to include
+    gitlinks to the subdataset at each commit where the subdirectory was modified.
+    This makes it appear as though the subdataset existed from the beginning.
 
-    Rewrites parent history to include gitlinks to the subdataset at each
-    commit where the subdirectory was modified. This makes it appear as
-    though the subdataset existed from the beginning.
+    Based on the proven approach from Experiment 17.
 
     NOTE: This is a simplified implementation. Full nested support requires
     using the split_helpers_nested module and batch processing multiple paths.
@@ -996,17 +986,21 @@ def _apply_rewrite_parent_simple(parent_ds, subdataset_path, rel_path):
         lgr.warning("No commits found to map - subdataset may be empty or history mismatch")
         return
 
-    # Reset to clean state for filter-branch (remove the split commit)
-    # The subdataset registration creates uncommitted changes that conflict with filter-branch
-    # After filter-branch rewrites history, the gitlinks will be added throughout history
-    lgr.debug("Resetting to prepare for history rewrite (removing split commit)")
-    parent_repo.call_git(['reset', '--hard', 'HEAD~1'])
+    # Get list of ALL commits (no split commit has been made yet for rewrite-parent mode)
+    # We want to rewrite ALL existing commits
+    all_commits = parent_repo.call_git([
+        'rev-list', '--reverse', 'HEAD'
+    ]).strip().split('\n')
 
-    # Rewrite parent history using index-filter (faster than tree-filter)
-    _rewrite_history_with_gitlinks(
+    lgr.debug("Will rewrite %d commits", len(all_commits))
+
+    # Rewrite parent history using manual git commit-tree approach
+    # This will create a completely new history with gitlinks
+    _rewrite_history_with_commit_tree(
         parent_repo=parent_repo,
         rel_path=str(rel_path),
-        commit_map=commit_map)
+        commit_map=commit_map,
+        original_commits=all_commits)
 
     lgr.info("Parent history rewritten - %s now appears as subdataset throughout history",
              rel_path)
@@ -1083,102 +1077,140 @@ def _build_commit_mapping(parent_repo, subdataset_repo, rel_path):
     return commit_map
 
 
-def _rewrite_history_with_gitlinks(parent_repo, rel_path, commit_map):
-    """Rewrite parent history to replace directory with gitlinks.
+def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, original_commits):
+    """Rewrite parent history using manual git commit-tree approach.
 
-    Uses git filter-branch with --index-filter for performance.
+    This creates new commits one-by-one, preserving metadata and adding gitlinks.
+    Approach validated in Experiment 17.
+
+    Parameters
+    ----------
+    parent_repo : GitRepo
+        Parent repository
+    rel_path : str
+        Relative path of subdataset
+    commit_map : dict
+        Mapping of {parent_commit_sha: subdataset_commit_sha}
+    original_commits : list
+        List of original commit SHAs to rewrite (oldest first)
     """
-    import json
-    import tempfile
+    lgr.info("Rewriting history (this may take time for large repositories)...")
 
-    # Create commit map file for the filter script
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        json.dump(commit_map, f)
-        commit_map_file = f.name
+    # Use the provided list of commits (already in reverse order, oldest first)
+    all_commits = original_commits
 
-    # Create index filter script
-    filter_script = f"""#!/bin/bash
-# Get current commit being rewritten (GIT_COMMIT is set by filter-branch)
-ORIG_COMMIT=$GIT_COMMIT
-
-# Load commit map
-COMMIT_MAP_FILE="{commit_map_file}"
-
-# Check if this commit has a corresponding subdataset commit
-if [ -f "$COMMIT_MAP_FILE" ]; then
-    SUBDS_SHA=$(python3 -c "
-import json, sys
-try:
-    with open('$COMMIT_MAP_FILE') as f:
-        cm = json.load(f)
-    print(cm.get('$ORIG_COMMIT', ''))
-except:
-    pass
-" 2>/dev/null)
-
-    if [ ! -z "$SUBDS_SHA" ]; then
-        # This commit should have gitlink
-        # Remove directory entries
-        git rm -r --cached --ignore-unmatch {rel_path} 2>/dev/null || true
-
-        # Add gitlink
-        git update-index --add --cacheinfo 160000,$SUBDS_SHA,{rel_path} 2>/dev/null || true
-
-        # Add .gitmodules if not present
-        if ! git ls-files --error-unmatch .gitmodules >/dev/null 2>&1; then
-            cat > .gitmodules << 'GITMODULES_EOF'
-[submodule "{rel_path}"]
-	path = {rel_path}
-	url = ./{rel_path}
-GITMODULES_EOF
-            git add .gitmodules 2>/dev/null || true
-        fi
-    fi
-fi
+    # Create .gitmodules content
+    gitmodules_content = f"""[submodule "{rel_path}"]
+\tpath = {rel_path}
+\turl = ./{rel_path}
 """
 
-    filter_script_path = None
+    # Create .gitmodules blob once (will be reused)
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+        f.write(gitmodules_content)
+        gitmodules_file = f.name
+
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
-            f.write(filter_script)
-            filter_script_path = f.name
-
-        os.chmod(filter_script_path, 0o755)
-
-        # Run filter-branch
-        env = os.environ.copy()
-        env['FILTER_BRANCH_SQUELCH_WARNING'] = '1'
-
-        lgr.info("Rewriting history (this may take time for large repositories)...")
-
-        # Get current branch name
-        current_branch = parent_repo.call_git(['rev-parse', '--abbrev-ref', 'HEAD']).strip()
-
-        # Only rewrite current branch, not --all (which can cause issues)
-        parent_repo.call_git([
-            'filter-branch', '-f',
-            '--index-filter', filter_script_path,
-            '--tag-name-filter', 'cat',
-            '--', current_branch
-        ], env=env)
-
-        lgr.debug("History rewrite complete")
-
+        gitmodules_blob = parent_repo.call_git(
+            ['hash-object', '-w', gitmodules_file]
+        ).strip()
     finally:
-        # Cleanup
-        if filter_script_path and os.path.exists(filter_script_path):
-            os.unlink(filter_script_path)
-        if os.path.exists(commit_map_file):
-            os.unlink(commit_map_file)
+        os.unlink(gitmodules_file)
 
-        # Clean up refs/original
+    new_commits = {}
+    prev_new_commit = None
+
+    for orig_commit in all_commits:
+        # Get original commit metadata
+        author_name = parent_repo.call_git([
+            'log', '-1', '--format=%an', orig_commit]).strip()
+        author_email = parent_repo.call_git([
+            'log', '-1', '--format=%ae', orig_commit]).strip()
+        author_date = parent_repo.call_git([
+            'log', '-1', '--format=%ai', orig_commit]).strip()
+        committer_name = parent_repo.call_git([
+            'log', '-1', '--format=%cn', orig_commit]).strip()
+        committer_email = parent_repo.call_git([
+            'log', '-1', '--format=%ce', orig_commit]).strip()
+        committer_date = parent_repo.call_git([
+            'log', '-1', '--format=%ci', orig_commit]).strip()
+        message = parent_repo.call_git([
+            'log', '-1', '--format=%B', orig_commit]).strip()
+
+        # Get original tree
+        orig_tree = parent_repo.call_git([
+            'log', '-1', '--format=%T', orig_commit]).strip()
+
+        # List tree entries, excluding the split path
+        tree_entries_output = parent_repo.call_git([
+            'ls-tree', orig_tree
+        ]).strip()
+
+        new_tree_entries = []
+        if tree_entries_output:
+            for line in tree_entries_output.split('\n'):
+                # Parse: "mode type sha\tpath"
+                if line and not line.endswith(f'\t{rel_path}'):
+                    new_tree_entries.append(line)
+
+        # Add gitlink if this commit has mapping
+        if orig_commit in commit_map:
+            gitlink_sha = commit_map[orig_commit]
+            new_tree_entries.append(f'160000 commit {gitlink_sha}\t{rel_path}')
+            # Add .gitmodules
+            new_tree_entries.append(f'100644 blob {gitmodules_blob}\t.gitmodules')
+
+        # Create new tree from entries
+        tree_input = '\n'.join(new_tree_entries) + '\n' if new_tree_entries else ''
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+            f.write(tree_input)
+            tree_file = f.name
+
         try:
-            import glob
-            for ref in glob.glob(os.path.join(parent_repo.path, '.git/refs/original/**'), recursive=True):
-                if os.path.isfile(ref):
-                    os.unlink(ref)
-        except:
-            pass
+            # Use stdin redirection for mktree
+            import subprocess
+            result = subprocess.run(
+                ['git', 'mktree'],
+                stdin=open(tree_file, 'r'),
+                capture_output=True,
+                text=True,
+                cwd=parent_repo.path
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"git mktree failed: {result.stderr}")
+            new_tree = result.stdout.strip()
+        finally:
+            os.unlink(tree_file)
+
+        # Create new commit with same metadata
+        env = os.environ.copy()
+        env['GIT_AUTHOR_NAME'] = author_name
+        env['GIT_AUTHOR_EMAIL'] = author_email
+        env['GIT_AUTHOR_DATE'] = author_date
+        env['GIT_COMMITTER_NAME'] = committer_name
+        env['GIT_COMMITTER_EMAIL'] = committer_email
+        env['GIT_COMMITTER_DATE'] = committer_date
+
+        commit_tree_args = ['commit-tree', new_tree, '-m', message]
+        if prev_new_commit:
+            commit_tree_args.insert(1, '-p')
+            commit_tree_args.insert(2, prev_new_commit)
+
+        new_commit = parent_repo.call_git(commit_tree_args, env=env).strip()
+
+        lgr.debug("Rewrote %s -> %s (%s)", orig_commit[:8], new_commit[:8],
+                  message.split('\n')[0][:40])
+
+        new_commits[orig_commit] = new_commit
+        prev_new_commit = new_commit
+
+    # Update branch to new history
+    current_branch = parent_repo.call_git(['rev-parse', '--abbrev-ref', 'HEAD']).strip()
+    parent_repo.call_git(['update-ref', f'refs/heads/{current_branch}', prev_new_commit])
+    parent_repo.call_git(['reset', '--hard', current_branch])
+
+    lgr.debug("History rewrite complete: %d commits rewritten", len(new_commits))
 
 
 def _handle_content(parent_ds, subdataset_path, mode):
