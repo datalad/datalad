@@ -1,9 +1,14 @@
 # Retroactive History Rewriting for Split - Design Document
 
-> **IMPLEMENTATION STATUS**: ✅ **IMPLEMENTED**
+> **IMPLEMENTATION STATUS**: ✅ **IMPLEMENTED** (top-level paths only)
+>
 > This design has been implemented as the `--mode=rewrite-parent` option in `datalad split`.
-> Implementation uses manual git commit-tree approach (as validated in Experiments 17-19).
+> Implementation uses manual git commit-tree approach (as validated in Experiment 17).
 > See `datalad/distribution/split.py:_apply_rewrite_parent_simple()` and `_rewrite_history_with_commit_tree()`.
+>
+> **Current Limitation**: Only supports **top-level directories** (e.g., `data/`).
+> Nested paths (e.g., `data/logs/`) require recursive tree manipulation - see Future Work section below.
+> Experiments 18-19 validated nested support works; integration pending.
 
 ## Problem Statement
 
@@ -501,10 +506,101 @@ A retroactive split is successful if:
 6. ✅ `git fsck` passes on both parent and subdataset
 7. ✅ Content is identical at HEAD before and after split
 
-## Next Steps
+## Implementation Status
 
-1. Create Experiment 14: Test git-filter-repo commit mapping
-2. Create Experiment 15: Test manual gitlink insertion
-3. Update IMPLEMENTATION_PLAN.md to include `--rewrite-parent-history` feature
-4. Implement Phase 1 (basic retroactive split for linear history)
-5. Add comprehensive tests for retroactive mode
+✅ **Completed:**
+1. ✅ Experiments 14-15: Validated git-filter-repo and manual gitlink approaches
+2. ✅ Experiment 17: Validated simple rewrite-parent with git commit-tree (top-level only)
+3. ✅ Experiments 18-19: Validated nested rewrite-parent with 3+ levels of nesting
+4. ✅ Implemented `--mode=rewrite-parent` for top-level directories
+5. ✅ Added comprehensive integration tests (3 tests, all passing)
+6. ✅ Created `split_helpers_nested.py` module (349 lines, ready for integration)
+
+## Future Work
+
+### TODO: Nested Path Support for Rewrite-Parent Mode
+
+**Priority**: High
+**Effort**: 8-12 hours
+**Status**: Experimentally validated, implementation ready
+
+**Current Limitation:**
+
+The `--mode=rewrite-parent` implementation only supports **top-level directories** (paths without slashes, e.g., `data/`). Nested paths like `data/logs/` or `images/adswa/` fail with:
+
+```
+NotImplementedError: Rewrite-parent mode does not yet support nested paths like 'data/logs/'.
+```
+
+**Why:**
+
+The `git mktree` command only accepts single-level path entries. For nested paths, we need recursive tree manipulation:
+1. Parse path into components (e.g., `['data', 'logs']`)
+2. Build intermediate trees bottom-up
+3. Replace deepest entry with gitlink
+4. Propagate modified trees upward to root
+
+**Solution:**
+
+Integrate the existing `split_helpers_nested` module:
+
+**Files Ready:**
+- `datalad/distribution/split_helpers_nested.py` (349 lines) - Complete nested setup implementation
+- `docs/designs/split/experiments/18_nested_rewrite_parent.sh` - Validation script (3+ levels tested)
+- `docs/designs/split/experiments/NESTED_SUBDATASET_SETUP_PROCEDURE.md` - Complete procedure
+
+**Integration Steps:**
+
+1. **Extend tree building** in `_rewrite_history_with_commit_tree()`:
+   ```python
+   def _build_tree_with_nested_gitlink(parent_repo, orig_tree, path_components, gitlink_sha):
+       """Recursively build tree with gitlink at nested path.
+
+       For path 'data/logs/', components are ['data', 'logs']:
+       1. Get 'data' tree from orig_tree
+       2. Build new 'logs' tree with gitlink
+       3. Build new 'data' tree containing new 'logs' tree
+       4. Return new 'data' tree SHA to add to root
+       """
+   ```
+
+2. **Post-rewrite setup** using `split_helpers_nested`:
+   ```python
+   from datalad.distribution.split_helpers_nested import setup_nested_subdatasets
+
+   # After rewriting history
+   setup_nested_subdatasets(
+       parent_ds=ds,
+       split_paths=['data/logs/', 'data/'],  # Bottom-up order
+       filtered_repos={...},
+       commit_maps={...}
+   )
+   ```
+
+3. **Critical 3-step setup** (from experiments):
+   - Step 1: Clone filtered repositories to their paths
+   - Step 2: Checkout commits matching gitlinks
+   - Step 3: **Initialize submodules** (often forgotten!)
+
+**Testing Plan:**
+
+Add integration tests:
+```python
+def test_rewrite_parent_mode_nested_2_levels():
+    """Test rewrite-parent with data/logs/ structure."""
+
+def test_rewrite_parent_mode_nested_3_levels():
+    """Test rewrite-parent with data/logs/subds/ structure."""
+```
+
+**Validation:**
+
+Experiments 18-19 successfully tested:
+- 3+ levels of nesting (`data/logs/subds/`)
+- Proper gitlink chains throughout history
+- Correct commit filtering at each level
+- Submodule initialization at all levels
+
+**See:**
+- `docs/designs/split/experiments/18_VERIFICATION_RESULTS.md` - Complete validation results
+- `docs/designs/split/SPLIT_MODES.md` - Updated with limitation and future work section

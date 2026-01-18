@@ -171,7 +171,9 @@ class Split(Interface):
             rewrites entire parent history to make subdatasets appear as if
             they existed from the beginning with proper gitlinks throughout
             history (WARNING: changes all parent commit SHAs, requires
-            re-cloning all copies).""",
+            re-cloning all copies). NOTE: rewrite-parent currently only
+            supports top-level directories (e.g., 'data/'), not nested paths
+            (e.g., 'data/logs/') - use split-top for nested paths.""",
             constraints=EnsureChoice('split-top', 'truncate-top',
                                      'truncate-top-graft', 'rewrite-parent')),
 
