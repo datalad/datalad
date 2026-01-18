@@ -640,8 +640,12 @@ def test_rewrite_parent_mode_commit_metadata(path=None):
 
 @pytest.mark.ai_generated
 @with_tempfile
-def test_rewrite_parent_mode_nested_path_2_levels(path=None):
-    """Test rewrite-parent mode with nested paths (2 levels: images/adswa/)."""
+def test_rewrite_parent_mode_nested_path(path=None):
+    """Test rewrite-parent mode with nested path (images/adswa/).
+
+    Only adswa/ becomes a subdataset; images/ remains a regular directory.
+    This creates 1 subdataset at a nested path, NOT nested subdatasets.
+    """
     ds = Dataset(path).create(force=True, annex=False)
 
     # Create nested structure (2 levels)
