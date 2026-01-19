@@ -412,31 +412,50 @@ class Split(Interface):
                     continue
                 validated_paths.append(target_path)
 
-        # Process splits (with bottom-up ordering if nested)
-        for target_path in _order_splits_bottomup(validated_paths, ds):
-            # Perform the actual split
-            for result in _perform_single_split(
+        # Process splits differently based on mode
+        if mode == 'rewrite-parent' and len(validated_paths) > 1:
+            # Batch processing for rewrite-parent mode with multiple paths
+            lgr.info("Processing %d paths together in rewrite-parent mode", len(validated_paths))
+            for result in _perform_batch_rewrite_parent(
                     ds=ds,
-                    target_path=target_path,
+                    paths=validated_paths,
                     clone_mode=clone_mode,
                     content=content,
                     worktree_branch_prefix=worktree_branch_prefix,
                     worktree_use_namespace=worktree_use_namespace,
-                    mode=mode,
                     cleanup=cleanup,
                     propagate_annex_config=propagate_annex_config,
                     preserve_branch_name=preserve_branch_name,
                     dry_run=dry_run,
-                    refds_path=refds_path):
+                    refds_path=refds_path,
+                    check=check):
                 yield result
-
-            # Post-split verification
-            if not dry_run and check != 'none':
-                for result in _verify_split(
+        else:
+            # Process splits individually (with bottom-up ordering if nested)
+            for target_path in _order_splits_bottomup(validated_paths, ds):
+                # Perform the actual split
+                for result in _perform_single_split(
                         ds=ds,
                         target_path=target_path,
-                        check_level=check):
+                        clone_mode=clone_mode,
+                        content=content,
+                        worktree_branch_prefix=worktree_branch_prefix,
+                        worktree_use_namespace=worktree_use_namespace,
+                        mode=mode,
+                        cleanup=cleanup,
+                        propagate_annex_config=propagate_annex_config,
+                        preserve_branch_name=preserve_branch_name,
+                        dry_run=dry_run,
+                        refds_path=refds_path):
                     yield result
+
+                # Post-split verification
+                if not dry_run and check != 'none':
+                    for result in _verify_split(
+                            ds=ds,
+                            target_path=target_path,
+                            check_level=check):
+                        yield result
 
 
 def _validate_split_params(clone_mode, content, paths, ds, mode):
@@ -459,14 +478,7 @@ def _validate_split_params(clone_mode, content, paths, ds, mode):
         raise InsufficientArgumentsError(
             "Please provide at least one path to split")
 
-    # Validate rewrite-parent mode limitations
-    if mode == 'rewrite-parent' and len(paths) > 1:
-        raise ValueError(
-            "The rewrite-parent mode currently only supports splitting ONE path at a time. "
-            f"You specified {len(paths)} paths: {', '.join(str(p) for p in paths)}. "
-            "This is because each rewrite changes all commit SHAs, breaking subsequent rewrites. "
-            "Please split paths one at a time, or use --mode=split-top for multiple paths."
-        )
+    # Note: rewrite-parent mode now supports multiple paths via batch processing
 
 
 def _validate_split_path(ds, path, refds_path):
@@ -607,6 +619,99 @@ def _order_splits_bottomup(paths, ds):
         reverse=True)
 
     return [str(p) for p in sorted_paths]
+
+
+def _perform_batch_rewrite_parent(
+        ds,
+        paths,
+        clone_mode,
+        content,
+        worktree_branch_prefix,
+        worktree_use_namespace,
+        cleanup,
+        propagate_annex_config,
+        preserve_branch_name,
+        dry_run,
+        refds_path,
+        check):
+    """Process multiple paths together for rewrite-parent mode.
+
+    This is necessary because rewrite-parent changes all commit SHAs,
+    so we must process all paths in a single history rewrite pass.
+    """
+    # Process paths in bottom-up order (deepest first)
+    ordered_paths = _order_splits_bottomup(paths, ds)
+
+    # Step 1: Filter all paths and create subdatasets
+    split_configs = []
+    for target_path in ordered_paths:
+        # Convert to relative path
+        rel_path = Path(target_path).relative_to(ds.path)
+
+        lgr.info("Filtering %s into subdataset", rel_path)
+
+        # Perform filtering (creates filtered repo)
+        for result in _perform_single_split(
+                ds=ds,
+                target_path=target_path,
+                clone_mode=clone_mode,
+                content=content,
+                worktree_branch_prefix=worktree_branch_prefix,
+                worktree_use_namespace=worktree_use_namespace,
+                mode='split-top',  # Use split-top for filtering, we'll do rewrite after
+                cleanup='none',  # No cleanup yet
+                propagate_annex_config=propagate_annex_config,
+                preserve_branch_name=preserve_branch_name,
+                dry_run=dry_run,
+                refds_path=refds_path):
+            if result['status'] != 'ok':
+                yield result
+                return  # Abort if any filtering fails
+            # Don't yield OK results yet - wait until after rewrite
+
+        # Store config for batch rewrite
+        split_configs.append({
+            'rel_path': rel_path,
+            'target_path': target_path
+        })
+
+    if dry_run:
+        yield get_status_dict(
+            action='split',
+            ds=ds,
+            status='ok',
+            message='Dry run: would batch-rewrite history for {} paths'.format(len(split_configs)))
+        return
+
+    # Step 2: Batch rewrite history for all paths
+    lgr.info("Batch rewriting parent history for %d paths", len(split_configs))
+    _apply_rewrite_parent_batch(
+        parent_ds=ds,
+        split_configs=split_configs)
+
+    # Step 3: Apply cleanup if requested
+    if cleanup != 'none':
+        for config in split_configs:
+            lgr.debug("Applying cleanup level: %s to %s", cleanup, config['rel_path'])
+            _apply_cleanup(config['target_path'], cleanup)
+
+    # Step 4: Verification
+    if check != 'none':
+        for config in split_configs:
+            for result in _verify_split(
+                    ds=ds,
+                    target_path=config['target_path'],
+                    check_level=check):
+                yield result
+
+    # Yield success results for all paths
+    for config in split_configs:
+        yield get_status_dict(
+            action='split',
+            path=config['target_path'],
+            ds=ds,
+            status='ok',
+            message=f'Successfully split {config["rel_path"]} into subdataset')
 
 
 def _perform_single_split(
@@ -1013,6 +1118,61 @@ def _apply_cleanup(subdataset_path, cleanup_level):
             lgr.warning("Annex cleanup failed: %s", e)
 
 
+def _apply_rewrite_parent_batch(parent_ds, split_configs):
+    """Apply rewrite-parent mode for multiple paths in batch.
+
+    Rewrites parent history once to include gitlinks for ALL specified paths.
+    This is more efficient and correct than rewriting multiple times.
+
+    Parameters
+    ----------
+    parent_ds : Dataset
+        Parent dataset object
+    split_configs : list of dict
+        List of {'rel_path': Path, 'target_path': str} for each split
+    """
+    lgr.info("Building commit mappings for %d paths", len(split_configs))
+
+    parent_repo = parent_ds.repo
+
+    # Build commit maps for all paths
+    commit_maps = {}
+    for config in split_configs:
+        rel_path = config['rel_path']
+        subdataset_path = config['target_path']
+        subdataset = Dataset(subdataset_path)
+        subdataset_repo = subdataset.repo
+
+        lgr.debug("Building commit mapping for %s", rel_path)
+        commit_map = _build_commit_mapping(
+            parent_repo, subdataset_repo, str(rel_path)
+        )
+        commit_maps[str(rel_path)] = commit_map
+
+        lgr.debug("Mapped %d commits for %s", len(commit_map), rel_path)
+
+    # Get all commits to rewrite (union of all paths)
+    all_mapped_commits = set()
+    for commit_map in commit_maps.values():
+        all_mapped_commits.update(commit_map.keys())
+
+    # Get full commit history in reverse order (oldest first)
+    original_commits = parent_repo.call_git([
+        'rev-list', '--reverse', 'HEAD'
+    ]).strip().split('\n')
+
+    lgr.info("Batch rewriting history for %d paths across %d commits",
+             len(split_configs), len(original_commits))
+
+    # Perform batch history rewrite
+    _rewrite_history_with_commit_tree_batch(
+        parent_repo=parent_repo,
+        split_configs=split_configs,
+        commit_maps=commit_maps,
+        original_commits=original_commits
+    )
+
+
 def _apply_rewrite_parent_simple(parent_ds, subdataset_path, rel_path):
     """Apply rewrite-parent mode for a single path.
 
@@ -1288,6 +1448,213 @@ def _build_tree_with_nested_gitlink(parent_repo, orig_tree, rel_path, gitlink_sh
 
     # new_tree_sha is now the modified root tree
     return new_tree_sha
+
+
+def _rewrite_history_with_commit_tree_batch(parent_repo, split_configs, commit_maps, original_commits):
+    """Rewrite parent history for multiple paths in a single pass.
+
+    Parameters
+    ----------
+    parent_repo : GitRepo
+        Parent repository
+    split_configs : list of dict
+        List of {'rel_path': Path, 'target_path': str} for each split
+    commit_maps : dict
+        Dictionary of {rel_path_str: {parent_commit_sha: subdataset_commit_sha}}
+    original_commits : list
+        List of original commit SHAs to rewrite (oldest first)
+    """
+    total_commits = len(original_commits)
+
+    # Create .gitmodules content for all paths
+    gitmodules_lines = []
+    for config in split_configs:
+        rel_path_str = str(config['rel_path'])
+        gitmodules_lines.append(f'[submodule "{rel_path_str}"]')
+        gitmodules_lines.append(f'\tpath = {rel_path_str}')
+        gitmodules_lines.append(f'\turl = ./{rel_path_str}')
+    gitmodules_content = '\n'.join(gitmodules_lines) + '\n'
+
+    # Create .gitmodules blob once (will be reused)
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+        f.write(gitmodules_content)
+        gitmodules_file = f.name
+
+    try:
+        gitmodules_blob = parent_repo.call_git(
+            ['hash-object', '-w', gitmodules_file]
+        ).strip()
+    finally:
+        os.unlink(gitmodules_file)
+
+    # Start progress reporting
+    pbar_id = f'rewrite-history-batch-{id(parent_repo)}'
+    log_progress(
+        lgr.info, pbar_id,
+        'Start rewriting %d commits for %d paths', total_commits, len(split_configs),
+        total=total_commits,
+        label='Batch rewriting history',
+        unit=' Commits'
+    )
+
+    new_commits = {}
+    prev_new_commit = None
+
+    for idx, orig_commit in enumerate(original_commits, 1):
+        # Get all commit metadata in a single git call for performance
+        metadata = parent_repo.call_git([
+            'log', '-1', '--format=%an%x00%ae%x00%ai%x00%cn%x00%ce%x00%ci%x00%T%x00%s%x00%B', orig_commit
+        ]).rstrip('\n')
+
+        parts = metadata.split('\x00', 8)
+        if len(parts) < 9:
+            lgr.warning("Failed to parse metadata for commit %s (got %d parts, expected 9)",
+                        orig_commit[:8], len(parts))
+            continue
+
+        author_name, author_email, author_date, committer_name, committer_email, committer_date, orig_tree, subject, message = parts
+
+        # Progress update
+        msg_snippet = subject[:50]
+        log_progress(
+            lgr.info, pbar_id,
+            'Processing commit %d/%d: %s', idx, total_commits, msg_snippet,
+            update=idx,
+            total=total_commits
+        )
+
+        # Build tree with ALL gitlinks that exist for this commit
+        # Start with entries from original tree, excluding all split paths
+        tree_entries_output = parent_repo.call_git(['ls-tree', orig_tree]).strip()
+
+        new_tree_entries = []
+        has_any_gitlink = False
+
+        if tree_entries_output:
+            for line in tree_entries_output.split('\n'):
+                if not line:
+                    continue
+                # Check if this entry is one of our split paths
+                is_split_path = False
+                for config in split_configs:
+                    rel_path_str = str(config['rel_path'])
+                    # For top-level paths, exact match
+                    if not '/' in rel_path_str and line.endswith(f'\t{rel_path_str}'):
+                        is_split_path = True
+                        break
+                if not is_split_path:
+                    new_tree_entries.append(line)
+
+        # Track which nested paths have been handled (to avoid duplicate processing)
+        nested_paths_processed = set()
+
+        # Add gitlinks for paths that have mappings for this commit
+        # Process top-level paths first, then nested paths
+        for config in sorted(split_configs, key=lambda c: (len(str(c['rel_path']).split('/')), str(c['rel_path']))):
+            rel_path = config['rel_path']
+            rel_path_str = str(rel_path)
+            commit_map = commit_maps[rel_path_str]
+
+            if orig_commit in commit_map:
+                has_any_gitlink = True
+                gitlink_sha = commit_map[orig_commit]
+
+                is_nested = '/' in rel_path_str
+                if is_nested:
+                    # Nested path: build tree recursively if not already processed
+                    if rel_path_str not in nested_paths_processed:
+                        lgr.debug("Building nested gitlink for %s at commit %s", rel_path_str, orig_commit[:8])
+                        # Build tree from current entries
+                        current_tree_input = '\n'.join(new_tree_entries) + '\n' if new_tree_entries else ''
+                        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                            f.write(current_tree_input)
+                            temp_tree_file = f.name
+
+                        try:
+                            result = subprocess.run(
+                                ['git', 'mktree'],
+                                stdin=open(temp_tree_file, 'r'),
+                                capture_output=True,
+                                text=True,
+                                cwd=parent_repo.path
+                            )
+                            if result.returncode != 0:
+                                raise RuntimeError(f"git mktree failed for temp tree: {result.stderr}")
+                            temp_tree = result.stdout.strip()
+                        finally:
+                            os.unlink(temp_tree_file)
+
+                        # Use recursive tree builder to add nested gitlink
+                        new_tree_sha = _build_tree_with_nested_gitlink(
+                            parent_repo, temp_tree, rel_path_str, gitlink_sha, gitmodules_blob
+                        )
+
+                        # Rebuild entries from new tree
+                        new_entries_output = parent_repo.call_git(['ls-tree', new_tree_sha]).strip()
+                        new_tree_entries = new_entries_output.split('\n') if new_entries_output else []
+                        nested_paths_processed.add(rel_path_str)
+                else:
+                    # Top-level path: simple addition
+                    new_tree_entries.append(f'160000 commit {gitlink_sha}\t{rel_path_str}')
+
+        # Add .gitmodules if we have any gitlinks
+        if has_any_gitlink:
+            new_tree_entries.append(f'100644 blob {gitmodules_blob}\t.gitmodules')
+
+        # Create new tree from entries
+        tree_input = '\n'.join(new_tree_entries) + '\n' if new_tree_entries else ''
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+            f.write(tree_input)
+            tree_file = f.name
+
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['git', 'mktree'],
+                stdin=open(tree_file, 'r'),
+                capture_output=True,
+                text=True,
+                cwd=parent_repo.path
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"git mktree failed: {result.stderr}")
+            new_tree = result.stdout.strip()
+        finally:
+            os.unlink(tree_file)
+
+        # Create new commit with same metadata
+        env = os.environ.copy()
+        env['GIT_AUTHOR_NAME'] = author_name
+        env['GIT_AUTHOR_EMAIL'] = author_email
+        env['GIT_AUTHOR_DATE'] = author_date
+        env['GIT_COMMITTER_NAME'] = committer_name
+        env['GIT_COMMITTER_EMAIL'] = committer_email
+        env['GIT_COMMITTER_DATE'] = committer_date
+
+        commit_tree_args = ['commit-tree', new_tree, '-m', message]
+        if prev_new_commit:
+            commit_tree_args.insert(1, '-p')
+            commit_tree_args.insert(2, prev_new_commit)
+
+        new_commit = parent_repo.call_git(commit_tree_args, env=env).strip()
+
+        lgr.debug("Rewrote %s -> %s (%s)", orig_commit[:8], new_commit[:8],
+                  subject[:40])
+
+        new_commits[orig_commit] = new_commit
+        prev_new_commit = new_commit
+
+    # Update HEAD to point to new history
+    current_branch = parent_repo.call_git(['rev-parse', '--abbrev-ref', 'HEAD']).strip()
+    parent_repo.call_git(['update-ref', f'refs/heads/{current_branch}', prev_new_commit])
+    parent_repo.call_git(['reset', '--hard', current_branch])
+
+    # Finish progress reporting
+    log_progress(
+        lgr.info, pbar_id,
+        'Finished batch rewriting %d commits successfully', len(new_commits)
+    )
 
 
 def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, original_commits):
