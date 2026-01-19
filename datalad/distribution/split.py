@@ -1501,6 +1501,9 @@ def _rewrite_history_with_commit_tree_batch(parent_repo, split_configs, commit_m
     new_commits = {}
     prev_new_commit = None
 
+    # Track current subdataset commits (once a subdataset appears, it stays with its latest commit)
+    current_subdataset_commits = {}  # {rel_path_str: subdataset_commit_sha}
+
     for idx, orig_commit in enumerate(original_commits, 1):
         # Get all commit metadata in a single git call for performance
         metadata = parent_repo.call_git([
@@ -1546,19 +1549,28 @@ def _rewrite_history_with_commit_tree_batch(parent_repo, split_configs, commit_m
                 if not is_split_path:
                     new_tree_entries.append(line)
 
+        # Update current subdataset commits based on mappings for this commit
+        for config in split_configs:
+            rel_path_str = str(config['rel_path'])
+            commit_map = commit_maps[rel_path_str]
+
+            if orig_commit in commit_map:
+                # This commit modified this subdataset - update its current commit
+                current_subdataset_commits[rel_path_str] = commit_map[orig_commit]
+
         # Track which nested paths have been handled (to avoid duplicate processing)
         nested_paths_processed = set()
 
-        # Add gitlinks for paths that have mappings for this commit
+        # Add gitlinks for ALL subdatasets that have appeared so far
         # Process top-level paths first, then nested paths
         for config in sorted(split_configs, key=lambda c: (len(str(c['rel_path']).split('/')), str(c['rel_path']))):
             rel_path = config['rel_path']
             rel_path_str = str(rel_path)
-            commit_map = commit_maps[rel_path_str]
 
-            if orig_commit in commit_map:
+            # Only add gitlink if this subdataset has appeared in history
+            if rel_path_str in current_subdataset_commits:
                 has_any_gitlink = True
-                gitlink_sha = commit_map[orig_commit]
+                gitlink_sha = current_subdataset_commits[rel_path_str]
 
                 is_nested = '/' in rel_path_str
                 if is_nested:
