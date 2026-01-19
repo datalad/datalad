@@ -327,7 +327,8 @@ class Split(Interface):
             clone_mode=clone_mode,
             content=content,
             paths=resolved_paths,
-            ds=ds)
+            ds=ds,
+            mode=mode)
 
         # Display safety warning unless forced
         if not force and not dry_run:
@@ -438,7 +439,7 @@ class Split(Interface):
                     yield result
 
 
-def _validate_split_params(clone_mode, content, paths, ds):
+def _validate_split_params(clone_mode, content, paths, ds, mode):
     """Validate parameter combinations early."""
 
     # Validate content mode compatibility
@@ -457,6 +458,15 @@ def _validate_split_params(clone_mode, content, paths, ds):
     if not paths:
         raise InsufficientArgumentsError(
             "Please provide at least one path to split")
+
+    # Validate rewrite-parent mode limitations
+    if mode == 'rewrite-parent' and len(paths) > 1:
+        raise ValueError(
+            "The rewrite-parent mode currently only supports splitting ONE path at a time. "
+            f"You specified {len(paths)} paths: {', '.join(str(p) for p in paths)}. "
+            "This is because each rewrite changes all commit SHAs, breaking subsequent rewrites. "
+            "Please split paths one at a time, or use --mode=split-top for multiple paths."
+        )
 
 
 def _validate_split_path(ds, path, refds_path):
@@ -1339,9 +1349,23 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
     prev_new_commit = None
 
     for idx, orig_commit in enumerate(all_commits, 1):
+        # Get all commit metadata in a single git call for performance
+        # Use %x00 (null) separator to safely handle special characters in messages
+        # Format: author_name\0author_email\0author_date\0committer_name\0committer_email\0committer_date\0tree\0subject\0body
+        metadata = parent_repo.call_git([
+            'log', '-1', '--format=%an%x00%ae%x00%ai%x00%cn%x00%ce%x00%ci%x00%T%x00%s%x00%B', orig_commit
+        ]).rstrip('\n')  # Only strip trailing newline, preserve message content
+
+        parts = metadata.split('\x00', 8)  # Split on null character, max 9 parts
+        if len(parts) < 9:
+            lgr.warning("Failed to parse metadata for commit %s (got %d parts, expected 9)",
+                        orig_commit[:8], len(parts))
+            continue
+
+        author_name, author_email, author_date, committer_name, committer_email, committer_date, orig_tree, subject, message = parts
+
         # Progress update
-        msg_snippet = parent_repo.call_git([
-            'log', '-1', '--format=%s', orig_commit]).strip()[:50]
+        msg_snippet = subject[:50]
         log_progress(
             lgr.info, pbar_id,
             'Processing commit %d/%d: %s', idx, total_commits, msg_snippet,
@@ -1349,25 +1373,7 @@ def _rewrite_history_with_commit_tree(parent_repo, rel_path, commit_map, origina
             total=total_commits
         )
 
-        # Get original commit metadata
-        author_name = parent_repo.call_git([
-            'log', '-1', '--format=%an', orig_commit]).strip()
-        author_email = parent_repo.call_git([
-            'log', '-1', '--format=%ae', orig_commit]).strip()
-        author_date = parent_repo.call_git([
-            'log', '-1', '--format=%ai', orig_commit]).strip()
-        committer_name = parent_repo.call_git([
-            'log', '-1', '--format=%cn', orig_commit]).strip()
-        committer_email = parent_repo.call_git([
-            'log', '-1', '--format=%ce', orig_commit]).strip()
-        committer_date = parent_repo.call_git([
-            'log', '-1', '--format=%ci', orig_commit]).strip()
-        message = parent_repo.call_git([
-            'log', '-1', '--format=%B', orig_commit]).strip()
-
-        # Get original tree
-        orig_tree = parent_repo.call_git([
-            'log', '-1', '--format=%T', orig_commit]).strip()
+        # orig_tree already extracted from metadata above
 
         # Build new tree - different approach for nested vs top-level paths
         if orig_commit in commit_map:
