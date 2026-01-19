@@ -413,9 +413,26 @@ class Split(Interface):
                 validated_paths.append(target_path)
 
         # Process splits differently based on mode
+        # Check if all paths are top-level (no nested paths) for batch processing
+        has_nested = any('/' in str(Path(p).relative_to(ds.path)) for p in validated_paths)
+
         if mode == 'rewrite-parent' and len(validated_paths) > 1:
-            # Batch processing for rewrite-parent mode with multiple paths
-            lgr.info("Processing %d paths together in rewrite-parent mode", len(validated_paths))
+            if has_nested:
+                # Multiple paths with nested - this is not yet optimized
+                yield get_status_dict(
+                    action='split',
+                    ds=ds,
+                    status='error',
+                    message=(
+                        f"Batch rewrite-parent with nested paths is not yet optimized and would be very slow. "
+                        f"You specified {len(validated_paths)} paths, some nested: {', '.join(str(Path(p).relative_to(ds.path)) for p in validated_paths)}. "
+                        f"Please either: (1) Use --mode=split-top for multiple paths, OR "
+                        f"(2) Split one path at a time with --mode=rewrite-parent"
+                    ))
+                return
+
+            # Batch processing for rewrite-parent mode with multiple TOP-LEVEL paths only
+            lgr.info("Processing %d top-level paths together in rewrite-parent mode", len(validated_paths))
             for result in _perform_batch_rewrite_parent(
                     ds=ds,
                     paths=validated_paths,
