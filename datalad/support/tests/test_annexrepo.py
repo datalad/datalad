@@ -1980,13 +1980,14 @@ def test_wanted(path=None):
 def test_AnnexRepo_metadata(path=None):
     # prelude
     obscure_name = get_most_obscure_supported_name()
+    obscure_dir_name = get_most_obscure_supported_name(directory_name=True)
 
     ar = AnnexRepo(path, create=True)
     create_tree(
         path,
         {
             'up.dat': 'content',
-            obscure_name: {
+            obscure_dir_name: {
                 obscure_name + '.dat': 'lowcontent'
             }
         })
