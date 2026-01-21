@@ -949,23 +949,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         cmd.append('annex')
         cmd += args
 
-        if lgr.getEffectiveLevel() <= 8:
-            cmd.append('--debug')
-
-        if self._annex_common_options:
-            cmd += self._annex_common_options
-
-        if jobs == 'auto':
-            # Limit to # of CPUs (but at least 3 to start with)
-            # and also an additional config constraint (by default 1
-            # due to https://github.com/datalad/datalad/issues/4404)
-            jobs = self._n_auto_jobs or min(
-                self.config.obtain('datalad.runtime.max-annex-jobs'),
-                max(3, cpu_count()))
-            # cache result to avoid repeated calls to cpu_count()
-            self._n_auto_jobs = jobs
-        if jobs and jobs != 1:
-            cmd.append('-J%d' % jobs)
+        cmd += self._get_annex_options(jobs)
 
         runner = self._git_runner
         env = None
@@ -1032,6 +1016,27 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # we don't know how to handle this, just pass it on
             raise
+
+    def _get_annex_options(self, jobs):
+        """Common logic to populate annex call options across our spectrum of annex invocations
+        """
+        cmd = []
+        if lgr.getEffectiveLevel() <= 8:
+            cmd.append('--debug')
+        if self._annex_common_options:
+            cmd += self._annex_common_options
+        if jobs == 'auto':
+            # Limit to # of CPUs (but at least 3 to start with)
+            # and also an additional config constraint (by default 1
+            # due to https://github.com/datalad/datalad/issues/4404)
+            jobs = self._n_auto_jobs or min(
+                self.config.obtain('datalad.runtime.max-annex-jobs'),
+                max(3, cpu_count()))
+            # cache result to avoid repeated calls to cpu_count()
+            self._n_auto_jobs = jobs
+        if jobs and jobs != 1:
+            cmd.append('-J%d' % jobs)
+        return cmd
 
     def _call_annex_records(self, args, files=None, jobs=None,
                             git_options=None,
@@ -1704,7 +1709,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         list of dict or dict
         """
-
         return list(self.add_(
             files, git=git, backend=backend, options=options, jobs=jobs,
             git_options=git_options, annex_options=annex_options, update=update
@@ -1789,12 +1793,48 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             if backend:
                 options.extend(('--backend', backend))
-            for r in self._call_annex_records(
+            yield from self._maybe_batched_add(
+                files, options, jobs, expected_additions, batch=None)
+
+    def _maybe_batched_add(self, files, options, jobs, expected_additions, batch=None):
+        # Common code to be reused across existing implementations of "annex add" invocation
+        do_batch = False
+        if True: #  TEMP: always batch! batch or (batch is None and len(files) > 1):
+            # workaround to not use batch on directory paths, see:
+            # https://git-annex.branchable.com/todo/make_add_--batch_add_directories_content/ :
+            # We do use directories in tests directly but if used from higher level interfaces,
+            # we are unlikely to be passed folders here
+            do_batch = not any(isdir(opj(self.path, f)) for f in files)
+            if batch and not do_batch:  # batch mode requested but could not be used since we got directories!
+                lgr.debug("Not using git annex --batch since was given directories and "
+                          "git-annex add --batch does not support that yet ")
+
+        if do_batch:
+            # TODO: interfacing total_nbytes etc
+            # Note: took the same-ish 144s here and 169s on master for AnnexRepo only of
+            # python -m nose -s -v datalad/support/tests/test_annexrepo.py:test_files_split
+            #
+            # It seems that BatchedCommand lost `yield_` in
+            # 9f066efa6a0b316a133b6d6d0d4e4c2e1b856ce0 and ability to be used as a
+            # generator over a list of files (at least directly), so we would do it "manually"
+            # for now although that is very inefficient due to all the prep/finalize overheads etc
+            # TODO: ask @christian-monch on how to do it properly
+            batched_get = self._batched.get(
+                'add',
+                json=True,
+                annex_options=options + self._get_annex_options(jobs),
+                path=self.path
+            )
+            for f in files:
+                yield batched_get.proc1(f)
+        else:
+            yield from self._call_annex_records(
                     ['add'] + options,
                     files=files,
                     jobs=jobs,
-                    total_nbytes=sum(expected_additions.values())):
-                yield r
+                    total_nbytes=sum(expected_additions.values())
+                    if expected_additions else None
+            )
 
     @normalize_paths
     def get_file_key(self, files, batch=None):
@@ -3560,13 +3600,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git is True:
             yield from GitRepo._save_add(self, files, git_opts=git_opts)
         else:
-            for r in self._call_annex_records(
-                    ['add'] + options,
-                    files=list(files.keys()),
-                    # TODO
+            for r in self._maybe_batched_add(
+                    list(files.keys()),
+                    options,
+                    # TODO: was marked TODO -- keeping a TODO
                     jobs=None,
-                    total_nbytes=sum(expected_additions.values())
-                    if expected_additions else None):
+                    expected_additions=expected_additions
+            ):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
