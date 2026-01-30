@@ -127,6 +127,7 @@ requires = [
     "wheel",
     "fasteners",
     "looseversion",
+    "typing_extensions>=4.0.0; python_version < '3.11'",
 ]
 
 [tool.setuptools]
