@@ -1,4 +1,13 @@
 
+<a id='changelog-1.3.1'></a>
+# 1.3.1 (2026-02-01)
+
+## 🐛 Bug Fixes
+
+- Add typing_extensions to build system requirements (Python < 3.11).  [PR #7798](https://github.com/datalad/datalad/pull/7798) (by [@lschr](https://github.com/lschr))
+
+- BF: Ensure annex-ignore config is immediately written for RIA stores.  Fixes [#5186](https://github.com/datalad/datalad/issues/5186) via [PR #7799](https://github.com/datalad/datalad/pull/7799) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.3.0'></a>
 # 1.3.0 (2026-01-17)
 
