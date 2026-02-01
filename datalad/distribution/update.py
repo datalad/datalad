@@ -593,7 +593,9 @@ def _get_adjust_mode(branch_name):
     import re
     match = re.match(r'adjusted/[^(]+\(([^)]+)\)', branch_name or '')
     if not match:
-        return '--unlock'  # default
+        # Default to unlocked mode as it is the most common adjustment,
+        # especially on crippled filesystems where unlocked behavior is expected.
+        return '--unlock'
     mode = match.group(1)
     mode_to_option = {
         'unlocked': '--unlock',
