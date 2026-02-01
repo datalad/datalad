@@ -3215,8 +3215,8 @@ class GitRepo(CoreGitRepo):
             prev_sha = st['prev_gitshasum']
             if prev_sha != subrepo_commit:
                 # Check if recorded commit matches HEAD on adjusted branch
-                subrepo_head = subrepo.get_hexsha()
-                if prev_sha == subrepo_head:
+                subrepo_head_sha = subrepo.get_hexsha()
+                if prev_sha == subrepo_head_sha:
                     st['state'] = 'clean'
                 else:
                     st['state'] = 'modified'
