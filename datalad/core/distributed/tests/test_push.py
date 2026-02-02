@@ -256,38 +256,39 @@ def test_push(annex):
     check_push(annex)
 
 
-@pytest.mark.parametrize("annex", [False, True])
-def test_push_all(annex, tmp_path):
+@with_tree(
+    tree={
+        "test_mod_file": "Some additional stuff.",
+        "test_mod_annex_file": "Heavy stuff.",
+        "test_mod_annex_file_del": "Heavy stuff to be deleted.",
+    }
+)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_all(src_path=None, dst_path=None, dst_path_all=None):
     """Check push with `data="all"`"""
-    src_path = tmp_path / "src"
-    src_path.mkdir()
-    src = Dataset(src_path).create(annex=annex)
+    src = Dataset(src_path).create(force=True)
     src_repo = src.repo
 
-    (src.pathobj / "test_mod_file").write_text("Some additional stuff.")
-    src.save(to_git=True, message="Modified.")
-    (src.pathobj / "test_mod_annex_file").write_text("Heavy stuff.")
-    (src.pathobj / "test_mod_annex_file_del").write_text("Heavy stuff to be deleted.")
-    src.save(to_git=not annex, message="Modified again.")
-    if annex:
-        keys = []
-        # not sure whether get_content_annexinfo is guaranteed to preserve the order
-        # of `paths` therefore call for single files in a loop
-        for file in "test_mod_annex_file", "test_mod_annex_file_del":
-            i = src_repo.get_file_annexinfo(file)
-            keys.append(i["key"])
-        file_key, file_del_key = keys
-    else:
-        file_key = None
-        file_del_key = None
+    src.save(["test_mod_file"], to_git=True, message="Modified.")
+    src.save(
+        ["test_mod_annex_file", "test_mod_annex_file_del"], message="Modified again."
+    )
+
+    keys = []
+    # not sure whether get_content_annexinfo is guaranteed to preserve the order
+    # of `paths` therefore call for single files in a loop
+    for file in "test_mod_annex_file", "test_mod_annex_file_del":
+        i = src_repo.get_file_annexinfo(file)
+        keys.append(i["key"])
+    file_key, file_del_key = keys
+
     (src.pathobj / "test_mod_annex_file_del").unlink()
     src.save(message="Removed one file.")
-    assert_repo_status(src_repo, annex=annex)
+    assert_repo_status(src_repo, annex=True)
 
     # push without `data` argument
-    dst_path = tmp_path / "dst"
-    dst_path.mkdir()
-    target = mk_push_target(src, "target", str(dst_path), annex=annex)
+    target = mk_push_target(src, "target", str(dst_path))
     res = src.push(to="target")
     eq_(
         list(target.get_branch_commits_(DEFAULT_BRANCH)),
@@ -300,25 +301,22 @@ def test_push_all(annex, tmp_path):
         target="target",
         refspec=DEFAULT_REFSPEC,
     )
-    if annex:
-        assert_in_results(
-            res,
-            action="copy",
-            status="ok",
-            annexkey=file_key,
-        )
-        # the following is not in HEAD and thus not copied
-        assert_not_in_results(
-            res,
-            action="copy",
-            status="ok",
-            annexkey=file_del_key,
-        )
+    assert_in_results(
+        res,
+        action="copy",
+        status="ok",
+        annexkey=file_key,
+    )
+    # the following is not in HEAD and thus not copied
+    assert_not_in_results(
+        res,
+        action="copy",
+        status="ok",
+        annexkey=file_del_key,
+    )
 
     # push with `data="all"
-    dst_path_all = tmp_path / "dst_all"
-    dst_path_all.mkdir()
-    target_all = mk_push_target(src, "target_all", str(dst_path_all), annex=annex)
+    target_all = mk_push_target(src, "target_all", str(dst_path_all))
     res_all = src.push(to="target_all", data="all")
     eq_(
         list(target_all.get_branch_commits_(DEFAULT_BRANCH)),
@@ -331,26 +329,20 @@ def test_push_all(annex, tmp_path):
         target="target_all",
         refspec=DEFAULT_REFSPEC,
     )
-    if annex:
-        for i in file_key, file_del_key:
-            assert_in_results(
-                res_all,
-                action="copy",
-                status="ok",
-                # path points to the repo
-                path=src.path,
-                annexkey=i,
-            )
-        f, fd = target_all.call_git_items_(
-            ["annex", "contentlocation"], files=[file_key, file_del_key]
+    for i in file_key, file_del_key:
+        assert_in_results(
+            res_all,
+            action="copy",
+            status="ok",
+            # path points to the repo
+            path=src.path,
+            annexkey=i,
         )
-        assert (dst_path_all / f).read_text() == "Heavy stuff."
-        assert (dst_path_all / fd).read_text() == "Heavy stuff to be deleted."
-    else:
-        assert (
-            target_all.call_git(["show", "HEAD:test_mod_annex_file"], read_only=True)
-            == "Heavy stuff."
-        )
+    f, fd = target_all.call_git_items_(
+        ["annex", "contentlocation"], files=[file_key, file_del_key]
+    )
+    assert Path(dst_path_all, f).read_text() == "Heavy stuff."
+    assert Path(dst_path_all, fd).read_text() == "Heavy stuff to be deleted."
     assert (
         target_all.call_git(["show", "HEAD:test_mod_file"], read_only=True)
         == "Some additional stuff."
@@ -364,36 +356,34 @@ def test_push_all(annex, tmp_path):
 
     # modify and push again
     (src.pathobj / "test_mod_annex_file2").write_text("More heavy stuff.")
-    src.save(to_git=not annex, message="Modification 3.")
+    src.save(message="Modification 3.")
     res2 = src.push(to="target", data="all")
     res2_copy = [r for r in res2 if r["action"] == "copy"]
-    if annex:
-        file2_key = src_repo.get_file_annexinfo("test_mod_annex_file2")["key"]
-        # now the previously omitted deleted file and the new file should be pushed
-        assert len(res2_copy) == 2
-        for k in file_del_key, file2_key:
-            assert_in_results(
-                res2_copy,
-                action="copy",
-                status="ok",
-                # path is path to the repo
-                path=src.path,
-                annexkey=k,
-            )
-    res_all2 = src.push(to="target_all", data="all")
-    res_all2_copy = [r for r in res_all2 if r["action"] == "copy"]
-    if annex:
-        file2_key = src_repo.get_file_annexinfo("test_mod_annex_file2")["key"]
-        # here only the new file should be pushed
-        assert len(res_all2_copy) == 1
+    file2_key = src_repo.get_file_annexinfo("test_mod_annex_file2")["key"]
+    # now the previously omitted deleted file and the new file should be pushed
+    assert len(res2_copy) == 2
+    for k in file_del_key, file2_key:
         assert_in_results(
             res2_copy,
             action="copy",
             status="ok",
-            # path points to the repo
+            # path is path to the repo
             path=src.path,
-            annexkey=file2_key,
+            annexkey=k,
         )
+    res_all2 = src.push(to="target_all", data="all")
+    res_all2_copy = [r for r in res_all2 if r["action"] == "copy"]
+    file2_key = src_repo.get_file_annexinfo("test_mod_annex_file2")["key"]
+    # here only the new file should be pushed
+    assert len(res_all2_copy) == 1
+    assert_in_results(
+        res2_copy,
+        action="copy",
+        status="ok",
+        # path points to the repo
+        path=src.path,
+        annexkey=file2_key,
+    )
     for tgt in target, target_all:
         head_tree2 = filter(
             lambda x: not x.startswith("."),
@@ -405,19 +395,39 @@ def test_push_all(annex, tmp_path):
 
 
 @slow  # 70 seconds on laptop
-def test_push_all_recursive(tmp_path):
+@with_tree(
+    tree={
+        "sub1": {
+            "sub11": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
+            "sub12": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
+            "file": "Stuff.",
+            "file_del": "Stuff to be deleted.",
+        },
+        "sub2": {
+            "sub21": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
+            "sub22": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
+            "file": "Stuff.",
+            "file_del": "Stuff to be deleted.",
+        },
+        "sub3": {
+            "sub31": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
+            "sub32": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
+            "file": "Stuff.",
+            "file_del": "Stuff to be deleted.",
+        },
+        "file": "Stuff.",
+        "file_del": "Stuff to be deleted.",
+    }
+)
+@with_tempfile(mkdir=True)
+def test_push_all_recursive(src_path=None, dst_path=None):
     """Check recursive push with `data="all"`"""
-    src_path = tmp_path / "src"
-    src_path.mkdir()
-    src = {"": Dataset(src_path).create()}
+    src = {"": Dataset(src_path).create(force=True)}
     for i in range(1, 4):
-        src[f"sub{i}"] = src[""].create(f"sub{i}")
+        src[f"sub{i}"] = src[""].create(f"sub{i}", force=True)
         for j in range(1, 3):
-            src[f"sub{i}/sub{i}{j}"] = src[f"sub{i}"].create(f"sub{i}{j}")
+            src[f"sub{i}/sub{i}{j}"] = src[f"sub{i}"].create(f"sub{i}{j}", force=True)
 
-    for ds in src.values():
-        (ds.pathobj / "file").write_text("Stuff.")
-        (ds.pathobj / "file_del").write_text("Stuff to be deleted.")
     src[""].save(to_git=False, message="Create files", recursive=True)
     file_keys = {k: ds.repo.get_file_annexinfo("file")["key"] for k, ds in src.items()}
     file_del_keys = {
@@ -427,11 +437,9 @@ def test_push_all_recursive(tmp_path):
         (ds.pathobj / "file_del").unlink()
     src[""].save(message="Remove files", recursive=True)
 
-    dst_path = tmp_path / "dst"
-    dst_path.mkdir()
     targets = {}
     for p, ds in src.items():
-        targets[p] = mk_push_target(ds, "target", str(dst_path / p), annex=True)
+        targets[p] = mk_push_target(ds, "target", str(Path(dst_path, p)), annex=True)
 
     with pytest.raises(ValueError):
         # path `sub1` is in a subdataset, therefore this cannot work without recursion
