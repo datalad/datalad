@@ -422,6 +422,13 @@ def test_push_all(src_path=None, dst_path=None, dst_path_all=None):
 @with_tempfile(mkdir=True)
 def test_push_all_recursive(src_path=None, dst_path=None):
     """Check recursive push with `data="all"`"""
+    # Create three subdatasets with one subsubdataset each. Tests performed:
+    # 1. Push subdataset 1 with recursion limit 1, which should push root and
+    #   subdataset 1, but not subsubdataset 1.
+    # 2. Push subdataset 2 without recursion limit. This should push subdataset 2 and
+    #   subsubdataset 2, but not root as it has already been pushed before.
+    # 3. Push the root dataset. This should push all remeaining stuff, i.e, subsubdataset1,
+    #   subdataset 3, subsubdataset 3, but nothing that has already been pushed.
     src = {"": Dataset(src_path).create(force=True)}
     for i in range(1, 4):
         src[f"sub{i}"] = src[""].create(f"sub{i}", force=True)
@@ -448,6 +455,8 @@ def test_push_all_recursive(src_path=None, dst_path=None):
         "sub1", to="target", data="all", recursive=True, recursion_limit=1
     )
     res1_copy = [r for r in res1 if r["action"] == "copy"]
+    # due to recursion limit, only files of root dataset and sub1, but not sub11
+    # should have been pushed
     assert len(res1_copy) == 4
     for d in "", "sub1":
         ds = src[d]
