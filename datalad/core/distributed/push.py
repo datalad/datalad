@@ -24,6 +24,7 @@ from datalad.distribution.dataset import (
     require_dataset,
     resolve_path,
 )
+from datalad.dochelpers import single_or_plural
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -113,16 +114,17 @@ class Push(Interface):
             constraints=EnsureStr() | EnsureNone()),
         data=Parameter(
             args=("--data",),
-            doc="""what to do with (annex'ed) data. 'anything' would cause
-            transfer of all annexed content, 'nothing' would avoid call to
-            `git annex copy` altogether. 'auto' would use 'git annex copy' with
-            '--auto' thus transferring only data which would satisfy "wanted"
+            doc="""what to do with (annex'ed) data. 'all' would cause
+            transfer of all annexed content, including unused files. 'anything' would
+            push all files from the current commit (git HEAD). 'nothing' would avoid
+            call to `git annex copy` altogether. 'auto' would use 'git annex copy'
+            with '--auto' thus transferring only data which would satisfy "wanted"
             or "numcopies" settings for the remote (thus "nothing" otherwise).
             'auto-if-wanted' would enable '--auto' mode only if there is a
             "wanted" setting for the remote, and transfer 'anything' otherwise.
-            """,
+            Note that 'all' cannot be used in conjunction with `since`.""",
             constraints=EnsureChoice(
-                'anything', 'nothing', 'auto', 'auto-if-wanted')),
+                'all', 'anything', 'nothing', 'auto', 'auto-if-wanted')),
         force=Parameter(
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
@@ -190,6 +192,8 @@ class Push(Interface):
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
         if since == '':
             raise ValueError("'since' should point to commitish or use '^'.")
+        if data == 'all' and since:
+            raise ValueError("`data='all'` cannot be used with `since`")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
@@ -234,17 +238,46 @@ class Push(Interface):
             # will blow with ValueError if unusable
             ds_repo.get_hexsha(since)
 
+        if data == "all":
+            if recursive:
+                dss = ds.subdatasets(
+                    path,
+                    recursive=recursive,
+                    recursion_limit=recursion_limit,
+                    result_xfm="paths",
+                    result_renderer="disabled",
+                    bottomup=True,
+                )
+            else:
+                dss = []
+            dss.append(ds.path)
 
-        # obtain a generator for information on the datasets to process
-        # idea is to turn the `paths` argument into per-dataset
-        # content listings that can be acted upon
-        ds_spec = _datasets_since_(
-            # important to pass unchanged dataset arg
-            dataset,
-            since,
-            paths,
-            recursive,
-            recursion_limit)
+            non_ds_paths = sorted(map(str, set(paths) - set(map(Path, dss))))
+            if non_ds_paths:
+                raise ValueError(
+                    single_or_plural(
+                        f"path `{non_ds_paths[0]}` is not a (sub)dataset",
+                        f"{len(non_ds_paths)} paths ({non_ds_paths[0]}, ...) are not (sub)datasets",
+                        len(non_ds_paths),
+                    )
+                    + " or the recursion limit is insufficient"
+                )
+
+            # list subdatasets, but no need to list files as `git annex copy --all`
+            # will transfer all of them
+            ds_spec = [(d, []) for d in dss]
+        else:
+            # obtain a generator for information on the datasets to process
+            # idea is to turn the `paths` argument into per-dataset
+            # content listings that can be acted upon
+            ds_spec = _datasets_since_(
+                # important to pass unchanged dataset arg
+                dataset,
+                since,
+                paths,
+                recursive,
+                recursion_limit,
+            )
 
         # instead of a loop, this could all be done in parallel
         matched_anything = False
@@ -799,50 +832,89 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
             )
             return
 
-    # it really looks like we will transfer files, get info on what annex
-    # has in store
-    # paths must be recoded to a dataset REPO root (in case of a symlinked
-    # location
-    annex_info_init = \
-        {ds_repo.pathobj / Path(c['path']).relative_to(ds.pathobj): c
-         for c in content} if ds.pathobj != ds_repo.pathobj else \
-        {Path(c['path']): c for c in content}
-    content = ds.repo.get_content_annexinfo(
-        # paths are taken from `annex_info_init`
-        paths=None,
-        init=annex_info_init,
-        ref='HEAD',
-        # this is an expensive operation that is only needed
-        # to perform a warning below, and for more accurate
-        # progress reporting (exclude unavailable content).
-        # limit to cases with explicit paths provided
-        eval_availability=True if got_path_arg else False,
-    )
-    # figure out which of the reported content (after evaluating
-    # `since` and `path` arguments needs transport
-    to_transfer = [
-        c
-        for c in content.values()
-        # by force
-        if ((force in ('all', 'checkdatapresent') or
-             # or by modification report
-             c.get('state', None) not in ('clean', 'deleted'))
-            # only consider annex'ed files
-            and 'key' in c
+    if data == "all":
+        cmd = ["copy", "--all", "--to", target]
+        file_list = None
+        repkey_paths = {}
+        nbytes = None
+    else:
+        # it really looks like we will transfer files, get info on what annex
+        # has in store
+        # paths must be recoded to a dataset REPO root (in case of a symlinked
+        # location
+        annex_info_init = (
+            {
+                ds_repo.pathobj / Path(c["path"]).relative_to(ds.pathobj): c
+                for c in content
+            }
+            if ds.pathobj != ds_repo.pathobj
+            else {Path(c["path"]): c for c in content}
         )
-    ]
-    if got_path_arg:
-        for c in [c for c in to_transfer if not c.get('has_content', False)]:
-            yield dict(
-                res_kwargs,
-                type=c['type'],
-                path=c['path'],
-                action='copy',
-                status='impossible',
-                message='Slated for transport, but no content present',
+        content = ds.repo.get_content_annexinfo(
+            # paths are taken from `annex_info_init`
+            paths=None,
+            init=annex_info_init,
+            ref="HEAD",
+            # this is an expensive operation that is only needed
+            # to perform a warning below, and for more accurate
+            # progress reporting (exclude unavailable content).
+            # limit to cases with explicit paths provided
+            eval_availability=True if got_path_arg else False,
+        )
+        # figure out which of the reported content (after evaluating
+        # `since` and `path` arguments needs transport
+        to_transfer = [
+            c
+            for c in content.values()
+            # by force
+            if (
+                (
+                    force in ("all", "checkdatapresent")
+                    or
+                    # or by modification report
+                    c.get("state", None) not in ("clean", "deleted")
+                )
+                # only consider annex'ed files
+                and "key" in c
             )
+        ]
+        if got_path_arg:
+            for c in [c for c in to_transfer if not c.get("has_content", False)]:
+                yield dict(
+                    res_kwargs,
+                    type=c["type"],
+                    path=c["path"],
+                    action="copy",
+                    status="impossible",
+                    message="Slated for transport, but no content present",
+                )
 
-    cmd = ['copy', '--batch', '-z', '--to', target]
+        cmd = ["copy", "--batch", "-z", "--to", target]
+
+        # A set and a dict is used to track files pointing to the
+        # same key.  The set could be dropped, using a single dictionary
+        # that has an entry for every seen key and a (likely empty) list
+        # of redundant files, but that would mean looping over potentially
+        # many keys to yield likely few if any notneeded results.
+        seen_keys = set()
+        repkey_paths = dict()
+
+        # produce final path list. use knowledge that annex command will
+        # run in the root of the dataset and compact paths to be relative
+        # to this location
+        file_list = b""
+        nbytes = 0
+        for c in to_transfer:
+            key = c["key"]
+            if key in seen_keys:
+                repkey_paths.setdefault(key, []).append(c["path"])
+            else:
+                file_list += bytes(Path(c["path"]).relative_to(ds.pathobj))
+                file_list += b"\0"
+                nbytes += c.get("bytesize", 0)
+                seen_keys.add(key)
+        lgr.debug("Counted %d bytes of annex data to transfer", nbytes)
+
 
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
@@ -865,31 +937,6 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # input has type=dataset, but now it is about files
     res_kwargs.pop('type', None)
 
-    # A set and a dict is used to track files pointing to the
-    # same key.  The set could be dropped, using a single dictionary
-    # that has an entry for every seen key and a (likely empty) list
-    # of redundant files, but that would mean looping over potentially
-    # many keys to yield likely few if any notneeded results.
-    seen_keys = set()
-    repkey_paths = dict()
-
-    # produce final path list. use knowledge that annex command will
-    # run in the root of the dataset and compact paths to be relative
-    # to this location
-    file_list = b''
-    nbytes = 0
-    for c in to_transfer:
-        key = c['key']
-        if key in seen_keys:
-            repkey_paths.setdefault(key, []).append(c['path'])
-        else:
-            file_list += bytes(Path(c['path']).relative_to(ds.pathobj))
-            file_list += b'\0'
-            nbytes += c.get('bytesize', 0)
-            seen_keys.add(key)
-    lgr.debug('Counted %d bytes of annex data to transfer',
-              nbytes)
-
     # and go
     res = ds_repo._call_annex_records(
         cmd,
@@ -906,13 +953,18 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     for j in res:
         yield annexjson2result(j, ds, type='file', **res_kwargs)
 
-    for annex_key, paths in repkey_paths.items():
-        for path in paths:
-            yield dict(
-                res_kwargs, action='copy', type='file', status='notneeded',
-                path=path, annexkey=annex_key,
-                message='Another file points to the same key')
-    return
+    if data != "all":
+        for annex_key, paths in repkey_paths.items():
+            for path in paths:
+                yield dict(
+                    res_kwargs,
+                    action="copy",
+                    type="file",
+                    status="notneeded",
+                    path=path,
+                    annexkey=annex_key,
+                    message="Another file points to the same key",
+                )
 
 
 def _get_corresponding_remote_state(repo, to):
