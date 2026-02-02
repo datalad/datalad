@@ -24,6 +24,7 @@ from datalad.distribution.dataset import (
     require_dataset,
     resolve_path,
 )
+from datalad.dochelpers import single_or_plural
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -251,12 +252,15 @@ class Push(Interface):
                 dss = []
             dss.append(ds.path)
 
-            non_ds_paths = sorted(set(paths) - set(map(Path, dss)))
+            non_ds_paths = sorted(map(str, set(paths) - set(map(Path, dss))))
             if non_ds_paths:
-                b = "\n".join(map(str, non_ds_paths))
                 raise ValueError(
-                    "The following paths are not (sub)datasets or the"
-                    f" recursion limit is insufficient:\n{b}"
+                    single_or_plural(
+                        f"path `{non_ds_paths[0]}` is not a (sub)dataset",
+                        f"{len(non_ds_paths)} paths ({non_ds_paths[0]}, ...) are not (sub)datasets",
+                        len(non_ds_paths),
+                    )
+                    + " or the recursion limit is insufficient"
                 )
 
             # list subdatasets, but no need to list files as `git annex copy --all`
