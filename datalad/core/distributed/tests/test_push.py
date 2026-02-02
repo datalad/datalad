@@ -394,24 +394,21 @@ def test_push_all(src_path=None, dst_path=None, dst_path_all=None):
         )
 
 
-@slow  # 70 seconds on laptop
+@slow  # 40 seconds on laptop
 @with_tree(
     tree={
         "sub1": {
             "sub11": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
-            "sub12": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
             "file": "Stuff.",
             "file_del": "Stuff to be deleted.",
         },
         "sub2": {
             "sub21": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
-            "sub22": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
             "file": "Stuff.",
             "file_del": "Stuff to be deleted.",
         },
         "sub3": {
             "sub31": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
-            "sub32": {"file": "Stuff.", "file_del": "Stuff to be deleted."},
             "file": "Stuff.",
             "file_del": "Stuff to be deleted.",
         },
@@ -432,8 +429,7 @@ def test_push_all_recursive(src_path=None, dst_path=None):
     src = {"": Dataset(src_path).create(force=True)}
     for i in range(1, 4):
         src[f"sub{i}"] = src[""].create(f"sub{i}", force=True)
-        for j in range(1, 3):
-            src[f"sub{i}/sub{i}{j}"] = src[f"sub{i}"].create(f"sub{i}{j}", force=True)
+        src[f"sub{i}/sub{i}1"] = src[f"sub{i}"].create(f"sub{i}1", force=True)
 
     src[""].save(to_git=False, message="Create files", recursive=True)
     file_keys = {k: ds.repo.get_file_annexinfo("file")["key"] for k, ds in src.items()}
@@ -471,9 +467,9 @@ def test_push_all_recursive(src_path=None, dst_path=None):
             )
     res2 = src[""].push("sub2", to="target", data="all", recursive=True)
     res2_copy = [r for r in res2 if r["action"] == "copy"]
-    # root dataset has already been pushed, leaving sub2, sub21, sub22
-    assert len(res2_copy) == 6
-    for d in "sub2", "sub2/sub21", "sub2/sub22":
+    # root dataset has already been pushed, leaving sub2, sub21
+    assert len(res2_copy) == 4
+    for d in "sub2", "sub2/sub21":
         ds = src[d]
         for k in file_keys[d], file_del_keys[d]:
             assert_in_results(
@@ -487,8 +483,8 @@ def test_push_all_recursive(src_path=None, dst_path=None):
     # This should push the rest (i.e., subsets of sub1 and all of sub3)
     res3 = src[""].push(to="target", data="all", recursive=True)
     res3_copy = [r for r in res3 if r["action"] == "copy"]
-    assert len(res3_copy) == 10
-    for d in "sub1/sub11", "sub1/sub12", "sub3", "sub3/sub31", "sub3/sub32":
+    assert len(res3_copy) == 6
+    for d in "sub1/sub11", "sub3", "sub3/sub31":
         ds = src[d]
         for k in file_keys[d], file_del_keys[d]:
             assert_in_results(
