@@ -281,6 +281,16 @@ class Run(Interface):
             uninstalled dataset will be left unexpanded because no subdatasets
             will be installed for a dry run.""",
             constraints=EnsureChoice(None, "basic", "command")),
+        versions=Parameter(
+            args=("-V", "--versions"),
+            metavar="SPEC",
+            doc="""Specify which tool/package versions to capture in the run
+            record. Use 'auto' to detect from command, 'none' to disable, or a
+            comma-separated list of version specs. Specs use prefixes: 'cmd:'
+            for CLI tools (e.g., 'cmd:python'), 'py:' for Python packages
+            (e.g., 'py:numpy'). Custom version commands: 'cmd:tool:command'.
+            Load from JSON file: '@path'.
+            [Default: config 'datalad.run.versions.default', or 'auto']"""),
         jobs=jobs_opt
     )
     _params_['jobs']._doc += """\
@@ -303,6 +313,7 @@ class Run(Interface):
             message=None,
             sidecar=None,
             dry_run=None,
+            versions=None,
             jobs=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
@@ -312,6 +323,7 @@ class Run(Interface):
                              message=message,
                              sidecar=sidecar,
                              dry_run=dry_run,
+                             versions=versions,
                              jobs=jobs):
             yield r
 
@@ -798,7 +810,7 @@ def _create_record(run_info, sidecar_flag, ds):
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
-                dry_run=False, jobs=None,
+                dry_run=False, jobs=None, versions=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -817,6 +829,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     Parameters
     ----------
+    versions : str, optional
+        Version capture specification. Use 'auto' to detect from command,
+        'none' to disable, or a comma-separated list of version specs
+        (e.g., 'cmd:python,py:numpy'). Default from config or 'auto'.
     extra_info : dict, optional
         Additional information to dump with the json run record. Any value
         given here will take precedence over the standard run key. Warning: To
@@ -1001,6 +1017,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info['pwd'] = rel_pwd
     if ds.id:
         run_info["dsid"] = ds.id
+
+    # Handle versions from extra_info (e.g., from extensions like containers-run)
+    extra_versions = {}
+    if extra_info and 'versions' in extra_info:
+        extra_versions = extra_info.pop('versions')
     if extra_info:
         run_info.update(extra_info)
 
@@ -1016,9 +1037,26 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         )
         return
 
+    # Check for stale injected versions file before command execution
+    from .run_versions import check_stale_injected_file
+    check_stale_injected_file(ds)
+
     if not inject:
         cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
+
+    # Capture versions after command execution
+    from .run_versions import capture_versions, read_injected_versions
+    captured_versions = capture_versions(cmd, versions, ds)
+    # Read any versions injected by the command (e.g., from container wrappers)
+    injected_versions = read_injected_versions(ds)
+    if injected_versions:
+        captured_versions.update(injected_versions)
+    # Merge extra_versions from extensions (e.g., containers-run)
+    if extra_versions:
+        captured_versions.update(extra_versions)
+    if captured_versions:
+        run_info['versions'] = captured_versions
 
     # Re-glob to capture any new outputs.
     #
