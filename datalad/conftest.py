@@ -1,3 +1,13 @@
+"""DataLad pytest configuration for local testing.
+
+This conftest.py provides fixtures and configuration for testing DataLad itself.
+
+The pytest hooks (pytest_configure, pytest_ignore_collect) are defined in
+datalad.pytest_plugin and are imported here so they're active when testing
+DataLad locally. For DataLad extensions, those hooks are loaded via the
+pytest11 entry point.
+"""
+
 import logging
 import os
 import re
@@ -19,6 +29,13 @@ from . import (
     ssh_manager,
 )
 from .log import lgr
+# Import pytest hooks from plugin so they're active for local testing
+# This is safe - when testing datalad itself, this conftest is loaded
+# as a regular conftest (not via entry point), so no double registration
+from .pytest_plugin import (  # noqa: F401
+    pytest_configure,
+    pytest_ignore_collect,
+)
 
 _test_states = {}
 
@@ -236,25 +253,3 @@ def capture_logs(caplog, monkeypatch):
         # And we should also set it within environ so underlying commands also
         # stay silent
         monkeypatch.setenv('DATALAD_LOG_LEVEL', '100')
-
-
-def pytest_ignore_collect(collection_path: Path) -> bool:
-    # Skip old nose code and the tests for it:
-    # Note, that this is not only about executing tests but also importing those
-    # files to begin with.
-    if collection_path.name == "test_tests_utils.py":
-        return True
-    if collection_path.parts[:-3] == ("datalad", "tests", "utils.py"):
-        return True
-    # When pytest is told to run doctests, by default it will import every
-    # source file in its search, but a number of datalad source file have
-    # undesirable side effects when imported.  This hook should ensure that
-    # only `test_*.py` files and `*.py` files containing doctests are imported
-    # during test collection.
-    if collection_path.name.startswith("test_") or collection_path.is_dir():
-        return False
-    if collection_path.suffix != ".py":
-        return True
-    return not any(
-        re.match(r"^\s*>>>", ln) for ln in collection_path.read_text("utf-8").splitlines()
-    )
