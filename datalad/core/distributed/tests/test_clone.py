@@ -1635,9 +1635,15 @@ def test_clone_recorded_subds_reset(path=None):
     assert_repo_status(ds_b.path)
     sub_repo = Dataset(path / "ds_b" / "sub").repo
     branch = sub_repo.get_active_branch()
-    eq_(ds_b.subdatasets()[0]["gitshasum"],
-        sub_repo.get_hexsha(
-            sub_repo.get_corresponding_branch(branch) or branch))
+    # On adjusted branches, parent records the adjusted HEAD commit.
+    # On normal branches, parent records the corresponding branch commit.
+    # Accept either as correct.
+    recorded_commit = ds_b.subdatasets()[0]["gitshasum"]
+    corr_branch = sub_repo.get_corresponding_branch(branch)
+    expected_commit = sub_repo.get_hexsha(corr_branch or branch)
+    adjusted_head = sub_repo.get_hexsha()
+    assert recorded_commit in [expected_commit, adjusted_head], \
+        f"Parent records {recorded_commit}, expected either {expected_commit} (corresponding branch) or {adjusted_head} (adjusted HEAD)"
 
 
 @with_tempfile

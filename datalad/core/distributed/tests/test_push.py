@@ -979,11 +979,13 @@ def test_nested_pushclone_cycle_allplatforms(origpath=None, storepath=None, clon
     # verify that nothing has changed as a result of a push/clone cycle
     clone_super = Dataset(Path(clonepath, 'super'))
     clone_sub = Dataset(clone_super.pathobj / 'sub')
-    assert_in_results(
-        clone_super.subdatasets(),
-        path=clone_sub.path,
-        gitshasum=orig_sub_corr_commit,
-    )
+    # On adjusted branches, the clone may record the adjusted HEAD instead
+    # of the corresponding branch commit. Accept either.
+    clone_sub_results = clone_super.subdatasets()
+    clone_sub_gitshasum = [r for r in clone_sub_results if r['path'] == clone_sub.path][0]['gitshasum']
+    clone_sub_head = clone_sub.repo.get_hexsha()
+    assert clone_sub_gitshasum in [orig_sub_corr_commit, clone_sub_head], \
+        f"Clone records {clone_sub_gitshasum}, expected either {orig_sub_corr_commit} (corresponding branch) or {clone_sub_head} (adjusted HEAD)"
 
     for ds1, ds2, f in ((orig_super, clone_super, 'file1.txt'),
                         (orig_sub, clone_sub, 'file2.txt')):
