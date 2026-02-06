@@ -726,6 +726,7 @@ def test_AnnexRepo_get_file_backend(src=None, dst=None):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
+@skip_if_adjusted_branch
 @with_tempfile
 def test_AnnexRepo_always_commit(path=None):
 
