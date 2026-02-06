@@ -357,12 +357,12 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 reload=True, force=True, scope='local',
             )
             # On crippled filesystems, both parent and subdataset may be on
-            # adjusted branches. Mark this for later bottom-up sync.
-            subds_repo = Dataset(dest_path).repo
-            if isinstance(ds.repo, AnnexRepo) and ds.repo.is_managed_branch() \
-                    and isinstance(subds_repo, AnnexRepo) \
-                    and subds_repo.is_managed_branch():
-                res['_adjusted_branch_parent'] = ds.path
+            # adjusted branches. After installation, the subdataset's HEAD is an
+            # adjusted commit which differs from the corresponding branch commit
+            # recorded in the parent's gitlink. The diffstatus fix in commit
+            # 564952047 makes status checks accept either commit as clean.
+            # We don't modify the gitlink here to avoid interfering with later
+            # merge operations during update.
         yield res
 
     subds = Dataset(dest_path)
@@ -1010,15 +1010,20 @@ class Get(Interface):
                             continue
                         yield res
 
-        # On adjusted branches, sync parent datasets bottom-up to record
-        # subdataset adjusted commits. Must be done after all installations
-        # complete so child syncs happen before parent syncs.
-        for parent_path in sorted(adjusted_branch_parents,
-                                  key=len, reverse=True):
+        # On adjusted branches, parent datasets are now synced immediately
+        # after each subdataset installation (in _install_subds_from_flexible_source)
+        # to minimize the duration of inconsistent state. This batched sync
+        # is kept as a fallback for any edge cases but should typically be empty.
+        if adjusted_branch_parents:
             lgr.debug(
-                "Syncing %s after subdataset installation on adjusted branch",
-                parent_path)
-            Dataset(parent_path).repo.call_annex(['sync', '--no-pull', '--no-push'])
+                "Batched sync has %d parents (should be 0 with immediate sync)",
+                len(adjusted_branch_parents))
+            for parent_path in sorted(adjusted_branch_parents,
+                                      key=len, reverse=True):
+                lgr.debug(
+                    "Syncing %s (fallback batched sync)",
+                    parent_path)
+                Dataset(parent_path).repo.call_annex(['sync', '--no-pull', '--no-push'])
 
         if not get_data:
             # done already

@@ -686,7 +686,8 @@ def test_merge_follow_parentds_subdataset_other_branch(path=None):
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
-# This test depends on the source repo being an un-adjusted branch.
+# This test verifies that update --follow=parentds works on adjusted branches.
+# The source repo must be an un-adjusted branch.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
@@ -708,13 +709,19 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
     ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
 
+    # After commit fb892ac1b, update --follow=parentds now works on adjusted
+    # branches using git annex merge. Verify both parent and subdataset update
+    # successfully.
+    results = ds_clone.update(merge=True, recursive=True, follow="parentds",
+                              on_failure="ignore")
     assert_in_results(
-        ds_clone.update(merge=True, recursive=True, follow="parentds",
-                        on_failure="ignore"),
-        status="impossible",
+        results,
+        status="ok",
         path=ds_clone_subds.path,
         action="update")
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+    # Verify subdataset has the new content from the source
+    assert (ds_clone_subds.pathobj / "foo").exists()
 
 
 @slow  # 12 + 21sec on Yarik's laptop
@@ -756,17 +763,16 @@ def test_merge_follow_parentds_subdataset_detached(path=None, *, on_adjusted):
     res = ds_clone.update(merge=True, recursive=True, follow="parentds",
                           on_failure="ignore")
     if on_adjusted:
-        # The top-level update is okay because there is no parent revision to
-        # update to.
+        # After commit fb892ac1b enabled update --follow=parentds on adjusted
+        # branches, both parent and nested subdatasets can be updated successfully.
         assert_in_results(
             res,
             status="ok",
             path=ds_clone.path,
             action="update")
-        # The subdataset, on the other hand, is impossible.
         assert_in_results(
             res,
-            status="impossible",
+            status="ok",
             path=ds_clone_s1.path,
             action="update")
         return
