@@ -369,13 +369,7 @@ class Update(Interface):
 
                 adjusted = is_annex and repo.is_managed_branch(curr_branch)
                 if adjusted:
-                    if follow_parent:
-                        yield dict(
-                            res, status="impossible",
-                            message=("follow='parentds' is incompatible "
-                                     "with adjusted branches"))
-                        continue
-                    if how_curr != "merge":
+                    if how_curr not in ("merge", "reset"):
                         yield dict(
                             res, status="impossible",
                             message=("Updating via '%s' is incompatible "
@@ -387,7 +381,8 @@ class Update(Interface):
                     repo,
                     how_curr,
                     is_annex=is_annex,
-                    adjusted=adjusted)
+                    adjusted=adjusted,
+                    follow_parent=follow_parent)
 
                 fn_opts = ["--ff-only"] if how_curr == "ff-only" else None
                 if update_fn is not _annex_sync:
@@ -493,15 +488,22 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
 #  Update functions
 
 
-def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
-    if adjusted and how != "merge":
+def _choose_update_fn(repo, how, is_annex=False, adjusted=False,
+                      follow_parent=False):
+    if adjusted and how not in ("merge", "reset"):
         raise RuntimeError(
             "bug: Upstream checks should abort if adjusted is used "
-            "with action other than 'merge'")
+            "with action other than 'merge' or 'reset'")
     elif how in ["merge", "ff-only"]:
         if adjusted and is_annex:
-            # For adjusted repos, blindly sync.
-            fn = _annex_sync
+            if follow_parent:
+                # For adjusted repos with a specific target (from parentds),
+                # use git annex merge <target> to merge into both the
+                # corresponding branch and the adjusted branch.
+                fn = _annex_merge_target
+            else:
+                # For adjusted repos following sibling, blindly sync.
+                fn = _annex_sync
         elif is_annex:
             fn = _annex_plain_merge
         elif adjusted:
@@ -511,7 +513,11 @@ def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
         else:
             fn = _plain_merge
     elif how == "reset":
-        fn = _reset_hard
+        if adjusted and is_annex:
+            # For adjusted repos, reset the corresponding branch and re-adjust
+            fn = _annex_reset_target
+        else:
+            fn = _reset_hard
     elif how == "checkout":
         fn = _checkout
     else:
@@ -564,6 +570,70 @@ def _annex_sync(repo, remote, _target, opts=None):
         {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
         repo.call_annex,
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
+
+
+def _annex_merge_target(repo, _remote, target, opts=None):
+    """Merge a specific target revision using git-annex merge.
+
+    This is useful for adjusted branches where we need to merge a specific
+    commit (e.g., from follow='parentds') into both the corresponding branch
+    and the adjusted branch.
+    """
+    yield _try_command(
+        {"action": "update.annex_merge", "message": ("Merged %s", target)},
+        repo.call_annex,
+        ['merge', target])
+
+
+def _get_adjust_mode(branch_name):
+    """Extract the adjustment mode from an adjusted branch name.
+
+    E.g., 'adjusted/master(unlocked)' -> '--unlock'
+    """
+    import re
+    match = re.match(r'adjusted/[^(]+\(([^)]+)\)', branch_name or '')
+    if not match:
+        # Default to unlocked mode as it is the most common adjustment,
+        # especially on crippled filesystems where unlocked behavior is expected.
+        return '--unlock'
+    mode = match.group(1)
+    mode_to_option = {
+        'unlocked': '--unlock',
+        'locked': '--lock',
+        'fix': '--fix',
+        'hidemissing': '--hide-missing',
+    }
+    return mode_to_option.get(mode, '--unlock')
+
+
+def _annex_reset_target(repo, _remote, target, opts=None):
+    """Reset an adjusted branch to a specific target revision.
+
+    This performs a hard reset on the corresponding branch, then re-adjusts
+    the branch to maintain the adjusted state. This is useful for
+    `how_subds='reset'` on adjusted branches.
+    """
+    if repo.dirty:
+        yield {"action": "update.reset",
+               "status": "error",
+               "message": "Refusing to reset dirty working tree"}
+        return
+
+    active_branch = repo.get_active_branch()
+    corr_branch = repo.get_corresponding_branch(active_branch)
+    adjust_mode = _get_adjust_mode(active_branch)
+
+    def do_reset():
+        # Checkout the corresponding branch
+        repo.call_git(['checkout', corr_branch])
+        # Reset to target
+        repo.call_git(['reset', '--hard', target])
+        # Re-adjust with --force to overwrite existing adjusted branch
+        repo.call_annex(['adjust', adjust_mode, '--force'])
+
+    yield _try_command(
+        {"action": "update.reset", "message": ("Reset to %s", target)},
+        do_reset)
 
 
 def _reset_hard(repo, _, target, opts=None):

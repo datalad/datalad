@@ -2117,7 +2117,6 @@ def test_AnnexRepo_get_tracking_branch(src_path=None, path=None):
         ar.get_tracking_branch())
 
 
-@skip_if_adjusted_branch
 @with_tempfile
 def test_AnnexRepo_is_managed_branch(path=None):
     ar = AnnexRepo(path, create=True)

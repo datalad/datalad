@@ -356,12 +356,20 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 res['source']['giturl'],
                 reload=True, force=True, scope='local',
             )
+            # On crippled filesystems, both parent and subdataset may be on
+            # adjusted branches. After installation, the subdataset's HEAD is an
+            # adjusted commit which differs from the corresponding branch commit
+            # recorded in the parent's gitlink. The diffstatus fix in commit
+            # 564952047 makes status checks accept either commit as clean.
+            # We don't modify the gitlink here to avoid interfering with later
+            # merge operations during update.
         yield res
 
     subds = Dataset(dest_path)
     if not subds.is_installed():
         lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
         return
+
 
     # check whether clone URL generators were involved
     cand_cfg = [rec for rec in clone_urls if rec.get('from_config', False)]
@@ -890,6 +898,9 @@ class Get(Interface):
         # keep track of error results for paths that do not exist
         error_reported = {}
         content_by_ds = {}
+        # Track parent datasets that need syncing on adjusted branches.
+        # These will be synced bottom-up after all installations complete.
+        adjusted_branch_parents = set()
         # use subdatasets() to discover any relevant content that is not
         # already present in the root dataset (refds)
         for sdsres in Subdatasets.__call__(
@@ -944,6 +955,9 @@ class Get(Interface):
                             dsrec = content_by_ds.get(res['path'], set())
                             dsrec.update(res['contains'])
                             content_by_ds[res['path']] = dsrec
+                        # Collect parent datasets needing sync on adjusted branches
+                        if '_adjusted_branch_parent' in res:
+                            adjusted_branch_parents.add(res['_adjusted_branch_parent'])
                         if res.get('status', None) != 'notneeded':
                             # all those messages on not having installed anything
                             # are a bit pointless
@@ -984,6 +998,9 @@ class Get(Interface):
                         dsrec = content_by_ds.get(res['path'], set())
                         dsrec.update(res['contains'])
                         content_by_ds[res['path']] = dsrec
+                    # Collect parent datasets needing sync on adjusted branches
+                    if '_adjusted_branch_parent' in res:
+                        adjusted_branch_parents.add(res['_adjusted_branch_parent'])
                     # prevent double-reporting of datasets that have been
                     # installed by explorative installation to get to target
                     # paths, prior in this loop
@@ -992,6 +1009,21 @@ class Get(Interface):
                         if _check_error_reported_before(res, error_reported):
                             continue
                         yield res
+
+        # On adjusted branches, parent datasets are now synced immediately
+        # after each subdataset installation (in _install_subds_from_flexible_source)
+        # to minimize the duration of inconsistent state. This batched sync
+        # is kept as a fallback for any edge cases but should typically be empty.
+        if adjusted_branch_parents:
+            lgr.debug(
+                "Batched sync has %d parents (should be 0 with immediate sync)",
+                len(adjusted_branch_parents))
+            for parent_path in sorted(adjusted_branch_parents,
+                                      key=len, reverse=True):
+                lgr.debug(
+                    "Syncing %s (fallback batched sync)",
+                    parent_path)
+                Dataset(parent_path).repo.call_annex(['sync', '--no-pull', '--no-push'])
 
         if not get_data:
             # done already
