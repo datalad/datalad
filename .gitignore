@@ -31,3 +31,8 @@ bin/
 tools/bisect-git-annex.simg
 __testhome__
 uv.lock
+
+# Build artifacts and local configs
+.gitconfig
+.venv/
+.npm/
