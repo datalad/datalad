@@ -17,16 +17,10 @@ from .utils import py2cmd
 
 
 class MinimalGeneratorProtocol(GeneratorMixIn, StdOutCapture):
-    def __init__(self) -> None:
-        StdOutCapture.__init__(self)
-        GeneratorMixIn.__init__(self)
+    pass
 
 
 class MinimalStdOutGeneratorProtocol(GeneratorMixIn, StdOutCapture):
-    def __init__(self) -> None:
-        StdOutCapture.__init__(self)
-        GeneratorMixIn.__init__(self)
-
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         for line in data.decode().splitlines():
             self.send_result((fd, line))

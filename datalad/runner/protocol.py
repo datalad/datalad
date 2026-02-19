@@ -31,7 +31,7 @@ lgr = logging.getLogger('datalad.runner.protocol')
 class GeneratorMixIn:
     """ Protocol mix in that will instruct runner.run to return a generator
 
-    When this class is in the parent of a protocol given to runner.run (and
+    When this class is a parent of a protocol given to runner.run (and
     some other functions/methods) the run-method will return a `Generator`,
     which yields whatever the protocol callbacks send to the `Generator`,
     via the `send_result`-method of this class.
@@ -41,12 +41,34 @@ class GeneratorMixIn:
         for result in runner.run(...):
             # do something, for example write to stdin of the subprocess
 
-    """
-    def __init__(self):
-        self.result_queue = deque()
 
+    Example for creating a generator-version of the StdOutCapture protocol, that
+    will yield tuples of (fd, data):
+
+        class GeneratorStdOutCapture(StdOutCapture, GeneratorMixIn):
+            def pipe_data_received(self, fd, data):
+                self.send_result((fd, data))
+
+    """
     def send_result(self, result):
+        """ This method sends a result that will be yielded by the generator
+
+        If ThreadedRunner.run() is called with a protocol that is derived from
+        this mixin-class, it will return a generator. The elements that the
+        generator yields have to be sent to the generator. This is done via this
+        method. Any `result` that is given to `GeneratorMixIn.send_result()`
+        will eventually be yielded by the generator. The order in which they
+        are yielded is the order in which they are "given" to
+        `GeneratorMixIn.send_result()`.
+        """
         self.result_queue.append(result)
+
+    @property
+    def result_queue(self) -> deque:
+        # lazy assignment avoids needing __init__ for the MixIn class
+        if not hasattr(self, '_result_queue'):
+            self._result_queue: deque = deque()
+        return self._result_queue
 
 
 class WitlessProtocol:
