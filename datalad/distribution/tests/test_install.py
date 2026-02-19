@@ -923,6 +923,16 @@ def test_install_from_tilda(opath=None, tpath=None):
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
+@with_tempfile(mkdir=True)
+def test_install_recursive_relpath(local_path=None):
+    with chpwd(local_path):
+        ds = create(os.path.join(local_path, 'src'))
+        ds.create('sub_ds')
+        dest_path = os.path.join(local_path, 'dest')
+        install(dest_path, source='src/', recursive=True)
+        assert Dataset(opj(dest_path, 'sub_ds')).is_installed()
+
+
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @usecase
