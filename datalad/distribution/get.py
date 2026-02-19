@@ -645,12 +645,15 @@ def _install_targetpath(
         yield res
 
 
-def _get_targetpaths(ds, content, refds_path, source, jobs):
+def _get_targetpaths(ds, content, refds_path, source, jobs, data):
     # not ready for Path instances...
     content = [str(c) for c in content]
     # hand over to git-annex, get files content,
     # report files in git as 'notneeded' to get
     ds_repo = ds.repo
+
+    get_opts = ['--from=%s' % source] if source else []
+
     # needs to be an annex to get content
     if not isinstance(ds_repo, AnnexRepo):
         for r in results_from_paths(
@@ -663,10 +666,19 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             yield r
         return
     respath_by_status = {}
+
+    if (data == 'auto') or \
+        (
+            (data == 'auto-if-wanted') and
+            ds_repo.get_preferred_content('wanted', 'here')
+        ):
+        lgr.debug("Invoking get --auto")
+        get_opts.append('--auto')
+
     try:
         results = ds_repo.get(
             content,
-            options=['--from=%s' % source] if source else [],
+            options=get_opts,
             jobs=jobs)
     except CommandError as exc:
         results = exc.kwargs.get("stdout_json")
@@ -855,6 +867,18 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
+        data=Parameter(
+            args=("--data",),
+            doc="""what to do with (annex'ed) data. 'anything' would cause
+            fetching of all annexed content, 'nothing' would avoid call to
+            `git annex get` altogether. 'auto' would use 'git annex get' with
+            '--auto' thus fetching only data which would satisfy "wanted"
+            or "numcopies" settings for the local copy (thus "nothing" otherwise).
+            'auto-if-wanted' would enable '--auto' mode only if there is a
+            "wanted" setting for the remote, and fetching 'anything' otherwise.
+            """,
+            constraints=EnsureChoice(
+                'anything', 'nothing', 'auto', 'auto-if-wanted')),
         description=location_description,
         reckless=reckless_opt,
         jobs=jobs_opt)
@@ -873,6 +897,7 @@ class Get(Interface):
             description=None,
             reckless=None,
             jobs='auto',
+            data='auto-if-wanted',
     ):
 
         if not (dataset or path):
@@ -993,7 +1018,7 @@ class Get(Interface):
                             continue
                         yield res
 
-        if not get_data:
+        if data=='nothing' or not get_data:
             # done already
             return
 
@@ -1004,7 +1029,8 @@ class Get(Interface):
                     content,
                     refds.path,
                     source,
-                    jobs):
+                    jobs,
+                    data):
                 if 'path' not in res or res['path'] not in content_by_ds:
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
