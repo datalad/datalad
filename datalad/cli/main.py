@@ -122,7 +122,7 @@ def main(args=sys.argv):
         # added new ones to consider
         load_extensions()
 
-    if 'datalad.runtime.librarymode' in datalad.cfg:
+    if datalad.cfg.getbool('datalad.runtime', 'librarymode', False):
         datalad.enable_librarymode()
 
     if cmdlineargs.change_path is not None:
