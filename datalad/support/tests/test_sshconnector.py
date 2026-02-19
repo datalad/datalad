@@ -214,7 +214,7 @@ def test_ssh_copy(sourcedir=None, sourcefile1=None, sourcefile2=None):
 
     # copy content of sourcefile3 to an obscurely named file in sourcedir
     obscure_file = get_most_obscure_supported_name()
-    obscure_path = opj(sourcedir, obscure_file)
+    obscure_path = opj(sourcedir, get_most_obscure_supported_name(directory_name=True))
     with open(obscure_path, 'w') as f:
         f.write('three')
 

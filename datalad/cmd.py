@@ -236,6 +236,7 @@ class BatchedCommand(SafeDelCloseMixin):
                  output_proc: Optional[Callable] = None,
                  timeout: Optional[float] = None,
                  exception_on_timeout: bool = False,
+                 request_terminator: bytes = b'\n',
                  ):
 
         command = cmd
@@ -244,6 +245,7 @@ class BatchedCommand(SafeDelCloseMixin):
         self.output_proc: Optional[Callable] = output_proc
         self.timeout: Optional[float] = timeout
         self.exception_on_timeout: bool = exception_on_timeout
+        self.request_terminator = request_terminator
 
         self.stderr_output = b""
         self.runner: Optional[WitlessRunner] = None
@@ -438,7 +440,7 @@ class BatchedCommand(SafeDelCloseMixin):
             # Remember request and send it to subprocess
             if not isinstance(request, str):
                 request = ' '.join(request)
-            self.stdin_queue.put((request + "\n").encode())
+            self.stdin_queue.put(request.encode() + self.request_terminator)
 
             # Get the response from the generator. We only consider
             # data received on stdout as a response.
