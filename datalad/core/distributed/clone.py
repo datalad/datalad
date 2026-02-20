@@ -30,6 +30,7 @@ from datalad.interface.base import (
 from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
+    save_message_opt,
 )
 from datalad.interface.results import get_status_dict
 from datalad.support.annexrepo import AnnexRepo
@@ -218,6 +219,7 @@ class Clone(Interface):
             '--branch'."""),
         description=location_description,
         reckless=reckless_opt,
+        message=save_message_opt,
     )
 
     @staticmethod
@@ -231,6 +233,7 @@ class Clone(Interface):
             dataset=None,
             description=None,
             reckless=None,
+            message=None,
         ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -342,10 +345,9 @@ class Clone(Interface):
             actually_saved_subds = False
             for r in ds.save(
                     path,
-                    # Note, that here we know we don't save anything but a new
-                    # subdataset. Hence, don't go with default commit message,
-                    # but be more specific.
-                    message="[DATALAD] Added subdataset",
+                    # This save only commits the new subdataset, nothing else.
+                    # Use caller's message if provided, otherwise a specific default.
+                    message=message or "[DATALAD] Added subdataset",
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,

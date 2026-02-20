@@ -320,7 +320,7 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     # Note, we test against the produced history in DEFAULT_BRANCH, not what it
     # turns into in an adjusted branch!
     hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
-    subds = ds.clone(source, "sub",
+    subds = ds.clone(source, "sub", message="custom clone message",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
@@ -340,6 +340,9 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     ))
     assert_not_in(hexsha_before, commits)
     eq_(len(commits), 1)
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom clone message")
+    # child is unaffected
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom clone message")
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes

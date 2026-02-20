@@ -26,6 +26,7 @@ from datalad.interface.base import (
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
+    save_message_opt,
 )
 from datalad.interface.results import (
     YieldDatasets,
@@ -209,7 +210,9 @@ class Update(Interface):
             args=("--reobtain-data",),
             action="store_true",
             doc="""if enabled, file content that was present before an update
-            will be re-obtained in case a file was changed by the update."""), )
+            will be re-obtained in case a file was changed by the update."""),
+        message=save_message_opt,
+    )
 
     @staticmethod
     @datasetmethod(name='update')
@@ -226,7 +229,9 @@ class Update(Interface):
             recursive=False,
             recursion_limit=None,
             fetch_all=None,
-            reobtain_data=False):
+            reobtain_data=False,
+            message=None,
+    ):
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
         if path and not recursive:
@@ -422,10 +427,10 @@ class Update(Interface):
         # it was a pure fetch
         if how_curr and recursive:
             yield from _save_after_update(
-                refds, save_paths, update_failures, path, saw_subds)
+                refds, save_paths, update_failures, path, saw_subds, message)
 
 
-def _save_after_update(refds, tosave, update_failures, path_arg, saw_subds):
+def _save_after_update(refds, tosave, update_failures, path_arg, saw_subds, message=None):
     if path_arg and not saw_subds:
         lgr.warning(
             'path constraints did not match an installed subdataset: %s',
@@ -444,7 +449,7 @@ def _save_after_update(refds, tosave, update_failures, path_arg, saw_subds):
         for r in refds.save(
                 path=save_paths,
                 recursive=False,
-                message='[DATALAD] Save updated subdatasets',
+                message=message or '[DATALAD] Save updated subdatasets',
                 return_type='generator',
                 result_renderer='disabled'):
             yield r
