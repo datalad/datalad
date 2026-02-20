@@ -1082,6 +1082,19 @@ xfail_buggy_annex_info = pytest.mark.xfail(
     reason="Regression in git-annex info. https://github.com/datalad/datalad/issues/7286"
 )
 
+xfail_annex_ignore_not_respected_for_local = pytest.mark.xfail(
+    # In 10.20260213, configRead in Remote/Git.hs was reordered for "Push to
+    # Create" support: (True, _, _) (repoCheap/local) is now matched before
+    # (_, True, _) (annex-ignore), so annex-ignore is not respected for local
+    # remotes.  This causes auto-initialization of the annex directory on the
+    # remote bare repo during clone.
+    # In 10.20250630 and earlier, (_, True, _) was matched first, correctly
+    # short-circuiting for annex-ignored remotes.
+    # https://git-annex.branchable.com/bugs/annex-ignore_check_is_skipped_for_local_remotes/
+    external_versions['cmd:annex'] and external_versions['cmd:annex'] >= '10.20260213',
+    reason="git-annex regression: annex-ignore not respected for local remotes"
+)
+
 
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
