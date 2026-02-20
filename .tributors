@@ -317,7 +317,8 @@
     },
     "malikwirin": {
         "name": "Malik",
-        "blog": "https://github.com/malikwirin"
+        "blog": "https://github.com/malikwirin",
+        "bio": "Sovereign Programmer"
     },
     "emmanuel-ferdman": {
         "name": "Emmanuel Ferdman",
