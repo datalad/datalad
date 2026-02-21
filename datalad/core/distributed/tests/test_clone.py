@@ -81,6 +81,7 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
+    xfail_annex_ignore_not_respected_for_local,
     xfail_buggy_annex_info,
 )
 from datalad.utils import (
@@ -1251,6 +1252,7 @@ def test_no_ria_postclonecfg(dspath=None, storepath=None, clonepath=None):
 
 # fatal: Could not read from remote repository.
 @known_failure_githubci_win  # in datalad/git-annex as e.g. of 20201218
+@xfail_annex_ignore_not_respected_for_local
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
