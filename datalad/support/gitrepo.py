@@ -1731,7 +1731,7 @@ class GitRepo(CoreGitRepo):
             if exc.code == 1 and not (exc.stdout or exc.stderr):
                 # No merge base was found (unrelated commits).
                 return None
-            if "fatal: Not a valid object name" in exc.stderr:
+            if "not a valid object name" in exc.stderr.lower():
                 return None
             raise
 
@@ -2904,7 +2904,7 @@ class GitRepo(CoreGitRepo):
                 expect_fail=True,
                 read_only=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in exc.stderr:
+            if "not a valid object name" in exc.stderr.lower():
                 raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
