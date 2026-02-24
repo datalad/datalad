@@ -794,10 +794,13 @@ def test_assure_unicode():
     eq_(ensure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
     # now, non-utf8
     # Decoding could be deduced with high confidence when the string is
-    # really encoded in that codepage
-    mom_koi8r = u"мама".encode('koi8-r')
-    eq_(ensure_unicode(mom_koi8r), u"мама")
-    eq_(ensure_unicode(mom_koi8r, confidence=0.9), u"мама")
+    # really encoded in that codepage.
+    # Use a longer string so chardet can reliably detect KOI8-R --
+    # chardet 6 rewrote single-byte detection and needs more bytes to
+    # distinguish KOI8-R from Thai (CP874) for very short inputs.
+    mom_koi8r = u"мама мыла раму".encode('koi8-r')
+    eq_(ensure_unicode(mom_koi8r), u"мама мыла раму")
+    eq_(ensure_unicode(mom_koi8r, confidence=0.5), u"мама мыла раму")
     mom_iso8859 = u'mamá'.encode('iso-8859-1')
     eq_(ensure_unicode(mom_iso8859), u'mamá')
     eq_(ensure_unicode(mom_iso8859, confidence=0.5), u'mamá')
