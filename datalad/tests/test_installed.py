@@ -42,6 +42,12 @@ def check_run_and_get_output(cmd):
 def test_run_datalad_help():
     out, err = check_run_and_get_output("datalad --help")
     ok_startswith(out, "Usage: ")
-    # There could be a warning from coverage that no data was collected, should be benign
-    lines = [l for l in err.split(os.linesep) if ('no-data-collected' not in l) and l]
+    # There could be a warning from coverage that no data was collected, should be benign.
+    # RequestsDependencyWarning can appear when requests doesn't recognize
+    # the installed chardet version (e.g. chardet 6.x with older requests).
+    lines = [l for l in err.split(os.linesep)
+             if ('no-data-collected' not in l)
+             and ('RequestsDependencyWarning' not in l)
+             and ('warnings.warn(' not in l)
+             and l]
     eq_(lines, [])
