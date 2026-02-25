@@ -887,6 +887,24 @@ def ensure_bytes(s: str | bytes, encoding: str='utf-8') -> bytes:
     return s.encode(encoding)
 
 
+def _chardet_detect(s: bytes) -> dict:
+    """Wrapper around chardet.detect with encoding_era=ALL for chardet >= 6.
+
+    chardet 6 defaults to encoding_era=MODERN_WEB which excludes legacy
+    encodings like KOI8-R.  We need to consider ALL eras for backward
+    compatibility.
+
+    TODO: remove version check once chardet >= 6 is required.
+    """
+    from chardet import detect
+
+    from datalad.support.external_versions import external_versions
+    if external_versions['chardet'] >= '6':
+        from chardet.enums import EncodingEra
+        return detect(s, encoding_era=EncodingEra.ALL)
+    return detect(s)
+
+
 def ensure_unicode(s: str | bytes, encoding: Optional[str]=None, confidence: Optional[float]=None) -> str:
     """Convert/decode bytestring to unicode.
 
@@ -912,8 +930,7 @@ def ensure_unicode(s: str | bytes, encoding: Optional[str]=None, confidence: Opt
             lgr.debug("Failed to decode a string as utf-8: %s",
                       CapturedException(exc))
         # And now we could try to guess
-        from chardet import detect
-        enc = detect(s)
+        enc = _chardet_detect(s)
         denc = enc.get('encoding', None)
         if denc:
             denc_confidence = enc.get('confidence', 0)
@@ -2255,12 +2272,10 @@ def open_r_encdetect(fname: str | Path, readahead: int=1000) -> IO[str]:
     """
     import io
 
-    from chardet import detect
-
     # read some bytes from the file
     with open(fname, 'rb') as f:
         head = f.read(readahead)
-    enc = detect(head)
+    enc = _chardet_detect(head)
     denc = enc.get('encoding', None)
     lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
               denc,
