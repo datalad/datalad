@@ -75,6 +75,7 @@ from datalad.consts import (
     RESERVED_NAMES_WIN,
 )
 from datalad.core.local.repo import repo_from_path
+from datalad.dochelpers import single_or_plural
 from datalad.dataset.gitrepo import GitRepo as CoreGitRepo
 from datalad.dataset.gitrepo import (
     _get_dot_git,
@@ -124,6 +125,7 @@ from .network import (
     PathRI,
     is_ssh,
 )
+from .openfiles import get_files_open_for_writing
 from .path import (
     get_filtered_paths_,
     get_parent_paths,
@@ -3587,6 +3589,10 @@ class GitRepo(CoreGitRepo):
             compat_config = \
                 self.config.obtain("datalad.save.windows-compat-warning")
             to_add, problems = self._check_for_win_compat(to_add, compat_config)
+            openfiles_config = \
+                self.config.obtain("datalad.save.skip-openfiles")
+            to_add, openfile_problems = \
+                self._check_for_openfiles(to_add, openfiles_config)
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
@@ -3611,6 +3617,18 @@ class GitRepo(CoreGitRepo):
                         path=(self.pathobj / ut.PurePosixPath(path)),
                         status='impossible',
                         message=msg,
+                        logger=lgr)
+            if openfile_problems:
+                for path in openfile_problems:
+                    yield get_status_dict(
+                        action='save',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(path)),
+                        status='impossible',
+                        message='File is open for writing by another '
+                                'process; disable with '
+                                'datalad.save.skip-openfiles.',
                         logger=lgr)
 
 
@@ -3699,6 +3717,84 @@ class GitRepo(CoreGitRepo):
 
         else:
             raise ValueError(f"Invalid 'config' value {config!r}")
+
+    def _check_for_openfiles(
+        self,
+        files: dict[str, Any],
+        config: str,
+    ) -> tuple[dict[str, Any], list[str] | None]:
+        """Filter *files* that are open for writing by another process.
+
+        Parameters
+        ----------
+        files
+            ``{relative_posix_path: props}`` as used by ``save_()``.
+        config
+            One of ``'none'``, ``'skip'``, ``'warning'``, ``'error'``.
+
+        Returns
+        -------
+        (files, problems)
+            *files* with open entries removed (for ``'skip'``/``'error'``),
+            and *problems* – a list of open paths (removed from the list)
+            or ``None``.
+        """
+        if config == 'none':
+            return files, None
+
+        abs_paths = [str(self.pathobj / ut.PurePosixPath(p)) for p in files]
+        open_map = get_files_open_for_writing(abs_paths)
+        if not open_map:
+            return files, None
+
+        # Map absolute paths back to relative keys
+        abs_to_rel: dict[str, str] = {
+            str(self.pathobj / ut.PurePosixPath(p)): p for p in files
+        }
+        open_rel: dict[str, list] = {}
+        for abs_path, openers in open_map.items():
+            rel = abs_to_rel.get(abs_path)
+            if rel is not None:
+                open_rel[rel] = openers
+
+        if not open_rel:
+            return files, None
+
+        n_open = len(open_rel)
+        _max_show = 10
+        items = [
+            f'{p} (PIDs: {", ".join(str(o["pid"]) for o in v)})'
+            for p, v in list(open_rel.items())[:_max_show]
+        ]
+        detail = ', '.join(items)
+        if n_open > _max_show:
+            detail += f', ... and {n_open - _max_show} more'
+
+        n_files = single_or_plural('file', 'files', n_open, include_count=True)
+
+        if config == 'warning':
+            lgr.warning(
+                '%s open for writing by other processes, '
+                'saving anyway: %s', n_files, detail)
+            return files, None
+
+        elif config == 'skip':
+            lgr.debug(
+                'Skipping %s open for writing: %s', n_files, detail)
+            for p in open_rel:
+                files.pop(p, None)
+            return files, None
+
+        elif config == 'error':
+            lgr.debug(
+                'Excluding %s open for writing: %s', n_files, detail)
+            for p in open_rel:
+                files.pop(p, None)
+            return files, list(open_rel)
+
+        else:
+            raise ValueError(
+                f"Invalid 'config' value {config!r}")
 
     def _save_add(self, files: dict[str, Any], git_opts: Optional[list[str]] = None) -> Iterator[dict]:
         """Simple helper to add files in save()"""
