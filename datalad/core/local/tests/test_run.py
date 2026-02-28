@@ -705,7 +705,7 @@ def test_dry_run(path=None):
 
     with swallow_outputs() as cmo:
         ds.run("blah {inputs} {outputs}", dry_run="basic",
-               inputs=["fo*"], outputs=["b*r"])
+               inputs=["fo*"], outputs=["b*r"])  # codespell:ignore fo
         assert_in(
             'blah "foo" "bar"' if on_windows else "blah foo bar",
             cmo.out)

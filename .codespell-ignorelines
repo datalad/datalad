@@ -1,2 +1,0 @@
-                %%NAME\tthe name of the dataset, where slashes are replaced by
-               inputs=["fo*"], outputs=["b*r"])
