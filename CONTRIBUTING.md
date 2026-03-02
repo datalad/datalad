@@ -2,6 +2,27 @@
 
 [gh-datalad]: http://github.com/datalad/datalad
 
+## Quick Reference
+
+Common commands for development:
+
+```sh
+# Install
+pip install -e .              # minimal install
+pip install -e '.[tests]'     # with test dependencies
+pip install -e '.[devel]'     # full development install
+
+# Test
+pytest datalad                                              # all tests
+pytest datalad/path/to/test.py::TestClass::test_function -v # single test
+pytest --cov=datalad path/to/tests                          # with coverage
+
+# Lint & type check
+tox -e lint                   # codespell + pylint
+tox -e typing                 # mypy
+make code-analysis            # flake8 + pylint
+```
+
 ## Files organization
 
 - [datalad/](./datalad) is the main Python module where major development is happening,
@@ -128,7 +149,7 @@ particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
-We support Python 3 only (>= 3.9).
+We support Python 3 only (>= 3.10).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -230,6 +251,16 @@ and if conflicts occur, provide short summary on how they were resolved
 in "Conflicts" listing within the merge commit
 (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
 
+
+## Code Style
+
+- **Max line length**: 120 characters (configured in `tox.ini` `[flake8]` section)
+- **Imports**: place at the top of the file; only use local/inline imports
+  when needed for efficiency (heavy optional deps) or to break circular dependencies
+- **External version checks**: use `external_versions` from
+  `datalad.support.external_versions`; never parse version strings manually
+  (e.g. `external_versions['chardet'] >= '6'`)
+- **Error handling**: use appropriate exception types; capture in test fixtures
 
 ## Quality Assurance
 
