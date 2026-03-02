@@ -27,18 +27,20 @@ make code-analysis            # flake8 + pylint
 
 - [datalad/](./datalad) is the main Python module where major development is happening,
   with major submodules being:
-    - `cmdline/` - helpers for accessing `interface/` functionality from
-     command line
+    - `cli/` - command line interface implementation (replaces deprecated `cmdline/`)
     - `customremotes/` - custom special remotes for annex provided by datalad
+    - `distributed/` - distributed operations, including ORA remote and
+      create-sibling commands
     - `downloaders/` - support for accessing data from various sources (e.g.
       http, S3, XNAT) via a unified interface.
         - `configs/` - specifications for known data providers and associated
           credentials
     - `interface/` - high level interface functions which get exposed via
-      command line (`cmdline/`) or Python (`datalad.api`).
+      command line (`cli/`) or Python (`datalad.api`).
+    - `runner/` - sub-process execution and IO
     - `tests/` - some unit- and regression- tests (more could be found under
       `tests/` of corresponding submodules. See [Tests](#tests))
-        - [utils.py](./datalad/tests/utils.py) provides convenience helpers used by unit-tests such as
+        - [utils_pytest.py](./datalad/tests/utils_pytest.py) provides convenience helpers used by unit-tests such as
           `@with_tree`, `@serve_path_via_http` and other decorators
     - `ui/` - user-level interactions, such as messages about errors, warnings,
       progress reports, AND when supported by available frontend --
@@ -125,11 +127,13 @@ we outline the workflow used by the developers:
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
    `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
-   also use `TST` for commits concerned solely with tests, and `BK` to signal
+   also use `TST` for commits concerned solely with tests, `CI` for CI/infrastructure
+   changes, `UX` for user experience improvements, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
-   entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
-   examples.  If a commit closes an existing DataLad issue, then add to the end
-   of the message `(Closes #ISSUE_NUMER)`
+   entries could be listed joined with a `+` (e.g. `RF+DOC`), and a scope can be
+   added in parentheses (e.g. `BF(TST):` for bug fixes in tests, `BF(CI):` for
+   CI fixes).  See `git log` for examples.  If a commit closes an existing DataLad
+   issue, then add to the end of the message `(Closes #ISSUE_NUMBER)`
 
 5. Push to GitHub with:
 
@@ -140,6 +144,12 @@ we outline the workflow used by the developers:
    will send an email to the committers.  You can commit new changes to this branch
    and keep pushing to your remote -- github automagically adds them to your
    previously opened PR.
+
+   PRs should be labeled with a `semver-*` label (e.g. `semver-patch`,
+   `semver-minor`) to indicate the type of version bump. Adding the
+   `CHANGELOG-missing` label triggers automatic generation of a changelog
+   snippet under `changelog.d/`.  See [CHANGELOG entries](#changelog-entries-and-labelling-pull-requests)
+   for details.
 
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
@@ -283,33 +293,20 @@ Further hands-on advice is detailed below.
 more tests are provided under corresponding submodules in `tests/`
 subdirectories to simplify re-running the tests concerning that portion
 of the codebase.  To execute many tests, the codebase first needs to be
-"installed" in order to generate scripts for the entry points.  For
-that, the recommended course of action is to use `virtualenv`, e.g.
+"installed" in order to generate scripts for the entry points:
 
 ```sh
-virtualenv --system-site-packages venv-tests
-source venv-tests/bin/activate
-pip install -r requirements.txt
-python setup.py develop
-```
-
-and then use that virtual environment to run the tests, via
-
-```sh
+pip install -e '.[tests]'
 pytest datalad
 ```
 
-then to later deactivate the virtualenv just simply enter
+See [Quick Reference](#quick-reference) for more test commands.
 
-```sh
-deactivate
-```
-
-Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
+Alternatively, or complementary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
 Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
-be used to establish a clean docker environment (based on any NtesteuroDebian-supported
+be used to establish a clean docker environment (based on any NeuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
 ### CI setup
@@ -327,13 +324,25 @@ You can also check for common programming errors with the following tools:
 
 - Code with good unittest coverage (at least 80%), check with:
 
-          pip install pytest coverage
           pytest --cov=datalad path/to/tests_for_package
 
-- We rely on https://codecov.io to provide convenient view of code coverage.
-  Installation of the codecov extension for Firefox/Iceweasel or Chromium
-  is strongly advised, since it provides coverage annotation of pull
-  requests.
+- We rely on https://codecov.io to provide convenient view of code coverage,
+  which annotates pull requests on GitHub with coverage changes.
+
+### Pre-commit hooks
+
+The project uses [pre-commit](https://pre-commit.com/) hooks configured in
+`.pre-commit-config.yaml`.  To enable them locally:
+
+```sh
+pip install pre-commit
+pre-commit install
+```
+
+The hooks automatically run on each commit and currently enforce:
+- **isort** — import sorting
+- **codespell** — spell checking
+- **trailing-whitespace** and **end-of-file** fixes
 
 ### Linting
 
@@ -345,27 +354,14 @@ base.
 
 *Sidenote*: watch [Raymond Hettinger - Beyond PEP 8][beyond-pep8]
 
-- No pyflakes warnings, check with:
+Run linting and type checking via tox:
 
-           pip install pyflakes
-           pyflakes path/to/module.py
+```sh
+tox -e lint     # codespell + pylint
+tox -e typing   # mypy on typed modules
+```
 
-- No PEP8 warnings, check with:
-
-           pip install pep8
-           pep8 path/to/module.py
-
-- AutoPEP8 can help you fix some of the easy redundant errors:
-
-           pip install autopep8
-           autopep8 path/to/pep8.py
-
-Also, some team developers use
-[PyCharm community edition](https://www.jetbrains.com/pycharm) which
-provides built-in PEP8 checker and handy tools such as smart
-splits/joins making it easier to maintain code following the PEP8
-recommendations.  NeuroDebian provides `pycharm-community-sloppy`
-package to ease pycharm installation even further.
+or use `make code-analysis` for flake8 + pylint.
 
 ### Benchmarking
 
@@ -566,7 +562,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables
-  like we do in one of the travis runs
+  like we do in some of the CI runs
 - *DATALAD_TESTS_TEMP_KEEP*:
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
 - *DATALAD_TESTS_TEMP_DIR*:
@@ -604,7 +600,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_TESTS_TEMP_FSSIZE*:
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
-  Specifies network interfaces to bring down/up for testing. Currently used by travis.
+  Specifies network interfaces to bring down/up for testing.
 - *DATALAD_TESTS_KNOWNFAILURES_PROBE*:
   Binary flag to test whether "known failures" still actually are failures. That
   is - change behavior of tests, that decorated with any of the `known_failure`,
