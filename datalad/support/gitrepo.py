@@ -3627,8 +3627,9 @@ class GitRepo(CoreGitRepo):
                         path=(self.pathobj / ut.PurePosixPath(path)),
                         status='impossible',
                         message='File is open for writing by another '
-                                'process; disable with '
-                                'datalad.save.skip-openfiles.',
+                                'process; set '
+                                'datalad.save.skip-openfiles=none '
+                                'to disable this check.',
                         logger=lgr)
 
 
