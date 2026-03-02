@@ -32,6 +32,7 @@ from datalad.interface.common_opts import (
     contains,
     dataset_state,
     fulfilled,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -45,6 +46,10 @@ from datalad.support.constraints import (
 from datalad.support.exceptions import (
     CapturedException,
     CommandError,
+)
+from datalad.support.filter import (
+    match_filters,
+    parse_filter_spec,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
@@ -165,6 +170,7 @@ class Subdatasets(Interface):
         fulfilled=fulfilled,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         contains=contains,
         bottomup=Parameter(
             args=("--bottomup",),
@@ -211,6 +217,7 @@ class Subdatasets(Interface):
             fulfilled=NoneDeprecated,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             contains=None,
             bottomup=False,
             set_property=None,
@@ -268,9 +275,12 @@ class Subdatasets(Interface):
             expanded_contains = [[c] + list(c.parents) for c in contains]
         else:
             expanded_contains = []
+        parsed_filters = [parse_filter_spec(f)
+                          for f in (recursion_filter or [])]
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
+                parsed_filters,
                 expanded_contains, bottomup, set_property, delete_property,
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
@@ -306,8 +316,8 @@ class Subdatasets(Interface):
 # internal helper that needs all switches, simply to avoid going through
 # the main command interface with all its decorators again
 def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
-                    contains, bottomup, set_property, delete_property,
-                    refds_path):
+                    parsed_filters, contains, bottomup, set_property,
+                    delete_property, refds_path):
     lookup_cache = {}
     # it should be OK to skip the extra check, because _parse_git_submodules()
     # we specifically look for .gitmodules and the rest of the function
@@ -333,6 +343,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         else:
             assert 'state' not in sm
             sm['state'] = 'present'
+        # apply recursion filter
+        if parsed_filters and not match_filters(sm, parsed_filters):
+            continue
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \
@@ -437,6 +450,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     (recursion_limit - 1)
                     if isinstance(recursion_limit, int)
                     else recursion_limit,
+                    parsed_filters,
                     contains,
                     bottomup,
                     set_property,

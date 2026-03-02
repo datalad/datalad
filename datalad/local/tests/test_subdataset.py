@@ -15,6 +15,8 @@ from os.path import (
     relpath,
 )
 
+import pytest
+
 from datalad.api import (
     clone,
     create,
@@ -360,3 +362,161 @@ def test_name_starts_with_hyphen(origpath=None, path=None):
         ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
 
     assert_repo_status(ds.path)
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_subdatasets_r_filter_by_property(path=None):
+    """Test --r-filter with custom .gitmodules properties"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    sub3 = ds.create('sub3')
+    # set custom properties on sub1 and sub2
+    ds.subdatasets(set_property=[('mytag', 'core')], path='sub1')
+    ds.subdatasets(set_property=[('mytag', 'extra')], path='sub2')
+    # sub3 has no mytag
+
+    # filter for mytag=core
+    res = ds.subdatasets(recursion_filter=['mytag=core'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1'])
+
+    # filter for mytag!=core -> sub2 (sub3 has no mytag so doesn't match !=)
+    res = ds.subdatasets(recursion_filter=['mytag!=core'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub2'])
+
+    # filter for mytag? (exists)
+    res = ds.subdatasets(recursion_filter=['mytag?'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1', 'sub2'])
+
+    # filter for mytag!? (not exists)
+    res = ds.subdatasets(recursion_filter=['mytag!?'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub3'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_subdatasets_r_filter_by_state(path=None):
+    """Test --r-filter with .state internal property"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    assert_repo_status(ds.path)
+
+    # both present
+    res = ds.subdatasets(recursion_filter=['.state=present'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1', 'sub2'])
+
+    res = ds.subdatasets(recursion_filter=['.state=absent'],
+                         result_xfm='relpaths')
+    eq_(res, [])
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_subdatasets_r_filter_url_regex(path=None):
+    """Test --r-filter with regex on URL"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+
+    # Get the URLs
+    all_subs = ds.subdatasets()
+    # Both have local URLs; test regex on url
+    # filter for url matching 'sub1'
+    res = ds.subdatasets(recursion_filter=['url~=sub1'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1'])
+
+    # filter for url NOT matching 'sub1'
+    res = ds.subdatasets(recursion_filter=['url!~sub1'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub2'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_subdatasets_r_filter_multiple_and(path=None):
+    """Test that multiple --r-filter expressions are ANDed"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub2')
+    ds.subdatasets(set_property=[('priority', 'high')], path='sub1')
+    ds.subdatasets(set_property=[('priority', 'low')], path='sub2')
+
+    # both have group=core
+    res = ds.subdatasets(recursion_filter=['group=core'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1', 'sub2'])
+
+    # AND with priority=high -> only sub1
+    res = ds.subdatasets(recursion_filter=['group=core', 'priority=high'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_subdatasets_r_filter_recursive(path=None):
+    """Test --r-filter works recursively into nested subdatasets"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    subsub = sub1.create('subsub')
+    ds.save(recursive=True)
+
+    # Set tag=include on sub1 and subsub, but not sub2
+    ds.subdatasets(set_property=[('tag', 'include')], path='sub1')
+    sub1.subdatasets(set_property=[('tag', 'include')], path='subsub')
+    sub1.save()
+    ds.save()
+
+    # recursive query with tag=include should get sub1 and subsub
+    # (sub2 is skipped, and sub1 matches so recursion enters it)
+    res = ds.subdatasets(recursive=True,
+                         recursion_filter=['tag=include'],
+                         result_xfm='relpaths')
+    eq_(res, ['sub1', _p('sub1/subsub')])
+
+    # filter that only matches top-level sub1: subsub is also visited
+    # because sub1 passes, but subsub also needs to match to be reported.
+    # Set a different property on sub1 only
+    ds.subdatasets(set_property=[('level', 'top')], path='sub1')
+    ds.save()
+
+    res = ds.subdatasets(recursive=True,
+                         recursion_filter=['level=top'],
+                         result_xfm='relpaths')
+    # sub1 matches, sub2 doesn't. sub1/subsub also doesn't have level=top.
+    eq_(res, ['sub1'])
+
+    # If parent is filtered out, we never recurse into its children
+    ds.subdatasets(set_property=[('tag', 'exclude')], path='sub1')
+    ds.save()
+
+    res = ds.subdatasets(recursive=True,
+                         recursion_filter=['tag=exclude'],
+                         result_xfm='relpaths')
+    # sub1 matches; subsub has tag=include, not tag=exclude
+    eq_(res, ['sub1'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_subdatasets_r_filter_no_filter(path=None):
+    """Passing no filter should return everything (same as without param)"""
+    ds = Dataset(path).create()
+    ds.create('sub1')
+    ds.create('sub2')
+
+    all_subs = ds.subdatasets(result_xfm='relpaths')
+    filtered_subs = ds.subdatasets(recursion_filter=None,
+                                   result_xfm='relpaths')
+    eq_(all_subs, filtered_subs)

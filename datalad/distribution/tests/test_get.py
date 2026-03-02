@@ -876,3 +876,60 @@ def test_get_non_existing(origin_path=None, clone_path=None):
 
     assert_result_count(res, 1, status="impossible",
                         message="path does not exist")
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_get_r_filter(path=None):
+    """Test that get -r --r-filter filters which subdatasets get installed"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    sub3 = ds.create('sub3')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    ds.subdatasets(set_property=[('group', 'extra')], path='sub2')
+    # sub3 has no group property
+    ds.save(recursive=True)
+    assert_repo_status(ds.path)
+
+    # Clone to get a fresh start with absent subdatasets
+    clonepath = path + '-clone'
+    ds_clone = clone(source=path, path=clonepath)
+    # all subdatasets should be absent
+    eq_(sorted(ds_clone.subdatasets(state='absent', result_xfm='relpaths')),
+        ['sub1', 'sub2', 'sub3'])
+
+    # get with filter to only get group=core
+    ds_clone.get('.', recursive=True, get_data=False,
+                 recursion_filter=['group=core'],
+                 result_renderer='disabled', on_failure='ignore')
+
+    # sub1 should be installed (group=core), sub2 and sub3 should not
+    eq_(ds_clone.subdatasets(state='present', result_xfm='relpaths'),
+        ['sub1'])
+    eq_(sorted(ds_clone.subdatasets(state='absent', result_xfm='relpaths')),
+        ['sub2', 'sub3'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_get_r_filter_url_regex(path=None):
+    """Test that get --r-filter with url regex works"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.save(recursive=True)
+    assert_repo_status(ds.path)
+
+    clonepath = path + '-clone'
+    ds_clone = clone(source=path, path=clonepath)
+
+    # get only subdatasets whose url contains 'sub1'
+    ds_clone.get('.', recursive=True, get_data=False,
+                 recursion_filter=['url~=sub1'],
+                 result_renderer='disabled', on_failure='ignore')
+
+    eq_(ds_clone.subdatasets(state='present', result_xfm='relpaths'),
+        ['sub1'])
+    eq_(ds_clone.subdatasets(state='absent', result_xfm='relpaths'),
+        ['sub2'])
