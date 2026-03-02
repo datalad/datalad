@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -91,9 +92,11 @@ def get_files_open_for_writing(
     # Only inspect processes owned by the current user — other users'
     # processes would raise AccessDenied anyway and cannot conflict
     # with our git operations.
-    my_uid = os.getuid()
+    my_uid = os.getuid() if hasattr(os, 'getuid') else None
     n_procs = 0
     n_skipped_uid = 0
+    # Cache lsof results per-pid so we call it at most once per process
+    _lsof_cache: dict[int, set[str] | None] = {}
 
     for proc in psutil.process_iter(['pid', 'uids']):
         try:
@@ -104,7 +107,7 @@ def get_files_open_for_writing(
         if pid in exclude_pids:
             continue
         # Skip processes owned by other users
-        if proc_uids is not None and proc_uids.real != my_uid:
+        if my_uid is not None and proc_uids is not None and proc_uids.real != my_uid:
             n_skipped_uid += 1
             continue
         n_procs += 1
@@ -118,12 +121,25 @@ def get_files_open_for_writing(
         for f in open_files:
             if f.path not in target_paths:
                 continue
-            mode = getattr(f, 'mode', '')
             if lgr.isEnabledFor(logging.DEBUG):
                 _proc_info = _describe_process(proc)
                 lgr.debug("Target file %s open by %s mode=%r fd=%s",
-                          f.path, _proc_info, mode, getattr(f, 'fd', '?'))
-            if mode and any(c in mode for c in ('w', 'a', '+')):
+                          f.path, _proc_info,
+                          getattr(f, 'mode', ''),
+                          getattr(f, 'fd', '?'))
+            is_write = _is_write_mode(f)
+            if is_write is None:
+                # mode/flags unavailable (e.g. macOS) — fall back to lsof
+                if pid not in _lsof_cache:
+                    _lsof_cache[pid] = _lsof_get_write_files(pid)
+                lsof_writes = _lsof_cache[pid]
+                if lsof_writes is not None:
+                    is_write = f.path in lsof_writes
+                else:
+                    lgr.log(5, "Cannot determine open mode for %s "
+                               "(pid=%d), skipping", f.path, pid)
+                    continue
+            if is_write:
                 orig = resolved_to_orig.get(f.path, f.path)
                 result.setdefault(orig, []).append(
                     {'pid': pid,
@@ -139,6 +155,46 @@ def get_files_open_for_writing(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _is_write_mode(f) -> bool | None:
+    """Check whether open-file handle *f* is opened for writing.
+
+    Returns ``True``/``False`` when determinable, ``None`` when neither
+    *mode* nor *flags* are available (e.g. macOS with older psutil).
+    """
+    mode = getattr(f, 'mode', '')
+    if mode:
+        return any(c in mode for c in ('w', 'a', '+'))
+    flags = getattr(f, 'flags', None)
+    if flags is not None:
+        return bool(flags & (os.O_WRONLY | os.O_RDWR))
+    return None
+
+
+def _lsof_get_write_files(pid: int) -> set[str] | None:
+    """Return resolved paths open for writing by *pid*, via ``lsof``.
+
+    Falls back to ``lsof`` on platforms where *psutil* does not expose
+    the file-open mode (notably macOS).  Returns ``None`` when ``lsof``
+    is unavailable or fails.
+    """
+    try:
+        out = subprocess.check_output(
+            ['lsof', '-p', str(pid), '-F', 'afn'],
+            text=True, timeout=10, stderr=subprocess.DEVNULL)
+    except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
+        lgr.log(5, "lsof fallback failed for pid %d: %s", pid, exc)
+        return None
+
+    write_files: set[str] = set()
+    current_access: str | None = None
+    for line in out.splitlines():
+        if line.startswith('a'):
+            current_access = line[1:]  # 'r', 'w', or 'u' (read-write)
+        elif line.startswith('n') and current_access in ('w', 'u'):
+            write_files.add(line[1:])
+    return write_files
+
 
 def _describe_process(proc: psutil.Process) -> str:
     """Return a short description of *proc* for log messages."""
