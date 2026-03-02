@@ -1,23 +1,46 @@
 # Contributing to DataLad
 
-[gh-datalad]: http://github.com/datalad/datalad
+[gh-datalad]: https://github.com/datalad/datalad
+
+## Quick Reference
+
+Common commands for development:
+
+```sh
+# Install
+pip install -e .              # minimal install
+pip install -e '.[tests]'     # with test dependencies
+pip install -e '.[devel]'     # full development install
+
+# Test
+pytest datalad                                              # all tests
+pytest datalad/path/to/test.py::TestClass::test_function -v # single test
+pytest --cov=datalad path/to/tests                          # with coverage
+
+# Lint & type check
+tox -e lint                   # codespell + pylint
+tox -e typing                 # mypy
+make code-analysis            # flake8 + pylint
+```
 
 ## Files organization
 
 - [datalad/](./datalad) is the main Python module where major development is happening,
   with major submodules being:
-    - `cmdline/` - helpers for accessing `interface/` functionality from
-     command line
+    - `cli/` - command line interface implementation (replaces deprecated `cmdline/`)
     - `customremotes/` - custom special remotes for annex provided by datalad
+    - `distributed/` - distributed operations, including ORA remote and
+      create-sibling commands
     - `downloaders/` - support for accessing data from various sources (e.g.
       http, S3, XNAT) via a unified interface.
         - `configs/` - specifications for known data providers and associated
           credentials
     - `interface/` - high level interface functions which get exposed via
-      command line (`cmdline/`) or Python (`datalad.api`).
+      command line (`cli/`) or Python (`datalad.api`).
+    - `runner/` - sub-process execution and IO
     - `tests/` - some unit- and regression- tests (more could be found under
       `tests/` of corresponding submodules. See [Tests](#tests))
-        - [utils.py](./datalad/tests/utils.py) provides convenience helpers used by unit-tests such as
+        - [utils_pytest.py](./datalad/tests/utils_pytest.py) provides convenience helpers used by unit-tests such as
           `@with_tree`, `@serve_path_via_http` and other decorators
     - `ui/` - user-level interactions, such as messages about errors, warnings,
       progress reports, AND when supported by available frontend --
@@ -104,11 +127,13 @@ we outline the workflow used by the developers:
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
    `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
-   also use `TST` for commits concerned solely with tests, and `BK` to signal
+   also use `TST` for commits concerned solely with tests, `CI` for CI/infrastructure
+   changes, `UX` for user experience improvements, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
-   entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
-   examples.  If a commit closes an existing DataLad issue, then add to the end
-   of the message `(Closes #ISSUE_NUMER)`
+   entries could be listed joined with a `+` (e.g. `RF+DOC`), and a scope can be
+   added in parentheses (e.g. `BF(TST):` for bug fixes in tests, `BF(CI):` for
+   CI fixes).  See `git log` for examples.  If a commit closes an existing DataLad
+   issue, then add to the end of the message `(Closes #ISSUE_NUMBER)`
 
 5. Push to GitHub with:
 
@@ -120,101 +145,55 @@ we outline the workflow used by the developers:
    and keep pushing to your remote -- github automagically adds them to your
    previously opened PR.
 
+   PRs should be labeled with a `semver-*` label (e.g. `semver-patch`,
+   `semver-minor`) to indicate the type of version bump. Adding the
+   `CHANGELOG-missing` label triggers automatic generation of a changelog
+   snippet under `changelog.d/`.  See [CHANGELOG entries](#changelog-entries-and-labelling-pull-requests)
+   for details.
+
 (If any of the above seems like magic to you, then look up the
-[Git documentation](http://git-scm.com/documentation) on the web.)
-Our [Design Docs](http://docs.datalad.org/en/stable/design/index.html) provide a
+[Git documentation](https://git-scm.com/documentation) on the web.)
+Our [Design Docs](https://docs.datalad.org/en/stable/design/index.html) provide a
 growing collection of insights on the command API principles and the design of
 particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
-We support Python 3 only (>= 3.9).
+We support Python 3 only (>= 3.10).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
-about installation of datalad itself.
-On Debian-based systems we recommend to enable [NeuroDebian](http://neuro.debian.net)
-since we use it to provide backports of recent fixed external modules we depend upon:
+about installation of datalad itself.  The recommended setup:
 
 ```sh
-apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python3-scrapy python3-{argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
+# Install uv (fast Python package manager) if you don't have it
+pip install uv
+
+# Create a virtualenv and install for development
+uv venv
+source .venv/bin/activate
+uv pip install -e '.[devel]'
 ```
 
-and additionally, for development we suggest to use tox and new
-versions of dependencies from pypy:
+You will need a recent [git-annex](https://git-annex.branchable.com/).
+It can be installed directly from PyPI via pip (`pip install git-annex`) or potentially via `datalad-installer`
+(e.g. `pip install datalad-installer && datalad-installer git-annex`),
+via [NeuroDebian](https://neuro.debian.net) on Debian/Ubuntu (`apt-get install git-annex-standalone`),
+or via your OS package manager.
+
+For running tests with `tox`, using `tox-uv` is encouraged for faster environment creation:
 
 ```sh
-apt-get install -y -q python3-{dev,httpretty,pytest,pip,vcr,virtualenv} python3-tox
-# Some libraries which might be needed for installing via pip
-apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
+uv pip install tox tox-uv
+tox -e py3
 ```
 
-some of which you could also install from PyPi using pip  (prior installation of those libraries listed above
-might be necessary)
+### Contributor files
 
-```sh
-pip install -r requirements-devel.txt
-```
-
-and you will need to install recent git-annex using appropriate for your
-OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
-
-Contributor Files History
--------------------------
-
-The original repository provided a [.zenodo.json](.zenodo.json)
-file, and we generate a [.contributors file](.all-contributorsrc) from that via:
-
-```bash
-pip install tributors
-tributors --version
-0.0.18
-```
-
-It helps to have a GitHub token to increase API limits:
-
-```bash
-export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment).
-Then update zenodo:
-
-```bash
-tributors update  zenodo
-INFO:    zenodo:Updating .zenodo.json
-INFO:    zenodo:Updating .tributors cache from .zenodo.json
-WARNING:tributors:zenodo does not support updating from names.
-```
-
-In the case that there is more than one orcid found for a user, you will be given a list
-to check. Others will be updated in the file. You can then curate the file as you see fit.
-We next want to add the .allcontributors file:
-
-```bash
-$ tributors init allcontrib
-INFO:allcontrib:Generating .all-contributorsrc for datalad/datalad
-$ tributors update allcontrib
-INFO:allcontrib:Updating .all-contributorsrc
-INFO:allcontrib:Updating .tributors cache from .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor glalteva in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor adswa in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
-...
-INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
-WARNING:tributors:allcontrib does not support updating from orcids.
-WARNING:tributors:allcontrib does not support updating from email.
-```
-
-We can then populate the shared .tributors file:
-
-```bash
-$ tributors update-lookup allcontrib
-```
-
-And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
-look for new orcids as we did above.
+Contributor metadata is maintained in [.tributors](.tributors) from which 
+[.zenodo.json](.zenodo.json) and [.all-contributorsrc](.all-contributorsrc) are updated:
+[GitHub Action](.github/workflows/update-contributors.yml)
+automatically updates contributor records on merges to master.  For manual
+updates, see the [tributors documentation](https://con.github.io/tributors/).
 
 ## Additional Hints
 
@@ -231,6 +210,16 @@ in "Conflicts" listing within the merge commit
 (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
 
 
+## Code Style
+
+- **Max line length**: 120 characters (configured in `tox.ini` `[flake8]` section)
+- **Imports**: place at the top of the file; only use local/inline imports
+  when needed for efficiency (heavy optional deps) or to break circular dependencies
+- **External version checks**: use `external_versions` from
+  `datalad.support.external_versions`; never parse version strings manually
+  (e.g. `external_versions['chardet'] >= '6'`)
+- **Error handling**: use appropriate exception types; capture in test fixtures
+
 ## Quality Assurance
 
 It is recommended to check that your contribution complies with the following
@@ -243,7 +232,7 @@ rules before submitting a pull request:
 
 - New code should be accompanied by tests.
 
-The documentation contains a [Design Document specifically on running and writing tests](http://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
+The documentation contains a [Design Document specifically on running and writing tests](https://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
 Further hands-on advice is detailed below.
 
 ### Tests
@@ -252,33 +241,20 @@ Further hands-on advice is detailed below.
 more tests are provided under corresponding submodules in `tests/`
 subdirectories to simplify re-running the tests concerning that portion
 of the codebase.  To execute many tests, the codebase first needs to be
-"installed" in order to generate scripts for the entry points.  For
-that, the recommended course of action is to use `virtualenv`, e.g.
+"installed" in order to generate scripts for the entry points:
 
 ```sh
-virtualenv --system-site-packages venv-tests
-source venv-tests/bin/activate
-pip install -r requirements.txt
-python setup.py develop
-```
-
-and then use that virtual environment to run the tests, via
-
-```sh
+pip install -e '.[tests]'
 pytest datalad
 ```
 
-then to later deactivate the virtualenv just simply enter
+See [Quick Reference](#quick-reference) for more test commands.
 
-```sh
-deactivate
-```
-
-Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
+Alternatively, or complementary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
 Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
-be used to establish a clean docker environment (based on any NtesteuroDebian-supported
+be used to establish a clean docker environment (based on any NeuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
 ### CI setup
@@ -296,13 +272,25 @@ You can also check for common programming errors with the following tools:
 
 - Code with good unittest coverage (at least 80%), check with:
 
-          pip install pytest coverage
           pytest --cov=datalad path/to/tests_for_package
 
-- We rely on https://codecov.io to provide convenient view of code coverage.
-  Installation of the codecov extension for Firefox/Iceweasel or Chromium
-  is strongly advised, since it provides coverage annotation of pull
-  requests.
+- We rely on https://codecov.io to provide convenient view of code coverage,
+  which annotates pull requests on GitHub with coverage changes.
+
+### Pre-commit hooks
+
+The project uses [pre-commit](https://pre-commit.com/) hooks configured in
+`.pre-commit-config.yaml`.  To enable them locally:
+
+```sh
+pip install pre-commit
+pre-commit install
+```
+
+The hooks automatically run on each commit and currently enforce:
+- **isort** — import sorting
+- **codespell** — spell checking
+- **trailing-whitespace** and **end-of-file** fixes
 
 ### Linting
 
@@ -314,34 +302,21 @@ base.
 
 *Sidenote*: watch [Raymond Hettinger - Beyond PEP 8][beyond-pep8]
 
-- No pyflakes warnings, check with:
+Run linting and type checking via tox:
 
-           pip install pyflakes
-           pyflakes path/to/module.py
+```sh
+tox -e lint     # codespell + pylint
+tox -e typing   # mypy on typed modules
+```
 
-- No PEP8 warnings, check with:
-
-           pip install pep8
-           pep8 path/to/module.py
-
-- AutoPEP8 can help you fix some of the easy redundant errors:
-
-           pip install autopep8
-           autopep8 path/to/pep8.py
-
-Also, some team developers use
-[PyCharm community edition](https://www.jetbrains.com/pycharm) which
-provides built-in PEP8 checker and handy tools such as smart
-splits/joins making it easier to maintain code following the PEP8
-recommendations.  NeuroDebian provides `pycharm-community-sloppy`
-package to ease pycharm installation even further.
+or use `make code-analysis` for flake8 + pylint.
 
 ### Benchmarking
 
 We use [asv] to benchmark some core DataLad functionality.
 The benchmarks suite is located under [benchmarks/](./benchmarks), and
 periodically we publish results of running benchmarks on a dedicated host
-to http://datalad.github.io/datalad/ .  Those results are collected
+to https://datalad.github.io/datalad/ .  Those results are collected
 and available under the `.asv/` submodule of this repository, so to get started
 
 - `git submodule update --init .asv`
@@ -423,16 +398,16 @@ Example (replace with the benchmark of interest)
 
 #### Common options
 
-- `-E` to restrict to specific environment, e.g. `-E virtualenv:2.7`
+- `-E` to restrict to specific environment, e.g. `-E existing`
 - `-b` could be used to specify specific benchmark(s)
 - `-q` to run benchmark just once for a quick assessment (results are
   not stored since too unreliable)
 
 
-[asv compare]: http://asv.readthedocs.io/en/latest/commands.html#asv-compare
-[asv continuous]: http://asv.readthedocs.io/en/latest/commands.html#asv-continuous
+[asv compare]: https://asv.readthedocs.io/en/latest/commands.html#asv-compare
+[asv continuous]: https://asv.readthedocs.io/en/latest/commands.html#asv-continuous
 
-[asv]: http://asv.readthedocs.io
+[asv]: https://asv.readthedocs.io
 
 
 ## Easy Issues
@@ -491,20 +466,17 @@ You're awesome. :wave::smiley:
 
 ## Useful tools
 
-- While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
-  for quick logging of various health stats in a separate terminal window:
+- While performing IO/net heavy operations use [dool](https://github.com/scottchiefbaker/dool)
+  (successor to dstat) for quick logging of various health stats in a separate terminal window:
 
-        dstat -c --top-cpu -d --top-bio --top-latency --net
+        dool -c --top-cpu -d --top-bio --top-latency --net
 
-- To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+- To monitor speed of any data pipelining [pv](https://www.ivarch.com/programs/pv.shtml) is really handy,
   just plug it in the middle of your pipe.
 
 - For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
   `python -c "import epdb; epdb.connect()".`
-
-- We are using codecov which has extensions for the popular browsers
-  (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
 
 ## Useful Environment Variables
 
@@ -535,7 +507,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables
-  like we do in one of the travis runs
+  like we do in some of the CI runs
 - *DATALAD_TESTS_TEMP_KEEP*:
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
 - *DATALAD_TESTS_TEMP_DIR*:
@@ -573,7 +545,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_TESTS_TEMP_FSSIZE*:
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
-  Specifies network interfaces to bring down/up for testing. Currently used by travis.
+  Specifies network interfaces to bring down/up for testing.
 - *DATALAD_TESTS_KNOWNFAILURES_PROBE*:
   Binary flag to test whether "known failures" still actually are failures. That
   is - change behavior of tests, that decorated with any of the `known_failure`,
