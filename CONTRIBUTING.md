@@ -1,6 +1,6 @@
 # Contributing to DataLad
 
-[gh-datalad]: http://github.com/datalad/datalad
+[gh-datalad]: https://github.com/datalad/datalad
 
 ## Quick Reference
 
@@ -152,8 +152,8 @@ we outline the workflow used by the developers:
    for details.
 
 (If any of the above seems like magic to you, then look up the
-[Git documentation](http://git-scm.com/documentation) on the web.)
-Our [Design Docs](http://docs.datalad.org/en/stable/design/index.html) provide a
+[Git documentation](https://git-scm.com/documentation) on the web.)
+Our [Design Docs](https://docs.datalad.org/en/stable/design/index.html) provide a
 growing collection of insights on the command API principles and the design of
 particular subsystems in DataLad to inform standard development practice.
 
@@ -177,7 +177,7 @@ uv pip install -e '.[devel]'
 You will need a recent [git-annex](https://git-annex.branchable.com/).
 It can be installed directly from PyPI via pip (`pip install git-annex`) or potentially via `datalad-installer`
 (e.g. `pip install datalad-installer && datalad-installer git-annex`),
-via [NeuroDebian](http://neuro.debian.net) on Debian/Ubuntu (`apt-get install git-annex-standalone`),
+via [NeuroDebian](https://neuro.debian.net) on Debian/Ubuntu (`apt-get install git-annex-standalone`),
 or via your OS package manager.
 
 For running tests with `tox`, using `tox-uv` is encouraged for faster environment creation:
@@ -232,7 +232,7 @@ rules before submitting a pull request:
 
 - New code should be accompanied by tests.
 
-The documentation contains a [Design Document specifically on running and writing tests](http://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
+The documentation contains a [Design Document specifically on running and writing tests](https://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
 Further hands-on advice is detailed below.
 
 ### Tests
@@ -316,7 +316,7 @@ or use `make code-analysis` for flake8 + pylint.
 We use [asv] to benchmark some core DataLad functionality.
 The benchmarks suite is located under [benchmarks/](./benchmarks), and
 periodically we publish results of running benchmarks on a dedicated host
-to http://datalad.github.io/datalad/ .  Those results are collected
+to https://datalad.github.io/datalad/ .  Those results are collected
 and available under the `.asv/` submodule of this repository, so to get started
 
 - `git submodule update --init .asv`
@@ -398,16 +398,16 @@ Example (replace with the benchmark of interest)
 
 #### Common options
 
-- `-E` to restrict to specific environment, e.g. `-E virtualenv:2.7`
+- `-E` to restrict to specific environment, e.g. `-E existing`
 - `-b` could be used to specify specific benchmark(s)
 - `-q` to run benchmark just once for a quick assessment (results are
   not stored since too unreliable)
 
 
-[asv compare]: http://asv.readthedocs.io/en/latest/commands.html#asv-compare
-[asv continuous]: http://asv.readthedocs.io/en/latest/commands.html#asv-continuous
+[asv compare]: https://asv.readthedocs.io/en/latest/commands.html#asv-compare
+[asv continuous]: https://asv.readthedocs.io/en/latest/commands.html#asv-continuous
 
-[asv]: http://asv.readthedocs.io
+[asv]: https://asv.readthedocs.io
 
 
 ## Easy Issues
@@ -466,20 +466,17 @@ You're awesome. :wave::smiley:
 
 ## Useful tools
 
-- While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
-  for quick logging of various health stats in a separate terminal window:
+- While performing IO/net heavy operations use [dool](https://github.com/scottchiefbaker/dool)
+  (successor to dstat) for quick logging of various health stats in a separate terminal window:
 
-        dstat -c --top-cpu -d --top-bio --top-latency --net
+        dool -c --top-cpu -d --top-bio --top-latency --net
 
-- To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+- To monitor speed of any data pipelining [pv](https://www.ivarch.com/programs/pv.shtml) is really handy,
   just plug it in the middle of your pipe.
 
 - For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
   `python -c "import epdb; epdb.connect()".`
-
-- We are using codecov which has extensions for the popular browsers
-  (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
 
 ## Useful Environment Variables
 
