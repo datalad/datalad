@@ -175,7 +175,8 @@ uv pip install -e '.[devel]'
 ```
 
 You will need a recent [git-annex](https://git-annex.branchable.com/).
-It can be installed via pip (`pip install datalad-installer && datalad-installer git-annex`),
+It can be installed directly from PyPI via pip (`pip install git-annex`) or potentially via `datalad-installer`
+(e.g. `pip install datalad-installer && datalad-installer git-annex`),
 via [NeuroDebian](http://neuro.debian.net) on Debian/Ubuntu (`apt-get install git-annex-standalone`),
 or via your OS package manager.
 
@@ -188,8 +189,9 @@ tox -e py3
 
 ### Contributor files
 
-Contributor metadata is maintained in [.zenodo.json](.zenodo.json) and
-[.all-contributorsrc](.all-contributorsrc).  A [GitHub Action](.github/workflows/update-contributors.yml)
+Contributor metadata is maintained in [.tributors](.tributors) from which 
+[.zenodo.json](.zenodo.json) and [.all-contributorsrc](.all-contributorsrc) are updated:
+[GitHub Action](.github/workflows/update-contributors.yml)
 automatically updates contributor records on merges to master.  For manual
 updates, see the [tributors documentation](https://con.github.io/tributors/).
 
