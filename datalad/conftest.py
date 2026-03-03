@@ -26,6 +26,19 @@ _test_states = {}
 test_http_server = None
 
 @pytest.fixture(autouse=True, scope="session")
+def _fix_pwd_for_changedir():
+    """Ensure PWD env var matches os.getcwd().
+
+    When tox uses changedir, subprocess CWD differs from inherited PWD.
+    Without this fix, getpwd() permanently switches to os.getcwd() mode,
+    breaking symlink path preservation and CWD recovery.
+    """
+    from datalad import utils
+    os.environ['PWD'] = os.getcwd()
+    utils._pwd_mode = None
+
+
+@pytest.fixture(autouse=True, scope="session")
 def setup_package():
     import tempfile
 

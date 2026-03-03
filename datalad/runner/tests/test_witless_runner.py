@@ -29,6 +29,7 @@ from typing import Any
 import pytest
 
 from datalad.tests.utils_pytest import (
+    FILESYSTEM_SUPPORTS_UTF8,
     OBSCURE_FILENAME,
     SkipTest,
     assert_cwd_unchanged,
@@ -65,7 +66,7 @@ result_counter = 0
 @with_tempfile
 def test_runner(tempfile: str = "") -> None:
     runner = Runner()
-    content = 'Testing real run' if on_windows else 'Testing äöü東 real run'
+    content = 'Testing real run' if on_windows or not FILESYSTEM_SUPPORTS_UTF8 else 'Testing äöü東 real run'
     cmd = 'echo %s > %s' % (content, tempfile)
     res = runner.run(cmd)
     assert isinstance(res, dict)

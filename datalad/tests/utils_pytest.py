@@ -1452,7 +1452,7 @@ UNICODE_FILENAME = u"ΔЙקم๗あ"
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
-if sys.getfilesystemencoding().lower() == 'utf-8':
+if not (FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf-8')):
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")

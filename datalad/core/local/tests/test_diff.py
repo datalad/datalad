@@ -16,6 +16,8 @@ import os
 import os.path as op
 from unittest.mock import patch
 
+import pytest
+
 import datalad.utils as ut
 from datalad.api import (
     create,
@@ -31,6 +33,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetFound
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
+    FILESYSTEM_SUPPORTS_UTF8,
     OBSCURE_FILENAME,
     SkipTest,
     assert_in,
@@ -494,6 +497,8 @@ def test_diff_rsync_syntax(path=None):
 
 @with_tempfile(mkdir=True)
 def test_diff_nonexistent_ref_unicode(path=None):
+    if not FILESYSTEM_SUPPORTS_UTF8:
+        pytest.skip("requires UTF-8 filesystem encoding for unicode ref args")
     ds = Dataset(path).create()
     assert_result_count(
         ds.diff(fr="HEAD", to=u"β", on_failure="ignore", result_renderer='disabled'),
