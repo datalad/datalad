@@ -92,21 +92,25 @@ def get_files_open_for_writing(
     # Only inspect processes owned by the current user — other users'
     # processes would raise AccessDenied anyway and cannot conflict
     # with our git operations.
-    my_uid = os.getuid() if hasattr(os, 'getuid') else None
+    # On Windows os.getuid() and psutil's 'uids' attr are unavailable,
+    # so UID-based filtering is skipped and all processes are scanned.
+    _have_uids = hasattr(os, 'getuid')
+    my_uid = os.getuid() if _have_uids else None
     n_procs = 0
     n_skipped_uid = 0
     # Cache lsof results per-pid so we call it at most once per process
     _lsof_cache: dict[int, set[str] | None] = {}
 
-    for proc in psutil.process_iter(['pid', 'uids']):
+    _iter_attrs = ['pid'] + (['uids'] if _have_uids else [])
+    for proc in psutil.process_iter(_iter_attrs):
         try:
             pid = proc.info['pid']
-            proc_uids = proc.info['uids']
+            proc_uids = proc.info.get('uids') if _have_uids else None
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
         if pid in exclude_pids:
             continue
-        # Skip processes owned by other users
+        # Skip processes owned by other users (not available on Windows)
         if my_uid is not None and proc_uids is not None and proc_uids.real != my_uid:
             n_skipped_uid += 1
             continue
