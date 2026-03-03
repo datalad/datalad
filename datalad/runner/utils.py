@@ -121,10 +121,13 @@ class AssemblingDecoderMixIn:
     combine it with additional data, that is delivered later,  and
     decodes the combined data.
 
-    Any un-decoded data is stored in the 'remaining_data'-attribute.
+    Any un-decoded data is stored in the 'remaining_data'-property.
     """
-    def __init__(self) -> None:
-        self.remaining_data: dict[int, bytes] = defaultdict(bytes)
+    @property
+    def remaining_data(self) -> dict[int, bytes]:
+        if not hasattr(self, "_remaining_data"):
+            self._remaining_data: dict[int, bytes] = defaultdict(bytes)
+        return self._remaining_data
 
     def decode(self,
                fd: int,
