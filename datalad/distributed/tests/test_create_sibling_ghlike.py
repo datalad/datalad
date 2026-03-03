@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test create publication target on GIN"""
 
+import logging
 import os
 from os.path import basename
 from unittest.mock import patch
@@ -182,11 +183,19 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint,
             moretests(ds)
     finally:
         token = os.environ[token_var]
-        requests.delete(
+        resp = requests.delete(
             '{}/{}'.format(api, delete_endpoint.format(reponame=reponame)),
             headers={
                 'user-agent': DEFAULT_USER_AGENT,
                 'authorization':
                     f'token {token}',
             },
-        ).raise_for_status()
+        )
+        # A 404 here means the repo was never created (e.g. creation
+        # failed with 401/500) -- just warn so we don't mask the real error.
+        if resp.status_code == 404:
+            logging.getLogger(__name__).warning(
+                "Cleanup DELETE returned 404 for %s (repo likely never created)",
+                reponame)
+        else:
+            resp.raise_for_status()
