@@ -23,6 +23,8 @@ from os import (
 )
 from unittest.mock import patch
 
+import pytest
+
 from datalad.api import (
     clone,
     run,
@@ -802,3 +804,34 @@ def test_substitution_config():
         eq_(_format_iospecs(['{dummy}'],
                             **_get_substitutions(dset)),
             ['a', 'b'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_cmdexec_config(path=None):
+    """Test that datalad.run.cmdexec wraps commands correctly."""
+    ds = Dataset(path).create()
+
+    # Test basic command wrapping with echo
+    ds.config.set("datalad.run.cmdexec", "sh -c '{cmd}'", scope="local")
+
+    # Run a command that creates output
+    ds.run("echo hello > output.txt", message="test cmdexec")
+
+    # Verify the file was created and committed
+    ok_file_has_content(op.join(ds.path, "output.txt"), "hello\n")
+    assert_repo_status(ds.path)
+
+    # Test that {python} placeholder works - use it to create a marker file
+    ds.config.set("datalad.run.cmdexec",
+                  "{python} -c 'i=1; print(\"Wonderful %d {cmd}\" % i)' > output2.txt",
+                  scope="local")
+
+    ds.run("world", message="test python placeholder")
+    ok_file_has_content(op.join(ds.path, "output2.txt"), "Wonderful 1 world\n")
+    assert_repo_status(ds.path)
+
+    # Verify that the command was actually wrapped by checking the run record
+    commit_msg = last_commit_msg(ds.repo)
+    # The command in the record should still be the original, not the wrapped version
+    assert_in('"cmd": "world"', commit_msg)
