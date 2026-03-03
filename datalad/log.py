@@ -625,6 +625,10 @@ class LoggerHelper(object):
         -------
         logging.Logger
         """
+        import datalad
+        if datalad.cfg.getbool('datalad.runtime', 'librarymode', False):
+            return self.lgr
+
         if not logtarget:
             logtarget = self._get_config('target', 'stderr')
 
