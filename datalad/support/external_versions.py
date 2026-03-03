@@ -160,6 +160,15 @@ def _get_system_7z_version():
     lgr.debug("Could not determine version of 7z from stdout. %s", out)
 
 
+def _get_python_version():
+    """Return version of Python interpreter."""
+    out = _runner.run(
+        ['python', '--version'],
+        protocol=StdOutErrCapture)
+    # Output: "Python 3.12.0"
+    return out['stdout'].strip().split()[1]
+
+
 def get_rsync_version():
 
     # This does intentionally not query the version of rsync itself, but
@@ -215,6 +224,7 @@ class ExternalVersions(object):
         'cmd:ssh': _get_ssh_version,
         'cmd:system-ssh': _get_system_ssh_version,
         'cmd:7z': _get_system_7z_version,
+        'cmd:python': _get_python_version,
     }
     # ad-hoc hardcoded map for relevant Python packages which do not provide
     # __version__ and are shipped by a differently named pypi package
