@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from datalad.utils import on_windows
+
 try:
     import psutil
 except ImportError:
@@ -100,6 +102,8 @@ def get_files_open_for_writing(
     n_skipped_uid = 0
     # Cache lsof results per-pid so we call it at most once per process
     _lsof_cache: dict[int, set[str] | None] = {}
+    # Cache Windows CreateFileW probe results per-path
+    _win_write_cache: dict[str, bool | None] = {}
 
     _iter_attrs = ['pid'] + (['uids'] if _have_uids else [])
     for proc in psutil.process_iter(_iter_attrs):
@@ -139,10 +143,16 @@ def get_files_open_for_writing(
                 lsof_writes = _lsof_cache[pid]
                 if lsof_writes is not None:
                     is_write = f.path in lsof_writes
-                else:
-                    lgr.log(5, "Cannot determine open mode for %s "
-                               "(pid=%d), skipping", f.path, pid)
-                    continue
+            if is_write is None and on_windows:
+                # Windows: no mode/flags or lsof; probe via CreateFileW
+                if f.path not in _win_write_cache:
+                    _win_write_cache[f.path] = _win_is_open_for_writing(
+                        f.path)
+                is_write = _win_write_cache[f.path]
+            if is_write is None:
+                lgr.log(5, "Cannot determine open mode for %s "
+                           "(pid=%d), skipping", f.path, pid)
+                continue
             if is_write:
                 orig = resolved_to_orig.get(f.path, f.path)
                 result.setdefault(orig, []).append(
@@ -198,6 +208,43 @@ def _lsof_get_write_files(pid: int) -> set[str] | None:
         elif line.startswith('n') and current_access in ('w', 'u'):
             write_files.add(line[1:])
     return write_files
+
+
+def _win_is_open_for_writing(path: str) -> bool | None:
+    """Check whether *path* is held open for writing, on Windows.
+
+    Probes with ``CreateFileW`` requesting write access with read-only
+    sharing.  A ``ERROR_SHARING_VIOLATION`` (32) indicates another
+    process holds a write handle on the file.
+
+    Returns ``True`` (write-open detected), ``False`` (no write
+    conflict), or ``None`` (cannot determine).
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return None
+
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+    _GENERIC_WRITE = 0x40000000
+    _FILE_SHARE_READ = 0x00000001
+    _OPEN_EXISTING = 3
+
+    handle = kernel32.CreateFileW(
+        path, _GENERIC_WRITE, _FILE_SHARE_READ,
+        None, _OPEN_EXISTING, 0, None)
+    # INVALID_HANDLE_VALUE = (HANDLE)(-1)
+    if handle == ctypes.c_void_p(-1).value or handle is None:
+        err = ctypes.get_last_error()
+        if err == 32:  # ERROR_SHARING_VIOLATION
+            return True
+        return None
+    kernel32.CloseHandle(handle)
+    return False
 
 
 def _describe_process(proc: psutil.Process) -> str:
