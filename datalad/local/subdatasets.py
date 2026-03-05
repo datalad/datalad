@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import warnings
+from enum import Enum
 
 from datalad.distribution.dataset import (
     Dataset,
@@ -64,6 +65,85 @@ lgr = logging.getLogger('datalad.local.subdatasets')
 
 
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
+
+
+class RelativeUrlInTree(str, Enum):
+    """Result of checking whether a relative URL resolves within the dataset tree.
+
+    Inherits from ``str`` so that ``.value`` yields the plain string
+    stored in subdataset records for filter matching with expressions
+    like ``.relative-url-in-tree=present``.
+    """
+    PRESENT = 'present'
+    """Relative URL resolves to an installed dataset in the tree."""
+    POTENTIAL = 'potential'
+    """Relative URL target is within the tree but not installed
+    (and a datalad-id is recorded)."""
+    FALSE = 'false'
+    """No relative URL resolves within the tree."""
+
+
+def _compute_relative_url_in_tree(
+        sm: dict, parentds_path: Path, refds_path: Path,
+) -> RelativeUrlInTree:
+    """Check if a relative URL resolves to a dataset in the reference tree.
+
+    Parameters
+    ----------
+    sm : dict
+        Subdataset record with at least 'path' and potentially
+        'gitmodule_url' and 'gitmodule_datalad-url'.
+    parentds_path : Path
+        Path to the immediate parent dataset (the one containing .gitmodules).
+        Git resolves relative URLs in .gitmodules relative to this root.
+    refds_path : Path
+        Path to the reference (top-level) dataset.
+
+    Returns
+    -------
+    RelativeUrlInTree
+    """
+    from datalad.support.network import (
+        RI,
+        PathRI,
+    )
+
+    for url_key in ('gitmodule_url', 'gitmodule_datalad-url'):
+        url_val = sm.get(url_key)
+        if not url_val:
+            continue
+        try:
+            parsed = RI(url_val)
+        except Exception:
+            continue
+        if not isinstance(parsed, PathRI):
+            continue
+        # must be a relative path
+        if os.path.isabs(parsed.path):
+            continue
+        # resolve relative to parent dataset root (git resolves .gitmodules
+        # URLs relative to the repository root, not the submodule's parent
+        # directory)
+        resolved = Path(os.path.normpath(parentds_path / parsed.path))
+        # must be within the reference dataset tree
+        try:
+            resolved.relative_to(refds_path)
+        except ValueError:
+            continue
+        # check if the resolved path is an installed dataset
+        if resolved.exists() and GitRepo.is_valid_repo(resolved):
+            # if an expected ID is recorded, verify it matches
+            expected_id = sm.get('gitmodule_datalad-id')
+            if expected_id:
+                actual_id = Dataset(resolved).id
+                if actual_id != expected_id:
+                    continue
+            return RelativeUrlInTree.PRESENT
+        else:
+            # not installed, but if we have an expected ID, it's "potential"
+            if sm.get('gitmodule_datalad-id'):
+                return RelativeUrlInTree.POTENTIAL
+    return RelativeUrlInTree.FALSE
 
 
 def _parse_git_submodules(ds, paths, cache):
@@ -275,8 +355,11 @@ class Subdatasets(Interface):
             expanded_contains = [[c] + list(c.parents) for c in contains]
         else:
             expanded_contains = []
-        parsed_filters = [parse_filter_spec(f)
-                          for f in (recursion_filter or [])]
+        cfg_filters = ds.config.get(
+            'datalad.recursion.filter', get_all=True, default=None)
+        all_filter_specs = ensure_list(recursion_filter) \
+            + ensure_list(cfg_filters)
+        parsed_filters = [parse_filter_spec(f) for f in all_filter_specs]
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
@@ -319,6 +402,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     parsed_filters, contains, bottomup, set_property,
                     delete_property, refds_path):
     lookup_cache = {}
+    # precompute which computed properties are needed by filters
+    needs_relative_url = parsed_filters and any(
+        f[0] == '.relative-url-in-tree' for f in parsed_filters)
     # it should be OK to skip the extra check, because _parse_git_submodules()
     # we specifically look for .gitmodules and the rest of the function
     # is on its results
@@ -343,6 +429,10 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         else:
             assert 'state' not in sm
             sm['state'] = 'present'
+        # lazily compute properties referenced in filters
+        if needs_relative_url:
+            sm['relative-url-in-tree'] = _compute_relative_url_in_tree(
+                sm, ds.pathobj, Path(refds_path)).value
         # apply recursion filter
         if parsed_filters and not match_filters(sm, parsed_filters):
             continue

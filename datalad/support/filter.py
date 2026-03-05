@@ -29,6 +29,8 @@ Namespace rules:
   in the subdataset record (dot stripped).
 """
 
+from __future__ import annotations
+
 import re
 
 # Ordered so longer operators are tried first to avoid prefix conflicts
@@ -38,7 +40,7 @@ _OPERATORS = ['!~', '~=', '!=', '!?', '=', '?']
 _KEY_RE = re.compile(r'^\.?[A-Za-z][-A-Za-z0-9]*$')
 
 
-def parse_filter_spec(expr):
+def parse_filter_spec(expr: str) -> tuple[str, str, str]:
     """Parse a filter expression into a (key, operator, value) tuple.
 
     Parameters
@@ -95,7 +97,7 @@ def parse_filter_spec(expr):
         f"Supported operators: = != ~= !~ ? !?")
 
 
-def _resolve_filter_key(key, record):
+def _resolve_filter_key(key: str, record: dict) -> tuple[str, bool]:
     """Resolve a filter key to its value in a subdataset record.
 
     Parameters
@@ -127,7 +129,7 @@ def _resolve_filter_key(key, record):
         return ('', False)
 
 
-def match_filter(record, parsed_filter):
+def match_filter(record: dict, parsed_filter: tuple[str, str, str]) -> bool:
     """Evaluate a single parsed filter against a subdataset record.
 
     Parameters
@@ -166,7 +168,9 @@ def match_filter(record, parsed_filter):
     raise ValueError(f"Unknown operator {op!r}")
 
 
-def match_filters(record, parsed_filters):
+def match_filters(
+        record: dict, parsed_filters: list[tuple[str, str, str]],
+) -> bool:
     """Evaluate multiple parsed filters against a subdataset record (AND logic).
 
     All filters must match for the record to pass. An empty filter list
