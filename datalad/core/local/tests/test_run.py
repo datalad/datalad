@@ -23,6 +23,8 @@ from os import (
 )
 from unittest.mock import patch
 
+import pytest
+
 from datalad.api import (
     clone,
     run,
@@ -42,6 +44,7 @@ from datalad.support.exceptions import (
 )
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
+    FILESYSTEM_SUPPORTS_UTF8,
     OBSCURE_FILENAME,
     assert_false,
     assert_in,
@@ -179,6 +182,8 @@ def test_basics(path=None, nodspath=None):
 # moreover the usage of unicode in the file names also breaks this on windows
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path=None):
+    if not FILESYSTEM_SUPPORTS_UTF8:
+        pytest.skip("requires UTF-8 filesystem encoding for unicode args")
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
     ds = Dataset(path).create()
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
