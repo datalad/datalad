@@ -1,4 +1,23 @@
 
+<a id='changelog-1.3.2'></a>
+# 1.3.2 (2026-03-05)
+
+## 🐛 Bug Fixes
+
+- ENH: push --since=^ should not push when there are no changes.  [PR #7766](https://github.com/datalad/datalad/pull/7766) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Adjust tests for chardet 6 which rewrote single-byte charset detection and misidentifies very short KOI8-R byte sequences as Thai.  [PR #7807](https://github.com/datalad/datalad/pull/7807) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- DOC: modernize CONTRIBUTING.md and add CLAUDE.md.  [PR #7813](https://github.com/datalad/datalad/pull/7813) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- BF: Harden test_gitea against transient demo.gitea.com failures.  [PR #7812](https://github.com/datalad/datalad/pull/7812) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Fix tox test failures from PWD mismatch and non-UTF-8 encoding.  [PR #7814](https://github.com/datalad/datalad/pull/7814) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.3.1'></a>
 # 1.3.1 (2026-02-01)
 
