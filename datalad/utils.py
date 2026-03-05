@@ -1975,12 +1975,12 @@ def make_tempfile(content: str | bytes | None = None, wrapped: Optional[Callable
             # For paranoid yoh who stepped into this already ones ;-)
             lgr.warning("It is unlikely that it was intended to remove all"
                         " files matching %r. Skipping" % filename_)
-            return
-        for f in filenames:
-            try:
-                rmtemp(f)
-            except OSError:  # pragma: no cover
-                pass
+        else:
+            for f in filenames:
+                try:
+                    rmtemp(f)
+                except OSError:  # pragma: no cover
+                    pass
 
 
 def _path_(*p: str) -> str:
