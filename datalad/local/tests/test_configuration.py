@@ -12,6 +12,7 @@
 
 from os.path import join as opj
 
+import pytest
 from packaging.version import Version
 
 import datalad
@@ -148,3 +149,25 @@ def test_something(path=None, new_home=None):
         ds.configuration(recursive=True)
         # we get something on the subds with the desired markup
         assert_in('<ds>/subds:rec.test=done', cml.out)
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_configuration_r_filter(path=None):
+    """Test that configuration passes recursion_filter through to subdatasets"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # set config recursively with filter matching only sub1
+    res = ds.configuration(
+        'set', spec=['datalad.test.r-filter=yes'],
+        scope='local', recursive=True,
+        recursion_filter=['group=core'])
+    # only ds and sub1 should have been configured (filter does not
+    # affect the root dataset itself, only subdataset selection)
+    set_paths = [r['path'] for r in res
+                 if r.get('action') == 'set_configuration']
+    assert ds.path in set_paths
+    assert str(sub1.pathobj) in set_paths
+    assert str(sub2.pathobj) not in set_paths

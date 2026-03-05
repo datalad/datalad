@@ -29,6 +29,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_cfg import definitions as cfg_defs
 from datalad.interface.common_opts import (
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -149,6 +150,7 @@ class Configuration(Interface):
             metavar='name[=value]'),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
     )
 
     @staticmethod
@@ -161,7 +163,8 @@ class Configuration(Interface):
             scope=None,
             dataset=None,
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            recursion_filter=None):
 
         # check conditions
         # - global and recursion makes no sense
@@ -219,6 +222,7 @@ class Configuration(Interface):
                 state='present',
                 recursive=True,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 on_failure='ignore',
                 return_type='generator',
                 result_renderer='disabled'):

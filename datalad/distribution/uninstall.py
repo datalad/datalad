@@ -28,6 +28,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import (
     if_dirty_opt,
+    recursion_filter,
     recursion_flag,
 )
 from datalad.interface.results import get_status_dict
@@ -73,6 +74,7 @@ class Uninstall(Interface):
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
+        recursion_filter=recursion_filter,
         check=check_argument,
         if_dirty=if_dirty_opt,
     )
@@ -85,6 +87,7 @@ class Uninstall(Interface):
             *,
             dataset=None,
             recursive=False,
+            recursion_filter=None,
             check=True,
             if_dirty='save-before'):
         # all this command does is to map legacy call to their replacement
@@ -137,6 +140,7 @@ class Uninstall(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive,
+            recursion_filter=recursion_filter,
             what='all',
             reckless=reckless,
             return_type='generator',

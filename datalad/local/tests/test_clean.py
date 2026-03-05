@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import pytest
+
 from datalad.api import clean
 from datalad.consts import (
     ANNEX_TEMP_DIR,
@@ -110,3 +112,18 @@ def test_clean(d=None):
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
                      "Removed empty annex temporary transfer directory")
         assert_false(annex_trans_path.exists())
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_clean_r_filter(path=None):
+    """Test that clean passes recursion_filter through to subdatasets"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # clean with filter matching only sub1
+    res = ds.clean(recursive=True, recursion_filter=['group=core'])
+    # should only process ds and sub1 (not sub2)
+    cleaned_paths = [r['path'] for r in res]
+    assert not any(str(sub2.pathobj) in p for p in cleaned_paths)

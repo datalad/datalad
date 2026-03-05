@@ -29,6 +29,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -102,6 +103,7 @@ class Clean(Interface):
                 'annex-transfer', 'search-index') | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
     )
 
     @staticmethod
@@ -109,7 +111,8 @@ class Clean(Interface):
     @eval_results
     def __call__(*,
                  dataset=None, what=None, dry_run=False,
-                 recursive=False, recursion_limit=None):
+                 recursive=False, recursion_limit=None,
+                 recursion_filter=None):
 
         ds = require_dataset(dataset,
                              purpose="report on cleanable locations"
@@ -120,6 +123,7 @@ class Clean(Interface):
                 state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 return_type='generator',
                 result_renderer='disabled',
                 result_xfm='datasets') if recursive else []):

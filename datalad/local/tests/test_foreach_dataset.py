@@ -154,3 +154,22 @@ def test_python():
         return kwargs
 
     check_python_eval(dummy_dir)  # direct function invocation
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_foreach_dataset_r_filter(path=None):
+    """Test that foreach_dataset passes recursion_filter through"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # without filter, should process both subs (+ top ds)
+    all_res = ds.foreach_dataset('echo hello',
+                                 recursive=True, subdatasets_only=True)
+    assert len([r for r in all_res if r.get('status') == 'ok']) == 2
+    # with filter matching only sub1
+    filtered = ds.foreach_dataset('echo hello',
+                                   recursive=True, subdatasets_only=True,
+                                   recursion_filter=['group=core'])
+    assert len([r for r in filtered if r.get('status') == 'ok']) == 1

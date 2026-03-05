@@ -82,7 +82,8 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
 
 
 def _yield_ds_w_matching_siblings(
-        ds, names, recursive=False, recursion_limit=None):
+        ds, names, recursive=False, recursion_limit=None,
+        recursion_filter=None):
     """(Recursively) inspect a dataset for siblings with particular name(s)
 
     Parameters
@@ -95,6 +96,8 @@ def _yield_ds_w_matching_siblings(
       Whether to recurse into subdatasets.
     recursion_limit: int, optional
       Recursion depth limit.
+    recursion_filter: list, optional
+      Filter expressions for subdataset selection.
 
     Yields
     ------
@@ -142,6 +145,7 @@ def _yield_ds_w_matching_siblings(
             _discover_all_remotes,
             recursive=recursive,
             recursion_limit=recursion_limit,
+            recursion_filter=recursion_filter,
             return_type='generator',
             result_renderer='disabled',
     ):

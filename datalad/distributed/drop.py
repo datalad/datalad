@@ -30,6 +30,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import (
     jobs_opt,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -151,6 +152,7 @@ class Drop(Interface):
             constraints=EnsureChoice('filecontent', 'allkeys', 'datasets', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         jobs=jobs_opt,
         check=Parameter(
             args=("--nocheck",),
@@ -173,6 +175,7 @@ class Drop(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             jobs=None,
             # deprecated
             check=None,
@@ -273,6 +276,7 @@ class Drop(Interface):
                     # recursion from any of the given paths!
                     recursive=recursive,
                     recursion_limit=recursion_limit,
+                    recursion_filter=recursion_filter,
                     jobs=jobs):
                 yield dict(res, **res_props)
             lgr.debug('Finished dropping %s at %s', what, d)
@@ -300,12 +304,12 @@ def _paths_atunder_dir(pbd, dirpath):
     return False
 
 
-def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
+def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, recursion_filter, jobs):
     lgr.debug('Start dropping for %s', ds)
     # we know that any given path is part of `ds` and not any of its
     # subdatasets!
 
-    # by-passing this completely with reckless=kill
+    # bypassing this completely with reckless=kill
     if recursive and not reckless == 'kill':
         # process subdatasets first with recursion
         for sub in ds.subdatasets(
@@ -317,6 +321,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 # of calls to _drop_dataset() must/can have recursive=True
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 # start reporting with the leaves
                 bottomup=True,
                 result_xfm='datasets',
@@ -331,6 +336,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                 reckless=reckless,
                 recursive=False,
                 recursion_limit=None,
+                recursion_filter=None,
                 jobs=jobs)
 
     if not ds.pathobj.exists():
@@ -355,6 +361,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                     state='present',
                     recursive=recursive,
                     recursion_limit=recursion_limit,
+                    recursion_filter=recursion_filter,
                     result_xfm='datasets',
                     on_failure='ignore',
                     return_type='generator',
@@ -369,6 +376,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
                         reckless=reckless,
                         recursive=False,
                         recursion_limit=None,
+                        recursion_filter=None,
                         jobs=jobs)
         # so we have paths constraints that prevent dropping the full dataset
         lgr.debug('Only dropping file content for given paths in %s, '
