@@ -690,6 +690,17 @@ _definitions = {
         'default': 'warning',
 
     },
+    'datalad.save.skip-openfiles': {
+        'ui': ('question', {
+            'title': 'Action when files open for writing are encountered '
+                     'during save',
+            'text': "If other processes have files open for writing, "
+                    "'none' disables the check, 'skip' silently excludes "
+                    "them, 'warning' logs but saves anyway, 'error' "
+                    "excludes them and yields 'impossible' results."}),
+        'type': EnsureChoice('none', 'skip', 'warning', 'error'),
+        'default': 'none',
+    },
     'datalad.source.epoch': {
         'ui': ('question', {
             'title': 'Datetime epoch to use for dates in built materials',

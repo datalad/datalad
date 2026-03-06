@@ -67,6 +67,7 @@ RRID = "https://identifiers.org/RRID:SCR_003931"
 downloaders-extra = ["requests_ftp"]
 misc = [
     "argcomplete>=1.12.3", # optional CLI completion
+    "psutil",              # open-file detection for datalad.save.skip-openfiles
     "pyperclip",           # clipboard manipulations
     "python-dateutil",     # add support for more date formats to check_dates
 ]
