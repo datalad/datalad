@@ -712,5 +712,119 @@ def test_rewrite_parent_mode_nested_path(path=None):
     assert subds_commits >= 3, f"Subdataset should have >=3 commits, got {subds_commits}"
 
 
+@pytest.mark.ai_generated
+@with_tempfile
+def test_rewrite_parent_batch_nested_same_parent(path=None):
+    """Test batch rewrite-parent with multiple nested paths under same parent.
+
+    Splits images/adswa and images/bids simultaneously - both become
+    subdatasets under the same parent directory images/.
+    """
+    ds = Dataset(path).create(force=True, annex=False)
+
+    # Create two sibling directories under images/
+    adswa_dir = Path(path) / 'images' / 'adswa'
+    bids_dir = Path(path) / 'images' / 'bids'
+    adswa_dir.mkdir(parents=True)
+    bids_dir.mkdir(parents=True)
+
+    (adswa_dir / 'file1.txt').write_text('adswa v1')
+    (bids_dir / 'file1.txt').write_text('bids v1')
+    (Path(path) / 'root.txt').write_text('root v1')
+    ds.save(message='Initial files')
+
+    (adswa_dir / 'file1.txt').write_text('adswa v2')
+    ds.save(message='Update adswa')
+
+    (bids_dir / 'file1.txt').write_text('bids v2')
+    ds.save(message='Update bids')
+
+    commits_before = int(ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+
+    # Split both nested paths in one batch
+    result = split(
+        ['images/adswa', 'images/bids'],
+        dataset=path,
+        mode='rewrite-parent',
+        force=True,
+        return_type='list'
+    )
+
+    assert_status('ok', result)
+
+    # Commit count should be at least the original (rewrite preserves originals,
+    # setup may add registration commits)
+    commits_after = int(ds.repo.call_git(['rev-list', '--count', 'HEAD']).strip())
+    assert commits_after >= commits_before, \
+        f"Commit count should be >= original: {commits_after} < {commits_before}"
+
+    # Verify both are gitlinks in images/ tree
+    tree = ds.repo.call_git(['log', '-1', '--format=%T', 'HEAD']).strip()
+    root_ls = ds.repo.call_git(['ls-tree', tree]).strip()
+
+    # Find images/ tree
+    images_tree_sha = None
+    for line in root_ls.split('\n'):
+        if line.endswith('\timages'):
+            images_tree_sha = line.split()[2]
+            break
+    assert images_tree_sha, "Should have images/ entry in root tree"
+
+    # Both should be gitlinks (mode 160000) in images/ tree
+    images_ls = ds.repo.call_git(['ls-tree', images_tree_sha]).strip()
+    for name in ('adswa', 'bids'):
+        found = False
+        for line in images_ls.split('\n'):
+            if line.endswith(f'\t{name}'):
+                mode_val = line.split()[0]
+                assert mode_val == '160000', \
+                    f"{name} should be gitlink (160000), got {mode_val}"
+                found = True
+                break
+        assert found, f"{name} not found in images/ tree"
+
+    # Verify subdatasets exist and have history
+    for name in ('adswa', 'bids'):
+        subds = Dataset(Path(path) / 'images' / name)
+        assert subds.is_installed(), f"{name} subdataset should be installed"
+        subds_commits = int(subds.repo.call_git(
+            ['rev-list', '--count', 'HEAD']).strip())
+        assert subds_commits >= 1, \
+            f"{name} should have commits, got {subds_commits}"
+
+    # root.txt should still exist in parent
+    assert (Path(path) / 'root.txt').exists()
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_rewrite_parent_batch_mixed_toplevel_nested_error(path=None):
+    """Test that mixing top-level and nested paths in batch rewrite-parent errors."""
+    ds = Dataset(path).create(force=True, annex=False)
+
+    # Create top-level and nested directories
+    data_dir = Path(path) / 'data'
+    nested_dir = Path(path) / 'images' / 'adswa'
+    data_dir.mkdir()
+    nested_dir.mkdir(parents=True)
+
+    (data_dir / 'file.txt').write_text('data')
+    (nested_dir / 'file.txt').write_text('nested')
+    ds.save(message='Initial')
+
+    # Should error on mixed top-level + nested
+    result = split(
+        ['data', 'images/adswa'],
+        dataset=path,
+        mode='rewrite-parent',
+        force=True,
+        return_type='list',
+        on_failure='ignore'
+    )
+
+    assert_result_count(result, 1, status='error')
+    assert_in('mixing top-level and nested', result[0]['message'].lower())
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

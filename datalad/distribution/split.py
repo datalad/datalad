@@ -414,25 +414,69 @@ class Split(Interface):
 
         # Process splits differently based on mode
         # Check if all paths are top-level (no nested paths) for batch processing
-        has_nested = any('/' in str(Path(p).relative_to(ds.path)) for p in validated_paths)
+        rel_paths = [Path(p).relative_to(ds.path) for p in validated_paths]
+        has_nested = any('/' in str(rp) for rp in rel_paths)
 
         if mode == 'rewrite-parent' and len(validated_paths) > 1:
             if has_nested:
-                # Multiple paths with nested - this is not yet optimized
-                yield get_status_dict(
-                    action='split',
-                    ds=ds,
-                    status='error',
-                    message=(
-                        f"Batch rewrite-parent with nested paths is not yet optimized and would be very slow. "
-                        f"You specified {len(validated_paths)} paths, some nested: {', '.join(str(Path(p).relative_to(ds.path)) for p in validated_paths)}. "
-                        f"Please either: (1) Use --mode=split-top for multiple paths, OR "
-                        f"(2) Split one path at a time with --mode=rewrite-parent"
-                    ))
-                return
+                # Check if all nested paths share the same parent directory
+                # e.g., images/adswa, images/bids, images/neuronets all share "images" parent
+                all_nested = all('/' in str(rp) for rp in rel_paths)
 
-            # Batch processing for rewrite-parent mode with multiple TOP-LEVEL paths only
-            lgr.info("Processing %d top-level paths together in rewrite-parent mode", len(validated_paths))
+                if not all_nested:
+                    # Mix of top-level and nested paths - not supported in batch
+                    yield get_status_dict(
+                        action='split',
+                        ds=ds,
+                        status='error',
+                        message=(
+                            f"Batch rewrite-parent does not support mixing top-level and nested paths. "
+                            f"You specified: {', '.join(str(rp) for rp in rel_paths)}. "
+                            f"Batch mode works for: (1) Multiple top-level paths (e.g., 'data logs'), OR "
+                            f"(2) Multiple paths under same parent (e.g., 'images/adswa images/bids'). "
+                            f"Please split top-level and nested paths separately."
+                        ))
+                    return
+
+                parents = set()
+                all_same_depth = True
+                first_depth = None
+
+                for rp in rel_paths:
+                    rp_str = str(rp)
+                    parent = str(Path(rp_str).parent)
+                    parents.add(parent)
+                    depth = len(Path(rp_str).parts)
+                    if first_depth is None:
+                        first_depth = depth
+                    elif depth != first_depth:
+                        all_same_depth = False
+
+                # Allow batch if all paths share same parent and same depth
+                same_parent_batch = len(parents) == 1 and all_same_depth
+
+                if not same_parent_batch:
+                    # Mixed nesting levels or different parents - not yet optimized
+                    yield get_status_dict(
+                        action='split',
+                        ds=ds,
+                        status='error',
+                        message=(
+                            f"Batch rewrite-parent with mixed nested paths is not yet optimized. "
+                            f"You specified {len(validated_paths)} paths at different levels: {', '.join(str(rp) for rp in rel_paths)}. "
+                            f"Batch mode works for: (1) Multiple top-level paths (e.g., 'data logs'), OR "
+                            f"(2) Multiple paths under same parent (e.g., 'images/adswa images/bids'). "
+                            f"Please either: (a) Use --mode=split-top for mixed paths, OR "
+                            f"(b) Split one path at a time with --mode=rewrite-parent"
+                        ))
+                    return
+
+                lgr.info("Processing %d nested paths under same parent (%s) in batch mode",
+                         len(validated_paths), list(parents)[0])
+            else:
+                lgr.info("Processing %d top-level paths together in rewrite-parent mode", len(validated_paths))
+
+            # Batch processing for rewrite-parent mode
             for result in _perform_batch_rewrite_parent(
                     ds=ds,
                     paths=validated_paths,
@@ -1575,57 +1619,101 @@ def _rewrite_history_with_commit_tree_batch(parent_repo, split_configs, commit_m
                 # This commit modified this subdataset - update its current commit
                 current_subdataset_commits[rel_path_str] = commit_map[orig_commit]
 
-        # Track which nested paths have been handled (to avoid duplicate processing)
-        nested_paths_processed = set()
+        # Group nested paths by their parent directory for efficient batch processing
+        nested_by_parent = {}
+        top_level_gitlinks = []
 
-        # Add gitlinks for ALL subdatasets that have appeared so far
-        # Process top-level paths first, then nested paths
-        for config in sorted(split_configs, key=lambda c: (len(str(c['rel_path']).split('/')), str(c['rel_path']))):
-            rel_path = config['rel_path']
-            rel_path_str = str(rel_path)
+        for config in split_configs:
+            rel_path_str = str(config['rel_path'])
 
             # Only add gitlink if this subdataset has appeared in history
             if rel_path_str in current_subdataset_commits:
                 has_any_gitlink = True
                 gitlink_sha = current_subdataset_commits[rel_path_str]
 
-                is_nested = '/' in rel_path_str
-                if is_nested:
-                    # Nested path: build tree recursively if not already processed
-                    if rel_path_str not in nested_paths_processed:
-                        lgr.debug("Building nested gitlink for %s at commit %s", rel_path_str, orig_commit[:8])
-                        # Build tree from current entries
-                        current_tree_input = '\n'.join(new_tree_entries) + '\n' if new_tree_entries else ''
-                        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-                            f.write(current_tree_input)
-                            temp_tree_file = f.name
+                if '/' in rel_path_str:
+                    # Nested path: group by parent
+                    parent_dir = str(Path(rel_path_str).parent)
+                    child_name = Path(rel_path_str).name
 
-                        try:
-                            result = subprocess.run(
-                                ['git', 'mktree'],
-                                stdin=open(temp_tree_file, 'r'),
-                                capture_output=True,
-                                text=True,
-                                cwd=parent_repo.path
-                            )
-                            if result.returncode != 0:
-                                raise RuntimeError(f"git mktree failed for temp tree: {result.stderr}")
-                            temp_tree = result.stdout.strip()
-                        finally:
-                            os.unlink(temp_tree_file)
-
-                        # Use recursive tree builder to add nested gitlink
-                        new_tree_sha = _build_tree_with_nested_gitlink(
-                            parent_repo, temp_tree, rel_path_str, gitlink_sha, gitmodules_blob
-                        )
-
-                        # Rebuild entries from new tree
-                        new_entries_output = parent_repo.call_git(['ls-tree', new_tree_sha]).strip()
-                        new_tree_entries = new_entries_output.split('\n') if new_entries_output else []
-                        nested_paths_processed.add(rel_path_str)
+                    if parent_dir not in nested_by_parent:
+                        nested_by_parent[parent_dir] = []
+                    nested_by_parent[parent_dir].append((child_name, gitlink_sha))
                 else:
-                    # Top-level path: simple addition
-                    new_tree_entries.append(f'160000 commit {gitlink_sha}\t{rel_path_str}')
+                    # Top-level path
+                    top_level_gitlinks.append((rel_path_str, gitlink_sha))
+
+        # Add top-level gitlinks directly
+        for name, sha in top_level_gitlinks:
+            new_tree_entries.append(f'160000 commit {sha}\t{name}')
+
+        # Process nested paths by building parent trees
+        for parent_dir, children in nested_by_parent.items():
+            lgr.debug("Building tree for parent %s with %d children", parent_dir, len(children))
+
+            # Get parent directory tree from original tree
+            # Navigate to parent dir tree
+            path_parts = parent_dir.split('/')
+            current_tree = orig_tree
+
+            # Walk down to parent directory
+            for part in path_parts:
+                tree_output = parent_repo.call_git(['ls-tree', current_tree]).strip()
+                found = False
+                for line in tree_output.split('\n'):
+                    if line and line.endswith(f'\t{part}'):
+                        current_tree = line.split()[2]
+                        found = True
+                        break
+                if not found:
+                    # Parent doesn't exist yet, skip
+                    lgr.debug("Parent %s not found in commit %s", parent_dir, orig_commit[:8])
+                    current_tree = None
+                    break
+
+            if current_tree:
+                # Build new parent tree with all gitlinks
+                parent_entries_output = parent_repo.call_git(['ls-tree', current_tree]).strip()
+                parent_entries = []
+
+                # Keep all entries except our split paths
+                if parent_entries_output:
+                    child_names = {name for name, _ in children}
+                    for line in parent_entries_output.split('\n'):
+                        if line:
+                            # Extract entry name
+                            entry_name = line.split('\t', 1)[1] if '\t' in line else ''
+                            if entry_name not in child_names:
+                                parent_entries.append(line)
+
+                # Add all child gitlinks
+                for child_name, child_sha in children:
+                    parent_entries.append(f'160000 commit {child_sha}\t{child_name}')
+
+                # Create new parent tree
+                parent_tree_input = '\n'.join(parent_entries) + '\n'
+                with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                    f.write(parent_tree_input)
+                    parent_tree_file = f.name
+
+                try:
+                    result = subprocess.run(
+                        ['git', 'mktree'],
+                        stdin=open(parent_tree_file, 'r'),
+                        capture_output=True,
+                        text=True,
+                        cwd=parent_repo.path
+                    )
+                    if result.returncode != 0:
+                        raise RuntimeError(f"git mktree failed for {parent_dir}: {result.stderr}")
+                    new_parent_tree = result.stdout.strip()
+                finally:
+                    os.unlink(parent_tree_file)
+
+                # Now update root tree to include this modified parent
+                # Remove old parent entry and add new one
+                new_tree_entries = [e for e in new_tree_entries if not e.endswith(f'\t{path_parts[0]}')]
+                new_tree_entries.append(f'040000 tree {new_parent_tree}\t{path_parts[0]}')
 
         # Add .gitmodules if we have any gitlinks
         if has_any_gitlink:
