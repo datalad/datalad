@@ -23,7 +23,62 @@ provides the configuration that extensions can inherit.
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
+
+import pytest
+
+# Deprecated datalad APIs still used by specific extensions.
+# Each entry maps a warning message pattern to the set of extension
+# top-level packages allowed to trigger it without error.
+# Once an extension is fixed, remove it from the set; once the set is
+# empty, remove the whole entry.
+_EXTENSION_DEPRECATION_ALLOWLIST: dict[str, set[str]] = {
+    # datalad-neuroimaging, datalad-deprecated use datalad.interface.utils.eval_results
+    r"datalad\.interface\.utils\.eval_results is obsolete": {
+        "datalad_neuroimaging",
+        "datalad_deprecated",
+    },
+    # datalad-neuroimaging uses datalad.interface.run_procedure
+    r"RunProcedure has been moved": {
+        "datalad_neuroimaging",
+    },
+    # datalad-deprecated uses datalad.cmdline
+    r"All of datalad\.cmdline is deprecated": {
+        "datalad_deprecated",
+    },
+    # datalad-crawler uses assure_list, assure_bool, etc. from datalad.utils
+    r"assure_\w+ is deprecated": {
+        "datalad_crawler",
+    },
+}
+
+
+def _get_extension_package(module_name: str) -> str | None:
+    """Return the datalad extension top-level package, or None for datalad itself."""
+    top = module_name.split(".")[0]
+    return top if top.startswith("datalad_") else None
+
+
+def _get_extension_package_from_path(path: Path) -> str | None:
+    """Return the datalad extension package detected from a file path."""
+    for part in path.parts:
+        if part.startswith("datalad_"):
+            return part
+    return None
+
+
+def _add_allowlist_filters(extension_package: str) -> None:
+    """Add ignore filters for deprecations allowlisted for the given extension.
+
+    Filters are prepended (highest priority) so they override the
+    ``error::DeprecationWarning:^datalad`` base filter.
+    """
+    for pattern, allowed in _EXTENSION_DEPRECATION_ALLOWLIST.items():
+        if extension_package in allowed:
+            warnings.filterwarnings(
+                "ignore", message=pattern, category=DeprecationWarning
+            )
 
 
 def pytest_configure(config):
@@ -118,3 +173,43 @@ def pytest_ignore_collect(collection_path: Path) -> bool:
     return not any(
         re.match(r"^\s*>>>", ln) for ln in collection_path.read_text("utf-8").splitlines()
     )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_collectstart(collector):
+    """During collection, suppress allowlisted deprecations per-extension.
+
+    Module imports happen during collection, so deprecated API usage (e.g.
+    decorators, module-level imports) triggers DeprecationWarnings here.
+    We save/restore the filter list around each Module so that ignores
+    only apply to the extension that owns that module.
+    """
+    if not isinstance(collector, pytest.Module):
+        yield
+        return
+
+    ext_pkg = _get_extension_package_from_path(collector.path)
+    if not ext_pkg:
+        yield
+        return
+
+    saved = warnings.filters[:]
+    _add_allowlist_filters(ext_pkg)
+    yield
+    warnings.filters[:] = saved
+
+
+@pytest.hookimpl(hookwrapper=True, trylast=True)
+def pytest_runtest_protocol(item, nextitem):
+    """During test execution, suppress allowlisted deprecations per-extension.
+
+    ``trylast=True`` ensures we run inside the ``_pytest.warnings`` plugin's
+    ``catch_warnings()`` context, so our filters are cleaned up automatically.
+    """
+    ext_pkg = (
+        _get_extension_package(item.module.__name__)
+        or _get_extension_package_from_path(item.path)
+    )
+    if ext_pkg:
+        _add_allowlist_filters(ext_pkg)
+    yield
