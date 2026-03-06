@@ -305,7 +305,7 @@ def _drop_dataset(ds, paths, what, reckless, recursive, recursion_limit, jobs):
     # we know that any given path is part of `ds` and not any of its
     # subdatasets!
 
-    # by-passing this completely with reckless=kill
+    # bypassing this completely with reckless=kill
     if recursive and not reckless == 'kill':
         # process subdatasets first with recursion
         for sub in ds.subdatasets(
