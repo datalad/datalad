@@ -192,3 +192,73 @@ def match_filters(
     # TODO: consider OR logic in the future — users can use regex alternation
     # within a single filter for now: url~=(pattern1|pattern2)
     return all(match_filter(record, f) for f in parsed_filters)
+
+
+def _get_gitmodules_filter_map(repo) -> dict:
+    """Return a map of submodule paths to gitmodule properties.
+
+    Results are cached on the repo object to avoid re-parsing
+    ``.gitmodules`` on every subdataset encountered during recursion.
+
+    Parameters
+    ----------
+    repo : GitRepo
+        Repository whose ``.gitmodules`` to parse.
+
+    Returns
+    -------
+    dict
+        ``{PurePosixPath: {str: str}}`` — keys are repo-relative submodule
+        paths, values are dicts with ``gitmodule_*`` properties.
+    """
+    cache_attr = '_datalad_gitmodules_filter_cache'
+    cached = getattr(repo, cache_attr, None)
+    if cached is not None:
+        return cached
+    result = repo._parse_gitmodules()
+    setattr(repo, cache_attr, result)
+    return result
+
+
+def match_submodule_filter(
+        repo, ds_pathobj, submod_path, props: dict,
+        parsed_filters: list[tuple[str, str, str]],
+) -> bool:
+    """Check if a subdataset passes the recursion filter.
+
+    Used by the diff/status recursion path where ``.gitmodules``
+    properties are not directly available.  Looks them up via
+    :func:`_get_gitmodules_filter_map` and builds a record compatible
+    with :func:`match_filters`.
+
+    Parameters
+    ----------
+    repo : GitRepo
+        Repository containing the submodule.
+    ds_pathobj : Path
+        Absolute path of the parent dataset.
+    submod_path : Path
+        Absolute path of the submodule entry (as reported by diffstatus).
+    props : dict
+        diffstatus properties (has 'type', 'state', 'gitshasum').
+    parsed_filters : list
+        Parsed filter specs from :func:`parse_filter_spec`.
+
+    Returns
+    -------
+    bool
+        True if the submodule passes all filters (should recurse into).
+    """
+    from pathlib import PurePosixPath
+
+    if not parsed_filters:
+        return True
+    gitmodules = _get_gitmodules_filter_map(repo)
+    # submod_path is absolute; convert to repo-relative PurePosixPath
+    rel_path = PurePosixPath(submod_path.relative_to(repo.pathobj))
+    sm_record = dict(gitmodules.get(rel_path, {}))
+    # add internal properties that filters can reference via dot-prefix
+    sm_record['path'] = ds_pathobj / submod_path.relative_to(repo.pathobj)
+    if 'state' not in sm_record:
+        sm_record['state'] = props.get('state', 'unknown')
+    return match_filters(sm_record, parsed_filters)

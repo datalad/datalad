@@ -547,3 +547,30 @@ def test_diff_fr_none_one_get_content_annexinfo_call(path=None):
     with patch.object(AnnexRepo, "get_content_annexinfo") as gca:
         res = ds.diff(fr=None, to="HEAD", annex="all", result_renderer='disabled')
         eq_(gca.call_count, 1)
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_diff_r_filter(path=None):
+    """Test that diff passes recursion_filter through to _diff_ds"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    ds.save(message='set property')
+    # make modifications in both subdatasets
+    (sub1.pathobj / 'file1.txt').write_text('content1')
+    sub1.save(message='add file1')
+    (sub2.pathobj / 'file2.txt').write_text('content2')
+    sub2.save(message='add file2')
+    # without filter, recursive diff reports changes from both
+    all_res = ds.diff(recursive=True, fr='HEAD~1')
+    all_parentds = set(r.get('parentds') for r in all_res)
+    assert str(sub1.pathobj) in all_parentds or any('sub1' in r.get('path', '') for r in all_res)
+    # with filter, only sub1 content should appear
+    filtered = ds.diff(recursive=True, fr='HEAD~1',
+                       recursion_filter=['group=core'])
+    # sub2 content should not be reported (no recursion into sub2)
+    sub2_content = [r for r in filtered
+                    if r.get('parentds') == str(sub2.pathobj)]
+    assert len(sub2_content) == 0

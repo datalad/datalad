@@ -53,6 +53,10 @@ from datalad.support.filter import (
     parse_filter_spec,
 )
 from datalad.support.gitrepo import GitRepo
+from datalad.support.network import (
+    RI,
+    PathRI,
+)
 from datalad.support.param import Parameter
 from datalad.utils import (
     Path,
@@ -103,11 +107,6 @@ def _compute_relative_url_in_tree(
     -------
     RelativeUrlInTree
     """
-    from datalad.support.network import (
-        RI,
-        PathRI,
-    )
-
     for url_key in ('gitmodule_url', 'gitmodule_datalad-url'):
         url_val = sm.get(url_key)
         if not url_val:

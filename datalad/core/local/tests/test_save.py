@@ -1126,3 +1126,24 @@ def test_save_sub_trailing_sep_bf6547(path=None):
     )
     # make sure it has the .gitmodules record
     assert 'sub' in (ds.pathobj / '.gitmodules').read_text()
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_save_r_filter(path=None):
+    """Test that save passes recursion_filter through to Status"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    ds.save(message='set property')
+    # make modifications in both subdatasets
+    (sub1.pathobj / 'file1.txt').write_text('content1')
+    (sub2.pathobj / 'file2.txt').write_text('content2')
+    # save recursively with filter - only sub1 should be saved
+    res = ds.save(recursive=True, message='filtered save',
+                  recursion_filter=['group=core'])
+    # sub1 should have been saved (file1.txt committed)
+    ok_(not sub1.repo.dirty)
+    # sub2 should still have unsaved changes
+    ok_(sub2.repo.dirty)

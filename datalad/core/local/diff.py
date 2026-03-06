@@ -35,6 +35,10 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.exceptions import InvalidGitReferenceError
+from datalad.support.filter import (
+    match_submodule_filter,
+    parse_filter_spec,
+)
 from datalad.support.param import Parameter
 from datalad.utils import (
     ensure_list,
@@ -122,7 +126,8 @@ class Diff(Interface):
             annex=None,
             untracked='normal',
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            recursion_filter=None):
         yield from diff_dataset(
             dataset=dataset,
             fr=ensure_unicode(fr),
@@ -132,7 +137,8 @@ class Diff(Interface):
             annex=annex,
             untracked=untracked,
             recursive=recursive,
-            recursion_limit=recursion_limit)
+            recursion_limit=recursion_limit,
+            recursion_filter=recursion_filter)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: more cover
@@ -149,6 +155,7 @@ def diff_dataset(
         untracked='normal',
         recursive=False,
         recursion_limit=None,
+        recursion_filter=None,
         reporting_order='depth-first',
         datasets_only=False,
 ):
@@ -267,6 +274,12 @@ def diff_dataset(
     # availability information or at least enhance the respective commit
     # message with cross-dataset provenance info
 
+    cfg_filters = ds.config.get(
+        'datalad.recursion.filter', get_all=True, default=None)
+    all_filter_specs = ensure_list(recursion_filter) \
+        + ensure_list(cfg_filters)
+    parsed_filters = [parse_filter_spec(f) for f in all_filter_specs]
+
     # cache to help avoid duplicate status queries
     content_info_cache = {}
     for res in _diff_ds(
@@ -284,6 +297,7 @@ def diff_dataset(
             cache=content_info_cache,
             order=reporting_order,
             datasets_only=datasets_only,
+            parsed_filters=parsed_filters,
     ):
         res.update(
             refds=ds.path,
@@ -294,7 +308,8 @@ def diff_dataset(
 
 
 def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
-             annexinfo, cache, order='depth-first', datasets_only=False):
+             annexinfo, cache, order='depth-first', datasets_only=False,
+             parsed_filters=()):
     if not ds.is_installed():
         # asked to query a subdataset that is not available
         lgr.debug("Skip diff of unavailable subdataset: %s", ds)
@@ -395,7 +410,11 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             if subds_state in ('clean', 'deleted'):
                 # no need to look into the subdataset
                 continue
-            elif subds_state in ('added', 'modified'):
+            # check recursion filter before diving into subdataset
+            if parsed_filters and not match_submodule_filter(
+                    repo, ds.pathobj, path, props, parsed_filters):
+                continue
+            if subds_state in ('added', 'modified'):
                 # dive
                 subds = Dataset(pathinds)
                 call_args = (
@@ -425,6 +444,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     cache=cache,
                     order=order,
                     datasets_only=datasets_only,
+                    parsed_filters=parsed_filters,
                 )
                 if order in ('depth-first', 'bottom-up'):
                     yield from _diff_ds(*call_args, **call_kwargs)
