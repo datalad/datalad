@@ -1109,3 +1109,18 @@ def test_update_fetch_failure(path=None):
         status="ok",
         path=ds_b.path,
         action="update")
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_update_r_filter(path=None):
+    """Test that update passes recursion_filter through to subdatasets"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # update with filter matching only sub1 - should only process ds + sub1
+    res = ds.update(recursive=True, recursion_filter=['group=core'])
+    updated_paths = [r['path'] for r in res if r.get('type') == 'dataset']
+    assert str(sub1.pathobj) in updated_paths
+    assert str(sub2.pathobj) not in updated_paths

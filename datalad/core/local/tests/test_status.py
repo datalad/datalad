@@ -10,6 +10,8 @@
 
 import os.path as op
 
+import pytest
+
 import datalad.utils as ut
 from datalad.api import status
 from datalad.core.local.status import get_paths_by_ds
@@ -419,3 +421,33 @@ def test_get_paths_by_ds(path=None, otherdspath=None):
         list(paths_by_ds.keys()),
         [ds.pathobj, subds_modified.pathobj]
     )
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_status_r_filter(path=None):
+    """Test that status passes recursion_filter through the diff/status path"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # make modifications in both subdatasets so status has something to report
+    (sub1.pathobj / 'file1.txt').write_text('content1')
+    (sub2.pathobj / 'file2.txt').write_text('content2')
+    # without filter, recursive status reports from both subdatasets
+    all_res = ds.status(recursive=True)
+    all_paths = [r['path'] for r in all_res]
+    assert any('sub1' in p for p in all_paths)
+    assert any('sub2' in p for p in all_paths)
+    # with filter matching only sub1, sub2 should not appear
+    filtered = ds.status(recursive=True, recursion_filter=['group=core'])
+    filtered_paths = [r['path'] for r in filtered]
+    assert any('sub1' in p for p in filtered_paths)
+    assert not any(str(sub2.pathobj) in p for p in filtered_paths
+                   if 'sub2' in p and p != str(sub2.pathobj))
+    # actually, the subdataset record for sub2 itself will still appear
+    # (it's reported by the parent's diffstatus), but sub2's CONTENT
+    # should not be reported (no recursion into it)
+    sub2_content = [r for r in filtered
+                    if r.get('parentds') == str(sub2.pathobj)]
+    assert len(sub2_content) == 0

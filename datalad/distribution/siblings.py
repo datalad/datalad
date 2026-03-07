@@ -38,6 +38,7 @@ from datalad.interface.common_opts import (
     location_description,
     publish_by_default,
     publish_depends,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -197,7 +198,8 @@ class Siblings(Interface):
             doc="""Whether to query all information about the annex configurations
             of siblings. Can be disabled if speed is a concern"""),
         recursive=recursion_flag,
-        recursion_limit=recursion_limit)
+        recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter)
 
     @staticmethod
     @datasetmethod(name='siblings')
@@ -222,7 +224,8 @@ class Siblings(Interface):
             inherit=False,
             get_annex_info=True,
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            recursion_filter=None):
 
         # TODO: Detect malformed URL and fail?
         # XXX possibly fail if fetch is False and as_common_datasrc
@@ -298,6 +301,7 @@ class Siblings(Interface):
         for subds in ds.subdatasets(
                 state='present',
                 recursive=recursive, recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 result_xfm='datasets'):
             subds_repo = subds.repo
             subds_name = op.relpath(subds.path, start=ds.path)

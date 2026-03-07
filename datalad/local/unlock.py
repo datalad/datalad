@@ -30,6 +30,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -69,6 +70,7 @@ class Unlock(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
     )
 
     _examples_ = [
@@ -88,7 +90,8 @@ class Unlock(Interface):
             *,
             dataset=None,
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            recursion_filter=None):
         refds = require_dataset(dataset, check_installed=True,
                                 purpose="unlock")
 
@@ -137,6 +140,7 @@ class Unlock(Interface):
                 annex="availability",
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 result_renderer="disabled",
                 return_type="generator",
                 on_failure="ignore"):

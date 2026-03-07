@@ -40,6 +40,7 @@ from datalad.interface.common_opts import (
     contains,
     dataset_state,
     jobs_opt,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -156,6 +157,7 @@ class ForEachDataset(Interface):
         state=dataset_state,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         contains=contains,
         bottomup=Parameter(
             args=("--bottomup",),
@@ -212,6 +214,7 @@ class ForEachDataset(Interface):
             state='present',
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             contains=None,
             bottomup=False,
             subdatasets_only=False,
@@ -266,6 +269,7 @@ class ForEachDataset(Interface):
         subdatasets_it = refds.subdatasets(
             state=state,
             recursive=recursive, recursion_limit=recursion_limit,
+            recursion_filter=recursion_filter,
             contains=contains,
             bottomup=bottomup,
             result_xfm='paths',

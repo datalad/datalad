@@ -24,6 +24,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -200,6 +201,7 @@ class Update(Interface):
             --recursive CMD][PY: recursive=True PY] is specified.""", ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
@@ -225,6 +227,7 @@ class Update(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             fetch_all=None,
             reobtain_data=False):
         if fetch_all is not None:
@@ -248,6 +251,7 @@ class Update(Interface):
                 state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 return_type='generator',
                 result_renderer='disabled',
                 result_xfm=YieldDatasetAndRevision()) if recursive else []):

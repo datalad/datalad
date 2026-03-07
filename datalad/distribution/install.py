@@ -30,6 +30,7 @@ from datalad.interface.common_opts import (
     jobs_opt,
     location_description,
     reckless_opt,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -180,6 +181,7 @@ class Install(Interface):
         description=location_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         reckless=reckless_opt,
         jobs=jobs_opt,
     )
@@ -196,6 +198,7 @@ class Install(Interface):
             description=None,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             reckless=None,
             jobs="auto",
             branch=None):
@@ -218,6 +221,7 @@ class Install(Interface):
             get_data=get_data,
             recursive=recursive,
             recursion_limit=recursion_limit,
+            recursion_filter=recursion_filter,
             # git_opts=git_opts,
             # annex_opts=annex_opts,
             reckless=reckless,

@@ -31,6 +31,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import (
     jobs_opt,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -134,6 +135,7 @@ class Push(Interface):
                 'all', 'gitpush', 'checkdatapresent', None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         jobs=jobs_opt,
     )
 
@@ -185,6 +187,7 @@ class Push(Interface):
             force=None,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             jobs=None):
         # push uses '^' to annotate the previous pushed committish, and None for default
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
@@ -244,7 +247,8 @@ class Push(Interface):
             since,
             paths,
             recursive,
-            recursion_limit)
+            recursion_limit,
+            recursion_filter=recursion_filter)
 
         # instead of a loop, this could all be done in parallel
         matched_anything = False
@@ -314,7 +318,8 @@ class Push(Interface):
 
 
 
-def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
+def _datasets_since_(dataset, since, paths, recursive, recursion_limit,
+                     recursion_filter=None):
     """Generator"""
     # rely on diff() reporting sequentially across datasets
     cur_ds = None
@@ -335,6 +340,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             annex=None,
             recursive=recursive,
             recursion_limit=recursion_limit,
+            recursion_filter=recursion_filter,
             # TODO?: expose order as an option for diff and push
             # since in some cases breadth-first would be sufficient
             # and result in "taking action faster"

@@ -305,6 +305,26 @@ def test_dryrun(path=None):
         pytest.fail("Crashed with TypeError on uninstalled datasets")
 
 
+@pytest.mark.ai_generated
+@with_tempfile
+def test_dryrun_r_filter(path=None):
+    """Test that create_sibling_gitlab passes recursion_filter through"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # configure a project path so the command can resolve projects
+    ds.config.set('datalad.gitlab-dummy-project', 'testproj')
+    # dry run with recursion_filter
+    res = ds.create_sibling_gitlab(
+        site='dummy', recursive=True, dry_run=True,
+        recursion_filter=['group=core'],
+        on_failure='ignore')
+    # sub2 should not appear in results
+    filtered_paths = [r.get('path') for r in res]
+    assert str(sub2.pathobj) not in filtered_paths
+
+
 class _FakeGitLab(object):
     def __init__(self, site):
         pass

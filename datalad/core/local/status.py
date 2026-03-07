@@ -34,6 +34,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -42,6 +43,10 @@ from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
+)
+from datalad.support.filter import (
+    match_submodule_filter,
+    parse_filter_spec,
 )
 from datalad.support.param import Parameter
 from datalad.utils import (
@@ -90,7 +95,8 @@ _common_diffstatus_params = dict(
         untracked directories are reported as such; 'all': report
         individual files even in fully untracked directories."""),
     recursive=recursion_flag,
-    recursion_limit=recursion_limit)
+    recursion_limit=recursion_limit,
+    recursion_filter=recursion_filter)
 
 
 STATE_COLOR_MAP = {
@@ -104,7 +110,7 @@ STATE_COLOR_MAP = {
 
 def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
                          queried, eval_submodule_state, eval_filetype, cache,
-                         reporting_order):
+                         reporting_order, parsed_filters=()):
     """Internal helper to obtain status information on a dataset
 
     Parameters
@@ -200,6 +206,10 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
                 # See https://github.com/datalad/datalad/pull/4526 for the usecase
                 lgr.debug("Got status for itself, which should not happen, skipping %s", path)
                 continue
+            # check recursion filter before diving into subdataset
+            if parsed_filters and not match_submodule_filter(
+                    repo, ds.pathobj, path, props, parsed_filters):
+                continue
             subds = Dataset(str(cpath))
             if subds.is_installed():
                 call_args = (
@@ -215,6 +225,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
                 )
                 call_kwargs = dict(
                     reporting_order='depth-first',
+                    parsed_filters=parsed_filters,
                 )
                 if reporting_order == 'depth-first':
                     yield from yield_dataset_status(*call_args, **call_kwargs)
@@ -372,6 +383,7 @@ class Status(Interface):
             untracked='normal',
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             eval_subdataset_state='full',
             report_filetype=None):
         if report_filetype is not None:
@@ -395,6 +407,13 @@ class Status(Interface):
         ds = require_dataset(
             dataset, check_installed=True, purpose='report status')
         ds_path = ds.path
+
+        cfg_filters = ds.config.get(
+            'datalad.recursion.filter', get_all=True, default=None)
+        all_filter_specs = ensure_list(recursion_filter) \
+            + ensure_list(cfg_filters)
+        parsed_filters = [parse_filter_spec(f) for f in all_filter_specs]
+
         queried = set()
         content_info_cache = {}
         for res in _yield_paths_by_ds(ds, dataset, ensure_list(path)):
@@ -414,7 +433,8 @@ class Status(Interface):
                     eval_subdataset_state,
                     None,
                     content_info_cache,
-                    reporting_order='depth-first'):
+                    reporting_order='depth-first',
+                    parsed_filters=parsed_filters):
                 if 'status' not in r:
                     r['status'] = 'ok'
                 yield dict(

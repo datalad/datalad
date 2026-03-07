@@ -12,6 +12,7 @@ import os
 from os.path import basename
 from unittest.mock import patch
 
+import pytest
 import requests
 
 from datalad.api import (
@@ -199,3 +200,22 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint,
                 reponame)
         else:
             resp.raise_for_status()
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_dryrun_r_filter(path=None):
+    """Test that create_sibling_gin passes recursion_filter in dry-run"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # dry run with recursion_filter -- credential='some' avoids ValueError
+    res = ds.create_sibling_gin(
+        'test-repo', recursive=True, dry_run=True,
+        recursion_filter=['group=core'],
+        credential='some',
+        on_failure='ignore')
+    # sub2 should not appear in results
+    filtered_paths = [r.get('path') for r in res]
+    assert str(sub2.pathobj) not in filtered_paths

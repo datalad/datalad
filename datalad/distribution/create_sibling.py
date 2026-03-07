@@ -58,6 +58,7 @@ from datalad.interface.common_opts import (
     inherit_opt,
     publish_by_default,
     publish_depends,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -509,6 +510,7 @@ class CreateSibling(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
@@ -574,6 +576,7 @@ class CreateSibling(Interface):
                  dataset=None,
                  recursive=False,
                  recursion_limit=None,
+                 recursion_filter=None,
                  existing='error',
                  shared=None,
                  group=None,
@@ -704,6 +707,7 @@ class CreateSibling(Interface):
                     annex=None,
                     untracked='no',
                     recursive=True,
+                    recursion_filter=recursion_filter,
                     datasets_only=True,
                 )
                 # not installed subdatasets would be 'clean' so we would skip them

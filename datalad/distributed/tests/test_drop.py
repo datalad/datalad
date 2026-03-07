@@ -12,6 +12,8 @@ import os.path as op
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from datalad.api import (
     Dataset,
     clone,
@@ -629,3 +631,27 @@ def test_nodrop_symlinked_annex(origpath=None, clonepath=None):
         # https://github.com/datalad/datalad/issues/6960
         dsclone2.get('.')
     _droptest(dsclone2)
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_drop_r_filter(path=None):
+    """Test that drop passes recursion_filter through to subdatasets"""
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    # put a file in each subdataset so there is content to drop
+    (sub1.pathobj / 'f1.txt').write_text('content1')
+    sub1.save()
+    (sub2.pathobj / 'f2.txt').write_text('content2')
+    sub2.save()
+    ds.save()
+    # set a property on sub1 only
+    ds.subdatasets(set_property=[('group', 'keep')], path='sub1')
+    # drop with filter matching only sub1 (has group property)
+    res = ds.drop(recursive=True, reckless='availability',
+                  recursion_filter=['group?'])
+    # only sub1 should have been processed (not sub2)
+    drop_paths = [r['path'] for r in res if r.get('action') == 'drop']
+    assert any(str(sub1.pathobj) in p for p in drop_paths)
+    assert not any(str(sub2.pathobj) in p for p in drop_paths)

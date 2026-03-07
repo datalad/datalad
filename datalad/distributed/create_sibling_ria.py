@@ -40,6 +40,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -274,6 +275,7 @@ class CreateSiblingRia(Interface):
         ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         trust_level=Parameter(
             args=("--trust-level",),
             metavar="TRUST-LEVEL",
@@ -307,6 +309,7 @@ class CreateSiblingRia(Interface):
                  trust_level=None,
                  recursive=False,
                  recursion_limit=None,
+                 recursion_filter=None,
                  disable_storage__=None,
                  push_url=None
                  ):
@@ -385,7 +388,8 @@ class CreateSiblingRia(Interface):
                     ds,
                     (name, storage_name),
                     recursive=recursive,
-                    recursion_limit=recursion_limit):
+                    recursion_limit=recursion_limit,
+                    recursion_filter=recursion_filter):
                 res = get_status_dict(
                     status='error',
                     message=(
@@ -450,6 +454,7 @@ class CreateSiblingRia(Interface):
             for subds in ds.subdatasets(state='present',
                                         recursive=True,
                                         recursion_limit=recursion_limit,
+                                        recursion_filter=recursion_filter,
                                         return_type='generator',
                                         result_renderer='disabled',
                                         result_xfm='datasets'):

@@ -30,6 +30,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import (
     jobs_opt,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
     save_message_opt,
@@ -129,6 +130,7 @@ class Save(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         updated=Parameter(
             args=('-u', '--updated',),
             action='store_true',
@@ -166,6 +168,7 @@ class Save(Interface):
                  message=None, dataset=None,
                  version_tag=None,
                  recursive=False, recursion_limit=None,
+                 recursion_filter=None,
                  updated=False,
                  message_file=None,
                  to_git=None,
@@ -228,6 +231,7 @@ class Save(Interface):
                 untracked=untracked_mode,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 on_failure='ignore',
                 # for save without recursion only commit matters
                 eval_subdataset_state='full' if recursive else 'commit',

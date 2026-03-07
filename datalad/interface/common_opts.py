@@ -43,6 +43,17 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdatasets to the given number of levels""")
 
+recursion_filter = Parameter(
+    args=("--r-filter",),
+    metavar="EXPR",
+    action='append',
+    doc="""filter expression to select subdatasets during recursive
+    operations. Bare keywords (e.g. 'url', 'name') match .gitmodules
+    properties. Dot-prefixed keywords (e.g. '.state') match internal
+    properties. Operators: = != ~= !~ ? !?. Multiple filters are ANDed.
+    """,
+    constraints=EnsureStr() | EnsureNone())
+
 contains = Parameter(
     args=('--contains',),
     metavar='PATH',

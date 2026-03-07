@@ -27,6 +27,7 @@ from datalad.downloaders.credentials import Token
 from datalad.downloaders.http import DEFAULT_USER_AGENT
 from datalad.interface.common_opts import (
     publish_depends,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -88,6 +89,7 @@ class _GitHubLike(object):
             constraints=EnsureStr()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         name=Parameter(
             args=('-s', '--name',),
             metavar='NAME',
@@ -225,10 +227,11 @@ class _GitHubLike(object):
 
     def get_dataset_reponame_mapping(
             self, ds, name, reponame, existing, recursive, recursion_limit,
-            res_kwargs):
+            res_kwargs, recursion_filter=None):
         """Discover all relevant datasets locally, and build remote repo names
         """
-        dss = _get_present_datasets(ds, recursive, recursion_limit)
+        dss = _get_present_datasets(ds, recursive, recursion_limit,
+                                    recursion_filter=recursion_filter)
         # check for existing remote configuration
         toprocess = []
         toyield = []
@@ -579,6 +582,7 @@ def _create_sibling(
         dataset=None,
         recursive=False,
         recursion_limit=None,
+        recursion_filter=None,
         name=None,
         existing='error',
         access_protocol='https',
@@ -627,7 +631,8 @@ def _create_sibling(
 
     toprocess, filterresults = platform.get_dataset_reponame_mapping(
         ds, name, reponame, existing, recursive, recursion_limit,
-        res_kwargs
+        res_kwargs,
+        recursion_filter=recursion_filter,
     )
     yield from filterresults
 
@@ -665,7 +670,8 @@ def split_org_repo(name):
         return split[0], split[1]
 
 
-def _get_present_datasets(ds, recursive, recursion_limit):
+def _get_present_datasets(ds, recursive, recursion_limit,
+                          recursion_filter=None):
     """Return list of (sub)dataset instances for all locally present datasets
     """
     # gather datasets and essential info
@@ -677,6 +683,7 @@ def _get_present_datasets(ds, recursive, recursion_limit):
                 state='any',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 result_xfm='datasets',
                 result_renderer='disabled',
                 return_type='generator'):

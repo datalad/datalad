@@ -32,6 +32,7 @@ from datalad.interface.common_opts import (
     jobs_opt,
     location_description,
     reckless_opt,
+    recursion_filter,
     recursion_flag,
 )
 from datalad.interface.results import (
@@ -461,7 +462,8 @@ def _install_necessary_subdatasets(
 
 
 def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
-                 refds_path=None, description=None, jobs=None, producer_only=False):
+                 refds_path=None, description=None, jobs=None, producer_only=False,
+                 recursion_filter=None):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
     # install using helper that give some flexibility regarding where to
@@ -475,6 +477,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
     def gen_subs_to_install():  # producer
         for sub in ds.subdatasets(
                 path=start,
+                recursion_filter=recursion_filter,
                 return_type='generator',
                 result_renderer='disabled'):
             sub_path = sub['path']
@@ -517,7 +520,8 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 reckless=reckless,
                 refds_path=refds_path,
                 jobs=jobs,
-                producer_only=True  # we will be adding to producer queue
+                producer_only=True,  # we will be adding to producer queue
+                recursion_filter=recursion_filter,
         ):
             producer_consumer.add_to_producer_queue(res)
 
@@ -546,6 +550,7 @@ def _install_targetpath(
         refds_path,
         description,
         jobs=None,
+        recursion_filter=None,
 ):
     """Helper to install as many subdatasets as needed to verify existence
     of a target path
@@ -607,6 +612,7 @@ def _install_targetpath(
                 path=target_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                recursion_filter=recursion_filter,
                 return_type='generator',
                 result_renderer='disabled'):
             res.update(
@@ -634,6 +640,7 @@ def _install_targetpath(
             refds_path=refds_path,
             description=description,
             jobs=jobs,
+            recursion_filter=recursion_filter,
     ):
         # yield immediately so errors could be acted upon
         # outside, before we continue
@@ -848,6 +855,7 @@ class Get(Interface):
             Alternatively, 'existing' will limit recursion to subdatasets that already
             existed on the filesystem at the start of processing, and prevent new
             subdatasets from being obtained recursively."""),
+        recursion_filter=recursion_filter,
         get_data=Parameter(
             args=("-n", "--no-data",),
             dest='get_data',
@@ -869,6 +877,7 @@ class Get(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             get_data=True,
             description=None,
             reckless=None,
@@ -936,6 +945,7 @@ class Get(Interface):
                             refds_path,
                             description,
                             jobs=jobs,
+                            recursion_filter=recursion_filter,
                     ):
                         # fish out the datasets that 'contains' a targetpath
                         # and store them for later
@@ -977,6 +987,7 @@ class Get(Interface):
                         refds_path,
                         description,
                         jobs=jobs,
+                        recursion_filter=recursion_filter,
                 ):
                     known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \

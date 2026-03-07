@@ -33,6 +33,7 @@ from ..interface.base import (
 )
 from ..interface.common_opts import (
     publish_depends,
+    recursion_filter,
     recursion_flag,
     recursion_limit,
 )
@@ -188,6 +189,7 @@ class CreateSiblingGitlab(Interface):
             """),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        recursion_filter=recursion_filter,
         name=Parameter(
             args=('-s', '--name',),
             metavar='NAME',
@@ -241,6 +243,7 @@ class CreateSiblingGitlab(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            recursion_filter=None,
             name=None,
             existing='error',
             access=None,
@@ -291,6 +294,7 @@ class CreateSiblingGitlab(Interface):
                     state='present',
                     recursive=recursive,
                     recursion_limit=recursion_limit,
+                    recursion_filter=recursion_filter,
                     contains=None,
                     bottomup=False,
                     result_xfm='datasets',
