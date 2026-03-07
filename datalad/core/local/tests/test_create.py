@@ -21,6 +21,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
 from datalad.tests.utils_pytest import (
+    DEFAULT_BRANCH,
     OBSCURE_FILENAME,
     assert_in,
     assert_in_results,
@@ -30,6 +31,7 @@ from datalad.tests.utils_pytest import (
     assert_status,
     eq_,
     has_symlink_capability,
+    neq_,
     ok_,
     ok_exists,
     swallow_outputs,
@@ -194,7 +196,7 @@ def test_create_sub(path=None):
     ds.create()
 
     # 1. create sub and add to super:
-    subds = ds.create(op.join("some", "what", "deeper"))
+    subds = ds.create(op.join("some", "what", "deeper"), message="custom create message")
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     assert_repo_status(subds.path, annex=True)
@@ -211,6 +213,9 @@ def test_create_sub(path=None):
               ds.subdatasets(result_xfm='relpaths'))
     # and was committed:
     assert_repo_status(ds.path)
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom create message")
+    # child is unaffected
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom create message")
 
     # subds finds superdataset
     ok_(subds.get_superdataset() == ds)
