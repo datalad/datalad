@@ -601,6 +601,7 @@ def _get_adjust_mode(branch_name):
         'unlocked': '--unlock',
         'locked': '--lock',
         'fix': '--fix',
+        'fixed': '--fix',
         'hidemissing': '--hide-missing',
     }
     return mode_to_option.get(mode, '--unlock')
@@ -626,10 +627,21 @@ def _annex_reset_target(repo, _remote, target, opts=None):
     def do_reset():
         # Checkout the corresponding branch
         repo.call_git(['checkout', corr_branch])
-        # Reset to target
-        repo.call_git(['reset', '--hard', target])
-        # Re-adjust with --force to overwrite existing adjusted branch
-        repo.call_annex(['adjust', adjust_mode, '--force'])
+        try:
+            # Reset to target
+            repo.call_git(['reset', '--hard', target])
+            # Re-adjust with --force to overwrite existing adjusted branch
+            repo.call_annex(['adjust', adjust_mode, '--force'])
+        except Exception:
+            # Try to restore the adjusted branch so the repo isn't stranded
+            # on the corresponding branch
+            try:
+                repo.call_annex(['adjust', adjust_mode, '--force'])
+            except Exception:
+                lgr.debug(
+                    "Failed to restore adjusted branch %s after "
+                    "failed reset", active_branch, exc_info=True)
+            raise
 
     yield _try_command(
         {"action": "update.reset", "message": ("Reset to %s", target)},

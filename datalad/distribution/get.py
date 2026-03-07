@@ -1010,19 +1010,16 @@ class Get(Interface):
                             continue
                         yield res
 
-        # On adjusted branches, parent datasets are now synced immediately
-        # after each subdataset installation (in _install_subds_from_flexible_source)
-        # to minimize the duration of inconsistent state. This batched sync
-        # is kept as a fallback for any edge cases but should typically be empty.
+        # On adjusted branches, parent datasets need their index synced after
+        # subdataset installations. Sync bottom-up so nested hierarchies are
+        # consistent.
         if adjusted_branch_parents:
             lgr.debug(
-                "Batched sync has %d parents (should be 0 with immediate sync)",
+                "Syncing %d parent datasets on adjusted branches",
                 len(adjusted_branch_parents))
             for parent_path in sorted(adjusted_branch_parents,
                                       key=len, reverse=True):
-                lgr.debug(
-                    "Syncing %s (fallback batched sync)",
-                    parent_path)
+                lgr.debug("Syncing %s", parent_path)
                 Dataset(parent_path).repo.call_annex(['sync', '--no-pull', '--no-push'])
 
         if not get_data:
