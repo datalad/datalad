@@ -51,6 +51,14 @@ _EXTENSION_DEPRECATION_ALLOWLIST: dict[str, set[str]] = {
     r"assure_\w+ is deprecated": {
         "datalad_crawler",
     },
+    # datalad-crawler uses AnnexRepo.get_file_key()
+    r"AnnexRepo\.get_file_key\(\) is deprecated": {
+        "datalad_crawler",
+    },
+    # datalad-crawler uses subdatasets's fulfilled option
+    r"subdatasets's `fulfilled` option is deprecated": {
+        "datalad_crawler",
+    },
 }
 
 
@@ -176,13 +184,14 @@ def pytest_ignore_collect(collection_path: Path) -> bool:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_collectstart(collector):
+def pytest_make_collect_report(collector):
     """During collection, suppress allowlisted deprecations per-extension.
 
-    Module imports happen during collection, so deprecated API usage (e.g.
-    decorators, module-level imports) triggers DeprecationWarnings here.
-    We save/restore the filter list around each Module so that ignores
-    only apply to the extension that owns that module.
+    Module imports happen inside ``collector.collect()`` which this hook
+    wraps, so deprecated API usage (e.g. decorators, module-level imports)
+    triggers DeprecationWarnings here.  We save/restore the filter list
+    around each Module so that ignores only apply to the extension that
+    owns that module.
     """
     if not isinstance(collector, pytest.Module):
         yield
@@ -206,10 +215,11 @@ def pytest_runtest_protocol(item, nextitem):
     ``trylast=True`` ensures we run inside the ``_pytest.warnings`` plugin's
     ``catch_warnings()`` context, so our filters are cleaned up automatically.
     """
+    # DoctestItem has no .module attribute
+    module = getattr(item, "module", None)
     ext_pkg = (
-        _get_extension_package(item.module.__name__)
-        or _get_extension_package_from_path(item.path)
-    )
+        _get_extension_package(module.__name__) if module else None
+    ) or _get_extension_package_from_path(item.path)
     if ext_pkg:
         _add_allowlist_filters(ext_pkg)
     yield
