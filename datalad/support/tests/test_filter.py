@@ -7,6 +7,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for filter expression parsing and matching"""
 
+from pathlib import PurePosixPath
+
 import pytest
 
 from datalad.support.filter import (
@@ -63,7 +65,7 @@ def test_parse_filter_spec_invalid(expr):
     # dot key not found
     ('.state', {'gitmodule_url': 'http://example.com'}, ('', False)),
     # Path converted to str
-    ('.path', {'path': Path('/some/path')}, ('/some/path', True)),
+    ('.path', {'path': PurePosixPath('/some/path')}, ('/some/path', True)),
     # bare key with hyphen
     ('datalad-id', {'gitmodule_datalad-id': 'abc123'}, ('abc123', True)),
 ])

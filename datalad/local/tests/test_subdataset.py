@@ -540,9 +540,13 @@ def test_subdatasets_r_filter_relative_url_in_tree(path=None):
         cwd=str(deriv.pathobj),
         check=True,
     )
-    # save changes
+    # save changes in derivatives/sub1 (records the new submodule)
     deriv.save(message='add input submodule with relative URL')
-    ds.save(recursive=True, message='save all')
+    # save top-level non-recursively — recursive save would try to
+    # resolve branches inside the nested input submodule which fails
+    # on adjusted-branch filesystems (CrippledFS) where the corresponding
+    # regular branch may not exist locally (gh-7820)
+    ds.save(message='save all')
 
     # First, without filter, confirm recursive query sees all 3 subdatasets
     all_res = ds.subdatasets(recursive=True)
