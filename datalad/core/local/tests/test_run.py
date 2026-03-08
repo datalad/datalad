@@ -839,3 +839,140 @@ def test_substitution_config():
         eq_(_format_iospecs(['{dummy}'],
                             **_get_substitutions(dset)),
             ['a', 'b'])
+
+
+# -- Tests for run producing merge commits when command creates commits --
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_cmd_creates_commits(path=None):
+    from datalad.local.rerun import get_run_info
+    ds = Dataset(path).create()
+    # Run a command that creates a commit internally
+    ds.run('touch foo && git add foo && git commit -m "inner commit"')
+    assert_repo_status(ds.path)
+    # HEAD should be a merge commit (2 parents)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    # First parent is the pre-command state, second is command's commits
+    parent1 = ds.repo.get_hexsha("HEAD^1")
+    parent2 = ds.repo.get_hexsha("HEAD^2")
+    neq_(parent1, parent2)
+    # Run record should be extractable from the merge commit message
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    assert_in("cmd", info)
+    # The file created by the inner commit should exist
+    ok_((ds.pathobj / "foo").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_no_merge_without_inner_commits(path=None):
+    from datalad.local.rerun import get_run_info
+    ds = Dataset(path).create()
+    # Run a command that does NOT create commits
+    ds.run('touch bar')
+    assert_repo_status(ds.path)
+    # HEAD should NOT be a merge commit
+    assert_false(ds.repo.commit_exists("HEAD^2"))
+    # Run record should still be present
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    ok_((ds.pathobj / "bar").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_multiple_inner_commits(path=None):
+    from datalad.local.rerun import get_run_info
+    ds = Dataset(path).create()
+    # Run a command that creates multiple commits
+    ds.run(
+        'touch f1 && git add f1 && git commit -m "first" && '
+        'touch f2 && git add f2 && git commit -m "second"'
+    )
+    assert_repo_status(ds.path)
+    # Should still be a single merge commit wrapping all
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    assert_false(ds.repo.commit_exists("HEAD^3"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    ok_((ds.pathobj / "f1").exists())
+    ok_((ds.pathobj / "f2").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_inner_commits_plus_uncommitted(path=None):
+    from datalad.local.rerun import get_run_info
+    ds = Dataset(path).create()
+    # Command commits one file but leaves another uncommitted
+    ds.run(
+        'touch committed && git add committed && git commit -m "inner" && '
+        'touch uncommitted'
+    )
+    assert_repo_status(ds.path)
+    # Should be a merge commit
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    # Both files should exist and be tracked
+    ok_((ds.pathobj / "committed").exists())
+    ok_((ds.pathobj / "uncommitted").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_undeclared_committed_error(path=None):
+    ds = Dataset(path).create()
+    # Make repo dirty (explicit mode allows dirty)
+    (ds.pathobj / "dirty").write_text("dirty")
+    # In explicit mode, command commits a file not declared as output -> error
+    res = ds.run(
+        'touch foo && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["declared_output"],
+        on_failure="ignore",
+        result_renderer=None
+    )
+    assert_in_results(
+        res,
+        status="error",
+        action="run",
+    )
+    # Verify the error message mentions undeclared files
+    error_results = [r for r in res
+                     if r.get("action") == "run" and r.get("status") == "error"]
+    ok_(any("not declared as --output" in str(r.get("message", ""))
+            for r in error_results))
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_undeclared_committed_ignore(path=None):
+    from datalad.local.rerun import get_run_info
+    ds = Dataset(path).create()
+    # Set config to ignore undeclared committed files
+    ds.config.set('datalad.run.dirty-committed', 'ignore', scope='local')
+    # In explicit mode, command commits a file not declared as output
+    # With config=ignore, this should proceed
+    ds.run(
+        'touch foo && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["foo"],
+    )
+    # Should succeed with a merge commit
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)

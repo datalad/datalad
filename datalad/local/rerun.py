@@ -301,15 +301,21 @@ def _revrange_as_results(dset, revrange):
                 "Error on {}'s message".format(rev)) from exc
 
         if info is not None:
-            if len(parents) != 1:
+            if len(parents) == 2:
+                # Run-merge commit: command created intermediate commits.
+                # Rerunnable — use parent[0] as the base.
+                res["run_info"] = info
+                res["run_message"] = msg
+            elif len(parents) != 1:
                 lgr.warning(
                     "%s has run information but is a %s commit; "
                     "it will not be re-executed",
                     rev,
                     "merge" if len(parents) > 1 else "root")
                 continue
-            res["run_info"] = info
-            res["run_message"] = msg
+            else:
+                res["run_info"] = info
+                res["run_message"] = msg
         yield dict(res, status="ok")
 
 
@@ -474,8 +480,20 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
         parent = res["parents"][0]
         new_base = new_bases.get(parent)
         head_to_restore = None  # ... to find our way back if we skip.
+        # Run-merge commit: command created intermediate commits,
+        # so we must checkout the first parent to recreate pre-command state.
+        is_run_merge = (
+            len(res.get("parents", [])) > 1 and "run_info" in res
+        )
 
-        if new_base:
+        if is_run_merge:
+            # For run-merge commits, always checkout the first parent
+            # (or its remapped equivalent) to recreate pre-command state.
+            checkout_target = new_bases.get(parent, parent)
+            if checkout_target != head:
+                ds_repo.checkout(checkout_target)
+                head = checkout_target
+        elif new_base:
             if new_base != head:
                 ds_repo.checkout(new_base)
                 head_to_restore, head = head, new_base
