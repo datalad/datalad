@@ -159,6 +159,16 @@ def test_configuration_r_filter(path=None):
     sub1 = ds.create('sub1')
     sub2 = ds.create('sub2')
     ds.subdatasets(set_property=[('group', 'core')], path='sub1')
+    # extensions (e.g. datalad-next) may replace Configuration.__call__
+    # without recursion_filter support — check after extensions are loaded
+    import inspect
+
+    from datalad.local.configuration import Configuration
+    sig = inspect.signature(Configuration.__call__)
+    if 'recursion_filter' not in sig.parameters:
+        pytest.skip(
+            'Configuration.__call__ does not support recursion_filter '
+            '(likely patched by an extension)')
     # set config recursively with filter matching only sub1
     res = ds.configuration(
         'set', spec=['datalad.test.r-filter=yes'],
