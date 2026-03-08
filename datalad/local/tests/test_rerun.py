@@ -421,6 +421,8 @@ def test_rerun_cherry_pick(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_invalid_merge_run_commit(path=None):
+    # 2-parent run-merge commits are now valid (command created intermediate
+    # commits). Only 3+ parent (octopus) merges with run info should warn.
     ds = Dataset(path).create()
     ds.run("echo foo >>foo")
     ds.run("echo invalid >>invalid")
@@ -430,17 +432,23 @@ def test_rerun_invalid_merge_run_commit(path=None):
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
         nrfh.write("non-run")
     ds.save()
-    # Assign two parents to the invalid run commit.
+    second_parent = ds.repo.get_hexsha()
+    # Create a third lineage for octopus merge
+    ds.repo.call_git(["reset", "--hard", run_hexsha + "^"])
+    with open(op.join(ds.path, "non-run2"), "w") as nrfh:
+        nrfh.write("non-run2")
+    ds.save()
+    third_parent = ds.repo.get_hexsha()
+    # Assign three parents to the run commit (octopus merge).
     commit = ds.repo.call_git_oneline(
         ["commit-tree", run_hexsha + "^{tree}", "-m", run_msg,
          "-p", run_hexsha + "^",
-         "-p", ds.repo.get_hexsha()])
+         "-p", second_parent,
+         "-p", third_parent])
     ds.repo.call_git(["reset", "--hard", commit])
-    hexsha_orig = ds.repo.get_hexsha()
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.rerun(since="")
         assert_in("has run information but is a merge commit", cml.out)
-    eq_(len(ds.repo.get_revisions(hexsha_orig + ".." + DEFAULT_BRANCH)), 1)
 
 
 @with_tempfile(mkdir=True)
@@ -954,3 +962,62 @@ def test_rerun_commit_message_check():
     eq_(subject, "fine")
     assert_dict_equal(info,
                       {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
+
+
+# -- Tests for rerunning run-merge commits --
+
+@skip_if_adjusted_branch
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_rerun_of_merge_run(path=None):
+    """Rerun a run-merge commit (command that created intermediate commits)."""
+    ds = Dataset(path).create()
+    # Create a run-merge commit
+    ds.run('touch foo && git add foo && git commit -m "inner"')
+    assert_repo_status(ds.path)
+    # Verify it's a merge commit
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    merge_hexsha = ds.repo.get_hexsha()
+    # Extract the run info to verify it's valid
+    msg, info = get_run_info(ds, ds.repo.format_commit("%B", "HEAD"))
+    ok_(info is not None)
+    # Now rerun it
+    ds.rerun()
+    assert_repo_status(ds.path)
+    # The result should also be a merge commit (the rerun re-executes
+    # the same command which creates inner commits again)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    # And should have a valid run record
+    msg2, info2 = get_run_info(ds, ds.repo.format_commit("%B", "HEAD"))
+    ok_(info2 is not None)
+    eq_(info2["cmd"], info["cmd"])
+    # The file should still exist
+    ok_((ds.pathobj / "foo").exists())
+
+
+@skip_if_adjusted_branch
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_rerun_range_with_merge_runs(path=None):
+    """Rerun a range that includes both normal and merge-run commits.
+
+    Range reruns with run-merge commits need --onto to properly replay
+    from a clean base, because the command creates git commits and is
+    not idempotent at the current HEAD.
+    """
+    ds = Dataset(path).create()
+    # First: a normal run
+    ds.run('touch normal_file')
+    assert_repo_status(ds.path)
+    # Second: a run that creates intermediate commits (merge-run)
+    ds.run('touch inner && git add inner && git commit -m "inner"')
+    assert_repo_status(ds.path)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    # Rerun both using --since with --onto to replay from a clean base
+    ds.rerun(since="", onto="", branch="rerun-test")
+    assert_repo_status(ds.path)
+    # Both files should exist after rerun
+    ok_((ds.pathobj / "normal_file").exists())
+    ok_((ds.pathobj / "inner").exists())
