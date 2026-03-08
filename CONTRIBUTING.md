@@ -189,7 +189,7 @@ tox -e py3
 
 ### Contributor files
 
-Contributor metadata is maintained in [.tributors](.tributors) from which 
+Contributor metadata is maintained in [.tributors](.tributors) from which
 [.zenodo.json](.zenodo.json) and [.all-contributorsrc](.all-contributorsrc) are updated:
 [GitHub Action](.github/workflows/update-contributors.yml)
 automatically updates contributor records on merges to master.  For manual
