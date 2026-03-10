@@ -1142,6 +1142,7 @@ def _mock_open_for_writing(open_file_abspath):
     return _fake
 
 
+@pytest.mark.ai_generated
 @with_tempfile
 def test_save_skip_openfiles(path=None):
     ds = Dataset(path).create(annex=False)
@@ -1194,3 +1195,17 @@ def test_save_skip_openfiles(path=None):
             res = ds.save(on_failure='ignore')
             cml.assert_logged('.*open for writing by other processes')
     assert_in_results(res, path=str(f_open), status='ok', action='add')
+
+
+@pytest.mark.ai_generated
+def test_check_for_openfiles_invalid_config(tmp_path):
+    """_check_for_openfiles raises ValueError on invalid config."""
+    ds = Dataset(str(tmp_path)).create(annex=False)
+    f = ds.pathobj / 'dummy.txt'
+    f.write_text('content')
+    with patch(
+        'datalad.support.gitrepo.get_files_open_for_writing',
+        side_effect=_mock_open_for_writing(str(f)),
+    ):
+        with assert_raises(ValueError):
+            ds.repo._check_for_openfiles({'dummy.txt': {}}, 'bogus')
