@@ -668,7 +668,7 @@ def test_merge_follow_parentds_subdataset_other_branch(path=None):
 
     res = ds_clone.update(merge=True, follow="parentds", recursive=True,
                           on_failure="ignore")
-    # After commit fb892ac1b, update --follow=parentds now works on adjusted
+    # After commit 463627692, update --follow=parentds now works on adjusted
     # branches using git annex merge.
     assert_in_results(res, action="update", status="ok")
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
@@ -704,7 +704,7 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
     ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
 
-    # After commit fb892ac1b, update --follow=parentds now works on adjusted
+    # After commit 463627692, update --follow=parentds now works on adjusted
     # branches using git annex merge. Verify both parent and subdataset update
     # successfully.
     results = ds_clone.update(merge=True, recursive=True, follow="parentds",
@@ -758,7 +758,7 @@ def test_merge_follow_parentds_subdataset_detached(path=None, *, on_adjusted):
     res = ds_clone.update(merge=True, recursive=True, follow="parentds",
                           on_failure="ignore")
     if on_adjusted:
-        # After commit fb892ac1b enabled update --follow=parentds on adjusted
+        # After commit 463627692 enabled update --follow=parentds on adjusted
         # branches, both parent and nested subdatasets can be updated successfully.
         assert_in_results(
             res,
@@ -879,7 +879,7 @@ def test_update_follow_parentds_lazy(path=None):
     # `-- s2      * matches registered commit
     res = ds_clone.update(follow="parentds-lazy", merge=True, recursive=True,
                           on_failure="ignore")
-    # After commit fb892ac1b, follow=parentds works on adjusted branches,
+    # After commit 463627692, follow=parentds works on adjusted branches,
     # so behavior is consistent across branch types.
     assert_result_count(res, 2, action="update", status="notneeded")
     assert_in_results(res, action="update", status="notneeded",

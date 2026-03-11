@@ -360,7 +360,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             # adjusted branches. After installation, the subdataset's HEAD is an
             # adjusted commit which differs from the corresponding branch commit
             # recorded in the parent's gitlink. The diffstatus fix in commit
-            # 564952047 makes status checks accept either commit as clean.
+            # df3f1c065 makes status checks accept either commit as clean.
             # We don't modify the gitlink here to avoid interfering with later
             # merge operations during update.
         yield res

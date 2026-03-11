@@ -17,6 +17,7 @@ import itertools
 import logging
 from os.path import lexists
 
+from datalad.consts import ADJUSTED_BRANCH_EXPR
 from datalad.distribution.dataset import require_dataset
 from datalad.interface.base import (
     Interface,
@@ -590,13 +591,12 @@ def _get_adjust_mode(branch_name):
 
     E.g., 'adjusted/master(unlocked)' -> '--unlock'
     """
-    import re
-    match = re.match(r'adjusted/[^(]+\(([^)]+)\)', branch_name or '')
+    match = ADJUSTED_BRANCH_EXPR.match(branch_name or '')
     if not match:
         # Default to unlocked mode as it is the most common adjustment,
         # especially on crippled filesystems where unlocked behavior is expected.
         return '--unlock'
-    mode = match.group(1)
+    mode = match.group('mode')
     mode_to_option = {
         'unlocked': '--unlock',
         'locked': '--lock',
