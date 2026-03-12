@@ -57,7 +57,7 @@ GITHUB_LOGIN_URL = 'https://github.com/login'
 GITHUB_TOKENS_URL = 'https://github.com/settings/tokens'
 
 # format of git-annex adjusted branch names
-ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\(.*\)$')
+ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\((?P<mode>[^)]*)\)$')
 
 # Reserved file names on Windows machines
 RESERVED_NAMES_WIN = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3',
