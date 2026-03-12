@@ -1000,54 +1000,38 @@ def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
-def test_rerun_of_merge_run(path=None):
-    """Rerun a run-merge commit (command that created intermediate commits)."""
+def test_rerun_merge_runs(path=None):
+    """Rerun of merge-run commits (commands that create intermediate commits).
+
+    Tests both single rerun and range rerun with --onto.
+    """
     ds = Dataset(path).create()
-    # Create a run-merge commit
+
+    # 1. Create a run-merge commit and rerun it
     ds.run('touch foo && git add foo && git commit -m "inner"')
     assert_repo_status(ds.path)
-    # Verify it's a merge commit
     ok_(ds.repo.commit_exists("HEAD^2"))
-    merge_hexsha = ds.repo.get_hexsha()
-    # Extract the run info to verify it's valid
     msg, info = get_run_info(ds, ds.repo.format_commit("%B", "HEAD"))
     ok_(info is not None)
-    # Now rerun it
+
     ds.rerun()
     assert_repo_status(ds.path)
-    # The result should also be a merge commit (the rerun re-executes
-    # the same command which creates inner commits again)
+    # The rerun re-executes the same command which creates inner commits again
     ok_(ds.repo.commit_exists("HEAD^2"))
-    # And should have a valid run record
     msg2, info2 = get_run_info(ds, ds.repo.format_commit("%B", "HEAD"))
     ok_(info2 is not None)
     eq_(info2["cmd"], info["cmd"])
-    # The file should still exist
     ok_((ds.pathobj / "foo").exists())
 
-
-@skip_if_adjusted_branch
-@known_failure_windows
-@with_tempfile(mkdir=True)
-@pytest.mark.ai_generated
-def test_rerun_range_with_merge_runs(path=None):
-    """Rerun a range that includes both normal and merge-run commits.
-
-    Range reruns with run-merge commits need --onto to properly replay
-    from a clean base, because the command creates git commits and is
-    not idempotent at the current HEAD.
-    """
-    ds = Dataset(path).create()
-    # First: a normal run
+    # 2. Range rerun: normal run + merge-run, replayed via --onto
     ds.run('touch normal_file')
     assert_repo_status(ds.path)
-    # Second: a run that creates intermediate commits (merge-run)
-    ds.run('touch inner && git add inner && git commit -m "inner"')
+
+    ds.run('touch inner2 && git add inner2 && git commit -m "inner2"')
     assert_repo_status(ds.path)
     ok_(ds.repo.commit_exists("HEAD^2"))
-    # Rerun both using --since with --onto to replay from a clean base
+
     ds.rerun(since="", onto="", branch="rerun-test")
     assert_repo_status(ds.path)
-    # Both files should exist after rerun
     ok_((ds.pathobj / "normal_file").exists())
-    ok_((ds.pathobj / "inner").exists())
+    ok_((ds.pathobj / "inner2").exists())
