@@ -119,6 +119,9 @@ git-annex-remote-ria = "datalad.customremotes.ria_remote:main"
 git-annex-remote-ora = "datalad.distributed.ora_remote:main"
 git-credential-datalad = "datalad.local.gitcredential_datalad:git_credential_datalad"
 
+[project.entry-points.pytest11]
+datalad = "datalad.pytest_plugin"
+
 [build-system]
 # wheel to get more lightweight (not EASY-INSTALL) entry-points
 requires = [
