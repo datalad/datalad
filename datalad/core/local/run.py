@@ -1067,6 +1067,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record) if record_path else record)
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
+
+    # Track whether the user declared any outputs (before we append record_path).
+    # Use .paths (raw declarations) rather than expand_strict() which drops
+    # non-existent paths -- we want to know if the user *declared* outputs.
+    has_declared_outputs = bool(globbed['outputs'].paths) if explicit else False
+
     if explicit and pre_command_outputs:
         # Include outputs that existed before the command but were deleted
         # by it. expand_strict() only returns files present on disk, so
@@ -1079,9 +1085,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
 
-    # In explicit mode, check if intermediate commits swept in files
-    # not declared as --output (which would lose provenance for those files)
-    if cmd_made_commits and explicit and outputs_to_save is not None:
+    # In explicit mode with declared outputs, check if intermediate commits
+    # swept in files not declared as --output (which would lose provenance).
+    # Skip when no outputs were declared (e.g. run_procedure with explicit=True)
+    # since there is no declaration to check against.
+    if cmd_made_commits and explicit and has_declared_outputs:
         committed_diff = ds.repo.diff(pre_cmd_hexsha, post_cmd_hexsha)
         committed_paths = {
             str(p.relative_to(ds.pathobj)) for p in committed_diff
