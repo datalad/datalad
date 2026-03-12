@@ -878,8 +878,12 @@ def test_run_no_merge_without_inner_commits(path=None):
     assert_repo_status(ds.path)
     # HEAD should NOT be a merge commit
     assert_false(ds.repo.commit_exists("HEAD^2"))
-    # Run record should still be present
-    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    # Run record should still be present.
+    # On adjusted branches, localsync adds an adjustment commit on top,
+    # so the run record is at HEAD~1 rather than HEAD.
+    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    run_commit = "HEAD~1" if managed else "HEAD"
+    commit_msg = ds.repo.format_commit("%B", run_commit)
     msg, info = get_run_info(ds, commit_msg)
     ok_(info is not None)
     ok_((ds.pathobj / "bar").exists())
