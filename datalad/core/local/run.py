@@ -15,10 +15,12 @@ import json
 import logging
 import os
 import os.path as op
+import sys
 import warnings
 from argparse import REMAINDER
 from pathlib import Path
 from tempfile import mkdtemp
+from typing import Union
 
 import datalad
 import datalad.support.ansi_colors as ac
@@ -611,7 +613,7 @@ def normalize_command(command):
     return command
 
 
-def format_command(dset, command, **kwds):
+def format_command(dset: Dataset, command: Union[str, list], **kwds) -> str:
     """Plug in placeholders in `command`.
 
     Parameters
@@ -626,13 +628,25 @@ def format_command(dset, command, **kwds):
     -------
     formatted command (str)
     """
-    command = normalize_command(command)
+    command: str = normalize_command(command)
     sfmt = SequenceFormatter()
 
     for k, v in dset.config.items("datalad.run.substitutions"):
         sub_key = k.replace("datalad.run.substitutions.", "")
         if sub_key not in kwds:
             kwds[sub_key] = v
+
+    if (cmd_exec := dset.config.get("datalad.run.cmdexec")):
+        cmd_kwargs = dict(
+            # point to the python installation that runs *this* code
+            # we know that it would have things like the docker
+            # adaptor installed with this extension package
+            python=sys.executable,
+            cmd=command,
+        )
+        new_command = cmd_exec.format(**cmd_kwargs)
+        lgr.debug("cmdexec formatted %r into %r", command, new_command)
+        command = new_command
 
     for name in ["inputs", "outputs"]:
         io_val = kwds.pop(name, None)
