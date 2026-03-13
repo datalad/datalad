@@ -38,7 +38,6 @@ lgr = logging.getLogger('datalad.support.openfiles')
 
 def get_files_open_for_writing(
     paths: list[str | Path],
-    exclude_pids: set[int] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Return a mapping of *paths* that are open for writing.
 
@@ -46,16 +45,13 @@ def get_files_open_for_writing(
     ----------
     paths
         File paths to check (absolute or relative – they will be resolved).
-    exclude_pids
-        PIDs to ignore.  If *None* the current process tree is excluded
-        automatically to avoid false positives from our own open fds.
 
     Returns
     -------
     dict
         ``{original_path: [{'pid': int, 'fd': int}, ...]}`` for every path
         from *paths* that is currently open for writing by at least one
-        process not in *exclude_pids*.
+        process.
 
     Raises
     ------
@@ -69,9 +65,6 @@ def get_files_open_for_writing(
 
     if not paths:
         return {}
-
-    if exclude_pids is None:
-        exclude_pids = _get_own_process_tree()
 
     # Build a lookup: resolved_path -> original_path
     resolved_to_orig: dict[str, str] = {}
@@ -111,8 +104,6 @@ def get_files_open_for_writing(
             pid = proc.info['pid']
             proc_uids = proc.info.get('uids') if _have_uids else None
         except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue
-        if pid in exclude_pids:
             continue
         # Skip processes owned by other users (not available on Windows)
         if my_uid is not None and proc_uids is not None and proc_uids.real != my_uid:
@@ -260,18 +251,6 @@ def _describe_process(proc: psutil.Process) -> str:
         username = '?'
     return f"pid {proc.pid} ({cmd!r}, user={username})"
 
-
-def _get_own_process_tree() -> set[int]:
-    """Return PIDs of the current process and all its children."""
-    me = psutil.Process()
-    pids = {me.pid}
-    try:
-        for child in me.children(recursive=True):
-            pids.add(child.pid)
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
-        pass
-    lgr.log(5, "Own process tree: %s", pids)
-    return pids
 
 
 # ---------------------------------------------------------------------------

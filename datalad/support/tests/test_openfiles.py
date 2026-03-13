@@ -54,24 +54,20 @@ def test_get_files_open_for_writing(tmp_path):
     # -- file exists but not open --
     assert get_files_open_for_writing([str(testfile)]) == {}
 
-    # -- our own process is excluded by default --
+    # -- our own process IS detected (no self-exclusion) --
     fh = open(testfile, 'w')
     try:
-        assert get_files_open_for_writing([str(testfile)]) == {}, \
-            "Our own process tree should be excluded"
+        result = get_files_open_for_writing([str(testfile)])
+        assert str(testfile) in result, \
+            "Our own process should be detected"
     finally:
         fh.close()
-
-    # In the remaining checks we pass exclude_pids={os.getpid()} so that
-    # child-spawned helpers are *not* silently excluded (the default
-    # _get_own_process_tree() would hide them since they are our children).
-    only_self = {os.getpid()}
 
     # -- read-only open should NOT be detected --
     proc_r = _hold_open(testfile, 'r')
     try:
         assert get_files_open_for_writing(
-            [str(testfile)], exclude_pids=only_self) == {}, \
+            [str(testfile)]) == {}, \
             "Read-only open must not be detected"
     finally:
         proc_r.terminate()
@@ -81,7 +77,7 @@ def test_get_files_open_for_writing(tmp_path):
     proc_w = _hold_open(testfile, 'w')
     try:
         result = get_files_open_for_writing(
-            [str(testfile)], exclude_pids=only_self)
+            [str(testfile)])
         assert str(testfile) in result, \
             f"Write-open file not detected: {result}"
         assert any(o['pid'] == proc_w.pid for o in result[str(testfile)])
@@ -93,7 +89,7 @@ def test_get_files_open_for_writing(tmp_path):
     proc_a = _hold_open(testfile, 'a')
     try:
         result = get_files_open_for_writing(
-            [str(testfile)], exclude_pids=only_self)
+            [str(testfile)])
         assert str(testfile) in result, \
             f"Append-open file not detected: {result}"
     finally:
@@ -104,23 +100,12 @@ def test_get_files_open_for_writing(tmp_path):
     proc_rw = _hold_open(testfile, 'r+')
     try:
         result = get_files_open_for_writing(
-            [str(testfile)], exclude_pids=only_self)
+            [str(testfile)])
         assert str(testfile) in result, \
             f"r+ open file not detected: {result}"
     finally:
         proc_rw.terminate()
         proc_rw.wait()
-
-    # -- explicit exclude_pids hides the opener --
-    proc_ex = _hold_open(testfile, 'w')
-    try:
-        result = get_files_open_for_writing(
-            [str(testfile)], exclude_pids={proc_ex.pid, os.getpid()})
-        assert result == {}, \
-            f"Excluded PID should not appear: {result}"
-    finally:
-        proc_ex.terminate()
-        proc_ex.wait()
 
     # -- symlink resolved: querying via symlink still detects --
     link = tmp_path / "link.txt"
@@ -128,7 +113,7 @@ def test_get_files_open_for_writing(tmp_path):
     proc_sym = _hold_open(testfile, 'w')
     try:
         result = get_files_open_for_writing(
-            [str(link)], exclude_pids=only_self)
+            [str(link)])
         assert str(link) in result, \
             f"Symlink query should detect open file: {result}"
     finally:
@@ -223,7 +208,7 @@ def test_lsof_fallback_triggered(path=None):
             'subprocess.check_output', return_value=lsof_output
         ):
             result = get_files_open_for_writing(
-                [str(testfile)], exclude_pids={os.getpid()})
+                [str(testfile)])
         assert str(testfile) in result, \
             f"lsof fallback should detect write-open file: {result}"
     finally:

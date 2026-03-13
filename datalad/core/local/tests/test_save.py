@@ -1133,7 +1133,7 @@ def test_save_sub_trailing_sep_bf6547(path=None):
 
 def _mock_open_for_writing(open_file_abspath):
     """Return a mock for get_files_open_for_writing that reports *open_file_abspath*."""
-    def _fake(paths, exclude_pids=None):
+    def _fake(paths):
         result = {}
         for p in paths:
             if str(Path(p).resolve()) == str(Path(open_file_abspath).resolve()):
