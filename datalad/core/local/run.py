@@ -1025,6 +1025,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # TODO: If a warning or error is desired when an --output pattern doesn't
     # have a match, this would be the spot to do it.
     if explicit or expand in ["outputs", "both"]:
+        # Before refreshing, capture the pre-command output expansion so we
+        # can detect files that were deleted by the command (gh-7822).
+        # expand_strict() only returns files that exist on disk, so without
+        # this, deleted outputs would be silently excluded from the commit.
+        if explicit:
+            pre_command_outputs = set(globbed['outputs'].expand_strict())
         # also for explicit mode we have to re-glob to be able to save all
         # matching outputs
         globbed['outputs'].expand(refresh=True)
@@ -1051,6 +1057,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record) if record_path else record)
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
+    if explicit and pre_command_outputs:
+        # Include outputs that existed before the command but were deleted
+        # by it. expand_strict() only returns files present on disk, so
+        # deleted outputs need to be added back explicitly (gh-7822).
+        post_outputs = set(outputs_to_save)
+        for p in sorted(pre_command_outputs - post_outputs):
+            if not op.lexists(op.join(pwd, p)):
+                outputs_to_save.append(p)
     if outputs_to_save is not None and record_path:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
