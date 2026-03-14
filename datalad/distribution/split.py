@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 from datalad.distribution.dataset import (
@@ -30,6 +31,7 @@ from datalad.interface.base import (
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.results import get_status_dict
 from datalad.log import log_progress
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
@@ -139,6 +141,19 @@ class Split(Interface):
             'none' leaves content retrievable on-demand. Note: 'copy' and
             'move' only work with --clone-mode=clone.""",
             constraints=EnsureChoice('auto', 'copy', 'move', 'none')),
+
+        annex=Parameter(
+            args=("--annex",),
+            metavar='MODE',
+            doc="""how to handle git-annex in the new subdataset. 'auto'
+            (default) detects whether any files under the split path are
+            annexed - if none are, creates a plain git repo; otherwise
+            behaves like 'as-is'. 'as-is' mirrors the parent: if parent
+            has annex, subdataset gets annex. 'yes' always initializes
+            git-annex. 'no' never initializes git-annex - all annexed
+            content is unlocked and committed directly to git (requires
+            content to be locally available).""",
+            constraints=EnsureChoice('auto', 'as-is', 'yes', 'no')),
 
         worktree_branch_prefix=Parameter(
             args=("--worktree-branch-prefix",),
@@ -284,6 +299,7 @@ class Split(Interface):
             dataset=None,
             clone_mode='clone',
             content='auto',
+            annex='auto',
             worktree_branch_prefix='split/',
             worktree_use_namespace=False,
             mode='split-top',
@@ -326,9 +342,11 @@ class Split(Interface):
         _validate_split_params(
             clone_mode=clone_mode,
             content=content,
+            annex=annex,
             paths=resolved_paths,
             ds=ds,
-            mode=mode)
+            mode=mode,
+            propagate_annex_config=propagate_annex_config)
 
         # Display safety warning unless forced
         if not force and not dry_run:
@@ -482,6 +500,7 @@ class Split(Interface):
                     paths=validated_paths,
                     clone_mode=clone_mode,
                     content=content,
+                    annex=annex,
                     worktree_branch_prefix=worktree_branch_prefix,
                     worktree_use_namespace=worktree_use_namespace,
                     cleanup=cleanup,
@@ -500,6 +519,7 @@ class Split(Interface):
                         target_path=target_path,
                         clone_mode=clone_mode,
                         content=content,
+                        annex=annex,
                         worktree_branch_prefix=worktree_branch_prefix,
                         worktree_use_namespace=worktree_use_namespace,
                         mode=mode,
@@ -519,7 +539,31 @@ class Split(Interface):
                         yield result
 
 
-def _validate_split_params(clone_mode, content, paths, ds, mode):
+def _has_annexed_content(ds, rel_path):
+    """Check if any files under rel_path are annexed in the dataset.
+
+    Parameters
+    ----------
+    ds : Dataset
+        The dataset to check
+    rel_path : str
+        Relative path within the dataset
+
+    Returns
+    -------
+    bool
+        True if any files under rel_path are annexed
+    """
+    if not isinstance(ds.repo, AnnexRepo):
+        return False
+    # git annex find returns empty string (not error) when no files match
+    result = ds.repo.call_annex(
+        ['find', '--include', str(rel_path) + '/*'])
+    return bool(result.strip())
+
+
+def _validate_split_params(clone_mode, content, annex, paths, ds, mode,
+                           propagate_annex_config):
     """Validate parameter combinations early."""
 
     # Validate content mode compatibility
@@ -533,6 +577,15 @@ def _validate_split_params(clone_mode, content, paths, ds, mode):
             lgr.warning(
                 "Content mode '%s' specified but dataset has no git-annex",
                 content)
+
+    # Validate annex parameter conflicts
+    if annex == 'no' and propagate_annex_config:
+        lgr.warning(
+            "--annex=no disables git-annex; ignoring --propagate-annex-config")
+
+    if annex == 'no' and content in ('copy', 'move'):
+        lgr.warning(
+            "--annex=no removes git-annex; --content=%s has no effect", content)
 
     # Ensure paths is not empty
     if not paths:
@@ -687,6 +740,7 @@ def _perform_batch_rewrite_parent(
         paths,
         clone_mode,
         content,
+        annex,
         worktree_branch_prefix,
         worktree_use_namespace,
         cleanup,
@@ -717,6 +771,7 @@ def _perform_batch_rewrite_parent(
                 target_path=target_path,
                 clone_mode=clone_mode,
                 content=content,
+                annex=annex,
                 worktree_branch_prefix=worktree_branch_prefix,
                 worktree_use_namespace=worktree_use_namespace,
                 mode='split-top',  # Use split-top for filtering, we'll do rewrite after
@@ -780,6 +835,7 @@ def _perform_single_split(
         target_path,
         clone_mode,
         content,
+        annex,
         worktree_branch_prefix,
         worktree_use_namespace,
         mode,
@@ -796,19 +852,61 @@ def _perform_single_split(
         Split mode: 'split-top', 'truncate-top', 'truncate-top-graft', or 'rewrite-parent'
     cleanup : str
         Cleanup level: 'none', 'reflog', 'gc', 'annex', or 'all'
+    annex : str
+        Annex mode: 'auto', 'as-is', 'yes', or 'no'
     """
 
     path_obj = Path(target_path)
     ds_path = Path(ds.path)
     rel_path = path_obj.relative_to(ds_path)
 
-    lgr.info("Splitting %s into subdataset", rel_path)
+    # Resolve 'auto' annex mode before proceeding
+    if annex == 'auto':
+        if _has_annexed_content(ds, str(rel_path)):
+            annex = 'as-is'
+            lgr.debug("Auto-detected annexed content under %s, using 'as-is'", rel_path)
+        else:
+            annex = 'no'
+            lgr.debug("No annexed content under %s, using 'no' (plain git)", rel_path)
+
+    # For --annex=no, ensure all annexed content is locally available
+    if annex == 'no' and isinstance(ds.repo, AnnexRepo):
+        missing = ds.repo.call_annex(
+            ['find', '--not', '--in', 'here',
+             '--include', str(rel_path) + '/*']).strip()
+        if missing:
+            missing_files = missing.splitlines()
+            lgr.info(
+                "Fetching %d annexed files for --annex=no "
+                "(content must be local)", len(missing_files))
+            # local import to avoid circular dependency with datalad.api
+            from datalad.api import get as datalad_get
+            get_results = list(datalad_get(
+                missing_files,
+                dataset=ds.path,
+                on_failure='ignore'))
+            failed = [r for r in get_results
+                      if r.get('status') == 'error']
+            if failed:
+                yield get_status_dict(
+                    'split',
+                    status='error',
+                    message=(
+                        "--annex=no requires all annexed content to be "
+                        "locally available. Failed to get %d files."
+                        % len(failed)),
+                    path=str(target_path),
+                    refds=refds_path,
+                    logger=lgr)
+                return
+
+    lgr.info("Splitting %s into subdataset (annex=%s)", rel_path, annex)
 
     if dry_run:
         yield get_status_dict(
             'split',
             status='ok',
-            message=f"[DRY-RUN] Would split {rel_path}",
+            message=f"[DRY-RUN] Would split {rel_path} (annex={annex})",
             path=str(target_path),
             type='dataset',
             refds=refds_path,
@@ -849,7 +947,8 @@ def _perform_single_split(
         _filter_subdataset(
             subdataset_path=target_path,
             filter_path=str(rel_path),
-            parent_path=ds.path)
+            parent_path=ds.path,
+            annex_mode=annex)
 
         # Step 4.5: Apply mode-specific transformations
         if mode == 'truncate-top':
@@ -883,8 +982,8 @@ def _perform_single_split(
                 subdataset_path=target_path,
                 mode=content)
 
-        # Step 6: Propagate annex config if requested
-        if propagate_annex_config:
+        # Step 6: Propagate annex config if requested (skip for --annex=no)
+        if propagate_annex_config and annex != 'no':
             _propagate_annex_config(
                 parent_ds=ds,
                 subdataset_path=target_path,
@@ -907,6 +1006,7 @@ def _perform_single_split(
                 f"Split mode: {mode}\n"
                 f"Clone mode: {clone_mode}\n"
                 f"Content mode: {content}\n"
+                f"Annex mode: {annex}\n"
                 f"Cleanup: {cleanup}\n\n"
                 "Generated by datalad split"
             )
@@ -1013,24 +1113,38 @@ def _create_via_reckless_ephemeral(ds, target_path, rel_path):
         lgr.debug("Symlinked annex objects to parent")
 
 
-def _filter_subdataset(subdataset_path, filter_path, parent_path):
-    """Apply git-annex filter-branch and git filter-branch."""
-    lgr.debug("Filtering subdataset %s", subdataset_path)
+def _filter_subdataset(subdataset_path, filter_path, parent_path,
+                       annex_mode='as-is'):
+    """Apply git-annex filter-branch and git filter-branch.
+
+    Parameters
+    ----------
+    annex_mode : str
+        'as-is' mirrors parent, 'yes' forces annex init, 'no' removes annex
+    """
+    lgr.debug("Filtering subdataset %s (annex_mode=%s)", subdataset_path, annex_mode)
 
     subdataset = Dataset(subdataset_path)
     repo = subdataset.repo
 
-    # Check if it's an annex repo
-    is_annex = hasattr(repo, 'call_annex')
+    # Determine whether to treat as annex based on annex_mode
+    parent_has_annex = isinstance(repo, AnnexRepo)
 
-    if is_annex:
+    if annex_mode == 'no':
+        is_annex = False
+    elif annex_mode == 'yes':
+        is_annex = True
+    else:  # 'as-is'
+        is_annex = parent_has_annex
+
+    if parent_has_annex:
+        # Even for --annex=no, we need git-annex filter-branch first to get
+        # proper filtered repo, then dereference annex pointers afterwards
         # Step 0: Initialize git-annex to ensure git-annex branch exists locally
-        # Without this, filter-branch might not work correctly
         lgr.debug("Initializing git-annex in subdataset")
         try:
             repo.call_annex(['init', f'split-{Path(filter_path).name}'])
         except CommandError as e:
-            # Init might fail if already initialized, which is okay
             lgr.debug("git-annex init returned error (might be already initialized): %s", e)
 
         # Step 1: git-annex filter-branch
@@ -1069,10 +1183,134 @@ def _filter_subdataset(subdataset_path, filter_path, parent_path):
     else:
         repo.call_git(['remote', 'add', 'origin', parent_path])
 
-    # Step 4: git annex forget (if annex)
-    if is_annex:
+    # Step 4: Handle annex post-filtering
+    if parent_has_annex and is_annex:
+        # Normal annex path: forget to clean up
         lgr.debug("Running git annex forget")
         repo.call_annex(['forget', '--force', '--drop-dead'])
+
+    elif parent_has_annex and not is_annex:
+        # --annex=no: dereference all annex pointers throughout history
+        lgr.info("Dereferencing annex pointers throughout history (--annex=no)")
+        _dereference_annex_history(subdataset_path)
+
+    # Step 5: For --annex=yes when parent has no annex, init annex
+    if annex_mode == 'yes' and not parent_has_annex:
+        lgr.info("Initializing git-annex in subdataset (--annex=yes)")
+        subprocess.run(
+            ['git', 'annex', 'init', f'split-{Path(filter_path).name}'],
+            cwd=subdataset_path,
+            check=True,
+            capture_output=True)
+
+
+def _dereference_annex_history(subdataset_path):
+    """Rewrite history to replace annex pointers with actual file content.
+
+    After git filter-branch has created a filtered repo that still has annex
+    pointers, this function rewrites every commit to dereference those
+    pointers, then removes git-annex entirely so the subdataset is plain git.
+
+    Parameters
+    ----------
+    subdataset_path : str
+        Path to the subdataset whose history should be dereferenced
+    """
+    subdataset = Dataset(subdataset_path)
+    repo = subdataset.repo
+
+    # Check if there are any annexed files to dereference
+    annexed_files = repo.call_annex(['find', '--include', '*']).strip()
+    if annexed_files:
+        # Unlock and unannex all annexed files
+        repo.call_annex(['unlock', '.'])
+        repo.call_annex(['unannex', '.'])
+
+        # Stage the now-regular files
+        repo.call_git(['add', '.'])
+
+        # Commit the unannexed state
+        # git diff --cached --quiet exits 1 if there are staged changes
+        staged = repo.call_git(
+            ['diff', '--cached', '--name-only']).strip()
+        if staged:
+            repo.call_git(['commit', '-m',
+                            'Dereference annex pointers (--annex=no)'])
+
+        # Rewrite full history to replace annex pointers with content
+        env = os.environ.copy()
+        env['FILTER_BRANCH_SQUELCH_WARNING'] = '1'
+
+        repo.call_git(
+            ['filter-branch', '-f', '--tree-filter',
+             'git annex smudge --clean -- . 2>/dev/null; '
+             'find . -type l -name "*.annex" -delete 2>/dev/null; '
+             'git annex unlock . 2>/dev/null; '
+             'git annex unannex . 2>/dev/null; '
+             'true',
+             '--', 'HEAD'],
+            env=env)
+
+    # Remove git-annex entirely
+    # uninit may fail if annex is already partially torn down, which is fine
+    # since we do manual cleanup below regardless
+    try:
+        repo.call_annex(['uninit'])
+    except CommandError as e:
+        lgr.debug("git annex uninit returned error (cleaning up manually): %s", e)
+
+    # Clean up annex artifacts from .git/
+    annex_dir = Path(subdataset_path) / '.git' / 'annex'
+    if annex_dir.exists():
+        shutil.rmtree(str(annex_dir))
+
+    # Remove annex-related entries from .gitattributes if present
+    gitattributes = Path(subdataset_path) / '.gitattributes'
+    if gitattributes.exists():
+        lines = gitattributes.read_text().splitlines()
+        filtered = [l for l in lines if 'annex' not in l.lower()]
+        if filtered:
+            gitattributes.write_text('\n'.join(filtered) + '\n')
+        else:
+            gitattributes.unlink()
+
+    # Remove local git-annex branch if it exists
+    local_branches = repo.call_git(
+        ['branch', '--list', 'git-annex']).strip()
+    if local_branches:
+        repo.call_git(['branch', '-D', 'git-annex'])
+
+    # Remove remote git-annex tracking branches
+    remote_refs = repo.call_git(
+        ['for-each-ref', '--format=%(refname)',
+         'refs/remotes/']).strip()
+    for ref in remote_refs.splitlines():
+        if ref.endswith('/git-annex'):
+            repo.call_git(['update-ref', '-d', ref])
+
+    # Remove annex-related git config sections
+    # git config --get-regexp returns exit 1 when no matches, so check first
+    local_config = repo.call_git(
+        ['config', '--local', '--list']).strip()
+    for section in ['annex', 'filter.annex']:
+        if any(line.startswith(section + '.') for line in local_config.splitlines()):
+            repo.call_git(
+                ['config', '--local', '--remove-section', section])
+
+    # Remove annex-related remote config keys
+    for line in local_config.splitlines():
+        key = line.split('=', 1)[0]
+        if key.startswith('remote.') and '.annex' in key:
+            repo.call_git(['config', '--local', '--unset', key])
+
+    # Stage any remaining cleanup changes and commit if needed
+    repo.call_git(['add', '-A'])
+    staged = repo.call_git(['diff', '--cached', '--name-only']).strip()
+    if staged:
+        repo.call_git(['commit', '-m',
+                        'Remove git-annex artifacts (--annex=no)'])
+
+    lgr.info("Annex dereferenced: subdataset is now plain git")
 
 
 def _apply_truncate_top(subdataset_path, create_graft_branch=False):

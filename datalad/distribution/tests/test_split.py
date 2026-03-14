@@ -18,6 +18,7 @@ from datalad.api import (
     create,
     split,
 )
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     IncompleteResultsError,
     InsufficientArgumentsError,
@@ -847,3 +848,176 @@ def test_split_relative_path(path=None):
     # Verify subdataset exists
     subds = Dataset(Path(ds.path) / 'subdir' / 'data')
     ok_(subds.is_installed())
+
+
+############################
+# Test --annex parameter
+############################
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_split_annex_auto_no_annexed_files(path=None):
+    """Test --annex=auto creates plain git when no annexed files exist.
+
+    When splitting a directory that has no annexed content, auto mode
+    should create a plain git subdataset (no annex).
+    """
+    # Create dataset WITH annex
+    ds = Dataset(path).create(force=True)
+
+    # Create scripts dir with files forced into git (not annex)
+    scripts_dir = Path(path) / 'scripts'
+    scripts_dir.mkdir()
+    (scripts_dir / 'run.sh').write_text('#!/bin/bash\necho hello')
+    (scripts_dir / 'process.py').write_text('print("hello")')
+
+    # Force files into git using --force-small BEFORE any save
+    ds.repo.call_git(['annex', 'add', '--force-small',
+                      'scripts/run.sh', 'scripts/process.py'])
+    ds.repo.call_git(['commit', '-m', 'Add scripts to git (not annex)'])
+
+    # Also add a root file normally
+    (Path(path) / 'root.txt').write_text('root content')
+    ds.save(message='Add root file')
+
+    # Split with auto mode
+    res = split(
+        'scripts',
+        dataset=ds.path,
+        annex='auto',
+        force=True,
+        on_failure='ignore',
+        return_type='list',
+    )
+
+    assert_in_results(res, action='split', status='ok')
+
+    # Verify subdataset exists
+    subds = Dataset(Path(ds.path) / 'scripts')
+    ok_(subds.is_installed())
+
+    # Verify no git-annex in subdataset
+    assert_false(hasattr(subds.repo, 'call_annex'))
+
+
+@pytest.mark.ai_generated
+@with_tree(tree={
+    'root.txt': 'root content',
+    'data': {
+        'large_file.bin': 'x' * 1024,
+    }
+})
+def test_split_annex_auto_with_annexed_files(path=None):
+    """Test --annex=auto preserves annex when annexed files exist."""
+    ds = Dataset(path).create(force=True)
+    ds.save()
+
+    # Verify data/ has annexed content; if not, force annex it
+    annexed = ds.repo.call_annex(['find', '--include', 'data/*']).strip()
+    if not annexed:
+        ds.repo.call_annex(['add', 'data/large_file.bin'])
+        staged = ds.repo.call_git(['diff', '--cached', '--name-only']).strip()
+        if staged:
+            ds.repo.call_git(['commit', '-m', 'annex the large file'])
+
+    # Split with auto mode
+    res = split(
+        'data',
+        dataset=ds.path,
+        annex='auto',
+        force=True,
+        on_failure='ignore',
+        return_type='list',
+    )
+
+    assert_in_results(res, action='split', status='ok')
+
+    # Verify subdataset has annex
+    subds = Dataset(Path(ds.path) / 'data')
+    ok_(subds.is_installed())
+    ok_(isinstance(subds.repo, AnnexRepo))
+
+
+@pytest.mark.ai_generated
+@with_tree(tree={
+    'root.txt': 'root content',
+    'data': {
+        'file1.txt': 'data1',
+    }
+})
+def test_split_annex_as_is(path=None):
+    """Test --annex=as-is mirrors parent behavior."""
+    # Parent with annex
+    ds = Dataset(path).create(force=True)
+    ds.save()
+
+    res = split(
+        'data',
+        dataset=ds.path,
+        annex='as-is',
+        force=True,
+        on_failure='ignore',
+        return_type='list',
+    )
+
+    assert_in_results(res, action='split', status='ok')
+    subds = Dataset(Path(ds.path) / 'data')
+    ok_(subds.is_installed())
+    # Parent had annex, so subdataset should too
+    ok_(isinstance(subds.repo, AnnexRepo))
+
+
+@pytest.mark.ai_generated
+@with_tree(tree={
+    'root.txt': 'root content',
+    'data': {
+        'file1.txt': 'data1',
+    }
+})
+def test_split_annex_as_is_no_parent_annex(path=None):
+    """Test --annex=as-is with no-annex parent creates no-annex subdataset."""
+    ds = Dataset(path).create(force=True, annex=False)
+    ds.save()
+
+    res = split(
+        'data',
+        dataset=ds.path,
+        annex='as-is',
+        force=True,
+        on_failure='ignore',
+        return_type='list',
+    )
+
+    assert_in_results(res, action='split', status='ok')
+    subds = Dataset(Path(ds.path) / 'data')
+    ok_(subds.is_installed())
+    # Parent had no annex, so subdataset shouldn't either
+    assert_false(hasattr(subds.repo, 'call_annex'))
+
+
+@pytest.mark.ai_generated
+@with_tree(tree={
+    'root.txt': 'root content',
+    'data': {
+        'file1.txt': 'data1',
+    }
+})
+def test_split_annex_yes_no_parent_annex(path=None):
+    """Test --annex=yes initializes annex even when parent doesn't have it."""
+    ds = Dataset(path).create(force=True, annex=False)
+    ds.save()
+
+    res = split(
+        'data',
+        dataset=ds.path,
+        annex='yes',
+        force=True,
+        on_failure='ignore',
+        return_type='list',
+    )
+
+    assert_in_results(res, action='split', status='ok')
+    subds = Dataset(Path(ds.path) / 'data')
+    ok_(subds.is_installed())
+    # Even though parent has no annex, subdataset should have it
+    ok_(isinstance(subds.repo, AnnexRepo))
