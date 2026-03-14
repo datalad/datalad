@@ -213,14 +213,19 @@ in "Conflicts" listing within the merge commit
 ## Code Style
 
 - **Max line length**: 120 characters (configured in `tox.ini` `[flake8]` section)
-- **Imports**: place at the top of the file, sorted by **isort** (configured in
-  `pyproject.toml`; runs automatically via pre-commit hook).  Only use
-  local/inline imports when needed for efficiency (heavy optional deps) or to
-  break circular dependencies
+- **Imports**: place at the top of the file; only use local/inline imports
+  when needed for efficiency (heavy optional deps) or to break circular dependencies
+  (e.g. `from datalad.api import ...` inside `datalad.distribution.*` modules).
+  Inline imports for circular dependency reasons must have a comment explaining why.
 - **External version checks**: use `external_versions` from
   `datalad.support.external_versions`; never parse version strings manually
   (e.g. `external_versions['chardet'] >= '6'`)
-- **Error handling**: use appropriate exception types; capture in test fixtures
+- **Type checks**: use `isinstance` rather than `hasattr` for type detection
+  (e.g. `isinstance(repo, AnnexRepo)` not `hasattr(repo, 'call_annex')`)
+- **Error handling**: use appropriate exception types; capture in test fixtures.
+  Never swallow exceptions with bare `except SomeError: pass` — either check
+  preconditions to avoid the error, or log at debug level with context about
+  what went wrong. Only catch specific expected failure modes.
 
 ## Quality Assurance
 
