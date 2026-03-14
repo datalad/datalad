@@ -16,6 +16,7 @@ from datalad.api import (
     Dataset,
     split,
 )
+from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils_pytest import (
     assert_in,
     assert_result_count,
@@ -824,6 +825,116 @@ def test_rewrite_parent_batch_mixed_toplevel_nested_error(path=None):
 
     assert_result_count(result, 1, status='error')
     assert_in('mixing top-level and nested', result[0]['message'].lower())
+
+
+############################
+# Test --annex parameter
+############################
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_split_annex_no_full_workflow(path=None):
+    """End-to-end: create dataset with annex, split with --annex=no.
+
+    Verifies the resulting subdataset is plain git with actual file content
+    (not annex pointers).
+    """
+    ds = Dataset(path).create(force=True)
+
+    # Create directory with files that get annexed
+    data_dir = Path(path) / 'data'
+    data_dir.mkdir()
+    (data_dir / 'large1.bin').write_bytes(b'x' * 2048)
+    (data_dir / 'large2.bin').write_bytes(b'y' * 2048)
+    (Path(path) / 'root.txt').write_text('root content')
+    ds.save(message='Add data files')
+
+    # Ensure files are annexed; if not, force annex them
+    annexed = ds.repo.call_annex(['find', '--include', 'data/*']).strip()
+    if not annexed:
+        ds.repo.call_annex(['add', 'data/large1.bin', 'data/large2.bin'])
+        staged = ds.repo.call_git(['diff', '--cached', '--name-only']).strip()
+        if staged:
+            ds.repo.call_git(['commit', '-m', 'Force annex data files'])
+
+    # Ensure content is present (needed for --annex=no)
+    ds.repo.call_annex(['get', 'data/'])
+
+    # Split with --annex=no
+    res = split(
+        'data',
+        dataset=path,
+        annex='no',
+        force=True,
+        return_type='list',
+        on_failure='ignore',
+    )
+
+    assert_result_count(res, 1, action='split', status='ok')
+
+    # Verify subdataset exists
+    subds = Dataset(Path(path) / 'data')
+    assert subds.is_installed(), "Subdataset should be installed"
+
+    # Verify it's NOT an annex repo
+    assert not isinstance(subds.repo, AnnexRepo), \
+        "Subdataset should be plain git (not annex)"
+
+    # Verify .git/annex does not exist
+    assert not (Path(path) / 'data' / '.git' / 'annex').exists(), \
+        ".git/annex should not exist in plain git subdataset"
+
+    # Verify files have actual content (not annex pointers)
+    large1 = Path(path) / 'data' / 'large1.bin'
+    large2 = Path(path) / 'data' / 'large2.bin'
+    if large1.exists():
+        content = large1.read_bytes()
+        # Annex pointer files start with "/annex/" or are symlinks
+        assert not large1.is_symlink(), "File should not be a symlink"
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_split_annex_auto_detects_no_annex_content(path=None):
+    """Test auto mode correctly detects when split path has no annexed content.
+
+    Create a dataset with annex, but put only git-tracked (non-annexed) files
+    under the split path. Auto mode should create a plain git subdataset.
+    """
+    ds = Dataset(path).create(force=True)
+
+    # Create scripts dir with small text files (should be in git, not annex)
+    scripts_dir = Path(path) / 'scripts'
+    scripts_dir.mkdir()
+    (scripts_dir / 'run.sh').write_text('#!/bin/bash\necho hello')
+    (scripts_dir / 'process.py').write_text('print("hello")')
+
+    # Force these into git (not annex)
+    ds.repo.call_git(['annex', 'add', '--force-small',
+                      'scripts/run.sh', 'scripts/process.py'])
+    ds.repo.call_git(['commit', '-m', 'Add scripts to git'])
+
+    # Also add an annexed file outside the split path
+    (Path(path) / 'large_data.bin').write_bytes(b'x' * 4096)
+    ds.save(message='Add large annexed file')
+
+    # Split scripts/ with auto mode
+    res = split(
+        'scripts',
+        dataset=path,
+        annex='auto',
+        force=True,
+        return_type='list',
+        on_failure='ignore',
+    )
+
+    assert_result_count(res, 1, action='split', status='ok')
+
+    # Verify subdataset is plain git (no annex)
+    subds = Dataset(Path(path) / 'scripts')
+    assert subds.is_installed()
+    assert not isinstance(subds.repo, AnnexRepo), \
+        "Subdataset should be plain git since no annexed content was under scripts/"
 
 
 if __name__ == '__main__':
