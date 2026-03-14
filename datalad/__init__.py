@@ -21,6 +21,18 @@ if not __debug__:
 
 import atexit
 import os
+import warnings
+
+# Suppress RequestsDependencyWarning from requests.
+# requests 2.32.x checks chardet<6 but datalad (and the ecosystem) uses
+# chardet>=6.  The requests main branch already accepts chardet<8 but no
+# release has been cut yet.
+# TODO: remove once a requests release supports chardet>=6
+warnings.filterwarnings(
+    "ignore",
+    message=r"urllib3.*or chardet.*doesn't match a supported version",
+    category=Warning,
+)
 
 # this is not to be modified. for querying use get_apimode()
 __api = 'python'
