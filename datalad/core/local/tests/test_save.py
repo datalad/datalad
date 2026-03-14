@@ -1126,3 +1126,86 @@ def test_save_sub_trailing_sep_bf6547(path=None):
     )
     # make sure it has the .gitmodules record
     assert 'sub' in (ds.pathobj / '.gitmodules').read_text()
+
+
+# -- Tests for datalad.save.skip-openfiles ----------------------------------
+
+
+def _mock_open_for_writing(open_file_abspath):
+    """Return a mock for get_files_open_for_writing that reports *open_file_abspath*."""
+    def _fake(paths):
+        result = {}
+        for p in paths:
+            if str(Path(p).resolve()) == str(Path(open_file_abspath).resolve()):
+                result[str(p)] = [{'pid': 99999, 'fd': 3}]
+        return result
+    return _fake
+
+
+@pytest.mark.ai_generated
+@with_tempfile
+def test_save_skip_openfiles(path=None):
+    ds = Dataset(path).create(annex=False)
+
+    # -- 'none' (default): no check, file saved regardless --
+    f_none = ds.pathobj / 'none.txt'
+    f_none.write_text('content')
+    res = ds.save(on_failure='ignore')
+    assert_in_results(res, path=str(f_none), status='ok', action='add')
+
+    # -- 'error': open file yields impossible, closed file saved --
+    f_open = ds.pathobj / 'open.txt'
+    f_closed = ds.pathobj / 'closed.txt'
+    f_open.write_text('content1')
+    f_closed.write_text('content2')
+    ds.repo.config.set('datalad.save.skip-openfiles', 'error')
+    ds.save('.datalad/config')
+    with patch(
+        'datalad.support.gitrepo.get_files_open_for_writing',
+        side_effect=_mock_open_for_writing(str(f_open)),
+    ):
+        res = ds.save(on_failure='ignore')
+    assert_in_results(res, path=str(f_open), status='impossible',
+                      action='save')
+    assert_in_results(res, path=str(f_closed), status='ok', action='add')
+
+    # -- 'skip': open file silently skipped, closed file saved --
+    # f_open is still untracked from previous step
+    f_closed2 = ds.pathobj / 'closed2.txt'
+    f_closed2.write_text('content3')
+    ds.repo.config.set('datalad.save.skip-openfiles', 'skip')
+    ds.save('.datalad/config')
+    with patch(
+        'datalad.support.gitrepo.get_files_open_for_writing',
+        side_effect=_mock_open_for_writing(str(f_open)),
+    ):
+        res = ds.save(on_failure='ignore')
+    assert_result_count(res, 0, path=str(f_open), status='impossible')
+    assert_in_results(res, path=str(f_closed2), status='ok', action='add')
+
+    # -- 'warning': open file saved with warning --
+    # f_open is still untracked
+    ds.repo.config.set('datalad.save.skip-openfiles', 'warning')
+    ds.save('.datalad/config')
+    with patch(
+        'datalad.support.gitrepo.get_files_open_for_writing',
+        side_effect=_mock_open_for_writing(str(f_open)),
+    ):
+        with swallow_logs(new_level=logging.WARN) as cml:
+            res = ds.save(on_failure='ignore')
+            cml.assert_logged('.*open for writing by other processes')
+    assert_in_results(res, path=str(f_open), status='ok', action='add')
+
+
+@pytest.mark.ai_generated
+def test_check_for_openfiles_invalid_config(tmp_path):
+    """_check_for_openfiles raises ValueError on invalid config."""
+    ds = Dataset(str(tmp_path)).create(annex=False)
+    f = ds.pathobj / 'dummy.txt'
+    f.write_text('content')
+    with patch(
+        'datalad.support.gitrepo.get_files_open_for_writing',
+        side_effect=_mock_open_for_writing(str(f)),
+    ):
+        with assert_raises(ValueError):
+            ds.repo._check_for_openfiles({'dummy.txt': {}}, 'bogus')
