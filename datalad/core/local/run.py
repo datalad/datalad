@@ -1150,6 +1150,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             run_result[f'expanded_{s}'] = globbed[s].expand_strict()
     yield run_result
 
+    on_adjusted = (
+        hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    )
     if cmd_made_commits:
         # Command created intermediate commits. Save any remaining
         # uncommitted changes, then create a merge commit that carries
@@ -1166,24 +1169,49 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                         result_renderer='disabled',
                         on_failure='ignore'):
                     yield r
-        # Create merge commit:
-        #   parent1 = pre_cmd_hexsha (first-parent = clean run history)
-        #   parent2 = current HEAD  (command's commits + any leftover save)
-        #   tree    = current HEAD's tree (reflects all changes)
-        current_head = ds.repo.get_hexsha()
-        tree = ds.repo.call_git_oneline(
-            ["rev-parse", current_head + "^{tree}"])
-        merge_hexsha = ds.repo.call_git_oneline(
-            ["commit-tree", tree,
-             "-p", pre_cmd_hexsha,
-             "-p", current_head,
-             "-m", msg])
-        branch = ds.repo.get_active_branch()
-        if branch:
-            ds.repo.update_ref(
-                "refs/heads/" + branch, merge_hexsha)
+        if on_adjusted:
+            # On adjusted branches, git-annex cannot propagate merge commits
+            # created directly on the adjusted branch.  Instead:
+            # 1. Sync to propagate the inner commit(s) to the original branch
+            # 2. Create the merge commit on the original branch
+            # 3. Use `git annex merge` to bring it back to the adjusted branch
+            # See https://git-annex.branchable.com/git-annex-adjust/
+            orig_branch = ds.repo.get_corresponding_branch()
+            ds.repo.call_git([
+                "annex", "sync", "--no-push", "--no-pull",
+                "--no-commit", "--no-resolvemerge", "--no-content"])
+            orig_post = ds.repo.get_hexsha("refs/heads/" + orig_branch)
+            # pre_cmd_hexsha was recorded on the adjusted branch; get the
+            # corresponding original-branch ancestor for the merge parent.
+            orig_pre = ds.repo.call_git_oneline(
+                ["merge-base", orig_branch, pre_cmd_hexsha])
+            tree = ds.repo.call_git_oneline(
+                ["rev-parse", orig_post + "^{tree}"])
+            merge_hexsha = ds.repo.call_git_oneline(
+                ["commit-tree", tree,
+                 "-p", orig_pre, "-p", orig_post,
+                 "-m", msg])
+            ds.repo.update_ref("refs/heads/" + orig_branch, merge_hexsha)
+            ds.repo.call_git(["annex", "merge"])
         else:
-            ds.repo.update_ref("HEAD", merge_hexsha)
+            # Create merge commit directly on the current branch:
+            #   parent1 = pre_cmd_hexsha (first-parent = clean run history)
+            #   parent2 = current HEAD  (command's commits + any leftover save)
+            #   tree    = current HEAD's tree (reflects all changes)
+            current_head = ds.repo.get_hexsha()
+            tree = ds.repo.call_git_oneline(
+                ["rev-parse", current_head + "^{tree}"])
+            merge_hexsha = ds.repo.call_git_oneline(
+                ["commit-tree", tree,
+                 "-p", pre_cmd_hexsha,
+                 "-p", current_head,
+                 "-m", msg])
+            branch = ds.repo.get_active_branch()
+            if branch:
+                ds.repo.update_ref(
+                    "refs/heads/" + branch, merge_hexsha)
+            else:
+                ds.repo.update_ref("HEAD", merge_hexsha)
     elif do_save:
         with chpwd(pwd):
             for r in Save.__call__(
