@@ -1016,9 +1016,19 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         )
         return
 
+    pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
+
     if not inject:
         cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
+
+    # Detect if the command created commits (HEAD changed)
+    post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
+    cmd_made_commits = (
+        pre_cmd_hexsha is not None
+        and post_cmd_hexsha is not None
+        and pre_cmd_hexsha != post_cmd_hexsha
+    )
 
     # Re-glob to capture any new outputs.
     #
@@ -1051,9 +1061,47 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record) if record_path else record)
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
+    # Track whether the user declared any outputs (before we append record_path).
+    # Use .paths (raw declarations) rather than expand_strict() which drops
+    # non-existent paths -- we want to know if the user *declared* outputs.
+    has_declared_outputs = bool(globbed['outputs'].paths) if explicit else False
     if outputs_to_save is not None and record_path:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
+
+    # In explicit mode with declared outputs, check if intermediate commits
+    # swept in files not declared as --output (which would lose provenance).
+    # Skip when no outputs were declared (e.g. run_procedure with explicit=True)
+    # since there is no declaration to check against.
+    if cmd_made_commits and explicit and has_declared_outputs:
+        committed_diff = ds.repo.diff(pre_cmd_hexsha, post_cmd_hexsha)
+        committed_paths = {
+            str(p.relative_to(ds.pathobj)) for p in committed_diff
+        }
+        # Normalize declared outputs to relative-to-dataset format
+        declared_set = set()
+        for p in outputs_to_save:
+            p = str(p)
+            if op.isabs(p):
+                p = op.relpath(p, ds_path)
+            else:
+                p = op.relpath(op.join(pwd, p), ds_path)
+            declared_set.add(p)
+        undeclared = committed_paths - declared_set
+        if undeclared:
+            dirty_committed_cfg = ds.config.get(
+                'datalad.run.dirty-committed', default='error')
+            if dirty_committed_cfg == 'error':
+                yield get_status_dict(
+                    'run', ds=ds, status='error',
+                    message=(
+                        'command created commits that include files not '
+                        'declared as --output: %s. '
+                        'Set config datalad.run.dirty-committed=ignore '
+                        'to override',
+                        sorted(undeclared)))
+                return
+
     msg_path = None
     if not rerun_info and cmd_exitcode:
         if do_save:
@@ -1102,7 +1150,69 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             run_result[f'expanded_{s}'] = globbed[s].expand_strict()
     yield run_result
 
-    if do_save:
+    on_adjusted = (
+        hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    )
+    if cmd_made_commits:
+        # Command created intermediate commits. Save any remaining
+        # uncommitted changes, then create a merge commit that carries
+        # the run record in its message.
+        if do_save and ds.repo.dirty:
+            with chpwd(pwd):
+                for r in Save.__call__(
+                        dataset=ds_path,
+                        path=outputs_to_save,
+                        recursive=True,
+                        message="Remaining changes after command execution",
+                        jobs=jobs,
+                        return_type='generator',
+                        result_renderer='disabled',
+                        on_failure='ignore'):
+                    yield r
+        if on_adjusted:
+            # On adjusted branches, git-annex cannot propagate merge commits
+            # created directly on the adjusted branch.  Instead:
+            # 1. Sync to propagate the inner commit(s) to the original branch
+            # 2. Create the merge commit on the original branch
+            # 3. Use `git annex merge` to bring it back to the adjusted branch
+            # See https://git-annex.branchable.com/git-annex-adjust/
+            orig_branch = ds.repo.get_corresponding_branch()
+            ds.repo.call_git([
+                "annex", "sync", "--no-push", "--no-pull",
+                "--no-commit", "--no-resolvemerge", "--no-content"])
+            orig_post = ds.repo.get_hexsha("refs/heads/" + orig_branch)
+            # pre_cmd_hexsha was recorded on the adjusted branch; get the
+            # corresponding original-branch ancestor for the merge parent.
+            orig_pre = ds.repo.call_git_oneline(
+                ["merge-base", orig_branch, pre_cmd_hexsha])
+            tree = ds.repo.call_git_oneline(
+                ["rev-parse", orig_post + "^{tree}"])
+            merge_hexsha = ds.repo.call_git_oneline(
+                ["commit-tree", tree,
+                 "-p", orig_pre, "-p", orig_post,
+                 "-m", msg])
+            ds.repo.update_ref("refs/heads/" + orig_branch, merge_hexsha)
+            ds.repo.call_git(["annex", "merge"])
+        else:
+            # Create merge commit directly on the current branch:
+            #   parent1 = pre_cmd_hexsha (first-parent = clean run history)
+            #   parent2 = current HEAD  (command's commits + any leftover save)
+            #   tree    = current HEAD's tree (reflects all changes)
+            current_head = ds.repo.get_hexsha()
+            tree = ds.repo.call_git_oneline(
+                ["rev-parse", current_head + "^{tree}"])
+            merge_hexsha = ds.repo.call_git_oneline(
+                ["commit-tree", tree,
+                 "-p", pre_cmd_hexsha,
+                 "-p", current_head,
+                 "-m", msg])
+            branch = ds.repo.get_active_branch()
+            if branch:
+                ds.repo.update_ref(
+                    "refs/heads/" + branch, merge_hexsha)
+            else:
+                ds.repo.update_ref("HEAD", merge_hexsha)
+    elif do_save:
         with chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,

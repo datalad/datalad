@@ -37,6 +37,7 @@ from datalad.core.local.run import (
     run_command,
 )
 from datalad.distribution.dataset import Dataset
+from datalad.local.rerun import get_run_info
 from datalad.support.exceptions import (
     CommandError,
     IncompleteResultsError,
@@ -807,3 +808,104 @@ def test_substitution_config():
         eq_(_format_iospecs(['{dummy}'],
                             **_get_substitutions(dset)),
             ['a', 'b'])
+
+
+# -- Tests for run producing merge commits when command creates commits --
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_commits(path=None):
+    ds = Dataset(path).create()
+
+    # 1. Normal run (no inner commits) -> NOT a merge commit
+    ds.run('touch bar')
+    assert_repo_status(ds.path)
+    assert_false(ds.repo.commit_exists("HEAD^2"))
+    # On adjusted branches, localsync adds an adjustment commit on top,
+    # so the run record is at HEAD~1 rather than HEAD.
+    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    run_commit = "HEAD~1" if managed else "HEAD"
+    commit_msg = ds.repo.format_commit("%B", run_commit)
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    ok_((ds.pathobj / "bar").exists())
+
+    # 2. Single inner commit -> merge commit with run info
+    ds.run('touch foo && git add foo && git commit -m "inner commit"')
+    assert_repo_status(ds.path)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    parent1 = ds.repo.get_hexsha("HEAD^1")
+    parent2 = ds.repo.get_hexsha("HEAD^2")
+    neq_(parent1, parent2)
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    assert_in("cmd", info)
+    ok_((ds.pathobj / "foo").exists())
+
+    # 3. Multiple inner commits -> single merge commit
+    ds.run(
+        'touch f1 && git add f1 && git commit -m "first" && '
+        'touch f2 && git add f2 && git commit -m "second"'
+    )
+    assert_repo_status(ds.path)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    assert_false(ds.repo.commit_exists("HEAD^3"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    ok_((ds.pathobj / "f1").exists())
+    ok_((ds.pathobj / "f2").exists())
+
+    # 4. Inner commit + uncommitted file -> merge commit with both files
+    ds.run(
+        'touch committed && git add committed && git commit -m "inner" && '
+        'touch uncommitted'
+    )
+    assert_repo_status(ds.path)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    ok_((ds.pathobj / "committed").exists())
+    ok_((ds.pathobj / "uncommitted").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_dirty_committed(path=None, path2=None):
+    # 1. Explicit mode: inner commit of undeclared file -> error
+    ds = Dataset(path).create()
+    (ds.pathobj / "dirty").write_text("dirty")
+    res = ds.run(
+        'touch foo && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["declared_output"],
+        on_failure="ignore",
+        result_renderer=None
+    )
+    assert_in_results(
+        res,
+        status="error",
+        action="run",
+    )
+    error_results = [r for r in res
+                     if r.get("action") == "run" and r.get("status") == "error"]
+    ok_(any("not declared as --output" in str(r.get("message", ""))
+            for r in error_results))
+
+    # 2. With dirty-committed=ignore config -> success
+    ds2 = Dataset(path2).create()
+    ds2.config.set('datalad.run.dirty-committed', 'ignore', scope='local')
+    ds2.run(
+        'touch foo && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["foo"],
+    )
+    ok_(ds2.repo.commit_exists("HEAD^2"))
+    commit_msg = ds2.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds2, commit_msg)
+    ok_(info is not None)
