@@ -189,7 +189,7 @@ tox -e py3
 
 ### Contributor files
 
-Contributor metadata is maintained in [.tributors](.tributors) from which 
+Contributor metadata is maintained in [.tributors](.tributors) from which
 [.zenodo.json](.zenodo.json) and [.all-contributorsrc](.all-contributorsrc) are updated:
 [GitHub Action](.github/workflows/update-contributors.yml)
 automatically updates contributor records on merges to master.  For manual
@@ -215,10 +215,17 @@ in "Conflicts" listing within the merge commit
 - **Max line length**: 120 characters (configured in `tox.ini` `[flake8]` section)
 - **Imports**: place at the top of the file; only use local/inline imports
   when needed for efficiency (heavy optional deps) or to break circular dependencies
+  (e.g. `from datalad.api import ...` inside `datalad.distribution.*` modules).
+  Inline imports for circular dependency reasons must have a comment explaining why.
 - **External version checks**: use `external_versions` from
   `datalad.support.external_versions`; never parse version strings manually
   (e.g. `external_versions['chardet'] >= '6'`)
-- **Error handling**: use appropriate exception types; capture in test fixtures
+- **Type checks**: use `isinstance` rather than `hasattr` for type detection
+  (e.g. `isinstance(repo, AnnexRepo)` not `hasattr(repo, 'call_annex')`)
+- **Error handling**: use appropriate exception types; capture in test fixtures.
+  Never swallow exceptions with bare `except SomeError: pass` — either check
+  preconditions to avoid the error, or log at debug level with context about
+  what went wrong. Only catch specific expected failure modes.
 
 ## Quality Assurance
 
@@ -249,6 +256,21 @@ pytest datalad
 ```
 
 See [Quick Reference](#quick-reference) for more test commands.
+
+When tests need a pre-populated file tree, use the `@with_tree` decorator from
+`datalad.tests.utils_pytest` instead of manually creating files in `tmp_path`:
+
+```python
+from datalad.tests.utils_pytest import with_tree
+
+@with_tree({'data.txt': 'content', 'sub': {'nested.txt': 'more'}})
+def test_something(path=None):
+    # path is a temporary directory already containing the files above
+    ...
+```
+
+See [utils_pytest.py](./datalad/tests/utils_pytest.py) for other helpers such as
+`@with_tempfile`, `@serve_path_via_http`, `swallow_logs`, etc.
 
 Alternatively, or complementary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can

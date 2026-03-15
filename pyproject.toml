@@ -67,6 +67,7 @@ RRID = "https://identifiers.org/RRID:SCR_003931"
 downloaders-extra = ["requests_ftp"]
 misc = [
     "argcomplete>=1.12.3", # optional CLI completion
+    "psutil",              # open-file detection for datalad.save.skip-openfiles
     "pyperclip",           # clipboard manipulations
     "python-dateutil",     # add support for more date formats to check_dates
 ]
@@ -118,6 +119,9 @@ git-annex-remote-datalad = "datalad.customremotes.datalad:main"
 git-annex-remote-ria = "datalad.customremotes.ria_remote:main"
 git-annex-remote-ora = "datalad.distributed.ora_remote:main"
 git-credential-datalad = "datalad.local.gitcredential_datalad:git_credential_datalad"
+
+[project.entry-points.pytest11]
+datalad = "datalad.pytest_plugin"
 
 [build-system]
 # wheel to get more lightweight (not EASY-INSTALL) entry-points
