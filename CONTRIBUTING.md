@@ -242,7 +242,20 @@ rules before submitting a pull request:
 The documentation contains a [Design Document specifically on running and writing tests](https://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
 Further hands-on advice is detailed below.
 
-### Tests
+### Testing
+
+#### Writing tests
+
+When fixing a bug, follow a **red/green** workflow: first write (or extend) a
+test that exposes the incorrect behavior, verify it fails, then implement the
+fix and verify the test passes.  To keep CI times manageable, look for an
+**existing** test that already sets up a similar scenario and extend it with a
+minimal assertion rather than adding an entirely new test function with its
+own setup/teardown overhead.
+
+Use `@with_tree` helper to establish a filetree with content of interest.
+
+#### Running tests
 
 `datalad/tests` contains tests for the core portion of the project, and
 more tests are provided under corresponding submodules in `tests/`
