@@ -761,22 +761,7 @@ class HTTPRemoteIO(object):
     def exists(self, path):
         # use same signature as in SSH and Local IO, although validity is
         # limited in case of HTTP.
-        # Lazy import: requests is only needed for HTTP-based RIA access.
-        # A top-level import would cause requests to emit a
-        # RequestsDependencyWarning to stderr at startup when chardet>=6
-        # is installed (requests 2.32 only declares support for chardet<6).
-        # Since datalad requires chardet (no upper bound) while requests
-        # depends on charset-normalizer, both get installed, and requests
-        # checks chardet first, failing its version assertion.
-        # Suppress the warning to keep stderr clean — git-annex-remote-ora
-        # runs as a git-annex external special remote subprocess where
-        # unexpected stderr output may interfere with operation.
-        import warnings
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore", message="urllib3.*chardet", category=Warning
-            )
-            import requests
+        import requests
 
         url = self.store_url + path.as_posix()
         try:

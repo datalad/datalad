@@ -2,8 +2,31 @@
 
 Change log
 **********
+1.3.3 (2026-03-12)
+==================
+
+Bug Fixes
+---------
+
+-  Avoid use of ``return`` in a ``finally`` block, which raises a
+   ``SyntaxWarning`` as of Python 3.14. Fixes
+   `#7817 <https://github.com/datalad/datalad/issues/7817>`__ via `PR
+   #7818 <https://github.com/datalad/datalad/pull/7818>`__ (by
+   `@effigies <https://github.com/effigies>`__)
+
+-  BF: Improve datalad operations on adjusted branches (crippled
+   filesystems) through annex merge/adjust/etc. Fixes
+   `#7768 <https://github.com/datalad/datalad/issues/7768>`__,
+   `#7769 <https://github.com/datalad/datalad/issues/7769>`__ via `PR
+   #7770 <https://github.com/datalad/datalad/pull/7770>`__ (by
+   `@yarikoptic <https://github.com/yarikoptic>`__)
+
+.. _section-1:
+
 1.3.2 (2026-03-05)
 ==================
+
+.. _bug-fixes-1:
 
 Bug Fixes
 ---------
@@ -35,12 +58,12 @@ Tests
    `PR #7814 <https://github.com/datalad/datalad/pull/7814>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-1:
+.. _section-2:
 
 1.3.1 (2026-02-01)
 ==================
 
-.. _bug-fixes-1:
+.. _bug-fixes-2:
 
 Bug Fixes
 ---------
@@ -54,7 +77,7 @@ Bug Fixes
    `PR #7799 <https://github.com/datalad/datalad/pull/7799>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-2:
+.. _section-3:
 
 1.3.0 (2026-01-17)
 ==================
@@ -66,7 +89,7 @@ Enhancements and New Features
    #7777 <https://github.com/datalad/datalad/pull/7777>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _bug-fixes-2:
+.. _bug-fixes-3:
 
 Bug Fixes
 ---------
@@ -104,7 +127,7 @@ Tests
    #7787 <https://github.com/datalad/datalad/pull/7787>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-3:
+.. _section-4:
 
 1.2.3 (2025-10-30)
 ==================
@@ -125,12 +148,12 @@ Tests
    ATM. `PR #7758 <https://github.com/datalad/datalad/pull/7758>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-4:
+.. _section-5:
 
 1.2.2 (2025-10-15)
 ==================
 
-.. _bug-fixes-3:
+.. _bug-fixes-4:
 
 Bug Fixes
 ---------
@@ -178,12 +201,12 @@ Tests
    #7755 <https://github.com/datalad/datalad/pull/7755>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-5:
+.. _section-6:
 
 1.2.1 (2025-07-02)
 ==================
 
-.. _bug-fixes-4:
+.. _bug-fixes-5:
 
 Bug Fixes
 ---------
@@ -198,7 +221,7 @@ Bug Fixes
    #7731 <https://github.com/datalad/datalad/pull/7731>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-6:
+.. _section-7:
 
 1.2.0 (2025-05-21)
 ==================
@@ -223,7 +246,7 @@ Internal
    #7590 <https://github.com/datalad/datalad/pull/7590>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-7:
+.. _section-8:
 
 1.1.6 (2025-05-18)
 ==================
@@ -247,7 +270,7 @@ Tests
    #7710 <https://github.com/datalad/datalad/pull/7710>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-8:
+.. _section-9:
 
 1.1.5 (2024-12-15)
 ==================
@@ -269,12 +292,12 @@ Tests
    #7692 <https://github.com/datalad/datalad/pull/7692>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-9:
+.. _section-10:
 
 1.1.4 (2024-11-18)
 ==================
 
-.. _bug-fixes-5:
+.. _bug-fixes-6:
 
 Bug Fixes
 ---------
@@ -331,7 +354,7 @@ Tests
    #7649 <https://github.com/datalad/datalad/pull/7649>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-10:
+.. _section-11:
 
 1.1.3 (2024-08-08)
 ==================
@@ -346,12 +369,12 @@ Tests
    #7640 <https://github.com/datalad/datalad/pull/7640>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-11:
+.. _section-12:
 
 1.1.2 (2024-07-25)
 ==================
 
-.. _bug-fixes-6:
+.. _bug-fixes-7:
 
 Bug Fixes
 ---------
@@ -367,12 +390,12 @@ Bug Fixes
    `PR #7636 <https://github.com/datalad/datalad/pull/7636>`__ (by
    `@christian-monch <https://github.com/christian-monch>`__)
 
-.. _section-12:
+.. _section-13:
 
 1.1.1 (2024-07-03)
 ==================
 
-.. _bug-fixes-7:
+.. _bug-fixes-8:
 
 Bug Fixes
 ---------
@@ -421,7 +444,7 @@ Tests
    #7622 <https://github.com/datalad/datalad/pull/7622>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-13:
+.. _section-14:
 
 1.1.0 (2024-06-06)
 ==================
@@ -451,12 +474,12 @@ Internal
    standard mode, removing our custom method. `PR
    #7340 <https://github.com/datalad/datalad/pull/7340>`__
 
-.. _section-14:
+.. _section-15:
 
 1.0.3 (2024-06-06)
 ==================
 
-.. _bug-fixes-8:
+.. _bug-fixes-9:
 
 Bug Fixes
 ---------
@@ -499,7 +522,7 @@ Tests
    #7601 <https://github.com/datalad/datalad/pull/7601>`__ (by
    `@jwodder <https://github.com/jwodder>`__)
 
-.. _section-15:
+.. _section-16:
 
 1.0.2 (2024-04-19)
 ==================
@@ -514,7 +537,7 @@ Tests
    #7581 <https://github.com/datalad/datalad/pull/7581>`__ (by
    `@christian-monch <https://github.com/christian-monch>`__)
 
-.. _section-16:
+.. _section-17:
 
 1.0.1 (2024-04-17)
 ==================
@@ -529,7 +552,7 @@ Internal
    implementation behavior in the same way than other DataLad
    components. (by `@mih <https://github.com/mih>`__)
 
-.. _section-17:
+.. _section-18:
 
 1.0.0 (2024-04-06)
 ==================
@@ -551,7 +574,7 @@ Enhancements and New Features
    #7431 <https://github.com/datalad/datalad/pull/7431>`__ (by
    `@adswa <https://github.com/adswa>`__)
 
-.. _section-18:
+.. _section-19:
 
 0.19.6 (2024-02-02)
 ===================
@@ -579,7 +602,7 @@ Internal
    #7553 <https://github.com/datalad/datalad/pull/7553>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-19:
+.. _section-20:
 
 0.19.5 (2023-12-28)
 ===================
@@ -595,12 +618,12 @@ Tests
    #7544 <https://github.com/datalad/datalad/pull/7544>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-20:
+.. _section-21:
 
 0.19.4 (2023-12-13)
 ===================
 
-.. _bug-fixes-9:
+.. _bug-fixes-10:
 
 Bug Fixes
 ---------
@@ -667,12 +690,12 @@ Tests
    #7541 <https://github.com/datalad/datalad/pull/7541>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-21:
+.. _section-22:
 
 0.19.3 (2023-08-10)
 ===================
 
-.. _bug-fixes-10:
+.. _bug-fixes-11:
 
 Bug Fixes
 ---------
@@ -734,12 +757,12 @@ Tests
    issues. `PR #7467 <https://github.com/datalad/datalad/pull/7467>`__
    (by `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-22:
+.. _section-23:
 
 0.19.2 (2023-07-03)
 ===================
 
-.. _bug-fixes-11:
+.. _bug-fixes-12:
 
 Bug Fixes
 ---------
@@ -760,7 +783,7 @@ Documentation
    #7445 <https://github.com/datalad/datalad/pull/7445>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-23:
+.. _section-24:
 
 0.19.1 (2023-06-26)
 ===================
@@ -786,7 +809,7 @@ Tests
    `PR #7372 <https://github.com/datalad/datalad/pull/7372>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-24:
+.. _section-25:
 
 0.19.0 (2023-06-14)
 ===================
@@ -809,7 +832,7 @@ Enhancements and New Features
    `@jsheunis <https://github.com/jsheunis>`__ and
    `@adswa <https://github.com/adswa>`__)
 
-.. _bug-fixes-12:
+.. _bug-fixes-13:
 
 Bug Fixes
 ---------
@@ -851,12 +874,12 @@ Tests
    #7261 <https://github.com/datalad/datalad/pull/7261>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-25:
+.. _section-26:
 
 0.18.5 (2023-06-13)
 ===================
 
-.. _bug-fixes-13:
+.. _bug-fixes-14:
 
 Bug Fixes
 ---------
@@ -914,12 +937,12 @@ Tests
    #7422 <https://github.com/datalad/datalad/pull/7422>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-26:
+.. _section-27:
 
 0.18.4 (2023-05-16)
 ===================
 
-.. _bug-fixes-14:
+.. _bug-fixes-15:
 
 Bug Fixes
 ---------
@@ -964,12 +987,12 @@ Tests
       snapshots.d.o
    -  use specific miniconda installer for py 3.7.
 
-.. _section-27:
+.. _section-28:
 
 0.18.3 (2023-03-25)
 ===================
 
-.. _bug-fixes-15:
+.. _bug-fixes-16:
 
 Bug Fixes
 ---------
@@ -1072,12 +1095,12 @@ Tests
    #7353 <https://github.com/datalad/datalad/pull/7353>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-28:
+.. _section-29:
 
 0.18.2 (2023-02-27)
 ===================
 
-.. _bug-fixes-16:
+.. _bug-fixes-17:
 
 Bug Fixes
 ---------
@@ -1129,12 +1152,12 @@ Tests
    #7260 <https://github.com/datalad/datalad/pull/7260>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-29:
+.. _section-30:
 
 0.18.1 (2023-01-16)
 ===================
 
-.. _bug-fixes-17:
+.. _bug-fixes-18:
 
 Bug Fixes
 ---------
@@ -1166,7 +1189,7 @@ Performance
    #7250 <https://github.com/datalad/datalad/pull/7250>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-30:
+.. _section-31:
 
 0.18.0 (2022-12-31)
 ===================
@@ -1243,7 +1266,7 @@ Enhancements and New Features
    #7235 <https://github.com/datalad/datalad/pull/7235>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-18:
+.. _bug-fixes-19:
 
 Bug Fixes
 ---------
@@ -1374,7 +1397,7 @@ Tests
    `PR #7176 <https://github.com/datalad/datalad/pull/7176>`__ (by
    `@adswa <https://api.github.com/users/adswa>`__)
 
-.. _section-31:
+.. _section-32:
 
 0.17.10 (2022-12-14)
 ====================
@@ -1398,7 +1421,7 @@ Enhancements and New Features
    #7210 <https://github.com/datalad/datalad/pull/7210>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _bug-fixes-19:
+.. _bug-fixes-20:
 
 Bug Fixes
 ---------
@@ -1505,12 +1528,12 @@ Tests
    #7209 <https://github.com/datalad/datalad/pull/7209>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-32:
+.. _section-33:
 
 0.17.9 (2022-11-07)
 ===================
 
-.. _bug-fixes-20:
+.. _bug-fixes-21:
 
 Bug Fixes
 ---------
@@ -1586,12 +1609,12 @@ Tests
    #7130 <https://github.com/datalad/datalad/pull/7130>`__ (by
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _section-33:
+.. _section-34:
 
 0.17.8 (2022-10-24)
 ===================
 
-.. _bug-fixes-21:
+.. _bug-fixes-22:
 
 Bug Fixes
 ---------
@@ -1634,12 +1657,12 @@ Bug Fixes
    #7103 <https://github.com/datalad/datalad/pull/7103>`__ (by
    `@mslw <https://github.com/mslw>`__)
 
-.. _section-34:
+.. _section-35:
 
 0.17.7 (2022-10-14)
 ===================
 
-.. _bug-fixes-22:
+.. _bug-fixes-23:
 
 Bug Fixes
 ---------
@@ -1695,12 +1718,12 @@ Tests
    pass. `PR #7002 <https://github.com/datalad/datalad/pull/7002>`__ (by
    `@bpoldrack <https://github.com/bpoldrack>`__)
 
-.. _section-35:
+.. _section-36:
 
 0.17.6 (2022-09-21)
 ===================
 
-.. _bug-fixes-23:
+.. _bug-fixes-24:
 
 Bug Fixes
 ---------
@@ -2143,7 +2166,7 @@ Deprecations and removals
    `#6273 <https://github.com/datalad/datalad/pull/6273>`__ (by
    @jwodder)
 
-.. _bug-fixes-24:
+.. _bug-fixes-25:
 
 Bug Fixes
 ---------
@@ -2791,7 +2814,7 @@ Deprecations and removals
    commands. `#6564 <https://github.com/datalad/datalad/pull/6564>`__
    (by @mih)
 
-.. _bug-fixes-25:
+.. _bug-fixes-26:
 
 Bug Fixes
 ---------

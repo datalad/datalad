@@ -1,4 +1,16 @@
 
+<a id='changelog-1.3.3'></a>
+# 1.3.3 (2026-03-12)
+
+## 🐛 Bug Fixes
+
+- Avoid use of `return` in a `finally` block, which raises a `SyntaxWarning` as of Python 3.14.
+  Fixes [#7817](https://github.com/datalad/datalad/issues/7817) via
+  [PR #7818](https://github.com/datalad/datalad/pull/7818)
+  (by [@effigies](https://github.com/effigies))
+
+- BF: Improve datalad operations on adjusted branches (crippled filesystems) through annex merge/adjust/etc.  Fixes [#7768](https://github.com/datalad/datalad/issues/7768), [#7769](https://github.com/datalad/datalad/issues/7769) via [PR #7770](https://github.com/datalad/datalad/pull/7770) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.3.2'></a>
 # 1.3.2 (2026-03-05)
 
