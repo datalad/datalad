@@ -169,6 +169,14 @@ def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
     assert_result_count(res, 1, path=str(subds.pathobj), status='ok', action="create-sibling-ria")
     assert_result_count(res, 1, path=str(subds2.pathobj), status='ok', action="create-sibling-ria")
 
+    # verify that ORA remote UUID in bare repo config is preserved
+    # after reconfigure
+    content = git_config.read_text()
+    recfg_uuid = ds.config.get(
+        "remote.{}.annex-uuid".format('datastore-storage'))
+    eq_(recfg_uuid, super_uuid)
+    assert_in("uuid = {}".format(recfg_uuid), content)
+
     # remotes now exist in super and sub
     siblings = ds.siblings(result_renderer='disabled')
     eq_({'datastore', 'datastore-storage', 'here'},
@@ -192,6 +200,26 @@ def _test_create_store(host, base_path=None, ds_path=None, clone_path=None):
         assert_in('[datastore-storage]',
                   [r['description']
                    for r in res['{}ed repositories'.format(trust)]])
+
+    # Verify reconfigure after removing siblings writes correct UUID
+    # to the RIA bare repo config (gh-7827).  When the git remote is
+    # removed, the annex-uuid is gone from the in-memory config; the
+    # subsequent enableremote writes it back to disk but without a
+    # config.reload() the stale in-memory value (None) was written
+    # into the bare repo config instead.
+    ds.siblings('remove', name='datastore', result_renderer='disabled')
+    ds.siblings('remove', name='datastore-storage', result_renderer='disabled')
+    res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
+                                existing='reconfigure',
+                                new_store_ok=True)
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    content = git_config.read_text()
+    recfg_uuid = ds.config.get(
+        "remote.{}.annex-uuid".format('datastore-storage'))
+    assert recfg_uuid is not None, \
+        "annex-uuid must not be None after reconfigure (gh-7827)"
+    eq_(recfg_uuid, super_uuid)
+    assert_in("uuid = {}".format(recfg_uuid), content)
 
 
 @slow  # 11 + 42 sec on travis
