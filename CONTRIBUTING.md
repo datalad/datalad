@@ -253,7 +253,108 @@ fix and verify the test passes.  To keep CI times manageable, look for an
 minimal assertion rather than adding an entirely new test function with its
 own setup/teardown overhead.
 
-Use `@with_tree` helper to establish a filetree with content of interest.
+Test helpers live in
+[datalad/tests/utils_pytest.py](datalad/tests/utils_pytest.py); import what
+you need from there.
+
+**Setting up files and directories** — use `@with_tempfile` and `@with_tree`:
+
+```python
+from datalad.tests.utils_pytest import with_tempfile, with_tree
+
+@with_tempfile(mkdir=True)
+def test_something(path=None):        # path is a fresh temp dir, auto-cleaned
+    ds = Dataset(path).create()
+
+@with_tree(tree={'input.txt': 'data', 'subdir': {'nested.csv': 'a,b'}})
+def test_with_content(path=None):     # tree materialised under path
+    ds = Dataset(path).create(force=True)
+    ds.save()
+```
+
+Decorators can be **stacked** — each adds a parameter (bottom-to-top order):
+
+```python
+@with_tempfile(mkdir=True)
+@with_tree(tree={'src': {'f.txt': '123'}})
+def test_two_paths(dest=None, srcdir=None):
+    ...
+```
+
+**Asserting command results** — all DataLad commands return a list of result
+dicts with `status`, `action`, `path`, etc.  Use the dedicated helpers rather
+than hand-rolling loops:
+
+```python
+from datalad.tests.utils_pytest import (
+    assert_result_count,
+    assert_status,
+    assert_in_results,
+    assert_not_in_results,
+    assert_repo_status,
+)
+
+res = ds.save()
+assert_status('ok', res)                         # every result is 'ok'
+assert_result_count(res, 1, action='save')       # exactly 1 save result
+assert_in_results(res, path=str(ds.pathobj / 'file.txt'))
+assert_not_in_results(res, status='error')
+assert_repo_status(ds.path)                      # working tree is clean
+```
+
+`assert_repo_status` accepts keyword lists for expected non-clean states:
+
+```python
+assert_repo_status(ds.path, modified=['changed.txt'], untracked=['new.txt'])
+```
+
+**Testing error paths** — pass `on_failure='ignore'` so the command returns
+error results instead of raising `IncompleteResultsError`:
+
+```python
+res = ds.save('nonexistent', on_failure='ignore')
+assert_in_results(res, status='error')
+```
+
+**Capturing output and logs:**
+
+```python
+from datalad.utils import swallow_outputs, swallow_logs
+
+with swallow_outputs() as cmo:
+    ds.some_command()
+    assert 'expected' in cmo.out
+
+with swallow_logs(new_level=logging.WARNING) as cml:
+    ds.some_command()
+    assert_in('expected warning', cml.out)
+```
+
+**Serving test data over HTTP:**
+
+```python
+from datalad.tests.utils_pytest import serve_path_via_http
+
+@with_tree(tree={'data.txt': 'content'})
+@serve_path_via_http
+def test_download(srcdir=None, url=None):   # url points at srcdir over HTTP
+    ds.download_url(url + '/data.txt')
+```
+
+**Marks and conditional skips:**
+
+| Decorator | Purpose |
+|-----------|---------|
+| `@slow` | ≥ 10 s — add a timing comment (e.g. `# ~12 sec`) |
+| `@turtle` | ≥ 2 min |
+| `@integration` | needs network or heavy external resources |
+| `@skip_if_no_network` | skip when `DATALAD_TESTS_NONETWORK` is set |
+| `@skip_ssh` | skip unless `DATALAD_TESTS_SSH` is set |
+| `@skip_if_on_windows` | platform gate |
+| `@skip_wo_symlink_capability` | filesystem gate |
+| `@known_failure_windows` / `_osx` | expected to fail on that platform |
+
+For parameterised tests use `@pytest.mark.parametrize` as usual.
 
 #### Running tests
 
