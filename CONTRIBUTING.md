@@ -291,12 +291,14 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
 )
 
-res = ds.save()
-assert_status('ok', res)                         # every result is 'ok'
-assert_result_count(res, 1, action='save')       # exactly 1 save result
-assert_in_results(res, path=str(ds.pathobj / 'file.txt'))
-assert_not_in_results(res, status='error')
-assert_repo_status(ds.path)                      # working tree is clean
+def test_...(...):
+    ...
+    res = ds.save()
+    assert_status('ok', res)                         # every result is 'ok'
+    assert_result_count(res, 1, action='save')       # exactly 1 save result
+    assert_in_results(res, path=str(ds.pathobj / 'file.txt'))
+    assert_not_in_results(res, status='error')
+    assert_repo_status(ds.path)                      # working tree is clean
 ```
 
 `assert_repo_status` accepts keyword lists for expected non-clean states:
@@ -318,13 +320,15 @@ assert_in_results(res, status='error')
 ```python
 from datalad.utils import swallow_outputs, swallow_logs
 
-with swallow_outputs() as cmo:
-    ds.some_command()
-    assert 'expected' in cmo.out
+def test_...(...):
+    ...
+    with swallow_outputs() as cmo:
+        ds.some_command()
+        assert 'expected' in cmo.out
 
-with swallow_logs(new_level=logging.WARNING) as cml:
-    ds.some_command()
-    assert_in('expected warning', cml.out)
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        ds.some_command()
+        assert_in('expected warning', cml.out)
 ```
 
 **Serving test data over HTTP:**
