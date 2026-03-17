@@ -941,3 +941,165 @@ def test_run_explicit_dirty_committed(path=None, path2=None):
     commit_msg = ds2.repo.format_commit("%B", "HEAD")
     msg, info = get_run_info(ds2, commit_msg)
     ok_(info is not None)
+
+
+# -- Tests for subdataset hierarchy merge commits --
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_subdataset_only(path=None):
+    """Inner commit only in subdataset -> merge in both sub and super."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+
+    ds.run('cd sub && touch foo && git add foo && git commit -m "inner"')
+    assert_repo_status(ds.path)
+
+    # sub should have a merge commit
+    ok_(sub.repo.commit_exists("HEAD^2"))
+    commit_msg = sub.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(sub, commit_msg)
+    ok_(info is not None)
+    assert_in("cmd", info)
+
+    # super should also have a merge commit (submodule pointer changed)
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    assert_in("cmd", info)
+
+    ok_((sub.pathobj / "foo").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_both_levels(path=None):
+    """Inner commits in both super and sub -> merges in both."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+
+    ds.run(
+        'touch top && git add top && git commit -m "top-inner" && '
+        'cd sub && touch foo && git add foo && git commit -m "sub-inner"'
+    )
+    assert_repo_status(ds.path)
+
+    # sub has merge
+    ok_(sub.repo.commit_exists("HEAD^2"))
+    commit_msg = sub.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(sub, commit_msg)
+    ok_(info is not None)
+
+    # super has merge
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+
+    ok_((ds.pathobj / "top").exists())
+    ok_((sub.pathobj / "foo").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_three_levels(path=None):
+    """Three-level hierarchy: commit only in leaf -> merges at all levels."""
+    ds = Dataset(path).create()
+    mid = ds.create("mid")
+    leaf = mid.create("leaf")
+    ds.save(recursive=True, message="record leaf creation")
+    assert_repo_status(ds.path)
+
+    ds.run(
+        'cd mid/leaf && touch foo && git add foo && git commit -m "inner"'
+    )
+    assert_repo_status(ds.path)
+
+    # leaf has merge
+    ok_(leaf.repo.commit_exists("HEAD^2"))
+    commit_msg = leaf.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(leaf, commit_msg)
+    ok_(info is not None)
+
+    # mid has merge (submodule pointer changed)
+    ok_(mid.repo.commit_exists("HEAD^2"))
+    commit_msg = mid.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(mid, commit_msg)
+    ok_(info is not None)
+
+    # super has merge
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+
+    ok_((leaf.pathobj / "foo").exists())
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_no_subdataset_change(path=None):
+    """Commit only in superdataset -> sub untouched, no spurious merge."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+    sub_head_before = sub.repo.get_hexsha()
+
+    ds.run('touch top && git add top && git commit -m "top-inner"')
+    assert_repo_status(ds.path)
+
+    # super has merge
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+
+    # sub HEAD is unchanged — no merge commit, no changes
+    eq_(sub.repo.get_hexsha(), sub_head_before)
+    assert_false(sub.repo.commit_exists("HEAD^2"))
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_subdataset_deletions(path=None):
+    """File deletions (committed + uncommitted) in subdataset are reflected."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    # Create tracked files in sub
+    (sub.pathobj / "kept").write_text("keep")
+    (sub.pathobj / "rm_committed").write_text("remove by commit")
+    (sub.pathobj / "rm_uncommitted").write_text("remove uncommitted")
+    sub.save(message="add test files")
+    ds.save(message="record sub state")
+    assert_repo_status(ds.path)
+
+    ds.run(
+        'cd sub && git rm rm_committed && git commit -m "remove" && '
+        'rm rm_uncommitted'
+    )
+    assert_repo_status(ds.path)
+
+    # sub has merge
+    ok_(sub.repo.commit_exists("HEAD^2"))
+    commit_msg = sub.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(sub, commit_msg)
+    ok_(info is not None)
+
+    # Verify file states
+    ok_((sub.pathobj / "kept").exists())
+    assert_false((sub.pathobj / "rm_committed").exists())
+    assert_false((sub.pathobj / "rm_uncommitted").exists())
+
+    # super also has merge
+    ok_(ds.repo.commit_exists("HEAD^2"))
+    commit_msg = ds.repo.format_commit("%B", "HEAD")
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
