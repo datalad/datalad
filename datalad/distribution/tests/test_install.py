@@ -1061,14 +1061,6 @@ def test_install_recursive_github(path=None):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_install_withcfg(src_path=None, dest=None):
-    src = create(src_path)
-    ds = install(path=dest, source=src_path, cfg_proc=['yoda'])
-
-    assert (ds.pathobj / 'README.md').exists()
-
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
 def test_recursive_install_withcfg(src_path=None, dest=None):
     src = create(src_path)
     src.create('subds')
