@@ -81,15 +81,38 @@ we outline the workflow used by the developers:
 2. Add your forked clone as a remote to the local clone you already have on your
    local disk:
 
-          git remote add gh-YourLogin git@github.com:YourLogin/datalad.git
-          git fetch gh-YourLogin
+          git remote add --fetch gh-YourLogin git@github.com:YourLogin/datalad.git
 
-3. Create a branch (generally off the `origin/master`) to hold your changes:
+   The resulting setup forms a triangle of 3 instances of the same repository:
+   `origin`-al + 2 clones: one personal fork on GitHub and one local:
 
-          git checkout -b nf-my-feature
+   ```mermaid
+   graph TD
+       subgraph GitHub
+           direction LR
+           O["datalad/datalad<br/>[<b>origin</b>]"]
+           F["YourLogin/datalad<br/>[<b>gh-YourLogin</b>]"]
+           O ~~~ F
+           O -. "1. Fork" .-> F
+           F -. "6. Send Pull Request" .-> O
+       end
+       O -- "0. git clone" --> L["local clone"]
+       F -- "2. git remote add" --> L
+       L -- "3. git checkout -b;
+             4. git add; git commit" --> L
+       L -- "5. git push" --> F
+   ```
 
-    and start making changes.  Use a prefix signaling the purpose of the
-    branch and matching commit messages.  Do not work in the `master` branch.
+3. Create a branch to hold your changes.  The default branch after cloning
+   is `maint` (bug-fix line for the current release).  If you are adding a
+   new feature or enhancement, switch to `master` first.  See
+   [Branches](#branches) for details.
+
+          git checkout origin/master -b nf-my-feature   # new feature
+          git checkout origin/maint  -b bf-my-fix       # bug fix
+
+    Use a prefix signaling the purpose of the branch and matching commit
+    messages.
 
     | Prefix | Branch  | Commit  | Purpose            |
     |--------|---------|---------|--------------------|
@@ -118,11 +141,15 @@ we outline the workflow used by the developers:
 
           git push -u gh-YourLogin nf-my-feature
 
-   Finally, go to the web page of your fork of the DataLad repo, and click
+6. Finally, go to the web page of your fork of the DataLad repo, and click
    'Pull request' (PR) to send your changes to the maintainers for review. This
    will send an email to the committers.  You can commit new changes to this branch
-   and keep pushing to your remote -- github automagically adds them to your
+   and keep pushing to your remote -- GitHub automagically adds them to your
    previously opened PR.
+
+   GitHub pre-fills the PR description from
+   [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) —
+   fill in the checklist and delete the instructions.
 
    PRs should be labeled with a `semver-*` label (e.g. `semver-patch`,
    `semver-minor`) to indicate the type of version bump. Adding the
@@ -154,10 +181,10 @@ uv pip install -e '.[devel]'
 ```
 
 You will need a recent [git-annex](https://git-annex.branchable.com/).
-It can be installed directly from PyPI via pip (`pip install git-annex`) or potentially via `datalad-installer`
-(e.g. `pip install datalad-installer && datalad-installer git-annex`),
-via [NeuroDebian](https://neuro.debian.net) on Debian/Ubuntu (`apt-get install git-annex-standalone`),
-or via your OS package manager.
+It can be installed from PyPI (`uv pip install git-annex`), potentially via
+`datalad-installer` (`pip install datalad-installer && datalad-installer git-annex`),
+via [NeuroDebian](https://neuro.debian.net) on Debian/Ubuntu
+(`apt-get install git-annex-standalone`), or via your OS package manager.
 
 For running tests with `tox`, using `tox-uv` is encouraged for faster environment creation:
 
@@ -342,7 +369,7 @@ requests on GitHub with coverage changes.
 ### CI setup
 
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.
-Please note that new a contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
+Please note that a new contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
 As the full CI suite takes a while to complete, we recommend to run at least tests directly related to your contributions locally beforehand.
 Logs from all CI runs are collected periodically by [con/tinuous](https://github.com/con/tinuous/) and archived at `smaug:/mnt/btrfs/datasets/datalad/ci/logs/`.
 For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
