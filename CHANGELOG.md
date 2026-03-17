@@ -1,4 +1,26 @@
 
+<a id='changelog-1.3.4'></a>
+# 1.3.4 (2026-03-17)
+
+## 🐛 Bug Fixes
+
+- Fix `run --explicit --output` failing to commit file deletions.
+  When a command deleted files specified in `--output`, the deletions
+  were left unstaged because post-command globbing only matched
+  files still present on disk.
+  Fixes [#7822](https://github.com/datalad/datalad/issues/7822) via
+  [PR #7823](https://github.com/datalad/datalad/pull/7823)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Suppress `RequestsDependencyWarning` emitted by `requests` 2.32.x
+  when `chardet>=6` is installed.  The warning was purely cosmetic
+  (HTTP functionality is unaffected) but appeared on stderr for every
+  datalad command.
+  Fixes [#7825](https://github.com/datalad/datalad/issues/7825)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Reload config after enableremote in create-sibling-ria.  Fixes [#7827](https://github.com/datalad/datalad/issues/7827) via [PR #7828](https://github.com/datalad/datalad/pull/7828) (by [@just-meng](https://github.com/just-meng))
+
 <a id='changelog-1.3.3'></a>
 # 1.3.3 (2026-03-12)
 
