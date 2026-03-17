@@ -40,6 +40,7 @@ from datalad.interface.common_opts import (
     location_description,
     save_message_opt,
 )
+from datalad.local.run_procedure import _get_proc_configs
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureKeyChoice,
@@ -341,7 +342,6 @@ class Create(Interface):
             yield res
             return
 
-        from datalad.local.run_procedure import _get_proc_configs
         cfg_proc_specs = _get_proc_configs(cfg_proc, tbds) if cfg_proc else []
 
         if initopts is not None and isinstance(initopts, list):

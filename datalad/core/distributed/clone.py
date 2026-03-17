@@ -557,6 +557,7 @@ def clone_dataset(
         rmtree(destds.path, children_only=dest_path_existed)
         return
 
+    # import in function to circumvent circular import issue
     from datalad.local.run_procedure import _get_proc_configs
     cfg_proc_specs = _get_proc_configs(cfg_proc, destds) if cfg_proc else []
     for cfg_proc_spec in cfg_proc_specs:
