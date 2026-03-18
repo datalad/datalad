@@ -1083,7 +1083,8 @@ xfail_annex_ignore_not_respected_for_local = pytest.mark.xfail(
     # In 10.20250630 and earlier, (_, True, _) was matched first, correctly
     # short-circuiting for annex-ignored remotes.
     # https://git-annex.branchable.com/bugs/annex-ignore_check_is_skipped_for_local_remotes/
-    external_versions['cmd:annex'] and external_versions['cmd:annex'] >= '10.20260213',
+    # Fixed in 10.20260316.
+    external_versions['cmd:annex'] and ('10.20260213' <= external_versions['cmd:annex'] < '10.20260316'),
     reason="git-annex regression: annex-ignore not respected for local remotes"
 )
 
