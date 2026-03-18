@@ -82,7 +82,6 @@ from datalad.tests.utils_pytest import (
     with_tempfile,
     with_tree,
     xfail_annex_ignore_not_respected_for_local,
-    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -1557,7 +1556,6 @@ def test_clone_unborn_head_sub(path=None):
     eq_(managed, ds_cloned_sub.repo.is_managed_branch())
 
 
-@xfail_buggy_annex_info
 @skip_if_no_network
 @with_tempfile
 def test_gin_cloning(path=None):
