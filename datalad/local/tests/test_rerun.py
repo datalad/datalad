@@ -149,12 +149,7 @@ def test_rerun(path=None, nodspath=None):
 
     # Nothing changed.
     eq_('xxxxxxxxxx\n', open(probe_path).read())
-    # With fix for issue #4700, we now include all commits, not just those after
-    # the first run commit. We expect 3 skip-or-pick actions:
-    # 1. Initial dataset creation commit
-    # 2. Subdataset creation commit
-    # 3. The non-run "nonrun-file" commit
-    assert_result_count(report, 3, rerun_action="skip-or-pick")
+    assert_result_count(report, 1, rerun_action="skip-or-pick")
     report[-1]["commit"] == ds.repo.get_hexsha()
 
     # If a file is dropped, we remove it instead of unlocking it.
