@@ -117,7 +117,6 @@ from .utils_pytest import (
     ok_file_has_content,
     ok_generator,
     ok_startswith,
-    on_travis,
     probe_known_failure,
     skip_if,
     skip_if_no_module,
@@ -1290,7 +1289,6 @@ def test_never_fail():
         assert_raises(ValueError, ifail2, 1)
 
 
-@pytest.mark.xfail(reason="TODO: for some reason fails on Travis")
 @with_tempfile
 def test_is_interactive(fout=None):
     # must not fail if one of the streams is no longer open:
@@ -1331,17 +1329,7 @@ def test_is_interactive(fout=None):
     # happen, also test the core protocols
     # (we can only be interactive in a runner, if the test execution
     # itself happens in an interactive environment)
-    for proto, interactive in ((NoCapture,
-                                # It is unclear why (on travis only) a child
-                                # process can report to be interactive
-                                # whenever the parent process is not.
-                                # Maintain this test exception until
-                                # someone can provide insight. The point of
-                                # this test is to ensure that NoCapture
-                                # in an interactive parent also keeps the
-                                # child interactive, so this oddity is not
-                                # relevant.
-                                True if on_travis else is_interactive()),
+    for proto, interactive in ((NoCapture, is_interactive()),
                                (KillOutput, False),
                                (StdOutErrCapture, False),
                                (GitProgress, False),
