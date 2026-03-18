@@ -23,7 +23,6 @@ from tempfile import mkdtemp
 import datalad
 import datalad.support.ansi_colors as ac
 from datalad.config import anything2bool
-from datalad.core.local.diff import diff_dataset
 from datalad.core.local.save import Save
 from datalad.core.local.status import Status
 from datalad.distribution.dataset import (
@@ -80,61 +79,6 @@ def _format_cmd_shorty(cmd):
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
     return cmd_shorty
-
-
-def _create_merge_commit(repo, pre_hexsha, msg):
-    """Create a merge commit wrapping command-created commits.
-
-    The merge has two parents:
-      parent1 = pre_hexsha (pre-command state, keeps first-parent history clean)
-      parent2 = current HEAD (command's commits + any leftover save)
-      tree    = current HEAD's tree (reflects all changes)
-
-    On adjusted branches (git-annex), the merge is created on the
-    original branch and then propagated back via ``git annex merge``.
-
-    Parameters
-    ----------
-    repo : GitRepo or AnnexRepo
-    pre_hexsha : str
-        Commit hash of the pre-command state (first parent).
-    msg : str
-        Commit message (typically the run record).
-    """
-    on_adjusted = (
-        hasattr(repo, 'is_managed_branch') and repo.is_managed_branch()
-    )
-    if on_adjusted:
-        orig_branch = repo.get_corresponding_branch()
-        repo.call_git([
-            "annex", "sync", "--no-push", "--no-pull",
-            "--no-commit", "--no-resolvemerge", "--no-content"])
-        orig_post = repo.get_hexsha("refs/heads/" + orig_branch)
-        orig_pre = repo.call_git_oneline(
-            ["merge-base", orig_branch, pre_hexsha])
-        tree = repo.call_git_oneline(
-            ["rev-parse", orig_post + "^{tree}"])
-        merge_hexsha = repo.call_git_oneline(
-            ["commit-tree", tree,
-             "-p", orig_pre, "-p", orig_post,
-             "-m", msg])
-        repo.update_ref("refs/heads/" + orig_branch, merge_hexsha)
-        repo.call_git(["annex", "merge"])
-    else:
-        current_head = repo.get_hexsha()
-        tree = repo.call_git_oneline(
-            ["rev-parse", current_head + "^{tree}"])
-        merge_hexsha = repo.call_git_oneline(
-            ["commit-tree", tree,
-             "-p", pre_hexsha,
-             "-p", current_head,
-             "-m", msg])
-        branch = repo.get_active_branch()
-        if branch:
-            repo.update_ref(
-                "refs/heads/" + branch, merge_hexsha)
-        else:
-            repo.update_ref("HEAD", merge_hexsha)
 
 
 assume_ready_opt = Parameter(
@@ -1222,118 +1166,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             run_result[f'expanded_{s}'] = globbed[s].expand_strict()
     yield run_result
 
-    if pre_cmd_hexsha is not None:
-        # Use diff_dataset to discover all changes across the hierarchy,
-        # bottom-up (deepest subdatasets first).  This replaces Save's
-        # internal Status call with correct per-subdataset baselines.
-        status_by_ds = {}   # {ds_path_str: {Path: props}}
-        subds_pre = {}      # {sub_path_str: prev_gitshasum}
-
-        for r in diff_dataset(
-                dataset=ds, fr=pre_cmd_hexsha, to=None,
-                constant_refs=False,
-                recursive=True,
-                reporting_order='bottom-up',
-                untracked='normal'):
-            if r.get('status') != 'ok':
-                continue
-            pds = r['parentds']
-            rpath = Path(r['path'])
-            props = {k: v for k, v in r.items()
-                     if k not in ('path', 'parentds', 'refds',
-                                  'status', 'action', 'logger')}
-            status_by_ds.setdefault(pds, {})[rpath] = props
-            if props.get('type') == 'dataset' and 'prev_gitshasum' in props:
-                subds_pre[r['path']] = props['prev_gitshasum']
-
-        # Determine which datasets need merge commits:
-        # those where the command created intermediate commits
-        # (pre-command pointer != current HEAD).
-        ds_needs_merge = {}
-        for ds_path_str in status_by_ds:
-            ds_pre = (pre_cmd_hexsha if ds_path_str == ds.path
-                      else subds_pre.get(ds_path_str))
-            if ds_pre is not None:
-                cur_head = Dataset(ds_path_str).repo.get_hexsha()
-                if ds_pre != cur_head:
-                    ds_needs_merge[ds_path_str] = ds_pre
-
-        # Propagate merge need upward: if a child subdataset needs a
-        # merge, the parent must also get a merge to wrap the updated
-        # submodule pointer.  Iterate in bottom-up order so that each
-        # level's children are resolved before the parent is checked.
-        for ds_path_str, ds_items in status_by_ds.items():
-            if ds_path_str in ds_needs_merge:
-                continue
-            for p, props in ds_items.items():
-                if (props.get('type') == 'dataset'
-                        and str(p) in ds_needs_merge):
-                    ds_pre = (pre_cmd_hexsha if ds_path_str == ds.path
-                              else subds_pre.get(ds_path_str))
-                    if ds_pre is not None:
-                        ds_needs_merge[ds_path_str] = ds_pre
-                    break
-
-        if ds_needs_merge:
-            # Process bottom-up: save remaining changes, then create merges.
-            # Dict insertion order preserves bottom-up ordering from
-            # diff_dataset.
-            for ds_path_str, ds_items in status_by_ds.items():
-                cur_ds = Dataset(ds_path_str)
-                cur_repo = cur_ds.repo
-                needs_merge = ds_path_str in ds_needs_merge
-
-                if do_save:
-                    # Recode paths to repo-anchored absolute paths
-                    # (same transform as save.py save_ds)
-                    pds_status = {
-                        cur_repo.pathobj / p.relative_to(ds_path_str): props
-                        for p, props in ds_items.items()
-                    }
-                    if not all(
-                        p.get('state') == 'clean'
-                        for p in pds_status.values()
-                    ):
-                        save_msg = (
-                            "Remaining changes after command execution"
-                            if needs_merge else msg)
-                        for r in cur_repo.save_(
-                                message=save_msg,
-                                paths=None,
-                                git=True
-                                if not hasattr(cur_repo, 'uuid')
-                                else None,
-                                untracked='no',
-                                _status=pds_status):
-                            # recode path back to dataset path anchor
-                            for k in ('path', 'refds'):
-                                if k in r:
-                                    r[k] = str(
-                                        cur_ds.pathobj
-                                        / Path(r[k]).relative_to(
-                                            cur_repo.pathobj)
-                                    )
-                            yield r
-
-                if needs_merge:
-                    _create_merge_commit(
-                        cur_repo, ds_needs_merge[ds_path_str], msg)
-        elif do_save:
-            # No inner commits anywhere — use standard Save for backward
-            # compatibility (yields dataset-level result records).
-            with chpwd(pwd):
-                for r in Save.__call__(
-                        dataset=ds_path,
-                        path=outputs_to_save,
-                        recursive=True,
-                        message=msg,
-                        jobs=jobs,
-                        return_type='generator',
-                        result_renderer='disabled',
-                        on_failure='ignore'):
-                    yield r
-    elif do_save:
-        # inject mode — use existing Save path
+    if do_save:
         with chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,
@@ -1341,6 +1174,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     recursive=True,
                     message=msg,
                     jobs=jobs,
+                    fr=pre_cmd_hexsha,
                     return_type='generator',
                     result_renderer='disabled',
                     on_failure='ignore'):
