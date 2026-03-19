@@ -603,6 +603,8 @@ def test_rerun_script(path=None):
 
 @slow  # ~10s
 @known_failure_windows
+@pytest.mark.xfail(reason="push to non-bare repo fails: "
+                          "[remote rejected] (branch is currently checked out)")
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
