@@ -1095,6 +1095,14 @@ xfail_annex_ignore_not_respected_for_local = pytest.mark.xfail(
     reason="git-annex regression: annex-ignore not respected for local remotes"
 )
 
+xfail_annex_enableremote_bare_git = pytest.mark.xfail(
+    # In 10.20260316, enableremote of a bare-git remote fails with
+    # "enableremote (normal) bare-git failed" / "enableremote: 1 failed".
+    # Worked in 10.20260213 and earlier.
+    external_versions['cmd:annex'] and external_versions['cmd:annex'] >= '10.20260316',
+    reason="git-annex regression: enableremote fails for bare-git remotes"
+)
+
 
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
