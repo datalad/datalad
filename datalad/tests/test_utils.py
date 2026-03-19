@@ -1289,6 +1289,9 @@ def test_never_fail():
         assert_raises(ValueError, ifail2, 1)
 
 
+@pytest.mark.xfail(on_windows,
+                   reason="NoCapture child reports is_interactive()=True "
+                          "when parent is non-interactive on Windows")
 @with_tempfile
 def test_is_interactive(fout=None):
     # must not fail if one of the streams is no longer open:
