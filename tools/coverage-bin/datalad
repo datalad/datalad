@@ -5,14 +5,19 @@
 
 set -eu
 
+# Paths must not use $PWD: tests invoke datalad with cwd under temp dirs, so
+# $PWD/../.coveragerc would not point at the repository root (see AppVeyor/CI).
+_script_dir=$(cd "$(dirname "$0")" && pwd)
+_repo_root=$(cd "$_script_dir/../.." && pwd)
+
 bin=$(basename $0)
 curbin=$(which "$bin")
 curdatalad=$(which datalad)
 curdir=$(dirname $curdatalad)
 
 COVERAGE_RUN="-m coverage run"
-export COVERAGE_PROCESS_START=$PWD/../.coveragerc
-export PYTHONPATH="$PWD/../tools/coverage-bin/"
+export COVERAGE_PROCESS_START=$_repo_root/.coveragerc
+export PYTHONPATH="$_script_dir/"
 export PATH=${PATH//$curdir:/}
 newdatalad=$(which datalad)
 newbin=$(which $bin)
