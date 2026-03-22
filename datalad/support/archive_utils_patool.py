@@ -20,8 +20,8 @@ assert(external_versions["patoolib"] >= "1.7")
 # need to consider those two locations
 if int(patoolib.__version__.split(".")[0]) >= 2:
     from patoolib.fileutil import check_new_filename
-else:
-    from patoolib.util import check_new_filename
+else:  # pragma: no cover -- patoolib 1.x; CI uses 2.x
+    from patoolib.util import check_new_filename  # pragma: no cover
 
 
 import logging
