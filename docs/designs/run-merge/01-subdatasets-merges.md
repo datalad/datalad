@@ -1,350 +1,248 @@
 # Run-merge commits in subdataset hierarchies
 
-## Status: TODO
+## Status: implemented
+
+Merge-commit wrapping now works across subdataset hierarchies.
+The logic lives in `Save` (via the `fr=` parameter) rather than in
+`run_command`, making it available to both `datalad run` and standalone
+`datalad save --from`.
 
 ## Problem
 
 When `datalad run` executes a command that creates git commits inside
-subdatasets, the merge-commit wrapping (introduced in this PR) only
-operates on the top-level dataset.  Subdatasets that gained inner commits
-during command execution receive no merge commit and therefore no run
-record annotation at their level.
+subdatasets, the merge-commit wrapping must operate at every level of the
+hierarchy — not just the top-level dataset.  Each subdataset that gained
+inner commits needs its own merge commit carrying the run record, and the
+parent's submodule pointer must reference the subdataset's merge commit
+(not the raw inner commit).
 
-## Current behavior
+## Implementation
 
-### Detection is top-level only
+### Architecture
 
-`pre_cmd_hexsha` and `post_cmd_hexsha` are computed only for the dataset
-on which `run()` was invoked (`run.py:1019,1026`):
+The merge-commit logic is a first-class feature of `datalad save` via the
+`--from` / `fr=` parameter (`save.py`).  `run_command` passes
+`fr=pre_cmd_hexsha` to `Save.__call__()`, which handles discovery, saving,
+and merge creation in a single pass.
 
-```python
-pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
-# ... command executes ...
-post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
-cmd_made_commits = (
-    pre_cmd_hexsha is not None
-    and post_cmd_hexsha is not None
-    and pre_cmd_hexsha != post_cmd_hexsha
-)
-```
+When `fr` is `None` (inject mode or plain `datalad save`), the standard
+`Status`-based discovery is used — identical to prior behavior.
 
-No subdataset HEADs are recorded or compared.
+### Discovery: `diff_dataset` replaces `Status` when `fr` is set
 
-### Save is recursive but produces regular commits
+`Save.__call__` conditionally uses `diff_dataset(fr=..., to=None)` instead
+of `Status()` for change discovery (`save.py:292-326`).  This is necessary
+because:
 
-The `Save(recursive=True)` call (`run.py:1162-1173`) does save bottom-up
-through the hierarchy: subdatasets first, then parent submodule-pointer
-updates.  But these are ordinary commits, not merge commits carrying the
-run record.
+- `Status` hardcodes `fr='HEAD'` — after the command moves HEAD, it cannot
+  see the pre-command baseline.
+- `diff_dataset` accepts an explicit `fr` and **translates it
+  per-subdataset** via `prev_gitshasum` from the parent's diff result
+  (`diff.py:401-411`).
 
-### Merge commit is created only at top level
+The `dataset` argument is passed as the original (non-Dataset-instance)
+value to preserve `resolve_path()` CWD-relative semantics matching the
+`Status()` branch (see `resolve_path()` docs: only Dataset *instances*
+trigger dataset-root-relative resolution).
 
-The `git commit-tree` merge (`run.py:1178-1191`) operates only on the
-top-level repo.  The subdataset's inner commits end up as ancestors of
-the submodule pointer recorded in the superdataset's merge, but the
-subdataset itself has no merge commit wrapping them.
+### Merge creation: bottom-up in `save_ds`
 
-### Consequence
+Inside the `save_ds` closure (`save.py:396-487`):
 
-Given a superdataset `ds` with subdataset `sub`, and a command like:
+1. **`fr_map`** maps each dataset path to its pre-command hexsha
+   (top-level gets `fr` directly; subdatasets get `prev_gitshasum`
+   from diff_dataset results).
 
-```bash
-datalad run 'cd sub && touch foo && git add foo && git commit -m inner'
-```
+2. **Merge detection** per dataset: `had_inner = (pre_hexsha is not None
+   and pre_hexsha != start_commit)`.  Additionally, `child_merged` checks
+   if any child subdataset was merged (upward propagation via
+   `_merged_datasets` set).
 
-The result is:
+3. **Save remaining changes**: if the dataset has uncommitted changes,
+   `repo.save_()` commits them with a "Remaining changes" message (when a
+   merge follows) or the run record message (when no merge needed).
 
-- **`sub`**: has the bare "inner" commit.  No merge commit, no run record.
-  `Save` may add a follow-up commit for any remaining dirty state, but
-  it's a plain commit.
-- **`ds`**: gets a merge commit if its own HEAD changed (due to the
-  submodule pointer update from `Save`).  The run record lives only here.
+4. **Create merge**: `_create_merge_commit(repo, pre_hexsha, message)`
+   produces a two-parent commit: parent1 = pre-command state (linear
+   first-parent history), parent2 = current HEAD (all changes), tree =
+   current HEAD's tree.
 
-If the command creates commits only in `sub` without changing `ds`'s own
-working tree, then `cmd_made_commits` is `False` for `ds` and no merge
-is created anywhere.
+5. **Record in `_merged_datasets`** so parent datasets know to create
+   their own merge even if they had no direct inner commits.
 
-## Desired behavior
-
-Each dataset in the hierarchy where the command created intermediate
-commits should get its own merge commit that:
-
-1. Wraps the inner commit(s) in that dataset
-2. Carries the run record (or a reference to the top-level run record)
-3. Has first-parent = pre-command state, second-parent = post-command
-   state (same topology as the current top-level merge)
-
-The superdataset's merge commit then records submodule pointers that
-point to the subdatasets' merge commits, giving a consistent merge
-topology across the entire hierarchy.
-
-## Implementation plan
-
-### Key insight: Diff and Status diverge on `fr` handling
-
-`datalad diff` and `datalad status` both use `repo.diffstatus()` under
-the hood but handle the `fr` (baseline revision) parameter very
-differently:
-
-**`datalad diff`** (`diff.py:_diff_ds`, line 296):
-- Accepts `fr`/`to` as parameters, passes them directly to
-  `repo.diffstatus(fr, to)` (line 331-337).
-- For subdataset recursion, **translates `fr`/`to` per-subdataset**
-  using `prev_gitshasum`/`gitshasum` from the parent's diff result
-  (lines 404-411):
-  ```python
-  fr=props['prev_gitshasum']   # pre-command sub pointer
-  to=None if to is None else props['gitshasum']
-  ```
-- Supports `order='bottom-up'` for processing deepest subdatasets first.
-
-**`datalad status`** (`status.py:yield_dataset_status`, line 105):
-- **Hardcodes `fr='HEAD'`** (line 160), no parameter to override.
-- For subdataset recursion, passes **`None`** as paths (line 207) —
-  no `fr` translation, each sub just uses its own HEAD.
-
-**`datalad save`** (`save.py:Save.__call__`, line 222):
-- Calls `Status()` internally — inherits the hardcoded `fr='HEAD'`.
-- No `fr`/`to` parameters in its interface.
-
-So Save → Status → `diffstatus(fr='HEAD')` is locked to comparing
-against current HEAD.  After the command moves HEAD, `prev_gitshasum`
-for subdatasets reflects the **post-command** state, not pre-command.
-
-### Recommended approach: replace Save with `diff_dataset` in cmd_made_commits path
-
-#### No additional git calls
-
-Currently the `cmd_made_commits` path in `run_command` calls:
-
-```
-Save → Status → diffstatus(fr='HEAD', to=None)   [one per dataset]
-```
-
-The proposed approach replaces this with:
-
-```
-diff_dataset(fr=pre_cmd_hexsha, to=None)  →  diffstatus(fr=pre_cmd, to=None)  [one per dataset]
-```
-
-Same number of `diffstatus()` invocations (one per dataset in the
-hierarchy), same underlying `get_content_info()` calls — the only
-difference is the `fr` value.  This is a **replacement**, not an
-addition: `diff_dataset` takes over the discovery role that
-Save → Status currently fills.
-
-For the actual committing of remaining uncommitted changes, we call
-`repo.save_(_status=...)` directly (same low-level call that
-`save_ds` in `save.py:306` already uses), passing the pre-computed
-status from `diff_dataset`.  This bypasses Save's redundant Status
-call entirely.
-
-#### Implementation steps
-
-1. **In `run_command`**, when `cmd_made_commits` is True, replace
-   the current Save + merge-commit sequence with:
-
-   ```python
-   from datalad.core.local.diff import diff_dataset
-
-   # Collect all changes since pre-command, bottom-up through hierarchy.
-   # This calls diffstatus(fr=pre_cmd_hexsha, to=None) at each level —
-   # same call count as Save's internal Status, just with correct fr.
-   results_by_ds = {}
-   for r in diff_dataset(
-           dataset=ds, fr=pre_cmd_hexsha, to=None,
-           constant_refs=False,
-           recursive=True,
-           reporting_order='bottom-up',
-           untracked='normal'):
-       # Collect per-dataset status for save_() and merge decisions
-       ds_path = r.get('parentds')
-       results_by_ds.setdefault(ds_path, {})[Path(r['path'])] = r
-   ```
-
-2. **Process bottom-up**: for each dataset (deepest first):
-   a. If there are uncommitted changes (state not clean, not already
-      committed): call `repo.save_(_status=per_ds_status)` to commit
-      remaining changes.
-   b. Check if the dataset had inner commits from the command:
-      compare `prev_gitshasum` (pre-command pointer from parent's
-      diff) against current HEAD.
-   c. If yes: create merge commit (`git commit-tree`) with
-      parent1 = `prev_gitshasum`, parent2 = current HEAD.
-   d. On adjusted branches: route through `git annex sync` +
-      `git annex merge`.
-
-3. **For the top-level dataset**: same merge-commit logic as today,
-   using `pre_cmd_hexsha` as parent1.
-
-#### Why `diff_dataset` already handles subdataset `fr` translation
-
-When `_diff_ds` encounters a modified subdataset, it recurses with
-(diff.py:401-411):
-
-```python
-fr = props['prev_gitshasum']  # pre-command pointer for this sub
-to = None                     # compare to worktree
-```
-
-So at each level, `diffstatus(fr=prev_gitshasum, to=None)` naturally
-compares from the pre-command state of that subdataset to its current
-worktree.  Files committed by the command show as 'modified' (sha
-differs from pre-command) but `git add` is a no-op (worktree matches
-index).  Truly uncommitted files also show as 'modified' and get
-saved normally.
-
-### Run record placement
-
-Two options:
-
-- **A) Duplicate**: embed the full run record in every subdataset's merge
-  commit message (matches the existing docstring claim at `run.py:116-117`
-  that the record is "duplicated in each modified (sub)dataset").
-- **B) Top-only**: only the top-level merge carries the full run record;
-  subdataset merges get a shorter message referencing the parent.
-
-Option A is more self-contained (each subdataset can be understood
-independently) and aligns with the existing documented intent.
+Bottom-up ordering is guaranteed by `ProducerConsumerProgressLog` with
+`sorted(..., reverse=True)` + `no_subds_in_futures`.
 
 ### Adjusted-branch handling
 
-The current adjusted-branch path (`git annex sync` + `commit-tree` on
-original branch + `git annex merge`) must be applied per-subdataset as
-well.  Each subdataset on an adjusted branch needs its own sync-merge
-cycle before the parent can record its submodule pointer.  The
-`order='bottom-up'` traversal from `diff_dataset` ensures the right
-processing order.
+`_create_merge_commit` (`save.py:59-111`) checks `is_managed_branch()`
+per-repo.  On adjusted branches: `git annex sync` → `commit-tree` on
+original branch → `git annex merge`.  Each subdataset independently
+handles its own adjusted-branch state.
 
-## Test scenarios
+### Run record placement
 
-All tests should use `@known_failure_windows`, `@pytest.mark.ai_generated`.
+Option A (duplicate): the full run record is embedded in every dataset's
+merge commit message.  This matches the existing docstring claim
+(`run.py:116-117`) that the record is "duplicated in each modified
+(sub)dataset" and allows each subdataset to be understood independently.
 
-### 1. Inner commit in a subdataset only
+### `run_command` simplification
 
-```
-ds/
-  sub/  ← command creates commit here, nothing in ds itself
-```
+`run_command` (`run.py:1170-1182`) is now a single `Save.__call__()` with
+`fr=pre_cmd_hexsha`:
 
-Run: `datalad run 'cd sub && touch foo && git add foo && git commit -m inner'`
-
-Assert:
-- `sub` has a merge commit at HEAD (on corresponding branch if adjusted)
-- `ds` has a merge commit whose tree records `sub`'s merge as the
-  submodule pointer
-- Run info is extractable from both merge commit messages
-
-### 2. Inner commits in both superdataset and subdataset
-
-```
-ds/    ← command creates commit here
-  sub/ ← and here
+```python
+if do_save:
+    with chpwd(pwd):
+        for r in Save.__call__(
+                dataset=ds_path,
+                path=outputs_to_save,
+                recursive=True,
+                message=msg,
+                jobs=jobs,
+                fr=pre_cmd_hexsha,   # None for inject → standard save
+                ...):
+            yield r
 ```
 
-Run: `datalad run 'touch top && git add top && git commit -m top-inner && cd sub && touch foo && git add foo && git commit -m sub-inner'`
+This replaced ~120 lines of `diff_dataset` traversal, merge detection,
+upward propagation, and manual `save_()` calls that previously lived in
+`run_command`.
 
-Assert:
-- Both `ds` and `sub` have merge commits
-- `ds`'s merge records `sub`'s merge commit as submodule pointer
-- Both merge commits carry valid run info
+## Test coverage
 
-### 3. Three-level hierarchy: commit only at leaf
+Tests in `test_run.py` (all `@known_failure_windows`,
+`@pytest.mark.ai_generated`):
 
-```
-ds/
-  mid/
-    leaf/  ← command creates commit here only
-```
+| Test | Scenario |
+|------|----------|
+| `test_run_merge_commits` | Single/multiple inner commits, mixed committed+uncommitted |
+| `test_run_explicit_dirty_committed` | Explicit mode inner commit check + config override |
+| `test_run_merge_subdataset_only` | Inner commit only in sub → merges in both |
+| `test_run_merge_both_levels` | Inner commits in super and sub → merges in both |
+| `test_run_merge_three_levels` | Three-level hierarchy, commit at leaf → merges propagate up |
+| `test_run_merge_no_subdataset_change` | Commit only in super → sub HEAD unchanged |
+| `test_run_merge_subdataset_deletions` | Committed + uncommitted deletions in sub |
+| `test_rerun_merge` (`test_rerun.py`) | `rerun` traverses merge first-parent correctly |
 
-Run: `datalad run 'cd mid/leaf && touch foo && git add foo && git commit -m inner'`
+Adjusted-branch test (scenario 4 from design) is covered by
+`test_run_merge_commits` on CrippledFS CI environments where all repos
+are on adjusted branches.
 
-Assert:
-- `leaf` has a merge commit wrapping the inner commit
-- `mid` has a merge commit (or at least records `leaf`'s new pointer)
-- `ds` has a merge commit recording the full chain
-- Run info extractable at each level
+## Resolved questions
 
-### 4. Adjusted branch (crippled FS) with subdataset commit
+- **`rerun` compatibility**: resolved.  `datalad rerun` extracts the run
+  record from the merge commit message (option A — duplicate records).
+  `test_rerun_merge` verifies this.  `rerun` follows first-parent by
+  default, which skips the inner commits inside the merge.
 
-Same as scenario 1 but on a vfat / adjusted-branch filesystem.
+- **Interaction with `--explicit`**: resolved.  When `path` is provided
+  (from `outputs_to_save`), it is passed to `diff_dataset` to constrain
+  discovery.  The `dirty-committed` check in `run_command` catches inner
+  commits that sweep in undeclared files.  `test_run_explicit_dirty_committed`
+  verifies both the error path and the config override.
 
-Assert:
-- Merge created on the original branch of each affected dataset
-- `git annex sync` succeeds at all levels
-- `git annex merge` propagates correctly bottom-up
+- **Distinguishing command commits from pre-existing state**: resolved.
+  `run` requires a clean tree (checked before command execution).
+  `--explicit` mode skips that check, but the `dirty-committed` check
+  catches undeclared files swept in by inner commits.
 
-### 5. No inner commits in subdataset (negative case)
+- **Partial failures**: partially addressed.  Each `_create_merge_commit`
+  is an atomic `update_ref` per dataset.  If a parent merge fails after a
+  child succeeded, the child's merge is already recorded.  The parent's
+  `save_ds` would yield an error result.  No rollback mechanism exists,
+  but the child state is valid on its own.  This is consistent with how
+  recursive `save` already handles partial failures.
 
-Command creates commits only in the top-level dataset; subdataset is
-unmodified.
+## TODO
 
-Assert:
-- Only the top-level dataset gets a merge commit
-- Subdataset HEAD is unchanged
-- No spurious merge commits in subdatasets
+### TODO 1: `untracked` mode — verify behavioral equivalence with prior code
 
-### 6. File removal: committed and uncommitted deletions
+The old `run_command` called `diff_dataset(..., untracked='normal')` for
+merge discovery.  The new code in `Save` uses
+`untracked=untracked_mode` which resolves to `'all'` (since `updated`
+defaults to False).
 
-Tests that merge commits handle file deletions correctly, including
-the case where a deletion is committed by the command vs left
-uncommitted.
+**Difference**: `'normal'` reports untracked directories as single
+entries; `'all'` enumerates every file inside untracked directories.
+Both produce the same final committed state (save_ gets
+`untracked='no'` and operates only on the provided `_status` dict),
+but `'all'` may build a much larger `paths_by_ds` for repos with many
+untracked files.
 
-```
-ds/
-  sub/  ← has existing tracked files: kept, rm_committed, rm_uncommitted
-```
+**Action items**:
+- Benchmark `diff_dataset` with `untracked='normal'` vs `'all'` on a
+  repo with a large untracked directory (e.g. `node_modules/` or
+  build artifacts) to quantify the overhead.
+- If significant, consider passing `untracked='normal'` explicitly
+  when `fr` is set, since the merge path does not need individual
+  file entries — only the presence of uncommitted changes matters.
+- Check whether `'normal'` causes any difference in `save_()`
+  behavior when directory entries (vs individual file entries) are in
+  `_status`.
+- Add a test with a large untracked tree to catch regressions.
 
-Setup: create `sub` with three tracked files.
+### TODO 2: `dataset=dataset or ds` — path resolution when `dataset=None`
 
-Run: `datalad run 'cd sub && git rm rm_committed && git commit -m "remove" && rm rm_uncommitted'`
+When `Save` is called without an explicit `dataset` argument (e.g.,
+standalone `datalad save --from HEAD~3 somefile` without `-d`),
+`dataset` is `None`.  The expression `dataset or ds` falls back to
+`ds` — a `Dataset` instance from `require_dataset()`.
 
-Assert:
-- `sub` has a merge commit (inner commit deleted `rm_committed`)
-- `rm_committed` does not exist in the final tree
-- `rm_uncommitted` does not exist in the final tree (saved by the
-  remaining-changes commit before merge)
-- `kept` still exists and is unmodified
-- The merge commit tree correctly reflects all three outcomes
-- Run info is extractable from the merge commit
+**Problem**: `resolve_path(p, Dataset_instance)` resolves relative
+paths against the dataset root, while `resolve_path(p, None)` (used
+by `Status` when `dataset=None`) resolves against CWD.  This means
+a user running `datalad save --from HEAD~3 myfile` from a
+subdirectory would get different path resolution than
+`datalad save myfile` (without `--from`).
 
-This scenario is important because:
-- `diffstatus(fr=pre_cmd_hexsha, to=None)` will report `rm_committed`
-  as `state='deleted'` (was in pre-cmd tree, gone from worktree)
-- `rm_uncommitted` will also be `state='deleted'` but needs to be
-  staged via `git rm` before creating the merge
-- The merge tree must be built from the post-save HEAD, not from
-  the pre-command tree, to reflect both deletions
+**Action items**:
+- Write a test: from a subdirectory of a dataset (without `-d`),
+  run `save(path=['somefile'], fr=<commit>)` and verify that
+  `somefile` is resolved relative to CWD (matching `save` without
+  `fr`).  This test will currently fail and document the bug.
+- Fix: when `dataset` is `None`, pass `None` to `diff_dataset` so
+  it falls through to `require_dataset()` internally, which returns a
+  Dataset instance but `resolve_path` still receives `None` as `ds`
+  and resolves against CWD.  Or: resolve paths explicitly before
+  calling diff_dataset.
+- Alternatively: pass `dataset` unconditionally (even when `None`)
+  since `diff_dataset` calls `require_dataset()` itself.  However,
+  `diff_dataset(dataset=None)` may not discover the dataset from CWD
+  the same way `Status(dataset=None)` does — needs verification.
 
-### 7. Mixed: file removal committed in subdataset, addition uncommitted
+### TODO 3: tests for standalone `datalad save --from`
 
-```
-ds/
-  sub/  ← has tracked file: old_file
-```
+The `fr=` parameter is documented as independently useful ("can also
+be used standalone to close a unit of work as a merge"), but all
+current tests exercise it indirectly through `datalad run`.
 
-Run: `datalad run 'cd sub && git rm old_file && git commit -m "remove old" && touch new_file'`
+**Action items** — extend existing save tests in `test_save.py`:
 
-Assert:
-- `sub` has a merge commit
-- `old_file` is gone, `new_file` exists
-- Merge tree = post-save state (has new_file, lacks old_file)
+- **`test_save` or new `test_save_from_basic`**: create commits A, B, C.
+  Call `save(fr=A)`.  Verify: merge commit at HEAD, first-parent = A,
+  second-parent = C, run of `git log --first-parent` is linear.  Then
+  verify `save(fr=HEAD)` (no changes since baseline) → `status='notneeded'`.
 
-## Open questions
+- **`test_subdataset_save` or new `test_save_from_recursive`**: create a
+  dataset with subdataset.  Make commits in both.  Call
+  `save(fr=<before>, recursive=True)`.  Verify merge commits at both
+  levels with correct `fr_map` propagation.
 
-- **Partial failures**: if a subdataset merge succeeds but the parent
-  merge fails, we need a recovery strategy.  Currently the top-level
-  merge is atomic (single `update_ref`), but with a hierarchy there are
-  multiple refs to update.
-- **`rerun` compatibility**: `datalad rerun` needs to handle merge
-  commits at each level of the hierarchy.  The current rerun
-  implementation extracts the run record from the commit message, which
-  would work with option A (duplicate records).
-- **Interaction with `--explicit`**: in explicit mode, `outputs_to_save`
-  scoping might need to be per-subdataset.
-- **Distinguishing command commits from pre-existing state**: if a
-  subdataset was already at a different commit than what the parent
-  recorded (dirty submodule pointer before `run`), the diff would show
-  a difference that isn't from the command.  This shouldn't happen
-  because `run` checks for a clean tree first, but `--explicit` mode
-  skips that check.
+- **`test_relpath_add` / `test_symlinked_relpath` extension**: from a
+  subdirectory, call `save(path=['somefile'], fr=<commit>)`.  Verify the
+  path is resolved relative to CWD, not dataset root (this is the
+  TODO 2 bug — the test should initially fail, then pass after the fix).
+
+- **`test_save_from_no_inner_commits`**: `fr=HEAD` with only working-tree
+  changes (no intermediate commits).  Verify: plain save, no merge commit.
+  This ensures `fr=` falls back correctly when there's nothing to merge.
+
+- **`test_save_from_with_path_filter`**: `fr=<commit>` with explicit
+  `path=` argument.  Verify only the specified paths are saved, other
+  changed files remain uncommitted — matching `save(path=...)` behavior
+  without `fr`.
+
+These tests establish behavioral expectations that work on TODOs 1
+and 2 must preserve.
