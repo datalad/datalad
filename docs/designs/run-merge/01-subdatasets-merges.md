@@ -175,66 +175,23 @@ correctly — they land in `untracked_dirs`, get checked for submodules,
 then `git add <dir>/` recursively adds all contents.  Dotfile
 directories (e.g. `.hidden/`) are also reported by `--directory`.
 
-### TODO 2: `dataset=dataset or ds` — path resolution when `dataset=None`
+### ~~TODO 2: `dataset=dataset or ds`~~ — resolved
 
-When `Save` is called without an explicit `dataset` argument (e.g.,
-standalone `datalad save --from HEAD~3 somefile` without `-d`),
-`dataset` is `None`.  The expression `dataset or ds` falls back to
-`ds` — a `Dataset` instance from `require_dataset()`.
+Fixed: changed `dataset=dataset or ds` to `dataset=dataset` in the
+`diff_dataset` call.  When `dataset=None`, `diff_dataset` discovers
+the dataset from CWD via its own `require_dataset()` call (same as
+`Status`), and `resolve_path(p, None)` resolves relative paths against
+CWD (matching `Status` behavior).
 
-**Problem**: `resolve_path(p, Dataset_instance)` resolves relative
-paths against the dataset root, while `resolve_path(p, None)` (used
-by `Status` when `dataset=None`) resolves against CWD.  This means
-a user running `datalad save --from HEAD~3 myfile` from a
-subdirectory would get different path resolution than
-`datalad save myfile` (without `--from`).
+`test_save_from_relpath` verifies this: from a subdirectory, relative
+paths are resolved against CWD, not dataset root.
 
-**Action items**:
-- Write a test: from a subdirectory of a dataset (without `-d`),
-  run `save(path=['somefile'], fr=<commit>)` and verify that
-  `somefile` is resolved relative to CWD (matching `save` without
-  `fr`).  This test will currently fail and document the bug.
-- Fix: when `dataset` is `None`, pass `None` to `diff_dataset` so
-  it falls through to `require_dataset()` internally, which returns a
-  Dataset instance but `resolve_path` still receives `None` as `ds`
-  and resolves against CWD.  Or: resolve paths explicitly before
-  calling diff_dataset.
-- Alternatively: pass `dataset` unconditionally (even when `None`)
-  since `diff_dataset` calls `require_dataset()` itself.  However,
-  `diff_dataset(dataset=None)` may not discover the dataset from CWD
-  the same way `Status(dataset=None)` does — needs verification.
+### ~~TODO 3: tests for standalone `datalad save --from`~~ — resolved
 
-### TODO 3: tests for standalone `datalad save --from`
+Five tests added in `test_save.py`:
 
-The `fr=` parameter is documented as independently useful ("can also
-be used standalone to close a unit of work as a merge"), but all
-current tests exercise it indirectly through `datalad run`.
-
-**Action items** — extend existing save tests in `test_save.py`:
-
-- **`test_save` or new `test_save_from_basic`**: create commits A, B, C.
-  Call `save(fr=A)`.  Verify: merge commit at HEAD, first-parent = A,
-  second-parent = C, run of `git log --first-parent` is linear.  Then
-  verify `save(fr=HEAD)` (no changes since baseline) → `status='notneeded'`.
-
-- **`test_subdataset_save` or new `test_save_from_recursive`**: create a
-  dataset with subdataset.  Make commits in both.  Call
-  `save(fr=<before>, recursive=True)`.  Verify merge commits at both
-  levels with correct `fr_map` propagation.
-
-- **`test_relpath_add` / `test_symlinked_relpath` extension**: from a
-  subdirectory, call `save(path=['somefile'], fr=<commit>)`.  Verify the
-  path is resolved relative to CWD, not dataset root (this is the
-  TODO 2 bug — the test should initially fail, then pass after the fix).
-
-- **`test_save_from_no_inner_commits`**: `fr=HEAD` with only working-tree
-  changes (no intermediate commits).  Verify: plain save, no merge commit.
-  This ensures `fr=` falls back correctly when there's nothing to merge.
-
-- **`test_save_from_with_path_filter`**: `fr=<commit>` with explicit
-  `path=` argument.  Verify only the specified paths are saved, other
-  changed files remain uncommitted — matching `save(path=...)` behavior
-  without `fr`.
-
-These tests establish behavioral expectations that work on TODOs 1
-and 2 must preserve.
+- `test_save_from_basic` — merge topology, first/second parent, notneeded
+- `test_save_from_no_inner_commits` — working-tree only, no merge
+- `test_save_from_with_path_filter` — only declared paths saved
+- `test_save_from_recursive` — merges at both super and sub levels
+- `test_save_from_relpath` — CWD-relative paths from subdirectory

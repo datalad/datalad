@@ -1268,10 +1268,6 @@ def test_save_from_recursive(path=None):
 @known_failure_windows
 @with_tree(**tree_arg)
 @pytest.mark.ai_generated
-@pytest.mark.xfail(
-    reason="TODO 2: dataset=dataset or ds passes Dataset instance to "
-           "diff_dataset when dataset=None, making resolve_path() resolve "
-           "relative to dataset root instead of CWD")
 def test_save_from_relpath(path=None):
     """save(fr=..., path=...) from a subdirectory resolves paths against CWD."""
     ds = Dataset(path).create(force=True, annex=False)
