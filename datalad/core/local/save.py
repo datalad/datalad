@@ -297,9 +297,11 @@ class Save(Interface):
             # diff_dataset resolves relative paths against CWD — the
             # same semantics as the Status() call in the else branch.
             # See resolve_path() docs: only Dataset *instances* trigger
-            # dataset-root-relative resolution.
+            # dataset-root-relative resolution.  When dataset=None,
+            # diff_dataset discovers the dataset from CWD via its own
+            # require_dataset() call, same as Status does.
             for s in diff_dataset(
-                    dataset=dataset or ds, fr=fr, to=None,
+                    dataset=dataset, fr=fr, to=None,
                     constant_refs=False,
                     # Stringify to avoid mixed PosixPath/str in
                     # diff_dataset's sorted() call
