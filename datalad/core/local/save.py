@@ -306,7 +306,15 @@ class Save(Interface):
                     path=[str(p) for p in path] if path else None,
                     recursive=recursive,
                     reporting_order='bottom-up',
-                    untracked=untracked_mode):
+                    # Use 'normal' (not untracked_mode='all') to
+                    # report untracked directories as single entries
+                    # rather than enumerating every file.  save_()
+                    # handles directory entries correctly (git add
+                    # recurses into them).  This matches the prior
+                    # run.py behavior and avoids building a huge
+                    # paths_by_ds dict for repos with large untracked
+                    # trees (node_modules/, build/, etc).
+                    untracked='normal' if not updated else 'no'):
                 if s.get('status') == 'error':
                     yield s
                     continue

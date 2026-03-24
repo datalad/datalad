@@ -157,31 +157,23 @@ are on adjusted branches.
 
 ## TODO
 
-### TODO 1: `untracked` mode — verify behavioral equivalence with prior code
+### ~~TODO 1: `untracked` mode~~ — resolved
 
-The old `run_command` called `diff_dataset(..., untracked='normal')` for
-merge discovery.  The new code in `Save` uses
-`untracked=untracked_mode` which resolves to `'all'` (since `updated`
-defaults to False).
+Fixed: the `fr` branch now passes `untracked='normal'` to
+`diff_dataset` (matching the old `run_command` behavior), instead of
+`untracked_mode` (`'all'`).
 
-**Difference**: `'normal'` reports untracked directories as single
-entries; `'all'` enumerates every file inside untracked directories.
-Both produce the same final committed state (save_ gets
-`untracked='no'` and operates only on the provided `_status` dict),
-but `'all'` may build a much larger `paths_by_ds` for repos with many
-untracked files.
+**Why it matters**: `'all'` calls `git ls-files -o` which enumerates
+every individual untracked file; `'normal'` adds `--directory
+--no-empty-directory` which collapses untracked directories to single
+entries.  With a `node_modules/` or `build/` containing 50k files,
+`'all'` would build a 50k-entry `paths_by_ds` dict; `'normal'` builds
+1 entry.
 
-**Action items**:
-- Benchmark `diff_dataset` with `untracked='normal'` vs `'all'` on a
-  repo with a large untracked directory (e.g. `node_modules/` or
-  build artifacts) to quantify the overhead.
-- If significant, consider passing `untracked='normal'` explicitly
-  when `fr` is set, since the merge path does not need individual
-  file entries — only the presence of uncommitted changes matters.
-- Check whether `'normal'` causes any difference in `save_()`
-  behavior when directory entries (vs individual file entries) are in
-  `_status`.
-- Add a test with a large untracked tree to catch regressions.
+**Why `'normal'` is safe**: `save_()` handles directory entries
+correctly — they land in `untracked_dirs`, get checked for submodules,
+then `git add <dir>/` recursively adds all contents.  Dotfile
+directories (e.g. `.hidden/`) are also reported by `--directory`.
 
 ### TODO 2: `dataset=dataset or ds` — path resolution when `dataset=None`
 
