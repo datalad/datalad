@@ -20,7 +20,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 [![RRID](https://img.shields.io/badge/RRID-SCR__003931-blue)](https://identifiers.org/RRID:SCR_003931)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-56-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-57-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ## Distribution
@@ -253,6 +253,9 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/lschr"><img src="https://avatars.githubusercontent.com/u/13418822?v=4?s=100" width="100px;" alt="Lukas Schrangl"/><br /><sub><b>Lukas Schrangl</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=lschr" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mlell"><img src="https://avatars.githubusercontent.com/u/16210594?v=4?s=100" width="100px;" alt="mlell"/><br /><sub><b>mlell</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mlell" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/malikwirin"><img src="https://avatars.githubusercontent.com/u/117918464?v=4?s=100" width="100px;" alt="Malik"/><br /><sub><b>Malik</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=malikwirin" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/just-meng"><img src="https://avatars.githubusercontent.com/u/108482432?v=4?s=100" width="100px;" alt="Jiameng Wu"/><br /><sub><b>Jiameng Wu</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=just-meng" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
