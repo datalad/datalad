@@ -625,6 +625,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/117918464?v=4"
             ]
+        },
+        {
+            "login": "just-meng",
+            "name": "Jiameng Wu",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/just-meng",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/108482432?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
