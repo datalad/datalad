@@ -1,4 +1,28 @@
 
+<a id='changelog-1.4.0'></a>
+# 1.4.0 (2026-04-01)
+
+## 🚀 Enhancements and New Features
+
+- DataLad now provides a pytest plugin that automatically registers custom markers and pytest configuration for DataLad extensions. Extensions no longer need to duplicate 31 marker definitions and pytest configuration in their tox.ini files. The plugin is automatically discovered when datalad is installed, making it easier for extensions to inherit consistent test configuration. [PR #7793](https://github.com/datalad/datalad/pull/7793) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- [ENH ] allow using submodule {path_basename} as props for url rewrite.  [PR #7726](https://github.com/datalad/datalad/pull/7726) (by [@bpinsard](https://github.com/bpinsard))
+
+- Add `--message` option to `clone`, `create`, and `update` for custom commit messages when registering subdatasets. Related to [#3316](https://github.com/datalad/datalad/issues/3316) via [PR #7785](https://github.com/datalad/datalad/pull/7785) (by [@asmacdo](https://github.com/asmacdo))
+
+## 📝 Documentation
+
+- Overhaul `CONTRIBUTING.md`: add testing guidance (red/green TDD workflow,
+  `@with_tree`/`@with_tempfile` examples, result assertion helpers, marks
+  table), extend Code Style rules, and tighten the file by removing command
+  duplication, condensing Benchmarking and Environment Variables sections,
+  and consolidating branch/commit prefix lists into a single table.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🎉 Enhancements
+
+- ENH: config option `datalad.save.skip-openfiles` to handle situation with files open for writing during `datalad save`.  [PR #7811](https://github.com/datalad/datalad/pull/7811) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.3.4'></a>
 # 1.3.4 (2026-03-17)
 
