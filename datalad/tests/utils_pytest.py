@@ -1074,14 +1074,6 @@ def known_failure_osx(func):
 # ### ###
 
 
-xfail_buggy_annex_info = pytest.mark.xfail(
-    # 10.20230127 is lower bound since bug was introduced before next 10.20230214
-    # release, and thus snapshot builds would fail. There were no release on
-    # '10.20230221' - but that is the next day after the fix
-    external_versions['cmd:annex'] and ('10.20230127' <= external_versions['cmd:annex'] < '10.20230221'),
-    reason="Regression in git-annex info. https://github.com/datalad/datalad/issues/7286"
-)
-
 xfail_annex_ignore_not_respected_for_local = pytest.mark.xfail(
     # In 10.20260213, configRead in Remote/Git.hs was reordered for "Push to
     # Create" support: (True, _, _) (repoCheap/local) is now matched before
@@ -1091,8 +1083,17 @@ xfail_annex_ignore_not_respected_for_local = pytest.mark.xfail(
     # In 10.20250630 and earlier, (_, True, _) was matched first, correctly
     # short-circuiting for annex-ignored remotes.
     # https://git-annex.branchable.com/bugs/annex-ignore_check_is_skipped_for_local_remotes/
-    external_versions['cmd:annex'] and external_versions['cmd:annex'] >= '10.20260213',
+    # Fixed in 10.20260316.
+    external_versions['cmd:annex'] and ('10.20260213' <= external_versions['cmd:annex'] < '10.20260316'),
     reason="git-annex regression: annex-ignore not respected for local remotes"
+)
+
+xfail_annex_enableremote_bare_git = pytest.mark.xfail(
+    # In 10.20260316, enableremote of a bare-git remote fails with
+    # "enableremote (normal) bare-git failed" / "enableremote: 1 failed".
+    # Worked in 10.20260213 and earlier.
+    external_versions['cmd:annex'] and external_versions['cmd:annex'] >= '10.20260316',
+    reason="git-annex regression: enableremote fails for bare-git remotes"
 )
 
 
