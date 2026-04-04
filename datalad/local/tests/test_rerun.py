@@ -1007,18 +1007,22 @@ def test_rerun_merge_runs(path=None):
     """
     ds = Dataset(path).create()
 
+    # On adjusted branches, the merge commit is at HEAD~1 (HEAD is adjustment)
+    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    merge_ref = "HEAD~1" if managed else "HEAD"
+
     # 1. Create a run-merge commit and rerun it
     ds.run('touch foo && git add foo && git commit -m "inner"')
     assert_repo_status(ds.path)
-    ok_(ds.repo.commit_exists("HEAD^2"))
-    msg, info = get_run_info(ds, ds.repo.format_commit("%B", "HEAD"))
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    msg, info = get_run_info(ds, ds.repo.format_commit("%B", merge_ref))
     ok_(info is not None)
 
     ds.rerun()
     assert_repo_status(ds.path)
     # The rerun re-executes the same command which creates inner commits again
-    ok_(ds.repo.commit_exists("HEAD^2"))
-    msg2, info2 = get_run_info(ds, ds.repo.format_commit("%B", "HEAD"))
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    msg2, info2 = get_run_info(ds, ds.repo.format_commit("%B", merge_ref))
     ok_(info2 is not None)
     eq_(info2["cmd"], info["cmd"])
     ok_((ds.pathobj / "foo").exists())
@@ -1029,7 +1033,7 @@ def test_rerun_merge_runs(path=None):
 
     ds.run('touch inner2 && git add inner2 && git commit -m "inner2"')
     assert_repo_status(ds.path)
-    ok_(ds.repo.commit_exists("HEAD^2"))
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
 
     ds.rerun(since="", onto="", branch="rerun-test")
     assert_repo_status(ds.path)
