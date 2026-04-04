@@ -1160,11 +1160,14 @@ def test_save_from_basic(path=None):
     assert_repo_status(ds.path)
 
     # HEAD should be a merge commit
-    ok_(ds.repo.commit_exists("HEAD^2"))
+    # On adjusted branches, the merge is at HEAD~1 (HEAD is the adjustment)
+    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    merge_ref = "HEAD~1" if managed else "HEAD"
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
     # first-parent = commit A (linear history)
-    eq_(ds.repo.get_hexsha("HEAD^1"), commit_a)
+    eq_(ds.repo.get_hexsha(merge_ref + "^1"), commit_a)
     # second-parent = commit C (the work)
-    eq_(ds.repo.get_hexsha("HEAD^2"), commit_c)
+    eq_(ds.repo.get_hexsha(merge_ref + "^2"), commit_c)
     # tree matches commit C (all files present)
     ok_((ds.pathobj / "a.txt").exists())
     ok_((ds.pathobj / "b.txt").exists())
@@ -1251,12 +1254,17 @@ def test_save_from_recursive(path=None):
     assert_repo_status(ds.path)
 
     # Both should have merge commits
-    ok_(ds.repo.commit_exists("HEAD^2"))
-    ok_(sub.repo.commit_exists("HEAD^2"))
+    # On adjusted branches, the merge is at HEAD~1 (HEAD is the adjustment)
+    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    ds_merge = "HEAD~1" if ds_managed else "HEAD"
+    sub_managed = hasattr(sub.repo, 'is_managed_branch') and sub.repo.is_managed_branch()
+    sub_merge = "HEAD~1" if sub_managed else "HEAD"
+    ok_(ds.repo.commit_exists(ds_merge + "^2"))
+    ok_(sub.repo.commit_exists(sub_merge + "^2"))
 
     # sub's merge: first-parent should be the baseline sub pointer,
     # second-parent should be the sub inner commit
-    sub_parent2 = sub.repo.get_hexsha("HEAD^2")
+    sub_parent2 = sub.repo.get_hexsha(sub_merge + "^2")
     # The inner commit is an ancestor of the second parent
     eq_(sub_parent2, sub_pre_save)
 
@@ -1292,7 +1300,9 @@ def test_save_from_relpath(path=None):
     ok_((ds.pathobj / "dir" / "wt_change").exists())
 
     # The merge should exist because there was an inner commit
-    ok_(ds.repo.commit_exists("HEAD^2"))
+    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
+    merge_ref = "HEAD~1" if managed else "HEAD"
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
 
 
 # -- Tests for datalad.save.skip-openfiles ----------------------------------
