@@ -195,3 +195,33 @@ Five tests added in `test_save.py`:
 - `test_save_from_with_path_filter` — only declared paths saved
 - `test_save_from_recursive` — merges at both super and sub levels
 - `test_save_from_relpath` — CWD-relative paths from subdirectory
+
+### TODO 4: `test_rerun` failure on CrippledFS (adjusted branches)
+
+`test_rerun` (a pre-existing test, not added by this PR) fails on
+CrippledFS after our changes.  The test does
+`ds.run('echo x > sub/sequence')` — writes to a subdataset file
+without creating inner commits.  After save, `sub` is reported as
+modified.
+
+The cause: `run_command` now always passes `fr=pre_cmd_hexsha` to
+Save.  When no inner commits were created (`pre_cmd_hexsha == HEAD`),
+the `diff_dataset(fr=HEAD, to=None)` path is used instead of the
+standard `Status()` path.  On adjusted branches, `diff_dataset` may
+handle subdataset submodule pointers differently from `Status`,
+leaving the subdataset dirty after save.
+
+This cannot be reproduced locally (requires CrippledFS / adjusted
+branches).  On non-CrippledFS the same code path works correctly.
+
+**Action items**:
+- Reproduce on a CrippledFS environment (Docker image or CI)
+- Compare what `diff_dataset(fr=HEAD, to=None)` returns vs
+  `Status()` on an adjusted branch when only a subdataset file
+  changed (no commits)
+- If the difference is in how adjusted-branch submodule pointers
+  are reported, fix in `diff_dataset` or in `save_ds`
+- If the fix is complex, consider passing `fr=None` when
+  `pre_cmd_hexsha == post_cmd_hexsha` (no top-level commits) as a
+  workaround — but this requires also detecting subdataset-only
+  commits to avoid breaking `test_run_merge_subdataset_only`
