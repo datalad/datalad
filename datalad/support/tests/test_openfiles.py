@@ -28,6 +28,16 @@ from ..openfiles import (
     get_files_open_for_writing,
 )
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+skip_if_no_psutil = pytest.mark.skipif(
+    psutil is None,
+    reason="psutil is not installed",
+)
+
 
 def _hold_open(path, mode, seconds=30):
     """Spawn a subprocess that holds *path* open in *mode*."""
@@ -39,6 +49,7 @@ def _hold_open(path, mode, seconds=30):
     return proc
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 def test_get_files_open_for_writing(tmp_path):
     """Check various scenarios in a single tmp_path to avoid per-test overhead."""
@@ -192,6 +203,7 @@ def test_lsof_get_write_files_timeout():
     assert result is None
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 @with_tree({'testfile.txt': 'hello'})
 def test_lsof_fallback_triggered(path=None):
@@ -219,6 +231,7 @@ def test_lsof_fallback_triggered(path=None):
 # -- CLI tests ---------------------------------------------------------------
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 @with_tree({'quiet.txt': 'hello'})
 def test_cli_no_open_files(path=None):
@@ -231,6 +244,7 @@ def test_cli_no_open_files(path=None):
     assert 'No files open for writing' in result.stdout
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 @with_tree({'a.txt': 'a', 'b.txt': 'b'})
 def test_cli_with_directory(path=None):
@@ -242,6 +256,7 @@ def test_cli_with_directory(path=None):
     assert 'No files open for writing' in result.stdout
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 @with_tree({'busy.txt': 'hello'})
 def test_cli_detects_open_file(path=None):
