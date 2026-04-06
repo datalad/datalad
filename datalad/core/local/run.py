@@ -1017,18 +1017,48 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
+    # Record all subdataset HEADs (recursive) to detect subdataset-only
+    # commits later.  A command may create commits deep in the hierarchy
+    # (e.g. in a leaf of ds/mid/leaf) without changing any parent HEAD.
+    pre_cmd_sub_hexshas = {}
+    if pre_cmd_hexsha is not None:
+        for sub_res in ds.subdatasets(
+                recursive=True, state='present',
+                result_renderer='disabled'):
+            sub_repo = Dataset(sub_res['path']).repo
+            if sub_repo:
+                pre_cmd_sub_hexshas[sub_res['path']] = \
+                    sub_repo.get_hexsha()
 
     if not inject:
         cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
 
-    # Detect if the command created commits (HEAD changed)
+    # Detect if the command created commits (HEAD changed), either in
+    # the top-level dataset or in any subdataset.  Only when commits
+    # were created do we use Save(fr=...) which routes through
+    # diff_dataset for merge creation.  Without inner commits, we use
+    # the standard Status-based save (fr=None) which handles adjusted
+    # branches correctly.
     post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
     cmd_made_commits = (
         pre_cmd_hexsha is not None
         and post_cmd_hexsha is not None
         and pre_cmd_hexsha != post_cmd_hexsha
     )
+    # Also detect subdataset-only commits: the top-level HEAD didn't
+    # change, but a subdataset HEAD did.  Compare pre-recorded sub
+    # HEADs against current.  This is more reliable than diff-index
+    # on adjusted branches (where submodule pointers can appear
+    # modified even without new commits).
+    if (pre_cmd_hexsha is not None
+            and not cmd_made_commits
+            and pre_cmd_sub_hexshas):
+        for sub_path, pre_sha in pre_cmd_sub_hexshas.items():
+            sub_repo = Dataset(sub_path).repo
+            if sub_repo and sub_repo.get_hexsha() != pre_sha:
+                cmd_made_commits = True
+                break
 
     # Re-glob to capture any new outputs.
     #
@@ -1174,7 +1204,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     recursive=True,
                     message=msg,
                     jobs=jobs,
-                    fr=pre_cmd_hexsha,
+                    # Only use fr= when the command created commits
+                    # (in the top-level or any subdataset).  Without
+                    # inner commits, use fr=None (standard Status path).
+                    fr=pre_cmd_hexsha if cmd_made_commits else None,
                     return_type='generator',
                     result_renderer='disabled',
                     on_failure='ignore'):
