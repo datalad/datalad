@@ -183,6 +183,17 @@ def skip_if_no_module(module):
         pytest.skip("Module %s fails to load" % module, allow_module_level=True)
 
 
+try:
+    import psutil as _psutil
+except ImportError:
+    _psutil = None
+
+skip_if_no_psutil = pytest.mark.skipif(
+    _psutil is None,
+    reason="psutil is not installed",
+)
+
+
 def skip_if_scrapy_without_selector():
     """A little helper to skip some tests which require recent scrapy"""
     try:

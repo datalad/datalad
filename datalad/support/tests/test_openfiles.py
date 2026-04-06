@@ -20,22 +20,15 @@ from unittest.mock import (
 
 import pytest
 
-from datalad.tests.utils_pytest import with_tree
+from datalad.tests.utils_pytest import (
+    skip_if_no_psutil,
+    with_tree,
+)
 
 from ..openfiles import (
     _is_write_mode,
     _lsof_get_write_files,
     get_files_open_for_writing,
-)
-
-try:
-    import psutil
-except ImportError:
-    psutil = None
-
-skip_if_no_psutil = pytest.mark.skipif(
-    psutil is None,
-    reason="psutil is not installed",
 )
 
 
