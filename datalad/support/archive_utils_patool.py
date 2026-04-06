@@ -18,7 +18,7 @@ assert(external_versions["patoolib"] >= "1.7")
 # check_new_filename moved from patoolib.util -> patoolib.fileutil in 2.0.0
 # still exists in patoolib.util as of 1.7; given the above assert we only
 # need to consider those two locations
-if int(patoolib.__version__.split(".")[0]) >= 2:
+if external_versions["patoolib"] >= "2.0":
     from patoolib.fileutil import check_new_filename
 else:  # pragma: no cover -- patoolib 1.x; CI uses 2.x
     from patoolib.util import check_new_filename  # pragma: no cover
