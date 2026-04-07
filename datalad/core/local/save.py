@@ -64,6 +64,70 @@ def _status_props(result):
     return {k: v for k, v in result.items() if k not in _STATUS_SKIP_KEYS}
 
 
+def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
+    """Inject changed subdatasets that diff_dataset missed on adjusted branches.
+
+    On adjusted branches, diff_dataset reports subdatasets as clean because
+    the index submodule pointer records the adjusted SHA (which doesn't
+    change when the sub gets new commits).  This function uses pre-command
+    sub HEADs captured by run_command to:
+
+    - Override fr_map entries with the true pre-command SHAs
+    - Add changed subs to paths_by_ds so save_ds processes them
+    - Ensure all ancestor datasets up to ds_path have fr_map/paths_by_ds
+      entries for child_merged propagation through multi-level hierarchies
+
+    Parameters
+    ----------
+    paths_by_ds : dict
+        {dataset_path: {item_path: status_props}} — mutated in place.
+    fr_map : dict
+        {dataset_path: pre_hexsha} — mutated in place.
+    _fr_sub_info : dict
+        {sub_path: pre_hexsha} from run_command's pre-command snapshot.
+    ds_path : str
+        Root dataset path (the hierarchy walk stops here).
+    """
+    for sub_path, sub_pre_sha in _fr_sub_info.items():
+        sub_repo = Dataset(sub_path).repo
+        if not sub_repo:
+            continue
+        cur_sha = sub_repo.get_hexsha()
+        if cur_sha == sub_pre_sha:
+            continue
+
+        # Override fr_map with the true pre-command SHA (not the adjusted pointer)
+        fr_map[sub_path] = sub_pre_sha
+        if sub_path not in paths_by_ds:
+            paths_by_ds[sub_path] = {}
+
+        # Walk up from the changed sub to ds_path, ensuring each ancestor
+        # has fr_map and paths_by_ds entries for merge propagation.
+        child_path, child_sha, child_pre = sub_path, cur_sha, sub_pre_sha
+        while True:
+            parent_path = str(ut.Path(child_path).parent)
+            pds_status = paths_by_ds.get(parent_path, {})
+            pds_status[ut.Path(child_path)] = dict(
+                type='dataset', state='modified',
+                prev_gitshasum=child_pre, gitshasum=child_sha)
+            paths_by_ds[parent_path] = pds_status
+
+            if parent_path not in fr_map:
+                parent_pre = _fr_sub_info.get(parent_path)
+                if parent_pre is None:
+                    parent_repo = Dataset(parent_path).repo
+                    parent_pre = parent_repo.get_hexsha() if parent_repo else None
+                if parent_pre:
+                    fr_map[parent_path] = parent_pre
+
+            if parent_path == ds_path:
+                break
+            child_path = parent_path
+            child_repo = Dataset(parent_path).repo
+            child_sha = child_repo.get_hexsha() if child_repo else child_sha
+            child_pre = _fr_sub_info.get(parent_path, child_sha)
+
+
 def _create_merge_commit(repo, pre_hexsha, msg):
     """Create a merge commit wrapping command-created commits.
 
@@ -248,6 +312,7 @@ class Save(Interface):
                  jobs=None,
                  amend=False,
                  fr=None,
+                 _fr_sub_info=None,
                  ):
         if message and message_file:
             raise ValueError(
@@ -340,6 +405,13 @@ class Save(Interface):
                     fr_map[s['path']] = props['prev_gitshasum']
             # The top-level dataset's baseline is `fr` itself
             fr_map[ds.path] = fr
+
+            # On adjusted branches, diff_dataset may not detect
+            # subdataset commits (index submodule pointer stays the
+            # same).  Inject changed subs from run_command's snapshot.
+            if _fr_sub_info:
+                _inject_sub_info(paths_by_ds, fr_map,
+                                 _fr_sub_info, ds.path)
         else:
             # Standard Status-based discovery
             for s in Status()(

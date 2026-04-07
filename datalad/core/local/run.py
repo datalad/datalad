@@ -1207,6 +1207,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     # (in the top-level or any subdataset).  Without
                     # inner commits, use fr=None (standard Status path).
                     fr=pre_cmd_hexsha if cmd_made_commits else None,
+                    # Pass pre-command sub HEADs so Save can detect
+                    # subdataset commits on adjusted branches where
+                    # diff_dataset can't see them (index submodule
+                    # pointer doesn't change on adjusted branches).
+                    _fr_sub_info={p: sha for p, (_, sha)
+                                  in pre_cmd_sub_info.items()}
+                    if cmd_made_commits else None,
                     return_type='generator',
                     result_renderer='disabled',
                     on_failure='ignore'):
