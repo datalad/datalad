@@ -43,12 +43,38 @@ lgr = logging.getLogger('datalad.distribution.tests')
 
 
 def _parse_spec(spec):
-    out = []   # will return a list of tuples (min, max) for each layer
+    """Parse a hierarchy spec string into a list of level descriptors.
+
+    Each level is separated by ``/`` and has the form::
+
+        [d]min[-max][+Nf]
+
+    ``d`` prefix makes entries plain directories instead of subdatasets.
+    ``+Nf`` suffix adds N tracked files to each dataset at that level
+    (default: 1 file per dataset, as before).
+
+    Returns a list of dicts with keys: min, max, is_dir, nfiles.
+    """
+    out = []
     if not spec:
         return out
     for ilevel, level in enumerate(spec.split('/')):
         if not level:
             continue
+
+        is_dir = False
+        nfiles = None  # None means "use the nfiles parameter default"
+
+        # Check for +Nf suffix (e.g., "2+100f")
+        if '+' in level and level.endswith('f'):
+            level, nf_str = level.rsplit('+', 1)
+            nfiles = int(nf_str[:-1])  # strip trailing 'f'
+
+        # Check for 'd' prefix (plain directory, not subdataset)
+        if level.startswith('d'):
+            is_dir = True
+            level = level[1:]
+
         minmax = level.split('-')
         if len(minmax) == 1:  # only abs number specified
             minmax = int(minmax[0])
@@ -58,17 +84,20 @@ def _parse_spec(spec):
             if not min_:  # might be omitted entirely
                 min_ = 0
             if not max_:
-                raise ValueError("Specify max number at level %d. Full spec was: %s"
-                                 % (ilevel, spec))
+                raise ValueError(
+                    "Specify max number at level %d. Full spec was: %s"
+                    % (ilevel, spec))
             min_ = int(min_)
             max_ = int(max_)
         else:
-            raise ValueError("Must have only min-max at level %d" % ilevel)
-        out.append((min_, max_))
+            raise ValueError(
+                "Must have only min-max at level %d" % ilevel)
+
+        out.append(dict(min=min_, max=max_, is_dir=is_dir, nfiles=nfiles))
     return out
 
 
-def _makeds(path, levels, ds=None, max_leading_dirs=2):
+def _makeds(path, levels, ds=None, max_leading_dirs=2, nfiles=1):
     """Create a hierarchy of datasets
 
     Used recursively, with current invocation generating datasets for the
@@ -79,14 +108,17 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
     path : str
       Path to the top directory under which dataset will be created.
       If relative -- relative to current directory
-    levels : list of list
-      List of specifications for :func:`random.randint` call per each level.
+    levels : list of dict
+      List of level descriptors from :func:`_parse_spec`.
     ds : Dataset, optional
       Super-dataset which would contain a new dataset (thus its path would be
       a parent of path. Note that ds needs to be installed.
     max_leading_dirs : int, optional
       Up to how many leading directories within a dataset could lead to a
       sub-dataset
+    nfiles : int, optional
+      Number of files to create in each dataset (default 1).  Per-level
+      ``+Nf`` spec overrides this.
 
     Yields
     ------
@@ -104,12 +136,19 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
     RepoClass = GitRepo if random.randint(0, 1) else AnnexRepo
     lgr.info("Generating repo of class %s under %s", RepoClass, path)
     repo = RepoClass(path, create=True)
-    # let's create some dummy file and add it to the beast
-    fn = opj(path, "file%d.dat" % random.randint(1, 1000))
-    with open(fn, 'w') as f:
-        f.write(fn)
-    repo.add(fn, git=True)
-    repo.commit(msg="Added %s" % fn)
+    # Create tracked files.  Consume one random.randint for the first
+    # filename to preserve RNG sequence compatibility with the original
+    # code that used random filenames (callers with fixed seeds depend
+    # on the RNG producing the same dataset structure).
+    fns = []
+    first_file_id = random.randint(1, 1000)
+    for fi in range(nfiles):
+        fn = opj(path, "file%d.dat" % (first_file_id if fi == 0 else fi))
+        with open(fn, 'w') as f:
+            f.write(fn)
+        fns.append(fn)
+    repo.add(fns, git=True)
+    repo.commit(msg="Added %d file(s)" % nfiles)
 
     yield path
 
@@ -118,16 +157,37 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
         ds_ = Dataset(path)
         # Process the levels
         level, levels_ = levels[0], levels[1:]
-        nrepos = random.randint(*level)  # how many subds to generate
-        for irepo in range(nrepos):
-            # we would like to have up to 2 leading dirs
-            subds_path = opj(*(['d%i' % i
-                                for i in range(random.randint(0, max_leading_dirs+1))]
-                               + ['r%i' % irepo]))
-            subds_fpath = opj(path, subds_path)
-            # yield all under
-            for d in _makeds(subds_fpath, levels_, ds=ds_):
-                yield d
+        nchildren = random.randint(level['min'], level['max'])
+        child_nfiles = level.get('nfiles') or nfiles
+
+        for ichild in range(nchildren):
+            if level['is_dir']:
+                # Plain directory with files, not a subdataset
+                dirname = "dir%d" % ichild
+                dirpath = opj(path, dirname)
+                os.makedirs(dirpath, exist_ok=True)
+                for fi in range(child_nfiles):
+                    fn = opj(dirpath, "file%d.dat" % fi)
+                    with open(fn, 'w') as f:
+                        f.write(fn)
+                repo.add(dirname, git=True)
+            else:
+                # Subdataset
+                # we would like to have up to 2 leading dirs
+                subds_path = opj(
+                    *(['d%i' % i
+                       for i in range(
+                           random.randint(0, max_leading_dirs + 1))]
+                      + ['r%i' % ichild]))
+                subds_fpath = opj(path, subds_path)
+                # yield all under
+                for d in _makeds(subds_fpath, levels_, ds=ds_,
+                                 nfiles=child_nfiles):
+                    yield d
+
+        if level['is_dir']:
+            # Commit the directories we just created
+            repo.commit(msg="Added %d directories" % nchildren)
 
     if ds:
         assert ds.is_installed()
@@ -150,27 +210,46 @@ class CreateTestDataset(Interface):
         spec=Parameter(
             args=("--spec",),
             doc="""\
-            spec for hierarchy, defined as a min-max (min could be omitted to assume 0)
-            defining how many (random number from min to max) of sub-datasets to generate
-            at any given level of the hierarchy.  Each level separated from each other with /.
-            Example:  1-3/-2  would generate from 1 to 3 subdatasets at the top level, and
-            up to two within those at the 2nd level
+            spec for hierarchy.  Each level is separated by ``/`` and has
+            the form ``[d]min[-max][+Nf]``.
+
+            ``min-max`` defines how many (random from min to max)
+            sub-datasets to generate at that level (min can be omitted
+            to assume 0).
+
+            Prefix ``d`` makes entries plain directories instead of
+            subdatasets (e.g. ``d3`` creates 3 dirs with files).
+
+            Suffix ``+Nf`` creates N tracked files per entry at that
+            level (overrides --nfiles for that level).
+
+            Examples::
+
+                1-3/-2        1–3 subdatasets at L1, up to 2 at L2
+                2+100f/-2     2 subs at L1 each with 100 files, up to 2 at L2
+                10/d5+50f     10 subs, each containing 5 plain dirs with 50 files
             """,
             constraints=EnsureStr() | EnsureNone()),
         seed=Parameter(
             args=("--seed",),
             doc="""seed for rng""",
             constraints=EnsureInt() | EnsureNone()),
-
+        nfiles=Parameter(
+            args=("--nfiles",),
+            doc="""number of files to create in each dataset (default 1).
+            Per-level +Nf suffix in spec overrides this.""",
+            constraints=EnsureInt() | EnsureNone()),
     )
 
     @staticmethod
-    def __call__(path=None, *, spec=None, seed=None):
+    def __call__(path=None, *, spec=None, seed=None, nfiles=None):
         levels = _parse_spec(spec)
 
         if seed is not None:
             # TODO: if to be used within a bigger project we shouldn't seed main RNG
             random.seed(seed)
+        if nfiles is None:
+            nfiles = 1
         if path is None:
             kw = get_tempfile_kwargs({}, prefix="ds")
             path = tempfile.mkdtemp(**kw)
@@ -180,7 +259,7 @@ class CreateTestDataset(Interface):
             os.makedirs(path)
 
         # now we should just make it happen and return list of all the datasets
-        return list(_makeds(path, levels))
+        return list(_makeds(path, levels, nfiles=nfiles))
 
     @staticmethod
     def result_renderer_cmdline(res, args):
