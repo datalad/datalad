@@ -1412,13 +1412,12 @@ def test_ephemeral(origin_path=None, bare_path=None,
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
     clone1.push(to=DEFAULT_REMOTE, data='nothing' if can_symlink else 'auto')
-    if AnnexRepo._check_version_kludges("annex-supports-private"):
-        # ephemeral clones are private (if supported by annex version). Despite
-        # the push, clone1's UUID doesn't show up in origin
-        recorded_locations = origin.repo.call_git(['cat-file', 'blob',
-                                                   'git-annex:uuid.log'],
-                                                  read_only=True)
-        assert_not_in(clone1.config.get("annex.uuid"), recorded_locations)
+    # ephemeral clones are private (if supported by annex version). Despite
+    # the push, clone1's UUID doesn't show up in origin
+    recorded_locations = origin.repo.call_git(['cat-file', 'blob',
+                                               'git-annex:uuid.log'],
+                                              read_only=True)
+    assert_not_in(clone1.config.get("annex.uuid"), recorded_locations)
 
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
@@ -1465,10 +1464,6 @@ def test_ephemeral(origin_path=None, bare_path=None,
 @with_tempfile
 def test_private(origin_path=None, clone_path=None):
     ds = Dataset(origin_path).create()
-    if not AnnexRepo._check_version_kludges("annex-supports-private"):
-        assert_raises(ValueError, clone, ds, clone_path, reckless="private")
-        return
-
     ds_clone = clone(ds, clone_path, reckless="private")
 
     # check that the annex.private config is set
