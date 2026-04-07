@@ -329,17 +329,30 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         return
 
     ds_repo = dset.repo
-    # Drop any leading commits that don't have a run command. These would be
-    # skipped anyways.
-    results = list(dropwhile(lambda r: "run_info" not in r, results))
-    if not results:
+    # When replaying everything from the beginning (since="" or since=None),
+    # drop leading non-run commits as they're already at the base of the
+    # target history. For explicit since ranges, keep all commits including
+    # non-run ones (fixes #4700).
+    if since is not None and since.strip() != "":
+        # Explicit range: keep all commits including leading non-run ones
+        results = list(results)
+    else:
+        # Full history replay: drop leading non-run commits (they're at the base)
+        results = list(dropwhile(lambda r: "run_info" not in r, results))
+
+    if not results or not any("run_info" in r for r in results):
         yield get_status_dict(
             "run", status="impossible", ds=dset,
             message=("No run commits found in range %s", revrange))
         return
 
     if onto is not None and onto.strip() == "":
-        onto = results[0]["commit"] + "^"
+        # Find the first commit with run info to determine the onto point
+        first_run_commit = next((r for r in results if "run_info" in r), None)
+        if first_run_commit:
+            onto = first_run_commit["commit"] + "^"
+        else:
+            onto = results[0]["commit"] + "^"
 
     if onto and not ds_repo.commit_exists(onto):
         yield get_status_dict(

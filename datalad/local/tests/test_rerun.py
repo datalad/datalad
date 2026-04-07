@@ -949,3 +949,38 @@ def test_rerun_commit_message_check():
     eq_(subject, "fine")
     assert_dict_equal(info,
                       {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
+
+
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
+    """Test for issue #4700: regular commits before first RUNCMD are not cherry-picked"""
+    ds = Dataset(path).create()
+    initial_commit = ds.repo.get_hexsha()
+
+    # Create regular commits before any run commands
+    create_tree(ds.path, {"file1.txt": "content1", "file2.txt": "content2"})
+    ds.save(["file1.txt", "file2.txt"], message="Add files before run")
+
+    # Create a run command
+    ds.run('echo "run output" > run_output.txt')
+
+    # Create another regular commit after the run
+    create_tree(ds.path, {"file3.txt": "content3"})
+    ds.save("file3.txt", message="Add file after run")
+
+    head_commit = ds.repo.get_hexsha()
+
+    # Go back to initial commit and rerun everything
+    ds.repo.checkout(initial_commit, options=["--detach"])
+
+    # Rerun from the saved HEAD (issue #4700: without fix, regular commits before
+    # first RUNCMD would be dropped by dropwhile())
+    ds.rerun(revision=head_commit, since=initial_commit, branch="rerun-branch")
+
+    # Verify all files exist (with fix, regular commits are no longer dropped)
+    ds.repo.checkout("rerun-branch")
+    ok_exists(op.join(path, "file1.txt"))
+    ok_exists(op.join(path, "file2.txt"))
+    ok_exists(op.join(path, "run_output.txt"))
+    ok_exists(op.join(path, "file3.txt"))
