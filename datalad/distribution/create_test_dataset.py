@@ -137,11 +137,13 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2, nfiles=1):
     lgr.info("Generating repo of class %s under %s", RepoClass, path)
     repo = RepoClass(path, create=True)
     # Create tracked files
+    fns = []
     for fi in range(nfiles):
         fn = opj(path, "file%d.dat" % fi)
         with open(fn, 'w') as f:
             f.write(fn)
-    repo.add('.', git=True)
+        fns.append(fn)
+    repo.add(fns, git=True)
     repo.commit(msg="Added %d file(s)" % nfiles)
 
     yield path
