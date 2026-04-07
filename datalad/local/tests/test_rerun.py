@@ -26,7 +26,11 @@ from datalad.api import (
     run,
 )
 from datalad.core.local.run import run_command
-from datalad.core.local.tests.test_run import last_commit_msg
+from datalad.core.local.tests.test_run import (
+    _assert_run_merge,
+    _merge_ref,
+    last_commit_msg,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.local.rerun import (
     diff_revision,
@@ -1007,23 +1011,17 @@ def test_rerun_merge_runs(path=None):
     """
     ds = Dataset(path).create()
 
-    # On adjusted branches, the merge commit is at HEAD~1 (HEAD is adjustment)
-    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    merge_ref = "HEAD~1" if managed else "HEAD"
+    merge_ref = _merge_ref(ds.repo)
 
     # 1. Create a run-merge commit and rerun it
     ds.run('touch foo && git add foo && git commit -m "inner"')
     assert_repo_status(ds.path)
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
-    msg, info = get_run_info(ds, ds.repo.format_commit("%B", merge_ref))
-    ok_(info is not None)
+    info = _assert_run_merge(ds, merge_ref)
 
     ds.rerun()
     assert_repo_status(ds.path)
     # The rerun re-executes the same command which creates inner commits again
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
-    msg2, info2 = get_run_info(ds, ds.repo.format_commit("%B", merge_ref))
-    ok_(info2 is not None)
+    info2 = _assert_run_merge(ds, merge_ref)
     eq_(info2["cmd"], info["cmd"])
     ok_((ds.pathobj / "foo").exists())
 
@@ -1033,7 +1031,7 @@ def test_rerun_merge_runs(path=None):
 
     ds.run('touch inner2 && git add inner2 && git commit -m "inner2"')
     assert_repo_status(ds.path)
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    _assert_run_merge(ds, merge_ref)
 
     ds.rerun(since="", onto="", branch="rerun-test")
     assert_repo_status(ds.path)

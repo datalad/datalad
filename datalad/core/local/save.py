@@ -55,6 +55,14 @@ from .status import Status
 
 lgr = logging.getLogger('datalad.core.local.save')
 
+_STATUS_SKIP_KEYS = frozenset((
+    'path', 'parentds', 'refds', 'status', 'action', 'logger'))
+
+
+def _status_props(result):
+    """Extract status properties from a result dict, dropping metadata keys."""
+    return {k: v for k, v in result.items() if k not in _STATUS_SKIP_KEYS}
+
 
 def _create_merge_commit(repo, pre_hexsha, msg):
     """Create a merge commit wrapping command-created commits.
@@ -323,18 +331,13 @@ class Save(Interface):
                 if s.get('status') != 'ok':
                     continue
                 ds_status = paths_by_ds.get(s['parentds'], {})
-                ds_status[ut.Path(s['path'])] = \
-                    {k: v for k, v in s.items()
-                     if k not in (
-                         'path', 'parentds', 'refds', 'status', 'action',
-                         'logger')}
+                props = _status_props(s)
+                ds_status[ut.Path(s['path'])] = props
                 paths_by_ds[s['parentds']] = ds_status
                 # Track per-subdataset pre-command pointers for merge
                 if (s.get('type') == 'dataset'
-                        and 'prev_gitshasum' in
-                        ds_status[ut.Path(s['path'])]):
-                    fr_map[s['path']] = \
-                        ds_status[ut.Path(s['path'])]['prev_gitshasum']
+                        and 'prev_gitshasum' in props):
+                    fr_map[s['path']] = props['prev_gitshasum']
             # The top-level dataset's baseline is `fr` itself
             fr_map[ds.path] = fr
         else:
@@ -359,13 +362,7 @@ class Save(Interface):
 
                 # fish out status dict for this parent dataset
                 ds_status = paths_by_ds.get(s['parentds'], {})
-                # reassemble path status info as repo.status() would have
-                # made it
-                ds_status[ut.Path(s['path'])] = \
-                    {k: v for k, v in s.items()
-                     if k not in (
-                         'path', 'parentds', 'refds', 'status', 'action',
-                         'logger')}
+                ds_status[ut.Path(s['path'])] = _status_props(s)
                 paths_by_ds[s['parentds']] = ds_status
 
         lgr.debug('Determined %i datasets for saving from input arguments',
