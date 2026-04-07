@@ -1110,6 +1110,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for p in sorted(pre_command_outputs - post_outputs):
             if not op.lexists(op.join(pwd, p)):
                 outputs_to_save.append(p)
+
     if outputs_to_save is not None and record_path:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
