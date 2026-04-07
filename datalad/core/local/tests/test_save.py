@@ -21,6 +21,10 @@ from datalad.api import (
     install,
     save,
 )
+from datalad.core.local.tests.test_run import (
+    _assert_run_merge,
+    _merge_ref,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
@@ -1161,8 +1165,7 @@ def test_save_from_basic(path=None):
 
     # HEAD should be a merge commit
     # On adjusted branches, the merge is at HEAD~1 (HEAD is the adjustment)
-    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    merge_ref = "HEAD~1" if managed else "HEAD"
+    merge_ref = _merge_ref(ds.repo)
     ok_(ds.repo.commit_exists(merge_ref + "^2"))
     # first-parent = commit A (linear history)
     eq_(ds.repo.get_hexsha(merge_ref + "^1"), commit_a)
@@ -1255,10 +1258,8 @@ def test_save_from_recursive(path=None):
 
     # Both should have merge commits
     # On adjusted branches, the merge is at HEAD~1 (HEAD is the adjustment)
-    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    ds_merge = "HEAD~1" if ds_managed else "HEAD"
-    sub_managed = hasattr(sub.repo, 'is_managed_branch') and sub.repo.is_managed_branch()
-    sub_merge = "HEAD~1" if sub_managed else "HEAD"
+    ds_merge = _merge_ref(ds.repo)
+    sub_merge = _merge_ref(sub.repo)
     ok_(ds.repo.commit_exists(ds_merge + "^2"))
     ok_(sub.repo.commit_exists(sub_merge + "^2"))
 
@@ -1300,9 +1301,7 @@ def test_save_from_relpath(path=None):
     ok_((ds.pathobj / "dir" / "wt_change").exists())
 
     # The merge should exist because there was an inner commit
-    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    merge_ref = "HEAD~1" if managed else "HEAD"
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    ok_(ds.repo.commit_exists(_merge_ref(ds.repo) + "^2"))
 
 
 # -- Tests for datalad.save.skip-openfiles ----------------------------------

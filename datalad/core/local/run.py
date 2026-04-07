@@ -1017,18 +1017,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
-    # Record all subdataset HEADs (recursive) to detect subdataset-only
+    # Record subdataset HEADs (recursive) to detect subdataset-only
     # commits later.  A command may create commits deep in the hierarchy
     # (e.g. in a leaf of ds/mid/leaf) without changing any parent HEAD.
-    pre_cmd_sub_hexshas = {}
+    # Store repo references to avoid re-instantiating Dataset objects
+    # in the post-command comparison.
+    pre_cmd_sub_info = {}  # {path: (repo, hexsha)}
     if pre_cmd_hexsha is not None:
         for sub_res in ds.subdatasets(
                 recursive=True, state='present',
                 result_renderer='disabled'):
             sub_repo = Dataset(sub_res['path']).repo
             if sub_repo:
-                pre_cmd_sub_hexshas[sub_res['path']] = \
-                    sub_repo.get_hexsha()
+                pre_cmd_sub_info[sub_res['path']] = \
+                    (sub_repo, sub_repo.get_hexsha())
 
     if not inject:
         cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
@@ -1047,16 +1049,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         and pre_cmd_hexsha != post_cmd_hexsha
     )
     # Also detect subdataset-only commits: the top-level HEAD didn't
-    # change, but a subdataset HEAD did.  Compare pre-recorded sub
-    # HEADs against current.  This is more reliable than diff-index
-    # on adjusted branches (where submodule pointers can appear
-    # modified even without new commits).
+    # change, but a subdataset HEAD did.  Reuse the repo objects from
+    # the pre-command snapshot to avoid re-instantiating Datasets.
     if (pre_cmd_hexsha is not None
             and not cmd_made_commits
-            and pre_cmd_sub_hexshas):
-        for sub_path, pre_sha in pre_cmd_sub_hexshas.items():
-            sub_repo = Dataset(sub_path).repo
-            if sub_repo and sub_repo.get_hexsha() != pre_sha:
+            and pre_cmd_sub_info):
+        for sub_repo, pre_sha in pre_cmd_sub_info.values():
+            if sub_repo.get_hexsha() != pre_sha:
                 cmd_made_commits = True
                 break
 

@@ -842,6 +842,30 @@ def test_substitution_config():
             ['a', 'b'])
 
 
+# -- Helpers for merge-commit tests --
+
+def _merge_ref(repo):
+    """Return the commit ref where the merge lives.
+
+    On adjusted branches, git annex merge creates an adjustment commit
+    on top of the merge, so the merge is at HEAD~1 instead of HEAD.
+    """
+    if hasattr(repo, 'is_managed_branch') and repo.is_managed_branch():
+        return "HEAD~1"
+    return "HEAD"
+
+
+def _assert_run_merge(ds, ref=None):
+    """Assert that `ref` is a merge commit with extractable run info."""
+    ref = ref or _merge_ref(ds.repo)
+    ok_(ds.repo.commit_exists(ref + "^2"))
+    commit_msg = ds.repo.format_commit("%B", ref)
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    assert_in("cmd", info)
+    return info
+
+
 # -- Tests for run producing merge commits when command creates commits --
 
 @known_failure_windows
@@ -856,8 +880,7 @@ def test_run_merge_commits(path=None):
     assert_false(ds.repo.commit_exists("HEAD^2"))
     # On adjusted branches, localsync adds an adjustment commit on top,
     # so the run record is at HEAD~1 rather than HEAD.
-    managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    run_commit = "HEAD~1" if managed else "HEAD"
+    run_commit = _merge_ref(ds.repo)
     commit_msg = ds.repo.format_commit("%B", run_commit)
     msg, info = get_run_info(ds, commit_msg)
     ok_(info is not None)
@@ -866,15 +889,11 @@ def test_run_merge_commits(path=None):
     # 2. Single inner commit -> merge commit with run info
     ds.run('touch foo && git add foo && git commit -m "inner commit"')
     assert_repo_status(ds.path)
-    merge_ref = "HEAD~1" if managed else "HEAD"
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    merge_ref = _merge_ref(ds.repo)
+    info = _assert_run_merge(ds, merge_ref)
     parent1 = ds.repo.get_hexsha(merge_ref + "^1")
     parent2 = ds.repo.get_hexsha(merge_ref + "^2")
     neq_(parent1, parent2)
-    commit_msg = ds.repo.format_commit("%B", merge_ref)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
-    assert_in("cmd", info)
     ok_((ds.pathobj / "foo").exists())
 
     # 3. Multiple inner commits -> single merge commit
@@ -883,11 +902,8 @@ def test_run_merge_commits(path=None):
         'touch f2 && git add f2 && git commit -m "second"'
     )
     assert_repo_status(ds.path)
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    _assert_run_merge(ds, merge_ref)
     assert_false(ds.repo.commit_exists(merge_ref + "^3"))
-    commit_msg = ds.repo.format_commit("%B", merge_ref)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
     ok_((ds.pathobj / "f1").exists())
     ok_((ds.pathobj / "f2").exists())
 
@@ -897,10 +913,7 @@ def test_run_merge_commits(path=None):
         'touch uncommitted'
     )
     assert_repo_status(ds.path)
-    ok_(ds.repo.commit_exists(merge_ref + "^2"))
-    commit_msg = ds.repo.format_commit("%B", merge_ref)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(ds, merge_ref)
     ok_((ds.pathobj / "committed").exists())
     ok_((ds.pathobj / "uncommitted").exists())
 
@@ -938,12 +951,7 @@ def test_run_explicit_dirty_committed(path=None, path2=None):
         explicit=True,
         outputs=["foo"],
     )
-    managed2 = hasattr(ds2.repo, 'is_managed_branch') and ds2.repo.is_managed_branch()
-    merge_ref2 = "HEAD~1" if managed2 else "HEAD"
-    ok_(ds2.repo.commit_exists(merge_ref2 + "^2"))
-    commit_msg = ds2.repo.format_commit("%B", merge_ref2)
-    msg, info = get_run_info(ds2, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(ds2)
 
 
 # -- Tests for subdataset hierarchy merge commits --
@@ -961,22 +969,10 @@ def test_run_merge_subdataset_only(path=None):
     assert_repo_status(ds.path)
 
     # sub should have a merge commit
-    sub_managed = hasattr(sub.repo, 'is_managed_branch') and sub.repo.is_managed_branch()
-    sub_merge = "HEAD~1" if sub_managed else "HEAD"
-    ok_(sub.repo.commit_exists(sub_merge + "^2"))
-    commit_msg = sub.repo.format_commit("%B", sub_merge)
-    msg, info = get_run_info(sub, commit_msg)
-    ok_(info is not None)
-    assert_in("cmd", info)
+    _assert_run_merge(sub)
 
     # super should also have a merge commit (submodule pointer changed)
-    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    ds_merge = "HEAD~1" if ds_managed else "HEAD"
-    ok_(ds.repo.commit_exists(ds_merge + "^2"))
-    commit_msg = ds.repo.format_commit("%B", ds_merge)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
-    assert_in("cmd", info)
+    _assert_run_merge(ds)
 
     ok_((sub.pathobj / "foo").exists())
 
@@ -997,20 +993,10 @@ def test_run_merge_both_levels(path=None):
     assert_repo_status(ds.path)
 
     # sub has merge
-    sub_managed = hasattr(sub.repo, 'is_managed_branch') and sub.repo.is_managed_branch()
-    sub_merge = "HEAD~1" if sub_managed else "HEAD"
-    ok_(sub.repo.commit_exists(sub_merge + "^2"))
-    commit_msg = sub.repo.format_commit("%B", sub_merge)
-    msg, info = get_run_info(sub, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(sub)
 
     # super has merge
-    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    ds_merge = "HEAD~1" if ds_managed else "HEAD"
-    ok_(ds.repo.commit_exists(ds_merge + "^2"))
-    commit_msg = ds.repo.format_commit("%B", ds_merge)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(ds)
 
     ok_((ds.pathobj / "top").exists())
     ok_((sub.pathobj / "foo").exists())
@@ -1033,28 +1019,13 @@ def test_run_merge_three_levels(path=None):
     assert_repo_status(ds.path)
 
     # leaf has merge
-    leaf_managed = hasattr(leaf.repo, 'is_managed_branch') and leaf.repo.is_managed_branch()
-    leaf_merge = "HEAD~1" if leaf_managed else "HEAD"
-    ok_(leaf.repo.commit_exists(leaf_merge + "^2"))
-    commit_msg = leaf.repo.format_commit("%B", leaf_merge)
-    msg, info = get_run_info(leaf, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(leaf)
 
     # mid has merge (submodule pointer changed)
-    mid_managed = hasattr(mid.repo, 'is_managed_branch') and mid.repo.is_managed_branch()
-    mid_merge = "HEAD~1" if mid_managed else "HEAD"
-    ok_(mid.repo.commit_exists(mid_merge + "^2"))
-    commit_msg = mid.repo.format_commit("%B", mid_merge)
-    msg, info = get_run_info(mid, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(mid)
 
     # super has merge
-    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    ds_merge = "HEAD~1" if ds_managed else "HEAD"
-    ok_(ds.repo.commit_exists(ds_merge + "^2"))
-    commit_msg = ds.repo.format_commit("%B", ds_merge)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(ds)
 
     ok_((leaf.pathobj / "foo").exists())
 
@@ -1073,17 +1044,12 @@ def test_run_merge_no_subdataset_change(path=None):
     assert_repo_status(ds.path)
 
     # super has merge
-    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    ds_merge = "HEAD~1" if ds_managed else "HEAD"
-    ok_(ds.repo.commit_exists(ds_merge + "^2"))
-    commit_msg = ds.repo.format_commit("%B", ds_merge)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(ds)
 
     # sub HEAD is unchanged — no merge commit, no changes
     # On managed branches the adjustment commit changes the hexsha,
     # so compare only on non-managed branches.
-    if not (hasattr(sub.repo, 'is_managed_branch') and sub.repo.is_managed_branch()):
+    if _merge_ref(sub.repo) == "HEAD":
         eq_(sub.repo.get_hexsha(), sub_head_before)
     assert_false(sub.repo.commit_exists("HEAD^2"))
 
@@ -1110,12 +1076,7 @@ def test_run_merge_subdataset_deletions(path=None):
     assert_repo_status(ds.path)
 
     # sub has merge
-    sub_managed = hasattr(sub.repo, 'is_managed_branch') and sub.repo.is_managed_branch()
-    sub_merge = "HEAD~1" if sub_managed else "HEAD"
-    ok_(sub.repo.commit_exists(sub_merge + "^2"))
-    commit_msg = sub.repo.format_commit("%B", sub_merge)
-    msg, info = get_run_info(sub, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(sub)
 
     # Verify file states
     ok_((sub.pathobj / "kept").exists())
@@ -1123,9 +1084,4 @@ def test_run_merge_subdataset_deletions(path=None):
     assert_false((sub.pathobj / "rm_uncommitted").exists())
 
     # super also has merge
-    ds_managed = hasattr(ds.repo, 'is_managed_branch') and ds.repo.is_managed_branch()
-    ds_merge = "HEAD~1" if ds_managed else "HEAD"
-    ok_(ds.repo.commit_exists(ds_merge + "^2"))
-    commit_msg = ds.repo.format_commit("%B", ds_merge)
-    msg, info = get_run_info(ds, commit_msg)
-    ok_(info is not None)
+    _assert_run_merge(ds)
