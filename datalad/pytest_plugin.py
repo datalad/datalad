@@ -49,6 +49,7 @@ def pytest_configure(config):
         "serve_path_via_http: marks tests that serve paths via HTTP",
         "skip_if_adjusted_branch: skip test on adjusted branches",
         "skip_if_no_network: skip test when network is unavailable",
+        "skip_if_no_psutil: skip test when psutil is not installed",
         "skip_if_on_windows: skip test on Windows",
         "skip_if_root: skip test when running as root",
         "skip_known_failure: skip tests with known failures",

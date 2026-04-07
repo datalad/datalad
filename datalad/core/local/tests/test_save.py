@@ -46,6 +46,7 @@ from datalad.tests.utils_pytest import (
     ok_,
     patch,
     skip_if_adjusted_branch,
+    skip_if_no_psutil,
     skip_wo_symlink_capability,
     swallow_logs,
     swallow_outputs,
@@ -1142,6 +1143,7 @@ def _mock_open_for_writing(open_file_abspath):
     return _fake
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 @with_tempfile
 def test_save_skip_openfiles(path=None):
@@ -1197,6 +1199,7 @@ def test_save_skip_openfiles(path=None):
     assert_in_results(res, path=str(f_open), status='ok', action='add')
 
 
+@skip_if_no_psutil
 @pytest.mark.ai_generated
 def test_check_for_openfiles_invalid_config(tmp_path):
     """_check_for_openfiles raises ValueError on invalid config."""
