@@ -136,10 +136,14 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2, nfiles=1):
     RepoClass = GitRepo if random.randint(0, 1) else AnnexRepo
     lgr.info("Generating repo of class %s under %s", RepoClass, path)
     repo = RepoClass(path, create=True)
-    # Create tracked files
+    # Create tracked files.  Consume one random.randint for the first
+    # filename to preserve RNG sequence compatibility with the original
+    # code that used random filenames (callers with fixed seeds depend
+    # on the RNG producing the same dataset structure).
     fns = []
+    first_file_id = random.randint(1, 1000)
     for fi in range(nfiles):
-        fn = opj(path, "file%d.dat" % fi)
+        fn = opj(path, "file%d.dat" % (first_file_id if fi == 0 else fi))
         with open(fn, 'w') as f:
             f.write(fn)
         fns.append(fn)
