@@ -48,11 +48,14 @@
     "loj": {
         "name": "Laura Waite",
         "blog": "https://github.com/loj",
-        "email": "laura@waite.eu"
+        "email": "laura@waite.eu",
+        "orcid": "0000-0003-2213-7465"
     },
     "feilong": {
         "name": "Feilong Ma",
-        "blog": "https://github.com/feilong"
+        "blog": "https://github.com/feilong",
+        "orcid": "0000-0002-6838-3971",
+        "affiliation": "Dartmouth College, Hanover, NH, United States"
     },
     "jhpoelen": {
         "name": "jhpoelen",
@@ -60,11 +63,15 @@
     },
     "andycon": {
         "name": "Andrew Connolly",
-        "blog": "https://github.com/andycon"
+        "blog": "https://github.com/andycon",
+        "orcid": "0000-0003-4366-8230",
+        "affiliation": "Dartmouth College Geisel School of Medicine"
     },
     "nicholsn": {
         "name": "Nolan Nichols",
-        "blog": "https://github.com/nicholsn"
+        "blog": "https://github.com/nicholsn",
+        "orcid": "0000-0003-1099-3328",
+        "affiliation": "Altos Labs"
     },
     "adelavega": {
         "name": "Alejandro de la Vega",
@@ -109,7 +116,9 @@
     "emdupre": {
         "name": "Elizabeth DuPre",
         "blog": "https://github.com/emdupre",
-        "bio": "Neuroscience graduate student at McGill University"
+        "bio": "Neuroscience graduate student at McGill University",
+        "orcid": "0000-0003-1358-196X",
+        "affiliation": "Stanford University"
     },
     "aqw": {
         "name": "Alex Waite",
@@ -182,7 +191,8 @@
     "ypid": {
         "name": "Robin Schneider",
         "bio": "Working on Free Software as in Freedom.                   EDE1 371D 1B87 D28D A5E8  0515 86FD 980B BF1A 40F8",
-        "blog": "https://me.ypid.de/"
+        "blog": "https://me.ypid.de/",
+        "orcid": "0000-0002-2922-488X"
     },
     "kimsin98": {
         "name": "Sin Kim",
@@ -244,7 +254,8 @@
         "blog": "https://www.mmmccormick.com",
         "orcid": "0000-0001-9475-3756",
         "affiliation": "Kitware Inc",
-        "email": "matt@mmmccormick.com"
+        "email": "matt@mmmccormick.com",
+        "bio": "Empowering innovators to extract insights from scientific images."
     },
     "tstoeter": {
         "name": "tstoeter",
@@ -286,11 +297,37 @@
     },
     "dguibert": {
         "name": "David Guibert",
-        "blog": "https://github.com/dguibert"
+        "blog": "https://github.com/dguibert",
+        "orcid": "0000-0001-5533-8867"
     },
     "alliesw": {
         "name": "Alex Shields-Weber",
         "bio": "CCNA | B.S. in Computer Science \r\n",
         "blog": "https://github.com/alliesw"
+    },
+    "lschr": {
+        "name": "Lukas Schrangl",
+        "orcid": "0000-0002-0420-7872",
+        "affiliation": "University of Natural Resources and Life Sciences, Vienna",
+        "blog": "https://github.com/lschr"
+    },
+    "mlell": {
+        "name": "mlell",
+        "blog": "https://github.com/mlell"
+    },
+    "malikwirin": {
+        "name": "Malik",
+        "blog": "https://github.com/malikwirin",
+        "bio": "Sovereign Programmer"
+    },
+    "emmanuel-ferdman": {
+        "name": "Emmanuel Ferdman",
+        "bio": "MS Computer Science with a focus on Machine Learning and Computer Vision. Full-time software developer at @Intel.",
+        "orcid": "0009-0004-8953-0151",
+        "blog": "https://github.com/emmanuel-ferdman"
+    },
+    "just-meng": {
+        "name": "Jiameng Wu",
+        "blog": "https://github.com/just-meng"
     }
 }

@@ -347,11 +347,6 @@ def test_newthings_coming_down(originpath=None, destpath=None):
 def test_update_volatile_subds(originpath=None, otherpath=None, destpath=None):
     origin = Dataset(originpath).create()
     repo = origin.repo
-    if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
-        # Fails before git-annex's fd161da2c (adjustTree: Consider submodule
-        # deletions, 2021-01-06).
-        raise SkipTest(
-            "On adjusted branch, test requires fix in more recent git-annex")
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -509,8 +504,8 @@ def test_unrelated_history_merge(tmp_path):
 
 # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
 # adjusted branch, so we don't give an error if TARGET can't be
-# determined.
-@skip_if_adjusted_branch
+# determined. However, on adjusted branches the test still passes because
+# the sync operation correctly reports impossible status.
 @with_tempfile(mkdir=True)
 def test_merge_no_merge_target(path=None):
     path = Path(path)
@@ -523,8 +518,9 @@ def test_merge_no_merge_target(path=None):
     assert_in_results(res, status="impossible", action="update")
 
 
-# `git annex sync REMOTE` is used on an adjusted branch, but this error
-# depends on `git merge TARGET` being used.
+# `git annex sync REMOTE` is used on an adjusted branch. This test
+# relies on specific merge conflict resolution steps that work differently
+# with git-annex-sync, so we skip it on adjusted branches.
 @skip_if_adjusted_branch
 @slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
@@ -577,8 +573,9 @@ def test_merge_conflict(path=None):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
-# `git annex sync REMOTE` is used on an adjusted branch, but this error
-# depends on `git merge TARGET` being used.
+# `git annex sync REMOTE` is used on an adjusted branch. This test
+# relies on specific conflict detection via `git ls-files --unmerged`
+# that works differently with git-annex-sync, so we skip it on adjusted branches.
 @skip_if_adjusted_branch
 @slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
@@ -671,13 +668,9 @@ def test_merge_follow_parentds_subdataset_other_branch(path=None):
 
     res = ds_clone.update(merge=True, follow="parentds", recursive=True,
                           on_failure="ignore")
-    if on_adjusted:
-        # Our git-annex sync based on approach on adjusted branches is
-        # incompatible with follow='parentds'.
-        assert_in_results(res, action="update", status="impossible")
-        return
-    else:
-        assert_in_results(res, action="update", status="ok")
+    # After commit 463627692, update --follow=parentds now works on adjusted
+    # branches using git annex merge.
+    assert_in_results(res, action="update", status="ok")
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
     ok_(ds_clone_subds.repo.is_under_annex("foo"))
 
@@ -685,11 +678,11 @@ def test_merge_follow_parentds_subdataset_other_branch(path=None):
     ds_src.save(recursive=True)
     ds_clone_subds.repo.checkout(DEFAULT_BRANCH, options=["-bnew"])
     ds_clone.update(merge=True, follow="parentds", recursive=True)
-    if not on_adjusted:
-        eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+    eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
-# This test depends on the source repo being an un-adjusted branch.
+# This test verifies that update --follow=parentds works on adjusted branches.
+# The source repo must be an un-adjusted branch.
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
@@ -711,13 +704,19 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
     ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
 
+    # After commit 463627692, update --follow=parentds now works on adjusted
+    # branches using git annex merge. Verify both parent and subdataset update
+    # successfully.
+    results = ds_clone.update(merge=True, recursive=True, follow="parentds",
+                              on_failure="ignore")
     assert_in_results(
-        ds_clone.update(merge=True, recursive=True, follow="parentds",
-                        on_failure="ignore"),
-        status="impossible",
+        results,
+        status="ok",
         path=ds_clone_subds.path,
         action="update")
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+    # Verify subdataset has the new content from the source
+    assert (ds_clone_subds.pathobj / "foo").exists()
 
 
 @slow  # 12 + 21sec on Yarik's laptop
@@ -726,12 +725,6 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_detached(path=None, *, on_adjusted):
-    if on_adjusted and DEFAULT_REMOTE != "origin" and \
-       external_versions['cmd:annex'] <= "8.20210330":
-        raise SkipTest(
-            "'git annex init' with adjusted branch currently fails "
-            "due to hard-coded 'origin'")
-
     # Note: For the adjusted case, this is not much more than a smoke test that
     # on an adjusted branch we fail sensibly. The resulting state is not easy
     # to reason about nor desirable.
@@ -765,17 +758,16 @@ def test_merge_follow_parentds_subdataset_detached(path=None, *, on_adjusted):
     res = ds_clone.update(merge=True, recursive=True, follow="parentds",
                           on_failure="ignore")
     if on_adjusted:
-        # The top-level update is okay because there is no parent revision to
-        # update to.
+        # After commit 463627692 enabled update --follow=parentds on adjusted
+        # branches, both parent and nested subdatasets can be updated successfully.
         assert_in_results(
             res,
             status="ok",
             path=ds_clone.path,
             action="update")
-        # The subdataset, on the other hand, is impossible.
         assert_in_results(
             res,
-            status="impossible",
+            status="ok",
             path=ds_clone_s1.path,
             action="update")
         return
@@ -887,25 +879,14 @@ def test_update_follow_parentds_lazy(path=None):
     # `-- s2      * matches registered commit
     res = ds_clone.update(follow="parentds-lazy", merge=True, recursive=True,
                           on_failure="ignore")
-    on_adjusted = ds_clone.repo.is_managed_branch()
-    # For adjusted branches, follow=parentds* bails with an impossible result,
-    # so the s0 update doesn't get brought in and s0_s0 also matches the
-    # registered commit.
-    n_notneeded_expected = 3 if on_adjusted else 2
-    assert_result_count(res, n_notneeded_expected,
-                        action="update", status="notneeded")
+    # After commit 463627692, follow=parentds works on adjusted branches,
+    # so behavior is consistent across branch types.
+    assert_result_count(res, 2, action="update", status="notneeded")
     assert_in_results(res, action="update", status="notneeded",
                       path=ds_clone_s0_s1.repo.path)
     assert_in_results(res, action="update", status="notneeded",
                       path=ds_clone_s2.repo.path)
-    if on_adjusted:
-        assert_in_results(res, action="update", status="notneeded",
-                          path=ds_clone_s0_s0.repo.path)
-        assert_repo_status(ds_clone.path,
-                           modified=[ds_clone_s0.repo.path,
-                                     ds_clone_s1.repo.path])
-    else:
-        assert_repo_status(ds_clone.path)
+    assert_repo_status(ds_clone.path)
 
 
 @slow  # ~10s
@@ -1120,3 +1101,22 @@ def test_update_fetch_failure(path=None):
         status="ok",
         path=ds_b.path,
         action="update")
+
+
+@with_tempfile(mkdir=True)
+def test_update_custom_message(path=None):
+    path = Path(path)
+    origin = Dataset(path / "origin").create()
+    origin.create("sub")
+    clone_ds = install(source=origin.path, path=str(path / "clone"), recursive=True)
+    # Change subdataset without saving in parent - forces save after update
+    (origin.pathobj / "sub" / "newfile.txt").write_text("content")
+    Dataset(origin.pathobj / "sub").save("newfile.txt")
+    custom_msg = "Update subdataset to latest version"
+    clone_ds.update(recursive=True, how="merge", message=custom_msg)
+    # Parent has custom message. Use DEFAULT_BRANCH to handle adjusted branches
+    # where git-annex adds an extra commit on top.
+    eq_(clone_ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)
+    # Child is unaffected
+    subds = Dataset(clone_ds.pathobj / "sub")
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), custom_msg)

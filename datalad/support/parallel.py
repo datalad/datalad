@@ -100,17 +100,16 @@ class ProducerConsumer:
 
     Examples
     --------
-    A simple and somewhat boring example could be to count lines in '*.py'
-    files in parallel
+    A simple and somewhat boring example to count lines in '*.py'
 
-        from glob import glob
-        from pprint import pprint
-        from datalad.support.parallel import ProducerConsumer
-
-        def count_lines(fname):
-            with open(fname) as f:
-                return fname, len(f.readlines())
-        pprint(dict(ProducerConsumer(glob("*.py"), count_lines)))
+    >>> from glob import glob
+    >>> from pprint import pprint
+    >>> from datalad.support.parallel import ProducerConsumer
+    >>> def count_lines(fname):
+    ...     with open(fname) as f:
+    ...         return fname, len(f.readlines())
+    >>> pprint(dict(ProducerConsumer(glob("*.py"), count_lines)))  # doctest: +SKIP
+    {'setup.py': 182, 'versioneer.py': 2136}
 
     More usage examples could be found in `test_parallel.py` and around the
     codebase `addurls.py`, `get.py`, `save.py`, etc.

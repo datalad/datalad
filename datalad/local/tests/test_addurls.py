@@ -432,12 +432,6 @@ def test_addurls_dry_run(path=None):
                   cml.out)
 
 
-OLD_EXAMINEKEY = external_versions["cmd:annex"] < "8.20201116"
-skip_key_tests = skip_if(
-    OLD_EXAMINEKEY,
-    "git-annex version does not support `examinekey --migrate-to-backend`")
-
-
 class TestAddurls(object):
 
     @classmethod
@@ -913,9 +907,6 @@ class TestAddurls(object):
     def check_addurls_from_key(self, key_arg, expected_backend, fake_dates,
                                path):
         ds = Dataset(path).create(force=True, fake_dates=fake_dates)
-        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
-            raise SkipTest("Adjusted branch functionality requires "
-                           "more recent `git annex examinekey`")
         ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
                    key=key_arg, result_renderer='disabled')
         repo = ds.repo
@@ -932,21 +923,17 @@ class TestAddurls(object):
         assert_result_count(get_res, 2, action="get", status="ok")
 
     def test_addurls_from_key(self=None):
-        fn = self.check_addurls_from_key
-        for testfunc, arg1, arg2 in [
-                (fn, "MD5-s{size}--{md5sum}", "MD5"),
-                (fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"),
-                (skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"),
-                (skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
-            testfunc(arg1, arg2, False)
-            testfunc(arg1, arg2, True)
+        for arg1, arg2 in [
+                ("MD5-s{size}--{md5sum}", "MD5"),
+                ("MD5E-s{size}--{md5sum}.dat", "MD5E"),
+                ("et:MD5-s{size}--{md5sum}", "MD5E"),
+                ("et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
+            self.check_addurls_from_key(arg1, arg2, False)
+            self.check_addurls_from_key(arg1, arg2, True)
 
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self=None, path=None):
         ds = Dataset(path).create(force=True)
-        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
-            raise SkipTest("Adjusted branch functionality requires "
-                           "more recent `git annex examinekey`")
         data = deepcopy(self.data)
         for row in data:
             if row["name"] == "b":

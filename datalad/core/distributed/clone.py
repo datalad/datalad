@@ -30,6 +30,7 @@ from datalad.interface.base import (
 from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
+    save_message_opt,
 )
 from datalad.interface.results import get_status_dict
 from datalad.support.annexrepo import AnnexRepo
@@ -218,6 +219,7 @@ class Clone(Interface):
             '--branch'."""),
         description=location_description,
         reckless=reckless_opt,
+        message=save_message_opt,
     )
 
     @staticmethod
@@ -231,6 +233,7 @@ class Clone(Interface):
             dataset=None,
             description=None,
             reckless=None,
+            message=None,
         ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -342,10 +345,9 @@ class Clone(Interface):
             actually_saved_subds = False
             for r in ds.save(
                     path,
-                    # Note, that here we know we don't save anything but a new
-                    # subdataset. Hence, don't go with default commit message,
-                    # but be more specific.
-                    message="[DATALAD] Added subdataset",
+                    # This save only commits the new subdataset, nothing else.
+                    # Use caller's message if provided, otherwise a specific default.
+                    message=message or "[DATALAD] Added subdataset",
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
@@ -378,7 +380,10 @@ class Clone(Interface):
                 # Note, that we didn't allow deviating from git's default
                 # behavior WRT a submodule's name vs its path when we made this
                 # a new subdataset.
-                subds_name = path.relative_to(ds.pathobj)
+                # all pathobjs involved are platform paths, but the
+                # default submodule name equals the relative path
+                # in posix conventions, hence .as_posix()
+                subds_name = path.relative_to(ds.pathobj).as_posix()
                 ds.repo.call_git(
                     ['config',
                      '--file',
@@ -576,27 +581,35 @@ def _post_gitclone_processing_(
 
     if knows_annex(destds.path):
         # init annex when traces of a remote annex can be detected
-        yield from _pre_annex_init_processing_(
-            destds=destds,
-            cfg=cfg,
-            gitclonerec=gitclonerec,
-            remote=remote,
-            reckless=reckless,
-        )
-        dest_repo = _annex_init(
-            destds=destds,
-            cfg=cfg,
-            gitclonerec=gitclonerec,
-            remote=remote,
-            description=description,
-        )
-        yield from _post_annex_init_processing_(
-            destds=destds,
-            cfg=cfg,
-            gitclonerec=gitclonerec,
-            remote=remote,
-            reckless=reckless,
-        )
+        noannexf = destds.pathobj / ".noannex"
+        if noannexf.exists() or noannexf.is_symlink():
+            lgr.warning(
+                "%s seems to know about git-annex, but has .noannex file present. "
+                "We skip running 'git annex init'.",
+                destds,
+            )
+        else:
+            yield from _pre_annex_init_processing_(
+                destds=destds,
+                cfg=cfg,
+                gitclonerec=gitclonerec,
+                remote=remote,
+                reckless=reckless,
+            )
+            dest_repo = _annex_init(
+                destds=destds,
+                cfg=cfg,
+                gitclonerec=gitclonerec,
+                remote=remote,
+                description=description,
+            )
+            yield from _post_annex_init_processing_(
+                destds=destds,
+                cfg=cfg,
+                gitclonerec=gitclonerec,
+                remote=remote,
+                reckless=reckless,
+            )
 
     if checkout_gitsha and \
        dest_repo.get_hexsha(
@@ -916,8 +929,12 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
     # given the clone source is a local dataset, we can have a
     # cheap look at it, and configure its own `remote` as a remote
     # (if there is any), and benefit from additional annex availability
-    yield from configure_origins(
-        cfgds,
-        Dataset(probeds.pathobj / origin_url),
-        label=label + 1,
-        remote=remote)
+    # But first check if we would recurse into the same dataset
+    # to prevent infinite recursion (see gh-7721)
+    next_dataset_path = probeds.pathobj / origin_url
+    if next_dataset_path.resolve() != probeds.pathobj.resolve():
+        yield from configure_origins(
+            cfgds,
+            Dataset(next_dataset_path),
+            label=label + 1,
+            remote=remote)

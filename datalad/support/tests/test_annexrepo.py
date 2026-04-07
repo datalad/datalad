@@ -125,7 +125,6 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
-    xfail_buggy_annex_info,
 )
 from datalad.utils import (
     Path,
@@ -351,7 +350,6 @@ def test_AnnexRepo_file_has_content(src=None, annex_path=None, *, batch):
 
 
 # 1 is enough to test
-@xfail_buggy_annex_info
 @with_parametric_batch
 @with_tempfile
 @with_tempfile
@@ -389,7 +387,6 @@ def test_AnnexRepo_is_under_annex(src=None, annex_path=None, *, batch):
         [False])
 
 
-@xfail_buggy_annex_info
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -1185,14 +1182,6 @@ def test_annex_backends(path=None):
 @skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
 def test_annex_ssh(topdir=None):
-    # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
-    # 7.20191230-142-g75059c9f3. This is likely due to an interaction with an
-    # older openssh version. See
-    # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
-    if external_versions['cmd:system-ssh'] < '7.4' and \
-       external_versions['cmd:annex'] <= '8.20200720.1':
-        raise SkipTest("Test known to hang")
-
     topdir = Path(topdir)
     rm1 = AnnexRepo(topdir / "remote1", create=True)
     rm2 = AnnexRepo.clone(rm1.path, str(topdir / "remote2"))
@@ -1355,18 +1344,6 @@ def test_repo_version_supported(version, tmp_path):
                 print("HERE")
                 # some annex command might have ran to trigger the update
                 assert annex_version in {v for v in _GIT_ANNEX_VERSIONS_INFO["supported"] if v >= version}
-
-
-@skip_if(external_versions['cmd:annex'] > '8.20210428', "Stopped showing if too quick")
-@with_tempfile
-def test_init_scanning_message(path=None):
-    with swallow_logs(new_level=logging.INFO) as cml:
-        AnnexRepo(path, create=True, version=7)
-        # somewhere around 8.20210428-186-g428c91606 git annex changed
-        # handling of scanning for unlocked files upon init and started to report
-        # "scanning for annexed" instead of "scanning for unlocked".
-        # Could be a line among many (as on Windows) so match=False so we search
-        assert_re_in(".*scanning for .* files", cml.out, flags=re.IGNORECASE, match=False)
 
 
 # ignore deprecation warnings since that is the test testing that functionality
@@ -1630,7 +1607,6 @@ def test_get_urls_none(path=None):
     eq_(ar.get_urls("afile"), [])
 
 
-@xfail_buggy_annex_info
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path=None):
     ar = AnnexRepo(path, create=True)
@@ -1766,7 +1742,15 @@ def test_AnnexRepo_flyweight(path1=None, path2=None):
     # should be the only counted reference to this instance.
     # Note, that sys.getrefcount reports its own argument and therefore one
     # reference too much.
-    assert_equal(1, sys.getrefcount(repo1) - 1)
+    # Python 3.14+ changed internal reference handling - the interpreter now
+    # "borrows" references when loading objects onto the operand stack instead
+    # of incrementing refcount, leading to different sys.getrefcount() values.
+    # Per Python docs: "do not rely on the returned value to be accurate,
+    # other than a value of 0 or 1". The actual test for circular references
+    # is whether the object gets garbage collected below (lines ~1805-1825) -
+    # if circular refs existed, the finalizer wouldn't be called.
+    if sys.version_info < (3, 14):
+        assert_equal(1, sys.getrefcount(repo1) - 1)
 
     # instantiate again:
     repo2 = AnnexRepo(path1, create=False)
@@ -2129,7 +2113,6 @@ def test_AnnexRepo_get_tracking_branch(src_path=None, path=None):
         ar.get_tracking_branch())
 
 
-@skip_if_adjusted_branch
 @with_tempfile
 def test_AnnexRepo_is_managed_branch(path=None):
     ar = AnnexRepo(path, create=True)
@@ -2676,15 +2659,9 @@ def test_whereis_batch_eqv(path=None):
         else:
             assert_equal(out_non_batch, out_non_batch_keys)
 
-        if external_versions['cmd:annex'] >= '8.20210903':
-            # --batch-keys support was introduced
-            assert_equal(out_non_batch_keys,
-                         repo_b.whereis(files=keys, batch=True, key=True, output=output))
-
-    if external_versions['cmd:annex'] < '8.20210903':
-        # --key= and --batch are incompatible.
-        with assert_raises(ValueError):
-            repo_b.whereis(files=files, batch=True, key=True)
+        # --batch-keys support was introduced
+        assert_equal(out_non_batch_keys,
+                     repo_b.whereis(files=keys, batch=True, key=True, output=output))
 
 
 def test_done_deprecation():

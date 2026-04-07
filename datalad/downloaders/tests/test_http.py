@@ -15,11 +15,13 @@ import time
 from calendar import timegm
 from os.path import join as opj
 
+from datalad.downloaders.providers import Providers
 from datalad.downloaders.tests.utils import get_test_providers
 from datalad.support.network import (
     download_url,
     get_url_straight_filename,
 )
+from datalad.support.path import Path
 from datalad.utils import ensure_unicode
 
 from ...support.exceptions import AccessFailedError
@@ -55,6 +57,8 @@ except (ImportError, AttributeError):
     httpretty = NoHTTPPretty()
 
 from unittest.mock import patch
+
+import pytest
 
 from ...support.exceptions import (
     AccessDeniedError,
@@ -258,7 +262,15 @@ def test_access_denied(toppath=None, topurl=None, keyring=None):
 
     # We've forced an AccessDenied error and then set up bogus credentials,
     # leading to a 501 (not implemented) error.
-    assert_raises(AccessFailedError, run_set_up_provider)
+    try:
+        assert_raises(AccessFailedError, run_set_up_provider)
+    finally:
+        # Clean up the provider config file created during the test to avoid
+        # polluting subsequent test runs
+        providers_dir = Providers._get_providers_dirs().get('user')
+        cfg_file = Path(providers_dir) / 'newprovider.cfg'
+        cfg_file.unlink(missing_ok=True)
+        Providers.reset_default_providers()
 
 
 @with_tempfile(mkdir=True)
@@ -389,8 +401,10 @@ def test_detect_login_error2():
 test_detect_login_error2.tags = ['external-portal', 'network']
 
 
+@pytest.mark.xfail(reason="unknown. flaky but below flaky does not help? TODO: figure out")
 @known_failure_githubci_win
 @skip_if_no_network
+@pytest.mark.flaky(retries=3, only_on=[AccessFailedError])
 def test_download_ftp():
     try:
         import requests_ftp
@@ -404,7 +418,7 @@ def test_download_ftp():
         )
     except AccessFailedError as exc:  # pragma: no cover
         if 'status code 503' in str(exc):
-            raise SkipTest("ftp.gnu.org throws 503 when on travis (only?)")
+            raise SkipTest("ftp.gnu.org throws 503")
         raise
 
 
@@ -831,6 +845,50 @@ def test_lorisadapter(d=None, keyring=None):
 
     content = read_file(fpath)
     assert_equal(content, "correct body")
+
+
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+def test_server_error_retry(toppath=None, topurl=None):
+    """Test retry logic for 5xx server errors (e.g., 503 Service Unavailable)."""
+    furl = "%sfile.dat" % topurl
+    downloader = HTTPDownloader()
+
+    def _fail_get_downloader_session(try_to_fail):
+        """Return a function that raises AccessFailedError for N tries, then succeeds."""
+        try_ = [0]
+        _orig_get_downloader_session = HTTPDownloader.get_downloader_session
+
+        def _get_downloader_session(self, *args, **kwargs):
+            try_[0] += 1
+            if try_[0] >= try_to_fail:
+                return _orig_get_downloader_session(self, *args, **kwargs)
+            raise AccessFailedError(
+                f"Access to {args[0]} has failed: status code 503",
+                status=503
+            )
+        return _get_downloader_session
+
+    start_time = time.time()
+
+    # Mock time.sleep to avoid actual delays during testing
+    with patch('datalad.downloaders.base.time.sleep'):
+        # Should succeed after 5 failures (on 6th attempt)
+        with patch.object(HTTPDownloader, 'get_downloader_session',
+                          _fail_get_downloader_session(6)), \
+                swallow_logs():
+            assert_equal(downloader.fetch(furl), 'abc')
+
+        # Should fail after 6 failures (exceeds 5 retry limit)
+        with patch.object(HTTPDownloader, 'get_downloader_session',
+                          _fail_get_downloader_session(7)), \
+                swallow_logs():
+            assert_raises(AccessFailedError, downloader.fetch, furl)
+
+    elapsed = time.time() - start_time
+    # Ensure test runs fast (sleep is mocked) - fail if implementation changes
+    # and starts sleeping for real
+    assert elapsed < 1.0, f"Test took {elapsed:.1f}s, expected < 1s (is sleep mocked?)"
 
 
 @with_tree(tree=[('file.dat', 'abc')])

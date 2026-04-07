@@ -8,36 +8,19 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import sys
-from typing import TypeVar
+from typing import (
+    Concatenate,
+    Literal,
+    ParamSpec,
+    Protocol,
+    TypedDict,
+    TypeVar,
+)
 
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self
-
-if sys.version_info >= (3, 10):
-    from typing import (
-        Concatenate,
-        ParamSpec,
-    )
-else:
-    from typing_extensions import (
-        Concatenate,
-        ParamSpec,
-    )
-
-if sys.version_info >= (3, 8):
-    from typing import (
-        Literal,
-        Protocol,
-        TypedDict,
-    )
-else:
-    from typing_extensions import (
-        Literal,
-        Protocol,
-        TypedDict,
-    )
 
 __all__ = ["Literal", "ParamSpec", "T", "K", "V", "P"]
 

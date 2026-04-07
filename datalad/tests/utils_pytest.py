@@ -21,6 +21,7 @@ from http.server import (
     SimpleHTTPRequestHandler,
 )
 from json import dumps
+from typing import Optional
 from unittest import SkipTest
 from unittest.mock import patch
 
@@ -36,8 +37,8 @@ from datalad.cmd import (
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.dochelpers import borrowkwargs
 from datalad.support.external_versions import (
+    LooseVersion,
     external_versions,
-    get_rsync_version,
 )
 from datalad.support.keyring_ import MemoryKeyring
 from datalad.support.network import RI
@@ -1073,12 +1074,26 @@ def known_failure_osx(func):
 # ### ###
 
 
-xfail_buggy_annex_info = pytest.mark.xfail(
-    # 10.20230127 is lower bound since bug was introduced before next 10.20230214
-    # release, and thus snapshot builds would fail. There were no release on
-    # '10.20230221' - but that is the next day after the fix
-    external_versions['cmd:annex'] and ('10.20230127' <= external_versions['cmd:annex'] < '10.20230221'),
-    reason="Regression in git-annex info. https://github.com/datalad/datalad/issues/7286"
+xfail_annex_ignore_not_respected_for_local = pytest.mark.xfail(
+    # In 10.20260213, configRead in Remote/Git.hs was reordered for "Push to
+    # Create" support: (True, _, _) (repoCheap/local) is now matched before
+    # (_, True, _) (annex-ignore), so annex-ignore is not respected for local
+    # remotes.  This causes auto-initialization of the annex directory on the
+    # remote bare repo during clone.
+    # In 10.20250630 and earlier, (_, True, _) was matched first, correctly
+    # short-circuiting for annex-ignored remotes.
+    # https://git-annex.branchable.com/bugs/annex-ignore_check_is_skipped_for_local_remotes/
+    # Fixed in 10.20260316.
+    external_versions['cmd:annex'] and ('10.20260213' <= external_versions['cmd:annex'] < '10.20260316'),
+    reason="git-annex regression: annex-ignore not respected for local remotes"
+)
+
+xfail_annex_enableremote_bare_git = pytest.mark.xfail(
+    # In 10.20260316, enableremote of a bare-git remote fails with
+    # "enableremote (normal) bare-git failed" / "enableremote: 1 failed".
+    # Worked in 10.20260213 and earlier.
+    external_versions['cmd:annex'] and external_versions['cmd:annex'] >= '10.20260316',
+    reason="git-annex regression: enableremote fails for bare-git remotes"
 )
 
 
@@ -1117,25 +1132,6 @@ def with_sameas_remote(func, autoenabled=False):
     @with_tempfile(mkdir=True)
     @with_tempfile(mkdir=True)
     def  _wrap_with_sameas_remote(*args, **kwargs):
-        # With git-annex's 8.20200522-77-g1f2e2d15e, transferring from an rsync
-        # special remote hangs on Xenial. This is likely due to an interaction
-        # with an older rsync or openssh version. Use openssh as a rough
-        # indicator. See
-        # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
-        if external_versions['cmd:system-ssh'] < '7.4' and \
-           '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
-            pytest.skip("Test known to hang")
-
-        # A fix in rsync 3.2.4 broke compatibility with older annex versions.
-        # To make things a bit more complicated, ubuntu pulled that fix into
-        # their rsync package for 3.1.3-8.
-        # Issue: gh-7320
-        rsync_ver = get_rsync_version()
-        rsync_fixed = rsync_ver >= "3.1.3-8ubuntu" or rsync_ver >= "3.2.4"
-        if rsync_fixed and external_versions['cmd:annex'] < "10.20220504":
-            pytest.skip(f"rsync {rsync_ver} and git-annex "
-                        f"{external_versions['cmd:annex']} incompatible")
-
         sr_path, repo_path = args[-2:]
         fn_args = args[:-2]
         repo = AnnexRepo(repo_path)
@@ -1457,7 +1453,7 @@ UNICODE_FILENAME = u"ΔЙקم๗あ"
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
-if sys.getfilesystemencoding().lower() == 'utf-8':
+if not (FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf-8')):
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
@@ -2023,7 +2019,7 @@ def set_date(timestamp):
 
 
 @contextmanager
-def set_annex_version(version):
+def set_annex_version(version: Optional[str]):
     """Override the git-annex version.
 
     This temporarily masks the git-annex version present in external_versions
@@ -2033,7 +2029,7 @@ def set_annex_version(version):
     ar_vers = AnnexRepo.git_annex_version
     with patch.dict(
             "datalad.support.annexrepo.external_versions._versions",
-            {"cmd:annex": version}):
+            {"cmd:annex": LooseVersion(version) if version else version}):
         try:
             AnnexRepo.git_annex_version = None
             yield

@@ -23,6 +23,8 @@ from os import (
 )
 from unittest.mock import patch
 
+import pytest
+
 from datalad.api import (
     clone,
     run,
@@ -42,6 +44,7 @@ from datalad.support.exceptions import (
 )
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
+    FILESYSTEM_SUPPORTS_UTF8,
     OBSCURE_FILENAME,
     assert_false,
     assert_in,
@@ -179,6 +182,8 @@ def test_basics(path=None, nodspath=None):
 # moreover the usage of unicode in the file names also breaks this on windows
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path=None):
+    if not FILESYSTEM_SUPPORTS_UTF8:
+        pytest.skip("requires UTF-8 filesystem encoding for unicode args")
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
     ds = Dataset(path).create()
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
@@ -640,6 +645,38 @@ with open(name + ".txt", "w") as fh:
     ok_exists(str(ds.pathobj / "bar.txt"))
     assert_repo_status(ds.path)
 
+    # Deleting a declared output with a literal path should be committed
+    # (gh-7822).
+    hexsha_pre = repo.get_hexsha()
+    ds.run("rm foo.txt", outputs=["foo.txt"], explicit=True,
+           result_renderer='disabled')
+    assert_false((ds.pathobj / "foo.txt").exists())
+    neq_(hexsha_pre, repo.get_hexsha())
+    assert_repo_status(ds.path)
+
+    # Glob pattern where only some matches are deleted (gh-7822).
+    hexsha_pre = repo.get_hexsha()
+    ds.run("rm bar.txt", outputs=["*.txt"], explicit=True,
+           result_renderer='disabled')
+    assert_false((ds.pathobj / "bar.txt").exists())
+    neq_(hexsha_pre, repo.get_hexsha())
+    assert_repo_status(ds.path)
+
+    # Delete old outputs and create new ones in one command (the motivating
+    # use-case from gh-7822: zip files then delete originals).
+    (ds.pathobj / "a.dat").write_text("a")
+    (ds.pathobj / "b.dat").write_text("b")
+    ds.save(to_git=True)
+    hexsha_pre = repo.get_hexsha()
+    ds.run("{} write_text.py c && rm a.dat b.dat".format(sys.executable),
+           outputs=["*.dat", "*.txt"], explicit=True,
+           result_renderer='disabled')
+    assert_false((ds.pathobj / "a.dat").exists())
+    assert_false((ds.pathobj / "b.dat").exists())
+    ok_exists(str(ds.pathobj / "c.txt"))
+    neq_(hexsha_pre, repo.get_hexsha())
+    assert_repo_status(ds.path)
+
 
 @with_tempfile(mkdir=True)
 def test_run_unexpanded_placeholders(path=None):
@@ -705,7 +742,7 @@ def test_dry_run(path=None):
 
     with swallow_outputs() as cmo:
         ds.run("blah {inputs} {outputs}", dry_run="basic",
-               inputs=["fo*"], outputs=["b*r"])
+               inputs=["fo*"], outputs=["b*r"])  # codespell:ignore fo
         assert_in(
             'blah "foo" "bar"' if on_windows else "blah foo bar",
             cmo.out)

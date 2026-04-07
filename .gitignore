@@ -30,3 +30,4 @@ tmp
 bin/
 tools/bisect-git-annex.simg
 __testhome__
+uv.lock

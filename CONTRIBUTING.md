@@ -1,24 +1,45 @@
 # Contributing to DataLad
 
-[gh-datalad]: http://github.com/datalad/datalad
+[gh-datalad]: https://github.com/datalad/datalad
+
+## Quick Reference
+
+Common commands for development:
+
+```sh
+# Install
+pip install -e .              # minimal install
+pip install -e '.[tests]'     # with test dependencies
+pip install -e '.[devel]'     # full development install
+
+# Test
+pytest datalad                                              # all tests
+pytest datalad/path/to/test.py::TestClass::test_function -v # single test
+pytest --cov=datalad path/to/tests                          # with coverage
+
+# Lint & type check
+tox -e lint                   # codespell + pylint
+tox -e typing                 # mypy
+make code-analysis            # flake8 + pylint
+```
 
 ## Files organization
 
 - [datalad/](./datalad) is the main Python module where major development is happening,
   with major submodules being:
-    - `cmdline/` - helpers for accessing `interface/` functionality from
-     command line
+    - `cli/` - command line interface implementation (replaces deprecated `cmdline/`)
     - `customremotes/` - custom special remotes for annex provided by datalad
+    - `distributed/` - distributed operations, including ORA remote and
+      create-sibling commands
     - `downloaders/` - support for accessing data from various sources (e.g.
       http, S3, XNAT) via a unified interface.
         - `configs/` - specifications for known data providers and associated
           credentials
     - `interface/` - high level interface functions which get exposed via
-      command line (`cmdline/`) or Python (`datalad.api`).
+      command line (`cli/`) or Python (`datalad.api`).
+    - `runner/` - sub-process execution and IO
     - `tests/` - some unit- and regression- tests (more could be found under
-      `tests/` of corresponding submodules. See [Tests](#tests))
-        - [utils.py](./datalad/tests/utils.py) provides convenience helpers used by unit-tests such as
-          `@with_tree`, `@serve_path_via_http` and other decorators
+      `tests/` of corresponding submodules. See [Testing](#testing))
     - `ui/` - user-level interactions, such as messages about errors, warnings,
       progress reports, AND when supported by available frontend --
       interactive dialogs
@@ -60,41 +81,55 @@ we outline the workflow used by the developers:
 2. Add your forked clone as a remote to the local clone you already have on your
    local disk:
 
-          git remote add gh-YourLogin git@github.com:YourLogin/datalad.git
-          git fetch gh-YourLogin
+          git remote add --fetch gh-YourLogin git@github.com:YourLogin/datalad.git
 
-    To ease addition of other github repositories as remotes, here is
-    a little bash function/script to add to your `~/.bashrc`:
+   The resulting setup forms a triangle of 3 instances of the same repository:
+   `origin`-al + 2 clones: one personal fork on GitHub and one local:
 
-        ghremote () {
-                url="$1"
-                proj=${url##*/}
-                url_=${url%/*}
-                login=${url_##*/}
-                git remote add gh-$login $url
-                git fetch gh-$login
-        }
+   ```mermaid
+   graph TD
+       subgraph GitHub
+           direction LR
+           O["datalad/datalad<br/>[<b>origin</b>]"]
+           F["YourLogin/datalad<br/>[<b>gh-YourLogin</b>]"]
+           O ~~~ F
+           O -. "1. Fork" .-> F
+           F -. "6. Send Pull Request" .-> O
+       end
+       O -- "0. git clone" --> L["local clone"]
+       F -- "2. git remote add" --> L
+       L -- "3. git checkout -b;
+             4. git add; git commit" --> L
+       L -- "5. git push" --> F
+   ```
 
-    thus you could simply run:
+3. Create a branch to hold your changes.  The default branch after cloning
+   is `maint` (bug-fix line for the current release).  If you are adding a
+   new feature or enhancement, switch to `master` first.  See
+   [Branches](#branches) for details.
 
-         ghremote git@github.com:YourLogin/datalad.git
+          git checkout origin/master -b nf-my-feature   # new feature
+          git checkout origin/maint  -b bf-my-fix       # bug fix
 
-    to add the above `gh-YourLogin` remote.  Additional handy aliases
-    such as `ghpr` (to fetch existing pr from someone's remote) and
-    `ghsendpr` could be found at [yarikoptic's bash config file](http://git.onerussian.com/?p=etc/bash.git;a=blob;f=.bash/bashrc/30_aliases_sh;hb=HEAD#l865)
+    Use a prefix signaling the purpose of the branch and matching commit
+    messages.
 
-3. Create a branch (generally off the `origin/master`) to hold your changes:
+    | Prefix | Branch  | Commit  | Purpose            |
+    |--------|---------|---------|--------------------|
+    | NF     | `nf-`   | `NF:`   | New feature        |
+    | BF     | `bf-`   | `BF:`   | Bug fix            |
+    | RF     | `rf-`   | `RF:`   | Refactoring        |
+    | DOC    | `doc-`  | `DOC:`  | Documentation      |
+    | BM     | `bm-`   | `BM:`   | Benchmarks         |
+    | TST    | —       | `TST:`  | Tests only         |
+    | CI     | —       | `CI:`   | CI / infrastructure|
+    | UX     | —       | `UX:`   | User experience    |
+    | BK     | —       | `BK:`   | Known breakage     |
 
-          git checkout -b nf-my-feature
-
-    and start making changes. Ideally, use a prefix signaling the purpose of the
-    branch
-    - `nf-` for new features
-    - `bf-` for bug fixes
-    - `rf-` for refactoring
-    - `doc-` for documentation contributions (including in the code docstrings).
-    - `bm-` for changes to benchmarks
-    We recommend to not work in the ``master`` branch!
+    Multiple prefixes can be joined with `+` (e.g. `RF+DOC`), and a scope can
+    be added in parentheses (e.g. `BF(TST):`, `BF(CI):`).  See `git log` for
+    examples.  If a commit closes an existing DataLad issue, add
+    `(Closes #ISSUE_NUMBER)` to the end of the message.
 
 4. Work on this copy on your computer using Git to do the version control. When
    you're done editing, do:
@@ -102,123 +137,69 @@ we outline the workflow used by the developers:
           git add modified_files
           git commit
 
-   to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
-   also use `TST` for commits concerned solely with tests, and `BK` to signal
-   that the commit causes a breakage (e.g. of tests) at that point.  Multiple
-   entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
-   examples.  If a commit closes an existing DataLad issue, then add to the end
-   of the message `(Closes #ISSUE_NUMER)`
-
 5. Push to GitHub with:
 
           git push -u gh-YourLogin nf-my-feature
 
-   Finally, go to the web page of your fork of the DataLad repo, and click
+6. Finally, go to the web page of your fork of the DataLad repo, and click
    'Pull request' (PR) to send your changes to the maintainers for review. This
    will send an email to the committers.  You can commit new changes to this branch
-   and keep pushing to your remote -- github automagically adds them to your
+   and keep pushing to your remote -- GitHub automagically adds them to your
    previously opened PR.
 
+   GitHub pre-fills the PR description from
+   [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) —
+   fill in the checklist and delete the instructions.
+
+   PRs should be labeled with a `semver-*` label (e.g. `semver-patch`,
+   `semver-minor`) to indicate the type of version bump. Adding the
+   `CHANGELOG-missing` label triggers automatic generation of a changelog
+   snippet under `changelog.d/`.  See [CHANGELOG entries](#changelog-entries-and-labelling-pull-requests)
+   for details.
+
 (If any of the above seems like magic to you, then look up the
-[Git documentation](http://git-scm.com/documentation) on the web.)
-Our [Design Docs](http://docs.datalad.org/en/stable/design/index.html) provide a
+[Git documentation](https://git-scm.com/documentation) on the web.)
+Our [Design Docs](https://docs.datalad.org/en/stable/design/index.html) provide a
 growing collection of insights on the command API principles and the design of
 particular subsystems in DataLad to inform standard development practice.
 
 ## Development environment
 
-We support Python 3 only (>= 3.9).
+We support Python 3 only (>= 3.10).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
-about installation of datalad itself.
-On Debian-based systems we recommend to enable [NeuroDebian](http://neuro.debian.net)
-since we use it to provide backports of recent fixed external modules we depend upon:
+about installation of datalad itself.  The recommended setup:
 
 ```sh
-apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python3-scrapy python3-{argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
+# Install uv (fast Python package manager) if you don't have it
+pip install uv
+
+# Create a virtualenv and install for development
+uv venv
+source .venv/bin/activate
+uv pip install -e '.[devel]'
 ```
 
-and additionally, for development we suggest to use tox and new
-versions of dependencies from pypy:
+You will need a recent [git-annex](https://git-annex.branchable.com/).
+It can be installed from PyPI (`uv pip install git-annex`), potentially via
+`datalad-installer` (`pip install datalad-installer && datalad-installer git-annex`),
+via [NeuroDebian](https://neuro.debian.net) on Debian/Ubuntu
+(`apt-get install git-annex-standalone`), or via your OS package manager.
+
+For running tests with `tox`, using `tox-uv` is encouraged for faster environment creation:
 
 ```sh
-apt-get install -y -q python3-{dev,httpretty,pytest,pip,vcr,virtualenv} python3-tox
-# Some libraries which might be needed for installing via pip
-apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
+uv pip install tox tox-uv
+tox -e py3
 ```
 
-some of which you could also install from PyPi using pip  (prior installation of those libraries listed above
-might be necessary)
+### Contributor files
 
-```sh
-pip install -r requirements-devel.txt
-```
+Contributor metadata lives in [.tributors](.tributors).  See
+[Recognizing contributions](#recognizing-contributions) for how it is
+synced automatically.
 
-and you will need to install recent git-annex using appropriate for your
-OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
-
-Contributor Files History
--------------------------
-
-The original repository provided a [.zenodo.json](.zenodo.json)
-file, and we generate a [.contributors file](.all-contributorsrc) from that via:
-
-```bash
-pip install tributors
-tributors --version
-0.0.18
-```
-
-It helps to have a GitHub token to increase API limits:
-
-```bash
-export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment).
-Then update zenodo:
-
-```bash
-tributors update  zenodo
-INFO:    zenodo:Updating .zenodo.json
-INFO:    zenodo:Updating .tributors cache from .zenodo.json
-WARNING:tributors:zenodo does not support updating from names.
-```
-
-In the case that there is more than one orcid found for a user, you will be given a list
-to check. Others will be updated in the file. You can then curate the file as you see fit.
-We next want to add the .allcontributors file:
-
-```bash
-$ tributors init allcontrib
-INFO:allcontrib:Generating .all-contributorsrc for datalad/datalad
-$ tributors update allcontrib
-INFO:allcontrib:Updating .all-contributorsrc
-INFO:allcontrib:Updating .tributors cache from .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor glalteva in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor adswa in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
-...
-INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
-WARNING:tributors:allcontrib does not support updating from orcids.
-WARNING:tributors:allcontrib does not support updating from email.
-```
-
-We can then populate the shared .tributors file:
-
-```bash
-$ tributors update-lookup allcontrib
-```
-
-And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
-look for new orcids as we did above.
-
-## Additional Hints
-
-### Merge commits
+## Merge commits
 
 For merge commits to have more informative description, add to your
 `.git/config` or `~/.gitconfig` following section:
@@ -231,208 +212,219 @@ in "Conflicts" listing within the merge commit
 (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
 
 
+## Code Style
+
+- **Max line length**: 120 characters (configured in `tox.ini` `[flake8]` section)
+- **Imports**: place at the top of the file; only use local/inline imports
+  when needed for efficiency (heavy optional deps) or to break circular dependencies
+  (e.g. `from datalad.api import ...` inside `datalad.distribution.*` modules).
+  Inline imports for circular dependency reasons must have a comment explaining why.
+- **External version checks**: use `external_versions` from
+  `datalad.support.external_versions`; never parse version strings manually
+  (e.g. `external_versions['chardet'] >= '6'`)
+- **Type checks**: use `isinstance` rather than `hasattr` for type detection
+  (e.g. `isinstance(repo, AnnexRepo)` not `hasattr(repo, 'call_annex')`)
+- **Error handling**: use appropriate exception types; capture in test fixtures.
+  Never swallow exceptions with bare `except SomeError: pass` — either check
+  preconditions to avoid the error, or log at debug level with context about
+  what went wrong. Only catch specific expected failure modes.
+
 ## Quality Assurance
 
-It is recommended to check that your contribution complies with the following
-rules before submitting a pull request:
+Before submitting a pull request:
 
-- All public methods should have informative docstrings with sample usage
-  presented as doctests when appropriate.
-
-- All other tests pass when everything is rebuilt from scratch.
-
+- All public methods should have informative docstrings.
+- All existing tests pass.
 - New code should be accompanied by tests.
 
-The documentation contains a [Design Document specifically on running and writing tests](http://docs.datalad.org/en/stable/design/testing.html) that we encourage you to read beforehand.
-Further hands-on advice is detailed below.
+See also the [Design Document on running and writing tests](https://docs.datalad.org/en/stable/design/testing.html).
 
-### Tests
+### Testing
 
-`datalad/tests` contains tests for the core portion of the project, and
-more tests are provided under corresponding submodules in `tests/`
-subdirectories to simplify re-running the tests concerning that portion
-of the codebase.  To execute many tests, the codebase first needs to be
-"installed" in order to generate scripts for the entry points.  For
-that, the recommended course of action is to use `virtualenv`, e.g.
+#### Writing tests
 
-```sh
-virtualenv --system-site-packages venv-tests
-source venv-tests/bin/activate
-pip install -r requirements.txt
-python setup.py develop
+When fixing a bug, follow a **red/green** workflow: first write (or extend) a
+test that exposes the incorrect behavior, verify it fails, then implement the
+fix and verify the test passes.  To keep CI times manageable, look for an
+**existing** test that already sets up a similar scenario and extend it with a
+minimal assertion rather than adding an entirely new test function with its
+own setup/teardown overhead.
+
+Test helpers live in
+[datalad/tests/utils_pytest.py](datalad/tests/utils_pytest.py); import what
+you need from there.
+
+**Setting up files and directories** — use `@with_tempfile` and `@with_tree`:
+
+```python
+from datalad.tests.utils_pytest import with_tempfile, with_tree
+
+@with_tempfile(mkdir=True)
+def test_something(path=None):        # path is a fresh temp dir, auto-cleaned
+    ds = Dataset(path).create()
+
+@with_tree(tree={'input.txt': 'data', 'subdir': {'nested.csv': 'a,b'}})
+def test_with_content(path=None):     # tree materialised under path
+    ds = Dataset(path).create(force=True)
+    ds.save()
 ```
 
-and then use that virtual environment to run the tests, via
+Decorators can be **stacked** — each adds a parameter (bottom-to-top order):
 
-```sh
-pytest datalad
+```python
+@with_tempfile(mkdir=True)
+@with_tree(tree={'src': {'f.txt': '123'}})
+def test_two_paths(dest=None, srcdir=None):
+    ...
 ```
 
-then to later deactivate the virtualenv just simply enter
+**Asserting command results** — all DataLad commands return a list of result
+dicts with `status`, `action`, `path`, etc.  Use the dedicated helpers rather
+than hand-rolling loops:
 
-```sh
-deactivate
+```python
+from datalad.tests.utils_pytest import (
+    assert_result_count,
+    assert_status,
+    assert_in_results,
+    assert_not_in_results,
+    assert_repo_status,
+)
+
+def test_...(...):
+    ...
+    res = ds.save()
+    assert_status('ok', res)                         # every result is 'ok'
+    assert_result_count(res, 1, action='save')       # exactly 1 save result
+    assert_in_results(res, path=str(ds.pathobj / 'file.txt'))
+    assert_not_in_results(res, status='error')
+    assert_repo_status(ds.path)                      # working tree is clean
 ```
 
-Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
-file which sets up a few virtual environments for testing locally, which you can
-later reuse like any other regular virtualenv for troubleshooting.
-Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
-be used to establish a clean docker environment (based on any NtesteuroDebian-supported
-release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
+`assert_repo_status` accepts keyword lists for expected non-clean states:
+
+```python
+assert_repo_status(ds.path, modified=['changed.txt'], untracked=['new.txt'])
+```
+
+**Testing error paths** — pass `on_failure='ignore'` so the command returns
+error results instead of raising `IncompleteResultsError`:
+
+```python
+res = ds.save('nonexistent', on_failure='ignore')
+assert_in_results(res, status='error')
+```
+
+**Capturing output and logs:**
+
+```python
+from datalad.utils import swallow_outputs, swallow_logs
+
+def test_...(...):
+    ...
+    with swallow_outputs() as cmo:
+        ds.some_command()
+        assert 'expected' in cmo.out
+
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        ds.some_command()
+        assert_in('expected warning', cml.out)
+```
+
+**Serving test data over HTTP:**
+
+```python
+from datalad.tests.utils_pytest import serve_path_via_http
+
+@with_tree(tree={'data.txt': 'content'})
+@serve_path_via_http
+def test_download(srcdir=None, url=None):   # url points at srcdir over HTTP
+    ds.download_url(url + '/data.txt')
+```
+
+**Marks and conditional skips:**
+
+| Decorator                          | Purpose                                       |
+|------------------------------------|-----------------------------------------------|
+| `@slow`                            | ≥ 10 s — add a timing comment (e.g. `# ~12 sec`) |
+| `@turtle`                          | ≥ 2 min                                       |
+| `@integration`                     | needs network or heavy external resources      |
+| `@skip_if_no_network`              | skip when `DATALAD_TESTS_NONETWORK` is set     |
+| `@skip_ssh`                        | skip unless `DATALAD_TESTS_SSH` is set         |
+| `@skip_if_on_windows`              | platform gate                                  |
+| `@skip_wo_symlink_capability`      | filesystem gate                                |
+| `@known_failure_windows` / `_osx`  | expected to fail on that platform               |
+
+For parameterised tests use `@pytest.mark.parametrize` as usual.
+
+#### Running tests
+
+Test files live in `datalad/tests` and in `tests/` subdirectories of each
+submodule.  See [Quick Reference](#quick-reference) for install and run
+commands.  You can also use `tox` (see `tox.ini`) or the
+[tools/testing/test_README_in_docker](tools/testing/test_README_in_docker)
+script for a clean Docker environment.  The
+[tools/testing/adhoc](tools/testing/adhoc) folder has ad-hoc testing scripts
+for reference.
+
+We rely on https://codecov.io for coverage tracking — it annotates pull
+requests on GitHub with coverage changes.
 
 ### CI setup
 
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.
-Please note that new a contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
+Please note that a new contributor's first PR needs workflow approval from a team member to start the CI runs, but we promise to promptly review and start the CI runs on your PR.
 As the full CI suite takes a while to complete, we recommend to run at least tests directly related to your contributions locally beforehand.
 Logs from all CI runs are collected periodically by [con/tinuous](https://github.com/con/tinuous/) and archived at `smaug:/mnt/btrfs/datasets/datalad/ci/logs/`.
 For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
 If you would like to propose patch against `git-annex` itself, submit them against [datalad/git-annex](https://github.com/datalad/git-annex/#submitting-patches) repository which builds and tests `git-annex`.
 
-### Coverage
+### Pre-commit hooks
 
-You can also check for common programming errors with the following tools:
+The project uses [pre-commit](https://pre-commit.com/) hooks configured in
+`.pre-commit-config.yaml`.  To enable them locally:
 
-- Code with good unittest coverage (at least 80%), check with:
+```sh
+pip install pre-commit
+pre-commit install
+```
 
-          pip install pytest coverage
-          pytest --cov=datalad path/to/tests_for_package
-
-- We rely on https://codecov.io to provide convenient view of code coverage.
-  Installation of the codecov extension for Firefox/Iceweasel or Chromium
-  is strongly advised, since it provides coverage annotation of pull
-  requests.
+The hooks automatically run on each commit and currently enforce:
+- **isort** — import sorting
+- **codespell** — spell checking
+- **trailing-whitespace** and **end-of-file** fixes
 
 ### Linting
 
-We are not (yet) fully PEP8 compliant, so please use these tools as
-guidelines for your contributions, but not to PEP8 entire code
-base.
-
-[beyond-pep8]: https://www.youtube.com/watch?v=wf-BqAjZb8M
-
-*Sidenote*: watch [Raymond Hettinger - Beyond PEP 8][beyond-pep8]
-
-- No pyflakes warnings, check with:
-
-           pip install pyflakes
-           pyflakes path/to/module.py
-
-- No PEP8 warnings, check with:
-
-           pip install pep8
-           pep8 path/to/module.py
-
-- AutoPEP8 can help you fix some of the easy redundant errors:
-
-           pip install autopep8
-           autopep8 path/to/pep8.py
-
-Also, some team developers use
-[PyCharm community edition](https://www.jetbrains.com/pycharm) which
-provides built-in PEP8 checker and handy tools such as smart
-splits/joins making it easier to maintain code following the PEP8
-recommendations.  NeuroDebian provides `pycharm-community-sloppy`
-package to ease pycharm installation even further.
+Run linting and type-checking commands listed in [Quick Reference](#quick-reference).
+Do not reformat code outside your changes.
 
 ### Benchmarking
 
-We use [asv] to benchmark some core DataLad functionality.
-The benchmarks suite is located under [benchmarks/](./benchmarks), and
-periodically we publish results of running benchmarks on a dedicated host
-to http://datalad.github.io/datalad/ .  Those results are collected
-and available under the `.asv/` submodule of this repository, so to get started
+We use [asv] to benchmark core DataLad functionality.  Benchmarks live in
+[benchmarks/](./benchmarks).  Historical results were published at
+https://datalad.github.io/datalad/ (not actively maintained).  The
+[benchmarks workflow](.github/workflows/benchmarks.yml) still runs on PRs to
+gate against performance regressions.
 
-- `git submodule update --init .asv`
-- `pip install .[devel]` or just `pip install asv`
-- `asv machine` - to configure asv for your host if you want to run
-  benchmarks locally
+Setup:
 
-And then you could use [asv] in multiple ways.
-
-#### Quickly benchmark the working tree
-
-- `asv run -E existing` - benchmark using the existing python environment
-  and just print out results (not stored anywhere).  You can add `-q`
-  to run each benchmark just once (thus less reliable estimates)
-- `asv run -b api.supers.time_createadd_to_dataset -E existing`
-  would run that specific benchmark using the existing python environment
-
-Note: `--python=same` (`-E existing`) seems to have restricted
-applicability, e.g. can't be used for a range of commits, so it can't
-be used with `continuous`.
-
-#### Compare results for two commits from recorded runs
-
-Use [asv compare] to compare results from different runs, which should be
-available under `.asv/results/<machine>`.  (Note that the example
-below passes ref names instead of commit IDs, which requires asv v0.3
-or later.)
-
-```shell
-> asv compare -m hopa maint master
-
-All benchmarks:
-
-       before           after         ratio
-     [b619eca4]       [7635f467]
--           1.87s            1.54s     0.82  api.supers.time_createadd
--           1.85s            1.56s     0.84  api.supers.time_createadd_to_dataset
--           5.57s            4.40s     0.79  api.supers.time_installr
-          145±6ms          145±6ms     1.00  api.supers.time_ls
--           4.59s            2.17s     0.47  api.supers.time_remove
-          427±1ms          434±8ms     1.02  api.testds.time_create_test_dataset1
--           4.10s            3.37s     0.82  api.testds.time_create_test_dataset2x2
-      1.81±0.07ms      1.73±0.04ms     0.96  core.runner.time_echo
-       2.30±0.2ms      2.04±0.03ms    ~0.89  core.runner.time_echo_gitrunner
-+        420±10ms          535±3ms     1.27  core.startup.time_help_np
-          111±6ms          107±3ms     0.96  core.startup.time_import
-+         334±6ms          466±4ms     1.39  core.startup.time_import_api
+```sh
+git submodule update --init .asv
+pip install asv        # or pip install .[devel]
+asv machine            # configure for your host
 ```
 
+Quick usage:
 
-#### Run and compare results for two commits
+- `asv run -E existing` — benchmark the working tree (add `-q` for a single quick pass)
+- `asv run -b <name> -E existing` — run a specific benchmark
+- `asv continuous master HEAD` — run and compare HEAD against master
+- `asv compare -m <machine> maint master` — compare recorded results
 
-[asv continuous] could be used to first run benchmarks for the to-be-tested
-commits and then provide stats:
+See the [asv documentation][asv] for the full command reference.
 
-- `asv continuous maint master` - would run and compare `maint` and `master` branches
-- `asv continuous HEAD` - would compare `HEAD` against `HEAD^`
-- `asv continuous master HEAD` - would compare `HEAD` against state of master
-- [TODO: continuous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
-
-Notes:
-- only significant changes will be reported
-- raw results from benchmarks are not stored (use `--record-samples` if
-  desired)
-
-#### Run and record benchmarks results (for later comparison etc)
-
-- `asv run` would run all configured branches (see
-  [asv.conf.json](./asv.conf.json))
-
-
-#### Profile a benchmark and produce a nice graph visualization
-
-Example (replace with the benchmark of interest)
-
-    asv profile -v -o profile.gprof usecases.study_forrest.time_make_studyforrest_mockup
-    gprof2dot -f pstats profile.gprof | dot -Tpng -o profile.png \
-        && xdg-open profile.png
-
-#### Common options
-
-- `-E` to restrict to specific environment, e.g. `-E virtualenv:2.7`
-- `-b` could be used to specify specific benchmark(s)
-- `-q` to run benchmark just once for a quick assessment (results are
-  not stored since too unreliable)
-
-
-[asv compare]: http://asv.readthedocs.io/en/latest/commands.html#asv-compare
-[asv continuous]: http://asv.readthedocs.io/en/latest/commands.html#asv-continuous
-
-[asv]: http://asv.readthedocs.io
+[asv]: https://asv.readthedocs.io
 
 
 ## Easy Issues
@@ -472,129 +464,44 @@ New and existing contributors are invited to join teams:
 
 ## Recognizing contributions
 
-We welcome and recognize all contributions from documentation to testing to code development.
-
-You can see a list of current contributors in our [zenodo file][link_zenodo].
-If you are new to the project, don't forget to add your name and affiliation there!
-We also have an .all-contributorsrc that is updated automatically on merges. Once it's
-merged, if you helped in a non standard way (e.g., a contribution other than code)
-you can open a pull request to add any [All Contributors Emoji][contrib_emoji] that
-match your contribution types.
-
-## Thank you!
-
-You're awesome. :wave::smiley:
-
-
-
-# Various hints for developers
+We welcome and recognize all contributions — from documentation to testing to
+code.  Contributor metadata is discovered and synced by
+[con/tributors](https://github.com/con/tributors) via the
+[update-contributors workflow](.github/workflows/update-contributors.yml),
+which runs automatically on merges to master and updates
+[.zenodo.json][link_zenodo] and [.all-contributorsrc](.all-contributorsrc).
+If you are new, please add yourself to [.zenodo.json][link_zenodo].
 
 ## Useful tools
 
-- While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
-  for quick logging of various health stats in a separate terminal window:
+- While performing IO/net heavy operations use [dool](https://github.com/scottchiefbaker/dool)
+  (successor to dstat) for quick logging of various health stats in a separate terminal window:
 
-        dstat -c --top-cpu -d --top-bio --top-latency --net
+        dool -c --top-cpu -d --top-bio --top-latency --net
 
-- To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+- To monitor speed of any data pipelining [pv](https://www.ivarch.com/programs/pv.shtml) is really handy,
   just plug it in the middle of your pipe.
 
 - For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
   `python -c "import epdb; epdb.connect()".`
 
-- We are using codecov which has extensions for the popular browsers
-  (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
-
 ## Useful Environment Variables
 
-Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
+The most commonly needed variables for development and testing:
 
-- *DATALAD_DATASETS_TOPURL*:
-  Used to point to an alternative location for `///` dataset. If running
-  tests preferred to be set to https://datasets-tests.datalad.org
-- *DATALAD_LOG_LEVEL*:
-  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_LOG_NAME*:
-  Whether to include logger name (e.g. `datalad.support.sshconnector`) in the log
-- *DATALAD_LOG_OUTPUTS*:
-  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
-- *DATALAD_LOG_PID*
-  To instruct datalad to log PID of the process
-- *DATALAD_LOG_TARGET*
-  Where to log: `stderr` (default), `stdout`, or another filename
-- *DATALAD_LOG_TIMESTAMP*:
-  Used to add timestamp to datalad logs
-- *DATALAD_LOG_TRACEBACK*:
-  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
-  This replaces any common prefix between current traceback log and previous invocation with "..."
-- *DATALAD_LOG_VMEM*:
-  Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
-- *DATALAD_EXC_STR_TBLIMIT*:
-  This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
-- *DATALAD_SEED*:
-  To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
-  those random values reproducible.  You might want also to set all the relevant git config variables
-  like we do in one of the travis runs
-- *DATALAD_TESTS_TEMP_KEEP*:
-  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
-- *DATALAD_TESTS_TEMP_DIR*:
-  Create a temporary directory at location specified by this flag.
-  It is used by tests to create a temporary git directory while testing git annex archives etc
-- *DATALAD_TESTS_NONETWORK*:
-  Skips network tests completely if this flag is set
-  Examples include test for S3, git_repositories, OpenfMRI, etc
-- *DATALAD_TESTS_SSH*:
-  Skips SSH tests if this flag is **not** set.  If you enable this,
-  you need to set up a "datalad-test" and "datalad-test2" target in
-  your SSH configuration.  The second target is used by only a couple
-  of tests, so depending on the tests you're interested in, you can
-  get by with only "datalad-test" configured.
+- *DATALAD_LOG_LEVEL*: verbosity of log output to stderr (`DEBUG`, `WARNING`, etc.)
+- *DATALAD_LOG_TARGET*: where to log — `stderr` (default), `stdout`, or a filename
+- *DATALAD_LOG_NAME*: include logger name (e.g. `datalad.support.sshconnector`) in output
+- *DATALAD_SEED*: seed Python's `random` RNG for reproducible dataset UUIDs
+- *DATALAD_TESTS_TEMP_KEEP*: keep temporary test directories after test run
+- *DATALAD_TESTS_TEMP_DIR*: base path for temporary test directories
+- *DATALAD_TESTS_NONETWORK*: skip all network-dependent tests
+- *DATALAD_TESTS_SSH*: enable SSH tests (requires `datalad-test` / `datalad-test2`
+  SSH targets; see [docker-ssh-target](https://github.com/datalad-tester/docker-ssh-target))
 
-  A Docker image that is used for DataLad's tests is available at
-  <https://github.com/datalad-tester/docker-ssh-target>.  Note that
-  the DataLad tests assume that target files exist in
-  `DATALAD_TESTS_TEMP_DIR`, which restricts the "datalad-test" target
-  to being either the localhost or a container that mounts
-  `DATALAD_TESTS_TEMP_DIR`.
-- *DATALAD_TESTS_NOTEARDOWN*:
-  Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
-- *DATALAD_TESTS_USECASSETTE*:
-  Specifies the location of the file to record network transactions by the VCR module.
-  Currently used by when testing custom special remotes
-- *DATALAD_TESTS_OBSCURE_PREFIX*:
-  A string to prefix the most obscure (but supported by the filesystem test filename
-- *DATALAD_TESTS_PROTOCOLREMOTE*:
-  Binary flag to specify whether to test protocol interactions of custom remote with annex
-- *DATALAD_TESTS_RUNCMDLINE*:
-  Binary flag to specify if shell testing using shunit2 to be carried out
-- *DATALAD_TESTS_TEMP_FS*:
-  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
-- *DATALAD_TESTS_TEMP_FSSIZE*:
-  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
-- *DATALAD_TESTS_NONLO*:
-  Specifies network interfaces to bring down/up for testing. Currently used by travis.
-- *DATALAD_TESTS_KNOWNFAILURES_PROBE*:
-  Binary flag to test whether "known failures" still actually are failures. That
-  is - change behavior of tests, that decorated with any of the `known_failure`,
-  to not skip, but executed and *fail* if they would pass (indicating that the
-  decorator may be removed/reconsidered).
-- *DATALAD_TESTS_GITCONFIG*:
-  Additional content to add to `~/.gitconfig` in the tests `HOME` environment. `\n` is replaced with `os.linesep`.
-- *DATALAD_TESTS_CREDENTIALS*:
-  Set to `system` to allow for credentials possibly present in the user/system wide environment to be used.
-- *DATALAD_CMD_PROTOCOL*:
-  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs.
-  'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
-  Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
-- *DATALAD_CMD_PROTOCOL_PREFIX*:
-  Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
-- *DATALAD_USE_DEFAULT_GIT*:
-  Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
-- *DATALAD_ASSERT_NO_OPEN_FILES*:
-  Instructs test helpers to check for open files at the end of a test. If set, remaining open files are logged at ERROR level. Alternative modes are: "assert" (raise AssertionError if any open file is found), "pdb"/"epdb" (drop into debugger when open files are found, info on files is provided in a "files" dictionary, mapping filenames to psutil process objects).
-- *DATALAD_ALLOW_FAIL*:
-  Instructs `@never_fail` decorator to allow to fail, e.g. to ease debugging.
+For the full list of configuration variables, see `datalad/config.py` or run
+`datalad configuration`.
 
 # Release(s) workflow
 
@@ -651,7 +558,6 @@ The section that workflow adds to the changelog depends on the `semver-` label a
 - `semver-performance` — for performance improvements
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
-[contrib_emoji]: https://allcontributors.org/docs/en/emoji-key
 
 
 ## git-annex

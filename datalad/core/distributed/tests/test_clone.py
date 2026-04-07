@@ -12,6 +12,7 @@
 import logging
 import os.path as op
 import stat
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -67,11 +68,9 @@ from datalad.tests.utils_pytest import (
     ok_startswith,
     on_github,
     on_osx,
-    on_travis,
     patch_config,
     serve_path_via_http,
     set_date,
-    skip_if,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
@@ -81,7 +80,7 @@ from datalad.tests.utils_pytest import (
     with_sameas_remote,
     with_tempfile,
     with_tree,
-    xfail_buggy_annex_info,
+    xfail_annex_ignore_not_respected_for_local,
 )
 from datalad.utils import (
     Path,
@@ -310,7 +309,6 @@ def test_clone_isnot_recursive(path_src=None, path_nr=None, path_r=None):
         {'subm 1', '2'})
 
 
-@skip_if(on_travis)  # xfails -- stalls, https://github.com/datalad/datalad/issues/6845
 @with_tempfile
 @with_tempfile
 def test_clone_into_dataset(source_path=None, top_path=None):
@@ -320,7 +318,7 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     # Note, we test against the produced history in DEFAULT_BRANCH, not what it
     # turns into in an adjusted branch!
     hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
-    subds = ds.clone(source, "sub",
+    subds = ds.clone(source, "sub", message="custom clone message",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
@@ -340,6 +338,9 @@ def test_clone_into_dataset(source_path=None, top_path=None):
     ))
     assert_not_in(hexsha_before, commits)
     eq_(len(commits), 1)
+    eq_(ds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom clone message")
+    # child is unaffected
+    neq_(subds.repo.format_commit("%B", DEFAULT_BRANCH).strip(), "custom clone message")
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -484,22 +485,15 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
     if annex:
-        if ds.repo.git_annex_version < "8.20200908":
-            # TODO: Drop when GIT_ANNEX_MIN_VERSION is at least 8.20200908.
-
-            # the standard setup keeps the annex locks accessible to the user only
-            nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-                 & stat.S_IWGRP)
-        else:
-            # umask might be such (e.g. 002) that group write permissions are inherited, so
-            # for the next test we should check if that is the case on some sample file
-            dltmp_path = ds.pathobj / '.git' / "dltmp"
-            dltmp_path.write_text('')
-            default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
-            dltmp_path.unlink()
-            # the standard setup keeps the annex locks following umask inheritance
-            eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-                 & stat.S_IWGRP, default_grp_write_perms)
+        # umask might be such (e.g. 002) that group write permissions are inherited, so
+        # for the next test we should check if that is the case on some sample file
+        dltmp_path = ds.pathobj / '.git' / "dltmp"
+        dltmp_path.write_text('')
+        default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
+        dltmp_path.unlink()
+        # the standard setup keeps the annex locks following umask inheritance
+        eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+             & stat.S_IWGRP, default_grp_write_perms)
 
         # but we can set it up for group-shared access too
         sharedds = clone(
@@ -1258,6 +1252,7 @@ def test_no_ria_postclonecfg(dspath=None, storepath=None, clonepath=None):
 
 # fatal: Could not read from remote repository.
 @known_failure_githubci_win  # in datalad/git-annex as e.g. of 20201218
+@xfail_annex_ignore_not_respected_for_local
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
@@ -1412,7 +1407,8 @@ def test_ephemeral(origin_path=None, bare_path=None,
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
     clone1.push(to=DEFAULT_REMOTE, data='nothing' if can_symlink else 'auto')
-    # ephemeral clones are private (if supported by annex version). Despite
+
+    # ephemeral clones are private. Despite
     # the push, clone1's UUID doesn't show up in origin
     recorded_locations = origin.repo.call_git(['cat-file', 'blob',
                                                'git-annex:uuid.log'],
@@ -1579,7 +1575,6 @@ def test_clone_unborn_head_sub(path=None):
     eq_(managed, ds_cloned_sub.repo.is_managed_branch())
 
 
-@xfail_buggy_annex_info
 @skip_if_no_network
 @with_tempfile
 def test_gin_cloning(path=None):
@@ -1631,7 +1626,6 @@ def test_fetch_git_special_remote(url_path=None, url=None, path=None):
     ok_(ds_b.repo.file_has_content("f1"))
 
 
-@skip_if_adjusted_branch
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 def test_nonuniform_adjusted_subdataset(path=None):
@@ -1660,9 +1654,15 @@ def test_clone_recorded_subds_reset(path=None):
     assert_repo_status(ds_b.path)
     sub_repo = Dataset(path / "ds_b" / "sub").repo
     branch = sub_repo.get_active_branch()
-    eq_(ds_b.subdatasets()[0]["gitshasum"],
-        sub_repo.get_hexsha(
-            sub_repo.get_corresponding_branch(branch) or branch))
+    # On adjusted branches, parent records the adjusted HEAD commit.
+    # On normal branches, parent records the corresponding branch commit.
+    # Accept either as correct.
+    recorded_commit = ds_b.subdatasets()[0]["gitshasum"]
+    corr_branch = sub_repo.get_corresponding_branch(branch)
+    expected_commit = sub_repo.get_hexsha(corr_branch or branch)
+    adjusted_head = sub_repo.get_hexsha()
+    assert recorded_commit in [expected_commit, adjusted_head], \
+        f"Parent records {recorded_commit}, expected either {expected_commit} (corresponding branch) or {adjusted_head} (adjusted HEAD)"
 
 
 @with_tempfile
@@ -1770,3 +1770,37 @@ def test_url_mapping_specs():
             ):
         with patch.dict(cfg._merged_store, m):
             eq_(_map_urls(cfg, [i]), [o])
+
+
+@with_tempfile(mkdir=True)
+def test_clone_self_referential_remote(path=None):
+    """Test that cloning doesn't recurse infinitely when a remote points to itself
+
+    Regression test for https://github.com/datalad/datalad/issues/7721
+    """
+    path = Path(path)
+
+    # Create datasets a and b
+    ds_a = Dataset(path / 'a').create()
+    ds_b = Dataset(path / 'b').create()
+
+    # Set b's origin remote to point to itself - use absolute path as in the issue
+    ds_b.repo.call_git(['remote', 'add', 'origin', str(ds_b.pathobj.resolve())])
+
+    # This should not cause infinite recursion
+    # Before the fix, this would raise RecursionError
+
+    # Set a lower recursion limit to catch the issue faster
+    old_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(100)
+    try:
+        # Use the same syntax as in the issue report
+        with chpwd(str(ds_a.path)):
+            ds_cloned = clone(source='../b', path='b')
+        # If we get here, the fix is working
+        ok_(ds_cloned.is_installed())
+    except RecursionError:
+        # This is the bug we're trying to fix
+        raise AssertionError("Clone encountered infinite recursion with self-referential remote")
+    finally:
+        sys.setrecursionlimit(old_limit)

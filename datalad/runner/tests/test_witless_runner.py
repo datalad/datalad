@@ -29,6 +29,7 @@ from typing import Any
 import pytest
 
 from datalad.tests.utils_pytest import (
+    FILESYSTEM_SUPPORTS_UTF8,
     OBSCURE_FILENAME,
     SkipTest,
     assert_cwd_unchanged,
@@ -65,7 +66,7 @@ result_counter = 0
 @with_tempfile
 def test_runner(tempfile: str = "") -> None:
     runner = Runner()
-    content = 'Testing real run' if on_windows else 'Testing äöü東 real run'
+    content = 'Testing real run' if on_windows or not FILESYSTEM_SUPPORTS_UTF8 else 'Testing äöü東 real run'
     cmd = 'echo %s > %s' % (content, tempfile)
     res = runner.run(cmd)
     assert isinstance(res, dict)
@@ -225,17 +226,19 @@ def test_runner_parametrized_protocol() -> None:
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_asyncio_loop_noninterference1(path1: str = "", path2: str = "") -> None:
-    if on_windows and sys.version_info < (3, 8):
-        raise SkipTest(
-            "get_event_loop() raises "
-            "RuntimeError: There is no current event loop in thread 'MainThread'.")
     # minimalistic use case provided by Dorota
     import datalad.api as dl
     src = dl.create(path1)  # type: ignore[attr-defined]
     reproducer = src.pathobj/ "reproducer.py"
     reproducer.write_text(f"""\
 import asyncio
-asyncio.get_event_loop()
+import sys
+# Python 3.14+ no longer implicitly creates event loops in get_event_loop()
+if sys.version_info >= (3, 14):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+else:
+    asyncio.get_event_loop()
 import datalad.api as datalad
 ds = datalad.clone(path=r'{path2}', source=r"{path1}")
 loop = asyncio.get_event_loop()
@@ -260,10 +263,6 @@ def test_asyncio_forked(temp_: str = "") -> None:
         # so we will just skip if no forking is possible
         raise SkipTest(f"Cannot fork: {exc}")
     # if does not fail (in original or in a fork) -- we are good
-    if sys.version_info < (3, 8) and pid != 0:
-        # for some reason it is crucial to sleep a little (but 0.001 is not enough)
-        # in the master process with older pythons or it takes forever to make the child run
-        sleep(0.1)
     try:
         runner.run([sys.executable, '--version'], protocol=StdOutCapture)
         if pid == 0:

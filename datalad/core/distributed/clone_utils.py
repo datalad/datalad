@@ -75,7 +75,10 @@ def postclone_preannex_cfg_ria(ds, remote="origin"):
     # store could also hold simple standard annexes w/o an intended ORA remote.
     # This needs the introduction of a new version label in RIA datasets, making
     # the following call conditional.
-    ds.config.set(f'remote.{remote}.annex-ignore', 'true', scope='local')
+
+    # Use git config directly to ensure the setting is immediately written
+    # and git-annex can see it during initialization
+    ds.repo.call_git(['config', f'remote.{remote}.annex-ignore', 'true'])
 
 
 def postclonecfg_ria(ds, props, remote="origin"):

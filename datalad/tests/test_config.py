@@ -34,6 +34,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     DEFAULT_REMOTE,
+    FILESYSTEM_SUPPORTS_UTF8,
     assert_equal,
     assert_false,
     assert_in,
@@ -186,8 +187,9 @@ def test_something(path=None, new_home=None):
     assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
 
     # modification follows
-    cfg.add('something.new', 'の')
-    assert_equal(cfg.get('something.new'), u'の')
+    if FILESYSTEM_SUPPORTS_UTF8:
+        cfg.add('something.new', 'の')
+        assert_equal(cfg.get('something.new'), u'の')
     # sections are added on demand
     cfg.add('unheard.of', 'fame')
     assert_true(cfg.has_section('unheard.of'))

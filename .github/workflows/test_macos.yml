@@ -1,8 +1,9 @@
 name: Test on macOS
 
 on:
-    - pull_request
-    - push
+  pull_request:
+  push:
+    branches: ['master', 'maint']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
@@ -25,12 +26,12 @@ jobs:
         git config --global user.name "GitHub Almighty"
 
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
     - name: Set up Python 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: 3.11
 
@@ -58,7 +59,7 @@ jobs:
         python -m pytest -c ../tox.ini -s -v --cov=datalad --cov-report=xml --pyargs datalad.core datalad.support
 
     - name: Upload coverage report to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       with:
         file: __testhome__/coverage.xml
         token: ${{ secrets.CODECOV_TOKEN }}

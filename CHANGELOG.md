@@ -1,4 +1,191 @@
 
+<a id='changelog-1.4.0'></a>
+# 1.4.0 (2026-04-01)
+
+## 🚀 Enhancements and New Features
+
+- DataLad now provides a pytest plugin that automatically registers custom markers and pytest configuration for DataLad extensions. Extensions no longer need to duplicate 31 marker definitions and pytest configuration in their tox.ini files. The plugin is automatically discovered when datalad is installed, making it easier for extensions to inherit consistent test configuration. [PR #7793](https://github.com/datalad/datalad/pull/7793) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- [ENH ] allow using submodule {path_basename} as props for url rewrite.  [PR #7726](https://github.com/datalad/datalad/pull/7726) (by [@bpinsard](https://github.com/bpinsard))
+
+- Add `--message` option to `clone`, `create`, and `update` for custom commit messages when registering subdatasets. Related to [#3316](https://github.com/datalad/datalad/issues/3316) via [PR #7785](https://github.com/datalad/datalad/pull/7785) (by [@asmacdo](https://github.com/asmacdo))
+
+## 📝 Documentation
+
+- Overhaul `CONTRIBUTING.md`: add testing guidance (red/green TDD workflow,
+  `@with_tree`/`@with_tempfile` examples, result assertion helpers, marks
+  table), extend Code Style rules, and tighten the file by removing command
+  duplication, condensing Benchmarking and Environment Variables sections,
+  and consolidating branch/commit prefix lists into a single table.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🎉 Enhancements
+
+- ENH: config option `datalad.save.skip-openfiles` to handle situation with files open for writing during `datalad save`.  [PR #7811](https://github.com/datalad/datalad/pull/7811) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.3.4'></a>
+# 1.3.4 (2026-03-17)
+
+## 🐛 Bug Fixes
+
+- Fix `run --explicit --output` failing to commit file deletions.
+  When a command deleted files specified in `--output`, the deletions
+  were left unstaged because post-command globbing only matched
+  files still present on disk.
+  Fixes [#7822](https://github.com/datalad/datalad/issues/7822) via
+  [PR #7823](https://github.com/datalad/datalad/pull/7823)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Suppress `RequestsDependencyWarning` emitted by `requests` 2.32.x
+  when `chardet>=6` is installed.  The warning was purely cosmetic
+  (HTTP functionality is unaffected) but appeared on stderr for every
+  datalad command.
+  Fixes [#7825](https://github.com/datalad/datalad/issues/7825)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Reload config after enableremote in create-sibling-ria.  Fixes [#7827](https://github.com/datalad/datalad/issues/7827) via [PR #7828](https://github.com/datalad/datalad/pull/7828) (by [@just-meng](https://github.com/just-meng))
+
+<a id='changelog-1.3.3'></a>
+# 1.3.3 (2026-03-12)
+
+## 🐛 Bug Fixes
+
+- Avoid use of `return` in a `finally` block, which raises a `SyntaxWarning` as of Python 3.14.
+  Fixes [#7817](https://github.com/datalad/datalad/issues/7817) via
+  [PR #7818](https://github.com/datalad/datalad/pull/7818)
+  (by [@effigies](https://github.com/effigies))
+
+- BF: Improve datalad operations on adjusted branches (crippled filesystems) through annex merge/adjust/etc.  Fixes [#7768](https://github.com/datalad/datalad/issues/7768), [#7769](https://github.com/datalad/datalad/issues/7769) via [PR #7770](https://github.com/datalad/datalad/pull/7770) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.3.2'></a>
+# 1.3.2 (2026-03-05)
+
+## 🐛 Bug Fixes
+
+- ENH: push --since=^ should not push when there are no changes.  [PR #7766](https://github.com/datalad/datalad/pull/7766) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Adjust tests for chardet 6 which rewrote single-byte charset detection and misidentifies very short KOI8-R byte sequences as Thai.  [PR #7807](https://github.com/datalad/datalad/pull/7807) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- DOC: modernize CONTRIBUTING.md and add CLAUDE.md.  [PR #7813](https://github.com/datalad/datalad/pull/7813) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- BF: Harden test_gitea against transient demo.gitea.com failures.  [PR #7812](https://github.com/datalad/datalad/pull/7812) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: Fix tox test failures from PWD mismatch and non-UTF-8 encoding.  [PR #7814](https://github.com/datalad/datalad/pull/7814) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.3.1'></a>
+# 1.3.1 (2026-02-01)
+
+## 🐛 Bug Fixes
+
+- Add typing_extensions to build system requirements (Python < 3.11).  [PR #7798](https://github.com/datalad/datalad/pull/7798) (by [@lschr](https://github.com/lschr))
+
+- BF: Ensure annex-ignore config is immediately written for RIA stores.  Fixes [#5186](https://github.com/datalad/datalad/issues/5186) via [PR #7799](https://github.com/datalad/datalad/pull/7799) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.3.0'></a>
+# 1.3.0 (2026-01-17)
+
+## 🚀 Enhancements and New Features
+
+- maint: drop Python 3.9 - update CI and codebase.  [PR #7777](https://github.com/datalad/datalad/pull/7777) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- fix: clone - do not run  'git annex init'   if there is .noannex file.  Fixes [#7774](https://github.com/datalad/datalad/issues/7774) via [PR #7775](https://github.com/datalad/datalad/pull/7775) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 📝 Documentation
+
+- doc: Use importlib.metadata for author info in manpage generation to avoid None's and double nested <>.  [PR #7788](https://github.com/datalad/datalad/pull/7788) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Add testing and compatibility fixes for Python 3.14 support.  [PR #7784](https://github.com/datalad/datalad/pull/7784) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF(TST): Clean up provider config file in test_access_denied.  [PR #7786](https://github.com/datalad/datalad/pull/7786) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- ci: avoid running various test workflows on BOTH PR and branch (unless master and maint).  [PR #7787](https://github.com/datalad/datalad/pull/7787) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.2.3'></a>
+# 1.2.3 (2025-10-30)
+
+## 🔩 Dependencies
+
+- Boost minimal git-annex version to 10.20230126.  [PR #7693](https://github.com/datalad/datalad/pull/7693) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- BF: altogether xfail the test_download_ftp -- too flaky/unknown reason ATM.  [PR #7758](https://github.com/datalad/datalad/pull/7758) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.2.2'></a>
+# 1.2.2 (2025-10-15)
+
+## 🐛 Bug Fixes
+
+- Remove absolute path specification from `/bin/ls` invocation while interrogating remote path.  [PR #7730](https://github.com/datalad/datalad/pull/7730) (by [@malikwirin](https://github.com/malikwirin))
+
+## 📝 Documentation
+
+- DOC: clarify in config documentation that we log to stderr not stdout.  [PR #7734](https://github.com/datalad/datalad/pull/7734) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Move project metadata from setup.py to pyproject.toml.  [PR #7740](https://github.com/datalad/datalad/pull/7740) (by [@lschr](https://github.com/lschr))
+
+## 🧪 Tests
+
+- TST: Allow for tests under NFS (cron run only) for x20 more time.  [PR #7749](https://github.com/datalad/datalad/pull/7749) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- chore: Upgrade/switch back to ubuntu-latest for github CI and use generalized neurodebian-ci-setup script (over https now).  [PR #7751](https://github.com/datalad/datalad/pull/7751) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Add use of pytest-retry and mark test_download_ftp to be retried.  [PR #7754](https://github.com/datalad/datalad/pull/7754) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Mark test_producer_future_key[10] as xfail on Windows.  [PR #7755](https://github.com/datalad/datalad/pull/7755) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.2.1'></a>
+# 1.2.1 (2025-07-02)
+
+## 🐛 Bug Fixes
+
+- Resolve datetime library warnings.  [PR #7714](https://github.com/datalad/datalad/pull/7714) (by [@emmanuel-ferdman](https://github.com/emmanuel-ferdman))
+
+- BF: Prevent infinite recursion in clone when a remote points to itself.  Fixes [#7721](https://github.com/datalad/datalad/issues/7721) via [PR #7731](https://github.com/datalad/datalad/pull/7731) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.2.0'></a>
+# 1.2.0 (2025-05-21)
+
+## 🚀 Enhancements and New Features
+
+- Remove import of GIT_SSH_COMMAND within .consts (import directly from datalad.runner.gitrunner).  [PR #7656](https://github.com/datalad/datalad/pull/7656) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Make github workflow which would ensure that a "release" PR against `master` would have everything from `maint` merged.  [PR #7590](https://github.com/datalad/datalad/pull/7590) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.1.6'></a>
+# 1.1.6 (2025-05-18)
+
+## 📝 Documentation
+
+- enh: update acknowledgments with additional grants.  [PR #7716](https://github.com/datalad/datalad/pull/7716) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- chore: for github tests CI - py 3.13 matrix should also (as for 3.12) use most recent available git-annex.  [PR #7710](https://github.com/datalad/datalad/pull/7710) (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.1.5'></a>
+# 1.1.5 (2024-12-15)
+
+## 🧪 Tests
+
+- test: xfail test_subsuperdataset_save on newer gits.  [PR #7687](https://github.com/datalad/datalad/pull/7687) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- test: refactor test_parallel.py to be abit more pytest'y.  [PR #7690](https://github.com/datalad/datalad/pull/7690) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF: use datalad/packages method of installing git-annex.  [PR #7692](https://github.com/datalad/datalad/pull/7692) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.1.4'></a>
 # 1.1.4 (2024-11-18)
 

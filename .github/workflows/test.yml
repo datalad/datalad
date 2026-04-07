@@ -3,6 +3,7 @@ name: Test
 on:
   pull_request:
   push:
+    branches: [ 'master', 'maint' ]
   schedule:
     - cron: '0 6 * * *'
 
@@ -19,11 +20,12 @@ env:
    # Note, that there's "turtle" as well, which is always excluded from running.
    PYTEST_SELECTION: "integration or usecase or slow or network"
    PYTEST_SELECTION_OP: "not "  # so it would be "not (integration or usecase)"
+   PYTEST_FAIL_SLOW: 60  # seconds allowed for tests to take (if not @slow or @turtle)
    DATALAD_TESTS_SSH: "1"
    DATALAD_LOG_ENV: GIT_SSH_COMMAND
    # How/which git-annex we install.  conda's build would be the fastest,
    # but it must not get ahead in PATH to not shadow travis' python
-   _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=8.20201007 -m conda"
+   _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batch git-annex=10.20230126 -m conda"
    BOTO_CONFIG: /tmp/nowhere
    DATALAD_DATASETS_TOPURL: https://datasets-tests.datalad.org
 
@@ -34,7 +36,7 @@ jobs:
       jobs: ${{ steps.jobs.outputs.matrix }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Possibly filter out cron-only jobs
         id: jobs
@@ -58,7 +60,7 @@ jobs:
     continue-on-error: ${{ matrix.allow-failure || false }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Do full clone (~10 extra seconds) to fetch all tags.
           # Otherwise we might be missing the tags for maint PRs
@@ -66,7 +68,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -79,17 +81,17 @@ jobs:
       - name: Install dependencies
         run: |
           # The ultimate one-liner setup for NeuroDebian repository
-          bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+          bash <(wget -q -O- https://neuro.debian.net/_files/neurodebian-ci-setup.sh)
           sudo apt-get update -qq
-          sudo apt-get install eatmydata  # to speedup some installations
+          sudo apt-get install -y eatmydata  # to speedup some installations
           tools/ci/prep-travis-forssh.sh
           tools/ci/debians_disable_outdated_ssl_cert
           # Install various basic dependencies
-          sudo eatmydata apt-get install zip pandoc p7zip-full
+          sudo eatmydata apt-get install -y zip pandoc p7zip-full
           # needed for tests of patool compression fall-back solution
-          sudo eatmydata apt-get install xz-utils
-          sudo eatmydata apt-get install shunit2
-          [ -z "$LC_ALL" ] || sudo eatmydata apt-get install locales-all
+          sudo eatmydata apt-get install -y xz-utils
+          sudo eatmydata apt-get install -y shunit2
+          [ -z "$LC_ALL" ] || sudo eatmydata apt-get install -y locales-all
 
       - name: Configure _DL_TMPDIR before installing git-annex
         run: |
@@ -186,7 +188,7 @@ jobs:
           # @turtle annotation
           if echo "$PYTEST_SELECTION_OP($PYTEST_SELECTION)" | grep -q "^not.*slow"
           then
-            PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow 60 )
+            PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --doctest-modules --durations=0 --durations-min=5 --fail-slow "$PYTEST_FAIL_SLOW" )
             export DATALAD_TESTS_SETUP_TESTREPOS=1
           fi
 
@@ -238,7 +240,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: github.event_name != 'schedule'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           directory: __testhome__
           fail_ci_if_error: false

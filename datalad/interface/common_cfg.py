@@ -433,7 +433,7 @@ _definitions = {
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
-                     'stdout while running datalad commands/debugging'}),
+                     'stderr while running datalad commands/debugging'}),
     },
     'datalad.log.result-level': {
         'ui': ('question', {
@@ -545,7 +545,7 @@ _definitions = {
                'title': 'git-annex repository version',
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
-        'default': 8,
+        'default': 10,
     },
     'datalad.runtime.max-annex-jobs': {
         'ui': ('question', {
@@ -689,6 +689,17 @@ _definitions = {
         'type': EnsureChoice('warning', 'error', 'none'),
         'default': 'warning',
 
+    },
+    'datalad.save.skip-openfiles': {
+        'ui': ('question', {
+            'title': 'Action when files open for writing are encountered '
+                     'during save',
+            'text': "If other processes have files open for writing, "
+                    "'none' disables the check, 'skip' silently excludes "
+                    "them, 'warning' logs but saves anyway, 'error' "
+                    "excludes them and yields 'impossible' results."}),
+        'type': EnsureChoice('none', 'skip', 'warning', 'error'),
+        'default': 'none',
     },
     'datalad.source.epoch': {
         'ui': ('question', {

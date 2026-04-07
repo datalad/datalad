@@ -1,6 +1,12 @@
 name: Extensions
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - maint
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
@@ -27,26 +33,26 @@ jobs:
     - name: Set up system
       shell: bash
       run: |
-        bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+        bash <(wget -q -O- https://neuro.debian.net/_files/neurodebian-ci-setup.sh)
         # enable in case -devel version is needed
         # sudo sed -i-devel.list -e 's,/debian ,/debian-devel ,g' /etc/apt/sources.list.d/neurodebian.sources.list
         sudo apt-get update -qq
-        sudo apt-get install eatmydata
-        sudo eatmydata apt-get install git-annex-standalone
+        sudo apt-get install -y eatmydata
+        sudo eatmydata apt-get install -y git-annex-standalone
 
     - name: Set up environment
       run: |
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v6
       with:
-        python-version: 3.9
+        python-version: '3.10'
 
     - name: Install DataLad and dependencies
       run: |
@@ -60,10 +66,20 @@ jobs:
         DL_REPO=datalad/${{ matrix.extension }}
         DL_TESTER=pytest
         DL_NEED_SINGULARITY=
+        DL_PYTEST_OPTS=
         # TODO: just reuse information from datalad-extensions!!
         case ${{ matrix.extension }} in
           datalad-container)
             DL_NEED_SINGULARITY=1;;
+          datalad-deprecated)
+            # python-xmp-toolkit requires libexempi
+            DL_APT_INSTALLS="$DL_APT_INSTALLS libexempi-dev";;
+          datalad-metalad)
+            # metalad's extractors/legacy/tests/test_xmp.py requires libexempi
+            DL_APT_INSTALLS="$DL_APT_INSTALLS libexempi-dev";;
+          datalad-next)
+            # Skip test_existing_switch - see https://github.com/datalad/datalad-next/issues/791
+            DL_PYTEST_OPTS='-k "not test_existing_switch"';;
         esac
         {
         echo "DL_PIP_INSTALLS=$DL_PIP_INSTALLS"
@@ -71,6 +87,7 @@ jobs:
         echo "DL_REPO=$DL_REPO"
         echo "DL_TESTER=$DL_TESTER"
         echo "DL_NEED_SINGULARITY=$DL_NEED_SINGULARITY"
+        echo "DL_PYTEST_OPTS=$DL_PYTEST_OPTS"
         echo "DL_PACKAGE=$(echo ${{ matrix.extension }} | tr '-' '_')"
         } >> "$GITHUB_ENV"
 
@@ -86,7 +103,7 @@ jobs:
     - name: Install additional dependencies and prepare for testing
       run: |
         pip install $DL_PIP_INSTALLS
-        [ -z "$DL_APT_INSTALLS" ] || sudo apt-get install $DL_APT_INSTALLS
+        [ -z "$DL_APT_INSTALLS" ] || sudo apt-get install -y $DL_APT_INSTALLS
         mkdir -p __testhome__
 
     - name: WTF!?
@@ -101,7 +118,7 @@ jobs:
         # configuration.  So far attempts to "fix" by somehow providing full path did not work.
         # That is why just symlink it here.  If no tox.ini -- create an empty one
         [ -e ../__extension__/tox.ini ] && ln -s ../__extension__/tox.ini . || touch tox.ini
-        python -m pytest -c ./tox.ini -s -v --cov=datalad --pyargs ${DL_PACKAGE}
+        eval python -m pytest -c ./tox.ini -s -v --cov=datalad $DL_PYTEST_OPTS --pyargs ${DL_PACKAGE}
       if: env.DL_TESTER == 'pytest'
 
     - name: Prepare coverage
@@ -111,7 +128,7 @@ jobs:
         python -m coverage xml
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       with:
         directory: __testhome__
         fail_ci_if_error: false

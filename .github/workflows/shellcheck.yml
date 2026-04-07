@@ -1,6 +1,9 @@
 name: Shellcheck on scripts
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches: ['master', 'maint']
 
 jobs:
   test:
@@ -12,8 +15,8 @@ jobs:
       shell: bash
       run: |
         sudo apt-get update -qq
-        sudo apt-get install shellcheck
-    - uses: actions/checkout@v4
+        sudo apt-get install -y shellcheck
+    - uses: actions/checkout@v6
     - name: Run shellcheck
       run: |
         # I: running only on a subset of scripts which are shellcheck clean ATM

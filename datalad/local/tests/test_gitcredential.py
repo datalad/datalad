@@ -7,6 +7,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test git-credential wrapper and helper"""
 
+import pytest
+
 from datalad.api import Dataset
 from datalad.downloaders.credentials import UserPassword
 from datalad.local.gitcredential import GitCredentialInterface
@@ -86,6 +88,16 @@ def test_datalad_credential_helper(path=None):
     url2 = "https://datalad-test.org/other"
     provider_name = "datalad-test.org"
 
+    # Skip if a user-level provider config for the test URL already exists,
+    # to avoid overwriting user data and getting false results.
+    cfg_file = Path(Providers._get_providers_dirs()['user']) \
+               / f"{provider_name}.cfg"
+    if cfg_file.exists():
+        pytest.skip(
+            f"Pre-existing provider config {cfg_file} would interfere and might "
+            f"get overwritten by the test; skipping to avoid data loss"
+        )
+
     # `Providers` code is old and only considers a dataset root based on PWD
     # for config lookup. contextmanager below can be removed once the
     # provider/credential system is redesigned.
@@ -101,11 +113,8 @@ def test_datalad_credential_helper(path=None):
         # store new credentials
         # Note, that `Providers.enter_new()` currently uses user-level config
         # files for storage only. TODO: make that an option!
-        # To not mess with existing ones, fail if it already exists:
-
-        cfg_file = Path(Providers._get_providers_dirs()['user']) \
-                   / f"{provider_name}.cfg"
-        assert_false(cfg_file.exists())
+        # To not mess with existing ones, the test skips if it already exists
+        # (see check above).
 
         # Make sure we clean up
         from datalad.tests import _TEMP_PATHS_GENERATED

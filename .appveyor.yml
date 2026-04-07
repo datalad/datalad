@@ -40,8 +40,8 @@
 #     Desktop (a required .txt extension will be added automatically). The session
 #     will run until the file is removed (or 60 min have passed)
 #
-#   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
-#     environment to debug in a Python 3.9 session (should generally match the
+#   - in a terminal execute, for example, `C:\datalad_debug.bat 310` to set up the
+#     environment to debug in a Python 3.10 session (should generally match the
 #     respective CI run configuration).
 #
 #   - Workers have vim installed for convenient text editing in the command shell
@@ -76,32 +76,33 @@ environment:
           datalad.distributed
           datalad.distribution
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
-      PY: 3.9
+      PY: 3.10
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     # Windows core tests
-    - ID: WinP39core
+    - ID: WinP310core
       # ~35 min
       DTS: datalad.core datalad.dataset datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       # Python version specification is non-standard on windows
-      PY: 39-x64
+      PY: 310-x64
       # TODO: use datalad/git-annex (github release packages) but
       # it would need setup of a GITHUB_TOKEN to access.
       # This one is set in master but kept without change in maint for now
       # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
-    - ID: MacP39core
+    - ID: MacP310core
       # ~40min
       DTS: datalad.core datalad.dataset datalad.runner datalad.support
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.9
-      # does not give a functional installation
+      PY: 3.10
+      # does not give a functional installation - needs env/PATH adjustment
       # INSTALL_GITANNEX: git-annex -m snapshot
       #INSTALL_GITANNEX: git-annex=8.20201129
-      INSTALL_GITANNEX: git-annex -m datalad/packages
+      # Pin to 10.20251114: newer versions (10.20251215+) cause dyld symbol errors on Monterey
+      INSTALL_GITANNEX: git-annex=10.20251114 -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
 
@@ -117,12 +118,12 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2204
-      PY: 3.9
+      PY: 3.10
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
-    - ID: WinP39a1
+      INSTALL_GITANNEX: git-annex -m datalad/packages
+    - ID: WinP310a1
       # ~40min
       DTS: >
           datalad.cli
@@ -133,17 +134,17 @@ environment:
           datalad.interface
           datalad.tests
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
-    - ID: WinP39a2
+      PY: 310-x64
+    - ID: WinP310a2
       # ~45min
       DTS: >
           datalad.local
           datalad.support
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
-      PY: 39-x64
+      PY: 310-x64
 
-    - ID: MacP39a1
+    - ID: MacP310a1
       # ~40min
       DTS: >
           datalad.cli
@@ -154,17 +155,17 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.9
+      PY: 3.10
       INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
-    - ID: MacP39a2
+    - ID: MacP310a2
       # ~40min
       DTS: >
           datalad.local
           datalad.distributed
       APPVEYOR_BUILD_WORKER_IMAGE: macos-monterey
-      PY: 3.9
+      PY: 3.10
       INSTALL_GITANNEX: git-annex -m datalad/packages
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
       CODECOV_BINARY: https://cli.codecov.io/v0.7.4/macos/codecov
@@ -184,7 +185,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
     - ID: Ubu22P311b
       # ~25min
       PY: 3.11
@@ -200,7 +201,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       CODECOV_BINARY: https://uploader.codecov.io/latest/linux/codecov
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m snapshot
+      INSTALL_GITANNEX: git-annex -m datalad/packages
 
 matrix:
   allow_failures:
@@ -308,13 +309,16 @@ install:
       )
   - sh: python -m pip install datalad-installer${DATALAD_INSTALLER_VERSION:-}
   # Missing system software
-  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
+  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacos-monterey\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
   - cmd: IF DEFINED INSTALL_GITANNEX datalad-installer --sudo ok %INSTALL_GITANNEX%
   - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && datalad-installer --sudo ok ${INSTALL_GITANNEX}"
   # TODO remove when datalad-installer can handle this
   - cmd: tools\ci\appveyor_install_git-annex.bat
+  # "package" installation does not place git-annex into the PATH, and for
+  # compatibility etc, we just symlink also git itself
+  - sh: "[ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacos-monterey\" ] && ln -sf /Applications/git-annex.app/Contents/MacOS/git* /usr/local/bin/ || true"
 
 
 #before_build:

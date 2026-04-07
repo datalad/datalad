@@ -138,7 +138,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     from the parent dataset's knowledge about the target subdataset. Properties
     include any submodule property specified in the respective `.gitmodules`
     record. For convenience, an existing `datalad-id` record is made available
-    under the shortened name `id`.
+    under the shortened name `id`, and the basename of the path of the submodule
+    in the parent repository is available as `path_basename`.
 
     Additionally, the URL of any configured remote that contains the respective
     submodule commit is available as `remoteurl-<name>` property, where `name`
@@ -195,6 +196,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
         for k, v in sm.items()
         if k.startswith('gitmodule_')
     }
+    if 'path' in sm_candidate_props:
+        sm_candidate_props['path_basename'] = op.basename(sm_candidate_props['path'])
 
     for remote in unique(candidate_remotes):
         remote_url = ds_repo.get_remote_url(remote, push=False)
@@ -230,7 +233,6 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         alternate_suffix=False)
                 )
 
-    cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
     for name, tmpl in [(c[len(candcfg_prefix):],
                         ds_repo.config[c])
@@ -254,13 +256,12 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
-        # outside. Additional guesswork can only make it slower
-        has_cost = cost_candidate_expr.match(name) is not None
+        # outside. Additional guesswork can only make it slower.
+        cost, cand_name = _parse_source_candidate_name(name)
         clone_urls.append(
-            # assign a default cost, if a config doesn't have one
             dict(
-                cost=int(name[:3]) if has_cost else 700,
-                name=name[3:] if has_cost else name,
+                cost=cost,
+                name=cand_name,
                 url=url,
                 from_config=True,
             ))
@@ -358,12 +359,20 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 res['source']['giturl'],
                 reload=True, force=True, scope='local',
             )
+            # On crippled filesystems, both parent and subdataset may be on
+            # adjusted branches. After installation, the subdataset's HEAD is an
+            # adjusted commit which differs from the corresponding branch commit
+            # recorded in the parent's gitlink. The diffstatus fix in commit
+            # df3f1c065 makes status checks accept either commit as clean.
+            # We don't modify the gitlink here to avoid interfering with later
+            # merge operations during update.
         yield res
 
     subds = Dataset(dest_path)
     if not subds.is_installed():
         lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
         return
+
 
     # check whether clone URL generators were involved
     cand_cfg = [rec for rec in clone_urls if rec.get('from_config', False)]
@@ -892,6 +901,9 @@ class Get(Interface):
         # keep track of error results for paths that do not exist
         error_reported = {}
         content_by_ds = {}
+        # Track parent datasets that need syncing on adjusted branches.
+        # These will be synced bottom-up after all installations complete.
+        adjusted_branch_parents = set()
         # use subdatasets() to discover any relevant content that is not
         # already present in the root dataset (refds)
         for sdsres in Subdatasets.__call__(
@@ -946,6 +958,9 @@ class Get(Interface):
                             dsrec = content_by_ds.get(res['path'], set())
                             dsrec.update(res['contains'])
                             content_by_ds[res['path']] = dsrec
+                        # Collect parent datasets needing sync on adjusted branches
+                        if '_adjusted_branch_parent' in res:
+                            adjusted_branch_parents.add(res['_adjusted_branch_parent'])
                         if res.get('status', None) != 'notneeded':
                             # all those messages on not having installed anything
                             # are a bit pointless
@@ -986,6 +1001,9 @@ class Get(Interface):
                         dsrec = content_by_ds.get(res['path'], set())
                         dsrec.update(res['contains'])
                         content_by_ds[res['path']] = dsrec
+                    # Collect parent datasets needing sync on adjusted branches
+                    if '_adjusted_branch_parent' in res:
+                        adjusted_branch_parents.add(res['_adjusted_branch_parent'])
                     # prevent double-reporting of datasets that have been
                     # installed by explorative installation to get to target
                     # paths, prior in this loop
@@ -994,6 +1012,18 @@ class Get(Interface):
                         if _check_error_reported_before(res, error_reported):
                             continue
                         yield res
+
+        # On adjusted branches, parent datasets need their index synced after
+        # subdataset installations. Sync bottom-up so nested hierarchies are
+        # consistent.
+        if adjusted_branch_parents:
+            lgr.debug(
+                "Syncing %d parent datasets on adjusted branches",
+                len(adjusted_branch_parents))
+            for parent_path in sorted(adjusted_branch_parents,
+                                      key=len, reverse=True):
+                lgr.debug("Syncing %s", parent_path)
+                Dataset(parent_path).repo.call_annex(['sync', '--no-pull', '--no-push'])
 
         if not get_data:
             # done already
@@ -1011,3 +1041,46 @@ class Get(Interface):
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res
+
+
+def _parse_source_candidate_name(name):
+    """Parse subdataset-source-candidate name to extract cost and candidate name.
+
+    If name starts with exactly 3 digits, those are used as the cost and the
+    remainder is the candidate name. Otherwise, default cost 700 is used and
+    the full name is kept. A warning is issued if name starts with digits but
+    not exactly 3.
+
+    Parameters
+    ----------
+    name : str
+        The candidate name (after 'datalad.get.subdataset-source-candidate-' prefix)
+
+    Returns
+    -------
+    tuple : (cost: int, cand_name: str)
+    """
+    cost = 700
+    cand_name = name
+    cost_candidate_expr = re.compile('([0-9]+)(.*)')
+    if (cost_match := cost_candidate_expr.match(name)):
+        cost_str, remainder = cost_match.groups()
+        n_digits = len(cost_str)
+        if n_digits == 3:
+            cost = int(cost_str)
+            cand_name = remainder
+        else:
+            # warn about non-3-digit cost prefix
+            # suggest padding for <3 digits, truncating for >3 digits
+            if n_digits < 3:
+                suggested = cost_str.zfill(3)
+            else:
+                suggested = cost_str[:3].lstrip('0').zfill(3)
+            suggested += remainder
+            lgr.warning(
+                "subdataset-source-candidate '%s' starts with %d digit(s) "
+                "which is not recognized as a cost (must be exactly 3). "
+                "Use e.g. '%s' to specify cost, or start with a non-digit.",
+                name, n_digits, suggested
+            )
+    return cost, cand_name

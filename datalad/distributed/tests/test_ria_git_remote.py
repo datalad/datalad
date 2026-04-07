@@ -36,6 +36,7 @@ from datalad.tests.utils_pytest import (
     skip_ssh,
     slow,
     with_tempfile,
+    xfail_annex_enableremote_bare_git,
 )
 from datalad.utils import (
     Path,
@@ -141,6 +142,7 @@ def _test_bare_git_version_1(host, dspath, store):
     eq_(len(ds.repo.whereis('one.txt')), 3)
 
 
+@xfail_annex_enableremote_bare_git
 @slow  # 12sec + ? on travis
 def test_bare_git_version_1():
     # TODO: Skipped due to gh-4436
@@ -227,6 +229,7 @@ def _test_bare_git_version_2(host, dspath, store):
     eq_(len(ds.repo.whereis('one.txt')), 1)
 
 
+@xfail_annex_enableremote_bare_git
 @slow  # 13sec + ? on travis
 def test_bare_git_version_2():
     # TODO: Skipped due to gh-4436

@@ -41,13 +41,13 @@ jobs:
     if: github.repository == 'datalad/datalad'
     steps:
       - name: 'Checkout Code'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch all history for all branches to perform the comparison
 
       - name: 'Check for "release" Label'
         id: check_label
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           script: |
             const prLabels = context.payload.pull_request.labels.map(label => label.name);

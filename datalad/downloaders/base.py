@@ -34,6 +34,7 @@ from datalad.downloaders import CREDENTIAL_TYPES
 from .. import cfg
 from ..support.exceptions import (
     AccessDeniedError,
+    AccessFailedError,
     AccessPermissionExpiredError,
     AnonymousAccessDeniedError,
     CapturedException,
@@ -148,7 +149,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             lgr.debug("set credential context as %s", url)
             self.credential.set_context(auth_url=url)
 
-        attempt, incomplete_attempt = 0, 0
+        attempt, incomplete_attempt, server_error_attempt = 0, 0, 0
         result = None
         credential_was_refreshed = False
         while True:
@@ -243,8 +244,24 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     raise
                 lgr.debug("Failed to download fully, will try again: %s", ce)
                 # TODO: may be fail earlier than after 20 attempts in such a case?
+            except AccessFailedError as e:
+                # Handle retryable server errors (5xx)
+                if hasattr(e, 'status') and e.status is not None and 500 <= e.status < 600:
+                    ce = CapturedException(e)
+                    server_error_attempt += 1
+                    if server_error_attempt > 5:
+                        # give up after 5 retries
+                        raise
+                    lgr.debug(
+                        "Server error (status %d), will retry (attempt %d): %s",
+                        e.status, server_error_attempt, ce
+                    )
+                    # Exponential backoff similar to 429 handling
+                    time.sleep(0.5 * (server_error_attempt ** 1.2))
+                    continue
+                # Non-retryable AccessFailedError
+                raise
             except DownloadError:
-                # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
 
         return result

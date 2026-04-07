@@ -7,7 +7,7 @@
 
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
 [![Test Status](https://github.com/datalad/datalad/actions/workflows/test.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test.yml)
-[![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/pb6v1ka50o0xhl9j/branch/master?svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
 [![Extensions](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml)
 [![Linters](https://github.com/datalad/datalad/actions/workflows/lint.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/lint.yml)
 [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
@@ -16,12 +16,11 @@
 [![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
-[![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/datalad/datalad/blob/master/CODE_OF_CONDUCT.md)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.808846.svg)](https://doi.org/10.5281/zenodo.808846)
 [![RRID](https://img.shields.io/badge/RRID-SCR__003931-blue)](https://identifiers.org/RRID:SCR_003931)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-52-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-57-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ## Distribution
@@ -250,6 +249,13 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Aksoo"><img src="https://avatars.githubusercontent.com/u/141905668?v=4?s=100" width="100px;" alt="Aksoo"/><br /><sub><b>Aksoo</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=Aksoo" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/dguibert"><img src="https://avatars.githubusercontent.com/u/1178864?v=4?s=100" width="100px;" alt="David Guibert"/><br /><sub><b>David Guibert</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=dguibert" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/alliesw"><img src="https://avatars.githubusercontent.com/u/72238329?v=4?s=100" width="100px;" alt="Alex Shields-Weber"/><br /><sub><b>Alex Shields-Weber</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=alliesw" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/emmanuel-ferdman"><img src="https://avatars.githubusercontent.com/u/35470921?v=4?s=100" width="100px;" alt="Emmanuel Ferdman"/><br /><sub><b>Emmanuel Ferdman</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=emmanuel-ferdman" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/lschr"><img src="https://avatars.githubusercontent.com/u/13418822?v=4?s=100" width="100px;" alt="Lukas Schrangl"/><br /><sub><b>Lukas Schrangl</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=lschr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mlell"><img src="https://avatars.githubusercontent.com/u/16210594?v=4?s=100" width="100px;" alt="mlell"/><br /><sub><b>mlell</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mlell" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/malikwirin"><img src="https://avatars.githubusercontent.com/u/117918464?v=4?s=100" width="100px;" alt="Malik"/><br /><sub><b>Malik</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=malikwirin" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/just-meng"><img src="https://avatars.githubusercontent.com/u/108482432?v=4?s=100" width="100px;" alt="Jiameng Wu"/><br /><sub><b>Jiameng Wu</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=just-meng" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

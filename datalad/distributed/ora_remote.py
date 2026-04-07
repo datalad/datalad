@@ -13,8 +13,6 @@ from pathlib import (
 )
 from shlex import quote as sh_quote
 
-import requests
-
 from datalad import ssh_manager
 from datalad.config import anything2bool
 from datalad.customremotes import (
@@ -763,6 +761,8 @@ class HTTPRemoteIO(object):
     def exists(self, path):
         # use same signature as in SSH and Local IO, although validity is
         # limited in case of HTTP.
+        import requests
+
         url = self.store_url + path.as_posix()
         try:
             response = requests.head(url, allow_redirects=True)
@@ -857,8 +857,7 @@ def handle_errors(func):
             try:
                 # We're done using io, so let it perform any needed cleanup. At
                 # the moment, this is only relevant for SSHRemoteIO, in which
-                # case it cleans up the SSH socket and prevents a hang with
-                # git-annex 8.20201103 and later.
+                # case it cleans up the SSH socket and prevents git-annex hang.
                 from atexit import unregister
                 if self._io:
                     self._io.close()
