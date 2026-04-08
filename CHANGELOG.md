@@ -1,4 +1,17 @@
 
+<a id='changelog-1.4.1'></a>
+# 1.4.1 (2026-04-08)
+
+## 🐛 Bug Fixes
+
+- BF: update patoolib imports for 2.0 API change and coverage-bin/datalad to arbitrary path to execute from.  [PR #7832](https://github.com/datalad/datalad/pull/7832) (by [@jkonieczny2](https://github.com/jkonieczny2))
+
+## 🧪 Tests
+
+- Skip `openfiles` tests when `psutil` is not installed instead of
+  failing with `ImportError`.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.4.0'></a>
 # 1.4.0 (2026-04-01)
 
