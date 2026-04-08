@@ -63,6 +63,7 @@ from datalad.tests.utils_pytest import (
     neq_,
     nok_,
     ok_,
+    ok_exists,
     ok_file_has_content,
     ok_startswith,
     on_github,
@@ -1407,7 +1408,7 @@ def test_ephemeral(origin_path=None, bare_path=None,
     # if we couldn't symlink:
     clone1.push(to=DEFAULT_REMOTE, data='nothing' if can_symlink else 'auto')
 
-    # ephemeral clones are private (if supported by annex version). Despite
+    # ephemeral clones are private. Despite
     # the push, clone1's UUID doesn't show up in origin
     recorded_locations = origin.repo.call_git(['cat-file', 'blob',
                                                'git-annex:uuid.log'],
@@ -1453,6 +1454,24 @@ def test_ephemeral(origin_path=None, bare_path=None,
     with chpwd(op.dirname(origin_path)):
         clone4 = clone(op.basename(origin_path), op.basename(clone4_path), reckless='ephemeral')
     check_clone(clone4)
+
+
+@with_tempfile
+@with_tempfile
+def test_private(origin_path=None, clone_path=None):
+    ds = Dataset(origin_path).create()
+    ds_clone = clone(ds, clone_path, reckless="private")
+
+    # check that the annex.private config is set
+    ok_(ds_clone.config.getbool("annex", "private"))
+
+    # check if the clone applied the config & started its own private journal
+    ok_exists(ds_clone.repo.dot_git / "annex" / "journal-private" / "uuid.log")
+
+    # verify that the clone didn't add itself to git-annex:uuid.log
+    recorded_locations = ds_clone.repo.call_git(
+        ["cat-file", "blob", "git-annex:uuid.log"], read_only=True)
+    assert_not_in(ds_clone.config.get("annex.uuid"), recorded_locations)
 
 
 @with_tempfile(mkdir=True)
