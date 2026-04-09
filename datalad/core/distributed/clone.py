@@ -28,6 +28,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    cfg_proc_opt,
     location_description,
     reckless_opt,
     save_message_opt,
@@ -217,15 +218,7 @@ class Clone(Interface):
             because both a regular branch and the git-annex branch are
             required. Note that a version in a RIA URL takes precedence over
             '--branch'."""),
-        cfg_proc=Parameter(
-            args=("-c", "--cfg-proc"),
-            metavar="PROC",
-            action='append',
-            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
-            on the installed dataset. Use
-            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
-            to get a list of available procedures, such as cfg_text2git.
-            """),
+        cfg_proc=cfg_proc_opt,
         description=location_description,
         reckless=reckless_opt,
         message=save_message_opt,

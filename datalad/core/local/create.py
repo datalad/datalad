@@ -37,6 +37,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    cfg_proc_opt,
     location_description,
     save_message_opt,
 )
@@ -175,16 +176,7 @@ class Create(Interface):
             doc="""Configure the repository to use fake dates. The date for a
             new commit will be set to one second later than the latest commit
             in the repository. This can be used to anonymize dates."""),
-        cfg_proc=Parameter(
-            args=("-c", "--cfg-proc"),
-            metavar="PROC",
-            action='append',
-            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
-            on the created dataset. Use
-            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
-            to get a list of available procedures, such as cfg_text2git.
-            """
-        ),
+        cfg_proc=cfg_proc_opt,
         message=save_message_opt,
     )
 

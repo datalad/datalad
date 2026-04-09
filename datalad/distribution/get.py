@@ -29,6 +29,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    cfg_proc_opt,
     jobs_opt,
     location_description,
     reckless_opt,
@@ -877,15 +878,7 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
-        cfg_proc=Parameter(
-            args=("-c", "--cfg-proc"),
-            metavar="PROC",
-            action='append',
-            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
-            on the installed subdataset. Use
-            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
-            to get a list of available procedures, such as cfg_text2git.
-            """),
+        cfg_proc=cfg_proc_opt,
         description=location_description,
         reckless=reckless_opt,
         jobs=jobs_opt)
