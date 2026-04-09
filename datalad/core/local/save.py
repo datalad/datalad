@@ -72,21 +72,10 @@ def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
     change when the sub gets new commits).  This function uses pre-command
     sub HEADs captured by run_command to:
 
-    - Override fr_map entries with the true pre-command SHAs
+    - Override fr_map with the true pre-command SHAs
     - Add changed subs to paths_by_ds so save_ds processes them
-    - Ensure all ancestor datasets up to ds_path have fr_map/paths_by_ds
-      entries for child_merged propagation through multi-level hierarchies
-
-    Parameters
-    ----------
-    paths_by_ds : dict
-        {dataset_path: {item_path: status_props}} — mutated in place.
-    fr_map : dict
-        {dataset_path: pre_hexsha} — mutated in place.
-    _fr_sub_info : dict
-        {sub_path: pre_hexsha} from run_command's pre-command snapshot.
-    ds_path : str
-        Root dataset path (the hierarchy walk stops here).
+    - Walk up from each changed sub to ds_path, ensuring every ancestor
+      has fr_map and paths_by_ds entries for merge propagation
     """
     for sub_path, sub_pre_sha in _fr_sub_info.items():
         sub_repo = Dataset(sub_path).repo
@@ -96,36 +85,32 @@ def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
         if cur_sha == sub_pre_sha:
             continue
 
-        # Override fr_map with the true pre-command SHA (not the adjusted pointer)
         fr_map[sub_path] = sub_pre_sha
         if sub_path not in paths_by_ds:
             paths_by_ds[sub_path] = {}
 
-        # Walk up from the changed sub to ds_path, ensuring each ancestor
-        # has fr_map and paths_by_ds entries for merge propagation.
-        child_path, child_sha, child_pre = sub_path, cur_sha, sub_pre_sha
+        # Walk up to ds_path, registering each child as modified in
+        # its parent and ensuring fr_map entries exist at each level.
+        child_path = sub_path
         while True:
             parent_path = str(ut.Path(child_path).parent)
-            pds_status = paths_by_ds.get(parent_path, {})
+            child_repo = Dataset(child_path).repo
+            child_sha = child_repo.get_hexsha() if child_repo else cur_sha
+            child_pre = _fr_sub_info.get(child_path, child_sha)
+
+            pds_status = paths_by_ds.setdefault(parent_path, {})
             pds_status[ut.Path(child_path)] = dict(
                 type='dataset', state='modified',
                 prev_gitshasum=child_pre, gitshasum=child_sha)
-            paths_by_ds[parent_path] = pds_status
 
             if parent_path not in fr_map:
-                parent_pre = _fr_sub_info.get(parent_path)
-                if parent_pre is None:
-                    parent_repo = Dataset(parent_path).repo
-                    parent_pre = parent_repo.get_hexsha() if parent_repo else None
-                if parent_pre:
-                    fr_map[parent_path] = parent_pre
+                fr_map[parent_path] = _fr_sub_info.get(
+                    parent_path,
+                    Dataset(parent_path).repo.get_hexsha())
 
             if parent_path == ds_path:
                 break
             child_path = parent_path
-            child_repo = Dataset(parent_path).repo
-            child_sha = child_repo.get_hexsha() if child_repo else child_sha
-            child_pre = _fr_sub_info.get(parent_path, child_sha)
 
 
 def _create_merge_commit(repo, pre_hexsha, msg):
@@ -495,10 +480,11 @@ class Save(Interface):
             pre_hexsha = fr_map.get(pdspath)
             had_inner = (pre_hexsha is not None
                          and pre_hexsha != start_commit)
-            child_merged = any(
-                str(p) in _merged_datasets
-                for p, props in paths.items()
-                if props.get('type') == 'dataset')
+            child_merged = (
+                pre_hexsha is not None
+                and any(str(p) in _merged_datasets
+                        for p, props in paths.items()
+                        if props.get('type') == 'dataset'))
             will_merge = had_inner or child_merged
 
             if not all(p['state'] == 'clean'
@@ -529,7 +515,7 @@ class Save(Interface):
                             )
                     yield res
 
-            if will_merge and pre_hexsha is not None:
+            if will_merge:
                 _create_merge_commit(pds_repo, pre_hexsha, message)
                 _merged_datasets.add(pdspath)
 

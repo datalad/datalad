@@ -81,6 +81,27 @@ def _format_cmd_shorty(cmd):
     return cmd_shorty
 
 
+def _parse_sub_status(sub_status_output, ds_path):
+    """Parse ``git submodule status --recursive`` output into {path: sha}.
+
+    Each line has format: ``[+ ]<sha> <path> (<branch>)``
+    Returns {absolute_path: sha_string}.
+    """
+    result = {}
+    for line in sub_status_output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Strip leading +/- prefix
+        if line[0] in '+-U':
+            line = line[1:]
+        parts = line.split(None, 2)
+        if len(parts) >= 2:
+            sha, relpath = parts[0], parts[1]
+            result[op.join(ds_path, relpath)] = sha
+    return result
+
+
 assume_ready_opt = Parameter(
     args=("--assume-ready",),
     constraints=EnsureChoice(None, "inputs", "outputs", "both"),
@@ -1017,47 +1038,34 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
-    # Record subdataset HEADs (recursive) to detect subdataset-only
-    # commits later.  A command may create commits deep in the hierarchy
-    # (e.g. in a leaf of ds/mid/leaf) without changing any parent HEAD.
-    # Store repo references to avoid re-instantiating Dataset objects
-    # in the post-command comparison.
-    pre_cmd_sub_info = {}  # {path: (repo, hexsha)}
-    if pre_cmd_hexsha is not None:
-        for sub_res in ds.subdatasets(
-                recursive=True, state='present',
-                result_renderer='disabled'):
-            sub_repo = Dataset(sub_res['path']).repo
-            if sub_repo:
-                pre_cmd_sub_info[sub_res['path']] = \
-                    (sub_repo, sub_repo.get_hexsha())
+    # Snapshot subdataset state with a single git call to detect
+    # subdataset-only commits later (command may create commits deep
+    # in the hierarchy without changing the top-level HEAD).
+    pre_cmd_sub_status = (
+        ds.repo.call_git(["submodule", "status", "--recursive"])
+        if pre_cmd_hexsha is not None else None)
 
     if not inject:
         cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
 
-    # Detect if the command created commits (HEAD changed), either in
-    # the top-level dataset or in any subdataset.  Only when commits
-    # were created do we use Save(fr=...) which routes through
-    # diff_dataset for merge creation.  Without inner commits, we use
-    # the standard Status-based save (fr=None) which handles adjusted
-    # branches correctly.
+    # Detect if the command created commits — either in the top-level
+    # dataset or in any subdataset.  Only then do we use Save(fr=...)
+    # which routes through diff_dataset for merge creation.  Without
+    # inner commits, fr=None uses the standard Status-based save.
     post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
     cmd_made_commits = (
         pre_cmd_hexsha is not None
         and post_cmd_hexsha is not None
         and pre_cmd_hexsha != post_cmd_hexsha
     )
-    # Also detect subdataset-only commits: the top-level HEAD didn't
-    # change, but a subdataset HEAD did.  Reuse the repo objects from
-    # the pre-command snapshot to avoid re-instantiating Datasets.
-    if (pre_cmd_hexsha is not None
-            and not cmd_made_commits
-            and pre_cmd_sub_info):
-        for sub_repo, pre_sha in pre_cmd_sub_info.values():
-            if sub_repo.get_hexsha() != pre_sha:
-                cmd_made_commits = True
-                break
+    # Also detect subdataset-only commits by comparing the single-string
+    # submodule status snapshot (one git call, not N Dataset objects).
+    if (pre_cmd_sub_status is not None and not cmd_made_commits):
+        post_sub_status = ds.repo.call_git(
+            ["submodule", "status", "--recursive"])
+        if pre_cmd_sub_status != post_sub_status:
+            cmd_made_commits = True
 
     # Re-glob to capture any new outputs.
     #
@@ -1210,11 +1218,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     fr=pre_cmd_hexsha if cmd_made_commits else None,
                     # Pass pre-command sub HEADs so Save can detect
                     # subdataset commits on adjusted branches where
-                    # diff_dataset can't see them (index submodule
-                    # pointer doesn't change on adjusted branches).
-                    _fr_sub_info={p: sha for p, (_, sha)
-                                  in pre_cmd_sub_info.items()}
-                    if cmd_made_commits else None,
+                    # diff_dataset can't see them.  Parse from the
+                    # lightweight submodule status snapshot.
+                    _fr_sub_info=_parse_sub_status(
+                        pre_cmd_sub_status, ds_path)
+                    if cmd_made_commits and pre_cmd_sub_status
+                    else None,
                     return_type='generator',
                     result_renderer='disabled',
                     on_failure='ignore'):
