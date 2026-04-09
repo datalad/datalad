@@ -28,6 +28,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    cfg_proc_opt,
     location_description,
     reckless_opt,
     save_message_opt,
@@ -217,6 +218,7 @@ class Clone(Interface):
             because both a regular branch and the git-annex branch are
             required. Note that a version in a RIA URL takes precedence over
             '--branch'."""),
+        cfg_proc=cfg_proc_opt,
         description=location_description,
         reckless=reckless_opt,
         message=save_message_opt,
@@ -234,6 +236,7 @@ class Clone(Interface):
             description=None,
             reckless=None,
             message=None,
+            cfg_proc=None,
         ):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -327,6 +330,7 @@ class Clone(Interface):
                 result_props,
                 cfg=None if ds is None else ds.config,
                 clone_opts=git_clone_opts,
+                cfg_proc=cfg_proc,
                 ):
             if r['status'] in ['error', 'impossible']:
                 clone_failure = True
@@ -412,7 +416,8 @@ def clone_dataset(
         result_props=None,
         cfg=None,
         checkout_gitsha=None,
-        clone_opts=None):
+        clone_opts=None,
+        cfg_proc=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -445,6 +450,8 @@ def clone_dataset(
       Options passed to git-clone. Note that for RIA URLs, the version is
       translated to a --branch argument, and that will take precedence over a
       --branch argument included in this value.
+    cfg_proc : list of str, optional
+      List of procedures to be run on the cloned datasets.
 
     Yields
     ------
@@ -542,6 +549,16 @@ def clone_dataset(
         )
         rmtree(destds.path, children_only=dest_path_existed)
         return
+
+    # import in function to circumvent circular import issue
+    from datalad.local.run_procedure import _get_proc_configs
+    cfg_proc_specs = _get_proc_configs(cfg_proc, destds) if cfg_proc else []
+    for cfg_proc_spec in cfg_proc_specs:
+        yield from destds.run_procedure(
+            cfg_proc_spec,
+            result_renderer='disabled',
+            return_type='generator',
+        )
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
