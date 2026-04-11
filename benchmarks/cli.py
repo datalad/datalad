@@ -7,25 +7,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Benchmarks for DataLad CLI"""
 
-import os
-import os.path as osp
-import sys
 from subprocess import call
 
-from .common import SuprocBenchmarks
+from .common import StartupBenchmarks
 
 
-class startup(SuprocBenchmarks):
+class startup(StartupBenchmarks):
     """
     Benchmarks for datalad command startup
     """
-
-    def setup(self):
-        # we need to prepare/adjust PATH to point to installed datalad
-        # We will base it on taking sys.executable
-        python_path = osp.dirname(sys.executable)
-        self.env = os.environ.copy()
-        self.env['PATH'] = '%s:%s' % (python_path, self.env.get('PATH', ''))
 
     def time_usage_advice(self):
         call(["datalad"], env=self.env)

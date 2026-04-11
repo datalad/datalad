@@ -195,18 +195,19 @@ def gen_bucket_test0_nonversioned():
     return _gen_bucket_test0('datalad-test0-nonversioned', versioned=False)
 
 
-def gen_bucket_test1_dirs():
-    bucket_name = 'datalad-test1-dirs-versioned'
+def _gen_versioned_bucket(bucket_name):
+    """Create a versioned S3 test bucket with web access and public policy."""
     bucket = gen_test_bucket(bucket_name)
     bucket.Versioning().enable()
-
-    # Enable web access to that bucket to everyone
     bucket.Website().put(
         WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
     )
     set_bucket_public_access_policy(bucket)
+    return bucket, VersionedFilesPool(bucket)
 
-    files = VersionedFilesPool(bucket)
+
+def gen_bucket_test1_dirs():
+    bucket, files = _gen_versioned_bucket('datalad-test1-dirs-versioned')
 
     files("d1", load="")  # creating an empty file
     # then we would like to remove that d1 as a file and make a directory out of it
@@ -218,17 +219,7 @@ def gen_bucket_test1_dirs():
 def gen_bucket_test2_obscurenames_versioned():
     # in principle bucket name could also contain ., but boto doesn't digest it
     # well
-    bucket_name = 'datalad-test2-obscurenames-versioned'
-    bucket = gen_test_bucket(bucket_name)
-    bucket.Versioning().enable()
-
-    # Enable web access to that bucket to everyone
-    bucket.Website().put(
-        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
-    )
-    set_bucket_public_access_policy(bucket)
-
-    files = VersionedFilesPool(bucket)
+    bucket, files = _gen_versioned_bucket('datalad-test2-obscurenames-versioned')
 
     # http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
     files("f 1", load="")
@@ -244,17 +235,7 @@ def gen_bucket_test2_obscurenames_versioned():
 
 def gen_bucket_test1_manydirs():
     # to test crawling with flexible subdatasets making decisions
-    bucket_name = 'datalad-test1-manydirs-versioned'
-    bucket = gen_test_bucket(bucket_name)
-    bucket.Versioning().enable()
-
-    # Enable web access to that bucket to everyone
-    bucket.Website().put(
-        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
-    )
-    set_bucket_public_access_policy(bucket)
-
-    files = VersionedFilesPool(bucket)
+    bucket, files = _gen_versioned_bucket('datalad-test1-manydirs-versioned')
 
     files("d1", load="")  # creating an empty file
     # then we would like to remove that d1 as a file and make a directory out of it
