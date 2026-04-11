@@ -1,7 +1,10 @@
 """Utilities and definitions for DataLad command interfaces"""
 
 # TODO this should be a dochelper
-from datalad.interface.base import dedent_docstring
+from datalad.interface.base import (
+    _strip_rst_roles,
+    dedent_docstring,
+)
 
 # Some known extensions and their commands to suggest whenever lookup fails
 _known_extension_commands = {
@@ -80,18 +83,7 @@ def alter_interface_docs_for_cmdline(docs):
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
-    # remove :role:`...` RST markup for cmdline docs
-    docs = re.sub(
-        r':\S+:`[^`]*`[\\]*',
-        lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
-        docs,
-        flags=re.MULTILINE | re.DOTALL)
-    # make the handbook doc references more accessible
-    # the URL is a redirect configured at readthedocs
-    docs = re.sub(
-        r'(handbook:[0-9]-[0-9]*)',
-        '\\1 (http://handbook.datalad.org/symbols)',
-        docs)
+    docs = _strip_rst_roles(docs)
     # remove None constraint. In general, `None` on the cmdline means don't
     # give option at all, but specifying `None` explicitly is practically
     # impossible
