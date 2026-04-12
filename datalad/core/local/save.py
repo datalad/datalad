@@ -394,6 +394,7 @@ class Save(Interface):
                     # diff_dataset's sorted() call
                     path=[str(p) for p in path] if path else None,
                     recursive=recursive,
+                    recursion_limit=recursion_limit,
                     reporting_order='bottom-up',
                     # Use 'normal' (not untracked_mode='all') to
                     # report untracked directories as single entries
