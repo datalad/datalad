@@ -1273,6 +1273,23 @@ def test_save_from_recursive(path=None):
     ok_((ds.pathobj / "top.txt").exists())
     ok_((sub.pathobj / "sub.txt").exists())
 
+    # -- recursion_limit=0: reuse same hierarchy, add new inner commits --
+    baseline2 = ds.repo.get_hexsha()
+    (ds.pathobj / "top2.txt").write_text("top2")
+    ds.repo.call_git(["add", "top2.txt"])
+    ds.repo.call_git(["commit", "-m", "top inner 2"])
+    (sub.pathobj / "sub2.txt").write_text("sub2")
+    sub.repo.call_git(["add", "sub2.txt"])
+    sub.repo.call_git(["commit", "-m", "sub inner 2"])
+    sub_head_before = sub.repo.get_hexsha()
+
+    # With recursion_limit=0, only top-level should be processed
+    ds.save(fr=baseline2, recursive=True, recursion_limit=0,
+            message="limited save")
+    ok_(ds.repo.commit_exists(_merge_ref(ds.repo) + "^2"))
+    # Sub should NOT have been touched
+    eq_(sub.repo.get_hexsha(), sub_head_before)
+
 
 @known_failure_windows
 @with_tree(**tree_arg)
