@@ -954,6 +954,40 @@ def test_run_explicit_dirty_committed(path=None, path2=None):
     _assert_run_merge(ds2)
 
 
+@known_failure_windows
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_branch_switch_rejected(path=None):
+    """Merge is rejected when the command switches branches."""
+    ds = Dataset(path).create(annex=False)
+    (ds.pathobj / "file.txt").write_text("initial")
+    ds.save(message="initial")
+    # Create a second branch with divergent content
+    ds.repo.call_git(["checkout", "-b", "other"])
+    (ds.pathobj / "other.txt").write_text("other branch")
+    ds.repo.call_git(["add", "other.txt"])
+    ds.repo.call_git(["commit", "-m", "on other branch"])
+    ds.repo.call_git(["checkout", DEFAULT_BRANCH])
+    assert_repo_status(ds.path)
+
+    # Command that switches to the other branch
+    res = ds.run(
+        'git checkout other',
+        on_failure='ignore',
+        result_renderer='disabled')
+    # Should get an error about the branch switch
+    assert_in_results(res, status='error', action='run')
+    error_results = [r for r in res
+                     if r.get('action') == 'run'
+                     and r.get('status') == 'error']
+    ok_(any('switched the active branch' in str(r.get('message', ''))
+            for r in error_results))
+    # The commit message should be saved for manual recovery
+    msg_path = ds.pathobj / '.git' / 'COMMIT_EDITMSG'
+    ok_(msg_path.exists())
+    ok_('[DATALAD RUNCMD]' in msg_path.read_text())
+
+
 # -- Tests for subdataset hierarchy merge commits --
 
 @known_failure_windows

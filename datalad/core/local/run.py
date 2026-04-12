@@ -1038,6 +1038,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
+    pre_cmd_branch = ds.repo.get_active_branch() if not inject else None
     # Snapshot subdataset state with a single git call to detect
     # subdataset-only commits later (command may create commits deep
     # in the hierarchy without changing the top-level HEAD).
@@ -1059,6 +1060,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         and post_cmd_hexsha is not None
         and pre_cmd_hexsha != post_cmd_hexsha
     )
+
     # Also detect subdataset-only commits by comparing the single-string
     # submodule status snapshot (one git call, not N Dataset objects).
     if (pre_cmd_sub_status is not None and not cmd_made_commits):
@@ -1102,6 +1104,25 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = msg.format(
         message if message is not None else cmd_shorty,
         '"{}"'.format(record) if record_path else record)
+
+    # Safety: if the command switched branches, creating a merge commit
+    # would be wrong — it would link two unrelated lines of history.
+    # Save the run record for manual recovery and error out.
+    if cmd_made_commits and pre_cmd_branch is not None:
+        post_cmd_branch = ds.repo.get_active_branch()
+        if post_cmd_branch != pre_cmd_branch:
+            repo = ds.repo
+            msg_path = ds.pathobj / \
+                repo.dot_git.relative_to(repo.pathobj) / "COMMIT_EDITMSG"
+            msg_path.write_text(msg)
+            yield get_status_dict(
+                'run', ds=ds, status='error',
+                message=(
+                    'command switched the active branch from %s to %s. '
+                    'Cannot create a merge commit across branches. '
+                    'The run record was saved to %s',
+                    pre_cmd_branch, post_cmd_branch, str(msg_path)))
+            return
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
 
