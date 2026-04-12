@@ -124,6 +124,12 @@ def _create_merge_commit(repo, pre_hexsha, msg):
     On adjusted branches (git-annex), the merge is created on the
     original branch and then propagated back via ``git annex merge``.
 
+    Raises
+    ------
+    CommandError
+        If pre_hexsha is not an ancestor of the current HEAD, indicating
+        the command switched branches or reset to an unrelated state.
+
     Parameters
     ----------
     repo : GitRepo or AnnexRepo
@@ -143,6 +149,17 @@ def _create_merge_commit(repo, pre_hexsha, msg):
         orig_post = repo.get_hexsha("refs/heads/" + orig_branch)
         orig_pre = repo.call_git_oneline(
             ["merge-base", orig_branch, pre_hexsha])
+        # Verify the pre-command state is an ancestor of the
+        # post-command state.  If not, the command switched branches.
+        if not repo.call_git_success(
+                ["merge-base", "--is-ancestor", orig_pre, orig_post]):
+            raise CommandError(
+                cmd="run",
+                msg="cannot create merge commit: pre-command state "
+                    f"{orig_pre[:8]} is not an ancestor of "
+                    f"post-command state {orig_post[:8]} on branch "
+                    f"{orig_branch}.  The command may have switched "
+                    "branches or reset to an unrelated state.")
         tree = repo.call_git_oneline(
             ["rev-parse", orig_post + "^{tree}"])
         merge_hexsha = repo.call_git_oneline(
@@ -153,6 +170,18 @@ def _create_merge_commit(repo, pre_hexsha, msg):
         repo.call_git(["annex", "merge"])
     else:
         current_head = repo.get_hexsha()
+        # Verify the pre-command state is an ancestor of the current
+        # HEAD.  If not, the command switched branches or reset to an
+        # unrelated state — creating a merge would be nonsensical.
+        if not repo.call_git_success(
+                ["merge-base", "--is-ancestor",
+                 pre_hexsha, current_head]):
+            raise CommandError(
+                cmd="run",
+                msg="cannot create merge commit: pre-command state "
+                    f"{pre_hexsha[:8]} is not an ancestor of current "
+                    f"HEAD {current_head[:8]}.  The command may have "
+                    "switched branches or reset to an unrelated state.")
         tree = repo.call_git_oneline(
             ["rev-parse", current_head + "^{tree}"])
         merge_hexsha = repo.call_git_oneline(
@@ -516,7 +545,16 @@ class Save(Interface):
                     yield res
 
             if will_merge:
-                _create_merge_commit(pds_repo, pre_hexsha, message)
+                try:
+                    _create_merge_commit(pds_repo, pre_hexsha, message)
+                except CommandError as exc:
+                    yield dict(
+                        action='save', type='dataset',
+                        path=pds.path, refds=ds.path,
+                        status='error',
+                        message=str(exc),
+                        logger=lgr)
+                    return
                 _merged_datasets.add(pdspath)
 
             # report on the dataset itself
