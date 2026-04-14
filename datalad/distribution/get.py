@@ -29,6 +29,7 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    cfg_proc_opt,
     jobs_opt,
     location_description,
     reckless_opt,
@@ -402,7 +403,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
 
 
 def _install_necessary_subdatasets(
-        ds, path, reckless, refds_path, description=None):
+        ds, path, reckless, refds_path, description=None, cfg_proc=None):
     """Installs subdatasets of `ds`, that are necessary to obtain in order
     to have access to `path`.
 
@@ -438,7 +439,8 @@ def _install_necessary_subdatasets(
                 Dataset(cur_subds['parentds']),
                 cur_subds,
                 reckless=reckless,
-                description=description):
+                description=description,
+                cfg_proc=cfg_proc):
             if res.get('action', None) == 'install':
                 if res['status'] == 'ok':
                     # report installation, whether it helped or not
@@ -472,7 +474,8 @@ def _install_necessary_subdatasets(
 
 
 def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
-                 refds_path=None, description=None, jobs=None, producer_only=False):
+                 refds_path=None, description=None, jobs=None, producer_only=False,
+                 cfg_proc=None):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
     # install using helper that give some flexibility regarding where to
@@ -511,7 +514,8 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         else:
             # TODO: here we need another "ds"!  is it within "sub"?
             yield from _install_subds_from_flexible_source(
-                Dataset(ds_path), sub, reckless=reckless, description=description)
+                Dataset(ds_path), sub, reckless=reckless, description=description,
+                cfg_proc=cfg_proc)
 
         if not subds.is_installed():
             # an error result was emitted, and the external consumer can decide
@@ -528,6 +532,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 reckless=reckless,
                 refds_path=refds_path,
                 jobs=jobs,
+                cfg_proc=cfg_proc,
                 producer_only=True  # we will be adding to producer queue
         ):
             producer_consumer.add_to_producer_queue(res)
@@ -557,6 +562,7 @@ def _install_targetpath(
         refds_path,
         description,
         jobs=None,
+        cfg_proc=None,
 ):
     """Helper to install as many subdatasets as needed to verify existence
     of a target path
@@ -588,7 +594,12 @@ def _install_targetpath(
     else:
         # we don't have it yet. is it in a subdataset?
         for res in _install_necessary_subdatasets(
-                ds, target_path, reckless, refds_path, description=description):
+                ds,
+                target_path,
+                reckless,
+                refds_path,
+                description=description,
+                cfg_proc=cfg_proc):
             if (target_path.is_symlink() or target_path.exists()):
                 # this dataset brought the path, mark for annex
                 # processing outside
@@ -645,6 +656,7 @@ def _install_targetpath(
             refds_path=refds_path,
             description=description,
             jobs=jobs,
+            cfg_proc=cfg_proc,
     ):
         # yield immediately so errors could be acted upon
         # outside, before we continue
@@ -866,6 +878,7 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
+        cfg_proc=cfg_proc_opt,
         description=location_description,
         reckless=reckless_opt,
         jobs=jobs_opt)
@@ -881,6 +894,7 @@ class Get(Interface):
             recursive=False,
             recursion_limit=None,
             get_data=True,
+            cfg_proc=None,
             description=None,
             reckless=None,
             jobs='auto',
@@ -950,6 +964,7 @@ class Get(Interface):
                             refds_path,
                             description,
                             jobs=jobs,
+                            cfg_proc=cfg_proc,
                     ):
                         # fish out the datasets that 'contains' a targetpath
                         # and store them for later
@@ -994,6 +1009,7 @@ class Get(Interface):
                         refds_path,
                         description,
                         jobs=jobs,
+                        cfg_proc=cfg_proc,
                 ):
                     known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \

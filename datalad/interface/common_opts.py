@@ -154,6 +154,16 @@ save_message_opt = Parameter(
     doc="""a description of the state or the changes made to a dataset.""",
     constraints=EnsureStr() | EnsureNone())
 
+cfg_proc_opt = Parameter(
+    args=("-c", "--cfg-proc"),
+    metavar="PROC",
+    action='append',
+    doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
+    on the dataset. Use
+    [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
+    to get a list of available procedures, such as cfg_text2git.
+    """)
+
 message_file_opt = Parameter(
     args=("-F", "--message-file"),
     doc="""take the commit message from this file. This flag is
