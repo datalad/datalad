@@ -56,8 +56,10 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
     assert_result_count,
     assert_status,
+    cat_command,
     create_tree,
     eq_,
+    grep_command,
     known_failure_windows,
     neq_,
     ok_,
@@ -68,6 +70,7 @@ from datalad.tests.utils_pytest import (
     slow,
     swallow_logs,
     swallow_outputs,
+    touch_command,
     with_tempfile,
     with_tree,
 )
@@ -77,9 +80,6 @@ from datalad.utils import (
     on_windows,
 )
 
-cat_command = 'cat' if not on_windows else 'type'
-touch_command = "touch " if not on_windows else "type nul > "
-grep_command = 'grep ' if not on_windows else 'findstr '
 
 @slow  # 17.1880s
 @known_failure_windows
@@ -1001,7 +1001,6 @@ def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
 # -- Tests for rerunning run-merge commits --
 
 @skip_if_adjusted_branch
-@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_rerun_merge_runs(path=None):
@@ -1014,7 +1013,7 @@ def test_rerun_merge_runs(path=None):
     merge_ref = _merge_ref(ds.repo)
 
     # 1. Create a run-merge commit and rerun it
-    ds.run('touch foo && git add foo && git commit -m "inner"')
+    ds.run(touch_command + 'foo && git add foo && git commit -m "inner"')
     assert_repo_status(ds.path)
     info = _assert_run_merge(ds, merge_ref)
 
@@ -1026,10 +1025,10 @@ def test_rerun_merge_runs(path=None):
     ok_((ds.pathobj / "foo").exists())
 
     # 2. Range rerun: normal run + merge-run, replayed via --onto
-    ds.run('touch normal_file')
+    ds.run(touch_command + 'normal_file')
     assert_repo_status(ds.path)
 
-    ds.run('touch inner2 && git add inner2 && git commit -m "inner2"')
+    ds.run(touch_command + 'inner2 && git add inner2 && git commit -m "inner2"')
     assert_repo_status(ds.path)
     _assert_run_merge(ds, merge_ref)
 

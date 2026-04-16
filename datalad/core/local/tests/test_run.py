@@ -56,6 +56,7 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
     assert_result_count,
     assert_status,
+    cat_command,
     create_tree,
     eq_,
     known_failure_windows,
@@ -66,6 +67,7 @@ from datalad.tests.utils_pytest import (
     patch_config,
     swallow_logs,
     swallow_outputs,
+    touch_command,
     with_tempfile,
     with_tree,
 )
@@ -74,8 +76,6 @@ from datalad.utils import (
     ensure_unicode,
     on_windows,
 )
-
-cat_command = 'cat' if not on_windows else 'type'
 
 
 @with_tempfile(mkdir=True)
@@ -868,14 +868,13 @@ def _assert_run_merge(ds, ref=None):
 
 # -- Tests for run producing merge commits when command creates commits --
 
-@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_commits(path=None):
     ds = Dataset(path).create()
 
     # 1. Normal run (no inner commits) -> NOT a merge commit
-    ds.run('touch bar')
+    ds.run(touch_command + 'bar')
     assert_repo_status(ds.path)
     assert_false(ds.repo.commit_exists("HEAD^2"))
     # On adjusted branches, localsync adds an adjustment commit on top,
@@ -887,7 +886,7 @@ def test_run_merge_commits(path=None):
     ok_((ds.pathobj / "bar").exists())
 
     # 2. Single inner commit -> merge commit with run info
-    ds.run('touch foo && git add foo && git commit -m "inner commit"')
+    ds.run(touch_command + 'foo' + ' && git add foo && git commit -m "inner commit"')
     assert_repo_status(ds.path)
     merge_ref = _merge_ref(ds.repo)
     info = _assert_run_merge(ds, merge_ref)
@@ -898,8 +897,8 @@ def test_run_merge_commits(path=None):
 
     # 3. Multiple inner commits -> single merge commit
     ds.run(
-        'touch f1 && git add f1 && git commit -m "first" && '
-        'touch f2 && git add f2 && git commit -m "second"'
+        touch_command + 'f1' + ' && git add f1 && git commit -m "first" && '
+        + touch_command + 'f2' + ' && git add f2 && git commit -m "second"'
     )
     assert_repo_status(ds.path)
     _assert_run_merge(ds, merge_ref)
@@ -909,8 +908,8 @@ def test_run_merge_commits(path=None):
 
     # 4. Inner commit + uncommitted file -> merge commit with both files
     ds.run(
-        'touch committed && git add committed && git commit -m "inner" && '
-        'touch uncommitted'
+        touch_command + 'committed' + ' && git add committed && git commit -m "inner"'
+        ' && ' + touch_command + 'uncommitted'
     )
     assert_repo_status(ds.path)
     _assert_run_merge(ds, merge_ref)
@@ -918,8 +917,6 @@ def test_run_merge_commits(path=None):
     ok_((ds.pathobj / "uncommitted").exists())
 
 
-@known_failure_windows
-@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
@@ -928,7 +925,7 @@ def test_run_explicit_dirty_committed(path=None, path2=None):
     ds = Dataset(path).create()
     (ds.pathobj / "dirty").write_text("dirty")
     res = ds.run(
-        'touch foo && git add foo && git commit -m "inner"',
+        touch_command + 'foo' + ' && git add foo && git commit -m "inner"',
         explicit=True,
         outputs=["declared_output"],
         on_failure="ignore",
@@ -948,7 +945,7 @@ def test_run_explicit_dirty_committed(path=None, path2=None):
     ds2 = Dataset(path2).create()
     ds2.config.set('datalad.run.dirty-committed', 'ignore', scope='local')
     ds2.run(
-        'touch foo && git add foo && git commit -m "inner"',
+        touch_command + 'foo' + ' && git add foo && git commit -m "inner"',
         explicit=True,
         outputs=["foo"],
     )
@@ -990,7 +987,6 @@ def test_run_merge_branch_switch_rejected(path=None):
 
 # -- Tests for subdataset hierarchy merge commits --
 
-@known_failure_windows  # uses Unix shell commands (cd, touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_subdataset_only(path=None):
@@ -999,7 +995,7 @@ def test_run_merge_subdataset_only(path=None):
     sub = ds.create("sub")
     assert_repo_status(ds.path)
 
-    ds.run('cd sub && touch foo && git add foo && git commit -m "inner"')
+    ds.run('cd sub && ' + touch_command + 'foo' + ' && git add foo && git commit -m "inner"')
     assert_repo_status(ds.path)
 
     # sub should have a merge commit
@@ -1011,7 +1007,6 @@ def test_run_merge_subdataset_only(path=None):
     ok_((sub.pathobj / "foo").exists())
 
 
-@known_failure_windows  # uses Unix shell commands (touch, cd, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_both_levels(path=None):
@@ -1021,8 +1016,8 @@ def test_run_merge_both_levels(path=None):
     assert_repo_status(ds.path)
 
     ds.run(
-        'touch top && git add top && git commit -m "top-inner" && '
-        'cd sub && touch foo && git add foo && git commit -m "sub-inner"'
+        touch_command + 'top' + ' && git add top && git commit -m "top-inner" && '
+        'cd sub && ' + touch_command + 'foo' + ' && git add foo && git commit -m "sub-inner"'
     )
     assert_repo_status(ds.path)
 
@@ -1036,7 +1031,6 @@ def test_run_merge_both_levels(path=None):
     ok_((sub.pathobj / "foo").exists())
 
 
-@known_failure_windows  # uses Unix shell commands (cd, touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_three_levels(path=None):
@@ -1048,7 +1042,7 @@ def test_run_merge_three_levels(path=None):
     assert_repo_status(ds.path)
 
     ds.run(
-        'cd mid/leaf && touch foo && git add foo && git commit -m "inner"'
+        'cd mid/leaf && ' + touch_command + 'foo' + ' && git add foo && git commit -m "inner"'
     )
     assert_repo_status(ds.path)
 
@@ -1064,7 +1058,6 @@ def test_run_merge_three_levels(path=None):
     ok_((leaf.pathobj / "foo").exists())
 
 
-@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_no_subdataset_change(path=None):
@@ -1074,7 +1067,7 @@ def test_run_merge_no_subdataset_change(path=None):
     assert_repo_status(ds.path)
     sub_head_before = sub.repo.get_hexsha()
 
-    ds.run('touch top && git add top && git commit -m "top-inner"')
+    ds.run(touch_command + 'top' + ' && git add top && git commit -m "top-inner"')
     assert_repo_status(ds.path)
 
     # super has merge
@@ -1088,7 +1081,6 @@ def test_run_merge_no_subdataset_change(path=None):
     assert_false(sub.repo.commit_exists("HEAD^2"))
 
 
-@known_failure_windows  # uses Unix shell commands (cd, git rm, rm, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_subdataset_deletions(path=None):
@@ -1103,9 +1095,10 @@ def test_run_merge_subdataset_deletions(path=None):
     ds.save(message="record sub state")
     assert_repo_status(ds.path)
 
+    rm_cmd = "del" if on_windows else "rm"
     ds.run(
         'cd sub && git rm rm_committed && git commit -m "remove" && '
-        'rm rm_uncommitted'
+        '{} rm_uncommitted'.format(rm_cmd)
     )
     assert_repo_status(ds.path)
 
