@@ -50,6 +50,16 @@ from datalad.utils import *
 _TEMP_PATHS_CLONES = set()
 
 
+# Cross-platform shell command fragments for use in ds.run() test commands
+if on_windows:
+    cat_command = 'type'
+    grep_command = 'findstr '
+    touch_command = 'type nul > '
+else:
+    cat_command = 'cat'
+    grep_command = 'grep '
+    touch_command = 'touch '
+
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
 on_appveyor = bool(os.environ.get('APPVEYOR', False))
