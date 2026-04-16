@@ -868,7 +868,7 @@ def _assert_run_merge(ds, ref=None):
 
 # -- Tests for run producing merge commits when command creates commits --
 
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_commits(path=None):
@@ -919,6 +919,7 @@ def test_run_merge_commits(path=None):
 
 
 @known_failure_windows
+@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
@@ -954,7 +955,6 @@ def test_run_explicit_dirty_committed(path=None, path2=None):
     _assert_run_merge(ds2)
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_branch_switch_rejected(path=None):
@@ -990,7 +990,7 @@ def test_run_merge_branch_switch_rejected(path=None):
 
 # -- Tests for subdataset hierarchy merge commits --
 
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (cd, touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_subdataset_only(path=None):
@@ -1011,7 +1011,7 @@ def test_run_merge_subdataset_only(path=None):
     ok_((sub.pathobj / "foo").exists())
 
 
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (touch, cd, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_both_levels(path=None):
@@ -1036,7 +1036,7 @@ def test_run_merge_both_levels(path=None):
     ok_((sub.pathobj / "foo").exists())
 
 
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (cd, touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_three_levels(path=None):
@@ -1064,7 +1064,7 @@ def test_run_merge_three_levels(path=None):
     ok_((leaf.pathobj / "foo").exists())
 
 
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_no_subdataset_change(path=None):
@@ -1088,7 +1088,7 @@ def test_run_merge_no_subdataset_change(path=None):
     assert_false(sub.repo.commit_exists("HEAD^2"))
 
 
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (cd, git rm, rm, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_merge_subdataset_deletions(path=None):
