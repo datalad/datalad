@@ -1001,7 +1001,7 @@ def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
 # -- Tests for rerunning run-merge commits --
 
 @skip_if_adjusted_branch
-@known_failure_windows
+@known_failure_windows  # uses Unix shell commands (touch, &&)
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_rerun_merge_runs(path=None):

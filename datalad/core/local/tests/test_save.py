@@ -1137,7 +1137,6 @@ def test_save_sub_trailing_sep_bf6547(path=None):
 # -- Tests for save --from (fr= parameter) ----------------------------------
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_basic(path=None):
@@ -1181,7 +1180,6 @@ def test_save_from_basic(path=None):
     assert_status('notneeded', res)
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_no_inner_commits(path=None):
@@ -1203,7 +1201,6 @@ def test_save_from_no_inner_commits(path=None):
     assert_false(ds.repo.commit_exists("HEAD^2"))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_with_path_filter(path=None):
@@ -1232,7 +1229,6 @@ def test_save_from_with_path_filter(path=None):
     assert_repo_status(ds.path, untracked=["excluded.txt"])
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_recursive(path=None):
@@ -1291,7 +1287,6 @@ def test_save_from_recursive(path=None):
     eq_(sub.repo.get_hexsha(), sub_head_before)
 
 
-@known_failure_windows
 @with_tree(**tree_arg)
 @pytest.mark.ai_generated
 def test_save_from_relpath(path=None):
