@@ -101,6 +101,17 @@ class SuprocBenchmarks(object):
         print("BM: "+ str(msg % tuple(args)))
 
 
+class StartupBenchmarks(SuprocBenchmarks):
+    """Base for benchmarks that need datalad on PATH."""
+
+    def setup(self):
+        # we need to prepare/adjust PATH to point to installed datalad
+        # We will base it on taking sys.executable
+        python_path = op.dirname(sys.executable)
+        self.env = os.environ.copy()
+        self.env['PATH'] = '%s:%s' % (python_path, self.env.get('PATH', ''))
+
+
 class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
     """
     Setup a sample hierarchy of datasets to be used

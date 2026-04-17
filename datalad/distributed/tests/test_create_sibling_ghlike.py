@@ -10,8 +10,12 @@
 import logging
 import os
 from os.path import basename
-from unittest.mock import patch
+from unittest.mock import (
+    MagicMock,
+    patch,
+)
 
+import pytest
 import requests
 
 from datalad.api import (
@@ -199,3 +203,68 @@ def check4real(testcmd, testdir, credential, api, delete_endpoint,
                 reponame)
         else:
             resp.raise_for_status()
+
+
+def _mock_response(status_code):
+    """Create a mock requests.Response with given status code."""
+    r = MagicMock()
+    r.status_code = status_code
+    return r
+
+
+@pytest.mark.ai_generated
+def test_is_repo_already_exists_ghlike():
+    from datalad.distributed.create_sibling_ghlike import _GitHubLike
+    obj = _GitHubLike.__new__(_GitHubLike)
+
+    # base: 422 + 'already exist' in message -> True
+    r = _mock_response(requests.codes.unprocessable)
+    assert obj._is_repo_already_exists(r, {'message': 'already exist'})
+
+    # base: 422 without 'already exist' -> False
+    assert not obj._is_repo_already_exists(r, {'message': 'other error'})
+    assert not obj._is_repo_already_exists(r, {})
+
+    # base: wrong status code -> False
+    r = _mock_response(requests.codes.conflict)
+    assert not obj._is_repo_already_exists(r, {'message': 'already exist'})
+
+
+@pytest.mark.ai_generated
+def test_is_repo_already_exists_github():
+    from datalad.distributed.create_sibling_github import _GitHub
+    obj = _GitHub.__new__(_GitHub)
+
+    # GitHub: 422 + errors array with 'already exist' -> True
+    r = _mock_response(requests.codes.unprocessable)
+    assert obj._is_repo_already_exists(
+        r, {'errors': [{'message': 'already exist'}]})
+
+    # GitHub: 422 + errors without 'already exist' -> False
+    assert not obj._is_repo_already_exists(
+        r, {'errors': [{'message': 'other'}]})
+    assert not obj._is_repo_already_exists(r, {'errors': []})
+    assert not obj._is_repo_already_exists(r, {})
+
+    # GitHub: wrong status code -> False
+    r = _mock_response(requests.codes.conflict)
+    assert not obj._is_repo_already_exists(
+        r, {'errors': [{'message': 'already exist'}]})
+
+
+@pytest.mark.ai_generated
+def test_is_repo_already_exists_gitea():
+    from datalad.distributed.create_sibling_gitea import _Gitea
+    obj = _Gitea.__new__(_Gitea)
+
+    # Gitea: 409 + 'already exist' in message -> True
+    r = _mock_response(requests.codes.conflict)
+    assert obj._is_repo_already_exists(r, {'message': 'already exist'})
+
+    # Gitea: 409 without 'already exist' -> False
+    assert not obj._is_repo_already_exists(r, {'message': 'other'})
+    assert not obj._is_repo_already_exists(r, {})
+
+    # Gitea: wrong status code -> False
+    r = _mock_response(requests.codes.unprocessable)
+    assert not obj._is_repo_already_exists(r, {'message': 'already exist'})

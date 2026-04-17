@@ -36,47 +36,10 @@ class _Gitea(_GOGS):
         'annex-ignore': 'true',
     }
 
-    def repo_create_response(self, r):
-        """
-        At present the only difference from the GHlike implementation
-        is the detection of an already existing via a proper 409 response.
-        """
-        try:
-            response = r.json()
-        except Exception as e:
-            lgr.debug('Cannot get JSON payload of %s [%s]' , r, e)
-            response = {}
-        lgr.debug('%s responded with %s %s', self.fullname, r, response)
-        if r.status_code == requests.codes.created:
-            return dict(
-                status='ok',
-                preexisted=False,
-                # perform some normalization
-                reponame=response.get('name'),
-                private=response.get('private'),
-                clone_url=response.get('clone_url'),
-                ssh_url=response.get('ssh_url'),
-                html_url=response.get('html_url'),
-                # and also return in full
-                host_response=response,
-            )
-        elif r.status_code == requests.codes.conflict and \
-                'already exist' in response.get('message', ''):
-            return dict(
-                status='impossible',
-                message='repository already exists',
-                preexisted=True,
-            )
-        elif r.status_code in (self.response_code_unauthorized,
-                               requests.codes.forbidden):
-            return dict(
-                status='error',
-                message=('unauthorized: %s', response.get('message')),
-            )
-        # make sure any error-like situation causes noise
-        r.raise_for_status()
-        # catch-all
-        raise RuntimeError(f'Unexpected host response: {response}')
+    def _is_repo_already_exists(self, r, response):
+        # Gitea reports existing repos via 409 Conflict
+        return (r.status_code == requests.codes.conflict
+                and 'already exist' in response.get('message', ''))
 
 
 @build_doc

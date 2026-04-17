@@ -199,6 +199,24 @@ def dedent_docstring(text):
         return textwrap.dedent(text)
 
 
+def _strip_rst_roles(docs):
+    """Strip RST role markup and enhance handbook reference links.
+
+    Used by both cmdline and Python API doc processors to remove
+    ``:role:`text``` markup and add URLs to handbook references.
+    """
+    docs = re.sub(
+        r':\S+:`[^`]*`[\\]*',
+        lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    docs = re.sub(
+        r'(handbook:[0-9]-[0-9]*)',
+        '\\1 (http://handbook.datalad.org/symbols)',
+        docs)
+    return docs
+
+
 def alter_interface_docs_for_api(docs):
     """Apply modifications to interface docstrings for Python API use."""
     # central place to alter the impression of docstrings,
@@ -234,18 +252,7 @@ def alter_interface_docs_for_api(docs):
         docs,
         flags=re.MULTILINE | re.DOTALL)
     if 'DATALAD_SPHINX_RUN' not in os.environ:
-        # remove :role:`...` RST markup for cmdline docs
-        docs = re.sub(
-            r':\S+:`[^`]*`[\\]*',
-            lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
-            docs,
-            flags=re.MULTILINE | re.DOTALL)
-        # make the handbook doc references more accessible
-        # the URL is a redirect configured at readthedocs
-        docs = re.sub(
-            r'(handbook:[0-9]-[0-9]*)',
-            '\\1 (http://handbook.datalad.org/symbols)',
-            docs)
+        docs = _strip_rst_roles(docs)
     docs = re.sub(
         r'^([ ]*)\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(2), subsequent_indent=match.group(1)),

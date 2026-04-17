@@ -498,6 +498,18 @@ class _GitHubLike(object):
         )
         return self.repo_create_response(r)
 
+    def _is_repo_already_exists(self, r, response):
+        """Check if a repo creation response indicates the repo already exists.
+
+        Override in subclasses to handle platform-specific response formats.
+
+        Returns
+        -------
+        bool
+        """
+        return (r.status_code == requests.codes.unprocessable
+                and 'already exist' in response.get('message', ''))
+
     def repo_create_response(self, r):
         """Handling of repo creation request responses
 
@@ -528,8 +540,7 @@ class _GitHubLike(object):
                 # perform some normalization
                 **self.normalize_repo_properties(response)
             )
-        elif r.status_code == requests.codes.unprocessable and \
-                'already exist' in response.get('message', ''):
+        elif self._is_repo_already_exists(r, response):
             return dict(
                 status='impossible',
                 message='repository already exists',
