@@ -228,6 +228,35 @@ def test_both():
     # this should always fail
     assert_raises(ValueError, lambda: c(77.0))
 
+def test_altconstraints_or_no_mutation():
+    # __or__ must return a new instance, not mutate the left operand
+    a = ct.EnsureStr() | ct.EnsureNone()
+    assert len(a.constraints) == 2
+    b = a | ct.EnsureFloat()
+    assert len(b.constraints) == 3
+    # a must be unchanged
+    assert len(a.constraints) == 2
+    assert a is not b
+    # chaining produces a flat AltConstraints
+    c = ct.EnsureStr() | ct.EnsureNone() | ct.EnsureFloat()
+    assert len(c.constraints) == 3
+    assert isinstance(c, ct.AltConstraints)
+    # merging two AltConstraints
+    d = (ct.EnsureStr() | ct.EnsureNone()) | (ct.EnsureFloat() | ct.EnsureInt())
+    assert len(d.constraints) == 4
+
+
+def test_constraints_and_no_mutation():
+    # __and__ must return a new instance, not mutate the left operand
+    a = ct.EnsureFloat() & ct.EnsureRange(min=0, max=10)
+    assert len(a.constraints) == 2
+    b = a & ct.EnsureRange(min=1, max=5)
+    assert len(b.constraints) == 3
+    # a must be unchanged
+    assert len(a.constraints) == 2
+    assert a is not b
+
+
 def test_type_str():
     assert_equal(ct._type_str((str,)), 'str')
     assert_equal(ct._type_str(str), 'str')

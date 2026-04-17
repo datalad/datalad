@@ -422,10 +422,9 @@ class AltConstraints(_MultiConstraint):
 
     def __or__(self, other):
         if isinstance(other, AltConstraints):
-            self.constraints.extend(other.constraints)
+            return AltConstraints(*self.constraints, *other.constraints)
         else:
-            self.constraints.append(other)
-        return self
+            return AltConstraints(*self.constraints, other)
 
     def __call__(self, value):
         e_list = []
@@ -460,10 +459,9 @@ class Constraints(_MultiConstraint):
 
     def __and__(self, other):
         if isinstance(other, Constraints):
-            self.constraints.extend(other.constraints)
+            return Constraints(*self.constraints, *other.constraints)
         else:
-            self.constraints.append(other)
-        return self
+            return Constraints(*self.constraints, other)
 
     def __call__(self, value):
         for c in (self.constraints):
