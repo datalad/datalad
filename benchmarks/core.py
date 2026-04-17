@@ -18,7 +18,10 @@ from datalad.runner import (
     StdOutErrCapture,
 )
 
-from .common import SuprocBenchmarks
+from .common import (
+    StartupBenchmarks,
+    SuprocBenchmarks,
+)
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
 #import gc
@@ -32,17 +35,10 @@ scripts_dir = osp.join(osp.dirname(__file__), 'scripts')
 heavyout_cmd = "{} 1000".format(osp.join(scripts_dir, 'heavyout'))
 
 
-class startup(SuprocBenchmarks):
+class startup(StartupBenchmarks):
     """
     Benchmarks for datalad commands startup
     """
-
-    def setup(self):
-        # we need to prepare/adjust PATH to point to installed datalad
-        # We will base it on taking sys.executable
-        python_path = osp.dirname(sys.executable)
-        self.env = os.environ.copy()
-        self.env['PATH'] = '%s:%s' % (python_path, self.env.get('PATH', ''))
 
     def time_import(self):
         call([sys.executable, "-c", "import datalad"])

@@ -10,6 +10,13 @@
 
 """
 
+from unittest.mock import (
+    MagicMock,
+    patch,
+)
+
+import pytest
+
 from datalad.downloaders.tests.utils import get_test_providers
 from datalad.support.network import URL
 from datalad.support.s3 import (
@@ -114,3 +121,26 @@ def test_version_url_deleted():
     eq_(get_versioned_url(url), turl)
     # too heavy for verification!
     #eq_(get_versioned_url(url, verify=True), turl)
+
+
+@pytest.mark.ai_generated
+def test_gen_versioned_bucket():
+    from datalad.support.s3 import (
+        VersionedFilesPool,
+        _gen_versioned_bucket,
+    )
+
+    mock_bucket = MagicMock()
+    with patch('datalad.support.s3.gen_test_bucket',
+               return_value=mock_bucket) as mock_gen, \
+         patch('datalad.support.s3.set_bucket_public_access_policy') as mock_policy:
+        bucket, files = _gen_versioned_bucket('test-bucket')
+
+    mock_gen.assert_called_once_with('test-bucket')
+    mock_bucket.Versioning().enable.assert_called_once()
+    mock_bucket.Website().put.assert_called_once_with(
+        WebsiteConfiguration={"IndexDocument": {"Suffix": "index.html"}}
+    )
+    mock_policy.assert_called_once_with(mock_bucket)
+    assert bucket is mock_bucket
+    assert isinstance(files, VersionedFilesPool)
