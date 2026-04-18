@@ -40,6 +40,28 @@ from datalad.tests.utils_pytest import (
 # - x_R: run commit
 
 
+def _setup_run_left_run_right(path):
+    """Create a dataset with a run on each branch merged together.
+
+    Produces the graph::
+
+        o                 d_n    (merge commit)
+        |\\
+        o |               c_r    (run on DEFAULT_BRANCH)
+        | o               b_r    (run on side)
+        |/
+        o                 a_n    (initial)
+    """
+    ds = Dataset(path).create()
+    ds_repo = ds.repo
+    ds_repo.checkout(DEFAULT_BRANCH, options=["-b", "side"])
+    ds.run("echo foo >foo")
+    ds_repo.checkout(DEFAULT_BRANCH)
+    ds.run("echo bar >bar")
+    ds_repo.merge("side", options=["-m", "Merge side"])
+    return ds, ds_repo
+
+
 @slow
 @with_tempfile(mkdir=True)
 def test_rerun_fastforwardable(path=None):
@@ -129,14 +151,7 @@ def test_rerun_fastforwardable_mutator(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_left_right_runs(path=None):
-    ds = Dataset(path).create()
-    # keep direct repo accessor to speed things up
-    ds_repo = ds.repo
-    ds_repo.checkout(DEFAULT_BRANCH, options=["-b", "side"])
-    ds.run("echo foo >foo")
-    ds_repo.checkout(DEFAULT_BRANCH)
-    ds.run("echo bar >bar")
-    ds_repo.merge("side", options=["-m", "Merge side"])
+    ds, ds_repo = _setup_run_left_run_right(path)
     # o                 d_n
     # |\
     # o |               c_r
@@ -437,14 +452,7 @@ def test_rerun_mutator_stem_nonrun_merges(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_exclude_side(path=None):
-    ds = Dataset(path).create()
-    # keep direct repo accessor to speed things up
-    ds_repo = ds.repo
-    ds_repo.checkout(DEFAULT_BRANCH, options=["-b", "side"])
-    ds.run("echo foo >foo")
-    ds_repo.checkout(DEFAULT_BRANCH)
-    ds.run("echo bar >bar")
-    ds_repo.merge("side", options=["-m", "Merge side"])
+    ds, ds_repo = _setup_run_left_run_right(path)
     # o                 d_n
     # |\
     # o |               c_r
