@@ -370,6 +370,10 @@ for reference.
 We rely on https://codecov.io for coverage tracking — it annotates pull
 requests on GitHub with coverage changes.
 
+The [tools/testing/adhoc](tools/testing/adhoc) folder contains ad-hoc testing
+scripts produced to test specific functionality at some point in time. These
+scripts are not actively maintained but may be useful for reference.
+
 ### CI setup
 
 We are using several continuous integration services to run our tests battery for every PR and on the default branch.
