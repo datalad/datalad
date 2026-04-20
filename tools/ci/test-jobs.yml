@@ -7,6 +7,11 @@
 - python-version: '3.10'
   extra-envs: {}
 
+# Exercise the patool backend (see PR description).
+- python-version: '3.10'
+  extra-envs:
+    DATALAD_RUNTIME_USE__PATOOL: "1"
+
 - python-version: '3.10'
   # Run all tests in a single whoop here
   # We cannot have empty -A selector, so the one which always will be fulfilled
