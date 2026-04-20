@@ -9,6 +9,7 @@
 
 # Exercise the patool backend (see PR description).
 - python-version: '3.10'
+  scenario: patool-backend
   extra-envs:
     DATALAD_RUNTIME_USE__PATOOL: "1"
 
