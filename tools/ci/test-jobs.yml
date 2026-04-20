@@ -188,7 +188,10 @@
     http_proxy: ""
     https_proxy: ""
 
-# Test under NFS mount  (full, only in master)
+# Test under NFS mount (the complement of the scoped NFS job above --
+# everything except datalad.tests and datalad.support, which are already
+# covered there). The previous "full" NFS job ran the entire suite and was
+# cancelled by GitHub's 6h job timeout on every scheduled run.
 - python-version: '3.10'
   cron-only: true
   allow-failure: true
@@ -196,6 +199,7 @@
     # give much more time to complete on NFS
     _DL_TMPDIR: "/tmp/nfsmount"
     PYTEST_FAIL_SLOW: 1200
+    TESTS_TO_PERFORM: "datalad.cli datalad.cmdline datalad.core datalad.customremotes datalad.dataset datalad.distributed datalad.distribution datalad.downloaders datalad.interface datalad.local datalad.plugin datalad.runner datalad.ui"
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
