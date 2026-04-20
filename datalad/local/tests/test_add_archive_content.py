@@ -653,3 +653,13 @@ class TestAddArchiveOptions():
             , existing='overwrite'
         )
         ok_file_under_git(self.ds.path, '1.dat', annexed=True)
+
+    def test_add_archive_gitignored_files(self):
+        # Extracted archive paths matching .gitignore are skipped with a
+        # warning rather than aborting the whole add-archive-content run.
+        create_tree(self.ds.path, {'.gitignore': '*.dat\n'})
+        self.ds.save('.gitignore', to_git=True, message='add gitignore')
+
+        self.ds.add_archive_content('1.tar')
+        ok_file_under_git(self.ds.path, opj('1', 'file.txt'), annexed=True)
+        assert not lexists(opj(self.ds.path, '1', '1.dat'))
