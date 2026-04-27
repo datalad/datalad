@@ -38,6 +38,7 @@ from datalad.core.local.run import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.local.rerun import get_run_info
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CommandError,
     IncompleteResultsError,
@@ -845,25 +846,43 @@ def test_substitution_config():
 
 # -- Helpers for merge-commit tests --
 
+def _run_merge_search_ref(repo):
+    """Return the ref to walk for run-merge lookup.
+
+    On adjusted branches, ``_create_merge_commit`` writes the merge
+    directly to the corresponding (non-adjusted) branch via
+    ``update_ref``.  The adjusted-branch HEAD reaches that merge only
+    after ``git annex merge`` propagates it, and exactly how that
+    propagation lands on the first-parent chain varies across
+    git-annex versions (older versions sometimes leave the run-merge
+    off the adjusted-branch first-parent line).  Searching the
+    corresponding branch directly is therefore both more correct
+    (that's where we wrote the merge) and version-independent.
+    """
+    if isinstance(repo, AnnexRepo) and repo.is_managed_branch():
+        return "refs/heads/" + repo.get_corresponding_branch()
+    return "HEAD"
+
+
 def _find_run_merge(ds):
     """Find the most recent run-info merge commit on the first-parent chain.
 
     Returns the SHA of the most recent commit on the first-parent chain
-    from HEAD whose message carries a ``[DATALAD RUNCMD]`` record *and*
-    has two or more parents (i.e. is a run-merge).  Returns ``None`` if
-    no such commit exists.
+    of the search ref (corresponding branch on adjusted, HEAD otherwise)
+    whose message carries a ``[DATALAD RUNCMD]`` record *and* has two
+    or more parents (i.e. is a run-merge).  Returns ``None`` if no such
+    commit exists.
 
     Implementation is DAG-based: we ask git itself for the most recent
     first-parent commit matching the run-record marker, then check its
-    parent count.  This is robust regardless of how many adjustment
-    commits ``git annex sync``/``merge`` may have stacked on top on
-    managed branches — adjustment commits do not carry the run-record
-    marker, so the grep skips them naturally.
+    parent count.  Adjustment commits don't carry the run-record marker,
+    so the grep skips them naturally regardless of where they sit.
     """
     repo = ds.repo
+    ref = _run_merge_search_ref(repo)
     sha = repo.call_git(
         ['rev-list', '--first-parent', '-1',
-         '--grep', r'\[DATALAD RUNCMD\]', 'HEAD']).strip()
+         '--grep', r'\[DATALAD RUNCMD\]', ref]).strip()
     if not sha:
         return None
     # `rev-list --parents -1 SHA` prints "<sha> <parent1> <parent2> ..."
@@ -933,13 +952,13 @@ def test_run_merge_commits(path=None):
     # on top of HEAD, so a literal ``HEAD^2`` check is unreliable.
     # Assert there is no run-info merge anywhere on the first-parent chain.
     _assert_no_run_merge(ds)
-    # The run record itself lives on a non-merge commit (HEAD or, on
-    # adjusted branches, a few adjustment commits up).  Use git itself
-    # to locate the most recent first-parent commit carrying the
-    # run-record marker — no count-based walk needed.
+    # The run record lives on a non-merge commit (HEAD on plain repos,
+    # or on the corresponding branch on adjusted ones — adjustment
+    # commits don't carry the marker).  Use git itself to locate it.
     run_sha = ds.repo.call_git(
         ['rev-list', '--first-parent', '-1',
-         '--grep', r'\[DATALAD RUNCMD\]', 'HEAD']).strip()
+         '--grep', r'\[DATALAD RUNCMD\]',
+         _run_merge_search_ref(ds.repo)]).strip()
     ok_(run_sha,
         msg="no run record found on first-parent chain after plain run")
     ok_((ds.pathobj / "bar").exists())
