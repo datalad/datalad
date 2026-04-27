@@ -1293,7 +1293,10 @@ def test_save_from_recursive(path=None):
     # With recursion_limit=0, only top-level should be processed
     ds.save(fr=baseline2, recursive=True, recursion_limit=0,
             message="limited save")
-    ok_(ds.repo.commit_exists(_merge_ref(ds.repo) + "^2"))
+    top_merge = _merge_ref(ds.repo)
+    ok_(ds.repo.commit_exists(top_merge + "^2"))
+    # First-parent is the pre-command baseline (linear history)
+    eq_(ds.repo.get_hexsha(top_merge + "^1"), baseline2)
     # Sub should NOT have been touched
     eq_(sub.repo.get_hexsha(), sub_head_before)
 
