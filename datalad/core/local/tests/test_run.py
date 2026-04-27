@@ -845,40 +845,30 @@ def test_substitution_config():
 
 # -- Helpers for merge-commit tests --
 
-# How far up the first-parent chain to look for a run-info merge commit.
-# On adjusted branches (git-annex managed), one or more adjustment commits
-# may sit between HEAD and the actual run-merge depending on git-annex
-# version and the sequence of `annex sync` / `annex merge` operations.
-_RUN_MERGE_WALK_LIMIT = 5
+def _find_run_merge(ds):
+    """Find the most recent run-info merge commit on the first-parent chain.
 
+    Returns the SHA of the most recent commit on the first-parent chain
+    from HEAD whose message carries a ``[DATALAD RUNCMD]`` record *and*
+    has two or more parents (i.e. is a run-merge).  Returns ``None`` if
+    no such commit exists.
 
-def _find_run_merge(ds, max_walk=_RUN_MERGE_WALK_LIMIT):
-    """Find the most recent run-info merge commit by walking first-parent.
-
-    Returns the ref string (e.g. ``"HEAD"`` or ``"HEAD~2"``) of the most
-    recent commit on the first-parent chain that has 2+ parents *and*
-    carries a parsable ``[DATALAD RUNCMD]`` record.  Returns ``None`` if
-    no such commit is found within ``max_walk`` steps.
-
-    On adjusted branches, ``git annex merge`` may stack one or more
-    adjustment commits above the run-merge, so a fixed offset is not
-    reliable.  This helper walks the ancestor chain instead.
+    Implementation is DAG-based: we ask git itself for the most recent
+    first-parent commit matching the run-record marker, then check its
+    parent count.  This is robust regardless of how many adjustment
+    commits ``git annex sync``/``merge`` may have stacked on top on
+    managed branches — adjustment commits do not carry the run-record
+    marker, so the grep skips them naturally.
     """
     repo = ds.repo
-    for i in range(max_walk):
-        ref = "HEAD" if i == 0 else "HEAD~%d" % i
-        if not repo.commit_exists(ref):
-            return None
-        if not repo.commit_exists(ref + "^2"):
-            continue  # not a merge — skip
-        commit_msg = repo.format_commit("%B", ref)
-        try:
-            msg, info = get_run_info(ds, commit_msg)
-        except ValueError:
-            continue
-        if info is not None:
-            return ref
-    return None
+    sha = repo.call_git(
+        ['rev-list', '--first-parent', '-1',
+         '--grep', r'\[DATALAD RUNCMD\]', 'HEAD']).strip()
+    if not sha:
+        return None
+    # `rev-list --parents -1 SHA` prints "<sha> <parent1> <parent2> ..."
+    parents = repo.call_git(['rev-list', '--parents', '-1', sha]).split()
+    return sha if len(parents) >= 3 else None
 
 
 def _merge_ref(repo):
@@ -944,22 +934,14 @@ def test_run_merge_commits(path=None):
     # Assert there is no run-info merge anywhere on the first-parent chain.
     _assert_no_run_merge(ds)
     # The run record itself lives on a non-merge commit (HEAD or, on
-    # adjusted branches, a few steps up).  Walk first-parent to find it.
-    run_commit = None
-    for i in range(_RUN_MERGE_WALK_LIMIT):
-        ref = "HEAD" if i == 0 else "HEAD~%d" % i
-        if not ds.repo.commit_exists(ref):
-            break
-        commit_msg = ds.repo.format_commit("%B", ref)
-        try:
-            msg, info = get_run_info(ds, commit_msg)
-        except ValueError:
-            continue
-        if info is not None:
-            run_commit = ref
-            break
-    ok_(run_commit is not None,
-        msg="no run record found on first-parent walk after plain run")
+    # adjusted branches, a few adjustment commits up).  Use git itself
+    # to locate the most recent first-parent commit carrying the
+    # run-record marker — no count-based walk needed.
+    run_sha = ds.repo.call_git(
+        ['rev-list', '--first-parent', '-1',
+         '--grep', r'\[DATALAD RUNCMD\]', 'HEAD']).strip()
+    ok_(run_sha,
+        msg="no run record found on first-parent chain after plain run")
     ok_((ds.pathobj / "bar").exists())
 
     # 2. Single inner commit -> merge commit with run info
