@@ -336,6 +336,7 @@ class Save(Interface):
                  amend=False,
                  fr=None,
                  _fr_sub_info=None,
+                 _sub_message=None,
                  ):
         if message and message_file:
             raise ValueError(
@@ -534,8 +535,14 @@ class Save(Interface):
             if not all(p['state'] == 'clean'
                        for p in pds_status.values()) or \
                     (amend and message):
-                save_msg = ("Remaining changes after command execution"
-                            if will_merge else message)
+                # When wrapping inner commits as a merge, the intermediate
+                # save of working-tree changes is subordinate to the merge
+                # commit (it lives on the second-parent chain).  Use
+                # _sub_message if the caller provided one (run_command
+                # passes a run-specific string); otherwise fall back to the
+                # user's message.
+                save_msg = (_sub_message if will_merge and _sub_message
+                            else message)
                 for res in pds_repo.save_(
                         message=save_msg,
                         # make sure to have the `path` arg be None, as we

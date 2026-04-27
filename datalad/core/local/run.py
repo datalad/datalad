@@ -1245,6 +1245,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                         pre_cmd_sub_status, ds_path)
                     if cmd_made_commits and pre_cmd_sub_status
                     else None,
+                    # Message for the auxiliary commit that wraps
+                    # uncommitted changes before the run-merge.  Keeps
+                    # the run-record out of the intermediate commit.
+                    _sub_message="Remaining changes after command execution",
                     return_type='generator',
                     result_renderer='disabled',
                     on_failure='ignore'):
