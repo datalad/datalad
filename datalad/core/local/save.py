@@ -334,6 +334,11 @@ class Save(Interface):
         if amend and recursive:
             raise ValueError("Cannot amend a commit recursively.")
 
+        if amend and fr is not None:
+            raise ValueError(
+                "Cannot amend when using --from; "
+                "--from creates a merge commit.")
+
         path = ensure_list(path)
 
         if message_file:
