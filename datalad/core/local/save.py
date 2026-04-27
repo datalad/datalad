@@ -38,6 +38,7 @@ from datalad.interface.utils import (
     discover_dataset_trace_to_targets,
     get_tree_roots,
 )
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
@@ -138,9 +139,7 @@ def _create_merge_commit(repo, pre_hexsha, msg):
     msg : str
         Commit message (typically the run record).
     """
-    on_adjusted = (
-        hasattr(repo, 'is_managed_branch') and repo.is_managed_branch()
-    )
+    on_adjusted = isinstance(repo, AnnexRepo) and repo.is_managed_branch()
     if on_adjusted:
         orig_branch = repo.get_corresponding_branch()
         repo.call_git([
