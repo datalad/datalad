@@ -92,9 +92,19 @@ def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
 
         # Walk up to ds_path, registering each child as modified in
         # its parent and ensuring fr_map entries exist at each level.
+        # Termination: normally `parent_path == ds_path`.  Defensive
+        # second termination on `parent_path == child_path` covers the
+        # case where `sub_path` is not a descendant of `ds_path` (which
+        # `_parse_sub_status` from `git submodule status --recursive`
+        # never produces, but a future caller might) — without it,
+        # `Path('/').parent == Path('/')` would loop forever.
         child_path = sub_path
         while True:
             parent_path = str(ut.Path(child_path).parent)
+            if parent_path == child_path:
+                lgr.debug("sub %s not under ds %s; aborting ancestor walk",
+                          sub_path, ds_path)
+                break
             child_repo = Dataset(child_path).repo
             child_sha = child_repo.get_hexsha() if child_repo else cur_sha
             child_pre = _fr_sub_info.get(child_path, child_sha)
