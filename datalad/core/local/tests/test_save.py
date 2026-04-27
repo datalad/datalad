@@ -21,6 +21,10 @@ from datalad.api import (
     install,
     save,
 )
+from datalad.core.local.tests.test_run import (
+    _assert_run_merge,
+    _merge_ref,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
@@ -29,6 +33,7 @@ from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     OBSCURE_FILENAME,
     SkipTest,
+    assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -1127,6 +1132,202 @@ def test_save_sub_trailing_sep_bf6547(path=None):
     )
     # make sure it has the .gitmodules record
     assert 'sub' in (ds.pathobj / '.gitmodules').read_text()
+
+
+# -- Tests for save --from (fr= parameter) ----------------------------------
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_save_from_basic(path=None):
+    """save(fr=<commit>) wraps intermediate commits as a merge."""
+    ds = Dataset(path).create(annex=False)
+    # Create baseline: commit A
+    (ds.pathobj / "a.txt").write_text("a")
+    ds.save(message="commit A")
+    commit_a = ds.repo.get_hexsha()
+
+    # Create intermediate commits B, C directly via git
+    (ds.pathobj / "b.txt").write_text("b")
+    ds.repo.call_git(["add", "b.txt"])
+    ds.repo.call_git(["commit", "-m", "commit B"])
+
+    (ds.pathobj / "c.txt").write_text("c")
+    ds.repo.call_git(["add", "c.txt"])
+    ds.repo.call_git(["commit", "-m", "commit C"])
+    commit_c = ds.repo.get_hexsha()
+
+    # save(fr=A) should wrap B+C as a merge
+    res = ds.save(fr=commit_a, message="wrap B+C")
+    assert_status('ok', res)
+    assert_repo_status(ds.path)
+
+    # HEAD should be a merge commit
+    # On adjusted branches, the merge is at HEAD~1 (HEAD is the adjustment)
+    merge_ref = _merge_ref(ds.repo)
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    # first-parent = commit A (linear history)
+    eq_(ds.repo.get_hexsha(merge_ref + "^1"), commit_a)
+    # second-parent = commit C (the work)
+    eq_(ds.repo.get_hexsha(merge_ref + "^2"), commit_c)
+    # tree matches commit C (all files present)
+    ok_((ds.pathobj / "a.txt").exists())
+    ok_((ds.pathobj / "b.txt").exists())
+    ok_((ds.pathobj / "c.txt").exists())
+
+    # save(fr=HEAD) with no changes → notneeded
+    res = ds.save(fr=ds.repo.get_hexsha(), on_failure='ignore')
+    assert_status('notneeded', res)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_save_from_no_inner_commits(path=None):
+    """save(fr=HEAD) with only working-tree changes → plain save, no merge."""
+    ds = Dataset(path).create(annex=False)
+    (ds.pathobj / "tracked.txt").write_text("initial")
+    ds.save(message="initial")
+    baseline = ds.repo.get_hexsha()
+
+    # Only working-tree changes, no intermediate commits
+    (ds.pathobj / "new.txt").write_text("new content")
+
+    res = ds.save(fr=baseline, message="just working-tree changes")
+    assert_status('ok', res)
+    assert_repo_status(ds.path)
+    ok_((ds.pathobj / "new.txt").exists())
+
+    # No merge commit — fr == pre-save HEAD so no inner commits detected
+    assert_false(ds.repo.commit_exists("HEAD^2"))
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_save_from_with_path_filter(path=None):
+    """save(fr=..., path=...) only saves specified paths."""
+    ds = Dataset(path).create(annex=False)
+    (ds.pathobj / "tracked.txt").write_text("initial")
+    ds.save(message="initial")
+    baseline = ds.repo.get_hexsha()
+
+    # Create intermediate commit + working-tree changes
+    (ds.pathobj / "committed.txt").write_text("committed")
+    ds.repo.call_git(["add", "committed.txt"])
+    ds.repo.call_git(["commit", "-m", "inner"])
+
+    (ds.pathobj / "included.txt").write_text("include me")
+    (ds.pathobj / "excluded.txt").write_text("leave me out")
+
+    # save only 'included.txt' — 'excluded.txt' should stay uncommitted
+    res = ds.save(
+        path=["included.txt"], fr=baseline, message="selective save",
+        on_failure='ignore')
+    assert_status('ok', res)
+    ok_((ds.pathobj / "included.txt").exists())
+    ok_((ds.pathobj / "excluded.txt").exists())
+    # excluded.txt should still be untracked
+    assert_repo_status(ds.path, untracked=["excluded.txt"])
+
+    # The inner commit forces a merge commit even with a path filter —
+    # the merge's tree carries committed.txt (from the inner commit) and
+    # included.txt; excluded.txt remains untracked.
+    merge_ref = _merge_ref(ds.repo)
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    eq_(ds.repo.get_hexsha(merge_ref + "^1"), baseline)
+    merge_tree_files = ds.repo.call_git(
+        ["ls-tree", "-r", "--name-only", merge_ref]).splitlines()
+    assert_in("committed.txt", merge_tree_files)
+    assert_in("included.txt", merge_tree_files)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_save_from_recursive(path=None):
+    """save(fr=..., recursive=True) creates merges across subdataset hierarchy."""
+    ds = Dataset(path).create(annex=False)
+    sub = ds.create("sub", annex=False)
+    assert_repo_status(ds.path)
+    baseline = ds.repo.get_hexsha()
+
+    # Create inner commits in both super and sub
+    (ds.pathobj / "top.txt").write_text("top")
+    ds.repo.call_git(["add", "top.txt"])
+    ds.repo.call_git(["commit", "-m", "top inner"])
+
+    (sub.pathobj / "sub.txt").write_text("sub")
+    sub.repo.call_git(["add", "sub.txt"])
+    sub.repo.call_git(["commit", "-m", "sub inner"])
+    sub_pre_save = sub.repo.get_hexsha()
+
+    res = ds.save(fr=baseline, recursive=True, message="wrap all")
+    assert_status('ok', res)
+    assert_repo_status(ds.path)
+
+    # Both should have merge commits
+    # On adjusted branches, the merge is at HEAD~1 (HEAD is the adjustment)
+    ds_merge = _merge_ref(ds.repo)
+    sub_merge = _merge_ref(sub.repo)
+    ok_(ds.repo.commit_exists(ds_merge + "^2"))
+    ok_(sub.repo.commit_exists(sub_merge + "^2"))
+
+    # sub's merge: first-parent should be the baseline sub pointer,
+    # second-parent should be the sub inner commit
+    sub_parent2 = sub.repo.get_hexsha(sub_merge + "^2")
+    # The inner commit is an ancestor of the second parent
+    eq_(sub_parent2, sub_pre_save)
+
+    # All files present
+    ok_((ds.pathobj / "top.txt").exists())
+    ok_((sub.pathobj / "sub.txt").exists())
+
+    # -- recursion_limit=0: reuse same hierarchy, add new inner commits --
+    baseline2 = ds.repo.get_hexsha()
+    (ds.pathobj / "top2.txt").write_text("top2")
+    ds.repo.call_git(["add", "top2.txt"])
+    ds.repo.call_git(["commit", "-m", "top inner 2"])
+    (sub.pathobj / "sub2.txt").write_text("sub2")
+    sub.repo.call_git(["add", "sub2.txt"])
+    sub.repo.call_git(["commit", "-m", "sub inner 2"])
+    sub_head_before = sub.repo.get_hexsha()
+
+    # With recursion_limit=0, only top-level should be processed
+    ds.save(fr=baseline2, recursive=True, recursion_limit=0,
+            message="limited save")
+    top_merge = _merge_ref(ds.repo)
+    ok_(ds.repo.commit_exists(top_merge + "^2"))
+    # First-parent is the pre-command baseline (linear history)
+    eq_(ds.repo.get_hexsha(top_merge + "^1"), baseline2)
+    # Sub should NOT have been touched
+    eq_(sub.repo.get_hexsha(), sub_head_before)
+
+
+@with_tree(**tree_arg)
+@pytest.mark.ai_generated
+def test_save_from_relpath(path=None):
+    """save(fr=..., path=...) from a subdirectory resolves paths against CWD."""
+    ds = Dataset(path).create(force=True, annex=False)
+    ds.save(message="initial")
+    assert_repo_status(ds.path)
+    baseline = ds.repo.get_hexsha()
+
+    # Create an inner commit + new file in subdir
+    (ds.pathobj / "dir" / "newfile").write_text("new")
+    ds.repo.call_git(["add", "dir/newfile"])
+    ds.repo.call_git(["commit", "-m", "inner"])
+
+    (ds.pathobj / "dir" / "wt_change").write_text("working tree")
+
+    # From inside dir/, save 'wt_change' using a relative path
+    with chpwd(op.join(path, 'dir')):
+        res = save(path=['wt_change'], fr=baseline,
+                   message="from subdir",
+                   on_failure='ignore',
+                   result_renderer='disabled')
+    assert_status('ok', res)
+    ok_((ds.pathobj / "dir" / "wt_change").exists())
+
+    # The merge should exist because there was an inner commit
+    ok_(ds.repo.commit_exists(_merge_ref(ds.repo) + "^2"))
 
 
 # -- Tests for datalad.save.skip-openfiles ----------------------------------

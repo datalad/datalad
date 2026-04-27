@@ -37,6 +37,7 @@ from datalad.core.local.run import (
     run_command,
 )
 from datalad.distribution.dataset import Dataset
+from datalad.local.rerun import get_run_info
 from datalad.support.exceptions import (
     CommandError,
     IncompleteResultsError,
@@ -55,6 +56,7 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
     assert_result_count,
     assert_status,
+    cat_command,
     create_tree,
     eq_,
     known_failure_windows,
@@ -63,8 +65,10 @@ from datalad.tests.utils_pytest import (
     ok_exists,
     ok_file_has_content,
     patch_config,
+    slow,
     swallow_logs,
     swallow_outputs,
+    touch_command,
     with_tempfile,
     with_tree,
 )
@@ -73,8 +77,6 @@ from datalad.utils import (
     ensure_unicode,
     on_windows,
 )
-
-cat_command = 'cat' if not on_windows else 'type'
 
 
 @with_tempfile(mkdir=True)
@@ -839,3 +841,372 @@ def test_substitution_config():
         eq_(_format_iospecs(['{dummy}'],
                             **_get_substitutions(dset)),
             ['a', 'b'])
+
+
+# -- Helpers for merge-commit tests --
+
+def _find_run_merge(ds):
+    """Find the most recent run-info merge commit on the first-parent chain.
+
+    Returns the SHA of the most recent commit on the first-parent chain
+    from HEAD whose message carries a ``[DATALAD RUNCMD]`` record *and*
+    has two or more parents (i.e. is a run-merge).  Returns ``None`` if
+    no such commit exists.
+
+    Implementation is DAG-based: we ask git itself for the most recent
+    first-parent commit matching the run-record marker, then check its
+    parent count.  This is robust regardless of how many adjustment
+    commits ``git annex sync``/``merge`` may have stacked on top on
+    managed branches — adjustment commits do not carry the run-record
+    marker, so the grep skips them naturally.
+    """
+    repo = ds.repo
+    sha = repo.call_git(
+        ['rev-list', '--first-parent', '-1',
+         '--grep', r'\[DATALAD RUNCMD\]', 'HEAD']).strip()
+    if not sha:
+        return None
+    # `rev-list --parents -1 SHA` prints "<sha> <parent1> <parent2> ..."
+    parents = repo.call_git(['rev-list', '--parents', '-1', sha]).split()
+    return sha if len(parents) >= 3 else None
+
+
+def _merge_ref(repo):
+    """Return the commit ref where the merge lives.
+
+    On adjusted branches, git annex merge creates an adjustment commit
+    on top of the merge, so the merge is at HEAD~1 instead of HEAD.
+
+    Note: this returns a fixed offset and is suitable when the caller
+    has already established that a run-merge exists (e.g. via
+    ``_find_run_merge``).  For new code prefer ``_find_run_merge``,
+    which walks the chain and is robust to varying adjustment-commit
+    stacking on adjusted branches.
+    """
+    if hasattr(repo, 'is_managed_branch') and repo.is_managed_branch():
+        return "HEAD~1"
+    return "HEAD"
+
+
+def _assert_run_merge(ds, ref=None):
+    """Assert that a run-info merge commit exists; return its info dict.
+
+    If ``ref`` is given, that exact ref is checked.  Otherwise, the
+    helper walks the first-parent chain to find the most recent
+    run-info merge — robust to adjustment commits on managed branches.
+    """
+    if ref is None:
+        ref = _find_run_merge(ds)
+        ok_(ref is not None,
+            msg="no run-info merge commit found on first-parent walk")
+    ok_(ds.repo.commit_exists(ref + "^2"))
+    commit_msg = ds.repo.format_commit("%B", ref)
+    msg, info = get_run_info(ds, commit_msg)
+    ok_(info is not None)
+    assert_in("cmd", info)
+    return info
+
+
+def _assert_no_run_merge(ds):
+    """Assert that no run-info merge commit exists in recent history.
+
+    Robust to adjustment commits on managed (adjusted) branches: the
+    adjustment merges created by ``git annex sync``/``merge`` do *not*
+    carry a ``[DATALAD RUNCMD]`` record, so they are correctly ignored.
+    """
+    ref = _find_run_merge(ds)
+    ok_(ref is None,
+        msg="unexpected run-info merge commit at %s" % ref)
+
+
+# -- Tests for run producing merge commits when command creates commits --
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_commits(path=None):
+    ds = Dataset(path).create()
+
+    # 1. Normal run (no inner commits) -> NOT a merge commit
+    ds.run(touch_command + 'bar')
+    assert_repo_status(ds.path)
+    # On adjusted branches, localsync may add adjustment merge commits
+    # on top of HEAD, so a literal ``HEAD^2`` check is unreliable.
+    # Assert there is no run-info merge anywhere on the first-parent chain.
+    _assert_no_run_merge(ds)
+    # The run record itself lives on a non-merge commit (HEAD or, on
+    # adjusted branches, a few adjustment commits up).  Use git itself
+    # to locate the most recent first-parent commit carrying the
+    # run-record marker — no count-based walk needed.
+    run_sha = ds.repo.call_git(
+        ['rev-list', '--first-parent', '-1',
+         '--grep', r'\[DATALAD RUNCMD\]', 'HEAD']).strip()
+    ok_(run_sha,
+        msg="no run record found on first-parent chain after plain run")
+    ok_((ds.pathobj / "bar").exists())
+
+    # 2. Single inner commit -> merge commit with run info
+    ds.run(touch_command + 'foo' + ' && git add foo && git commit -m "inner commit"')
+    assert_repo_status(ds.path)
+    # Walk to locate the run-merge — robust against adjustment commits
+    # that may stack on top on managed branches.
+    merge_ref = _find_run_merge(ds)
+    ok_(merge_ref is not None, msg="no run-info merge after inner commit")
+    info = _assert_run_merge(ds, merge_ref)
+    parent1 = ds.repo.get_hexsha(merge_ref + "^1")
+    parent2 = ds.repo.get_hexsha(merge_ref + "^2")
+    neq_(parent1, parent2)
+    ok_((ds.pathobj / "foo").exists())
+
+    # 3. Multiple inner commits -> single merge commit
+    ds.run(
+        touch_command + 'f1' + ' && git add f1 && git commit -m "first" && '
+        + touch_command + 'f2' + ' && git add f2 && git commit -m "second"'
+    )
+    assert_repo_status(ds.path)
+    # Re-locate: a new run-merge sits above any prior adjustment commits
+    merge_ref = _find_run_merge(ds)
+    ok_(merge_ref is not None, msg="no run-info merge after multiple inner commits")
+    _assert_run_merge(ds, merge_ref)
+    assert_false(ds.repo.commit_exists(merge_ref + "^3"))
+    ok_((ds.pathobj / "f1").exists())
+    ok_((ds.pathobj / "f2").exists())
+
+    # 4. Inner commit + uncommitted file -> merge commit with both files
+    ds.run(
+        touch_command + 'committed' + ' && git add committed && git commit -m "inner"'
+        ' && ' + touch_command + 'uncommitted'
+    )
+    assert_repo_status(ds.path)
+    merge_ref = _find_run_merge(ds)
+    ok_(merge_ref is not None,
+        msg="no run-info merge after inner commit + uncommitted file")
+    _assert_run_merge(ds, merge_ref)
+    ok_((ds.pathobj / "committed").exists())
+    ok_((ds.pathobj / "uncommitted").exists())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_dirty_committed(path=None, path2=None, path3=None):
+    # 1. Explicit mode: inner commit of undeclared file -> error
+    ds = Dataset(path).create()
+    (ds.pathobj / "dirty").write_text("dirty")
+    res = ds.run(
+        touch_command + 'foo' + ' && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["declared_output"],
+        on_failure="ignore",
+        result_renderer=None
+    )
+    assert_in_results(
+        res,
+        status="error",
+        action="run",
+    )
+    error_results = [r for r in res
+                     if r.get("action") == "run" and r.get("status") == "error"]
+    ok_(any("not declared as --output" in str(r.get("message", ""))
+            for r in error_results))
+
+    # 2. With dirty-committed=ignore config -> success
+    ds2 = Dataset(path2).create()
+    ds2.config.set('datalad.run.dirty-committed', 'ignore', scope='local')
+    ds2.run(
+        touch_command + 'foo' + ' && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["foo"],
+    )
+    _assert_run_merge(ds2)
+
+    # 3. Regression: explicit=True with NO declared outputs must not
+    #    trigger the dirty-committed check (run_procedure path).
+    #    run_command skips save entirely in this configuration (do_save
+    #    is False when outputs_to_save is an empty list), so the inner
+    #    commit stays at HEAD but the run must complete without error.
+    #    Pre-fix (dbe8d49c5) the dirty-committed check fired here.
+    ds3 = Dataset(path3).create()
+    head_before = ds3.repo.get_hexsha()
+    res3 = ds3.run(
+        touch_command + 'foo' + ' && git add foo && git commit -m "inner"',
+        explicit=True,
+        on_failure='ignore',
+        result_renderer='disabled',
+    )
+    assert_not_in_results(res3, status='error', action='run')
+    # The inner commit is visible at HEAD — save was not invoked.
+    neq_(ds3.repo.get_hexsha(), head_before)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_branch_switch_rejected(path=None):
+    """Merge is rejected when the command switches branches."""
+    ds = Dataset(path).create(annex=False)
+    (ds.pathobj / "file.txt").write_text("initial")
+    ds.save(message="initial")
+    # Create a second branch with divergent content
+    ds.repo.call_git(["checkout", "-b", "other"])
+    (ds.pathobj / "other.txt").write_text("other branch")
+    ds.repo.call_git(["add", "other.txt"])
+    ds.repo.call_git(["commit", "-m", "on other branch"])
+    ds.repo.call_git(["checkout", DEFAULT_BRANCH])
+    assert_repo_status(ds.path)
+
+    # Command that switches to the other branch
+    res = ds.run(
+        'git checkout other',
+        on_failure='ignore',
+        result_renderer='disabled')
+    # Should get an error about the branch switch
+    assert_in_results(res, status='error', action='run')
+    error_results = [r for r in res
+                     if r.get('action') == 'run'
+                     and r.get('status') == 'error']
+    ok_(any('switched the active branch' in str(r.get('message', ''))
+            for r in error_results))
+    # The commit message should be saved for manual recovery
+    msg_path = ds.pathobj / '.git' / 'COMMIT_EDITMSG'
+    ok_(msg_path.exists())
+    ok_('[DATALAD RUNCMD]' in msg_path.read_text())
+
+
+# -- Tests for subdataset hierarchy merge commits --
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_subdataset_only(path=None):
+    """Inner commit only in subdataset -> merge in both sub and super."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+
+    ds.run('cd sub && ' + touch_command + 'foo' + ' && git add foo && git commit -m "inner"')
+    assert_repo_status(ds.path)
+
+    # sub should have a merge commit
+    _assert_run_merge(sub)
+
+    # super should also have a merge commit (submodule pointer changed)
+    _assert_run_merge(ds)
+
+    ok_((sub.pathobj / "foo").exists())
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_both_levels(path=None):
+    """Inner commits in both super and sub -> merges in both."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+
+    ds.run(
+        touch_command + 'top' + ' && git add top && git commit -m "top-inner" && '
+        'cd sub && ' + touch_command + 'foo' + ' && git add foo && git commit -m "sub-inner"'
+    )
+    assert_repo_status(ds.path)
+
+    # sub has merge
+    _assert_run_merge(sub)
+
+    # super has merge
+    _assert_run_merge(ds)
+
+    ok_((ds.pathobj / "top").exists())
+    ok_((sub.pathobj / "foo").exists())
+
+
+# Setup (`mid.create("leaf")` followed by `ds.save(recursive=True)`)
+# leaves super seeing ``mid/.datalad``, ``mid/.gitattributes``,
+# ``mid/.gitmodules`` as untracked on adjusted branches (Windows
+# CrippledFS).  This appears to be a pre-existing 3-level-recursive-
+# create issue on adjusted FS, unrelated to the run-merge feature.
+# TODO: investigate independently and remove the marker.
+@known_failure_windows  # 3-level recursive create+save quirk on adjusted FS
+@slow  # ~15 sec — creates three-level dataset hierarchy with annex
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_three_levels(path=None):
+    """Three-level hierarchy: commit only in leaf -> merges at all levels."""
+    ds = Dataset(path).create()
+    mid = ds.create("mid")
+    leaf = mid.create("leaf")
+    ds.save(recursive=True, message="record leaf creation")
+    assert_repo_status(ds.path)
+
+    ds.run(
+        'cd mid/leaf && ' + touch_command + 'foo' + ' && git add foo && git commit -m "inner"'
+    )
+    assert_repo_status(ds.path)
+
+    # leaf has merge
+    _assert_run_merge(leaf)
+
+    # mid has merge (submodule pointer changed)
+    _assert_run_merge(mid)
+
+    # super has merge
+    _assert_run_merge(ds)
+
+    ok_((leaf.pathobj / "foo").exists())
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_no_subdataset_change(path=None):
+    """Commit only in superdataset -> sub untouched, no spurious merge."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+    sub_head_before = sub.repo.get_hexsha()
+
+    ds.run(touch_command + 'top' + ' && git add top && git commit -m "top-inner"')
+    assert_repo_status(ds.path)
+
+    # super has merge
+    _assert_run_merge(ds)
+
+    # sub HEAD is unchanged — no merge commit, no changes
+    # On managed branches the adjustment commit changes the hexsha,
+    # so compare only on non-managed branches.
+    if _merge_ref(sub.repo) == "HEAD":
+        eq_(sub.repo.get_hexsha(), sub_head_before)
+    # No run-info merge in sub.  ``HEAD^2`` may exist on adjusted branches
+    # due to ``git annex sync`` adjustment merges, but those don't carry
+    # ``[DATALAD RUNCMD]`` records — so the right check is "no run merge".
+    _assert_no_run_merge(sub)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_merge_subdataset_deletions(path=None):
+    """File deletions (committed + uncommitted) in subdataset are reflected."""
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    # Create tracked files in sub
+    (sub.pathobj / "kept").write_text("keep")
+    (sub.pathobj / "rm_committed").write_text("remove by commit")
+    (sub.pathobj / "rm_uncommitted").write_text("remove uncommitted")
+    sub.save(message="add test files")
+    ds.save(message="record sub state")
+    assert_repo_status(ds.path)
+
+    rm_cmd = "del" if on_windows else "rm"
+    ds.run(
+        'cd sub && git rm rm_committed && git commit -m "remove" && '
+        '{} rm_uncommitted'.format(rm_cmd)
+    )
+    assert_repo_status(ds.path)
+
+    # sub has merge
+    _assert_run_merge(sub)
+
+    # Verify file states
+    ok_((sub.pathobj / "kept").exists())
+    assert_false((sub.pathobj / "rm_committed").exists())
+    assert_false((sub.pathobj / "rm_uncommitted").exists())
+
+    # super also has merge
+    _assert_run_merge(ds)

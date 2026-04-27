@@ -38,6 +38,7 @@ from datalad.interface.utils import (
     discover_dataset_trace_to_targets,
     get_tree_roots,
 )
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
@@ -50,9 +51,159 @@ from datalad.support.parallel import (
 from datalad.support.param import Parameter
 from datalad.utils import ensure_list
 
+from .diff import diff_dataset
 from .status import Status
 
 lgr = logging.getLogger('datalad.core.local.save')
+
+_STATUS_SKIP_KEYS = frozenset((
+    'path', 'parentds', 'refds', 'status', 'action', 'logger'))
+
+
+def _status_props(result):
+    """Extract status properties from a result dict, dropping metadata keys."""
+    return {k: v for k, v in result.items() if k not in _STATUS_SKIP_KEYS}
+
+
+def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
+    """Inject changed subdatasets that diff_dataset missed on adjusted branches.
+
+    On adjusted branches, diff_dataset reports subdatasets as clean because
+    the index submodule pointer records the adjusted SHA (which doesn't
+    change when the sub gets new commits).  This function uses pre-command
+    sub HEADs captured by run_command to:
+
+    - Override fr_map with the true pre-command SHAs
+    - Add changed subs to paths_by_ds so save_ds processes them
+    - Walk up from each changed sub to ds_path, ensuring every ancestor
+      has fr_map and paths_by_ds entries for merge propagation
+    """
+    for sub_path, sub_pre_sha in _fr_sub_info.items():
+        sub_repo = Dataset(sub_path).repo
+        if not sub_repo:
+            continue
+        cur_sha = sub_repo.get_hexsha()
+        if cur_sha == sub_pre_sha:
+            continue
+
+        fr_map[sub_path] = sub_pre_sha
+        if sub_path not in paths_by_ds:
+            paths_by_ds[sub_path] = {}
+
+        # Walk up to ds_path, registering each child as modified in
+        # its parent and ensuring fr_map entries exist at each level.
+        # Termination: normally `parent_path == ds_path`.  Defensive
+        # second termination on `parent_path == child_path` covers the
+        # case where `sub_path` is not a descendant of `ds_path` (which
+        # `_parse_sub_status` from `git submodule status --recursive`
+        # never produces, but a future caller might) — without it,
+        # `Path('/').parent == Path('/')` would loop forever.
+        child_path = sub_path
+        while True:
+            parent_path = str(ut.Path(child_path).parent)
+            if parent_path == child_path:
+                lgr.debug("sub %s not under ds %s; aborting ancestor walk",
+                          sub_path, ds_path)
+                break
+            child_repo = Dataset(child_path).repo
+            child_sha = child_repo.get_hexsha() if child_repo else cur_sha
+            child_pre = _fr_sub_info.get(child_path, child_sha)
+
+            pds_status = paths_by_ds.setdefault(parent_path, {})
+            pds_status[ut.Path(child_path)] = dict(
+                type='dataset', state='modified',
+                prev_gitshasum=child_pre, gitshasum=child_sha)
+
+            if parent_path not in fr_map:
+                fr_map[parent_path] = _fr_sub_info.get(
+                    parent_path,
+                    Dataset(parent_path).repo.get_hexsha())
+
+            if parent_path == ds_path:
+                break
+            child_path = parent_path
+
+
+def _create_merge_commit(repo, pre_hexsha, msg):
+    """Create a merge commit wrapping command-created commits.
+
+    The merge has two parents:
+      parent1 = pre_hexsha (pre-command state, keeps first-parent history clean)
+      parent2 = current HEAD (command's commits + any leftover save)
+      tree    = current HEAD's tree (reflects all changes)
+
+    On adjusted branches (git-annex), the merge is created on the
+    original branch and then propagated back via ``git annex merge``.
+
+    Raises
+    ------
+    CommandError
+        If pre_hexsha is not an ancestor of the current HEAD, indicating
+        the command switched branches or reset to an unrelated state.
+
+    Parameters
+    ----------
+    repo : GitRepo or AnnexRepo
+    pre_hexsha : str
+        Commit hash of the pre-command state (first parent).
+    msg : str
+        Commit message (typically the run record).
+    """
+    on_adjusted = isinstance(repo, AnnexRepo) and repo.is_managed_branch()
+    if on_adjusted:
+        orig_branch = repo.get_corresponding_branch()
+        repo.call_git([
+            "annex", "sync", "--no-push", "--no-pull",
+            "--no-commit", "--no-resolvemerge", "--no-content"])
+        orig_post = repo.get_hexsha("refs/heads/" + orig_branch)
+        orig_pre = repo.call_git_oneline(
+            ["merge-base", orig_branch, pre_hexsha])
+        # Verify the pre-command state is an ancestor of the
+        # post-command state.  If not, the command switched branches.
+        if not repo.call_git_success(
+                ["merge-base", "--is-ancestor", orig_pre, orig_post]):
+            raise CommandError(
+                cmd="run",
+                msg="cannot create merge commit: pre-command state "
+                    f"{orig_pre[:8]} is not an ancestor of "
+                    f"post-command state {orig_post[:8]} on branch "
+                    f"{orig_branch}.  The command may have switched "
+                    "branches or reset to an unrelated state.")
+        tree = repo.call_git_oneline(
+            ["rev-parse", orig_post + "^{tree}"])
+        merge_hexsha = repo.call_git_oneline(
+            ["commit-tree", tree,
+             "-p", orig_pre, "-p", orig_post,
+             "-m", msg])
+        repo.update_ref("refs/heads/" + orig_branch, merge_hexsha)
+        repo.call_git(["annex", "merge"])
+    else:
+        current_head = repo.get_hexsha()
+        # Verify the pre-command state is an ancestor of the current
+        # HEAD.  If not, the command switched branches or reset to an
+        # unrelated state — creating a merge would be nonsensical.
+        if not repo.call_git_success(
+                ["merge-base", "--is-ancestor",
+                 pre_hexsha, current_head]):
+            raise CommandError(
+                cmd="run",
+                msg="cannot create merge commit: pre-command state "
+                    f"{pre_hexsha[:8]} is not an ancestor of current "
+                    f"HEAD {current_head[:8]}.  The command may have "
+                    "switched branches or reset to an unrelated state.")
+        tree = repo.call_git_oneline(
+            ["rev-parse", current_head + "^{tree}"])
+        merge_hexsha = repo.call_git_oneline(
+            ["commit-tree", tree,
+             "-p", pre_hexsha,
+             "-p", current_head,
+             "-m", msg])
+        branch = repo.get_active_branch()
+        if branch:
+            repo.update_ref(
+                "refs/heads/" + branch, merge_hexsha)
+        else:
+            repo.update_ref("HEAD", merge_hexsha)
 
 
 @build_doc
@@ -156,6 +307,18 @@ class Save(Interface):
             previous commit. This is mutually exclusive with recursive
             operation.
             """),
+        fr=Parameter(
+            args=("--from",),
+            dest='fr',
+            metavar='COMMIT',
+            doc="""if given, compare against this commit instead of HEAD to
+            discover changes, and wrap any intermediate commits made since
+            that point as a merge commit. The merge has first-parent = fr
+            (keeping first-parent history linear) and second-parent = the
+            post-save HEAD (all changes). This is used by `datalad run` to
+            wrap command-created commits but can also be used standalone to
+            close a unit of work as a merge.""",
+            constraints=EnsureStr() | EnsureNone()),
     )
 
     @staticmethod
@@ -171,6 +334,9 @@ class Save(Interface):
                  to_git=None,
                  jobs=None,
                  amend=False,
+                 fr=None,
+                 _fr_sub_info=None,
+                 _sub_message=None,
                  ):
         if message and message_file:
             raise ValueError(
@@ -178,6 +344,11 @@ class Save(Interface):
 
         if amend and recursive:
             raise ValueError("Cannot amend a commit recursively.")
+
+        if amend and fr is not None:
+            raise ValueError(
+                "Cannot amend when using --from; "
+                "--from creates a merge commit.")
 
         path = ensure_list(path)
 
@@ -217,40 +388,84 @@ class Save(Interface):
 
         ds = require_dataset(dataset, check_installed=True, purpose='save')
 
-        # use status() to do all discovery and annotation of paths
         paths_by_ds = {}
-        for s in Status()(
-                # ATTN: it is vital to pass the `dataset` argument as it,
-                # and not a dataset instance in order to maintain the path
-                # semantics between here and the status() call
-                dataset=dataset,
-                path=path,
-                untracked=untracked_mode,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                on_failure='ignore',
-                # for save without recursion only commit matters
-                eval_subdataset_state='full' if recursive else 'commit',
-                return_type='generator',
-                # this could be, but for now only 'error' results are handled
-                # below
-                #on_failure='ignore',
-                result_renderer='disabled'):
-            if s['status'] == 'error':
-                # Downstream code can't do anything with these. Let the caller
-                # decide their fate.
-                yield s
-                continue
+        fr_map = {}  # {ds_path: pre_hexsha} — only populated when fr is set
 
-            # fish out status dict for this parent dataset
-            ds_status = paths_by_ds.get(s['parentds'], {})
-            # reassemble path status info as repo.status() would have made it
-            ds_status[ut.Path(s['path'])] = \
-                {k: v for k, v in s.items()
-                 if k not in (
-                     'path', 'parentds', 'refds', 'status', 'action',
-                     'logger')}
-            paths_by_ds[s['parentds']] = ds_status
+        if fr is not None:
+            # Use diff_dataset to discover changes from the given baseline.
+            # This translates `fr` per-subdataset via prev_gitshasum.
+            # ATTN: pass `dataset` (the original argument) rather than
+            # `ds` (a Dataset instance) so that resolve_path() inside
+            # diff_dataset resolves relative paths against CWD — the
+            # same semantics as the Status() call in the else branch.
+            # See resolve_path() docs: only Dataset *instances* trigger
+            # dataset-root-relative resolution.  When dataset=None,
+            # diff_dataset discovers the dataset from CWD via its own
+            # require_dataset() call, same as Status does.
+            for s in diff_dataset(
+                    dataset=dataset, fr=fr, to=None,
+                    constant_refs=False,
+                    # Stringify to avoid mixed PosixPath/str in
+                    # diff_dataset's sorted() call
+                    path=[str(p) for p in path] if path else None,
+                    recursive=recursive,
+                    recursion_limit=recursion_limit,
+                    reporting_order='bottom-up',
+                    # Use 'normal' (not untracked_mode='all') to
+                    # report untracked directories as single entries
+                    # rather than enumerating every file.  save_()
+                    # handles directory entries correctly (git add
+                    # recurses into them).  This matches the prior
+                    # run.py behavior and avoids building a huge
+                    # paths_by_ds dict for repos with large untracked
+                    # trees (node_modules/, build/, etc).
+                    untracked='normal' if not updated else 'no'):
+                if s.get('status') == 'error':
+                    yield s
+                    continue
+                if s.get('status') != 'ok':
+                    continue
+                ds_status = paths_by_ds.get(s['parentds'], {})
+                props = _status_props(s)
+                ds_status[ut.Path(s['path'])] = props
+                paths_by_ds[s['parentds']] = ds_status
+                # Track per-subdataset pre-command pointers for merge
+                if (s.get('type') == 'dataset'
+                        and 'prev_gitshasum' in props):
+                    fr_map[s['path']] = props['prev_gitshasum']
+            # The top-level dataset's baseline is `fr` itself
+            fr_map[ds.path] = fr
+
+            # On adjusted branches, diff_dataset may not detect
+            # subdataset commits (index submodule pointer stays the
+            # same).  Inject changed subs from run_command's snapshot.
+            if _fr_sub_info:
+                _inject_sub_info(paths_by_ds, fr_map,
+                                 _fr_sub_info, ds.path)
+        else:
+            # Standard Status-based discovery
+            for s in Status()(
+                    # ATTN: it is vital to pass the `dataset` argument as
+                    # it, and not a dataset instance in order to maintain
+                    # the path semantics between here and the status() call
+                    dataset=dataset,
+                    path=path,
+                    untracked=untracked_mode,
+                    recursive=recursive,
+                    recursion_limit=recursion_limit,
+                    on_failure='ignore',
+                    eval_subdataset_state='full'
+                    if recursive else 'commit',
+                    return_type='generator',
+                    result_renderer='disabled'):
+                if s['status'] == 'error':
+                    yield s
+                    continue
+
+                # fish out status dict for this parent dataset
+                ds_status = paths_by_ds.get(s['parentds'], {})
+                ds_status[ut.Path(s['path'])] = _status_props(s)
+                paths_by_ds[s['parentds']] = ds_status
 
         lgr.debug('Determined %i datasets for saving from input arguments',
                   len(paths_by_ds))
@@ -301,13 +516,38 @@ class Save(Interface):
                 pds_repo.pathobj / p.relative_to(pdspath): props
                 for p, props in paths.items()}
             start_commit = pds_repo.get_hexsha()
-            if not all(p['state'] == 'clean' for p in pds_status.values()) or \
+
+            # Determine whether this dataset needs a merge commit.
+            # A merge is needed when either:
+            #  - the command created intermediate commits (pre-command
+            #    pointer != current HEAD), or
+            #  - a child subdataset was merged (upward propagation).
+            pre_hexsha = fr_map.get(pdspath)
+            had_inner = (pre_hexsha is not None
+                         and pre_hexsha != start_commit)
+            child_merged = (
+                pre_hexsha is not None
+                and any(str(p) in _merged_datasets
+                        for p, props in paths.items()
+                        if props.get('type') == 'dataset'))
+            will_merge = had_inner or child_merged
+
+            if not all(p['state'] == 'clean'
+                       for p in pds_status.values()) or \
                     (amend and message):
+                # When wrapping inner commits as a merge, the intermediate
+                # save of working-tree changes is subordinate to the merge
+                # commit (it lives on the second-parent chain).  Use
+                # _sub_message if the caller provided one (run_command
+                # passes a run-specific string); otherwise fall back to the
+                # user's message.
+                save_msg = (_sub_message if will_merge and _sub_message
+                            else message)
                 for res in pds_repo.save_(
-                        message=message,
-                        # make sure to have the `path` arg be None, as we want
-                        # to prevent and bypass any additional repo.status()
-                        # calls
+                        message=save_msg,
+                        # make sure to have the `path` arg be None, as we
+                        # want to prevent and bypass any additional
+                        # repo.status() calls
                         paths=None,
                         # prevent whining of GitRepo
                         git=True if not hasattr(pds_repo, 'uuid')
@@ -317,9 +557,6 @@ class Save(Interface):
                         untracked='no',
                         _status=pds_status,
                         amend=amend):
-                    # TODO remove stringification when datalad-core can handle
-                    # path objects, or when PY3.6 is the lowest supported
-                    # version
                     for k in ('path', 'refds'):
                         if k in res:
                             res[k] = str(
@@ -328,6 +565,20 @@ class Save(Interface):
                                     pds_repo.pathobj)
                             )
                     yield res
+
+            if will_merge:
+                try:
+                    _create_merge_commit(pds_repo, pre_hexsha, message)
+                except CommandError as exc:
+                    yield dict(
+                        action='save', type='dataset',
+                        path=pds.path, refds=ds.path,
+                        status='error',
+                        message=str(exc),
+                        logger=lgr)
+                    return
+                _merged_datasets.add(pdspath)
+
             # report on the dataset itself
             dsres = dict(
                 action='save',
@@ -353,15 +604,18 @@ class Save(Interface):
             except CommandError as e:
                 if dsres['status'] == 'ok':
                     # first we yield the result for the actual save
-                    # TODO: we will get duplicate dataset/save record obscuring
-                    # progress reporting.  yoh thought to decouple "tag" from "save"
-                    # messages but was worrying that original authors would disagree
                     yield dsres.copy()
                 # and now complain that tagging didn't work
                 dsres.update(
                     status='error',
                     message=('cannot tag this version: %s', e.stderr.strip()))
                 yield dsres
+
+        # Track which datasets got merge commits, so parent save_ds
+        # can detect child merges for upward propagation.
+        # Safe because ProducerConsumerProgressLog with
+        # no_subds_in_futures processes children before parents.
+        _merged_datasets = set()
 
         if not paths_by_ds:
             # Special case: empty repo. There's either an empty commit only or

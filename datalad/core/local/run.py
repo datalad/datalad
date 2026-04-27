@@ -81,6 +81,27 @@ def _format_cmd_shorty(cmd):
     return cmd_shorty
 
 
+def _parse_sub_status(sub_status_output, ds_path):
+    """Parse ``git submodule status --recursive`` output into {path: sha}.
+
+    Each line has format: ``[+ ]<sha> <path> (<branch>)``
+    Returns {absolute_path: sha_string}.
+    """
+    result = {}
+    for line in sub_status_output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Strip leading +/- prefix
+        if line[0] in '+-U':
+            line = line[1:]
+        parts = line.split(None, 2)
+        if len(parts) >= 2:
+            sha, relpath = parts[0], parts[1]
+            result[op.join(ds_path, relpath)] = sha
+    return result
+
+
 assume_ready_opt = Parameter(
     args=("--assume-ready",),
     constraints=EnsureChoice(None, "inputs", "outputs", "both"),
@@ -1016,9 +1037,37 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         )
         return
 
+    pre_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
+    pre_cmd_branch = ds.repo.get_active_branch() if not inject else None
+    # Snapshot subdataset state with a single git call to detect
+    # subdataset-only commits later (command may create commits deep
+    # in the hierarchy without changing the top-level HEAD).
+    pre_cmd_sub_status = (
+        ds.repo.call_git(["submodule", "status", "--recursive"])
+        if pre_cmd_hexsha is not None else None)
+
     if not inject:
         cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
+
+    # Detect if the command created commits — either in the top-level
+    # dataset or in any subdataset.  Only then do we use Save(fr=...)
+    # which routes through diff_dataset for merge creation.  Without
+    # inner commits, fr=None uses the standard Status-based save.
+    post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
+    cmd_made_commits = (
+        pre_cmd_hexsha is not None
+        and post_cmd_hexsha is not None
+        and pre_cmd_hexsha != post_cmd_hexsha
+    )
+
+    # Also detect subdataset-only commits by comparing the single-string
+    # submodule status snapshot (one git call, not N Dataset objects).
+    if (pre_cmd_sub_status is not None and not cmd_made_commits):
+        post_sub_status = ds.repo.call_git(
+            ["submodule", "status", "--recursive"])
+        if pre_cmd_sub_status != post_sub_status:
+            cmd_made_commits = True
 
     # Re-glob to capture any new outputs.
     #
@@ -1056,7 +1105,32 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         message if message is not None else cmd_shorty,
         '"{}"'.format(record) if record_path else record)
 
+    # Safety: if the command switched branches, creating a merge commit
+    # would be wrong — it would link two unrelated lines of history.
+    # Save the run record for manual recovery and error out.
+    if cmd_made_commits and pre_cmd_branch is not None:
+        post_cmd_branch = ds.repo.get_active_branch()
+        if post_cmd_branch != pre_cmd_branch:
+            repo = ds.repo
+            msg_path = ds.pathobj / \
+                repo.dot_git.relative_to(repo.pathobj) / "COMMIT_EDITMSG"
+            msg_path.write_text(msg)
+            yield get_status_dict(
+                'run', ds=ds, status='error',
+                message=(
+                    'command switched the active branch from %s to %s. '
+                    'Cannot create a merge commit across branches. '
+                    'The run record was saved to %s',
+                    pre_cmd_branch, post_cmd_branch, str(msg_path)))
+            return
+
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
+
+    # Track whether the user declared any outputs (before we append record_path).
+    # Use .paths (raw declarations) rather than expand_strict() which drops
+    # non-existent paths -- we want to know if the user *declared* outputs.
+    has_declared_outputs = bool(globbed['outputs'].paths) if explicit else False
+
     if explicit and pre_command_outputs:
         # Include outputs that existed before the command but were deleted
         # by it. expand_strict() only returns files present on disk, so
@@ -1065,9 +1139,44 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for p in sorted(pre_command_outputs - post_outputs):
             if not op.lexists(op.join(pwd, p)):
                 outputs_to_save.append(p)
+
     if outputs_to_save is not None and record_path:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
+
+    # In explicit mode with declared outputs, check if intermediate commits
+    # swept in files not declared as --output (which would lose provenance).
+    # Skip when no outputs were declared (e.g. run_procedure with explicit=True)
+    # since there is no declaration to check against.
+    if cmd_made_commits and explicit and has_declared_outputs:
+        committed_diff = ds.repo.diff(pre_cmd_hexsha, post_cmd_hexsha)
+        committed_paths = {
+            str(p.relative_to(ds.pathobj)) for p in committed_diff
+        }
+        # Normalize declared outputs to relative-to-dataset format
+        declared_set = set()
+        for p in outputs_to_save:
+            p = str(p)
+            if op.isabs(p):
+                p = op.relpath(p, ds_path)
+            else:
+                p = op.relpath(op.join(pwd, p), ds_path)
+            declared_set.add(p)
+        undeclared = committed_paths - declared_set
+        if undeclared:
+            dirty_committed_cfg = ds.config.get(
+                'datalad.run.dirty-committed', default='error')
+            if dirty_committed_cfg == 'error':
+                yield get_status_dict(
+                    'run', ds=ds, status='error',
+                    message=(
+                        'command created commits that include files not '
+                        'declared as --output: %s. '
+                        'Set config datalad.run.dirty-committed=ignore '
+                        'to override',
+                        sorted(undeclared)))
+                return
+
     msg_path = None
     if not rerun_info and cmd_exitcode:
         if do_save:
@@ -1124,10 +1233,23 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     recursive=True,
                     message=msg,
                     jobs=jobs,
+                    # Only use fr= when the command created commits
+                    # (in the top-level or any subdataset).  Without
+                    # inner commits, use fr=None (standard Status path).
+                    fr=pre_cmd_hexsha if cmd_made_commits else None,
+                    # Pass pre-command sub HEADs so Save can detect
+                    # subdataset commits on adjusted branches where
+                    # diff_dataset can't see them.  Parse from the
+                    # lightweight submodule status snapshot.
+                    _fr_sub_info=_parse_sub_status(
+                        pre_cmd_sub_status, ds_path)
+                    if cmd_made_commits and pre_cmd_sub_status
+                    else None,
+                    # Message for the auxiliary commit that wraps
+                    # uncommitted changes before the run-merge.  Keeps
+                    # the run-record out of the intermediate commit.
+                    _sub_message="Remaining changes after command execution",
                     return_type='generator',
-                    # we want this command and its parameterization to be in full
-                    # control about the rendering of results, hence we must turn
-                    # off internal rendering
                     result_renderer='disabled',
                     on_failure='ignore'):
                 yield r
