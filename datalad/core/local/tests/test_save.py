@@ -1228,6 +1228,17 @@ def test_save_from_with_path_filter(path=None):
     # excluded.txt should still be untracked
     assert_repo_status(ds.path, untracked=["excluded.txt"])
 
+    # The inner commit forces a merge commit even with a path filter —
+    # the merge's tree carries committed.txt (from the inner commit) and
+    # included.txt; excluded.txt remains untracked.
+    merge_ref = _merge_ref(ds.repo)
+    ok_(ds.repo.commit_exists(merge_ref + "^2"))
+    eq_(ds.repo.get_hexsha(merge_ref + "^1"), baseline)
+    merge_tree_files = ds.repo.call_git(
+        ["ls-tree", "-r", "--name-only", merge_ref]).splitlines()
+    assert_in("committed.txt", merge_tree_files)
+    assert_in("included.txt", merge_tree_files)
+
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
