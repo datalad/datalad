@@ -1557,6 +1557,7 @@ def test_clone_unborn_head_sub(path=None):
 
 
 @skip_if_no_network
+@pytest.mark.flaky(retries=2, only_on=[IncompleteResultsError])
 @with_tempfile
 def test_gin_cloning(path=None):
     # can we clone a public ds anoynmously from gin and retrieve content
