@@ -1557,11 +1557,30 @@ def test_clone_unborn_head_sub(path=None):
 
 
 @skip_if_no_network
-@pytest.mark.flaky(retries=2, only_on=[IncompleteResultsError])
+@pytest.mark.flaky(retries=3, delay=5, only_on=[IncompleteResultsError])
 @with_tempfile
 def test_gin_cloning(path=None):
     # can we clone a public ds anoynmously from gin and retrieve content
-    ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
+    try:
+        ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
+    except IncompleteResultsError as e:
+        # gin.g-node.org is occasionally unavailable to CI runners: it has
+        # been seen returning HTTP 403 to GitHub-hosted Azure ranges, and
+        # also outright TCP-connect-timeouts. Both are environment-side
+        # issues, not a problem with datalad/git-annex. Retries above cover
+        # short blips; if the condition persists, skip rather than fail CI.
+        msg = str(e)
+        if any(s in msg for s in (
+                "error: 403",
+                "Could not connect to server",
+                "Failed to connect to gin.g-node.org",
+        )):
+            pytest.skip(
+                "gin.g-node.org unreachable from this runner "
+                "(IP-block, rate-limit, or outage): "
+                + msg.split('\n', 1)[0][:200]
+            )
+        raise
     ok_(ds.is_installed())
     annex_path = op.join('annex', 'two')
     git_path = op.join('git', 'one')
