@@ -1065,6 +1065,7 @@ def test_run_merge_branch_switch_rejected(path=None):
     ds = Dataset(path).create(annex=False)
     (ds.pathobj / "file.txt").write_text("initial")
     ds.save(message="initial")
+    pre_cmd_hexsha = ds.repo.get_hexsha()
     # Create a second branch with divergent content
     ds.repo.call_git(["checkout", "-b", "other"])
     (ds.pathobj / "other.txt").write_text("other branch")
@@ -1083,8 +1084,19 @@ def test_run_merge_branch_switch_rejected(path=None):
     error_results = [r for r in res
                      if r.get('action') == 'run'
                      and r.get('status') == 'error']
-    ok_(any('switched the active branch' in str(r.get('message', ''))
-            for r in error_results))
+
+    def _rendered(r):
+        msg = r.get('message', '')
+        if isinstance(msg, tuple):
+            return msg[0] % msg[1:]
+        return str(msg)
+
+    rendered = [_rendered(r) for r in error_results]
+    ok_(any('switched the active branch' in m for m in rendered))
+    # Recovery hint: must surface the original commit and a save --from
+    # command so the user can complete the run on the new branch.
+    ok_(any(pre_cmd_hexsha in m for m in rendered))
+    ok_(any('datalad save' in m and '--from' in m for m in rendered))
     # The commit message should be saved for manual recovery
     msg_path = ds.pathobj / '.git' / 'COMMIT_EDITMSG'
     ok_(msg_path.exists())

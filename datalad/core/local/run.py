@@ -1120,8 +1120,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 message=(
                     'command switched the active branch from %s to %s. '
                     'Cannot create a merge commit across branches. '
-                    'The run record was saved to %s',
-                    pre_cmd_branch, post_cmd_branch, str(msg_path)))
+                    'The run record was saved to %s. '
+                    'To record the run on the new branch, use: '
+                    'datalad save -d %s --from %s -F %s',
+                    pre_cmd_branch, post_cmd_branch, str(msg_path),
+                    ds.path, pre_cmd_hexsha, str(msg_path)))
             return
 
     outputs_to_save = globbed['outputs'].expand_strict() if explicit else None
