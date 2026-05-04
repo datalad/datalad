@@ -524,19 +524,19 @@ def test_timeout_nothing() -> None:
     assert_true(len(timeout_queue) > 0)
 
 
-def test_timeout_stdout_stderr() -> None:
-    # Expect timeouts on stdin, stdout, stderr, and the process
-    class TestProtocol(StdOutErrCapture):
-        def __init__(self,
-                     timeout_queue: list[tuple[int, Optional[int]]]) -> None:
-            StdOutErrCapture.__init__(self)
-            self.timeout_queue = timeout_queue
-            self.counter = count()
+class _TimeoutProtocol(StdOutErrCapture):
+    def __init__(self,
+                 timeout_queue: list[tuple[int, Optional[int]]]) -> None:
+        StdOutErrCapture.__init__(self)
+        self.timeout_queue = timeout_queue
+        self.counter = count()
 
-        def timeout(self, fd: Optional[int]) -> bool:
-            self.timeout_queue.append((next(self.counter), fd))
-            return False
+    def timeout(self, fd: Optional[int]) -> bool:
+        self.timeout_queue.append((next(self.counter), fd))
+        return False
 
+
+def _run_timeout_command() -> list[tuple[int, Optional[int]]]:
     stdin_queue: Queue[Optional[bytes]] = queue.Queue()
     for i in range(12):
         stdin_queue.put(b"\x00" * 1024)
@@ -546,10 +546,16 @@ def test_timeout_stdout_stderr() -> None:
     run_command(
         py2cmd("import time;time.sleep(.5)\n"),
         stdin=stdin_queue,
-        protocol=TestProtocol,
+        protocol=_TimeoutProtocol,
         timeout=.1,
         protocol_kwargs=dict(timeout_queue=timeout_queue)
     )
+    return timeout_queue
+
+
+def test_timeout_stdout_stderr() -> None:
+    # Expect timeouts on stdout and stderr
+    timeout_queue = _run_timeout_command()
 
     # Expect at least one timeout for stdout and stderr.
     # there might be more.
@@ -560,38 +566,16 @@ def test_timeout_stdout_stderr() -> None:
 
 
 def test_timeout_process() -> None:
-    # Expect timeouts on stdin, stdout, stderr, and the process
-    class TestProtocol(StdOutErrCapture):
-        def __init__(self,
-                     timeout_queue: list[tuple[int, Optional[int]]]) -> None:
-            StdOutErrCapture.__init__(self)
-            self.timeout_queue = timeout_queue
-            self.counter = count()
-
-        def timeout(self, fd: Optional[int]) -> bool:
-            self.timeout_queue.append((next(self.counter), fd))
-            return False
-
-    stdin_queue: Queue[Optional[bytes]] = queue.Queue()
-    for i in range(12):
-        stdin_queue.put(b"\x00" * 1024)
-    stdin_queue.put(None)
-
-    timeout_queue: list[tuple[int, Optional[int]]] = []
-    run_command(
-        py2cmd("import time;time.sleep(.5)\n"),
-        stdin=stdin_queue,
-        protocol=TestProtocol,
-        timeout=.1,
-        protocol_kwargs=dict(timeout_queue=timeout_queue)
-    )
+    # Expect timeouts on stdout, stderr, and the process
+    timeout_queue = _run_timeout_command()
 
     # Expect at least one timeout for stdout and stderr.
-    # there might be more.
     sources = (1, 2)
     assert_true(len(timeout_queue) >= len(sources))
     for source in sources:
         assert_true(any(fd == source for _, fd in timeout_queue))
+    # Also expect at least one process-level timeout (fd=None)
+    assert_true(any(fd is None for _, fd in timeout_queue))
 
 
 def test_exit_3() -> None:
