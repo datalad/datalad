@@ -1212,3 +1212,82 @@ def test_check_for_openfiles_invalid_config(tmp_path):
     ):
         with assert_raises(ValueError):
             ds.repo._check_for_openfiles({'dummy.txt': {}}, 'bogus')
+
+
+@with_tempfile(mkdir=True)
+def test_save_unmatched_path(path=None):
+    # gh-7840 / gh-3844: a path argument that does not match any file
+    # known to git and does not exist on disk must produce an error
+    # record so save exits non-zero (mirroring `git add`/`git commit`).
+    ds = Dataset(path).create(annex=False)
+    (ds.pathobj / 'real_file').write_text('hi')
+    ds.save(message='initial')
+
+    # 1) sole nonexistent path -> error result, no save happens
+    res = ds.save(path='nope', message='m', on_failure='ignore',
+                  result_renderer='disabled')
+    assert_in_results(
+        res,
+        action='save',
+        status='error',
+        path=str(ds.pathobj / 'nope'),
+    )
+    # the original input path is included in the rendered message
+    err = [r for r in res if r['status'] == 'error'][0]
+    assert_in('nope', err['message'][1] if isinstance(err['message'], tuple)
+              else err['message'])
+
+    # 2) mixed existing+nonexistent: existing one is saved, error is reported
+    (ds.pathobj / 'real_file').write_text('changed')
+    res = ds.save(path=['real_file', 'no_such_path'], message='m',
+                  on_failure='ignore', result_renderer='disabled')
+    assert_in_results(res, action='save', status='error',
+                      path=str(ds.pathobj / 'no_such_path'))
+    assert_in_results(res, action='add', status='ok',
+                      path=str(ds.pathobj / 'real_file'))
+
+    # 3) existing empty directory is NOT flagged as unmatched
+    (ds.pathobj / 'empty_dir').mkdir()
+    res = ds.save(path='empty_dir', message='m', on_failure='ignore',
+                  result_renderer='disabled')
+    assert_result_count(res, 0, status='error')
+
+    # 4) existing clean tracked file is NOT flagged as unmatched
+    res = ds.save(path='real_file', message='m', on_failure='ignore',
+                  result_renderer='disabled')
+    assert_result_count(res, 0, status='error')
+
+    # 5) outside-refds path is reported once (by status), not duplicated by save
+    bogus = op.join(op.dirname(path), 'definitely_not_in_refds_xxx')
+    res = ds.save(path=bogus, message='m', on_failure='ignore',
+                  result_renderer='disabled')
+    # exactly one error, coming from status (not a save-side duplicate)
+    errs = [r for r in res if r['status'] == 'error']
+    eq_(len(errs), 1)
+    eq_(errs[0]['action'], 'status')
+
+    # 6) nonexistent paths inside a subdataset and a sub-subdataset are
+    #    detected and reported with the resolved path (covers nested-dataset
+    #    sorting via Status's get_paths_by_ds).
+    sub = ds.create('sub')
+    subsub = sub.create(op.join('sub', 'subsub'))  # noqa: F841
+    res = ds.save(path=op.join('sub', 'subsub', 'no_such_thing'),
+                  message='m', on_failure='ignore', result_renderer='disabled')
+    assert_in_results(
+        res, action='save', status='error',
+        path=str(ds.pathobj / 'sub' / 'subsub' / 'no_such_thing'))
+    res = ds.save(path=op.join('sub', 'no_such_thing_in_sub'), message='m',
+                  on_failure='ignore', result_renderer='disabled')
+    assert_in_results(
+        res, action='save', status='error',
+        path=str(ds.pathobj / 'sub' / 'no_such_thing_in_sub'))
+
+    # 7) deleted directory (whole tree removed from disk) is NOT flagged as
+    #    unmatched: Status reports its individual deletions, save commits them.
+    (ds.pathobj / 'gone' / 'a').mkdir(parents=True)
+    (ds.pathobj / 'gone' / 'a' / 'inner.txt').write_text('x')
+    ds.save(message='setup gone-tree')
+    rmtree(str(ds.pathobj / 'gone'))
+    res = ds.save(path='gone', message='m', on_failure='ignore',
+                  result_renderer='disabled')
+    assert_result_count(res, 0, status='error')
