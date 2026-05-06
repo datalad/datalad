@@ -37,9 +37,11 @@ from datalad.interface.base import (
     eval_results,
 )
 from datalad.interface.common_opts import (
+    cfg_proc_opt,
     location_description,
     save_message_opt,
 )
+from datalad.local.run_procedure import _get_proc_configs
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
     EnsureKeyChoice,
@@ -174,16 +176,7 @@ class Create(Interface):
             doc="""Configure the repository to use fake dates. The date for a
             new commit will be set to one second later than the latest commit
             in the repository. This can be used to anonymize dates."""),
-        cfg_proc=Parameter(
-            args=("-c", "--cfg-proc"),
-            metavar="PROC",
-            action='append',
-            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
-            on the created dataset. Use
-            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
-            to get a list of available procedures, such as cfg_text2git.
-            """
-        ),
+        cfg_proc=cfg_proc_opt,
         message=save_message_opt,
     )
 
@@ -341,25 +334,7 @@ class Create(Interface):
             yield res
             return
 
-        # Check if specified cfg_proc(s) can be discovered, storing
-        # the results so they can be used when the time comes to run
-        # the procedure. If a procedure cannot be found, raise an
-        # error to prevent creating the dataset.
-        cfg_proc_specs = []
-        if cfg_proc:
-            discovered_procs = tbds.run_procedure(
-                discover=True,
-                result_renderer='disabled',
-                return_type='list',
-            )
-            for cfg_proc_ in cfg_proc:
-                for discovered_proc in discovered_procs:
-                    if discovered_proc['procedure_name'] == 'cfg_' + cfg_proc_:
-                        cfg_proc_specs.append(discovered_proc)
-                        break
-                else:
-                    raise ValueError("Cannot find procedure with name "
-                                     "'%s'" % cfg_proc_)
+        cfg_proc_specs = _get_proc_configs(cfg_proc, tbds) if cfg_proc else []
 
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}

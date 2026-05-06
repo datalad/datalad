@@ -35,9 +35,26 @@ def test_create(outdir=None):
 
 
 def test_parse_spec():
-    eq_(_parse_spec('0/3/-1'), [(0, 0), (3, 3), (0, 1)])
-    eq_(_parse_spec('4-10'), [(4, 10)])
+    eq_(_parse_spec('0/3/-1'), [
+        dict(min=0, max=0, is_dir=False, nfiles=None),
+        dict(min=3, max=3, is_dir=False, nfiles=None),
+        dict(min=0, max=1, is_dir=False, nfiles=None),
+    ])
+    eq_(_parse_spec('4-10'), [
+        dict(min=4, max=10, is_dir=False, nfiles=None),
+    ])
     eq_(_parse_spec(''), [])
+    # Extended syntax: +Nf suffix and d prefix
+    eq_(_parse_spec('2+100f'), [
+        dict(min=2, max=2, is_dir=False, nfiles=100),
+    ])
+    eq_(_parse_spec('d3+50f'), [
+        dict(min=3, max=3, is_dir=True, nfiles=50),
+    ])
+    eq_(_parse_spec('2+10f/d4+5f'), [
+        dict(min=2, max=2, is_dir=False, nfiles=10),
+        dict(min=4, max=4, is_dir=True, nfiles=5),
+    ])
 
 
 def test_create_test_dataset():

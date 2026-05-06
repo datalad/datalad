@@ -636,6 +636,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/108482432?v=4"
             ]
+        },
+        {
+            "login": "jkonieczny2",
+            "name": "jkonieczny2",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/jkonieczny2",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/14842795?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
