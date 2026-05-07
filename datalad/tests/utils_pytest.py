@@ -1477,6 +1477,43 @@ if not (FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf
 OBSCURE_FILENAME_PARTS += [' ', '.datc', ' ']
 
 
+def fs_supports_filename(tdir, name):
+    """Return True iff `name` can be created as a directory under `tdir`.
+
+    Probes actual filesystem capability rather than relying on a
+    process-level encoding announcement. CrippledFS variants (vfat,
+    exfat, etc.) reject characters and trailing spaces even when the
+    process advertises UTF-8 via ``sys.getfilesystemencoding()``, so a
+    real ``mkdir`` is the only reliable check. The created directory is
+    removed before return.
+
+    Parameters
+    ----------
+    tdir : str
+      Existing directory under which to attempt creation.
+    name : str
+      Candidate basename to probe.
+
+    Returns
+    -------
+    bool
+      True if the filesystem accepted the name (and it was cleaned up),
+      False otherwise.
+    """
+    target = opj(tdir, name)
+    try:
+        os.mkdir(target)
+    except (OSError, ValueError):
+        return False
+    try:
+        os.rmdir(target)
+    except OSError:
+        # Created but couldn't clean up -- still counts as supported,
+        # leftover lives under the caller's tempdir which is its problem.
+        pass
+    return True
+
+
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir, return_candidates=False):
     """Return the most obscure filename that the filesystem would support under TEMPDIR
