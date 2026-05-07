@@ -215,7 +215,22 @@ jobs:
             --doctest-modules \
             --cov=datalad \
             --cov-report=xml \
+            --report-log=pytest-report.jsonl \
             --pyargs ${TESTS_TO_PERFORM:-datalad}
+
+      # pytest-reportlog writes one JSON object per test event (collect, call,
+      # teardown, ...).  Uploading on `always()` means timings survive even
+      # when the job is cancelled by the GH Actions 6h job timeout (which is
+      # what happens to the heavier NFS chunks); the file is line-delimited
+      # so the partial dump up to the last completed test is parseable.
+      - name: Upload pytest report log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report-${{ github.run_id }}-${{ strategy.job-index }}
+          path: __testhome__/pytest-report.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Makes it only more difficult to comprehend the failing output.  Enable
       # only when necessary for a particular debugging.
