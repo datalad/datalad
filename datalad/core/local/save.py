@@ -65,7 +65,7 @@ def _status_props(result):
     return {k: v for k, v in result.items() if k not in _STATUS_SKIP_KEYS}
 
 
-def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
+def _inject_sub_info(paths_by_ds, since_map, _since_sub_info, ds_path):
     """Inject changed subdatasets that diff_dataset missed on adjusted branches.
 
     On adjusted branches, diff_dataset reports subdatasets as clean because
@@ -73,12 +73,12 @@ def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
     change when the sub gets new commits).  This function uses pre-command
     sub HEADs captured by run_command to:
 
-    - Override fr_map with the true pre-command SHAs
+    - Override since_map with the true pre-command SHAs
     - Add changed subs to paths_by_ds so save_ds processes them
     - Walk up from each changed sub to ds_path, ensuring every ancestor
-      has fr_map and paths_by_ds entries for merge propagation
+      has since_map and paths_by_ds entries for merge propagation
     """
-    for sub_path, sub_pre_sha in _fr_sub_info.items():
+    for sub_path, sub_pre_sha in _since_sub_info.items():
         sub_repo = Dataset(sub_path).repo
         if not sub_repo:
             continue
@@ -86,12 +86,12 @@ def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
         if cur_sha == sub_pre_sha:
             continue
 
-        fr_map[sub_path] = sub_pre_sha
+        since_map[sub_path] = sub_pre_sha
         if sub_path not in paths_by_ds:
             paths_by_ds[sub_path] = {}
 
         # Walk up to ds_path, registering each child as modified in
-        # its parent and ensuring fr_map entries exist at each level.
+        # its parent and ensuring since_map entries exist at each level.
         # Termination: normally `parent_path == ds_path`.  Defensive
         # second termination on `parent_path == child_path` covers the
         # case where `sub_path` is not a descendant of `ds_path` (which
@@ -107,15 +107,15 @@ def _inject_sub_info(paths_by_ds, fr_map, _fr_sub_info, ds_path):
                 break
             child_repo = Dataset(child_path).repo
             child_sha = child_repo.get_hexsha() if child_repo else cur_sha
-            child_pre = _fr_sub_info.get(child_path, child_sha)
+            child_pre = _since_sub_info.get(child_path, child_sha)
 
             pds_status = paths_by_ds.setdefault(parent_path, {})
             pds_status[ut.Path(child_path)] = dict(
                 type='dataset', state='modified',
                 prev_gitshasum=child_pre, gitshasum=child_sha)
 
-            if parent_path not in fr_map:
-                fr_map[parent_path] = _fr_sub_info.get(
+            if parent_path not in since_map:
+                since_map[parent_path] = _since_sub_info.get(
                     parent_path,
                     Dataset(parent_path).repo.get_hexsha())
 
@@ -307,13 +307,12 @@ class Save(Interface):
             previous commit. This is mutually exclusive with recursive
             operation.
             """),
-        fr=Parameter(
-            args=("--from",),
-            dest='fr',
+        since=Parameter(
+            args=("--since",),
             metavar='COMMIT',
             doc="""if given, compare against this commit instead of HEAD to
             discover changes, and wrap any intermediate commits made since
-            that point as a merge commit. The merge has first-parent = fr
+            that point as a merge commit. The merge has first-parent = since
             (keeping first-parent history linear) and second-parent = the
             post-save HEAD (all changes). This is used by `datalad run` to
             wrap command-created commits but can also be used standalone to
@@ -334,8 +333,8 @@ class Save(Interface):
                  to_git=None,
                  jobs=None,
                  amend=False,
-                 fr=None,
-                 _fr_sub_info=None,
+                 since=None,
+                 _since_sub_info=None,
                  _sub_message=None,
                  ):
         if message and message_file:
@@ -345,10 +344,10 @@ class Save(Interface):
         if amend and recursive:
             raise ValueError("Cannot amend a commit recursively.")
 
-        if amend and fr is not None:
+        if amend and since is not None:
             raise ValueError(
-                "Cannot amend when using --from; "
-                "--from creates a merge commit.")
+                "Cannot amend when using --since; "
+                "--since creates a merge commit.")
 
         path = ensure_list(path)
 
@@ -389,11 +388,11 @@ class Save(Interface):
         ds = require_dataset(dataset, check_installed=True, purpose='save')
 
         paths_by_ds = {}
-        fr_map = {}  # {ds_path: pre_hexsha} — only populated when fr is set
+        since_map = {}  # {ds_path: pre_hexsha} — only populated when since is set
 
-        if fr is not None:
+        if since is not None:
             # Use diff_dataset to discover changes from the given baseline.
-            # This translates `fr` per-subdataset via prev_gitshasum.
+            # This translates `since` per-subdataset via prev_gitshasum.
             # ATTN: pass `dataset` (the original argument) rather than
             # `ds` (a Dataset instance) so that resolve_path() inside
             # diff_dataset resolves relative paths against CWD — the
@@ -403,7 +402,7 @@ class Save(Interface):
             # diff_dataset discovers the dataset from CWD via its own
             # require_dataset() call, same as Status does.
             for s in diff_dataset(
-                    dataset=dataset, fr=fr, to=None,
+                    dataset=dataset, fr=since, to=None,
                     constant_refs=False,
                     # Stringify to avoid mixed PosixPath/str in
                     # diff_dataset's sorted() call
@@ -432,16 +431,16 @@ class Save(Interface):
                 # Track per-subdataset pre-command pointers for merge
                 if (s.get('type') == 'dataset'
                         and 'prev_gitshasum' in props):
-                    fr_map[s['path']] = props['prev_gitshasum']
-            # The top-level dataset's baseline is `fr` itself
-            fr_map[ds.path] = fr
+                    since_map[s['path']] = props['prev_gitshasum']
+            # The top-level dataset's baseline is `since` itself
+            since_map[ds.path] = since
 
             # On adjusted branches, diff_dataset may not detect
             # subdataset commits (index submodule pointer stays the
             # same).  Inject changed subs from run_command's snapshot.
-            if _fr_sub_info:
-                _inject_sub_info(paths_by_ds, fr_map,
-                                 _fr_sub_info, ds.path)
+            if _since_sub_info:
+                _inject_sub_info(paths_by_ds, since_map,
+                                 _since_sub_info, ds.path)
         else:
             # Standard Status-based discovery
             for s in Status()(
@@ -522,7 +521,7 @@ class Save(Interface):
             #  - the command created intermediate commits (pre-command
             #    pointer != current HEAD), or
             #  - a child subdataset was merged (upward propagation).
-            pre_hexsha = fr_map.get(pdspath)
+            pre_hexsha = since_map.get(pdspath)
             had_inner = (pre_hexsha is not None
                          and pre_hexsha != start_commit)
             child_merged = (

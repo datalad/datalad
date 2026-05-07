@@ -1134,13 +1134,13 @@ def test_save_sub_trailing_sep_bf6547(path=None):
     assert 'sub' in (ds.pathobj / '.gitmodules').read_text()
 
 
-# -- Tests for save --from (fr= parameter) ----------------------------------
+# -- Tests for save --since (since= parameter) -----------------------------
 
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_basic(path=None):
-    """save(fr=<commit>) wraps intermediate commits as a merge."""
+    """save(since=<commit>) wraps intermediate commits as a merge."""
     ds = Dataset(path).create(annex=False)
     # Create baseline: commit A
     (ds.pathobj / "a.txt").write_text("a")
@@ -1157,8 +1157,8 @@ def test_save_from_basic(path=None):
     ds.repo.call_git(["commit", "-m", "commit C"])
     commit_c = ds.repo.get_hexsha()
 
-    # save(fr=A) should wrap B+C as a merge
-    res = ds.save(fr=commit_a, message="wrap B+C")
+    # save(since=A) should wrap B+C as a merge
+    res = ds.save(since=commit_a, message="wrap B+C")
     assert_status('ok', res)
     assert_repo_status(ds.path)
 
@@ -1175,15 +1175,15 @@ def test_save_from_basic(path=None):
     ok_((ds.pathobj / "b.txt").exists())
     ok_((ds.pathobj / "c.txt").exists())
 
-    # save(fr=HEAD) with no changes → notneeded
-    res = ds.save(fr=ds.repo.get_hexsha(), on_failure='ignore')
+    # save(since=HEAD) with no changes → notneeded
+    res = ds.save(since=ds.repo.get_hexsha(), on_failure='ignore')
     assert_status('notneeded', res)
 
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_no_inner_commits(path=None):
-    """save(fr=HEAD) with only working-tree changes → plain save, no merge."""
+    """save(since=HEAD) with only working-tree changes → plain save, no merge."""
     ds = Dataset(path).create(annex=False)
     (ds.pathobj / "tracked.txt").write_text("initial")
     ds.save(message="initial")
@@ -1192,19 +1192,19 @@ def test_save_from_no_inner_commits(path=None):
     # Only working-tree changes, no intermediate commits
     (ds.pathobj / "new.txt").write_text("new content")
 
-    res = ds.save(fr=baseline, message="just working-tree changes")
+    res = ds.save(since=baseline, message="just working-tree changes")
     assert_status('ok', res)
     assert_repo_status(ds.path)
     ok_((ds.pathobj / "new.txt").exists())
 
-    # No merge commit — fr == pre-save HEAD so no inner commits detected
+    # No merge commit — since == pre-save HEAD so no inner commits detected
     assert_false(ds.repo.commit_exists("HEAD^2"))
 
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_with_path_filter(path=None):
-    """save(fr=..., path=...) only saves specified paths."""
+    """save(since=..., path=...) only saves specified paths."""
     ds = Dataset(path).create(annex=False)
     (ds.pathobj / "tracked.txt").write_text("initial")
     ds.save(message="initial")
@@ -1220,7 +1220,7 @@ def test_save_from_with_path_filter(path=None):
 
     # save only 'included.txt' — 'excluded.txt' should stay uncommitted
     res = ds.save(
-        path=["included.txt"], fr=baseline, message="selective save",
+        path=["included.txt"], since=baseline, message="selective save",
         on_failure='ignore')
     assert_status('ok', res)
     ok_((ds.pathobj / "included.txt").exists())
@@ -1243,7 +1243,7 @@ def test_save_from_with_path_filter(path=None):
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_save_from_recursive(path=None):
-    """save(fr=..., recursive=True) creates merges across subdataset hierarchy."""
+    """save(since=..., recursive=True) creates merges across subdataset hierarchy."""
     ds = Dataset(path).create(annex=False)
     sub = ds.create("sub", annex=False)
     assert_repo_status(ds.path)
@@ -1259,7 +1259,7 @@ def test_save_from_recursive(path=None):
     sub.repo.call_git(["commit", "-m", "sub inner"])
     sub_pre_save = sub.repo.get_hexsha()
 
-    res = ds.save(fr=baseline, recursive=True, message="wrap all")
+    res = ds.save(since=baseline, recursive=True, message="wrap all")
     assert_status('ok', res)
     assert_repo_status(ds.path)
 
@@ -1291,7 +1291,7 @@ def test_save_from_recursive(path=None):
     sub_head_before = sub.repo.get_hexsha()
 
     # With recursion_limit=0, only top-level should be processed
-    ds.save(fr=baseline2, recursive=True, recursion_limit=0,
+    ds.save(since=baseline2, recursive=True, recursion_limit=0,
             message="limited save")
     top_merge = _merge_ref(ds.repo)
     ok_(ds.repo.commit_exists(top_merge + "^2"))
@@ -1304,7 +1304,7 @@ def test_save_from_recursive(path=None):
 @with_tree(**tree_arg)
 @pytest.mark.ai_generated
 def test_save_from_relpath(path=None):
-    """save(fr=..., path=...) from a subdirectory resolves paths against CWD."""
+    """save(since=..., path=...) from a subdirectory resolves paths against CWD."""
     ds = Dataset(path).create(force=True, annex=False)
     ds.save(message="initial")
     assert_repo_status(ds.path)
@@ -1319,7 +1319,7 @@ def test_save_from_relpath(path=None):
 
     # From inside dir/, save 'wt_change' using a relative path
     with chpwd(op.join(path, 'dir')):
-        res = save(path=['wt_change'], fr=baseline,
+        res = save(path=['wt_change'], since=baseline,
                    message="from subdir",
                    on_failure='ignore',
                    result_renderer='disabled')

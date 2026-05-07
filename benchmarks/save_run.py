@@ -5,13 +5,13 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Benchmarks for save (including save --from) and run operations.
+"""Benchmarks for save (including save --since) and run operations.
 
 These benchmarks cover:
-- Standard save (no fr=) -- regression guard on small and heavy trees
-- save(fr=) with inner commits -- the new merge path
-- save(fr=, recursive=True) on a hierarchy -- bottom-up merge propagation
-- save(fr=) with a large untracked tree -- 'normal' vs 'all' sensitivity
+- Standard save (no since=) -- regression guard on small and heavy trees
+- save(since=) with inner commits -- the new merge path
+- save(since=, recursive=True) on a hierarchy -- bottom-up merge propagation
+- save(since=) with a large untracked tree -- 'normal' vs 'all' sensitivity
 - run() with/without inner commits -- end-to-end pipeline
 - Heavy hierarchy: 10 subdatasets × 1000 files, changes in 2 subs --
   measures the cost of diff_dataset scanning untouched subdatasets
@@ -87,7 +87,7 @@ def _extract_tar(tarpath, dsname, counter_cls):
 
 
 class save_clean(SuprocBenchmarks):
-    """Baseline: standard save without fr= (Status-based path).
+    """Baseline: standard save without since= (Status-based path).
 
     Guards against regressions in the non-fr code path.
     Uses create_test_dataset for a single dataset with 50 files.
@@ -110,7 +110,7 @@ class save_clean(SuprocBenchmarks):
 
 
 class save_from_flat(SuprocBenchmarks):
-    """save(fr=<baseline>) on a flat dataset with inner commits."""
+    """save(since=<baseline>) on a flat dataset with inner commits."""
     tags = ['ai_generated']
 
     params = [[1, 5, 20]]
@@ -138,11 +138,11 @@ class save_from_flat(SuprocBenchmarks):
         self._cleanup()
 
     def time_save_from(self, n_inner_commits):
-        self.ds.save(fr=self.baseline, message="merge benchmark")
+        self.ds.save(since=self.baseline, message="merge benchmark")
 
 
 class save_from_untracked(SuprocBenchmarks):
-    """save(fr=...) with a large untracked directory.
+    """save(since=...) with a large untracked directory.
 
     Tests the performance impact of untracked='normal' (directory
     entries) vs 'all' (individual files).  With 'normal', a dir of N
@@ -163,7 +163,7 @@ class save_from_untracked(SuprocBenchmarks):
         (self.ds.pathobj / "tracked.txt").write_text("initial")
         self.ds.save(message="baseline")
         self.baseline = self.ds.repo.get_hexsha()
-        # One inner commit so fr= is meaningful
+        # One inner commit so since= is meaningful
         (self.ds.pathobj / "inner.txt").write_text("inner")
         self.ds.repo.call_git(["add", "inner.txt"])
         self.ds.repo.call_git(["commit", "-m", "inner"])
@@ -178,7 +178,7 @@ class save_from_untracked(SuprocBenchmarks):
         self._cleanup()
 
     def time_save_from_untracked(self, n_untracked):
-        self.ds.save(fr=self.baseline, message="untracked tree merge")
+        self.ds.save(since=self.baseline, message="untracked tree merge")
 
 
 class run_simple(SuprocBenchmarks):
@@ -209,7 +209,7 @@ class run_simple(SuprocBenchmarks):
 
 # ---- benchmarks: heavy hierarchy ------------------------------------------
 # 10 subdatasets × 1000 tracked files each.
-# The key question: when `run` or `save --from` touches only 2 of 10
+# The key question: when `run` or `save --since` touches only 2 of 10
 # subdatasets, does diff_dataset scanning all 10 add visible overhead
 # compared to the old Status-based path?
 
@@ -217,7 +217,7 @@ class run_simple(SuprocBenchmarks):
 class save_heavy_hierarchy(SuprocBenchmarks):
     """save on a heavy hierarchy (10 subs × 1000 files).
 
-    Benchmarks both the standard save (no fr=) and save(fr=) paths
+    Benchmarks both the standard save (no since=) and save(since=) paths
     after modifying files in only 2 of 10 subdatasets.  The overhead
     of scanning 8 untouched subdatasets is what we want to measure.
 
@@ -253,17 +253,17 @@ class save_heavy_hierarchy(SuprocBenchmarks):
             (sub.pathobj / "new_file.txt").write_text("added by setup")
 
     def time_save(self):
-        """Standard recursive save (no fr=) — the baseline."""
+        """Standard recursive save (no since=) — the baseline."""
         self.ds.save(recursive=True, message="bm save")
 
     def time_save_from(self):
-        """save(fr=baseline) — diff_dataset path, no inner commits."""
+        """save(since=baseline) — diff_dataset path, no inner commits."""
         self.ds.save(
-            fr=self.baseline, recursive=True, message="bm save --from")
+            since=self.baseline, recursive=True, message="bm save --since")
 
 
 class save_heavy_hierarchy_with_inner(SuprocBenchmarks):
-    """save(fr=) on a heavy hierarchy where 2 subs have inner commits.
+    """save(since=) on a heavy hierarchy where 2 subs have inner commits.
 
     Same tree as save_heavy_hierarchy, but the command created git
     commits in 2 subdatasets.  This triggers merge-commit creation in
@@ -297,16 +297,16 @@ class save_heavy_hierarchy_with_inner(SuprocBenchmarks):
         (sub00.pathobj / "uncommitted_new.txt").write_text("uncommitted")
 
     def time_save_from(self):
-        """save(fr=) with inner commits — full merge pipeline."""
+        """save(since=) with inner commits — full merge pipeline."""
         self.ds.save(
-            fr=self.baseline, recursive=True, message="bm merge")
+            since=self.baseline, recursive=True, message="bm merge")
 
 
 class run_heavy_hierarchy(SuprocBenchmarks):
     """End-to-end run() on a heavy hierarchy.
 
     Command touches 2 of 10 subdatasets: creates a file in each.
-    Measures the full run -> save(fr=) pipeline on a realistic tree.
+    Measures the full run -> save(since=) pipeline on a realistic tree.
     """
     tags = ['ai_generated']
 

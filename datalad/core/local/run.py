@@ -1051,9 +1051,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info['exit'] = cmd_exitcode
 
     # Detect if the command created commits — either in the top-level
-    # dataset or in any subdataset.  Only then do we use Save(fr=...)
+    # dataset or in any subdataset.  Only then do we use Save(since=...)
     # which routes through diff_dataset for merge creation.  Without
-    # inner commits, fr=None uses the standard Status-based save.
+    # inner commits, since=None uses the standard Status-based save.
     post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
     cmd_made_commits = (
         pre_cmd_hexsha is not None
@@ -1122,7 +1122,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     'Cannot create a merge commit across branches. '
                     'The run record was saved to %s. '
                     'To record the run on the new branch, use: '
-                    'datalad save -d %s --from %s -F %s',
+                    'datalad save -d %s --since %s -F %s',
                     pre_cmd_branch, post_cmd_branch, str(msg_path),
                     ds.path, pre_cmd_hexsha, str(msg_path)))
             return
@@ -1249,15 +1249,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     recursive=True,
                     message=msg,
                     jobs=jobs,
-                    # Only use fr= when the command created commits
+                    # Only use since= when the command created commits
                     # (in the top-level or any subdataset).  Without
-                    # inner commits, use fr=None (standard Status path).
-                    fr=pre_cmd_hexsha if cmd_made_commits else None,
+                    # inner commits, use since=None (standard Status path).
+                    since=pre_cmd_hexsha if cmd_made_commits else None,
                     # Pass pre-command sub HEADs so Save can detect
                     # subdataset commits on adjusted branches where
                     # diff_dataset can't see them.  Parse from the
                     # lightweight submodule status snapshot.
-                    _fr_sub_info=_parse_sub_status(
+                    _since_sub_info=_parse_sub_status(
                         pre_cmd_sub_status, ds_path)
                     if cmd_made_commits and pre_cmd_sub_status
                     else None,

@@ -17,49 +17,49 @@ subdataset's merge commit (not the raw inner commit).
 
 `run_command` (`run.py`) handles **detection** — did the command create
 commits anywhere?  `Save` (`save.py`) handles **discovery, saving, and
-merge creation** via the `fr=` parameter.
+merge creation** via the `since=` parameter.
 
 ```
 run_command:
   1. Snapshot: pre_cmd_hexsha + git submodule status --recursive
   2. Execute command
   3. Detect: compare top-level HEAD + submodule status string
-  4. Save(fr=pre_cmd_hexsha if commits detected else None,
-         _fr_sub_info=parsed submodule status if needed)
+  4. Save(since=pre_cmd_hexsha if commits detected else None,
+         _since_sub_info=parsed submodule status if needed)
 
-Save.__call__(fr=...):
-  if fr is set:
+Save.__call__(since=...):
+  if since is set:
     diff_dataset(fr=...) for change discovery
     _inject_sub_info() for adjusted-branch fixups
   else:
     Status() for standard discovery
-  → paths_by_ds, fr_map
+  → paths_by_ds, since_map
   → save_ds (bottom-up): save_ + merge if needed
 ```
 
-### Why `fr=` lives in Save (not run_command)
+### Why `since=` lives in Save (not run_command)
 
 The initial implementation kept all merge logic in `run_command`:
 diff_dataset traversal, merge detection, upward propagation, and manual
 `save_()` calls (~120 lines).  This duplicated Save's own tree walk.
 
 The current design makes merge-commit creation a first-class feature of
-`datalad save` via `--from` / `fr=`.  This:
+`datalad save` via `--since` / `since=`.  This:
 - Eliminates the duplicate traversal
-- Makes `datalad save --from <commit>` independently useful
+- Makes `datalad save --since <commit>` independently useful
 - Reduces `run_command`'s save block to a single `Save.__call__()` call
 
-### Why `fr=` is conditional (not always passed)
+### Why `since=` is conditional (not always passed)
 
-The initial refactoring always passed `fr=pre_cmd_hexsha` to Save.
+The initial refactoring always passed `since=pre_cmd_hexsha` to Save.
 This broke `test_rerun` on CrippledFS because `diff_dataset` handles
 adjusted-branch subdataset pointers differently from `Status`.
 Specifically, when no commits were created, `diff_dataset(fr=HEAD,
 to=None)` on adjusted branches misreports submodule state, leaving
 subdatasets dirty after save.
 
-The fix: `fr=` is only passed when `cmd_made_commits` is True (the
-command actually created commits somewhere).  When it didn't, `fr=None`
+The fix: `since=` is only passed when `cmd_made_commits` is True (the
+command actually created commits somewhere).  When it didn't, `since=None`
 falls through to the standard Status-based save path which handles
 adjusted branches correctly.
 
@@ -75,11 +75,11 @@ After the command, if the top-level HEAD didn't change, a second
 `git submodule status --recursive` is compared string-wise.  If the
 strings differ, subdataset commits were created.  The per-sub SHA
 parsing (via `_parse_sub_status`) is only done when actually needed
-for `_fr_sub_info`.
+for `_since_sub_info`.
 
 ### Change discovery: `diff_dataset` replaces `Status`
 
-When `fr` is set, `Save.__call__` uses `diff_dataset(fr=..., to=None)`
+When `since` is set, `Save.__call__` uses `diff_dataset(fr=..., to=None)`
 instead of `Status()`.  This is necessary because `Status` hardcodes
 `fr='HEAD'` — after the command moves HEAD, it cannot see the
 pre-command baseline.  `diff_dataset` accepts an explicit `fr` and
@@ -100,22 +100,22 @@ even when they have new commits, because the index submodule pointer
 records the adjusted SHA (which doesn't change).  Neither
 `diff_dataset` nor `Status` can detect this.
 
-The workaround: `run_command` passes `_fr_sub_info` (parsed from the
+The workaround: `run_command` passes `_since_sub_info` (parsed from the
 pre-command `git submodule status` snapshot) to Save.  After
 `diff_dataset` discovery, `_inject_sub_info()` compares each sub's
 current HEAD against the pre-command SHA.  For changed subs:
-1. Overrides `fr_map` with the true pre-command SHA
+1. Overrides `since_map` with the true pre-command SHA
 2. Adds the sub to `paths_by_ds` so `save_ds` processes it
-3. Walks up to `ds_path`, ensuring each ancestor has `fr_map` and
+3. Walks up to `ds_path`, ensuring each ancestor has `since_map` and
    `paths_by_ds` entries for merge propagation
 
-This is a private parameter (`_fr_sub_info`, not exposed via CLI).
+This is a private parameter (`_since_sub_info`, not exposed via CLI).
 
 ### Merge creation: bottom-up in `save_ds`
 
 Inside the `save_ds` closure:
 
-1. **`fr_map`** maps each dataset path to its pre-command hexsha.
+1. **`since_map`** maps each dataset path to its pre-command hexsha.
 2. **`had_inner`**: `pre_hexsha is not None and pre_hexsha != start_commit`.
 3. **`child_merged`**: any child path in `_merged_datasets` set
    (requires `pre_hexsha is not None`).
@@ -197,26 +197,26 @@ upward propagation, and manual `save_()` calls in `run_command`
 (~120 lines).  This worked but duplicated Save's tree walk and was not
 reusable outside of `run`.
 
-**Changed to**: merge logic in Save via `fr=` parameter — single
-traversal, reusable as `datalad save --from`.
+**Changed to**: merge logic in Save via `since=` parameter — single
+traversal, reusable as `datalad save --since`.
 
-### Initially: always pass fr= to Save
+### Initially: always pass since= to Save
 
-After moving merge logic to Save, `fr=pre_cmd_hexsha` was passed
+After moving merge logic to Save, `since=pre_cmd_hexsha` was passed
 unconditionally.  This used `diff_dataset` even when no commits were
 created, which broke `test_rerun` on CrippledFS — `diff_dataset`
 handles adjusted-branch submodule pointers differently from `Status`,
 leaving subs dirty when no actual commits occurred.
 
-**Changed to**: conditional `fr=` — only when `cmd_made_commits` is
+**Changed to**: conditional `since=` — only when `cmd_made_commits` is
 True.  Detection uses cheap `git submodule status` string comparison.
 
 ### Initially: untracked='all' inherited from Status path
 
-The `fr` branch inherited `untracked_mode='all'` from the standard
+The `since` branch inherited `untracked_mode='all'` from the standard
 Save path, enumerating every file in untracked directories.
 
-**Changed to**: `untracked='normal'` when `fr` is set — reports
+**Changed to**: `untracked='normal'` when `since` is set — reports
 untracked dirs as single entries.  Benchmarked: 26% faster at 5000
 files, scaling with directory size.
 
@@ -232,7 +232,7 @@ when actually needed.
 
 ### Initially: dataset=dataset or ds
 
-When `dataset=None` (standalone `datalad save --from`), the fallback
+When `dataset=None` (standalone `datalad save --since`), the fallback
 `or ds` passed a Dataset instance to `diff_dataset`, causing
 `resolve_path()` to resolve relative paths against the dataset root
 instead of CWD.
@@ -246,9 +246,9 @@ Benchmarks in `benchmarks/save_run.py` (10 annex subs × 1000 files):
 
 | Operation | Time | vs baseline |
 |-----------|------|-------------|
-| `save` (no fr=, Status path) | ~4.2s | baseline |
-| `save --from` (diff_dataset, no inner commits) | ~4.2s | ~1.0x |
-| `save --from` (with 2-sub merges) | ~4.2s | ~1.0x |
+| `save` (no since=, Status path) | ~4.2s | baseline |
+| `save --since` (diff_dataset, no inner commits) | ~4.2s | ~1.0x |
+| `save --since` (with 2-sub merges) | ~4.2s | ~1.0x |
 | `run` (no inner commits) | ~4.2s | ~1.0x |
 | `run` (inner commits in 2/10 subs) | ~4.2s | ~1.0x |
 

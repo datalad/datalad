@@ -1135,10 +1135,10 @@ def test_run_merge_branch_switch_rejected(path=None):
 
     rendered = [_rendered(r) for r in error_results]
     ok_(any('switched the active branch' in m for m in rendered))
-    # Recovery hint: must surface the original commit and a save --from
+    # Recovery hint: must surface the original commit and a save --since
     # command so the user can complete the run on the new branch.
     ok_(any(pre_cmd_hexsha in m for m in rendered))
-    ok_(any('datalad save' in m and '--from' in m for m in rendered))
+    ok_(any('datalad save' in m and '--since' in m for m in rendered))
     # The commit message should be saved for manual recovery
     msg_path = ds.pathobj / '.git' / 'COMMIT_EDITMSG'
     ok_(msg_path.exists())
