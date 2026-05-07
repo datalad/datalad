@@ -1180,6 +1180,19 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                         sorted(undeclared)))
                 return
 
+    # Inner commits that did not produce any declared output on disk
+    # (the canonical case: inner command commits entirely inside a sub,
+    # leaving super HEAD unchanged but the submodule pointer dirty) would
+    # otherwise be left unrecorded — do_save would be False because
+    # outputs_to_save came back empty from expand_strict().  Force a full
+    # save so the submodule pointer move / inner commits actually get
+    # recorded.  Skip when the user did not declare any outputs
+    # (run_procedure path) — there save is intentionally a no-op (see
+    # test_run_explicit_dirty_committed step 3).
+    if not do_save and cmd_made_commits and has_declared_outputs:
+        outputs_to_save = None
+        do_save = True
+
     msg_path = None
     if not rerun_info and cmd_exitcode:
         if do_save:

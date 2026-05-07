@@ -1060,6 +1060,48 @@ def test_run_explicit_dirty_committed(path=None, path2=None, path3=None):
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
+def test_run_explicit_dirty_committed_in_subdataset(path=None):
+    """`datalad run --explicit` with the inner commit only inside a sub.
+
+    Regression for PR #7821 review thread r3195581981.  Whatever path
+    `run` takes internally, the end state must be coherent:
+      * no failure result reported,
+      * working tree clean at every level (no ``M sub`` left in super),
+      * a `[DATALAD RUNCMD]` record exists for the inner commit
+        (a merge in the sub; the super may use a plain commit since
+        nothing was committed at super level by the command itself).
+    """
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+    super_head_pre = ds.repo.get_hexsha()
+
+    res = ds.run(
+        'cd sub && ' + touch_command + 'foo'
+        + ' && git add foo && git commit -m "inner"',
+        explicit=True,
+        outputs=["declared_output"],
+        on_failure="ignore",
+        result_renderer=None,
+    )
+    assert_not_in_results(res, status="error", action="run")
+    assert_repo_status(ds.path)
+    # sub: run-merge wrapping the inner commit
+    _assert_run_merge(sub)
+    # super: HEAD must advance to record the new submodule pointer with
+    # a RUNCMD-tagged commit (merge or plain — both are acceptable).
+    # On adjusted branches the recording commit lives on the
+    # corresponding branch, not the adjusted HEAD.
+    neq_(ds.repo.get_hexsha(), super_head_pre)
+    super_ref = _run_merge_search_ref(ds.repo)
+    head_subject = ds.repo.format_commit("%s", super_ref)
+    ok_("[DATALAD RUNCMD]" in head_subject,
+        msg="super %s subject lacks RUNCMD marker: %r"
+            % (super_ref, head_subject))
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
 def test_run_merge_branch_switch_rejected(path=None):
     """Merge is rejected when the command switches branches."""
     ds = Dataset(path).create(annex=False)
