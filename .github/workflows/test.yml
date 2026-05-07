@@ -108,7 +108,14 @@ jobs:
           if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]
           then echo "mkdir $_DL_TMPDIR"
                mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"
-               echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'
+               # `(rw)` alone defaults to `sync` on the NFS server side, which
+               # round-trips every git/git-annex fsync through nfsd and pushes
+               # the chunk-1 / chunk-2 NFS test jobs into the GH Actions 6h
+               # job timeout (cron 25434940670 / PR #7852).  `async` lets the
+               # server ack writes once they are in cache instead of after
+               # they reach disk; we are testing on an ephemeral runner so
+               # the durability tradeoff is irrelevant.  See PR #7852.
+               echo "/tmp/nfsmount_ localhost(rw,async)" | sudo bash -c 'cat - > /etc/exports'
                sudo apt-get install -y nfs-kernel-server
                sudo exportfs -a
                sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount
