@@ -26,7 +26,11 @@ from datalad.api import (
     run,
 )
 from datalad.core.local.run import run_command
-from datalad.core.local.tests.test_run import last_commit_msg
+from datalad.core.local.tests.test_run import (
+    _assert_run_merge,
+    _merge_ref,
+    last_commit_msg,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.local.rerun import (
     diff_revision,
@@ -52,8 +56,10 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
     assert_result_count,
     assert_status,
+    cat_command,
     create_tree,
     eq_,
+    grep_command,
     known_failure_windows,
     neq_,
     ok_,
@@ -64,6 +70,7 @@ from datalad.tests.utils_pytest import (
     slow,
     swallow_logs,
     swallow_outputs,
+    touch_command,
     with_tempfile,
     with_tree,
 )
@@ -73,9 +80,6 @@ from datalad.utils import (
     on_windows,
 )
 
-cat_command = 'cat' if not on_windows else 'type'
-touch_command = "touch " if not on_windows else "type nul > "
-grep_command = 'grep ' if not on_windows else 'findstr '
 
 @slow  # 17.1880s
 @known_failure_windows
@@ -421,6 +425,8 @@ def test_rerun_cherry_pick(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_invalid_merge_run_commit(path=None):
+    # 2-parent run-merge commits are now valid (command created intermediate
+    # commits). Only 3+ parent (octopus) merges with run info should warn.
     ds = Dataset(path).create()
     ds.run("echo foo >>foo")
     ds.run("echo invalid >>invalid")
@@ -430,17 +436,23 @@ def test_rerun_invalid_merge_run_commit(path=None):
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
         nrfh.write("non-run")
     ds.save()
-    # Assign two parents to the invalid run commit.
+    second_parent = ds.repo.get_hexsha()
+    # Create a third lineage for octopus merge
+    ds.repo.call_git(["reset", "--hard", run_hexsha + "^"])
+    with open(op.join(ds.path, "non-run2"), "w") as nrfh:
+        nrfh.write("non-run2")
+    ds.save()
+    third_parent = ds.repo.get_hexsha()
+    # Assign three parents to the run commit (octopus merge).
     commit = ds.repo.call_git_oneline(
         ["commit-tree", run_hexsha + "^{tree}", "-m", run_msg,
          "-p", run_hexsha + "^",
-         "-p", ds.repo.get_hexsha()])
+         "-p", second_parent,
+         "-p", third_parent])
     ds.repo.call_git(["reset", "--hard", commit])
-    hexsha_orig = ds.repo.get_hexsha()
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.rerun(since="")
         assert_in("has run information but is a merge commit", cml.out)
-    eq_(len(ds.repo.get_revisions(hexsha_orig + ".." + DEFAULT_BRANCH)), 1)
 
 
 @with_tempfile(mkdir=True)
@@ -984,3 +996,43 @@ def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
     ok_exists(op.join(path, "file2.txt"))
     ok_exists(op.join(path, "run_output.txt"))
     ok_exists(op.join(path, "file3.txt"))
+
+
+# -- Tests for rerunning run-merge commits --
+
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_rerun_merge_runs(path=None):
+    """Rerun of merge-run commits (commands that create intermediate commits).
+
+    Tests both single rerun and range rerun with --onto.
+    """
+    ds = Dataset(path).create()
+
+    merge_ref = _merge_ref(ds.repo)
+
+    # 1. Create a run-merge commit and rerun it
+    ds.run(touch_command + 'foo && git add foo && git commit -m "inner"')
+    assert_repo_status(ds.path)
+    info = _assert_run_merge(ds, merge_ref)
+
+    ds.rerun()
+    assert_repo_status(ds.path)
+    # The rerun re-executes the same command which creates inner commits again
+    info2 = _assert_run_merge(ds, merge_ref)
+    eq_(info2["cmd"], info["cmd"])
+    ok_((ds.pathobj / "foo").exists())
+
+    # 2. Range rerun: normal run + merge-run, replayed via --onto
+    ds.run(touch_command + 'normal_file')
+    assert_repo_status(ds.path)
+
+    ds.run(touch_command + 'inner2 && git add inner2 && git commit -m "inner2"')
+    assert_repo_status(ds.path)
+    _assert_run_merge(ds, merge_ref)
+
+    ds.rerun(since="", onto="", branch="rerun-test")
+    assert_repo_status(ds.path)
+    ok_((ds.pathobj / "normal_file").exists())
+    ok_((ds.pathobj / "inner2").exists())
