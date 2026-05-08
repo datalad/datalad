@@ -89,7 +89,7 @@ def _extract_tar(tarpath, dsname, counter_cls):
 class save_clean(SuprocBenchmarks):
     """Baseline: standard save without since= (Status-based path).
 
-    Guards against regressions in the non-fr code path.
+    Guards against regressions in the non-since code path.
     Uses create_test_dataset for a single dataset with 50 files.
     """
     tags = ['ai_generated']
@@ -109,7 +109,7 @@ class save_clean(SuprocBenchmarks):
         self.ds.save(message="benchmark save")
 
 
-class save_from_flat(SuprocBenchmarks):
+class save_since_flat(SuprocBenchmarks):
     """save(since=<baseline>) on a flat dataset with inner commits."""
     tags = ['ai_generated']
 
@@ -118,7 +118,7 @@ class save_from_flat(SuprocBenchmarks):
 
     def setup(self, n_inner_commits):
         tempdir = tempfile.mkdtemp(
-            **get_tempfile_kwargs({}, prefix="bm_save_from"))
+            **get_tempfile_kwargs({}, prefix="bm_save_since"))
         self.remove_paths.append(tempdir)
         dss = create_test_dataset(
             op.join(tempdir, "ds"), spec='0', seed=0, nfiles=10)
@@ -137,11 +137,11 @@ class save_from_flat(SuprocBenchmarks):
     def teardown(self, n_inner_commits):
         self._cleanup()
 
-    def time_save_from(self, n_inner_commits):
+    def time_save_since(self, n_inner_commits):
         self.ds.save(since=self.baseline, message="merge benchmark")
 
 
-class save_from_untracked(SuprocBenchmarks):
+class save_since_untracked(SuprocBenchmarks):
     """save(since=...) with a large untracked directory.
 
     Tests the performance impact of untracked='normal' (directory
@@ -177,7 +177,7 @@ class save_from_untracked(SuprocBenchmarks):
     def teardown(self, n_untracked):
         self._cleanup()
 
-    def time_save_from_untracked(self, n_untracked):
+    def time_save_since_untracked(self, n_untracked):
         self.ds.save(since=self.baseline, message="untracked tree merge")
 
 
@@ -256,7 +256,7 @@ class save_heavy_hierarchy(SuprocBenchmarks):
         """Standard recursive save (no since=) — the baseline."""
         self.ds.save(recursive=True, message="bm save")
 
-    def time_save_from(self):
+    def time_save_since(self):
         """save(since=baseline) — diff_dataset path, no inner commits."""
         self.ds.save(
             since=self.baseline, recursive=True, message="bm save --since")
@@ -296,7 +296,7 @@ class save_heavy_hierarchy_with_inner(SuprocBenchmarks):
         sub00 = Dataset(op.join(ds_path, "sub00"))
         (sub00.pathobj / "uncommitted_new.txt").write_text("uncommitted")
 
-    def time_save_from(self):
+    def time_save_since(self):
         """save(since=) with inner commits — full merge pipeline."""
         self.ds.save(
             since=self.baseline, recursive=True, message="bm merge")

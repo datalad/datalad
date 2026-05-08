@@ -159,11 +159,11 @@ allows each subdataset to be understood independently.
 | `test_run_merge_no_subdataset_change` | Commit only in super → sub HEAD unchanged |
 | `test_run_merge_subdataset_deletions` | Committed + uncommitted deletions in sub |
 | `test_rerun_merge` (`test_rerun.py`) | `rerun` traverses merge first-parent correctly |
-| `test_save_from_basic` | Merge topology, first/second parent, notneeded |
-| `test_save_from_no_inner_commits` | Working-tree only, no merge |
-| `test_save_from_with_path_filter` | Only declared paths saved |
-| `test_save_from_recursive` | Merges at both super and sub levels |
-| `test_save_from_relpath` | CWD-relative paths from subdirectory |
+| `test_save_since_basic` | Merge topology, first/second parent, notneeded |
+| `test_save_since_no_inner_commits` | Working-tree only, no merge |
+| `test_save_since_with_path_filter` | Only declared paths saved |
+| `test_save_since_recursive` | Merges at both super and sub levels |
+| `test_save_since_relpath` | CWD-relative paths from subdirectory |
 
 Test helpers `_merge_ref(repo)` and `_assert_run_merge(ds)` in
 `test_run.py` handle adjusted-branch commit offsets (`HEAD~1` vs

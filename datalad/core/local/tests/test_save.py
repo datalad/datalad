@@ -1139,7 +1139,7 @@ def test_save_sub_trailing_sep_bf6547(path=None):
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
-def test_save_from_basic(path=None):
+def test_save_since_basic(path=None):
     """save(since=<commit>) wraps intermediate commits as a merge."""
     ds = Dataset(path).create(annex=False)
     # Create baseline: commit A
@@ -1182,7 +1182,7 @@ def test_save_from_basic(path=None):
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
-def test_save_from_no_inner_commits(path=None):
+def test_save_since_no_inner_commits(path=None):
     """save(since=HEAD) with only working-tree changes → plain save, no merge."""
     ds = Dataset(path).create(annex=False)
     (ds.pathobj / "tracked.txt").write_text("initial")
@@ -1203,7 +1203,7 @@ def test_save_from_no_inner_commits(path=None):
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
-def test_save_from_with_path_filter(path=None):
+def test_save_since_with_path_filter(path=None):
     """save(since=..., path=...) only saves specified paths."""
     ds = Dataset(path).create(annex=False)
     (ds.pathobj / "tracked.txt").write_text("initial")
@@ -1242,7 +1242,7 @@ def test_save_from_with_path_filter(path=None):
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
-def test_save_from_recursive(path=None):
+def test_save_since_recursive(path=None):
     """save(since=..., recursive=True) creates merges across subdataset hierarchy."""
     ds = Dataset(path).create(annex=False)
     sub = ds.create("sub", annex=False)
@@ -1303,7 +1303,7 @@ def test_save_from_recursive(path=None):
 
 @with_tree(**tree_arg)
 @pytest.mark.ai_generated
-def test_save_from_relpath(path=None):
+def test_save_since_relpath(path=None):
     """save(since=..., path=...) from a subdirectory resolves paths against CWD."""
     ds = Dataset(path).create(force=True, annex=False)
     ds.save(message="initial")
