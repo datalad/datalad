@@ -55,6 +55,7 @@ from datalad.tests.utils_pytest import (
     assert_str_equal,
     assert_true,
     eq_,
+    fs_supports_filename,
     get_most_obscure_supported_name,
     ignore_nose_capturing_stdout,
     known_failure_githubci_win,
@@ -216,6 +217,18 @@ def test_get_most_obscure_supported_name():
     # from more complex to simpler ones
     ok_(len(OBSCURE_FILENAMES[0]) > len(OBSCURE_FILENAMES[-1]))
     print(repr(n))
+
+
+@with_tempfile(mkdir=True)
+def test_fs_supports_filename(tdir=None):
+    # A vanilla ASCII name is universally accepted, and the helper
+    # cleans up after itself.
+    assert_true(fs_supports_filename(tdir, "plain"))
+    assert_false(op.exists(op.join(tdir, "plain")))
+    # NUL byte is rejected by every filesystem and surfaces as
+    # ValueError from os.mkdir on POSIX, OSError on Windows -- the
+    # helper catches both.
+    assert_false(fs_supports_filename(tdir, "bad\x00name"))
 
 
 def test_keeptemp_via_env_variable():
