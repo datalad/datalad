@@ -384,22 +384,33 @@ Inputs from v2.1 + v2.2. Decision rules:
   the subclass to eliminate at least one `cast` / `assert`.
 - Otherwise the field stays in `extras` and the subclass is not created.
 
-Candidate clusters from the audit (subject to v2.1/v2.2 confirmation):
+##### Outcome (v2.3 landed)
 
-| Candidate subclass | Action(s) | Fields under consideration |
+Field promotions to base `StatusRecord`:
+
+| Field | Reason |
+|---|---|
+| `bytesize` | Listed in `docs/source/design/result_records.rst` as common in-the-wild; used across status / addurls / push |
+| `gitshasum` | Same; used in core/local/status, save, run-record |
+| `prev_gitshasum` | Same; pairs with `gitshasum` for diff/save records |
+| `key` | Same; git-annex key, used wherever `type='file'` annexed entities are reported |
+
+Subclasses parked (not introduced in v2.3):
+
+| Candidate | Decision | Reason |
 |---|---|---|
-| `FileStatusRecord` | `status`, `diff`, `save`, `get`, `add` | `state`, `gitshasum`, `prev_gitshasum`, `bytesize`, `key`, `annexkey` |
-| `DatasetStatusRecord` | most dataset-level results | `gitshasum`, `prev_gitshasum`, `branch` |
-| `SiblingStatusRecord` | `siblings`, `create-sibling-*` | `name`, `url`, `ssh_url`, `annex-ignore` (note: hyphen → stays in `extras`) |
-| `AnnexJsonRecord` | results from `annexjson2result` | `annexkey`, `metadata` |
+| `FileStatusRecord` (`state`, `gitshasum`, `prev_gitshasum`, `bytesize`, `key`, `annexkey`) | parked | Five of six fields now live on base; the marginal benefit of a subclass would be exclusively `annexkey` typing — too small to justify the API surface |
+| `DatasetStatusRecord` (`gitshasum`, `prev_gitshasum`, `branch`) | parked | First two now on base; `branch` appears in only one producer (`update.py`) — fails the ≥2-callers rule |
+| `SiblingStatusRecord` (`name`, `url`, `ssh_url`, `annex-ignore`) | parked | Cluster is real but `annex-ignore` *cannot* be a Python identifier (hyphen) and must stay in `_extras`; the typed-access benefit on the remaining three doesn't outweigh adding a class. Revisit if more sibling commands are added |
+| `AnnexJsonRecord` (`annexkey`, `metadata`) | parked | Two fields, single producer (`annexjson2result`); fails the ≥3-fields rule |
 
-Each subclass that survives the decision rule is added in its own sub-PR with
-a single producer migrated to it (e.g. `core/local/status.py` for
-`FileStatusRecord`). If a candidate fails the rule, this doc is updated with
-the reason ("`branch` only used by 1 producer; staying in `extras`") and the
-class is *not* created.
+The "park" decisions can be revisited cheaply later: a subclass is purely
+additive on top of `StatusRecord`. v2.3 deliberately chooses the smaller
+surface; the v2.4/v2.5 work can run with what's already in place.
 
-Exit criterion: subclass set frozen and documented in `docs/source/design/result_records.rst`.
+Exit criterion (met): the four in-the-wild fields are now typed attributes;
+the subclass set is documented as parked with reasons; no new tests
+regressed.
 
 #### v2.4 — opt-in strictness and validation
 

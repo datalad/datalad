@@ -123,8 +123,10 @@ class StatusRecord(MutableMapping):
     # is only "present" once explicitly assigned a non-_UNSET value. The
     # public type of each field is documented in
     # ``docs/source/design/result_records.rst``; the runtime annotations stay
-    # ``Any`` to keep this v1 change minimal-diff and avoid forcing strict
-    # types on existing call sites that pass ``None`` etc.
+    # ``Any`` to keep this minimal-diff and avoid forcing strict types on
+    # existing call sites that pass ``None`` etc.
+    #
+    # Mandatory and common optional fields:
     action: Any = _UNSET
     path: Any = _UNSET
     status: Any = _UNSET
@@ -138,6 +140,13 @@ class StatusRecord(MutableMapping):
     exception: Any = _UNSET
     exception_traceback: Any = _UNSET
     exit_code: Any = _UNSET
+    # Common "in-the-wild" fields promoted from extras in v2.3 because they
+    # are explicitly listed in result_records.rst as observed across
+    # commands. They are not mandatory; producers continue to opt in.
+    bytesize: Any = _UNSET          # entity size in bytes (int)
+    gitshasum: Any = _UNSET         # SHA1 of the entity
+    prev_gitshasum: Any = _UNSET    # SHA1 of a previous state
+    key: Any = _UNSET               # git-annex key (when type == 'file')
 
     # --- escape hatch for arbitrary action-specific keys ---
     _extras: dict = field(default_factory=dict, repr=False)

@@ -505,6 +505,35 @@ def test_repr_shows_dict_view():
 # Sentinel hygiene
 # ---------------------------------------------------------------------------
 
+def test_in_the_wild_fields_are_typed_attributes():
+    """v2.3 promotion: fields explicitly listed in
+    ``docs/source/design/result_records.rst`` as commonly-observed across
+    commands are exposed as typed attributes rather than living in
+    ``_extras``. Pin the specific set so a future regression cannot
+    silently demote them.
+    """
+    promoted = ('bytesize', 'gitshasum', 'prev_gitshasum', 'key')
+    for name in promoted:
+        assert name in StatusRecord._DECLARED_FIELDS_SET, \
+            f'{name!r} should be a declared StatusRecord field (v2.3)'
+
+    r = StatusRecord(
+        bytesize=1234,
+        gitshasum='deadbeef',
+        prev_gitshasum='cafebabe',
+        key='SHA256E-s12345--abc',
+    )
+    # accessible via both attribute and item style
+    assert r.bytesize == 1234
+    assert r['bytesize'] == 1234
+    assert r.gitshasum == 'deadbeef'
+    assert r['gitshasum'] == 'deadbeef'
+    assert r.prev_gitshasum == 'cafebabe'
+    assert r.key == 'SHA256E-s12345--abc'
+    # not in _extras
+    assert r._extras == {}
+
+
 def test_unset_sentinel_is_not_visible():
     r = StatusRecord()
     # _UNSET must never escape to a consumer
