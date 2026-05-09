@@ -15,6 +15,11 @@ __docformat__ = 'restructuredtext'
 import json
 import logging
 import sys
+from collections.abc import (
+    Iterable,
+    Iterator,
+    Mapping,
+)
 from os import listdir
 from os.path import isdir
 from os.path import join as opj
@@ -230,7 +235,7 @@ def eval_results(wrapped):
     return eval_results_moved(wrapped)
 
 
-def generic_result_renderer(res):
+def generic_result_renderer(res: Mapping) -> None:
     # Tolerate plain dicts here: this is a public, extension-callable
     # entry point. Coerce so downstream attribute access is safe.
     res = as_status_record(res)
@@ -297,14 +302,14 @@ def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
 
 
 def _process_results(
-        results,
+        results: 'Iterable[Mapping]',
         cmd_class,
         on_failure,
         action_summary,
         incomplete_results,
         result_renderer,
         result_log_level,
-        allkwargs):
+        allkwargs) -> 'Iterator[StatusRecord]':
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)

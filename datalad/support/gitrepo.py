@@ -75,12 +75,12 @@ from datalad.consts import (
     RESERVED_NAMES_WIN,
 )
 from datalad.core.local.repo import repo_from_path
-from datalad.dochelpers import single_or_plural
 from datalad.dataset.gitrepo import GitRepo as CoreGitRepo
 from datalad.dataset.gitrepo import (
     _get_dot_git,
     path_based_str_repr,
 )
+from datalad.dochelpers import single_or_plural
 from datalad.log import log_progress
 from datalad.support.due import (
     Doi,
@@ -133,6 +133,7 @@ from .path import (
 
 if TYPE_CHECKING:
     from datalad.distribution.dataset import Dataset
+    from datalad.interface.results import StatusRecord
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -3411,7 +3412,7 @@ class GitRepo(CoreGitRepo):
                 careless=True,
             )
 
-    def save(self, message: Optional[str] = None, paths: Optional[list[Path]] = None, _status: Optional[dict[Path, dict[str, str]]] = None, **kwargs: Any) -> list[dict]:
+    def save(self, message: Optional[str] = None, paths: Optional[list[Path]] = None, _status: Optional[dict[Path, dict[str, str]]] = None, **kwargs: Any) -> list['StatusRecord']:
         """Save dataset content.
 
         Parameters
@@ -3450,7 +3451,7 @@ class GitRepo(CoreGitRepo):
             )
         )
 
-    def save_(self, message: Optional[str] = None, paths: Optional[list[Path]] = None, _status: Optional[dict[Path, dict[str, str]]] = None, **kwargs: Any) -> Iterator[dict]:
+    def save_(self, message: Optional[str] = None, paths: Optional[list[Path]] = None, _status: Optional[dict[Path, dict[str, str]]] = None, **kwargs: Any) -> Iterator['StatusRecord']:
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
@@ -3808,7 +3809,7 @@ class GitRepo(CoreGitRepo):
             raise ValueError(
                 f"Invalid 'config' value {config!r}")
 
-    def _save_add(self, files: dict[str, Any], git_opts: Optional[list[str]] = None) -> Iterator[dict]:
+    def _save_add(self, files: dict[str, Any], git_opts: Optional[list[str]] = None) -> Iterator['StatusRecord']:
         """Simple helper to add files in save()"""
         from datalad.interface.results import get_status_dict
         try:
@@ -3842,7 +3843,7 @@ class GitRepo(CoreGitRepo):
             lgr.error("add: %s", e)
             raise
 
-    def _save_add_submodules(self, paths: list[Path] | dict[Path, dict]) -> Iterator[dict]:
+    def _save_add_submodules(self, paths: list[Path] | dict[Path, dict]) -> Iterator['StatusRecord']:
         """Add new submodules, or updates records of existing ones
 
         This method does not use `git submodule add`, but aims to be more

@@ -464,6 +464,27 @@ Now that consumers read typed attributes, annotate the return types of
 `results_from_annex_noinfo`, and the `eval_results` decorator's yielded type.
 This is pure annotation — no behavior change. Smallest possible diff.
 
+##### Outcome (v2.5 landed)
+
+- `get_status_dict(...)` — return type already migrated in v1 from
+  `dict[str, Any]` to `StatusRecord`.
+- `results_from_paths(...)` — return `Iterator[StatusRecord]`.
+- `annexjson2result(...)` — return `StatusRecord`.
+- `results_from_annex_noinfo(...)` — return `Iterator[StatusRecord]`.
+- `as_status_record(res)` — parameter tightened from `Any` to `Mapping`.
+- `interface/utils.py` `_process_results` — `results: Iterable[Mapping]
+  -> Iterator[StatusRecord]`.
+- `interface/utils.py` `generic_result_renderer` — `res: Mapping -> None`.
+- `interface/base.py` `eval_results` — docstring updated to point at
+  `StatusRecord`; the decorator itself is generic and intentionally not
+  signature-typed (would require `ParamSpec`/`TypeVar` machinery beyond
+  the v2.5 minimal-diff scope).
+
+These are pure annotations / docstring changes; runtime behavior is
+unchanged. mypy clean-run on `datalad/interface/` is the long-term
+target — v2.5 is the prerequisite typing scaffold that follow-on
+annotation passes (Phase 3 in this doc) build on.
+
 Exit criterion: annotations land; mypy/pyright run is clean for
 `datalad/interface/`.
 

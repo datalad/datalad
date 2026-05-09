@@ -343,7 +343,7 @@ StatusRecord._DECLARED_FIELDS = tuple(
 StatusRecord._DECLARED_FIELDS_SET = frozenset(StatusRecord._DECLARED_FIELDS)
 
 
-def as_status_record(res: Any) -> 'StatusRecord':
+def as_status_record(res: Mapping) -> 'StatusRecord':
     """Coerce a result record to a :class:`StatusRecord`.
 
     Returns ``res`` unchanged if it is already a ``StatusRecord``;
@@ -451,7 +451,7 @@ def results_from_paths(
     status: Optional[str] = None,
     message: Optional[str] = None,
     exception: Exception | CapturedException | None = None,
-) -> Iterator[dict[str, Any]]:
+) -> Iterator[StatusRecord]:
     """
     Helper to yield analog result dicts for each path in a sequence.
 
@@ -568,8 +568,8 @@ translate_annex_notes = {
 }
 
 
-def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> dict[str, Any]:
-    """Helper to convert an annex JSON result to a datalad result dict
+def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> StatusRecord:
+    """Helper to convert an annex JSON result to a datalad result record
 
     Info from annex is rather heterogeneous, partly because some of it
     our support functions are faking.
@@ -689,7 +689,7 @@ def results_from_annex_noinfo(
     noinfo_file_msg: str,
     noinfo_status: str = 'notneeded',
     **kwargs: Any
-) -> Iterator[dict[str, Any]]:
+) -> Iterator[StatusRecord]:
     """Helper to yield results based on what information git annex did no give us.
 
     The helper assumes that the annex command returned without an error code,
