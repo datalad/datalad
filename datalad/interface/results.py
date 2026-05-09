@@ -311,13 +311,11 @@ class StatusRecord(MutableMapping):
     exception: Any = _UNSET
     exception_traceback: Any = _UNSET
     exit_code: Any = _UNSET
-    # Common "in-the-wild" fields promoted from extras in v2.3 because they
-    # are explicitly listed in result_records.rst as observed across
-    # commands. They are not mandatory; producers continue to opt in.
-    bytesize: Any = _UNSET          # entity size in bytes (int)
+    # Cross-type fields confirmed by the v2.6 sweep (and grep in
+    # gitrepo.py) to apply to both ``type='dataset'`` and
+    # ``type='file'`` records — they remain on the base class.
     gitshasum: Any = _UNSET         # SHA1 of the entity
     prev_gitshasum: Any = _UNSET    # SHA1 of a previous state
-    key: Any = _UNSET               # git-annex key (when type == 'file')
 
     # --- escape hatch for arbitrary action-specific keys ---
     _extras: dict = field(default_factory=dict, repr=False)
@@ -329,12 +327,10 @@ class StatusRecord(MutableMapping):
     _DECLARED_FIELDS: ClassVar[tuple] = ()
     _DECLARED_FIELDS_SET: ClassVar[frozenset] = frozenset()
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        super().__init_subclass__(**kwargs)
-        cls._DECLARED_FIELDS = tuple(
-            f.name for f in fields(cls) if not f.name.startswith('_')
-        )
-        cls._DECLARED_FIELDS_SET = frozenset(cls._DECLARED_FIELDS)
+    # Subclasses must call ``_bootstrap_declared_fields(cls)`` after the
+    # ``@dataclass`` decorator runs (see helper defined below the class).
+    # ``__init_subclass__`` cannot do this for us because it fires before
+    # ``@dataclass`` has processed the subclass body.
 
     def __post_init__(self) -> None:
         # v2.6 telemetry: record any pre-loaded extras at construction time
@@ -507,12 +503,98 @@ class StatusRecord(MutableMapping):
         return f'{type(self).__name__}({dict(self)!r})'
 
 
-# bootstrap _DECLARED_FIELDS on the base class itself (__init_subclass__ only
-# runs for subclasses).
-StatusRecord._DECLARED_FIELDS = tuple(
-    f.name for f in fields(StatusRecord) if not f.name.startswith('_')
-)
-StatusRecord._DECLARED_FIELDS_SET = frozenset(StatusRecord._DECLARED_FIELDS)
+def _bootstrap_declared_fields(cls: 'type[StatusRecord]') -> None:
+    """Refresh ``_DECLARED_FIELDS`` / ``_DECLARED_FIELDS_SET`` on a
+    ``StatusRecord`` subclass after the ``@dataclass`` decorator has
+    applied.
+
+    ``__init_subclass__`` runs during class creation — before the
+    ``@dataclass`` decorator has processed the subclass body — so it
+    only sees inherited fields. Subclasses must re-bootstrap after the
+    decorator runs. The base class is bootstrapped manually below; new
+    subclasses defined elsewhere should call this helper after
+    ``@dataclass``.
+    """
+    cls._DECLARED_FIELDS = tuple(
+        f.name for f in fields(cls) if not f.name.startswith('_')
+    )
+    cls._DECLARED_FIELDS_SET = frozenset(cls._DECLARED_FIELDS)
+
+
+# bootstrap _DECLARED_FIELDS on the base class itself.
+_bootstrap_declared_fields(StatusRecord)
+
+
+# ---------------------------------------------------------------------------
+# Specialised subclasses introduced in v2.6 per the runtime extras-key
+# telemetry sweep (see ``docs/designs/status-record.md`` v2.6 outcome and
+# ``.git-meta/v26_report.md``). Each subclass extends the base with fields
+# that the data showed clustering tightly with a specific entity type.
+#
+# Subclasses are purely additive; the base ``StatusRecord`` is unchanged
+# semantically — extras flow through the same Mapping API regardless.
+# Producers opt in by constructing the subclass directly (or via
+# ``FileStatusRecord.from_kwargs(...)`` etc.). Consumers do not need to
+# change: ``isinstance(r, StatusRecord)`` is True for any subclass and
+# the Mapping contract is preserved.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(eq=False)
+class FileStatusRecord(StatusRecord):
+    """Result record for file / symlink entities.
+
+    Adds typed fields that the v2.6 runtime audit showed concentrate on
+    ``type='file'`` results and appear at ≥2 distinct in-tree call sites.
+    Most of these come from ``GitRepo.status()`` /
+    ``get_content_annexinfo()`` and ``annexjson2result()``.
+
+    File-specific fields previously declared on the base class
+    (``bytesize``, ``key`` — promoted in v1+v2.3 from a static grep)
+    have been moved here in v2.6 because the runtime data confirmed
+    they are strictly file-scoped.
+    """
+
+    # Moved from base in v2.6 — runtime audit confirmed file-only use.
+    bytesize: Any = _UNSET            # entity size in bytes (int)
+    key: Any = _UNSET                 # git-annex key (canonical name)
+
+    # Promoted in v2.6 from extras based on the sweep
+    # (see .git-meta/v26_report.md):
+    annexkey: Any = _UNSET            # 9 frames, 213 occurrences — alt
+                                      # name for ``key``; kept distinct
+                                      # because producers populate them
+                                      # via different code paths
+    backend: Any = _UNSET             # 2 frames, 22 occ
+    has_content: Any = _UNSET         # 2 frames, 18 occ
+    hashdirlower: Any = _UNSET        # 2 frames,  4 occ
+    hashdirmixed: Any = _UNSET        # 2 frames,  4 occ
+    humansize: Any = _UNSET           # 2 frames, 22 occ
+    keyname: Any = _UNSET             # 2 frames, 22 occ
+    mtime: Any = _UNSET               # 2 frames, 22 occ
+    objloc: Any = _UNSET              # 2 frames, 18 occ
+
+
+@dataclass(eq=False)
+class SiblingStatusRecord(StatusRecord):
+    """Result record for sibling / git-remote entities.
+
+    Adds the canonical sibling name. The remaining sibling-specific
+    keys observed in the v2.6 sweep are either hyphenated git-config
+    style identifiers (``annex-uuid``, ``annex-ignore``, ``annex-*``,
+    ``datalad-publish-depends``) — which cannot be Python attributes
+    and therefore must stay in ``_extras`` — or single-call-site
+    fields that fail the ≥2 promotion rule. ``url`` is kept in extras
+    for now (single call site at sweep time); promote in a future PR
+    if a second producer adds it.
+    """
+
+    name: Any = _UNSET                # 8 frames, 120 occ
+
+
+# refresh declared-fields cache on each subclass now that @dataclass has run
+_bootstrap_declared_fields(FileStatusRecord)
+_bootstrap_declared_fields(SiblingStatusRecord)
 
 
 def as_status_record(res: Mapping) -> 'StatusRecord':

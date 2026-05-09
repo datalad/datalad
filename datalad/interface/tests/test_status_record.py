@@ -706,33 +706,136 @@ def test_trace_dump_noop_when_disabled(trace_off, tmp_path, monkeypatch):
     assert not out.exists()
 
 
-def test_in_the_wild_fields_are_typed_attributes():
-    """v2.3 promotion: fields explicitly listed in
-    ``docs/source/design/result_records.rst`` as commonly-observed across
-    commands are exposed as typed attributes rather than living in
-    ``_extras``. Pin the specific set so a future regression cannot
-    silently demote them.
+def test_v23_v26_base_fields_are_typed():
+    """v2.3 promoted four "in-the-wild" fields to base StatusRecord; v2.6
+    moved the file-specific subset (``bytesize``, ``key``) onto
+    ``FileStatusRecord`` based on the runtime telemetry sweep. The
+    remaining cross-type fields (``gitshasum``, ``prev_gitshasum``)
+    stay on the base.
     """
-    promoted = ('bytesize', 'gitshasum', 'prev_gitshasum', 'key')
-    for name in promoted:
+    on_base = ('gitshasum', 'prev_gitshasum')
+    for name in on_base:
         assert name in StatusRecord._DECLARED_FIELDS_SET, \
-            f'{name!r} should be a declared StatusRecord field (v2.3)'
+            f'{name!r} should still be a declared base field (v2.3)'
 
-    r = StatusRecord(
-        bytesize=1234,
-        gitshasum='deadbeef',
-        prev_gitshasum='cafebabe',
-        key='SHA256E-s12345--abc',
-    )
-    # accessible via both attribute and item style
-    assert r.bytesize == 1234
-    assert r['bytesize'] == 1234
+    moved_to_file = ('bytesize', 'key')
+    for name in moved_to_file:
+        assert name not in StatusRecord._DECLARED_FIELDS_SET, \
+            (f'{name!r} was moved off the base in v2.6 — runtime audit '
+             f'confirmed it is file-specific. Should live on '
+             f'FileStatusRecord.')
+
+    r = StatusRecord(gitshasum='deadbeef', prev_gitshasum='cafebabe')
     assert r.gitshasum == 'deadbeef'
     assert r['gitshasum'] == 'deadbeef'
     assert r.prev_gitshasum == 'cafebabe'
-    assert r.key == 'SHA256E-s12345--abc'
-    # not in _extras
     assert r._extras == {}
+
+
+# ---------------------------------------------------------------------------
+# v2.6: FileStatusRecord and SiblingStatusRecord
+# ---------------------------------------------------------------------------
+
+def test_file_status_record_declares_file_specific_fields():
+    """v2.6: ``FileStatusRecord`` exposes the file-specific cluster as
+    typed attributes."""
+    from datalad.interface.results import FileStatusRecord
+
+    expected = {
+        # moved from base in v2.6
+        'bytesize', 'key',
+        # promoted from extras in v2.6 (each ≥2 frames in the sweep)
+        'annexkey', 'backend', 'has_content', 'hashdirlower',
+        'hashdirmixed', 'humansize', 'keyname', 'mtime', 'objloc',
+    }
+    for name in expected:
+        assert name in FileStatusRecord._DECLARED_FIELDS_SET, \
+            f'{name!r} should be a typed FileStatusRecord field'
+
+    # base-class fields still accessible (subclass inherits)
+    base = {'action', 'path', 'status', 'type', 'message',
+            'gitshasum', 'prev_gitshasum'}
+    for name in base:
+        assert name in FileStatusRecord._DECLARED_FIELDS_SET, \
+            f'{name!r} (base) should be inherited by FileStatusRecord'
+
+
+def test_file_status_record_construction():
+    from datalad.interface.results import FileStatusRecord
+
+    r = FileStatusRecord(
+        action='get', path='/x', status='ok', type='file',
+        bytesize=1234, key='SHA256E-s1234--abc',
+        annexkey='SHA256E-s1234--abc', has_content=True,
+        humansize='1.2 KB',
+    )
+    assert r.bytesize == 1234
+    assert r['bytesize'] == 1234
+    assert r.key == 'SHA256E-s1234--abc'
+    assert r['has_content'] is True
+    # still a StatusRecord and a Mapping
+    assert isinstance(r, StatusRecord)
+    from collections.abc import Mapping as _Mapping
+    assert isinstance(r, _Mapping)
+
+
+def test_file_status_record_from_kwargs():
+    """Permissive ``from_kwargs`` works on the subclass too: declared
+    fields go to attributes, the rest to ``_extras``."""
+    from datalad.interface.results import FileStatusRecord
+
+    r = FileStatusRecord.from_kwargs(
+        action='status', type='file', path='/x',
+        bytesize=99, custom_extra='hi',
+    )
+    assert r.bytesize == 99
+    assert r['custom_extra'] == 'hi'
+    assert 'custom_extra' not in FileStatusRecord._DECLARED_FIELDS_SET
+
+
+def test_sibling_status_record_declares_name():
+    from datalad.interface.results import SiblingStatusRecord
+    assert 'name' in SiblingStatusRecord._DECLARED_FIELDS_SET
+    r = SiblingStatusRecord(
+        action='configure-sibling', type='sibling', name='origin')
+    assert r.name == 'origin'
+    assert r['name'] == 'origin'
+    # url stayed in extras per the v2.6 decision (single call site at
+    # sweep time)
+    r['url'] = 'https://example.com'
+    assert r['url'] == 'https://example.com'
+    assert 'url' not in SiblingStatusRecord._DECLARED_FIELDS_SET
+
+
+def test_subclass_extras_keys_still_work():
+    """Hyphenated keys (``annex-ignore``, ``gitmodule_*``-with-hyphens)
+    must continue to flow through ``_extras`` on the subclasses, since
+    they cannot be Python identifiers."""
+    from datalad.interface.results import (
+        FileStatusRecord,
+        SiblingStatusRecord,
+    )
+
+    s = SiblingStatusRecord(name='origin')
+    s['annex-ignore'] = 'false'
+    s['annex-uuid'] = '00000000-...'
+    assert s['annex-ignore'] == 'false'
+    assert s['annex-uuid'] == '00000000-...'
+
+    f = FileStatusRecord(type='file')
+    f['some-weird-key'] = 1
+    assert f['some-weird-key'] == 1
+
+
+def test_subclass_isinstance_chain():
+    """Existing consumers that test ``isinstance(r, StatusRecord)`` must
+    still match subclass instances."""
+    from datalad.interface.results import (
+        FileStatusRecord,
+        SiblingStatusRecord,
+    )
+    assert isinstance(FileStatusRecord(), StatusRecord)
+    assert isinstance(SiblingStatusRecord(), StatusRecord)
 
 
 def test_unset_sentinel_is_not_visible():

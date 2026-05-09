@@ -623,6 +623,63 @@ set should be treated as a working hypothesis, not the final shape.
   not the grep — and any base-class fields that fail the data test
   are moved onto the appropriate subclass.
 
+##### Outcome (v2.6 landed in two sub-PRs)
+
+v2.6a — telemetry instrumentation: `StatusRecord` records every
+`_extras` write at construction (`__post_init__`) and post-construction
+(`__setitem__`) when `DATALAD_STATUSRECORD_TRACE=1` is set, dumping
+JSONL on process exit. Off by default; one cached-bool check on the
+hot path when off.
+
+v2.6b — sweep + decision. A 213-test sweep produced 1747 extras-key
+writes across 64 distinct keys. The aggregated report
+(`.git-meta/v26_report.md`) drove the field set as follows:
+
+**Field moves (off base):**
+
+| Field | Decision | Reason |
+|---|---|---|
+| `bytesize` | moved off base → `FileStatusRecord` | Runtime data + grep confirm strictly file-scoped |
+| `key` | moved off base → `FileStatusRecord` | Same |
+| `gitshasum` | **stays on base** | `gitrepo.py:2490` emits it for `type='dataset'` records too — cross-type |
+| `prev_gitshasum` | stays on base | Pairs with `gitshasum` |
+
+**Subclass introductions:**
+
+- `FileStatusRecord(StatusRecord)` — adds `bytesize`, `key` (moved
+  from base) plus the file-specific cluster from the sweep:
+  `annexkey` (9 frames, 213 occ), `backend`, `has_content`,
+  `hashdirlower`, `hashdirmixed`, `humansize`, `keyname`, `mtime`,
+  `objloc` (each 2 frames, ~4–22 occ).
+- `SiblingStatusRecord(StatusRecord)` — adds `name` (8 frames,
+  120 occ). `url` would be the natural pair but at sweep time has
+  only 1 producer call site; promote in a future PR if a second
+  producer adds it.
+
+**Subclasses parked again:**
+
+- `DatasetStatusRecord` — no field cluster meets the rule.
+  `contains` (5 frames, 44 occ) and `target` (5 frames, 141 occ)
+  are the only multi-frame dataset-typed extras, and they don't
+  cluster: `contains` is `subdataset`-only, `target` is
+  `publish`/`copy`. Each can be promoted individually if a future
+  data set shows broader use — keeping them in `_extras` for now
+  matches the rule.
+- `RunStatusRecord` — `run_info`, `msg_path`, `version_tag` are all
+  single-call-site (the static grep was wrong about a cluster).
+
+**Producer migration is out of scope for v2.6.** The subclasses
+exist and are tested; producers can opt in incrementally in v2.7+
+(or as side-effects of other refactors). Existing producers continue
+to work — they emit `StatusRecord` instances whose extras-keys still
+flow through `_extras`. Backward compat: `isinstance(r,
+StatusRecord)` is True for any subclass, so the central pipeline,
+hooks, JSON renderer, and Mapping consumers all behave identically.
+
+The sweep report at `.git-meta/v26_report.md` is preserved alongside
+the analyser script `.git-meta/analyze_v26_trace.py` so the
+methodology is reproducible.
+
 ### Phase 3 — opportunistic, no fixed timeline
 
 These are opt-in cleanups that do not affect the design and can land
