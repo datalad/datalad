@@ -164,13 +164,6 @@ jobs:
         # location
         run: sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
-      # TODO: remove - should not be needed
-      - name: Git-annex workaround for NFS mounts
-        run: |
-          if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]
-          then sudo git config --system annex.pidlock true
-          fi
-
       # Now it should be safe to point TMPDIR to a "tricky" setup just for the
       # purpose of testing
       - name: Point TMPDIR to "tricky" setup
