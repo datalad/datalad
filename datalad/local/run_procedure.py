@@ -17,7 +17,12 @@ import os.path as op
 import stat
 import sys
 from argparse import REMAINDER
+from collections.abc import Mapping
 from glob import iglob
+from importlib.resources import (
+    as_file,
+    files,
+)
 
 import datalad.support.ansi_colors as ac
 from datalad import cfg
@@ -46,11 +51,6 @@ from datalad.utils import (
     join_cmdline,
     quote_cmdlinearg,
     split_cmdline,
-)
-
-from importlib.resources import (
-    as_file,
-    files,
 )
 
 lgr = logging.getLogger('datalad.local.run_procedures')
@@ -382,9 +382,9 @@ class RunProcedure(Interface):
             return
 
 
-        if isinstance(spec, dict):
+        if isinstance(spec, Mapping):
             # Skip getting procedure implementation if called with a
-            # dictionary (presumably coming from --discover)
+            # mapping (presumably coming from --discover)
             procedure_file = spec['path']
             cmd_name = spec['procedure_name']
             cmd_tmpl = spec['procedure_callfmt']

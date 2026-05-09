@@ -18,6 +18,12 @@ import logging
 from collections.abc import (
     Iterable,
     Iterator,
+    MutableMapping,
+)
+from dataclasses import (
+    dataclass,
+    field,
+    fields,
 )
 from os.path import (
     isabs,
@@ -30,6 +36,7 @@ from os.path import (
 )
 from typing import (
     Any,
+    ClassVar,
     Optional,
 )
 
@@ -58,6 +65,234 @@ success_status_map = {
 }
 
 
+# ---------------------------------------------------------------------------
+# StatusRecord: typed result record that also implements MutableMapping
+#
+# Designed to be a drop-in replacement for the plain dict that
+# ``get_status_dict()`` historically returned. The class declares the
+# documented result-record fields (see ``docs/source/design/result_records.rst``)
+# as typed attributes, while any unknown / domain-specific keys are stored in
+# an internal ``_extras`` mapping so that:
+#
+#   * existing dict-style consumers (``r['k']``, ``r.get('k')``, ``'k' in r``,
+#     ``r['k'] = v``, ``dict(r)``, ``r.items()``, JSON serialization, hook
+#     match, pickling, etc.) keep working unchanged;
+#   * new code may use typed attribute access (``r.status``, ``r.path``);
+#   * the visible "key set" mirrors the old dict: a declared field is only
+#     reported as present when it has been explicitly set to a non-None value.
+#
+# See ``docs/designs/status-record.md`` for the migration plan.
+# ---------------------------------------------------------------------------
+
+# A sentinel to distinguish "field never set" from "explicitly set to None".
+# Plain ``None`` is a valid value for several fields (``message`` etc.) so we
+# need an unambiguous unset marker for declared fields. The marker is hidden
+# from external consumers: __getitem__/__contains__/__iter__ treat _UNSET as
+# "absent", and __setitem__ writing _UNSET routes through __delitem__.
+_UNSET: Any = object()
+
+
+@dataclass(eq=False)
+class StatusRecord(MutableMapping):
+    """Typed DataLad result record.
+
+    Behaves as both a dataclass (typed attribute access for declared fields)
+    and a :class:`MutableMapping` (dict-style access for backward
+    compatibility). Unknown / domain-specific keys are stored in an internal
+    extras mapping and are spliced into the Mapping view transparently.
+
+    Examples
+    --------
+    >>> r = StatusRecord(action='get', path='/x', status='ok')
+    >>> r['status']
+    'ok'
+    >>> r.status
+    'ok'
+    >>> 'status' in r
+    True
+    >>> r['custom'] = 42         # routed into extras
+    >>> r['custom']
+    42
+    >>> sorted(r.keys())
+    ['action', 'custom', 'path', 'status']
+    """
+
+    # --- documented result-record fields ---
+    # All default to a sentinel so that, just like the legacy dict, a field
+    # is only "present" once explicitly assigned a non-_UNSET value. The
+    # public type of each field is documented in
+    # ``docs/source/design/result_records.rst``; the runtime annotations stay
+    # ``Any`` to keep this v1 change minimal-diff and avoid forcing strict
+    # types on existing call sites that pass ``None`` etc.
+    action: Any = _UNSET
+    path: Any = _UNSET
+    status: Any = _UNSET
+    type: Any = _UNSET
+    message: Any = _UNSET
+    logger: Any = _UNSET
+    refds: Any = _UNSET
+    parentds: Any = _UNSET
+    state: Any = _UNSET
+    error_message: Any = _UNSET
+    exception: Any = _UNSET
+    exception_traceback: Any = _UNSET
+    exit_code: Any = _UNSET
+
+    # --- escape hatch for arbitrary action-specific keys ---
+    _extras: dict = field(default_factory=dict, repr=False)
+
+    # Declared field names in declaration order, plus a frozenset for O(1)
+    # membership tests. Computed once per class in __init_subclass__ / via
+    # the bootstrap below the class body for the base class. ClassVar keeps
+    # @dataclass from treating these as instance fields.
+    _DECLARED_FIELDS: ClassVar[tuple] = ()
+    _DECLARED_FIELDS_SET: ClassVar[frozenset] = frozenset()
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        cls._DECLARED_FIELDS = tuple(
+            f.name for f in fields(cls) if not f.name.startswith('_')
+        )
+        cls._DECLARED_FIELDS_SET = frozenset(cls._DECLARED_FIELDS)
+
+    # ---- permissive construction from arbitrary kwargs -----------------
+    @classmethod
+    def from_kwargs(
+        cls,
+        _mapping: Optional[Mapping] = None,
+        /,
+        **kwargs: Any,
+    ) -> 'StatusRecord':
+        """Construct from a mapping and/or arbitrary keyword arguments.
+
+        Mirrors :func:`dict` merge semantics: a positional mapping
+        provides the base, and keyword arguments override matching keys.
+        Unknown keys are routed into ``_extras``. Used by producers that
+        spread an existing result-kwargs dict and add or override fields,
+        e.g.::
+
+            yield StatusRecord.from_kwargs(res_kwargs, status='ok')
+
+        For the kwargs-only case (no base mapping), simply omit the
+        positional argument::
+
+            yield StatusRecord.from_kwargs(action='get', custom='v')
+        """
+        merged = dict(_mapping) if _mapping is not None else {}
+        merged.update(kwargs)
+        declared = {k: v for k, v in merged.items()
+                    if k in cls._DECLARED_FIELDS_SET}
+        extras = {k: v for k, v in merged.items()
+                  if k not in cls._DECLARED_FIELDS_SET}
+        return cls(**declared, _extras=extras)
+
+    # ---- MutableMapping protocol ------------------------------------
+    def __getitem__(self, key: str) -> Any:
+        if key in self._DECLARED_FIELDS_SET:
+            v = getattr(self, key)
+            if v is _UNSET:
+                raise KeyError(key)
+            return v
+        return self._extras[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if value is _UNSET:
+            # treat as deletion to keep "_UNSET means absent" invariant
+            try:
+                del self[key]
+            except KeyError:
+                pass
+            return
+        if key in self._DECLARED_FIELDS_SET:
+            setattr(self, key, value)
+        else:
+            self._extras[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        if key in self._DECLARED_FIELDS_SET:
+            if getattr(self, key) is _UNSET:
+                raise KeyError(key)
+            setattr(self, key, _UNSET)
+        else:
+            del self._extras[key]
+
+    def __iter__(self) -> Iterator[str]:
+        for name in self._DECLARED_FIELDS:
+            if getattr(self, name) is not _UNSET:
+                yield name
+        yield from self._extras
+
+    def __len__(self) -> int:
+        n = sum(1 for f in self._DECLARED_FIELDS
+                if getattr(self, f) is not _UNSET)
+        return n + len(self._extras)
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        if key in self._DECLARED_FIELDS_SET:
+            return getattr(self, key) is not _UNSET
+        return key in self._extras
+
+    def copy(self) -> 'StatusRecord':
+        """Return a shallow copy as a fresh ``StatusRecord`` (or subclass).
+
+        Mirrors ``dict.copy()`` for backward compatibility with code that
+        treats result records as dicts (e.g. test helpers like
+        ``_without_command`` in ``test_foreach_dataset.py`` that mutate
+        a copy of each result). The result is a new instance of the same
+        concrete class — ``FileStatusRecord.copy()`` returns a
+        ``FileStatusRecord`` — and ``_extras`` is also shallow-copied so
+        in-place mutation on the copy does not leak back.
+        """
+        return type(self).from_kwargs(self)
+
+    # ---- equality with dict and other StatusRecord ------------------
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, StatusRecord):
+            return dict(self) == dict(other)
+        if isinstance(other, dict):
+            return dict(self) == other
+        return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
+    # explicit __hash__ disabled (Mapping-style equality is mutation-sensitive)
+    __hash__ = None  # type: ignore[assignment]
+
+    # ---- pickling ---------------------------------------------------
+    # Default dataclass pickling round-trips ``__dict__`` verbatim, but the
+    # _UNSET sentinel does not survive identity comparison after unpickling
+    # (``object()`` instances become fresh objects). Round-trip via the
+    # public Mapping view instead.
+    def __getstate__(self) -> dict:
+        return dict(self)
+
+    def __setstate__(self, state: dict) -> None:
+        for name in self._DECLARED_FIELDS:
+            object.__setattr__(self, name, _UNSET)
+        object.__setattr__(self, '_extras', {})
+        for k, v in state.items():
+            self[k] = v
+
+    # ---- repr / debugging -------------------------------------------
+    def __repr__(self) -> str:
+        # mirror plain dict repr so log output etc. doesn't change shape
+        return f'{type(self).__name__}({dict(self)!r})'
+
+
+# bootstrap _DECLARED_FIELDS on the base class itself (__init_subclass__ only
+# runs for subclasses).
+StatusRecord._DECLARED_FIELDS = tuple(
+    f.name for f in fields(StatusRecord) if not f.name.startswith('_')
+)
+StatusRecord._DECLARED_FIELDS_SET = frozenset(StatusRecord._DECLARED_FIELDS)
+
+
 def get_status_dict(
     action: Optional[str] = None,
     ds: Optional[Dataset] = None,
@@ -70,14 +305,14 @@ def get_status_dict(
     exception: Exception | CapturedException | None = None,
     error_message: str | tuple | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> StatusRecord:
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
     # just for not shadowing the builtin `type` in this function
-    """Helper to create a result dictionary.
+    """Helper to create a result record.
 
-    Most arguments match their key in the resulting dict, and their given
-    values are simply assigned to the result record under these keys.  Only
+    Most arguments match their key in the resulting record, and their given
+    values are simply assigned to the record under these keys.  Only
     exceptions are listed here.
 
     Parameters
@@ -95,10 +330,14 @@ def get_status_dict(
 
     Returns
     -------
-    dict
+    StatusRecord
+        A record that behaves like a dict for backward-compatible
+        consumers (subscription, ``.get()``, ``in``, iteration, JSON
+        serialization, etc.) and exposes typed attributes for the
+        documented fields.
     """
 
-    d: dict[str, Any] = {}
+    d: StatusRecord = StatusRecord()
     if action is not None:
         d['action'] = action
     if ds:
