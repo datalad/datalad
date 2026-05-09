@@ -25,8 +25,13 @@ import pickle
 import pytest
 
 from datalad.interface.results import (
+    _TRACE_BUCKETS,
     _UNSET,
     StatusRecord,
+    _trace_dump,
+    _trace_enabled,
+    _trace_record_extra,
+    _trace_reset,
     get_status_dict,
 )
 
@@ -574,6 +579,131 @@ def test_strict_mode_status_none_allowed(monkeypatch):
     monkeypatch.setenv('DATALAD_STATUSRECORD_STRICT', '1')
     r = StatusRecord(status=None)        # accepted
     assert r.status is None
+
+
+# ---------------------------------------------------------------------------
+# v2.6: extras-key telemetry
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def trace_off(monkeypatch):
+    monkeypatch.delenv('DATALAD_STATUSRECORD_TRACE', raising=False)
+    _trace_reset()
+    yield
+    _trace_reset()
+
+
+@pytest.fixture
+def trace_on(monkeypatch):
+    monkeypatch.setenv('DATALAD_STATUSRECORD_TRACE', '1')
+    _trace_reset()
+    yield
+    _trace_reset()
+
+
+def test_trace_disabled_by_default(trace_off):
+    """No env var → trace is off → no buckets accumulate."""
+    assert not _trace_enabled()
+    r = StatusRecord.from_kwargs(action='get', custom='v')
+    r['post_extra'] = 1
+    assert dict(_TRACE_BUCKETS) == {}
+
+
+def test_trace_records_extras_at_construction(trace_on):
+    """from_kwargs(extras=...) → __post_init__ records each key."""
+    StatusRecord.from_kwargs(action='get', type='file',
+                             annexkey='ABC123', metadata={'k': 1})
+    keys = sorted(k for (k, _frame) in _TRACE_BUCKETS)
+    assert keys == ['annexkey', 'metadata']
+    # both record the producing action / type
+    for (k, _frame), bucket in _TRACE_BUCKETS.items():
+        assert bucket['count'] == 1
+        assert bucket['actions'] == {'get': 1}
+        assert bucket['types'] == {'file': 1}
+
+
+def test_trace_records_extras_post_construction(trace_on):
+    """r['unknown_key'] = v records via __setitem__ path."""
+    r = StatusRecord(action='configure-sibling', type='sibling')
+    r['name'] = 'origin'
+    r['url'] = 'https://example.com'
+    keys = sorted(k for (k, _frame) in _TRACE_BUCKETS)
+    assert keys == ['name', 'url']
+    for (k, _frame), bucket in _TRACE_BUCKETS.items():
+        assert bucket['actions'] == {'configure-sibling': 1}
+        assert bucket['types'] == {'sibling': 1}
+
+
+def test_trace_does_not_record_declared_field_assignment(trace_on):
+    """Declared-field writes don't go into telemetry — they're typed."""
+    r = StatusRecord(action='get', path='/x', status='ok')
+    r['status'] = 'notneeded'
+    r.path = '/y'
+    assert dict(_TRACE_BUCKETS) == {}
+
+
+def test_trace_aggregates_repeated_writes(trace_on):
+    """Same key from same frame → single bucket with count > 1."""
+    for i in range(5):
+        r = StatusRecord.from_kwargs(action='get', custom_key=i)
+    # all five constructions go through the same call site
+    buckets = list(_TRACE_BUCKETS.values())
+    assert len(buckets) == 1
+    assert buckets[0]['count'] == 5
+    assert buckets[0]['value_types'] == {'int': 5}
+
+
+def test_trace_value_type_diversity(trace_on):
+    """Mixed value types in the same key, from the same call site, get
+    aggregated; ``value_types`` records the diversity. Same call site
+    means same source line — call from a helper to fix the line."""
+    def _emit(v):
+        return StatusRecord.from_kwargs(action='get', custom_key=v)
+    _emit('string')
+    _emit(42)
+    buckets = list(_TRACE_BUCKETS.values())
+    assert len(buckets) == 1                    # same (key, frame)
+    assert buckets[0]['value_types'] == {'str': 1, 'int': 1}
+
+
+def test_trace_distinct_frames_separate_buckets(trace_on):
+    """Same key from different source lines → distinct buckets. This
+    is the property that lets the v2.6 sweep aggregate per-call-site."""
+    StatusRecord.from_kwargs(action='get', custom_key=1)  # call A
+    StatusRecord.from_kwargs(action='get', custom_key=2)  # call B
+    assert len(_TRACE_BUCKETS) == 2
+
+
+def test_trace_examples_truncated_to_three(trace_on):
+    """At most three example values per (key, frame) — bounded memory."""
+    for i in range(10):
+        StatusRecord.from_kwargs(action='get', sample=f'value-{i}')
+    bucket = next(iter(_TRACE_BUCKETS.values()))
+    assert len(bucket['examples']) == 3
+
+
+def test_trace_dump_writes_jsonl(trace_on, tmp_path, monkeypatch):
+    """_trace_dump() serialises buckets to JSONL at the configured path."""
+    out = tmp_path / 'trace.jsonl'
+    monkeypatch.setenv('DATALAD_STATUSRECORD_TRACE_PATH', str(out))
+    StatusRecord.from_kwargs(action='get', custom='v')
+    _trace_dump()
+    assert out.exists()
+    lines = out.read_text().splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec['key'] == 'custom'
+    assert rec['count'] == 1
+    assert rec['actions'] == {'get': 1}
+    assert rec['value_types'] == {'str': 1}
+
+
+def test_trace_dump_noop_when_disabled(trace_off, tmp_path, monkeypatch):
+    """No file written when trace is off, even if buckets exist."""
+    out = tmp_path / 'trace.jsonl'
+    monkeypatch.setenv('DATALAD_STATUSRECORD_TRACE_PATH', str(out))
+    _trace_dump()
+    assert not out.exists()
 
 
 def test_in_the_wild_fields_are_typed_attributes():

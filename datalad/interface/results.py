@@ -14,8 +14,12 @@ from __future__ import annotations
 
 __docformat__ = 'restructuredtext'
 
+import atexit
+import json
 import logging
 import os
+import traceback
+from collections import defaultdict
 from collections.abc import (
     Iterable,
     Iterator,
@@ -80,6 +84,157 @@ def _strict_mode_enabled() -> bool:
     """
     v = os.environ.get('DATALAD_STATUSRECORD_STRICT', '').strip().lower()
     return v in ('1', 'true', 'yes')
+
+
+# ---------------------------------------------------------------------------
+# v2.6: runtime extras-key telemetry
+#
+# When ``DATALAD_STATUSRECORD_TRACE=1`` is set in the environment, every
+# write of a key into ``StatusRecord._extras`` is recorded with the
+# topmost in-tree call site, the producing ``action`` / ``type`` (where
+# known on the record at that point), the value's Python type, and a
+# few example values. On process exit the accumulated buckets are
+# serialised to JSONL at ``DATALAD_STATUSRECORD_TRACE_PATH`` (default
+# ``/tmp/datalad_statusrecord_trace.jsonl``).
+#
+# The output drives the v2.6 promote-or-subclass redo per
+# ``docs/designs/status-record.md``: a static grep is structurally
+# incomplete (it misses dynamic key construction in addurls, helpers
+# that spread ``**res_kwargs`` from closures, etc.); the runtime audit
+# replaces it with real data.
+#
+# When trace is off (the default), the only cost on the hot path is
+# one cached-bool check.
+# ---------------------------------------------------------------------------
+
+# Frames inside these files are skipped when locating the producer call
+# site — they are part of the StatusRecord plumbing, not the producer.
+_TRACE_SKIP_FILES = (
+    'datalad/interface/results.py',
+    'datalad/interface/utils.py',
+    # standard library / framework frames are skipped via the
+    # 'datalad/' substring check below
+)
+
+_TRACE_ENABLED: Optional[bool] = None
+_TRACE_BUCKETS: dict = defaultdict(lambda: {
+    'count': 0,
+    'actions': defaultdict(int),
+    'types': defaultdict(int),
+    'value_types': defaultdict(int),
+    'examples': [],
+})
+
+
+def _trace_enabled() -> bool:
+    """Whether runtime extras-key telemetry is on.
+
+    Controlled by ``DATALAD_STATUSRECORD_TRACE`` (truthy: ``1`` /
+    ``true`` / ``yes``). The result is cached on first read so the hot
+    path stays cheap when off.
+    """
+    global _TRACE_ENABLED
+    if _TRACE_ENABLED is None:
+        v = os.environ.get(
+            'DATALAD_STATUSRECORD_TRACE', '').strip().lower()
+        _TRACE_ENABLED = v in ('1', 'true', 'yes')
+    return _TRACE_ENABLED
+
+
+def _trace_reset() -> None:
+    """Clear cached enabled-state and accumulated buckets.
+
+    Test-only helper; resets module state between sweeps so unit tests
+    can drive the env var with ``monkeypatch``.
+    """
+    global _TRACE_ENABLED
+    _TRACE_ENABLED = None
+    _TRACE_BUCKETS.clear()
+
+
+def _trace_top_frame() -> str:
+    """Find the topmost in-tree call site, skipping plumbing frames.
+
+    Walks the stack from innermost to outermost and returns the
+    deepest frame inside ``datalad/`` that is *not* part of the
+    StatusRecord plumbing. Returned as ``"datalad/...:lineno"`` so it
+    groups well in the JSONL output. Returns ``<no-in-tree-caller>``
+    if the call stack contains no datalad/ producer frame (synthetic
+    REPL invocations, third-party callers, etc.).
+    """
+    for frame in reversed(traceback.extract_stack()):
+        path = frame.filename
+        if 'datalad/' not in path:
+            continue
+        if any(skip in path for skip in _TRACE_SKIP_FILES):
+            continue
+        idx = path.rfind('datalad/')
+        return f"{path[idx:]}:{frame.lineno}"
+    return '<no-in-tree-caller>'
+
+
+def _trace_record_extra(
+    key: str,
+    value: Any,
+    action: Any,
+    type_: Any,
+) -> None:
+    """Record a single extras-key write. No-op when trace is off."""
+    if not _trace_enabled():
+        return
+    frame = _trace_top_frame()
+    bucket = _TRACE_BUCKETS[(key, frame)]
+    bucket['count'] += 1
+    if action is not None and action is not _UNSET:
+        bucket['actions'][str(action)] += 1
+    if type_ is not None and type_ is not _UNSET:
+        bucket['types'][str(type_)] += 1
+    bucket['value_types'][type(value).__name__] += 1
+    if len(bucket['examples']) < 3:
+        try:
+            bucket['examples'].append(repr(value)[:200])
+        except Exception:
+            pass
+
+
+def _trace_dump() -> None:
+    """Serialise accumulated extras-key buckets to JSONL.
+
+    Runs at process exit via ``atexit``. Also callable explicitly for
+    test harnesses. No-op when trace is off or no records were
+    captured. Output path is ``DATALAD_STATUSRECORD_TRACE_PATH`` or
+    ``/tmp/datalad_statusrecord_trace.jsonl``.
+    """
+    if not _trace_enabled() or not _TRACE_BUCKETS:
+        return
+    path = os.environ.get(
+        'DATALAD_STATUSRECORD_TRACE_PATH',
+        '/tmp/datalad_statusrecord_trace.jsonl')
+    try:
+        with open(path, 'w') as f:
+            for (key, frame), bucket in sorted(_TRACE_BUCKETS.items()):
+                rec = {
+                    'key': key,
+                    'frame': frame,
+                    'count': bucket['count'],
+                    'actions': dict(bucket['actions']),
+                    'types': dict(bucket['types']),
+                    'value_types': dict(bucket['value_types']),
+                    'examples': bucket['examples'],
+                }
+                f.write(json.dumps(rec) + '\n')
+        # also leave a hint in the log so humans notice the file
+        lgr.info(
+            'StatusRecord extras-key telemetry written to %s '
+            '(%d distinct (key, frame) clusters)',
+            path, len(_TRACE_BUCKETS))
+    except Exception as exc:
+        # best-effort; do not break process exit on telemetry I/O
+        lgr.debug(
+            'StatusRecord telemetry dump failed: %s', exc)
+
+
+atexit.register(_trace_dump)
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +336,16 @@ class StatusRecord(MutableMapping):
         )
         cls._DECLARED_FIELDS_SET = frozenset(cls._DECLARED_FIELDS)
 
+    def __post_init__(self) -> None:
+        # v2.6 telemetry: record any pre-loaded extras at construction time
+        # so we capture from_kwargs / direct ``StatusRecord(_extras=...)``
+        # call paths in addition to post-construction __setitem__ paths.
+        if self._extras and _trace_enabled():
+            action = getattr(self, 'action', _UNSET)
+            type_ = getattr(self, 'type', _UNSET)
+            for k, v in self._extras.items():
+                _trace_record_extra(k, v, action, type_)
+
     # ---- permissive construction from arbitrary kwargs -----------------
     @classmethod
     def from_kwargs(
@@ -234,10 +399,17 @@ class StatusRecord(MutableMapping):
         # DATALAD_STATUSRECORD_STRICT=1. Status-value validation is in
         # __setattr__ so it catches both dict-style and dataclass-init
         # paths.
-        if key not in self._DECLARED_FIELDS_SET and _strict_mode_enabled():
-            lgr.warning(
-                "StatusRecord: unknown key %r assigned to extras "
-                "(strict mode is on)", key)
+        if key not in self._DECLARED_FIELDS_SET:
+            if _strict_mode_enabled():
+                lgr.warning(
+                    "StatusRecord: unknown key %r assigned to extras "
+                    "(strict mode is on)", key)
+            # v2.6 telemetry: record post-construction extras writes.
+            # No-op when DATALAD_STATUSRECORD_TRACE is off.
+            _trace_record_extra(
+                key, value,
+                getattr(self, 'action', _UNSET),
+                getattr(self, 'type', _UNSET))
         if key in self._DECLARED_FIELDS_SET:
             setattr(self, key, value)
         else:
