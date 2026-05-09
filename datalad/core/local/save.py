@@ -34,6 +34,7 @@ from datalad.interface.common_opts import (
     recursion_limit,
     save_message_opt,
 )
+from datalad.interface.results import StatusRecord
 from datalad.interface.utils import (
     discover_dataset_trace_to_targets,
     get_tree_roots,
@@ -371,12 +372,12 @@ class Save(Interface):
                 yield from save_ds((ds.pathobj, dict()), version_tag=version_tag)
 
             else:
-                yield dict(action='save',
-                           type='dataset',
-                           path=ds.path,
-                           refds=ds.path,
-                           status='notneeded',
-                           logger=lgr)
+                yield StatusRecord(action='save',
+                                   type='dataset',
+                                   path=ds.path,
+                                   refds=ds.path,
+                                   status='notneeded',
+                                   logger=lgr)
             return
 
         # TODO: in principle logging could be improved to go not by a dataset
