@@ -12,7 +12,9 @@ import logging
 import os
 import platform
 import random
+import signal
 import sys
+import time
 
 try:
     # optional direct dependency we might want to kick out
@@ -78,6 +80,7 @@ from datalad.tests.utils_pytest import (
     rmtemp,
     run_under_dir,
     serve_path_via_http,
+    signal_timeout,
     skip_if,
     skip_if_no_module,
     skip_if_no_network,
@@ -706,3 +709,65 @@ def test_assert_raises():
 
     assert_raises((ValueError, TypeError), raise_TypeError)
     assert_raises((ValueError, TypeError), raise_ValueError)
+
+
+#
+# signal_timeout
+#
+
+_HAS_SIGALRM = hasattr(signal, "SIGALRM")
+
+
+@pytest.mark.skipif(not _HAS_SIGALRM, reason="needs SIGALRM (Unix)")
+@pytest.mark.parametrize(
+    ("budget", "block_for", "expect_timeout"),
+    [
+        (1.0, 0.05, False),    # finishes well under budget
+        (0.5, 0.0, False),     # zero-cost block, never sleeps
+        (0.05, 0.5, True),     # block exceeds tight budget
+        (0.1, 1.0, True),      # block clearly exceeds budget
+    ],
+    ids=["under_budget", "instant", "tight_over", "clear_over"],
+)
+def test_signal_timeout_fires(budget, block_for, expect_timeout):
+    t0 = time.monotonic()
+    if expect_timeout:
+        with assert_raises(TimeoutError) as cm:
+            with signal_timeout(budget):
+                time.sleep(block_for)
+        # message reports the configured budget
+        assert_in(str(budget), str(cm.value))
+        # fired at roughly the budget, not after the full sleep
+        elapsed = time.monotonic() - t0
+        ok_(elapsed < block_for, msg=f"elapsed={elapsed} block_for={block_for}")
+        ok_(elapsed >= budget * 0.9,
+            msg=f"fired too early: elapsed={elapsed} budget={budget}")
+    else:
+        with signal_timeout(budget):
+            time.sleep(block_for)
+
+
+@pytest.mark.skipif(not _HAS_SIGALRM, reason="needs SIGALRM (Unix)")
+def test_signal_timeout_disarms_on_clean_exit():
+    """No alarm machinery is left armed after a successful exit."""
+    with signal_timeout(60):
+        pass
+    eq_(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
+
+
+@pytest.mark.skipif(not _HAS_SIGALRM, reason="needs SIGALRM (Unix)")
+def test_signal_timeout_disarms_on_user_exception():
+    """Alarm is disarmed even when the with-block raises a non-timeout error."""
+    with assert_raises(RuntimeError):
+        with signal_timeout(60):
+            raise RuntimeError("boom")
+    eq_(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
+
+
+def test_signal_timeout_noop_without_sigalrm(monkeypatch):
+    """On platforms lacking SIGALRM the helper is a no-op (does not raise)."""
+    monkeypatch.delattr(signal, "SIGALRM", raising=False)
+    # Tight budget + non-trivial block; if the helper were active it would fire,
+    # but with SIGALRM removed it must be a pure no-op.
+    with signal_timeout(0.001):
+        time.sleep(0.05)
